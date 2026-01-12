@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Animales - Gecko Dev</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+        /* Estilos específicos para badges de estado estilo imagen.png */
+        .badge-status { font-size: 8px; font-weight: 900; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+    </style>
+
+    <script type="module">
+        import { initAnimalesPage } from '../../dist/js/pages/admin/animales.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../dist/js/auth.js';
+        import { showLoader } from '../../dist/js/components/LoaderComponent.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            showLoader();
+            Auth.checkAccess([1, 2, 4]); // Roles permitidos
+            initMenu();
+            initAnimalesPage(); 
+        });
+    </script>
+</head>
+<body>
+    <div class="container-fluid my-5 px-4 px-md-5">
+        <div class="card shadow-sm border-0 p-4">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted">URBE</li>
+                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item active">
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Gestión Animales</span>
+                    </li>
+                </ol>
+            </nav>
+
+            <h5 class="fw-bold mb-4">Registro de Animales</h5>
+
+           <div class="row align-items-end mb-4 pb-3 border-bottom">
+    <div class="input-group shadow-sm" style="max-width: 950px;">
+        
+        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Estado:</span>
+        <select id="filter-status-animal" class="form-select form-select-sm fw-bold">
+            <option value="all">TODOS LOS ESTADOS</option>
+            <option value="Sin estado">Sin estado</option>
+            <option value="Proceso">Proceso</option>
+            <option value="Reservado">Reservado</option>
+            <option value="Listo para entrega">Listo para entrega</option>
+            <option value="Entregado">Entregado</option>
+            <option value="Suspendido">Suspendido</option>
+        </select>
+
+        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
+        <select id="filter-column-animal" class="form-select form-select-sm fw-bold" style="max-width: 160px;">
+            <option value="all">TODOS LOS CAMPOS</option>
+            <option value="idformA">ID</option>
+            <option value="TipoNombre">TIPO</option>
+            <option value="Investigador">INVESTIGADOR</option>
+            <option value="NProtocolo">N° PROTOCOLO</option>
+            <option value="CatEspecie">ESPECIE</option>
+            <option value="Aclaracion">ACLARACIÓN</option>
+            <option value="QuienVio">QUIÉN VIO</option>
+        </select>
+        
+        <input type="text" id="search-input-animal" class="form-control form-control-sm" placeholder="Escribe para buscar...">
+        <button id="btn-search-animal" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;">Buscar</button>
+    </div>
+    <div class="col-md-1"></div>
+
+    <div class="col-md-2 d-flex gap-2 justify-content-end">
+        <button id="btn-excel-animal" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" title="Exportar Excel">
+            <i class="bi bi-file-earmark-excel me-1"></i> EXCEL
+        </button>
+        <button id="btn-ayuda-animal" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" title="Guía de ayuda">
+            <i class="bi bi-question-circle me-1"></i> AYUDA
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle border" style="font-size: 11px;">
+        <thead class="table-light text-uppercase">
+            <tr>
+                <th data-key="idformA" data-sortable="true" class="py-3 px-2">ID</th>
+                <th data-key="TipoNombre" data-sortable="true" class="py-3 px-2">Tipo</th>
+                <th data-key="Investigador" data-sortable="true" class="py-3 px-2">Investigador</th>
+                <th data-key="NProtocolo" data-sortable="true" class="py-3 px-2">N Protocolo</th>
+                <th data-key="Edad" data-sortable="true" class="py-3 px-2">Edad</th>
+                <th data-key="CatEspecie" data-sortable="true" class="py-3 px-2">Cat Especie</th>
+                <th data-key="CantAnimal" data-sortable="true" class="py-3 px-2 text-center">Cant. Animal</th>
+                <th data-key="Inicio" data-sortable="true" class="py-3 px-2">Inicio</th>
+                <th data-key="Retiro" data-sortable="true" class="py-3 px-2">Retiro</th>
+                <th data-key="Aclaracion" data-sortable="true" class="py-3 px-2">Aclaración</th>
+                <th data-key="QuienVio" data-sortable="true" class="py-3 px-2">Quién vio</th>
+                <th data-key="estado" data-sortable="true" class="py-3 px-2 text-center">Estado</th>
+            </tr>
+        </thead>
+        <tbody id="table-body-animals"></tbody>
+    </table>
+</div>
+
+            <nav aria-label="Page navigation" class="mt-5">
+                <ul id="pagination-animal" class="pagination pagination-sm justify-content-center"></ul>
+            </nav>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-animal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 border-top border-5 border-success shadow-lg">
+                <div id="modal-content-animal" class="modal-body p-4 p-md-5"></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modal-excel-animal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white py-2">
+                    <h6 class="modal-title fw-bold small uppercase">Exportar a Excel</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <label class="form-label small fw-bold text-muted">Desde:</label>
+                    <input type="date" id="excel-start-date" class="form-control form-control-sm mb-2">
+                    
+                    <label class="form-label small fw-bold text-muted">Hasta:</label>
+                    <input type="date" id="excel-end-date" class="form-control form-control-sm">
+                </div>
+                <div class="modal-footer p-2 border-top-0">
+                    <button type="button" class="btn btn-light btn-sm px-3 fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="button" class="btn btn-success btn-sm px-3 fw-bold" onclick="window.processExcelExport()">DESCARGAR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modal-animal-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white py-2">
+                    <h5 class="modal-title fw-bold">Guía de Gestión de Animales Vivos</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="help-item mb-4">
+                        <h6 class="fw-bold text-success border-bottom pb-1">1. BÚSQUEDA Y FILTROS INTELIGENTES</h6>
+                        <p class="small text-muted">Utilice la barra superior para localizar pedidos rápidamente por Investigador, Protocolo o Estado. Los filtros se aplican en tiempo real sobre la grilla.</p>
+                    </div>
+
+                    <div class="help-item mb-4">
+                        <h6 class="fw-bold text-success border-bottom pb-1">2. GESTIÓN DE ESTADOS Y NOTAS ADMIN</h6>
+                        <p class="small text-muted">Al abrir un pedido, puede cambiar el estado (Proceso, Reservado, Entregado, etc.). Las <strong>Aclaraciones Admin</strong> se guardan automáticamente al perder el foco del campo.</p>
+                    </div>
+
+                    <div class="help-item mb-4">
+                        <h6 class="fw-bold text-success border-bottom pb-1">3. CÁLCULO DE PRECIOS Y EXENCIONES</h6>
+                        <p class="small text-muted">El sistema calcula el precio total basándose en la subespecie y la cantidad. Si el pedido pertenece a una categoría exenta, el sistema mostrará automáticamente el aviso <strong>EXENTO DE PAGO (100%)</strong>.</p>
+                    </div>
+
+                    <div class="help-item mb-4">
+                        <h6 class="fw-bold text-success border-bottom pb-1">4. NOTIFICACIONES POR CORREO</h6>
+                        <p class="small text-muted">Utilice el botón <strong>NOTIFICAR</strong> para enviar un correo automático al investigador con los detalles del pedido y sus observaciones.</p>
+                    </div>
+
+                    <div class="help-item mb-4">
+                        <h6 class="fw-bold text-success border-bottom pb-1">5. FICHA TÉCNICA EN PDF Y EXCEL</h6>
+                        <p class="small text-muted">El botón PDF genera una hoja oficial con el membrete institucional. El botón Excel permite descargar los datos filtrados por un rango de fechas específico.</p>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button class="btn btn-success px-5 fw-bold" data-bs-dismiss="modal">ENTENDIDO</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

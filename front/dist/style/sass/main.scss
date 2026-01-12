@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.menu-personalizado {
+    @apply bg-green_one p-4;
+}

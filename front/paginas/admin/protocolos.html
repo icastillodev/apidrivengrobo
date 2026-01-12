@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Protocolos - Gecko Dev</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+    </style>
+
+    <script type="module">
+        import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../dist/js/auth.js';
+        import { showLoader } from '../../dist/js/components/LoaderComponent.js'; // <-- Importar
+
+        document.addEventListener('DOMContentLoaded', () => {
+            showLoader(); // <-- Ejecutar al inicio
+            Auth.checkAccess([1, 2, 4]);
+            initMenu();
+            initProtocolosPage(); // Dispara la carga de protocolos
+        });
+    </script>
+</head>
+<body>
+    <div class="container my-5">
+        <div class="card shadow-sm border-0 p-4 p-md-5">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted">URBE</li>
+                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item active">
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Protocolos</span>
+                    </li>
+                </ol>
+            </nav>
+
+            <div class="row align-items-end mb-4 pb-3 border-bottom">
+                <div class="input-group shadow-sm" style="max-width: 800px;">
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Ceuas:</span>
+                    <select id="filter-origin" class="form-select form-select-sm fw-bold" style="max-width: 160px;">
+                        <option value="all">TODOS</option>
+                        <option value="interno">INSTITUCIONALES</option>
+                        <option value="externo">OTROS CEUAS</option>
+                    </select>
+
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
+                    <select id="filter-type-prot" class="form-select form-select-sm fw-bold" style="max-width: 140px;">
+                        <option value="all">TODOS LOS CAMPOS</option>
+                        <option value="idprotA">ID</option>
+                        <option value="nprotA">N° PROTOCOLO</option>
+                        <option value="tituloA">TÍTULO</option>
+                        <option value="InvestigadorACargA">RESP. PROYECTO</option>
+                        <option value="ApellidoA">RESP. PROTOCOLO</option>
+                        <option value="EspeciesList">ESPECIES</option>
+                        <option value="DeptoBusqueda">DEPARTAMENTO</option> 
+                        <option value="TipoNombre">TIPO </option>
+                        <option value="SeveridadNombre">SEVERIDAD</option>
+                    </select>
+                    
+                    <input type="text" id="search-input-prot" class="form-control form-control-sm" placeholder="Escribe...">
+                    <button id="btn-search-prot" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;">Buscar</button>
+                </div>
+                <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                    <button class="btn btn-primary btn-sm fw-bold px-3 uppercase" onclick="openProtocolModal(null)">+ Nuevo</button>
+                    <button id="btn-excel-prot" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase">Excel</button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btn-ayuda-prot">AYUDA</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border" style="font-size: 11px;">
+                    <thead class="table-light text-uppercase">
+                        <tr>
+                            <th data-key="idprotA" data-sortable="true" class="py-3 px-2">ID</th>
+                            <th data-key="nprotA" data-sortable="true" class="py-3 px-2">N Protocolo</th>
+                            <th data-key="tituloA" data-sortable="true" class="py-3 px-2">Título</th>
+                            <th data-key="ApellidoA" data-sortable="true" class="py-3 px-2">Resp. Proy</th>
+                            <th data-key="encargaprot" class="py-3 px-2">Resp. Prot</th>
+                            <th data-key="CantidadAniA" class="py-3 px-2 text-center">Ani. Aprob</th>
+                            <th data-key="especie" class="py-3 px-2">Especies</th>
+                            <th data-key="departamento" class="py-3 px-2">Depto</th>
+                            <th data-key="tipoprotocolo" class="py-3 px-2 text-center">Tipo</th>
+                            <th data-key="FechaFinProtA" class="py-3 px-2">Vencimiento</th>
+                            <th data-key="severidad" class="py-3 px-2">Severidad</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body-protocols"></tbody>
+                </table>
+            </div>
+
+            <nav aria-label="Page navigation" class="mt-5">
+                <ul id="pagination-prot" class="pagination pagination-sm justify-content-center"></ul>
+            </nav>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-protocol" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 border-top border-5 border-primary shadow-lg">
+                <div id="modal-content-prot" class="modal-body p-4 p-md-5"></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modal-protocol-help" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white py-3">
+                <h5 class="modal-title fw-bold">Guía de Gestión de Protocolos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-4">
+                    <h6 class="fw-bold text-success text-uppercase small">1. Búsqueda y Filtros Inteligentes</h6>
+                    <p class="text-muted small">
+                        Utilice las herramientas de la barra superior para localizar protocolos rápidamente:<br>
+                        <strong>Criterio de Búsqueda:</strong> Filtre por Título, Número o Responsables.<br>
+                        <strong>Filtro Origen:</strong> Use "Internos" para ver protocolos del CEUA local o "Otros CEUAS" para externos.
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="fw-bold text-success text-uppercase small">2. Alta y Edición de Protocolos</h6>
+                    <p class="text-muted small">
+                        Haga clic sobre cualquier fila para editar o en el botón "Nuevo" para crear:<br>
+                        <strong>Responsables:</strong> Diferencie entre el Investigador (Texto libre) y el Responsable del Protocolo (Usuario del sistema).<br>
+                        <strong>Seguridad:</strong> El sistema bloquea especies duplicadas en un mismo protocolo para evitar errores de stock.
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <h6 class="fw-bold text-success text-uppercase small">3. Otros CEUAS (Protocolos Externos)</h6>
+                    <p class="text-muted small">
+                        Si activa el switch de <strong>Otros CEUAS</strong>, el sistema le permitirá ingresar un departamento de forma manual. 
+                        Tenga en cuenta que estos registros no se suman a las estadísticas de pago internas ni reportes por división administrativa.
+                    </p>
+                </div>
+
+            <div class="mb-4">
+                <h6 class="fw-bold text-success text-uppercase small">4. Ficha Técnica en PDF</h6>
+                <p class="text-muted small">
+                    Al editar cualquier protocolo existente, encontrará el botón <strong>FICHA PDF</strong> en la parte superior derecha. 
+                    Este documento genera una hoja oficial con el membrete de su institución, ideal para archivos físicos o auditorías externas.
+                </p>
+            </div>
+
+            <div class="mb-0">
+                <h6 class="fw-bold text-success text-uppercase small">5. Exportación de Datos</h6>
+                <p class="text-muted small">
+                    El botón <strong>Excel</strong> descargará únicamente lo que esté viendo en pantalla (aplicando sus búsquedas y filtros actuales).
+                </p>
+            </div>
+            </div>
+            <div class="modal-footer border-0 p-4">
+                <button type="button" class="btn btn-success w-100 py-2 fw-bold" data-bs-dismiss="modal">ENTENDIDO</button>
+            </div>
+        </div>
+    </div>
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<?php
+namespace App\Models\Protocol;
+
+use PDO;
+
+class ProtocolModel {
+    private $db;
+
+    public function __construct($db) {
+        $this->db = $db;
+    }
+
+    /**
+     * 1. MÉTODO PARA LA TABLA PRINCIPAL (GRILLA)
+     */
+
+    // api/src/Models/Protocol/ProtocolModel.php
+
+    public function getByInstitution($instId) {
+        $sql = "SELECT 
+                    pe.*, 
+                    pe.idprotA, pe.nprotA, pe.tituloA, pe.CantidadAniA as AniAprob, 
+                    pe.encargaprot as RespProt, 
+                    ts.NombreSeveridad as SeveridadNombre,
+                    pe.FechaFinProtA as Vencimiento,
+                    pe.protocoloexpe as IsExterno,
+                    pe.departamento as DeptoOriginal, -- Texto manual si es externo
+                    tp.NombreTipoprotocolo as TipoNombre, 
+                    p.NombreA, p.ApellidoA,
+                    -- Lógica para obtener el nombre del departamento interno vía protdeptor
+                    (SELECT d.NombreDeptoA 
+                    FROM protdeptor pd 
+                    JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA 
+                    WHERE pd.idprotA = pe.idprotA LIMIT 1) as DeptoInterno,
+                    COALESCE(
+                        (SELECT GROUP_CONCAT(e.EspeNombreA SEPARATOR ', ') 
+                        FROM protesper pre 
+                        JOIN especiee e ON pre.idespA = e.idespA 
+                        WHERE pre.idprotA = pe.idprotA),
+                        pe.especie
+                    ) as EspeciesList
+                FROM protocoloexpe pe
+                LEFT JOIN personae p ON pe.IdUsrA = p.IdUsrA
+                LEFT JOIN tipoprotocolo tp ON pe.tipoprotocolo = tp.idtipoprotocolo
+                LEFT JOIN tiposeveridad ts ON pe.severidad = ts.IdSeveridadTipo
+                WHERE pe.IdInstitucion = ?
+                ORDER BY pe.idprotA DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    /**
+     * 2. MÉTODO PARA EL FORMULARIO (MODAL)
+     */
+    public function getFormData($instId) {
+        // Usuarios filtrados: Nombre/Apellido >= 3 letras y sin caracteres especiales
+        $sqlUsers = "SELECT p.IdUsrA, p.ApellidoA, p.NombreA, 
+                            d.NombreDeptoA, o.NombreOrganismoSimple 
+                     FROM personae p
+                     JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
+                     LEFT JOIN departamentoe d ON p.LabA = d.iddeptoA
+                     LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
+                     WHERE u.IdInstitucion = ? 
+                       AND TRIM(p.NombreA) NOT REGEXP '^[., ]*$' 
+                       AND LENGTH(TRIM(p.NombreA)) >= 3 
+                       AND LENGTH(TRIM(p.ApellidoA)) >= 3
+                     ORDER BY p.ApellidoA ASC";
+        $stmtUser = $this->db->prepare($sqlUsers);
+        $stmtUser->execute([$instId]);
+        $users = $stmtUser->fetchAll(PDO::FETCH_ASSOC);
+
+        // Especies principales
+        $stmtEsp = $this->db->prepare("SELECT idespA, EspeNombreA FROM especiee WHERE IdInstitucion = ?");
+        $stmtEsp->execute([$instId]);
+        $species = $stmtEsp->fetchAll(PDO::FETCH_ASSOC);
+
+        // Severidades
+        $stmtSev = $this->db->query("SELECT IdSeveridadTipo, NombreSeveridad FROM tiposeveridad");
+        $severities = $stmtSev->fetchAll(PDO::FETCH_ASSOC);
+
+        // Tipos de Protocolo
+        $stmtTipos = $this->db->prepare("SELECT idtipoprotocolo, NombreTipoprotocolo FROM tipoprotocolo WHERE IdInstitucion = ?");
+        $stmtTipos->execute([$instId]);
+        $types = $stmtTipos->fetchAll(PDO::FETCH_ASSOC);
+
+        // Departamentos
+        $stmtDepto = $this->db->prepare("SELECT iddeptoA, NombreDeptoA FROM departamentoe WHERE IdInstitucion = ?");
+        $stmtDepto->execute([$instId]);
+        $depts = $stmtDepto->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmtInst = $this->db->prepare("SELECT otrosceuas, NombreCompletoInst FROM institucion WHERE IdInstitucion = ?");
+        $stmtInst->execute([$instId]);
+        $instConfig = $stmtInst->fetch(PDO::FETCH_ASSOC);
+
+        return [
+            'users' => $users,
+            'species' => $species,
+            'severities' => $severities,
+            'types' => $types,
+            'depts' => $depts,
+            'otrosceuas_enabled' => ($instConfig && $instConfig['otrosceuas'] != 2),
+            'NombreCompletoInst' => $instConfig['NombreCompletoInst'] ?? 'Institución' // Nuevo dato
+        ];
+    }
+    public function getProtocolSpecies($idprotA) {
+    $stmt = $this->db->prepare("SELECT idespA FROM protesper WHERE idprotA = ?");
+    $stmt->execute([$idprotA]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN); // Retorna array simple de IDs
+}
+}

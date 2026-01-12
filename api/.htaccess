@@ -1,0 +1,8 @@
+RewriteEngine On
+# Si el archivo existe (como una imagen), cárgalo
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Si no existe, manda todo al index.php de la API
+RewriteRule ^ index.php [QSA,L]

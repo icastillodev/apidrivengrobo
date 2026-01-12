@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bioterio Central - Acceso</title>
+    
+    <link rel="stylesheet" href="dist/style/css/styles.css">
+    <link rel="stylesheet" href="./dist/style/css/tilwind.css">
+    
+    <script type="module">
+        import { Auth } from './dist/js/auth.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Usamos el método que NO busca slug en la URL
+            Auth.initSuperAdmin();
+        });
+    </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
+
+    <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border-t-8 border-green-600">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter">GECKO MASTER</h1>
+            <p class="text-gray-400 text-xs uppercase tracking-widest mt-1">Administración Global</p>
+        </div>
+
+        <form id="login-form" class="space-y-5">
+            <div id="msg-alert" class="hidden p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded"></div>
+
+            <div> 
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Usuario Maestro</label>
+                <input type="text" id="username" required 
+                    class="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all"
+                    placeholder="">
+            </div>
+
+            <div> 
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Contraseña</label>
+                <input type="password" id="password" required 
+                    class="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all"
+                    placeholder="••••••••">
+            </div>
+
+            <button type="submit" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95">
+                Entrar al Sistema
+            </button>
+        </form>
+        <div class="mt-8 text-center">
+            <a href="index.html" class="text-gray-400 text-sm hover:text-green-600 transition-colors italic">
+                ← Volver al acceso institucional
+            </a>
+        </div>
+    </div>
+<script src="dist/js/config.js"></script>
+</body>
+</html>

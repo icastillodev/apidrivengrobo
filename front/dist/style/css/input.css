@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tus estilos personalizados de Gecko Dev aquí abajo */
+.font-lato {
+    font-family: 'Lato', sans-serif;
+}
