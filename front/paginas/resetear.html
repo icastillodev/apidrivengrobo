@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GROBO - Nueva Contraseña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="../dist/style/css/styles.css">
+    <script type="module">
+        import { initReset } from '../dist/js/pages/resetear.js';
+        document.addEventListener('DOMContentLoaded', initReset);
+    </script>
+</head>
+<body class="bg-[#f2f2f2] font-sans">
+    <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
+        <section class="w-full max-w-4xl bg-black p-[6px] gap-x-3 rounded-xl flex flex-col md:flex-row shadow-2xl overflow-hidden">
+            
+            <div class="w-full md:w-[40%] h-auto md:h-[65vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+                <div class="text-center pb-4">
+                    <h1 class="text-3xl font-bold mb-2 tracking-tighter italic">G.R.O.B.O.</h1>
+                    <p class="text-amber-500 text-[10px] uppercase tracking-widest mb-4 font-bold">Desarrollado para Bioterios</p>
+                    <p class="text-[#888] text-[10px] uppercase font-bold border-t border-gray-800 pt-4">Desarrollado por NETWISE</p>
+                </div>
+            </div>
+
+            <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col items-center justify-center p-12 text-center">
+                
+                <div id="reset-form-container" class="w-full max-w-sm">
+                    <h2 class="text-3xl font-black text-gray-900 uppercase mb-1 tracking-tighter">Nueva Contraseña</h2>
+                    <p id="inst-tag" class="text-amber-600 font-bold uppercase text-[10px] mb-8 tracking-widest italic">Estableciendo Clave Institucional</p>
+                    
+                    <form id="reset-password-form" class="space-y-5 text-left">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Nueva Contraseña *</label>
+                            <input type="password" id="new-pass" required placeholder="••••••••"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            <p class="text-[9px] text-gray-400 mt-2 font-bold uppercase italic tracking-tighter">Debe tener entre 5 y 20 caracteres</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Confirmar Contraseña *</label>
+                            <input type="password" id="confirm-pass" required placeholder="••••••••"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            <p id="match-error" class="text-[9px] text-red-600 mt-2 font-bold uppercase hidden italic tracking-tighter">Las contraseñas no coinciden</p>
+                        </div>
+
+                        <div class="pt-4">
+                            <button type="submit" id="btn-reset" disabled 
+                                class="w-full bg-black text-white py-4 rounded-xl font-bold uppercase text-xs tracking-[2px] shadow-lg opacity-50 cursor-not-allowed transition-all active:scale-95">
+                                Actualizar Contraseña
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="reset-success" class="hidden w-full max-w-sm">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-black text-gray-900 uppercase mb-2">¡Clave Actualizada!</h2>
+                    <p class="text-gray-500 text-sm mb-8 font-medium leading-relaxed">Tu contraseña ha sido restablecida con éxito. Ya puedes ingresar a la institución con tus nuevas credenciales.</p>
+                    
+                    <a href="#" id="btn-login-final" class="inline-block bg-black text-white px-10 py-4 rounded-xl font-bold uppercase text-[11px] tracking-widest shadow-lg hover:bg-gray-900 transition-all">
+                        Ir al Login de la Institución
+                    </a>
+                </div>
+
+            </div>
+        </section>
+    </main>
+</body>
+</html>

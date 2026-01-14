@@ -16,10 +16,8 @@ class AuthController {
     public function login() {
         if (ob_get_length()) ob_clean();
         
-        // 2. CAPTURAMOS los datos JSON del cuerpo del POST
         $data = json_decode(file_get_contents("php://input"), true);
         
-        // 3. Validamos que existan los datos
         if (!isset($data['user'], $data['pass'], $data['instSlug'])) {
             echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
             exit;
@@ -27,9 +25,25 @@ class AuthController {
         
         $res = $this->service->authenticate($data['user'], $data['pass'], $data['instSlug']);
         
-        echo json_encode($res['status'] 
-            ? ['status' => 'success', 'role' => $res['user']['role']] 
-            : ['status' => 'error', 'message' => $res['message']]);
+        if ($res['status']) {
+            // EXTRAEMOS LOS DATOS DEL USUARIO
+            $user = $res['user'];
+            
+            echo json_encode([
+                'status' => 'success',
+                'token'  => bin2hex(random_bytes(16)), // Generamos un token temporal
+                'userId' => $user['IdUsrA'],           // ESTO ARREGLA EL ID: 0
+                'userName' => $user['UsrA'],           // Nombre de usuario (login)
+                'userFull' => $user['Nombre'] ?? $user['UsrA'], // Nombre real (si existe en tu DB)
+                'role'   => $user['role'],
+                'instId' => $user['IdInstitucion']
+            ]);
+        } else {
+            echo json_encode([
+                'status' => 'error', 
+                'message' => $res['message']
+            ]);
+        }
         exit;
     }
 
@@ -60,27 +74,26 @@ class AuthController {
 
 
 
-    // Este método SÍ recibe ($slug) porque viene de la URL: /validate-inst/:slug
+    // api/src/Controllers/AuthController.php
+
     public function validateInstitution($slug) {
         if (ob_get_length()) ob_clean();
-        
-        // Obtenemos el objeto de la institución completo
         $instData = $this->service->validateSlug($slug);
         
         if ($instData) {
+            header('Content-Type: application/json');
             echo json_encode([
                 "status" => "success",
-                "message" => "Institución válida",
                 "data" => [
-                    // Usamos el ID real que viene de tu base de datos
-                    "id" => $instData['IdInstitucion'] 
+                    "id" => $instData['IdInstitucion'],
+                    "nombre" => $instData['NombreInst'],
+                    "nombre_completo" => $instData['NombreCompletoInst'], // Nuevo campo
+                    "dependencia" => $instData['DependenciaInstitucion'], // Nuevo campo
+                    "web" => $instData['Web']
                 ]
             ]);
         } else {
-            echo json_encode([
-                "status" => "error", 
-                "message" => "La institución no existe"
-            ]);
+            echo json_encode(["status" => "error", "message" => "Institución no válida"]);
         }
         exit;
     }

@@ -3,77 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bioterio Central - Acceso</title>
+    <title>GROBO - Acceso Institucional</title>
     
-    <link rel="stylesheet" href="dist/style/css/styles.css">
-    <link rel="stylesheet" href="./dist/style/css/tilwind.css">
-
-
+    <link rel="stylesheet" href="/URBE-API-DRIVEN/front/dist/style/css/styles.css">
+    <link rel="stylesheet" href="/URBE-API-DRIVEN/front/dist/style/css/tilwind.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
-        // Al ser type="module", el navegador sabe manejar los 'import' y 'export'
-        import { Auth } from './dist/js/auth.js';
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            Auth.init(); // Esto arranca el login normal
-        });
+        // Importación con ruta absoluta para evitar el error MIME
+        import { Auth } from '/URBE-API-DRIVEN/front/dist/js/auth.js';
+        document.addEventListener('DOMContentLoaded', () => Auth.init());
     </script>
 </head>
-<body class="bg-gray-50 h-screen flex items-center justify-center p-4">
-
-    <div id="auth-card" class="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-gray-100 fade-in">
-        
-        <div id="inst-header" class="text-center mb-8">
-            <div id="inst-logo-container" class="mb-4 flex justify-center">
-                <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-inner">
-                    B
+<body class="bg-[#f2f2f2] font-sans">
+    <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
+        <section class="w-full max-w-5xl bg-black p-[6px] gap-x-3 rounded-xl flex-col md:flex-row flex shadow-2xl overflow-hidden">
+            
+            <div class="w-full md:w-[40%] h-auto md:h-[80vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+                <div class="text-center pb-4">
+                    <h1 class="text-4xl font-bold mb-2 tracking-tighter italic">G.R.O.B.O.</h1>
+                    <h2 class="text-sm font-light mb-6 text-amber-500 uppercase tracking-widest">Gestor de Reactivos Biológicos Online</h2>
+                    <p class="text-[#888] leading-relaxed text-[11px] text-justify border-t border-gray-800 pt-6">
+                        Desarrollado por <strong>NETWISE</strong>, GROBO es una aplicación web que permite gestionar protocolos, gastos y peticiones referentes al uso de animales, alineada a estándares de la CNEA.
+                    </p>
                 </div>
             </div>
-            <h2 id="inst-name" class="text-3xl font-extrabold text-gray-900 tracking-tight">Cargando...</h2>
-            <p id="inst-description" class="text-sm text-gray-400 mt-2">Validando entorno institucional</p>
-        </div>
 
-        <form id="login-form" class="space-y-5 hidden">
-            <div>
-                <label for="username" class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Usuario</label>
-                <input type="text" id="username" required 
-                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Tu usuario">
-            </div>
-            <div>
-                <label for="password" class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Contraseña</label>
-                <input type="password" id="password" required 
-                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
-                    placeholder="••••••••">
-            </div>
-            
-            <button type="submit" 
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95">
-                Entrar al Sistema
-            </button>
-        </form>
-
-        <div id="auth-actions" class="mt-8 pt-6 border-t border-gray-100 flex flex-col gap-4 text-center ">
-            <p class="text-sm text-gray-600">
-                    ¿No tienes una cuenta? 
-                    <a href="paginas/registro.html" class="text-green_one font-bold hover:underline transition-all">
-                        Regístrate aquí
-                    </a>
-                </p>
+            <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col min-h-[500px] relative">
                 
-                <a href="paginas/recuperar.html" class="text-xs text-gray-400 hover:text-green_one transition-colors">
-                    ¿Olvidaste tu usuario o contraseña?
-                </a>
-        </div>
+                <div id="error-state" class="hidden flex-1 flex flex-col justify-center items-center p-8 text-center">
+                    <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-black text-red-600 mb-4 uppercase">Acceso Denegado</h2>
+                    <p class="text-gray-600 mb-6 font-medium">No se ha detectado una institución válida. Es necesario acceder a través de una sede autorizada para utilizar la aplicación.</p>
+                    <a href="https://groboapp.com" class="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-gray-900 transition-all">Ir a GROBOAPP.COM</a>
+                </div>
 
-        <div id="msg-alert" class="mt-6 p-4 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 hidden fade-in">
+                <div id="auth-content" class="flex-1 flex flex-col">
+                    <div class="p-8 pb-0">
+                        <div class="flex justify-end items-center mb-1">
+                            <span class="text-sm text-gray-600 mr-2">¿No tienes cuenta?</span>
+                            <a href="#" id="link-registro-dinamico" class="text-amber-600 hover:text-amber-700 font-bold text-sm underline uppercase tracking-tighter">Regístrate</a>
+                        </div>
+                        <div id="web-link-container" class="flex justify-end items-center mb-8 hidden">
+                            <a id="inst-web-link" href="#" target="_blank" class="text-green-700 font-bold text-[11px] uppercase transition-colors tracking-tighter italic">
+                                &#8617; regresar web
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col justify-center px-8 pb-8">
+                        <div class="max-w-sm mx-auto w-full">
+                            <div class="text-center mb-8">
+                                <h2 id="inst-welcome" class="text-3xl font-black text-gray-900 mb-0 uppercase tracking-tighter italic">Validando...</h2>
+                                <p id="inst-full-name" class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-4"></p>
+                                <p class="text-gray-500 text-sm italic font-medium">Ingresa tus credenciales para continuar</p>
+                            </div>
+
+                            <form id="login-form" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Usuario</label>
+                                    <input type="text" id="username" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" required>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Contraseña</label>
+                                    <input type="password" id="password" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" required>
+                                </div>
+                                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-4 rounded-xl font-bold shadow-lg uppercase text-xs tracking-[2px] active:scale-95 transition-all">Entrar al Sistema</button>
+                                
+                                <div class="text-center mt-4">
+                                    <a href="paginas/recuperar.html" class="text-[10px] text-gray-400 hover:text-amber-600 font-bold uppercase tracking-tighter">¿Olvidaste tu contraseña?</a>
+                                </div>
+                                <div id="msg-alert" class="mt-4 p-3 bg-red-50 text-red-600 text-[10px] uppercase font-bold rounded-lg border border-red-100 hidden text-center italic tracking-tighter"></div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 border-t border-gray-50 mt-auto">
+                    <div class="flex justify-between items-center text-[10px] text-gray-300 uppercase tracking-[2px] font-bold">
+                        <span>© 2026 NETWISE</span>
+                    </div>
+                </div>
             </div>
-
-    </div>
-
-    <script src="dist/js/config.js"></script>
-    
-    <script src="dist/js/api.js"></script>
-    
-
+        </section>
+    </main>
 </body>
 </html>

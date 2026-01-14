@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GROBO - Confirmación de Cuenta</title>
+    <link rel="stylesheet" href="../dist/style/css/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module">
+        import { initConfirmacion } from '../dist/js/pages/confirmar.js';
+        document.addEventListener('DOMContentLoaded', initConfirmacion);
+    </script>
+</head>
+<body class="bg-[#f2f2f2] font-sans">
+    <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
+        <section class="w-full max-w-4xl bg-black p-[6px] gap-x-3 rounded-xl flex flex-col md:flex-row shadow-2xl overflow-hidden">
+            
+            <div class="w-full md:w-[40%] h-auto md:h-[60vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+                <div class="text-center pb-4">
+                    <h1 class="text-3xl font-bold mb-2 tracking-tighter">G.R.O.B.O.</h1>
+                    <p class="text-amber-500 text-[10px] uppercase tracking-widest mb-4">Desarrollado para Bioterios</p>
+                    <p class="text-[#888] text-[10px] uppercase font-bold border-t border-gray-800 pt-4">Desarrollado por NETWISE</p>
+                </div>
+            </div>
+
+            <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col items-center justify-center p-12 text-center">
+                
+                <div id="status-loading" class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mb-4"></div>
+                    <h2 class="text-xl font-black text-gray-900 uppercase tracking-tight">Validando Institución...</h2>
+                    <p class="text-gray-400 text-xs italic mt-2">Por favor, no cierre esta ventana.</p>
+                </div>
+
+                <div id="status-success" class="hidden">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-black text-gray-900 uppercase mb-2">¡Cuenta Activada!</h2>
+                    <p class="text-gray-500 text-sm mb-1">Tu usuario ha sido confirmado correctamente para la institución:</p>
+                    <p id="confirm-inst-name" class="text-amber-600 font-black uppercase text-xl mb-8 tracking-tighter italic"></p>
+                    
+                    <a href="#" id="btn-ir-login" class="bg-black text-white px-10 py-4 rounded-xl font-bold uppercase text-[11px] tracking-widest shadow-lg hover:bg-gray-900 transition-all active:scale-95">
+                        Ir al Login de la Institución
+                    </a>
+                </div>
+
+                <div id="status-error" class="hidden">
+                    <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-black text-red-600 uppercase mb-2">Error de Activación</h2>
+                    <p id="error-message" class="text-gray-600 mb-8 text-sm font-medium">El enlace es inválido o el token ha expirado.</p>
+                    <a href="https://groboapp.com" class="text-[10px] font-bold text-gray-400 hover:text-black uppercase underline tracking-widest">
+                        Volver a GROBOAPP.COM
+                    </a>
+                </div>
+
+            </div>
+        </section>
+    </main>
+</body>
+</html>

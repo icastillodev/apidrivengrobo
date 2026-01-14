@@ -1,9 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
 <head>
-    <link rel="stylesheet" href="../dist/style/css/tailwind.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GROBO - Registro</title>
+    <link rel="stylesheet" href="../dist/style/css/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module">
+        import { initRegistro } from '../dist/js/pages/registro.js';
+        document.addEventListener('DOMContentLoaded', initRegistro);
+    </script>
 </head>
-<body class="bg-gray-50 flex items-center justify-center h-screen">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
-        <h2 class="text-2xl font-bold text-green_one mb-6">Crear Cuenta</h2>
-        <a href="../index.html" class="text-sm text-gray-500 hover:underline">← Volver al login</a>
-    </div>
+<body class="bg-[#f2f2f2] font-sans">
+    <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
+        <section class="w-full max-w-5xl bg-black p-[6px] gap-x-3 rounded-xl flex-col md:flex-row flex shadow-2xl overflow-hidden">
+            
+            <div class="w-full md:w-[40%] h-auto md:h-[80vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+                <div class="text-center pb-4">
+                    <h1 class="text-3xl font-bold mb-2 tracking-tighter">G.R.O.B.O.</h1>
+                    <p class="text-amber-500 text-[10px] uppercase tracking-widest mb-6">Registro para Investigadores</p>
+                    <p class="text-[#888] text-[10px] leading-relaxed text-justify border-t border-gray-800 pt-4">
+                        Al registrarse, quedará vinculado a la sede <strong class="text-white" id="reg-inst-description-name">...</strong>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col p-8">
+                <div id="error-state" class="hidden flex-1 flex flex-col justify-center items-center text-center">
+                    <h2 class="text-2xl font-black text-red-600 mb-4 uppercase">Sede No Válida</h2>
+                    <p class="text-gray-600 mb-6 font-medium">No puedes crear una cuenta sin estar en una sede institucional.</p>
+                    <a href="https://groboapp.com" class="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase text-xs">Regresar</a>
+                </div>
+
+                <div id="auth-content">
+                    <div class="flex justify-between items-start mb-8 border-bottom">
+                        <div>
+                            <h2 id="reg-inst-name" class="text-xl font-black text-gray-900 uppercase leading-none tracking-tight text-success">Validando...</h2>
+                            <p id="reg-inst-full-name" class="text-[9px] text-gray-400 font-bold uppercase mt-1"></p>
+                        </div>
+                        <a href="#" id="btn-volver-login" class="text-xs font-bold text-amber-600 hover:underline">&#8617; Volver al Login</a>
+                    </div>
+
+                    <form id="registro-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre de Usuario (Login) *</label>
+                            <input type="text" id="reg-user" name="usuario" required 
+                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            <p id="user-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Este usuario ya se encuentra registrado</p>
+                            <p id="user-success" class="text-[9px] text-green-600 mt-1 font-bold uppercase hidden">Nombre de usuario disponible</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre *</label>
+                            <input type="text" name="NombreA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Apellido *</label>
+                            <input type="text" name="ApellidoA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Correo Electrónico *</label>
+                            <input type="email" name="EmailA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <p class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-tighter">
+                                * Se enviará un correo de confirmación. Por favor ingrese su correo real para activar la cuenta.
+                            </p>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">País de Residencia *</label>
+                            <select id="reg-pais" name="PaisA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none"></select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Contraseña *</label>
+                            <input type="password" id="reg-pass" name="contrasena" required 
+                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Debe tener entre 5 y 20 caracteres</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Confirmar Contraseña *</label>
+                            <input type="password" id="reg-pass-confirm" required 
+                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <p id="pass-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Las contraseñas no coinciden</p>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Celular / Teléfono (Opcional)</label>
+                            <input type="text" name="CelularA" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                        </div>
+
+                        <div class="col-span-2 mt-4">
+                            <button type="submit" id="btn-finalizar" class="w-full bg-black text-white py-3 rounded-lg font-bold uppercase text-xs tracking-widest shadow-lg opacity-50 cursor-not-allowed" disabled>
+                                Finalizar Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
 </body>
+</html>

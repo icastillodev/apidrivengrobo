@@ -17,37 +17,51 @@ class AuthService {
 
 
 
-        public function authenticate($user, $pass, $slug) {
-            $instContext = $this->model->getInstitucionBySlug($slug);
-            if (!$instContext) return ['status' => false, 'message' => 'Institución inválida'];
-
-            $userData = $this->model->getUserByUsername($user);
-            
-            // 1. Verificación básica de credenciales
-            if (!$userData || !password_verify($pass, $userData['password_secure'])) {
-                return ['status' => false, 'message' => 'Credenciales incorrectas'];
-            }
-
-            // 2. LÓGICA DE SUPERADMIN (Rol 1): Salto de seguridad
-            // Si el usuario tiene rol 1 en la tabla tienetipor, entra directo a cualquier sede
-            if ($userData['role'] == 1) {
-                return [
-                    'status' => true, 
-                    'user' => $userData,
-                    'isMaster' => true // Marcamos que entró como maestro
-                ];
-            }
-
-            // 3. Regla normal para usuarios (Rol 2)
-            $accesoDirecto = $userData['IdInstitucion'] == $instContext['IdInstitucion'];
-            $accesoGrupo = $userData['DependenciaInstitucion'] == $instContext['DependenciaInstitucion'];
-
-            if ($accesoDirecto || $accesoGrupo) {
-                return ['status' => true, 'user' => $userData];
-            }
-
-            return ['status' => false, 'message' => 'No tienes permiso para esta sede'];
+    public function authenticate($user, $pass, $slug) {
+        // 1. Validar que la institución del link existe
+        $instContext = $this->model->getInstitucionBySlug($slug);
+        if (!$instContext) {
+            return ['status' => false, 'message' => 'Institución inválida'];
         }
+
+        // 2. Buscar al usuario por su login
+        $userData = $this->model->getUserByUsername($user);
+        
+        // 3. Verificación de credenciales (Usuario existe y contraseña coincide)
+        if (!$userData || !password_verify($pass, $userData['password_secure'])) {
+            return ['status' => false, 'message' => 'Credenciales incorrectas'];
+        }
+
+        // 4. LÓGICA DE SUPERADMIN (Rol 1): Acceso Total
+        // Si es un SuperAdmin de Netwise, entra a cualquier sede sin restricciones.
+        if ($userData['role'] == 1) {
+            // REGISTRO DE ACTIVIDAD: Actualizamos logs antes de entrar
+            $this->model->updateActivityMetadata($userData['IdUsrA']);
+            
+            return [
+                'status' => true, 
+                'user' => $userData,
+                'isMaster' => true 
+            ];
+        }
+
+        // 5. REGLAS PARA INVESTIGADORES (Rol 2)
+        // Acceso directo: Pertenece a la sede donde se está logueando.
+        $accesoDirecto = $userData['IdInstitucion'] == $instContext['IdInstitucion'];
+        
+        // Acceso por grupo: Pertenece a la misma dependencia (ej: todas las sedes de la CNEA).
+        $accesoGrupo = $userData['DependenciaInstitucion'] == $instContext['DependenciaInstitucion'];
+
+        if ($accesoDirecto || $accesoGrupo) {
+            // REGISTRO DE ACTIVIDAD: Actualizamos UltentradaA y ActivoA = 1
+            $this->model->updateActivityMetadata($userData['IdUsrA']);
+            
+            return ['status' => true, 'user' => $userData];
+        }
+
+        // Si llegó aquí, el usuario existe pero no tiene permiso para esta sede
+        return ['status' => false, 'message' => 'No tienes permiso para acceder a esta institución'];
+    }
 
     public function attemptSuperAdminLogin($user, $pass) {
         $userFound = $this->model->getSuperAdminByUsername($user);
