@@ -41,7 +41,7 @@ class MailService {
         return $this->executeSend($to, $subject, $body);
     }
 
-    private function executeSend($to, $subject, $body) {
+public function executeSend($to, $subject, $body) {
         $mail = new PHPMailer(true);
         try {
             $mail->isSMTP();
@@ -66,7 +66,7 @@ class MailService {
         }
     }
 
-    private function getTemplate($title, $message, $link, $btnText) {
+    public function getTemplate($title, $message, $link, $btnText) {
         return "
         <div style='background-color: #f4f4f4; padding: 40px; font-family: sans-serif;'>
             <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #ddd;'>
@@ -87,4 +87,25 @@ class MailService {
             </div>
         </div>";
     }
+/**
+ * Envía notificación incluyendo el desglose de insumos
+ */
+public function sendInsumoNotification($to, $nombre, $idformA, $nota, $estado, $insumosHtml, $instName) {
+    $subject = "Actualización Pedido de Insumos #$idformA - " . strtoupper($instName);
+    $link = "http://localhost/URBE-API-DRIVEN/front/paginas/investigador/mis-pedidos.html";
+    
+    // Construimos un mensaje más completo
+    $mensajeCompleto = "
+        Hola <b>$nombre</b>,<br><br>
+        Tu pedido de insumos <b>#$idformA</b> ha sido actualizado a estado: <b>$estado</b>.<br><br>
+        <b>Detalle de productos solicitados:</b><br>
+        $insumosHtml<br><br>
+        <b>Observaciones del Administrador:</b><br>
+        <i>$nota</i>
+    ";
+
+    $body = $this->getTemplate("Actualización de Pedido", $mensajeCompleto, $link, "VER MI PEDIDO");
+
+    return $this->executeSend($to, $subject, $body);
+}
 }

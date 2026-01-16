@@ -112,54 +112,32 @@ export async function initMenu() {
     const instId = localStorage.getItem('instId');
     if (isNaN(roleId)) return;
 
-    // 1. Inyectar estructura del Header
     const header = document.createElement('header');
     header.className = "w-full";
-    header.innerHTML = `
-        <nav class="w-full d-flex justify-content-center align-items-center position-relative">
-            <ul id="main-menu" class="nav border border-top-0 border-2 border-success bg-white p-1 rounded-bottom shadow-sm mt-0">
-            </ul>
-        </nav>
-    `;
+    header.innerHTML = `<nav class="w-full d-flex justify-content-center align-items-center position-relative">
+            <ul id="main-menu" class="nav border border-top-0 border-2 border-success bg-white p-1 rounded-bottom shadow-sm mt-0"></ul>
+        </nav>`;
     document.body.prepend(header);
     const menuList = document.getElementById('main-menu');
 
     try {
-        // 2. Carga paralela de estructura de menú y notificaciones iniciales
-        const [resMenu, resNotif] = await Promise.all([
-            fetch(`/URBE-API-DRIVEN/api/menu?role=${roleId}&inst=${instId}`).then(r => r.ok ? r.json() : {data:[]}),
-            fetch(`/URBE-API-DRIVEN/api/menu/notifications?inst=${instId}`).then(r => r.ok ? r.json() : {data:{}})
-        ]);
+        // Solo pedimos la estructura del menú
+        const resMenu = await fetch(`/URBE-API-DRIVEN/api/menu?role=${roleId}&inst=${instId}`).then(r => r.json());
 
         if (resMenu.status === "success" || Array.isArray(resMenu.data)) {
             let ids = resMenu.data || [];
-            const notifData = resNotif.data || {};
             
-            // 3. Forzar visibilidad de módulos para Administradores
+            // Reglas de visibilidad de NETWISE
             if ([1, 2].includes(roleId)) {
-                const extras = [2, 3, 4, 5, 9, 10, 202, 203]; 
-                extras.forEach(id => { if(!ids.includes(id)) ids.push(id); });
+                [2, 3, 4, 5, 9, 10, 202, 203].forEach(id => { if(!ids.includes(id)) ids.push(id); });
             }
             if(!ids.includes(201)) ids.push(201);
 
-            // 4. Renderizado con inyección de números iniciales
-                ids.forEach(id => {
-                    let count = 0;
-                    if (id === 2) count = notifData.protocolos || 0; // Para Protocolos
-                    if (id === 3) count = notifData.animales || 0;   // Para Animales
-                    if (id === 4) count = notifData.reactivos || 0;  // Para Reactivos
-                    if (id === 5) count = notifData.insumos || 0;    // Para Insumos
-                    
-                    renderItem(menuList, id, count);
-                });
+            // Renderizamos los ítems limpios (sin badges iniciales)
+            ids.forEach(id => renderItem(menuList, id, 0));
             setupDropdownLogic();
         }
-    } catch (err) {
-        console.error("Error en initMenu:", err);
-    }
-    
-    // 5. Ciclo de refresco cada 30 segundos
-    setInterval(refreshMenuNotifications, 30000);
+    } catch (err) { console.error("MenuComponent: Error al renderizar."); }
 }
 
 function getCorrectPath(rawPath) {
@@ -176,6 +154,10 @@ function renderItem(container, id, count = 0) {
     const item = MENU_TEMPLATES[id];
     if (!item) return;
 
+    // IDs que requieren estructura de notificación obligatoria
+    const targetIds = [2, 3, 4, 5]; 
+    const isTarget = targetIds.includes(Number(id));
+
     if (item.isDropdown) {
         const childrenHTML = item.children.map(child => `
             <li role="none">
@@ -188,7 +170,7 @@ function renderItem(container, id, count = 0) {
         container.innerHTML += `
             <li class="nav-item position-relative dropdown-container-gecko">
                 <button type="button" class="dropdown-toggle-gecko gecko-nav-link d-flex flex-column align-items-center border-0 bg-transparent px-3 py-2">
-                    <div class="menu-icon mb-1">
+                    <div class="menu-icon mb-1" data-menu-id="${id}">
                         ${item.svg}
                     </div>
                     <span class="menu-label d-flex align-items-center">
@@ -202,11 +184,21 @@ function renderItem(container, id, count = 0) {
             </li>`;
     } else {
         const finalPath = getCorrectPath(item.path);
-        const badgeHTML = count > 0 ? `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm">${count}</div>` : '';
+        
+        // ESTRUCTURA FORZADA: Si es uno de los 4 menús, creamos el div SIEMPRE
+        // Si el count es 0, lo ocultamos con CSS inicialmente pero el elemento EXISTE.
+        let badgeHTML = '';
+        if (isTarget) {
+            badgeHTML = `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm" 
+                              style="${count > 0 ? 'display: flex;' : 'display: none;'}">${count}</div>`;
+        } else if (count > 0) {
+            badgeHTML = `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm">${count}</div>`;
+        }
+
         container.innerHTML += `
             <li class="nav-item position-relative">
                 <a href="${finalPath}" class="gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2">
-                    <div class="menu-icon mb-1 position-relative">
+                    <div class="menu-icon mb-1 position-relative" data-menu-id="${id}">
                         ${item.svg}
                         ${badgeHTML}
                     </div>

@@ -22,11 +22,14 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
         import { showLoader } from '../../dist/js/components/LoaderComponent.js'; // <-- Importar
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
 
+        
         document.addEventListener('DOMContentLoaded', () => {
             showLoader(); // <-- Ejecutar al inicio
             Auth.checkAccess([1, 2, 4]);
             initMenu();
+            NotificationManager.init();
             initProtocolosPage(); // Dispara la carga de protocolos
         });
     </script>

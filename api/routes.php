@@ -24,7 +24,8 @@ $router->post('/update-password-recovery', 'UserController@updatePasswordRecover
 
 // SECCIÓN: Menú Dinámico
 $router->get('/menu', 'MenuController@getMenu');
-$router->get('/menu/notifications', 'AnimalController@getPendingCounts');
+// Cambiamos AnimalController por NotificationController para traer los 4 conteos
+$router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
 
 // SECCIÓN: Usuarios (Admin)
 $router->get('/users/institution', 'UserController@index'); 
@@ -52,18 +53,66 @@ $router->get('/animals/get-sex-data', 'AnimalController@getSexData');
 // ============================================================
 // SECCIÓN: Reactivos (Otros reactivos biológicos) 
 // ============================================================
-// Carga la grilla filtrada por la categoría específica
+// Carga la grilla principal
 $router->get('/reactivos/all', 'ReactivoController@getAll'); 
 
-// Actualización rápida de estado y auditoría (QuienVio)
+// Carga protocolos e insumos para los selectores del modal
+$router->get('/reactivos/form-data', 'ReactivoController@getFormData'); 
+
+// Actualización rápida de estado y auditoría administrativa
 $router->post('/reactivos/update-status', 'ReactivoController@updateStatus'); 
 
-// Modificación completa: incluye Cantidad (organo) y Medida (TipoInsumo)
+// Modificación técnica completa (Insumo, Cantidad, Fechas)
 $router->post('/reactivos/update-full', 'ReactivoController@updateFull'); 
 
-// (Opcional) Si decides usar el mismo sistema de notificaciones que Animales
+// Gestión de notificaciones por correo específicas para reactivos
 $router->get('/reactivos/last-notification', 'ReactivoController@getLastNotification'); 
 $router->post('/reactivos/send-notification', 'ReactivoController@sendNotification');
+$router->get('/reactivos/usage', 'ReactivoController@getUsageData');
 
-$router->get('/reactivos/form-data', 'ReactivoController@getFormData'); // <--- FALTA ESTA
+
+// ============================================================
+// SECCIÓN: Insumos Experimentales (GROBO 2026)
+// ============================================================
+$router->get('/insumos/all', 'InsumoController@getAll');
+// NUEVA: Carga de departamentos (departamentoe) para el modal
+$router->get('/insumos/form-data', 'InsumoController@getFormData');
+// NUEVA: Carga de productos desde la entidad 'insumo'
+$router->get('/insumos/catalog', 'InsumoController@getCatalog');
+// NUEVA: Detalle de items vinculados al formulario (forminsumo)
+$router->get('/insumos/details', 'InsumoController@getDetails');
+
+$router->post('/insumos/update-status', 'InsumoController@updateStatus');
+$router->post('/insumos/update-full', 'InsumoController@updateFull');
+// Gestión de notificaciones para Insumos
+$router->post('/insumos/send-notification', 'InsumoController@sendNotification');
+
+
+// Rutas para el Tarifario Institucional
+$router->get('/precios/animales', 'PreciosController@getAnimalPrices');
+$router->get('/precios/insumos', 'PreciosController@getInsumoPrices');
+// Rutas para el Tarifario Institucional
+$router->get('/precios/all-data', 'PreciosController@getAllData'); 
+$router->post('/precios/update-all', 'PreciosController@updateAll');
+
+
+
+// RUTAS PARA ALOJAMIENTOS
+$router->get('/alojamiento/list', 'AlojamientoController@list');
+$router->get('/alojamiento/history', 'AlojamientoController@history');
+$router->post('/alojamiento/save', 'AlojamientoController@save');
+$router->post('/alojamiento/finalizar', 'AlojamientoController@finalizar');
+$router->post('/alojamiento/delete-row', 'AlojamientoController@deleteRow');
+$router->post('/alojamiento/update-row', 'AlojamientoController@updateRow');
+$router->post('/alojamiento/desfinalizar', 'AlojamientoController@desfinalizar');
+
+// api/routes.php
+
+// Cambia 'ProtocoloController' por 'ProtocolController'
+$router->get('/protocolos/search-alojamiento', 'ProtocolController@searchForAlojamiento');
+$router->get('/protocolos/search', 'ProtocolController@search');
+
+// Auxiliares para búsqueda
+$router->get('/protocolos/search', 'ProtocoloController@search');
+$router->get('/investigadores/search', 'InvestigadorController@search');
 

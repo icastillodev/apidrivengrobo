@@ -65,6 +65,8 @@
         import { API } from '/URBE-API-DRIVEN/front/dist/js/api.js';
         import { initMenu } from '/URBE-API-DRIVEN/front/dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '/URBE-API-DRIVEN/front/dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+
 
         /**
          * Mapeo Oficial de Roles (según imagen proporcionada)
@@ -113,7 +115,7 @@
                 if (roleSmall) roleSmall.innerText = levelInt;
 
                 initMenu();
-
+                NotificationManager.init();
             } catch (error) {
                 console.error("Fallo en inicialización de Dashboard:", error);
             } finally {

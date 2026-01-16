@@ -136,6 +136,25 @@ class ProtocolController {
         echo json_encode(['status' => 'success', 'data' => $data]);
         exit;
     }
+// api/src/Controllers/Protocolo/ProtocoloController.php
 
+public function searchForAlojamiento() {
+    header('Content-Type: application/json');
+    $term = $_GET['term'] ?? '';
+    $instId = $_GET['inst'] ?? 1;
+
+    try {
+        $data = $this->model->searchForAlojamiento($term, $instId);
+        echo json_encode(['status' => 'success', 'data' => $data]);
+    } catch (\Exception $e) {
+        // Esto convertirá el 500 en un mensaje que puedes leer en la consola
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Error en la consulta: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
 
 }

@@ -108,4 +108,44 @@ class ProtocolModel {
     $stmt->execute([$idprotA]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN); // Retorna array simple de IDs
 }
+
+
+// api/src/Models/Protocolo/ProtocoloModel.php
+
+public function searchForAlojamiento($term, $instId) {
+    // Usamos IFNULL en el CONCAT para evitar que un NULL rompa la cadena
+    $sql = "SELECT 
+                p.idprotA, 
+                p.tituloA, 
+                p.nprotA, 
+                p.IdUsrA,
+                CONCAT(IFNULL(pers.NombreA, ''), ' ', IFNULL(pers.ApellidoA, '')) as Investigador
+            FROM protocoloexpe p
+            LEFT JOIN personae pers ON p.IdUsrA = pers.IdUsrA
+            LEFT JOIN solicitudprotocolo s ON p.idprotA = s.idprotA
+            WHERE p.IdInstitucion = ? 
+              AND (
+                  p.tituloA LIKE ? 
+                  OR p.nprotA LIKE ? 
+                  OR pers.NombreA LIKE ? 
+                  OR pers.ApellidoA LIKE ?
+              )
+              -- Filtro: Si no hay registro en solicitudprotocolo (NULL) o es 0/1, está OK
+              AND (s.Aprobado IS NULL OR s.Aprobado IN (0, 1))
+            ORDER BY p.idprotA DESC ";
+
+    $stmt = $this->db->prepare($sql);
+    $searchTerm = "%$term%";
+
+    // DEBES ENVIAR LOS 5 PARÁMETROS AQUÍ:
+    $stmt->execute([
+        (int)$instId, // 1. IdInstitucion
+        $searchTerm,  // 2. tituloA
+        $searchTerm,  // 3. nprotA
+        $searchTerm,  // 4. NombreA
+        $searchTerm   // 5. ApellidoA
+    ]);
+
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
 }
