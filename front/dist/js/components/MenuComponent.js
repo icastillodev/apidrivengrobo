@@ -33,7 +33,7 @@ const MENU_TEMPLATES = {
         isDropdown: true,
         children: [
             { label: 'Precios', path: 'admin/precios.html' },
-            { label: 'Facturación', path: 'admin/facturacion.html' },
+            { label: 'Facturación', path: 'admin/facturacion/index.html' },
             { label: 'Historial Pagos', path: 'admin/historial-pagos.html' }
         ]
     },

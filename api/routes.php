@@ -118,3 +118,31 @@ $router->get('/protocolos/search', 'ProtocolController@search');
 $router->get('/protocolos/search', 'ProtocoloController@search');
 $router->get('/investigadores/search', 'InvestigadorController@search');
 
+
+// ============================================================
+// SECCIÓN: Facturación y Cobranzas (GROBO 2026)
+// ============================================================
+
+// Reportes y Procesamiento
+$router->post('/billing/depto-report', 'BillingController@getDeptoReport');
+$router->get('/billing/investigador-report', 'BillingController@getInvestigadorReport');
+
+// Gestión de Ítems Individuales (Calculadora shared)
+$router->get('/billing/get-item', 'BillingController@getItem');
+$router->post('/billing/update-item', 'BillingController@updateItem');
+
+// Gestión de Saldos e Integridad Financiera
+$router->post('/billing/ajustar-saldo', 'BillingController@ajustarSaldo');
+$router->post('/billing/pagar-items-saldo', 'BillingController@pagarConSaldo');
+
+// Auxiliares para Selectores de Facturación
+// (Asegúrate de tener estos métodos en DeptoController y UserController)
+$router->get('/deptos/list', 'DeptoController@list');
+$router->get('/users/list-investigators', 'UserController@listInvestigators');
+
+
+$router->get('/deptos/list', 'DeptoController@list');
+
+$router->post('/billing/balance', 'BillingController@updateBalance');
+
+$router->post('/billing/process-payment', 'BillingController@processPayment');
