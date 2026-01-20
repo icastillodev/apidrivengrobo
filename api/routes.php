@@ -105,6 +105,8 @@ $router->post('/alojamiento/finalizar', 'AlojamientoController@finalizar');
 $router->post('/alojamiento/delete-row', 'AlojamientoController@deleteRow');
 $router->post('/alojamiento/update-row', 'AlojamientoController@updateRow');
 $router->post('/alojamiento/desfinalizar', 'AlojamientoController@desfinalizar');
+// SECCIÓN: Alojamientos
+$router->post('/alojamiento/update-config', 'AlojamientoController@updateConfig');
 
 // api/routes.php
 

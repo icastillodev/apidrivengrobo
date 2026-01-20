@@ -115,5 +115,34 @@ public function save() {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit;
+    }
+    // api/src/Controllers/AlojamientoController.php
+
+    /**
+     * Procesa la reconfiguración global de una historia.
+     */
+// api/src/Controllers/AlojamientoController.php
+
+public function updateConfig() {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json');
+
+    $data = json_decode(file_get_contents('php://input'), true);
+
+    // Verificación de que todos los IDs necesarios estén presentes
+    if (!isset($data['historia'], $data['idprotA'], $data['IdUsrA'], $data['idespA'])) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Faltan IDs críticos para la configuración']);
+        exit;
+    }
+
+    try {
+        $res = $this->model->updateHistoryConfig($data);
+        echo json_encode(['status' => 'success']);
+    } catch (\Exception $e) {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+    exit;
 }
 }

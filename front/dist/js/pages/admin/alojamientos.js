@@ -18,12 +18,11 @@ let currentHistoryData = [];
 // ***************************************************
 export async function initAlojamientosPage() {
     // Configuración inicial de filtros y listeners
-    const filterEstado = document.getElementById('filter-estado');
+const filterEstado = document.getElementById('filter-estado');
     if (filterEstado) filterEstado.value = "0";
-
-    setupProtocolSearch();
-    setupInvestigadorSearch();
-    setupFechaLimite();
+   
+    // 2. ACTIVAR LAS NUEVAS FUNCIONES (ORDENAMIENTO Y AYUDA)
+        setupTableFeatures();
     
     await loadAlojamientos();
 }
@@ -76,41 +75,41 @@ window.renderAlojamientosTable = () => {
         const infoCajas = a.totalcajachica > 0 ? `${a.totalcajachica} Chica(s)` : `${a.totalcajagrande} Grande(s)`;
         const isFinalizado = (a.finalizado == 1 || a.finalizado == "1");
 
-        return `
-        <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" onclick="window.verHistorial(${a.historia}, event)">
-            <td><span class="badge bg-dark">#${a.historia}</span></td>
-            <td><div class="fw-bold">${a.nprotA}</div><small class="text-muted">${a.tituloA}</small></td>
-            <td>${a.Investigador}</td>
-            <td>${a.EspeNombreA}</td>
-            <td class="text-center fw-bold">${infoCajas}</td>
-            <td class="text-center"><span class="badge bg-info text-dark">${diffDays} Días</span></td>
-            <td class="small text-muted" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${a.observaciones || '---'}
-            </td>
-            <td>
-                <span class="badge ${isFinalizado ? 'bg-danger' : 'bg-success'}">
-                    ${isFinalizado ? 'FINALIZADO' : 'VIGENTE'}
-                </span>
-            </td>
-            <td class="text-end">
-                <div class="d-flex gap-1 justify-content-end align-items-center">
-                    ${!isFinalizado ? `
-                        <button class="btn btn-success btn-sm fw-bold px-3 shadow-sm" 
-                                onclick="event.stopPropagation(); window.openModalActualizar(${a.historia})">
-                            <i class="bi bi-arrow-repeat me-1"></i> ACTUALIZAR
-                        </button>
-                    ` : ''}
-                    <div class="btn-group shadow-sm">
-                        <button class="btn btn-sm btn-light border fw-bold" onclick="event.stopPropagation(); window.verPaginaQR(${a.historia})">
-                            <i class="bi bi-qr-code me-1"></i> QR
-                        </button>
-                        <button class="btn btn-sm btn-light border fw-bold" onclick="event.stopPropagation(); window.verHistorial(${a.historia}, event)">
-                            <i class="bi bi-clock-history me-1"></i> HISTORIAL
-                        </button>
-                    </div>
+    return `
+    <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" onclick="window.verHistorial(${a.historia}, event)">
+        <td><span class="badge bg-dark">#${a.historia}</span></td>
+        <td class="small fw-bold text-secondary">${a.fechavisado}</td> <td><div class="fw-bold">${a.nprotA}</div><small class="text-muted">${a.tituloA}</small></td>
+        <td>${a.Investigador}</td>
+        <td>${a.EspeNombreA}</td>
+        <td class="text-center fw-bold">${infoCajas}</td>
+        <td class="text-center"><span class="badge bg-info text-dark">${diffDays} Días</span></td>
+        <td class="small text-muted" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${a.observaciones || '---'}
+        </td>
+        <td>
+            <span class="badge ${isFinalizado ? 'bg-danger' : 'bg-success'}">
+                ${isFinalizado ? 'FINALIZADO' : 'VIGENTE'}
+            </span>
+        </td>
+        <td class="text-end">
+            <div class="d-flex gap-1 justify-content-end align-items-center">
+                ${!isFinalizado ? `
+                    <button class="btn btn-success btn-sm fw-bold px-3 shadow-sm" 
+                            onclick="event.stopPropagation(); window.openModalActualizar(${a.historia})">
+                        <i class="bi bi-arrow-repeat me-1"></i> ACTUALIZAR
+                    </button>
+                ` : ''}
+                <div class="btn-group shadow-sm">
+                    <button class="btn btn-sm btn-light border fw-bold" onclick="event.stopPropagation(); window.verPaginaQR(${a.historia})">
+                        <i class="bi bi-qr-code me-1"></i> QR
+                    </button>
+                    <button class="btn btn-sm btn-light border fw-bold" onclick="event.stopPropagation(); window.verHistorial(${a.historia}, event)">
+                        <i class="bi bi-clock-history me-1"></i> HISTORIAL
+                    </button>
                 </div>
-            </td>
-        </tr>`;
+            </div>
+        </td>
+    </tr>`;
     }).join('');
 
     if (registrosFiltrados.length === 0) {
@@ -155,100 +154,6 @@ const setupProtocolSearch = () => {
     });
 };
 
-/**
- * LLENA EL SELECT DE PROTOCOLOS
- */
-const renderProtocolOptions = (protocols) => {
-    const select = document.getElementById('select-protocolo-reg');
-    select.innerHTML = '<option value="">-- Seleccione un protocolo de la lista --</option>' + 
-        protocols.map(p => `<option value="${p.idprotA}">#${p.idprotA} | ${p.nprotA} - ${p.tituloA} (${p.Investigador})</option>`).join('');
-};
-
-
-const setupInvestigadorSearch = () => {
-    const input = document.getElementById('input-search-inv');
-    const results = document.getElementById('results-inv');
-    if(!input) return;
-
-    input.addEventListener('input', async (e) => {
-        const term = e.target.value.trim();
-        if (term.length < 2) { results.innerHTML = ''; return; }
-        try {
-            const res = await API.request(`/investigadores/search?term=${term}`);
-            results.innerHTML = res.data.map(i => `
-                <button type="button" class="list-group-item list-group-item-action small" 
-                    onclick="window.selectInvestigador(${i.IdUsrA}, '${i.NombreA} ${i.ApellidoA}')">
-                    <div class="fw-bold">#${i.IdUsrA} - ${i.NombreA} ${i.ApellidoA}</div>
-                </button>
-            `).join('');
-        } catch (e) { console.error(e); }
-    });
-};
-
-window.selectProtocol = async (id, nprot, titulo, invNombre, invId) => {
-    document.getElementById('reg-idprotA').value = id;
-    document.getElementById('input-search-prot').value = `[${nprot}] ${titulo}`;
-    document.getElementById('results-prot').innerHTML = '';
-    window.selectInvestigador(invId, invNombre);
-    await cargarEspeciesDinamicas(id);
-};
-
-window.selectInvestigador = (id, nombre) => {
-    document.getElementById('reg-IdUsrA').value = id;
-    document.getElementById('input-search-inv').value = nombre;
-    document.getElementById('results-inv').innerHTML = '';
-};
-
-
-
-
-
-/**
- * ABRE EL MODAL DE REGISTRO
- * Limpia el formulario, oculta el paso 2 y carga la lista de protocolos
- */
-window.openModalRegistro = async () => {
-    const instId = localStorage.getItem('instId');
-    const select = document.getElementById('select-protocolo-reg');
-    const step2 = document.getElementById('registro-step-2');
-    const form = document.getElementById('form-alojamiento');
-
-    // Resetear formulario y ocultar paso 2
-    form.reset();
-    form.dataset.isUpdate = "false";
-    step2.classList.add('d-none');
-    select.innerHTML = '<option value="">Cargando protocolos...</option>';
-
-    showLoader();
-    try {
-        // La consulta modificada sin LIMIT 10
-        const res = await API.request(`/protocolos/search-alojamiento?term=&inst=${instId}`);
-        if (res.status === 'success') {
-            allProtocolsCache = res.data;
-            renderProtocolOptions(res.data);
-        }
-    } catch (e) { console.error("Error cargando protocolos:", e); }
-    hideLoader();
-
-    setupFechaLimite(); // Configura fecha de hoy y tope de mañana
-    new bootstrap.Modal(document.getElementById('modal-registro')).show();
-};
-
-
-/**
- * FILTRO EN TIEMPO REAL
- * Filtra las opciones del select basándose en el input de búsqueda
- */
-document.getElementById('input-search-prot').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase().trim();
-    const filtered = allProtocolsCache.filter(p => 
-        p.idprotA.toString().includes(term) ||
-        p.nprotA.toLowerCase().includes(term) ||
-        p.tituloA.toLowerCase().includes(term) ||
-        p.Investigador.toLowerCase().includes(term)
-    );
-    renderProtocolOptions(filtered);
-});
 
 window.openModalActualizar = (historiaId, desdeHistorial = false) => {
     const actual = dataFull.find(a => a.historia == historiaId);
@@ -332,23 +237,35 @@ window.saveAlojamiento = async (event) => {
 // ***************************************************
 // 6. GESTIÓN DE HISTORIAL (MODAL)
 // ***************************************************
+
 window.verHistorial = async (historiaId, event = null) => {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
     }
     try {
-        showLoader();
+        showLoader(); 
         const res = await API.request(`/alojamiento/history?historia=${historiaId}`);
+        
         if (res.status === 'success') {
-            currentHistoryData = res.data;
-            if (currentHistoryData.length === 0) return;
-            window.renderHistorialSummary(currentHistoryData, historiaId);
-            window.renderHistorialTable(currentHistoryData);
-            window.renderHistorialFooter(currentHistoryData, historiaId);
-            new bootstrap.Modal(document.getElementById('modal-historial')).show();
+            // ASIGNACIÓN GLOBAL: Fundamental para que configuracionAlojamiento.js 
+            // pueda leer los datos de la historia abierta.
+            window.currentHistoryData = res.data; 
+
+            if (window.currentHistoryData.length === 0) return;
+
+            // Renderizado de los componentes del modal de historial
+            window.renderHistorialSummary(window.currentHistoryData, historiaId);
+            window.renderHistorialTable(window.currentHistoryData);
+            window.renderHistorialFooter(window.currentHistoryData, historiaId);
+            
+            // Mostrar el modal de historial
+            const modalHist = new bootstrap.Modal(document.getElementById('modal-historial'));
+            modalHist.show();
         }
-    } catch (e) { console.error(e); } finally {
+    } catch (e) { 
+        console.error("Error al cargar historial:", e); 
+    } finally {
         hideLoader();
     }
 };
@@ -632,7 +549,7 @@ async function determinarTipoCaja(especieId) {
 
 /**
  * EVENTO AL SELECCIONAR PROTOCOLO
- */
+
 document.getElementById('select-protocolo-reg').addEventListener('change', async (e) => {
     const id = e.target.value;
     if (!id) return;
@@ -650,7 +567,7 @@ document.getElementById('select-protocolo-reg').addEventListener('change', async
         // Cargar especies aprobadas para este protocolo (protesper + especiee)
         await cargarEspeciesDinamicas(id);
     }
-});
+}); */
 
 async function cargarEspeciesDinamicas(protocolId) {
     showLoader();
@@ -697,12 +614,258 @@ async function validarCajasPorEspecie(especieId) {
     } catch (e) { console.error(e); }
 }
 
-const setupFechaLimite = () => {
-    const inputFecha = document.getElementById('reg-fecha');
-    const hoy = new Date();
-    const manana = new Date(hoy);
-    manana.setDate(manana.getDate() + 1);
+window.verPaginaQR = (historiaId = null) => {
+    // Tomamos el ID de la historia
+    const id = historiaId || (window.currentHistoryData && window.currentHistoryData[0]?.historia);
     
-    inputFecha.valueAsDate = hoy;
-    inputFecha.max = manana.toISOString().split('T')[0]; // Bloquea fechas más allá de mañana
+    if (!id) {
+        console.error("No se pudo identificar el número de historia.");
+        return;
+    }
+
+    // NUEVA RUTA: Ahora subimos dos niveles y entramos a paginas/
+    const url = `../../paginas/qr-alojamiento.html?historia=${id}`;
+    
+    // Abrir en una ventana tipo "Pop-up" para simular vista móvil
+    window.open(url, 'Ficha QR', 'width=450,height=700,menubar=no,toolbar=no');
+};
+
+// ***************************************************
+// 9. LÓGICA DE ORDENAMIENTO, PAGINACIÓN Y AYUDA
+// ***************************************************
+
+let currentPageAloj = 1;
+const rowsPerPageAloj = 10;
+let sortConfigAloj = { key: 'historia', direction: 'desc' };
+
+/**
+ * Inicialización de componentes de tabla
+ * Llamar esta función dentro de initAlojamientosPage()
+ */
+function setupTableFeatures() {
+    // Botón Ayuda
+    const btnAyuda = document.getElementById('btn-ayuda-alojamiento');
+    if (btnAyuda) {
+        btnAyuda.onclick = () => {
+            new bootstrap.Modal(document.getElementById('modal-alojamiento-help')).show();
+        };
+    }
+
+    // Configurar Headers Ordenables
+    document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.setAttribute('data-label', th.innerText.trim());
+        th.onclick = () => {
+            const key = th.getAttribute('data-key');
+            if (sortConfigAloj.key === key) {
+                sortConfigAloj.direction = sortConfigAloj.direction === 'asc' ? 'desc' : (sortConfigAloj.direction === 'desc' ? 'none' : 'asc');
+            } else { 
+                sortConfigAloj.key = key; 
+                sortConfigAloj.direction = 'asc'; 
+            }
+            window.renderAlojamientosTable();
+        };
+    });
+}
+
+function updateHeaderIconsAloj() {
+    document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+        const key = th.getAttribute('data-key');
+        const icon = sortConfigAloj.key === key 
+            ? (sortConfigAloj.direction === 'asc' ? ' ▲' : (sortConfigAloj.direction === 'desc' ? ' ▼' : ' -')) 
+            : ' -';
+        th.innerHTML = `${th.getAttribute('data-label')}${icon}`;
+    });
+}
+
+/**
+ * REFACTORIZACIÓN DEL RENDERIZADO (Motor Central)
+ */
+window.renderAlojamientosTable = () => {
+    const term = document.getElementById('search-alojamiento').value.toLowerCase().trim();
+    const estadoFiltro = document.getElementById('filter-estado').value; 
+    const tbody = document.getElementById('tbody-alojamientos');
+
+    if (!tbody) return;
+
+    // 1. FILTRADO
+    let data = dataFull.filter(a => {
+        const matchesSearch = a.nprotA.toLowerCase().includes(term) || 
+                             a.Investigador.toLowerCase().includes(term) ||
+                             String(a.historia).includes(term);
+        
+        const isFinalizado = (a.finalizado == 1 || a.finalizado == "1");
+        const valorEstado = isFinalizado ? "1" : "0";
+        const matchesEstado = estadoFiltro === "" || valorEstado === String(estadoFiltro);
+        
+        return matchesSearch && matchesEstado;
+    });
+
+    // 2. ORDENAMIENTO
+    if (sortConfigAloj.direction !== 'none') {
+        data.sort((a, b) => {
+            let valA = a[sortConfigAloj.key] || ''; 
+            let valB = b[sortConfigAloj.key] || '';
+            const factor = sortConfigAloj.direction === 'asc' ? 1 : -1;
+            
+            // Comparación inteligente (Números vs Strings)
+            return isNaN(valA) || isNaN(valB) 
+                ? valA.toString().localeCompare(valB.toString()) * factor 
+                : (parseFloat(valA) - parseFloat(valB)) * factor;
+        });
+    }
+
+    // 3. PAGINACIÓN
+    const totalItems = data.length;
+    const pageData = data.slice((currentPageAloj - 1) * rowsPerPageAloj, currentPageAloj * rowsPerPageAloj);
+
+    // 4. RENDERIZADO FÍSICO
+    updateHeaderIconsAloj();
+    renderPaginationAloj(totalItems);
+
+    tbody.innerHTML = pageData.map(a => {
+        const isFinalizado = (a.finalizado == 1 || a.finalizado == "1");
+        const infoCajas = a.totalcajachica > 0 ? `${a.totalcajachica} Chica(s)` : `${a.totalcajagrande} Grande(s)`;
+        
+        const fIni = new Date(a.fechavisado);
+        const hoy = new Date();
+        const diffDays = Math.floor(Math.abs(hoy - fIni) / (1000 * 60 * 60 * 24));
+
+        return `
+        <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" onclick="window.verHistorial(${a.historia}, event)">
+            <td><span class="badge bg-dark">#${a.historia}</span></td>
+            <td class="small fw-bold text-secondary">${a.fechavisado}</td> 
+            <td><div class="fw-bold">${a.nprotA}</div><small class="text-muted">${a.tituloA || '---'}</small></td>
+            <td>${a.Investigador}</td>
+            <td>${a.EspeNombreA}</td>
+            <td class="text-center fw-bold">${infoCajas}</td>
+            <td class="text-center"><span class="badge bg-info text-dark">${diffDays} Días</span></td>
+            <td class="small text-muted text-truncate" style="max-width:150px">${a.observaciones || '---'}</td>
+            <td><span class="badge ${isFinalizado ? 'bg-danger' : 'bg-success'}">${isFinalizado ? 'FINALIZADO' : 'VIGENTE'}</span></td>
+            <td class="text-end" onclick="event.stopPropagation()">
+                <div class="btn-group shadow-sm">
+                    ${!isFinalizado ? `<button class="btn btn-xs btn-success" onclick="window.openModalActualizar(${a.historia})"><i class="bi bi-arrow-repeat"></i></button>` : ''}
+                    <button class="btn btn-xs btn-light border" onclick="window.verPaginaQR(${a.historia})"><i class="bi bi-qr-code"></i></button>
+                    <button class="btn btn-xs btn-light border" onclick="window.verHistorial(${a.historia})"><i class="bi bi-clock-history"></i></button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    if (totalItems === 0) tbody.innerHTML = '<tr><td colspan="10" class="text-center p-4 text-muted">No se encontraron alojamientos.</td></tr>';
+};
+
+function renderPaginationAloj(totalItems) {
+    const pagContainer = document.getElementById('pagination-alojamiento');
+    const totalPages = Math.ceil(totalItems / rowsPerPageAloj);
+    pagContainer.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+
+    const createBtn = (label, page, disabled, active = false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link shadow-none" href="#">${label}</a>`;
+        if (!disabled) li.onclick = (e) => { e.preventDefault(); currentPageAloj = page; window.renderAlojamientosTable(); };
+        return li;
+    };
+
+    pagContainer.appendChild(createBtn('«', currentPageAloj - 1, currentPageAloj === 1));
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPageAloj - 2 && i <= currentPageAloj + 2)) {
+            pagContainer.appendChild(createBtn(i, i, false, i === currentPageAloj));
+        }
+    }
+    pagContainer.appendChild(createBtn('»', currentPageAloj + 1, currentPageAloj === totalPages));
+}
+
+// IMPORTANTE: Asegúrate de llamar a setupTableFeatures() en tu export async function initAlojamientosPage()
+
+// ***************************************************
+// 10. EXPORTACIÓN A EXCEL (CSV)
+// ***************************************************
+
+/**
+ * Abre el modal de selección de fechas
+ */
+window.exportExcelAlojamientos = () => {
+    new bootstrap.Modal(document.getElementById('modal-excel-alojamiento')).show();
+};
+
+/**
+ * Procesa los datos y genera el archivo de descarga
+ */
+window.processExcelExportAlojamientos = () => {
+    const start = document.getElementById('excel-start-date-aloj').value;
+    const end = document.getElementById('excel-end-date-aloj').value;
+    const nombreInst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+
+    if (!start || !end) {
+        return Swal.fire('Atención', 'Seleccione un rango de fechas para continuar.', 'warning');
+    }
+
+    // Obtenemos los datos actuales (usando la misma lógica de filtrado de la tabla)
+    const term = document.getElementById('search-alojamiento').value.toLowerCase().trim();
+    const estadoFiltro = document.getElementById('filter-estado').value; 
+
+    let data = dataFull.filter(a => {
+        // Filtro de búsqueda y estado
+        const matchesSearch = a.nprotA.toLowerCase().includes(term) || 
+                             a.Investigador.toLowerCase().includes(term) ||
+                             String(a.historia).includes(term);
+        const isFinalizado = (a.finalizado == 1 || a.finalizado == "1");
+        const matchesEstado = estadoFiltro === "" || (isFinalizado ? "1" : "0") === String(estadoFiltro);
+        
+        // Filtro por rango de fechas (basado en fechavisado)
+        const fechaAloj = a.fechavisado || '0000-00-00';
+        const matchesDate = fechaAloj >= start && fechaAloj <= end;
+
+        return matchesSearch && matchesEstado && matchesDate;
+    });
+
+    if (data.length === 0) {
+        return Swal.fire('Sin resultados', 'No hay registros de alojamiento en ese rango.', 'info');
+    }
+
+    // Definición de Columnas
+    const headers = ["ID Historia", "Fecha Inicio", "Protocolo", "Investigador", "Especie", "Cajas", "Dias Aloj.", "Estado"];
+    const csvRows = [headers.join(";")];
+
+    data.forEach(a => {
+        const infoCajas = a.totalcajachica > 0 ? `${a.totalcajachica} Chica(s)` : `${a.totalcajagrande} Grande(s)`;
+        const isFinalizado = (a.finalizado == 1 || a.finalizado == "1");
+        
+        // Cálculo de días similar al de la tabla
+        const fIni = new Date(a.fechavisado);
+        const diffDays = Math.floor(Math.abs(new Date() - fIni) / (1000 * 60 * 60 * 24));
+
+        const row = [
+            `#${a.historia}`,
+            a.fechavisado,
+            a.nprotA,
+            a.Investigador,
+            a.EspeNombreA,
+            infoCajas,
+            diffDays,
+            isFinalizado ? 'FINALIZADO' : 'VIGENTE'
+        ];
+        
+        // Limpiar puntos y comas para no romper el CSV
+        csvRows.push(row.map(v => String(v).replace(/;/g, ' ').replace(/\n/g, ' ')).join(";"));
+    });
+
+    // Generar y descargar el archivo
+    const csvContent = "\uFEFF" + csvRows.join("\r\n"); // UTF-8 BOM para Excel
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `ALOJAMIENTOS_${nombreInst}_${start}_al_${end}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Cerrar modal
+    bootstrap.Modal.getInstance(document.getElementById('modal-excel-alojamiento')).hide();
 };

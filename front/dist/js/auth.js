@@ -131,6 +131,17 @@ export const Auth = {
                     localStorage.setItem('userId', userId);
                     localStorage.setItem('userFull', res.userFull || res.userName);
                     
+                    // 2. LÓGICA DE REDIRECCIÓN DINÁMICA (GECKO DEVS)
+                    // Comprobamos si el usuario venía de un QR o página específica
+                    const redirectUrl = localStorage.getItem('redirectAfterLogin');
+                    
+                    if (redirectUrl) {
+                        localStorage.removeItem('redirectAfterLogin'); // Limpiamos para evitar bucles
+                        window.location.href = redirectUrl;
+                        return; // IMPORTANTE: Cortamos la ejecución aquí
+                    }
+
+
                     // REDIRECCIÓN DINÁMICA DE NETWISE
                     if (role === 1) {
                         // SuperAdmin

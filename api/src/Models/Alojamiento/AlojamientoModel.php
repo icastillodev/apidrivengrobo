@@ -261,20 +261,51 @@ public function saveAlojamiento($data) {
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
-    // ***************************************************
-    // ACTUALIZACIÓN GLOBAL DE HISTORIA
-    // ***************************************************
-    // Modifica el protocolo, investigador o especie para TODOS los tramos de una historia.
-    public function updateHistoryConfig($data) {
+// api/src/Models/Alojamiento/AlojamientoModel.php
+
+// api/src/Models/Alojamiento/AlojamientoModel.php
+
+public function updateHistoryConfig($data) {
+    $this->db->beginTransaction();
+    try {
+        $historia = $data['historia'];
+        $nuevoTipo = $data['tipoCaja']; // 'chica' o 'grande'
+
+        // Lógica de migración de cantidades entre columnas de caja
+        if ($nuevoTipo === 'chica') {
+            $sqlMigracion = "totalcajachica = (totalcajachica + totalcajagrande), totalcajagrande = 0";
+        } else {
+            $sqlMigracion = "totalcajagrande = (totalcajachica + totalcajagrande), totalcajachica = 0";
+        }
+
+        // UPDATE GLOBAL: Protocolo, Investigador, Especie y Precios
         $sql = "UPDATE alojamiento SET 
-                idprotA = ?, 
-                IdUsrA = ? 
-                WHERE historia = ?";
+                    idprotA = :idprotA, 
+                    IdUsrA = :idUsrA,
+                    TipoAnimal = :idEsp, 
+                    preciocajachica = :pChica,
+                    preciocajagrande = :pGrande,
+                    $sqlMigracion
+                WHERE historia = :historia";
+        
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([
-            $data['idprotA'], 
-            $data['IdUsrA'], 
-            $data['historia']
+        $stmt->execute([
+            ':idprotA'   => $data['idprotA'], 
+            ':idUsrA'    => $data['IdUsrA'], 
+            ':idEsp'     => $data['idespA'], // Actualizamos la especie globalmente
+            ':pChica'    => $data['precioChica'], 
+            ':pGrande'   => $data['precioGrande'],
+            ':historia'  => $historia
         ]);
+
+        // Sincronizamos los totales de dinero de cada tramo con los nuevos precios
+        $this->recalculateHistory($historia);
+
+        $this->db->commit();
+        return true;
+    } catch (\Exception $e) {
+        $this->db->rollBack();
+        throw $e;
     }
+}
 }

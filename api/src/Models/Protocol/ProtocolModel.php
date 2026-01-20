@@ -103,12 +103,24 @@ class ProtocolModel {
             'NombreCompletoInst' => $instConfig['NombreCompletoInst'] ?? 'Institución' // Nuevo dato
         ];
     }
+    /**
+     * Obtiene los detalles completos de las especies autorizadas para un protocolo.
+     * Relaciona protocoloexpe -> protesper -> especiee
+     */
     public function getProtocolSpecies($idprotA) {
-    $stmt = $this->db->prepare("SELECT idespA FROM protesper WHERE idprotA = ?");
-    $stmt->execute([$idprotA]);
-    return $stmt->fetchAll(PDO::FETCH_COLUMN); // Retorna array simple de IDs
-}
-
+        $sql = "SELECT 
+                    e.idespA, 
+                    e.EspeNombreA, 
+                    e.PalojamientoChica, 
+                    e.PalojamientoGrande
+                FROM protesper pe
+                INNER JOIN especiee e ON pe.idespA = e.idespA
+                WHERE pe.idprotA = ?";
+                
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idprotA]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC); // Ahora devuelve objetos completos
+    }
 
 // api/src/Models/Protocolo/ProtocoloModel.php
 
@@ -147,5 +159,37 @@ public function searchForAlojamiento($term, $instId) {
     ]);
 
     return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
+// api/src/Models/Alojamiento/AlojamientoModel.php
+
+public function updateHistoryConfig($data) {
+    $this->db->beginTransaction();
+    try {
+        // Actualizamos todos los tramos de la historia con el nuevo contexto
+        $sql = "UPDATE alojamiento SET 
+                idprotA = ?, 
+                IdUsrA = ?,
+                preciocajachica = ?,
+                preciocajagrande = ?
+                WHERE historia = ?";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            $data['idprotA'], 
+            $data['IdUsrA'], 
+            $data['precioChica'], 
+            $data['precioGrande'],
+            $data['historia']
+        ]);
+
+        // Al cambiar precios o protocolo, es vital recalcular para que los subtotales se actualicen
+        $this->recalculateHistory($data['historia']);
+
+        $this->db->commit();
+        return true;
+    } catch (\Exception $e) {
+        $this->db->rollBack();
+        throw $e;
+    }
 }
 }
