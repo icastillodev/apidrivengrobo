@@ -11,25 +11,21 @@ class BillingModel {
     }
 
 public function getProtocolosByDepto($deptoId) {
-    $instId = $_SESSION['IdInstitucion'] ?? 1; // Ajusta según tu sesión
-
-    $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, 
-            CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
-            u.IdUsrA,
-            IFNULL(d.SaldoDinero, 0) as saldoInv -- Traemos el saldo real de la tabla dinero
+    // Consulta directa a protocolos y usuarios para evitar duplicados
+    $sql = "SELECT DISTINCT 
+                p.idprotA, 
+                p.nprotA, 
+                p.tituloA, 
+                p.IdUsrA,
+                CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
             FROM protocoloexpe p
             JOIN personae u ON p.IdUsrA = u.IdUsrA
-            LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND d.IdInstitucion = ? 
             WHERE p.departamento = ? AND p.idprotA > 0"; 
     
     $stmt = $this->db->prepare($sql);
-    $stmt->execute([$instId, $deptoId]);
+    $stmt->execute([$deptoId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-/**
- * Obtiene Pedidos con cálculo de Precio Momento automático
- */
 public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
     $sql = "SELECT f.idformA as id, 
             CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
@@ -45,8 +41,11 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
             ie.TipoInsumo,
             s.totalA as cant_animal,
             s.organo as cant_organo,
-            pf.precioformulario,      -- PRECIO TOTAL
-            pf.precioanimalmomento,    -- PRECIO UNITARIO (MOMENTO)
+            pf.precioformulario,            -- Total de la tabla animales
+            pf.totalpago as pago_ani,       -- Pagado en tabla animales
+            pif.preciototal as total_ins,    -- Total de la tabla insumos
+            pif.totalpago as pago_ins,       -- Pagado en tabla insumos
+            pf.precioanimalmomento,
             f.estado
             FROM formularioe f
             JOIN protformr pf_link ON f.idformA = pf_link.idformA
@@ -54,6 +53,7 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
             JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
             LEFT JOIN sexoe s ON f.idformA = s.idformA
             LEFT JOIN precioformulario pf ON f.idformA = pf.idformA
+            LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA -- Unimos para traer costos de insumos
             LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
             LEFT JOIN formespe fe ON f.idformA = fe.idformA 
             LEFT JOIN especiee e ON fe.idespA = e.idespA
@@ -72,24 +72,31 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
 
     foreach ($rows as &$r) {
         $r['is_exento'] = ((int)$r['exento'] === 1);
-        $totalForm = (float)$r['precioformulario'];
+        
+        // SUMA DE TOTALES: Animales + Insumos
+        $totalForm = (float)$r['precioformulario'] + (float)$r['total_ins'];
+        
+        // SUMA DE PAGOS: Lo que se pagó por animales + lo que se pagó por insumos
+        $pagadoTotal = (float)$r['pago_ani'] + (float)$r['pago_ins'];
+        
         $pMomento = (float)$r['precioanimalmomento'];
         
-        // Cantidad según tipo para la división
+        // Cantidad según tipo para la división (para el precio unitario sugerido)
         $esRea = (strpos(strtolower($r['categoria']), 'reactivo') !== false);
         $cantDiv = $esRea ? (float)$r['cant_organo'] : (float)$r['cant_animal'];
 
-        // Si no tiene precio momento, se calcula pero NO se guarda en DB
         if ($pMomento <= 0 && $cantDiv > 0) {
             $pMomento = $totalForm / $cantDiv;
         }
 
         $r['total'] = $totalForm; 
         $r['p_unit'] = $pMomento;
-        $r['pagado'] = 0; // Ajustar si existe tabla de recibos
-        $r['debe'] = $r['is_exento'] ? 0 : ($r['total'] - $r['pagado']);
+        $r['pagado'] = $pagadoTotal; // Ahora sí refleja el pago real de la DB
+        
+        // Cálculo de deuda: Si es exento es 0, sino es Total - Pagado
+        $r['debe'] = $r['is_exento'] ? 0 : max(0, $r['total'] - $r['pagado']);
 
-        // Formateo de concepto para evitar undefined
+        // Formateo de concepto para la vista
         $cat = $r['categoria'] ?: "";
         $nom = $r['nombre_tipo'] ?: "";
         $dcto = ($r['descuento'] > 0) ? " <small class='text-success'>(Dcto: {$r['descuento']}%)</small>" : "";
@@ -149,11 +156,12 @@ public function getAlojamientosProtocolo($idProt, $desde = null, $hasta = null) 
 public function getInsumosGenerales($deptoId, $desde, $hasta) {
     $sql = "SELECT 
                 f.idformA as id,
-                f.IdUsrA, -- ID fundamental para el Dashboard
+                f.IdUsrA, 
                 MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
-                MAX(d.SaldoDinero) as saldoInv, -- Traemos el saldo actual desde la tabla dinero
+                MAX(d.SaldoDinero) as saldoInv, 
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ' (', fi.cantidad, ' ', i.TipoInsumo, ')') SEPARATOR ' | ') as detalle_completo,
-                MAX(pif.preciototal) as total_item 
+                MAX(pif.preciototal) as total_item,
+                MAX(pif.totalpago) as pagado -- 1. Agregamos la columna totalpago de la tabla pif
             FROM formularioe f
             JOIN personae u ON f.IdUsrA = u.IdUsrA
             LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion
@@ -170,8 +178,12 @@ public function getInsumosGenerales($deptoId, $desde, $hasta) {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($rows as &$r) {
-        $r['pagado'] = 0; 
-        $r['debe'] = (float)$r['total_item'] - $r['pagado'];
+        // 2. Convertimos a float y usamos el valor real que viene de la base de datos
+        $r['total_item'] = (float)$r['total_item'];
+        $r['pagado'] = (float)$r['pagado']; 
+        
+        // 3. Calculamos la deuda real restando el total menos lo que ya se pagó
+        $r['debe'] = $r['total_item'] - $r['pagado'];
     }
     return $rows;
 }
@@ -196,31 +208,175 @@ public function updateBalance($idUsr, $inst, $monto) {
 }
 
 /**
- * Ejecuta la transacción de pago (Todo o nada)
+ * Procesa la transacción de pago impactando saldo y deudas de forma atómica.
  */
 public function processPaymentTransaction($idUsr, $monto, $items, $inst) {
     try {
+        // Iniciamos la transacción para que si algo falla, no se descuente el dinero
         $this->db->beginTransaction();
 
-        // 1. Descontar del saldo
+        // 1. Descontar el monto del saldo del investigador
         $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-        $this->db->prepare($sqlSaldo)->execute([$monto, $idUsr, $inst]);
+        $stmtSaldo = $this->db->prepare($sqlSaldo);
+        $stmtSaldo->execute([$monto, $idUsr, $inst]);
 
-        // 2. Marcar ítems como pagados
+        // 2. Recorrer y liquidar cada ítem seleccionado
         foreach ($items as $item) {
-            if ($item['tipo'] === 'FORM') {
-                $sql = "UPDATE precioinsumosformulario SET totalpago = totalpago + (preciototal - totalpago) WHERE idformA = ?";
-            } else {
-                $sql = "UPDATE alojamiento SET totalpago = totalpago + (cuentaapagar - totalpago) WHERE historia = ?";
+            $id = $item['id'];
+
+            // Caso: Insumos (Generales o de Protocolo)
+            if ($item['tipo'] === 'INSUMO_GRAL' || $item['tipo'] === 'FORM') {
+                
+                // Actualizamos la deuda de insumos igualando totalpago a preciototal
+                $sqlIns = "UPDATE precioinsumosformulario 
+                           SET totalpago = totalpago + (preciototal - totalpago) 
+                           WHERE idformA = ?";
+                $this->db->prepare($sqlIns)->execute([$id]);
+
+                // Si es un Formulario de Protocolo (FORM), también liquidamos el precio del animal
+                if ($item['tipo'] === 'FORM') {
+                    $sqlAni = "UPDATE precioformulario 
+                               SET totalpago = totalpago + (precioformulario - totalpago) 
+                               WHERE idformA = ?";
+                    $this->db->prepare($sqlAni)->execute([$id]);
+                }
+
+            } 
+            // Caso: Alojamiento
+            else if ($item['tipo'] === 'ALOJ') {
+                $sqlAloj = "UPDATE alojamiento 
+                            SET totalpago = totalpago + (cuentaapagar - totalpago) 
+                            WHERE historia = ?";
+                $this->db->prepare($sqlAloj)->execute([$id]);
             }
-            $this->db->prepare($sql)->execute([$item['id']]);
         }
+
+        // Si todo salió bien, confirmamos los cambios
+        $this->db->commit();
+        return true;
+
+    } catch (\Exception $e) {
+        // Si hay CUALQUIER error (SQL, conexión, etc.), deshacemos todo
+        $this->db->rollBack();
+        error_log("Error en Pago: " . $e->getMessage());
+        throw $e;
+    }
+}
+/**
+ * Obtiene un mapa de saldos de todos los usuarios para una institución específica
+ */
+public function getSaldosPorInstitucion($instId) {
+    $sql = "SELECT IdUsrA, SaldoDinero FROM dinero WHERE IdInstitucion = ?";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$instId]);
+    
+    // Retornamos un array asociativo donde la llave es el IdUsrA
+    return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+}
+
+/**
+ * Obtiene el detalle técnico y financiero real del pedido
+ */
+public function getAnimalDetailById($id) {
+    $sql = "SELECT 
+                f.idformA, 
+                p.idprotA as id_protocolo,
+                f.tipoA as id_tipo_form,
+                tf.nombreTipo as nombre_tipo,
+                CONCAT(p.nprotA, ' - ', p.tituloA) as protocolo_info,
+                CONCAT(e.EspeNombreA, ' : ', COALESCE(se.SubEspeNombreA, 'N/A')) as taxonomia,
+                f.edadA as edad,
+                f.pesoa as peso,
+                tf.exento as is_exento,
+                COALESCE(s.machoA, 0) as machos,
+                COALESCE(s.hembraA, 0) as hembras,
+                COALESCE(s.indistintoA, 0) as indistintos,
+                COALESCE(s.totalA, 0) as cantidad,
+                f.fechainicioA as fecha_inicio,
+                f.fecRetiroA as fecha_fin,
+                f.aclaraA as aclaracion_usuario,
+                COALESCE(f.aclaracionadm, 'No hay aclaraciones del administrador.') as nota_admin,
+                COALESCE(pf.precioanimalmomento, 0) as precio_unitario, 
+                COALESCE(pf.precioformulario, 0) as total_calculado,
+                COALESCE(pf.totalpago, 0) as totalpago,
+                COALESCE(tf.descuento, 0) as descuento, -- Descuento desde precioformulario
+                COALESCE(d.SaldoDinero, 0) as saldoInv,
+                CONCAT(u.ApellidoA, ', ', u.NombreA) as solicitante
+            FROM formularioe f
+            INNER JOIN personae u ON f.IdUsrA = u.IdUsrA
+            LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            LEFT JOIN protformr rf ON f.idformA = rf.idformA 
+            LEFT JOIN protocoloexpe p ON rf.idprotA = p.idprotA
+            LEFT JOIN precioformulario pf ON f.idformA = pf.idformA
+            LEFT JOIN sexoe s ON f.idformA = s.idformA
+            LEFT JOIN formespe fe ON f.idformA = fe.idformA 
+            LEFT JOIN especiee e ON fe.idespA = e.idespA
+            LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
+            LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion
+            WHERE f.idformA = ?;";
+    
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$id]);
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
+}
+/**
+ * Actualización completa de un registro de animal
+ */
+public function updateAnimalFull($id, $cant, $precio, $pago) {
+    try {
+        $this->db->beginTransaction();
+
+        // 1. Actualizamos precios y pagos
+        $sql1 = "UPDATE precioformulario 
+                 SET precioanimalmomento = ?, 
+                     precioformulario = (? * ?), 
+                     totalpago = ? 
+                 WHERE idformA = ?";
+        $this->db->prepare($sql1)->execute([$precio, $precio, $cant, $pago, $id]);
+
+        // 2. Actualizamos la cantidad física en la tabla de sexos
+        $sql2 = "UPDATE sexoe SET totalA = ? WHERE idformA = ?";
+        $this->db->prepare($sql2)->execute([$cant, $id]);
 
         $this->db->commit();
         return true;
     } catch (\Exception $e) {
         $this->db->rollBack();
-        throw $e;
+        return false;
     }
 }
+public function procesarAjustePago($id, $monto, $accion) {
+    try {
+        $this->db->beginTransaction();
+
+        // 1. Obtener datos actuales del formulario e investigador
+        $sql = "SELECT f.IdUsrA, f.IdInstitucion, pf.totalpago 
+                FROM formularioe f 
+                JOIN precioformulario pf ON f.idformA = pf.idformA 
+                WHERE f.idformA = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$id]);
+        $data = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if ($accion === 'PAGAR') {
+            // Restar saldo al investigador y sumar al pago
+            $sqlPago = "UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?";
+            $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
+        } else {
+            // Restar al pago y devolver al saldo
+            $sqlPago = "UPDATE precioformulario SET totalpago = totalpago - ? WHERE idformA = ?";
+            $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?";
+        }
+
+        $this->db->prepare($sqlPago)->execute([$monto, $id]);
+        $this->db->prepare($sqlSaldo)->execute([$monto, $data['IdUsrA'], $data['IdInstitucion']]);
+
+        $this->db->commit();
+        return true;
+    } catch (\Exception $e) {
+        $this->db->rollBack();
+        return false;
+    }
+}
+
 }

@@ -155,7 +155,7 @@ const setupProtocolSearch = () => {
 };
 
 
-window.openModalActualizar = (historiaId, desdeHistorial = false) => {
+window.openModalRegistro = (historiaId, desdeHistorial = false) => {
     const actual = dataFull.find(a => a.historia == historiaId);
     if (!actual) return;
 
@@ -337,8 +337,12 @@ window.renderHistorialTable = (history) => {
             <td class="small italic text-muted">${h.observaciones || ''}</td>
             <td>
                 <div class="btn-group">
-                    <button class="btn btn-xs btn-outline-primary" onclick="window.modificarTramo(${h.IdAlojamiento})"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-xs btn-outline-danger" onclick="window.eliminarTramo(${h.IdAlojamiento}, ${h.historia})"><i class="bi bi-trash"></i></button>
+                    <button class="btn btn-xs btn-outline-primary" onclick="window.modificarTramo(${h.IdAlojamiento})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-xs btn-outline-danger" onclick="window.eliminarTramo(${h.IdAlojamiento}, ${h.historia})">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             </td>
         </tr>`;
@@ -868,4 +872,369 @@ window.processExcelExportAlojamientos = () => {
     
     // Cerrar modal
     bootstrap.Modal.getInstance(document.getElementById('modal-excel-alojamiento')).hide();
+};
+// ***************************************************
+// ELIMINAR TRAMO DE ALOJAMIENTO (Sincronizado con Historial)
+// ***************************************************
+// Esta función borra una fila específica de la estadía y actualiza los cálculos.
+window.eliminarTramo = async (idAlojamiento, historiaId) => {
+    // 1. Confirmación de seguridad con SweetAlert2
+    const { isConfirmed } = await Swal.fire({
+        title: '¿Eliminar este tramo?',
+        text: "Se borrará este registro de la historia y afectará los costos totales.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'SÍ, ELIMINAR',
+        cancelButtonText: 'CANCELAR'
+    });
+
+    if (isConfirmed) {
+        showLoader();
+        try {
+            // 2. Petición a la API (Ruta definida en routes.php)
+            const res = await API.request('/alojamiento/delete-row', 'POST', { 
+                IdAlojamiento: idAlojamiento,
+                historia: historiaId 
+            });
+
+            if (res.status === 'success') {
+                Swal.fire({
+                    title: 'Eliminado',
+                    text: 'El tramo ha sido borrado correctamente.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+
+                // 3. Recargar datos de la tabla principal en segundo plano
+                await loadAlojamientos();
+
+                // 4. Refrescar el modal de historial para mostrar los cambios
+                setTimeout(() => window.verHistorial(historiaId), 500);
+            } else {
+                Swal.fire('Error', res.message || 'No se pudo eliminar el tramo.', 'error');
+            }
+        } catch (error) {
+            console.error("Error crítico al eliminar tramo:", error);
+            Swal.fire('Error', 'Fallo de conexión con el servidor.', 'error');
+        } finally {
+            hideLoader();
+        }
+    }
+};
+
+
+
+// ***************************************************
+// FUNCIÓN: openModalActualizar (ACTUALIZADA AL NUEVO MODAL)
+// ***************************************************
+window.openModalActualizar = (historiaId, desdeHistorial = false) => {
+    // 1. Buscamos los datos actuales de la historia en el caché
+    const actual = dataFull.find(a => a.historia == historiaId);
+    if (!actual) return;
+
+    // 2. Si venimos del historial, cerramos ese modal para que no se pisen
+    if (desdeHistorial) {
+        const modalHistEl = document.getElementById('modal-historial');
+        const modalHist = bootstrap.Modal.getInstance(modalHistEl);
+        if (modalHist) modalHist.hide();
+    }
+
+    // 3. Mapeamos los datos a los IDs de TU NUEVO MODAL
+    // Fecha: Seteamos la fecha de hoy por defecto
+    document.getElementById('reg-fecha-qr').valueAsDate = new Date();
+
+    // Cantidad: Detectamos si usa caja chica o grande para mostrar la cantidad actual
+    const esChica = parseFloat(actual.totalcajachica) > 0;
+    const cantActual = esChica ? actual.totalcajachica : actual.totalcajagrande;
+    document.getElementById('reg-cantidad-qr').value = cantActual;
+
+    // Observaciones: Limpiamos el campo para la nueva actualización
+    document.getElementById('reg-obs-qr').value = "";
+
+    // 4. Guardamos la historia en el dataset del modal para que 'guardarNuevoTramo' sepa cuál es
+    const modalEl = document.getElementById('modal-actualizar-qr');
+    modalEl.dataset.historia = historiaId;
+
+    // 5. Abrimos el modal correcto
+    new bootstrap.Modal(modalEl).show();
+};
+
+// ***************************************************
+// GUARDAR NUEVO TRAMO (Corrección de error 'f is undefined')
+// ***************************************************
+window.guardarNuevoTramo = async () => {
+    const modalEl = document.getElementById('modal-actualizar-qr');
+    const historiaId = modalEl.dataset.historia;
+
+    // BUSQUEDA SEGURA: En lugar de currentHistoryData[0], buscamos en dataFull
+    // que es la fuente de verdad de la tabla principal.
+    const f = dataFull.find(a => a.historia == historiaId);
+
+    // Validación de seguridad para evitar el error 'undefined'
+    if (!f) {
+        console.error("❌ Error: No se encontraron datos maestros para la historia:", historiaId);
+        return Swal.fire('Error', 'No se pudo recuperar la información base del alojamiento.', 'error');
+    }
+
+    // Capturamos los valores de TU modal
+    const nuevaFecha = document.getElementById('reg-fecha-qr').value;
+    const nuevaCantidad = document.getElementById('reg-cantidad-qr').value;
+    const nuevaObs = document.getElementById('reg-obs-qr').value;
+
+    if (!nuevaFecha || !nuevaCantidad) {
+        return Swal.fire('Atención', 'Fecha y Cantidad son obligatorias.', 'warning');
+    }
+
+    // Identificamos el tipo de caja para mantener la consistencia
+    const esChica = parseFloat(f.totalcajachica) > 0;
+
+    const payload = {
+        fechavisado: nuevaFecha,
+        // Si el registro original era caja chica, actualizamos caja chica
+        totalcajachica: esChica ? nuevaCantidad : 0,
+        totalcajagrande: !esChica ? nuevaCantidad : 0,
+        observaciones: nuevaObs,
+        // Datos técnicos heredados (obligatorios para la BD)
+        idprotA: f.idprotA,
+        IdUsrA: f.IdUsrA,
+        historia: historiaId,
+        IdInstitucion: localStorage.getItem('instId'),
+        is_update: true // <--- Clave para que el backend cierre el tramo anterior
+    };
+
+    showLoader();
+    try {
+        const res = await API.request('/alojamiento/save', 'POST', payload);
+        
+        if (res.status === 'success') {
+            // Cerrar el modal de Bootstrap
+            const instModal = bootstrap.Modal.getInstance(modalEl);
+            if (instModal) instModal.hide();
+
+            Swal.fire({
+                title: '¡Actualizado!',
+                text: 'Nuevo tramo registrado correctamente.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            // Recargamos la tabla principal para ver los cambios
+            await loadAlojamientos();
+        } else {
+            Swal.fire('Error', res.message || 'Error en el servidor', 'error');
+        }
+    } catch (e) {
+        console.error("Error crítico en guardarNuevoTramo:", e);
+        Swal.fire('Error', 'Fallo de conexión.', 'error');
+    } finally {
+        hideLoader();
+    }
+};
+
+// ***************************************************
+// 1. ABRIR MODAL DE EDICIÓN (Carga de datos)
+// ***************************************************
+// Localiza el tramo específico en el historial y rellena el modal de edición.
+// ***************************************************
+// 7. MODIFICACIÓN DE TRAMOS INDIVIDUALES
+// ***************************************************
+
+
+
+// ***************************************************
+// FUNCIÓN: MODIFICAR TRAMO (Versión Blindada)
+// ***************************************************
+window.modificarTramo = (idAlojamiento) => {
+    console.log("🟢 Iniciando modificarTramo para ID:", idAlojamiento); // Esto DEBE aparecer en consola
+
+    // 1. Validar datos
+    if (!window.currentHistoryData || window.currentHistoryData.length === 0) {
+        console.error("❌ Error: No hay datos cargados en el historial.");
+        return;
+    }
+
+    const row = window.currentHistoryData.find(h => h.IdAlojamiento == idAlojamiento);
+    if (!row) {
+        console.error("❌ Error: No se encontró el tramo", idAlojamiento);
+        return;
+    }
+
+    // 2. Cerrar historial de forma segura
+    const modalHistEl = document.getElementById('modal-historial');
+    if (modalHistEl) {
+        const inst = bootstrap.Modal.getInstance(modalHistEl) || new bootstrap.Modal(modalHistEl);
+        inst.hide();
+    }
+
+    // 3. Preparar Modal de Modificación (IDs exactos de tu HTML)
+    try {
+        const esChica = parseInt(row.totalcajachica) > 0;
+        
+        // Elementos del modal de modificación
+        const inputChica = document.getElementById('edit-caja-ch');
+        const inputGrande = document.getElementById('edit-caja-gr');
+
+        if (esChica) {
+            inputChica.closest('.col-6').style.display = 'block';
+            inputGrande.closest('.col-6').style.display = 'none';
+            inputChica.value = row.totalcajachica;
+        } else {
+            inputGrande.closest('.col-6').style.display = 'block';
+            inputChica.closest('.col-6').style.display = 'none';
+            inputGrande.value = row.totalcajagrande;
+        }
+
+        document.getElementById('edit-id-alojamiento').value = row.IdAlojamiento;
+        document.getElementById('edit-historia').value = row.historia;
+        document.getElementById('edit-fecha-inicio').value = row.fechavisado;
+        document.getElementById('edit-obs').value = row.observaciones || '';
+
+        // 4. Mostrar modal
+        const modalModif = new bootstrap.Modal(document.getElementById('modal-modificar-tramo'));
+        modalModif.show();
+        
+    } catch (err) {
+        console.error("❌ Error configurando el modal de modificación:", err);
+    }
+};
+// ***************************************************
+// 2. GUARDAR EDICIÓN (Petición API)
+// ***************************************************
+// Procesa los cambios, mantiene el tipo de caja original y actualiza la BD.
+window.updateTramoData = async () => {
+    // Recopilamos los datos del formulario de edición
+    const hId = document.getElementById('edit-historia').value;
+    
+    const data = {
+        IdAlojamiento: parseInt(document.getElementById('edit-id-alojamiento').value),
+        historia: parseInt(hId),
+        fechavisado: document.getElementById('edit-fecha-inicio').value,
+        totalcajachica: parseInt(document.getElementById('edit-caja-ch').value) || 0,
+        totalcajagrande: parseInt(document.getElementById('edit-caja-gr').value) || 0,
+        observaciones: document.getElementById('edit-obs').value || "",
+        IdInstitucion: parseInt(localStorage.getItem('instId'))
+    };
+
+    // Validación mínima
+    if (!data.fechavisado) {
+        return Swal.fire('Atención', 'La fecha de inicio es obligatoria.', 'warning');
+    }
+
+    showLoader();
+    try {
+        const res = await API.request('/alojamiento/update-row', 'POST', data);
+        
+        if (res.status === 'success') {
+            // Cerramos el modal de edición
+            const modalEdit = bootstrap.Modal.getInstance(document.getElementById('modal-modificar-tramo'));
+            if (modalEdit) modalEdit.hide();
+
+            Swal.fire({
+                title: '¡Actualizado!',
+                text: 'Los datos del tramo se han modificado correctamente.',
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            // Recargamos la tabla principal y re-abrimos el historial actualizado
+            await loadAlojamientos();
+            setTimeout(() => window.verHistorial(hId), 600);
+        } else {
+            Swal.fire('Error', res.message || 'No se pudo actualizar el tramo.', 'error');
+        }
+    } catch (e) {
+        console.error("Error en updateTramoData:", e);
+        Swal.fire('Error', 'Fallo de conexión con el servidor.', 'error');
+    } finally {
+        hideLoader();
+    }
+};
+
+
+// ***************************************************
+// FINALIZAR ESTADÍA (Cerrar Historia)
+// ***************************************************
+window.confirmarFinalizarRango = async (historiaId, ultimaFechaInicio) => {
+    // 1. Configurar fecha de hoy para el cierre
+    const hoy = new Date().toISOString().split('T')[0];
+
+    // 2. Diálogo de confirmación
+    const { value: fechaFin, isConfirmed } = await Swal.fire({
+        title: 'Finalizar Alojamiento',
+        html: `
+            <div class="text-start small alert alert-warning">
+                Se marcará la estadía como <b>FINALIZADA</b>. <br>
+                El sistema calculará el costo total desde el último tramo hasta la fecha de retiro.
+            </div>
+            <label class="fw-bold small">FECHA DE RETIRO:</label>
+            <input type="date" id="swal-fecha-fin" class="form-control" value="${hoy}" min="${ultimaFechaInicio}">
+        `,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'CONFIRMAR FINALIZACIÓN',
+        confirmButtonColor: '#dc3545',
+        preConfirm: () => {
+            const f = document.getElementById('swal-fecha-fin').value;
+            if (!f) return Swal.showValidationMessage("La fecha es obligatoria");
+            return f;
+        }
+    });
+
+    if (isConfirmed) {
+        showLoader();
+        try {
+            // Enviamos el ID de historia y la fecha final
+            const res = await API.request('/alojamiento/finalizar', 'POST', { 
+                historia: historiaId,
+                hastafecha: fechaFin,
+                finalizado: 1 // Tu requerimiento: poner en 1 este atributo
+            });
+
+            if (res.status === 'success') {
+                Swal.fire('¡Finalizado!', 'La estadía ha sido cerrada y facturada.', 'success');
+                
+                // Cerramos el historial y recargamos la tabla principal
+                const modalHist = bootstrap.Modal.getInstance(document.getElementById('modal-historial'));
+                if (modalHist) modalHist.hide();
+
+                await loadAlojamientos(); 
+            } else {
+                Swal.fire('Error', res.message || 'No se pudo finalizar', 'error');
+            }
+        } catch (e) {
+            console.error("Error al finalizar historia:", e);
+        } finally {
+            hideLoader();
+        }
+    }
+};
+
+// ***************************************************
+// DESFINALIZAR (Re-abrir Historia)
+// ***************************************************
+window.confirmarDesfinalizar = async (historiaId) => {
+    const { isConfirmed } = await Swal.fire({
+        title: '¿Reabrir esta estadía?',
+        text: "El último tramo volverá a quedar como 'VIGENTE' y se eliminará su fecha de cierre.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'SÍ, REABRIR',
+        confirmButtonColor: '#f39c12'
+    });
+
+    if (isConfirmed) {
+        showLoader();
+        try {
+            const res = await API.request('/alojamiento/desfinalizar', 'POST', { historia: historiaId });
+            if (res.status === 'success') {
+                Swal.fire('Reabierto', 'La estadía está vigente nuevamente.', 'success');
+                await loadAlojamientos();
+                setTimeout(() => window.verHistorial(historiaId), 500);
+            }
+        } catch (e) { console.error(e); } finally { hideLoader(); }
+    }
 };

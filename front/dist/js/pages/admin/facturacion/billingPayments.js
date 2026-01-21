@@ -2,11 +2,11 @@ import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 
 /**
- * Ajuste manual de saldo (Agregar/Quitar)
+ * 1. Actualiza el saldo (Suma o Resta)
+ * Busca el input dinámicamente según si es el Dashboard o un Protocolo específico.
  */
-window.updateBalance = async (idUsr, action, isFromProtocol = false) => {
-    // Seleccionamos el input basándonos en si es dashboard o protocolo
-    const inputSelector = isFromProtocol ? `#inp-saldo-prot-${idUsr}` : `#inp-saldo-${idUsr}`;
+window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = null) => {
+    const inputSelector = isFromProtocol ? `#inp-saldo-prot-${idProt}` : `#inp-saldo-${idUsr}`;
     const input = document.querySelector(inputSelector);
     
     if (!input || !input.value) {
@@ -26,8 +26,8 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false) => {
         });
 
         if (res.status === 'success') {
-            input.value = ''; // Limpiamos el campo
-            // RECARGA GLOBAL: Esto es vital para ver los cambios
+            input.value = ''; 
+            // Recarga global para actualizar los visores de saldo en toda la pantalla
             await window.cargarFacturacionDepto(); 
             
             Swal.fire({
@@ -42,80 +42,217 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false) => {
     } catch (e) { console.error(e); } finally { hideLoader(); }
 };
 
-/**
- * Procesa el pago de los ítems seleccionados en un protocolo
- */
 window.procesarPagoProtocolo = async (idProt) => {
-    const prot = currentReportData.protocolos.find(p => p.idProt == idProt);
+    const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
     if (!prot) return;
 
     let totalAPagar = 0;
     const items = [];
 
-    // Capturamos lo seleccionado
-    document.querySelectorAll(`.check-item-form[data-prot="${idProt}"]:checked, .check-item-aloj[data-prot="${idProt}"]:checked`).forEach(chk => {
-        totalAPagar += parseFloat(chk.dataset.monto);
-        items.push({
-            tipo: chk.classList.contains('check-item-form') ? 'FORM' : 'ALOJ',
-            id: chk.dataset.id
+    // Recolectamos selección de checkboxes
+    const seleccionados = document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj)`);
+    seleccionados.forEach(chk => {
+        totalAPagar += parseFloat(chk.dataset.monto || 0);
+        items.push({ 
+            tipo: chk.classList.contains('check-item-form') ? 'FORM' : 'ALOJ', 
+            id: chk.dataset.id 
         });
     });
 
-    if (items.length === 0) {
-        Swal.fire('Atención', 'Selecciona qué quieres pagar.', 'warning');
+    if (totalAPagar <= 0) {
+        Swal.fire('Atención', 'Seleccione qué desea pagar.', 'info');
         return;
     }
 
-    const saldoActual = parseFloat(prot.saldoInv);
+    const saldoActual = parseFloat(prot.saldoInv || 0);
 
-    // Validación de Saldo
+    // VALIDACIÓN: ¿Tiene saldo suficiente?
     if (totalAPagar > saldoActual) {
         Swal.fire({
             title: 'Saldo Insuficiente',
-            html: `Intentas pagar <b>$ ${totalAPagar.toFixed(2)}</b> pero solo tienes <b>$ ${saldoActual.toFixed(2)}</b>.`,
+            html: `
+                <div class="alert alert-danger">
+                    El monto seleccionado (<b>$ ${totalAPagar.toLocaleString('es-UY')}</b>) 
+                    es mayor al saldo disponible (<b>$ ${saldoActual.toLocaleString('es-UY')}</b>).
+                </div>
+                <p>Por favor, agregue saldo o seleccione menos ítems.</p>`,
             icon: 'error'
         });
         return;
     }
 
-    // El "Cartelito" de confirmación
+    // CONFIRMACIÓN: Detalle de saldo restante
     const confirm = await Swal.fire({
         title: 'Confirmar Liquidación',
         html: `
             <div class="text-start">
-                <p>Estás por pagar <b>${items.length}</b> ítems.</p>
-                <ul class="list-group list-group-flush mb-3">
-                    <li class="list-group-item d-flex justify-content-between">Total a pagar: <span>$ ${totalAPagar.toFixed(2)}</span></li>
-                    <li class="list-group-item d-flex justify-content-between">Saldo después: <span>$ ${(saldoActual - totalAPagar).toFixed(2)}</span></li>
-                </ul>
+                <p>Estás por liquidar <b>${items.length}</b> ítems.</p>
+                <div class="p-3 bg-light rounded border shadow-sm">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total a pagar:</span> 
+                        <span class="fw-bold">$ ${totalAPagar.toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between text-success fw-bold">
+                        <span>Saldo después del pago:</span> 
+                        <span>$ ${(saldoActual - totalAPagar).toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
+                    </div>
+                </div>
             </div>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, pagar ahora',
-        confirmButtonColor: '#1a5d3b'
+        confirmButtonColor: '#1a5d3b',
+        cancelButtonText: 'Cancelar'
     });
 
     if (confirm.isConfirmed) {
-        ejecutarPagoAPI(prot.idUsr, totalAPagar, items);
+        ejecutarPagoFinal(prot.idUsr, totalAPagar, items);
     }
 };
-
 /**
- * Ejecución de la API de Pago
+ * Envío real a la base de datos
  */
-async function ejecutarTransaccionPago(idUsr, monto, items) {
+async function ejecutarPagoFinal(idUsr, monto, items) {
     try {
         showLoader();
         const res = await API.request('/billing/process-payment', 'POST', {
             idUsr,
             monto,
-            items, // Array con IDs y Tipos
+            items,
+            instId: localStorage.getItem('instId') || 1
+        });
+
+        if (res.status === 'success') {
+            // Cerramos el loader y mostramos éxito
+            hideLoader();
+            await Swal.fire({
+                title: '¡Pago Procesado!',
+                text: 'El saldo ha sido actualizado y los ítems marcados como pagados.',
+                icon: 'success',
+                confirmButtonText: 'Genial'
+            });
+
+            // RECARGA: Esto hará que las filas pasen a color VERDE
+            if (window.cargarFacturacionDepto) {
+                await window.cargarFacturacionDepto();
+            }
+        } else {
+            Swal.fire('Error', res.message || 'No se pudo procesar el pago.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
+    } finally {
+        hideLoader();
+    }
+}
+/**
+ * 3. Ejecución final del pago en la API
+ */
+window.ejecutarPagoAPI = async (idUsr, monto, items) => {
+    try {
+        showLoader();
+        const res = await API.request('/billing/process-payment', 'POST', {
+            idUsr,
+            monto,
+            items,
             instId: localStorage.getItem('instId') || 1
         });
 
         if (res.status === 'success') {
             await Swal.fire('Pago Exitoso', 'Los ítems han sido liquidados y el saldo actualizado.', 'success');
-            window.cargarFacturacionDepto(); // Refresca la vista
+            await window.cargarFacturacionDepto(); // Refresca tablas y dashboard
         }
-    } catch (e) { console.error(e); } finally { hideLoader(); }
-}
+    } catch (e) { 
+        console.error(e); 
+        Swal.fire('Error', 'No se pudo procesar el pago.', 'error');
+    } finally { 
+        hideLoader(); 
+    }
+};
+
+window.procesarPagoInsumosGenerales = async () => {
+    const seleccionados = document.querySelectorAll('.check-item-insumo:checked');
+    
+    if (seleccionados.length === 0) {
+        Swal.fire('Atención', 'Seleccione al menos un insumo para pagar.', 'info');
+        return;
+    }
+
+    let totalAPagar = 0;
+    const items = [];
+    let htmlItems = '<ul class="list-group list-group-flush mb-3 small shadow-sm">';
+
+    // Recolectamos datos de la grilla
+    seleccionados.forEach(chk => {
+        const fila = chk.closest('tr');
+        const concepto = fila.cells[3].innerText; // Columna de concepto
+        const monto = parseFloat(chk.dataset.monto || 0);
+        
+        totalAPagar += monto;
+        items.push({ tipo: 'INSUMO_GRAL', id: chk.dataset.id });
+        htmlItems += `<li class="list-group-item d-flex justify-content-between">
+                        <span class="text-truncate" style="max-width: 200px;">${concepto}</span>
+                        <b>$ ${monto.toLocaleString('es-UY')}</b>
+                      </li>`;
+    });
+    htmlItems += '</ul>';
+
+    // Obtenemos los datos del investigador (del primer insumo seleccionado)
+    // Asumimos que los insumos generales pertenecen a un investigador responsable
+    const primerItem = window.currentReportData.insumosGenerales.find(i => i.id == items[0].id);
+    const saldoActual = parseFloat(primerItem.saldoInv || 0);
+    const nombreInvestigador = primerItem.solicitante;
+
+    // VALIDACIÓN CRÍTICA: Si no le alcanza el saldo, no se abre el pago
+    if (totalAPagar > saldoActual) {
+        Swal.fire({
+            title: 'Saldo Insuficiente',
+            html: `
+                <div class="text-start">
+                    <p><b>Investigador:</b> ${nombreInvestigador}</p>
+                    <p class="text-danger">El saldo disponible ($ ${saldoActual.toLocaleString('es-UY')}) 
+                    no es suficiente para cubrir el total ($ ${totalAPagar.toLocaleString('es-UY')}).</p>
+                </div>`,
+            icon: 'error'
+        });
+        return;
+    }
+
+    // CARTEL DE CONFIRMACIÓN DETALLADO
+    const confirm = await Swal.fire({
+        title: 'Confirmar Liquidación de Insumos',
+        width: '500px',
+        html: `
+            <div class="text-start">
+                <div class="mb-2 small text-muted text-uppercase fw-bold">Investigador Responsable:</div>
+                <h6 class="fw-bold mb-3">${nombreInvestigador}</h6>
+                
+                <div class="mb-2 small text-muted text-uppercase fw-bold">Ítems a pagar:</div>
+                ${htmlItems}
+
+                <div class="p-3 bg-light rounded border">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Saldo Actual:</span> <b>$ ${saldoActual.toLocaleString('es-UY')}</b>
+                    </div>
+                    <div class="d-flex justify-content-between text-primary">
+                        <span>Total a Pagar:</span> <b>- $ ${totalAPagar.toLocaleString('es-UY')}</b>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between text-success fw-bold">
+                        <span>Saldo Restante:</span> <span>$ ${(saldoActual - totalAPagar).toLocaleString('es-UY')}</span>
+                    </div>
+                </div>
+            </div>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, liquidar insumos',
+        confirmButtonColor: '#0d6efd',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (confirm.isConfirmed) {
+        ejecutarPagoFinal(primerItem.IdUsrA, totalAPagar, items);
+    }
+};

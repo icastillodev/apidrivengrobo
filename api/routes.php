@@ -146,3 +146,25 @@ $router->get('/deptos/list', 'DeptoController@list');
 $router->post('/billing/balance', 'BillingController@updateBalance');
 
 $router->post('/billing/process-payment', 'BillingController@processPayment');
+
+
+/**
+ * NUEVAS RUTAS PARA MODALES DE EDICIÓN FINA (GROBO 2026)
+ */
+
+// Endpoints para obtener el detalle (Carga el modal)
+$router->get('/billing/detail-animal/:id', 'BillingController@getAnimalDetail');
+$router->get('/billing/detail-reactive/:id', 'BillingController@getReactiveDetail');
+$router->get('/billing/detail-insumo/:id', 'BillingController@getInsumoDetail');
+$router->get('/billing/detail-alojamiento/:id', 'BillingController@getAlojamientoDetail');
+
+// Endpoints para actualizar (Guarda cambios del modal)
+$router->post('/billing/update-animal', 'BillingController@updateAnimal');
+$router->post('/billing/update-reactive', 'BillingController@updateReactive');
+$router->post('/billing/update-insumo', 'BillingController@updateInsumo');
+$router->post('/billing/update-alojamiento', 'BillingController@updateAlojamiento');
+
+// Generación de Fichas PDF individuales
+$router->get('/billing/generate-pdf-ficha', 'BillingController@generatePdfFicha');
+// En la sección de Facturación y Cobranzas
+$router->post('/billing/ajustar-pago-individual', 'BillingController@ajustarPagoIndividual');

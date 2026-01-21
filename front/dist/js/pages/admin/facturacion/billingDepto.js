@@ -3,12 +3,13 @@ import { hideLoader, showLoader } from '../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../components/MenuComponent.js';
 import { renderDashboard } from './billingDashboard.js'; // Asegura que la ruta sea correcta
 import './billingPayments.js';
-
+import './Modals/manager.js';
 
 let currentReportData = null;
 
 export async function initBillingDepto() {
     try {
+        aplicarEstilosTablas();
         showLoader();
         await refreshMenuNotifications();
         const hoy = new Date();
@@ -41,12 +42,10 @@ window.cargarFacturacionDepto = async () => {
     const desde = document.getElementById('f-desde').value;
     const hasta = document.getElementById('f-hasta').value;
     
-    // Captura de filtros
     const chkAni = document.getElementById('chk-animales').checked;
     const chkAlo = document.getElementById('chk-alojamiento').checked;
     const chkIns = document.getElementById('chk-insumos').checked;
 
-    // Validación: Al menos uno debe estar activo
     if (!chkAni && !chkAlo && !chkIns) {
         Swal.fire('Atención', 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
         return;
@@ -58,8 +57,9 @@ window.cargarFacturacionDepto = async () => {
         showLoader();
         const res = await API.request('/billing/depto-report', 'POST', { depto: deptoId, desde, hasta, chkAni, chkAlo, chkIns });
         if (res.status === 'success') {
-            currentReportData = res.data;
-            renderizarResultados(currentReportData);
+            // CAMBIO AQUÍ: Usamos window para que sea accesible en todas las funciones
+            window.currentReportData = res.data; 
+            renderizarResultados(window.currentReportData);
         } else { Swal.fire('Error', res.message, 'error'); }
     } catch (error) { console.error(error); } finally { hideLoader(); }
 };
@@ -137,16 +137,14 @@ function vincularChecksPago() {
     });
 }
 /**
- * Cabezal del Protocolo con Gestión de Saldo integrada
+ * Cabezal del Protocolo - Corregido con IDs únicos por Protocolo
  */
 function getHeaderHTML(prot) {
     return `
         <div class="card-header bg-white py-3 border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <span class="badge bg-success mb-2 uppercase" style="font-size: 9px; background-color: #1a5d3b !important;">
-                        Protocolo: ${prot.nprotA}
-                    </span>
+                    <span class="badge bg-success mb-2 uppercase" style="font-size: 9px;">Protocolo: ${prot.nprotA}</span>
                     <h5 class="fw-bold m-0 text-dark">${prot.tituloA}</h5>
                     <div class="small text-muted mt-1">
                         <i class="bi bi-person-circle me-1"></i>Investigador: <b class="text-dark">${prot.investigador} (ID: ${prot.idUsr})</b>
@@ -155,18 +153,16 @@ function getHeaderHTML(prot) {
                 
                 <div class="text-end">
                     <div class="d-flex flex-column align-items-end gap-1">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
                             <small class="text-muted fw-bold uppercase" style="font-size: 10px;">Saldo Actual:</small>
-                            <input type="text" class="form-control form-control-sm text-center fw-bold bg-light border-0 shadow-none" 
-                                   value="$ ${parseFloat(prot.saldoInv).toLocaleString('es-UY', {minimumFractionDigits: 2})}" 
-                                   readonly style="width: 120px; font-size: 14px; color: #1a5d3b;">
+                            <span class="badge bg-light text-success border fs-6 fw-bold">$ ${parseFloat(prot.saldoInv).toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
                         </div>
                         
                         <div class="input-group input-group-sm shadow-sm" style="width: 210px;">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-pencil-square"></i></span>
-                            <input type="number" id="inp-saldo-prot-${prot.idUsr}" class="form-control border-start-0 border-end-0" placeholder="Monto a ajustar...">
-                            <button class="btn btn-success" onclick="window.updateBalance(${prot.idUsr}, 'add', true)"><i class="bi bi-plus-lg"></i></button>
-                            <button class="btn btn-danger" onclick="window.updateBalance(${prot.idUsr}, 'sub', true)"><i class="bi bi-dash-lg"></i></button>
+                            <input type="number" id="inp-saldo-prot-${prot.idProt}" class="form-control border-start-0 border-end-0" placeholder="Monto a ajustar...">
+                            <button class="btn btn-success" onclick="window.updateBalance(${prot.idUsr}, 'add', true, ${prot.idProt})"><i class="bi bi-plus-lg"></i></button>
+                            <button class="btn btn-danger" onclick="window.updateBalance(${prot.idUsr}, 'sub', true, ${prot.idProt})"><i class="bi bi-dash-lg"></i></button>
                         </div>
                     </div>
                 </div>
@@ -175,64 +171,109 @@ function getHeaderHTML(prot) {
 }
 function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
-    return `<h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos (Formularios)</h6>
-            <table class="table table-bordered table-billing mb-4 tabla-finanzas">
-                <thead class="table-light text-center">
-                    <tr>
-                        <th style="width:3%"><input type="checkbox" class="check-all-prot" data-prot="${idProt}"></th>
-                        <th style="width:5%">ID</th><th style="width:12%">Solicitante</th><th style="width:10%">F. Entrega</th>
-                        <th style="width:12%">Especie:Sub</th><th style="width:18%">Detalle / Concepto</th><th style="width:12%">Cantidad</th>
-                        <th style="width:8%">P. Momento</th><th style="width:8%">Total</th><th style="width:8%">Pagado</th><th style="width:8%">Debe</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${formularios.map(f => {
-                        const isFinished = f.is_exento || parseFloat(f.debe) <= 0;
-                        const rowStyle = isFinished ? 'style="background-color: #f0fff4 !important;"' : '';
-                        return `<tr class="text-center align-middle" ${rowStyle}>
-                                    <td><input type="checkbox" class="check-item-prot" data-prot="${idProt}" ${isFinished ? 'disabled' : ''}></td>
-                                    <td class="small text-muted">${f.id}</td><td>${f.solicitante}</td><td>${f.fecha}</td>
-                                    <td class="fw-bold text-start ps-2">${f.taxonomia}</td><td class="text-start ps-3">${f.detalle_display}</td>
-                                    <td class="text-primary">${f.cantidad_display}</td><td class="text-end">$ ${parseFloat(f.p_unit).toFixed(2)}</td>
-                                    <td class="text-end fw-bold">$ ${parseFloat(f.total).toFixed(2)}</td>
-                                    <td class="text-end text-success">$ ${parseFloat(f.pagado).toFixed(2)}</td>
-                                    <td class="text-end text-danger fw-bold">$ ${parseFloat(f.debe).toFixed(2)}</td>
-                                </tr>`;
-                    }).join('')}
-                </tbody>
-            </table>`;
+    aplicarEstilosTablas(); // Aseguramos que los estilos existan
+
+    return `
+        <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos (Formularios)</h6>
+        <table class="table table-bordered table-billing mb-4 tabla-finanzas">
+            <thead class="table-light text-center">
+                <tr>
+                    <th style="width:3%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
+                    <th style="width:5%">ID</th>
+                    <th style="width:10%">Estado</th> 
+                    <th style="width:12%">Solicitante</th>
+                    <th style="width:18%">Detalle / Concepto</th>
+                    <th style="width:10%">Total</th>
+                    <th style="width:10%">Pagado</th>
+                    <th style="width:10%">Debe</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${formularios.map(f => {
+                    const total = parseFloat(f.total || 0);
+                    const pagado = parseFloat(f.pagado || 0);
+                    const isExento = (f.is_exento == 1 || f.exento == 1);
+                    
+                    // REGLA: Si es exento, debe es 0. Si no, resta total - pagado
+                    const debe = isExento ? 0 : Math.max(0, total - pagado);
+
+                    // Badge de Descuento
+                    const dctoHTML = (f.descuento > 0) ? `<span class="badge-discount">-${f.descuento}%</span>` : '';
+
+                    let estadoBadge = isExento ? '<span class="badge bg-info text-dark">EXENTO</span>' : 
+                                     (debe <= 0 ? '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>' : 
+                                     (pagado > 0 ? '<span class="badge bg-warning text-dark">PAGO PARCIAL</span>' : 
+                                     '<span class="badge bg-danger">SIN PAGAR</span>'));
+
+                    const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+                    const tipoModal = (f.categoria && f.categoria.toLowerCase().includes('reactivo')) ? 'REACTIVO' : 'ANIMAL';
+
+                    return `
+                        <tr class="text-center align-middle" style="${rowStyle}" 
+                            onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('${tipoModal}', ${f.id})">
+                            <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
+                            <td class="small text-muted fw-bold">${f.id}</td>
+                            <td>${estadoBadge}</td>
+                            <td class="small">${f.solicitante}</td>
+                            <td class="text-start ps-3 small">${f.detalle_display}</td>
+                            <td class="text-end fw-bold">$ ${total.toFixed(2)} ${dctoHTML}</td>
+                            <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+                            <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+                        </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
 }
 
 function getAlojTableHTML(alojamientos, idProt) {
     if (!alojamientos || alojamientos.length === 0) return '';
     
     const filas = alojamientos.map(a => {
-        const isDone = (a.debe <= 0);
+        const total = parseFloat(a.total || 0);
+        const pagado = parseFloat(a.pagado || 0);
+        const debe = parseFloat(a.debe || 0);
+
+        let estadoHTML = '';
+        if (debe <= 0) {
+            estadoHTML = '<span class="badge bg-success">PAGO</span>';
+        } else if (pagado > 0) {
+            estadoHTML = '<span class="badge bg-warning text-dark">PARCIAL</span>';
+        } else {
+            estadoHTML = '<span class="badge bg-danger">PENDIENTE</span>';
+        }
+
+        const isDone = (debe <= 0);
+        const investigador = window.currentReportData.protocolos.find(p => p.idProt == idProt)?.investigador || 'N/A';
+
         return `
             <tr class="text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
-                <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${isDone ? 'disabled' : ''}></td>
+                <td>
+                    <input type="checkbox" class="check-item-aloj" 
+                           data-prot="${idProt}" data-id="${a.historia}" data-monto="${debe}" 
+                           ${isDone ? 'disabled' : ''}>
+                </td>
                 <td>${a.historia}</td>
-                <td class="text-start ps-3 small">${currentReportData.protocolos.find(p => p.idProt == idProt)?.investigador || 'N/A'} (ID: ${a.IdUsrA})</td>
+                <td>${estadoHTML}</td> <td class="text-start ps-3 small">${investigador}</td>
                 <td>${a.especie}</td>
-                <td>${a.caja} ($ ${parseFloat(a.p_caja).toFixed(2)})</td>
                 <td class="small">${a.periodo}</td>
                 <td class="fw-bold">${a.dias}</td>
-                <td class="text-end">$ ${parseFloat(a.total).toFixed(2)}</td>
-                <td class="text-end text-success">$ ${parseFloat(a.pagado).toFixed(2)}</td>
-                <td class="text-end text-danger fw-bold">$ ${parseFloat(a.debe).toFixed(2)}</td>
+                <td class="text-end">$ ${total.toFixed(2)}</td>
+                <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
             </tr>`;
     }).join('');
 
     return `
         <div class="mt-4">
-            <h6 class="fw-bold text-muted mb-3 uppercase" style="font-size: 10px;"><i class="bi bi-house-door me-2"></i>Detalle de Alojamientos</h6>
+            <h6 class="fw-bold text-muted mb-3 uppercase" style="font-size: 10px;">Detalle de Alojamientos</h6>
             <table class="table table-bordered table-billing mb-0">
-                <thead class="table-dark">
-                    <tr class="text-center">
+                <thead class="table-dark text-center">
+                    <tr>
                         <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                        <th style="width:8%">Historia</th>
-                        <th>Investigador</th> <th style="width:10%">Especie</th>
-                        <th style="width:12%">Caja</th>
+                        <th style="width:7%">Hist.</th>
+                        <th style="width:8%">Estado</th>
+                        <th>Investigador</th>
+                        <th style="width:10%">Especie</th>
                         <th style="width:12%">Periodo</th>
                         <th style="width:5%">Días</th>
                         <th style="width:8%">Total</th>
@@ -473,29 +514,49 @@ function actualizarSumaPago(protId) {
 }
 
 window.abrirAyudaBilling = () => { new bootstrap.Modal(document.getElementById('modal-billing-help')).show(); };
-window.procesarPagoProtocolo = (idProt) => { 
-    const total = document.getElementById(`total-seleccionado-${idProt}`).innerText;
-    if (total === '$ 0.00') { Swal.fire('Atención', 'Seleccione ítems para pagar.', 'info'); return; }
-    Swal.fire({ title: '¿Confirmar Pago?', text: `Se liquidará un total de ${total}`, icon: 'question', showCancelButton: true, confirmButtonColor: '#198754' }).then((r) => {
-        if (r.isConfirmed) console.log("Procesando pago...");
-    });
-};
 
+/**
+ * Renderiza la tabla de Insumos Generales con integración al Manager de Modales.
+ */
 function getInsumosGeneralesTableHTML(insumos) {
     if (!insumos || insumos.length === 0) return '';
     let sumTotal = 0, sumPagado = 0, sumDebe = 0;
 
     const filas = insumos.map(i => {
-        const total = parseFloat(i.total_item || 0), pagado = parseFloat(i.pagado || 0), debe = parseFloat(i.debe || 0);
-        sumTotal += total; sumPagado += pagado; sumDebe += debe;
+    const total = parseFloat(i.total_item || 0);
+    const pagado = parseFloat(i.pagado || 0);
+    const isExento = (i.is_exento == 1); 
+    const debe = isExento ? 0 : Math.max(0, total - pagado);
         
-        // Formateamos el detalle para que cada insumo aparezca en una línea distinta
+        sumTotal += total; 
+        sumPagado += pagado; 
+        sumDebe += debe;
+        
+        // Lógica de Estados (Badges)
+        let badge = '';
+        if (debe <= 0) {
+            badge = '<span class="badge bg-success shadow-sm">PAGO</span>';
+        } else if (pagado > 0) {
+            badge = '<span class="badge bg-warning text-dark">PARCIAL</span>';
+        } else {
+            badge = '<span class="badge bg-danger shadow-sm">PENDIENTE</span>';
+        }
+
         const detalleHTML = i.detalle_completo.split(' | ').map(item => `• ${item}`).join('<br>');
+        const rowStyle = (debe <= 0) ? 'background-color: #f0fff4 !important;' : '';
 
         return `
-            <tr class="text-center align-middle" ${(i.is_exento || debe <= 0) ? 'style="background-color: #f0fff4 !important;"' : ''}>
-                <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+            <tr class="text-center align-middle" 
+                style="${rowStyle} cursor: pointer;" 
+                onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('INSUMO', ${i.id})">
+                <td>
+                    <input type="checkbox" class="check-item-insumo" 
+                           data-id="${i.id}" 
+                           data-monto="${debe}" 
+                           ${debe <= 0 ? 'disabled' : ''}>
+                </td>
                 <td class="small text-muted">${i.id}</td>
+                <td>${badge}</td>
                 <td>${i.solicitante}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
                 <td class="text-end fw-bold">$ ${total.toFixed(2)}</td>
@@ -515,8 +576,13 @@ function getInsumosGeneralesTableHTML(insumos) {
                     <thead class="table-dark text-center">
                         <tr>
                             <th style="width:3%"><input type="checkbox" id="check-all-insumos-gen"></th>
-                            <th style="width:5%">ID</th><th style="width:15%">Solicitante</th>
-                            <th>Conceptos y Cantidades (Agrupados)</th> <th style="width:10%">Total</th><th style="width:10%">Pago</th><th style="width:10%">Falta</th>
+                            <th style="width:5%">ID</th>
+                            <th style="width:8%">Estado</th>
+                            <th style="width:15%">Solicitante</th>
+                            <th>Conceptos y Cantidades (Agrupados)</th> 
+                            <th style="width:10%">Total</th>
+                            <th style="width:10%">Pago</th>
+                            <th style="width:10%">Falta</th>
                         </tr>
                     </thead>
                     <tbody>${filas}</tbody>
@@ -525,13 +591,24 @@ function getInsumosGeneralesTableHTML(insumos) {
             <div class="card-footer bg-light py-3 border-top">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex gap-5">
-                        <div class="text-center"><small class="d-block text-muted uppercase" style="font-size:9px">Total Insumos</small><b class="fs-6">$ ${sumTotal.toFixed(2)}</b></div>
-                        <div class="text-center"><small class="d-block text-muted uppercase" style="font-size:9px">Total Pago</small><b class="fs-6 text-success">$ ${sumPagado.toFixed(2)}</b></div>
-                        <div class="text-center"><small class="d-block text-muted uppercase" style="font-size:9px">Total Falta</small><b class="fs-6 text-danger">$ ${sumDebe.toFixed(2)}</b></div>
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Insumos</small>
+                            <b class="fs-6">$ ${sumTotal.toFixed(2)}</b>
+                        </div>
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Pago</small>
+                            <b class="fs-6 text-success">$ ${sumPagado.toFixed(2)}</b>
+                        </div>
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Falta</small>
+                            <b class="fs-6 text-danger">$ ${sumDebe.toFixed(2)}</b>
+                        </div>
                     </div>
                     <div class="text-end">
                         <span class="fs-4 fw-bold text-primary" id="total-insumos-seleccionados">$ 0.00</span>
-                        <button class="btn btn-primary btn-sm fw-bold ms-3" onclick="procesarPagoInsumosGenerales()">Pagar Selección</button>
+                        <button class="btn btn-primary btn-sm fw-bold ms-3 shadow-sm" onclick="window.procesarPagoInsumosGenerales()">
+                            <i class="bi bi-wallet2 me-1"></i> Pagar Selección
+                        </button>
                     </div>
                 </div>
             </div>
@@ -711,3 +788,86 @@ window.exportExcelDeptoGlobal = () => {
 /**
  * Vincula los checkboxes para actualizar el total seleccionado
  */
+
+/**
+ * GESTIÓN ÚNICA DE SELECCIÓN Y PAGOS
+ * Una sola función para controlar checkboxes y sumas.
+ */
+document.addEventListener('change', (e) => {
+    // Detectamos si el cambio viene de un checkbox de este módulo
+    const t = e.target;
+    if (!t.matches('.check-item-form, .check-item-aloj, .check-all-form, .check-all-aloj')) return;
+
+    const idProt = t.dataset.prot;
+
+    // LÓGICA DE SELECCIONAR TODO: Solo marca los que NO están deshabilitados (los que deben)
+    if (t.classList.contains('check-all-form')) {
+        document.querySelectorAll(`.check-item-form[data-prot="${idProt}"]:not(:disabled)`)
+                .forEach(c => c.checked = t.checked);
+    }
+    if (t.classList.contains('check-all-aloj')) {
+        document.querySelectorAll(`.check-item-aloj[data-prot="${idProt}"]:not(:disabled)`)
+                .forEach(c => c.checked = t.checked);
+    }
+
+    // Actualizamos el monto visual una sola vez
+    actualizarMontoVisual(idProt);
+});
+
+/**
+ * Calcula el monto de los ítems seleccionados para pagar
+ */
+function actualizarMontoVisual(idProt) {
+    const visor = document.getElementById(`pago-seleccionado-${idProt}`);
+    if (!visor) return;
+
+    let total = 0;
+    // Buscamos solo los marcados que son ítems reales (no los "Select All")
+    const seleccionados = document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj)`);
+    
+    seleccionados.forEach(chk => {
+        total += parseFloat(chk.dataset.monto || 0);
+    });
+
+    // Actualización estética del visor
+    visor.innerText = `$ ${total.toLocaleString('es-UY', {minimumFractionDigits: 2})}`;
+    
+    if (total > 0) {
+        visor.classList.replace('text-primary', 'text-success');
+        visor.classList.add('fw-bold');
+    } else {
+        visor.classList.replace('text-success', 'text-primary');
+        visor.classList.remove('fw-bold');
+    }
+}
+
+/**
+ * Inyecta los estilos visuales para el resaltado de filas
+ */
+function aplicarEstilosTablas() {
+    if (document.getElementById('estilos-gecko-hover')) return;
+    const style = document.createElement('style');
+    style.id = 'estilos-gecko-hover';
+    style.innerHTML = `
+        /* Resaltado de fila Gecko */
+        .table-billing tbody tr { transition: all 0.2s; }
+        .table-billing tbody tr:hover td { 
+            background-color: #e8f5e9 !important; /* Verde muy clarito */
+            color: #000 !important;
+        }
+        /* Manito solo en celdas de datos, no en el checkbox */
+        .table-billing tbody tr td:not(:first-child) { cursor: pointer; }
+        
+        /* Badge de descuento */
+        .badge-discount {
+            font-size: 0.7rem;
+            padding: 2px 5px;
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+            border-radius: 4px;
+            margin-left: 5px;
+        }
+    `;
+    document.head.appendChild(style);
+}
