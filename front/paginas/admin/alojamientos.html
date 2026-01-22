@@ -130,25 +130,28 @@
                 <h6 class="modal-title fw-bold">ACTUALIZAR ESTADÍA</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
+                <div id="act-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm">
+                    </div>
+
                 <div class="row g-3">
                     <div class="col-6">
-                        <label class="small fw-bold">FECHA</label>
-                        <input type="date" id="reg-fecha-qr" class="form-control">
+                        <label class="small fw-bold text-uppercase text-muted" style="font-size: 10px;">Fecha del Cambio</label>
+                        <input type="date" id="reg-fecha-qr" class="form-control form-control-sm">
                     </div>
                     <div class="col-6">
-                        <label class="small fw-bold">CANTIDAD</label>
-                        <input type="number" id="reg-cantidad-qr" class="form-control">
+                        <label id="act-label-tipo" class="small fw-bold text-primary text-uppercase" style="font-size: 10px;">Cantidad</label>
+                        <input type="number" id="reg-cantidad-qr" class="form-control form-control-sm fw-bold border-primary" min="1">
                     </div>
                     <div class="col-12">
-                        <label class="small fw-bold">OBSERVACIONES</label>
-                        <textarea id="reg-obs-qr" class="form-control" rows="2" placeholder="Detalle del cambio..."></textarea>
+                        <label class="small fw-bold text-uppercase text-muted" style="font-size: 10px;">Observaciones del nuevo tramo</label>
+                        <textarea id="reg-obs-qr" class="form-control form-control-sm" rows="2" placeholder="Detalle el cambio (ej: cambio de sector, reducción de animales...)"></textarea>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light border-top-0">
                 <button class="btn btn-success w-100 fw-bold shadow-sm" onclick="window.guardarNuevoTramo()">
-                    <i class="bi bi-plus-circle me-1"></i> AGREGAR TRAMO
+                    <i class="bi bi-plus-circle me-1"></i> AGREGAR NUEVO TRAMO
                 </button>
             </div>
         </div>
@@ -211,36 +214,45 @@
 
 
 <!-- MODAL MODIFICACION -->
-<div class="modal fade" id="modal-modificar-tramo" tabindex="-1">
+<div class="modal fade" id="modal-modificar-tramo" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-        <div class="modal-content">
+        <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white py-2">
-                <h6 class="modal-title">Modificar Tramo de Historia</h6>
+                <h6 class="modal-title fw-bold">Modificar Tramo de Historia</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
+                <div id="edit-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm">
+                    </div>
+
                 <form id="form-modificar-tramo">
                     <input type="hidden" id="edit-id-alojamiento">
                     <input type="hidden" id="edit-historia">
+                    
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="small fw-bold">Fecha de Inicio (Tramo)</label>
+                            <label class="small fw-bold text-muted">Fecha de Inicio (Tramo)</label>
                             <input type="date" id="edit-fecha-inicio" class="form-control">
                         </div>
-                        <div class="col-6 d-block"> <label class="small fw-bold">Cant. Cajas Chicas</label>
-                            <input type="number" id="edit-caja-ch" class="form-control" min="0">
+
+                        <div class="col-12" id="div-chica">
+                            <label class="small fw-bold text-primary">CANT. CAJAS CHICAS</label>
+                            <input type="number" id="edit-caja-ch" class="form-control fw-bold border-primary" min="0">
                         </div>
-                        <div class="col-6 d-block"> <label class="small fw-bold">Cant. Cajas Grandes</label>
-                            <input type="number" id="edit-caja-gr" class="form-control" min="0">
+
+                        <div class="col-12" id="div-grande">
+                            <label class="small fw-bold text-primary">CANT. CAJAS GRANDES</label>
+                            <input type="number" id="edit-caja-gr" class="form-control fw-bold border-primary" min="0">
                         </div>
+
                         <div class="col-12">
-                            <label class="small fw-bold">Observaciones</label>
+                            <label class="small fw-bold text-muted">Observaciones</label>
                             <textarea id="edit-obs" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light border-top-0">
                 <button type="button" class="btn btn-primary btn-sm fw-bold px-4" onclick="window.updateTramoData()">
                     <i class="bi bi-save me-1"></i> GUARDAR CAMBIOS
                 </button>
@@ -248,7 +260,6 @@
         </div>
     </div>
 </div>
-
 
 
 <!-- REGISTRO ALOJAMIENTOS COMIENZA ACA -->

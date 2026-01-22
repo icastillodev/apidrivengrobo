@@ -1,5 +1,5 @@
 /**
- * MODAL: Ficha de Animales (Versión Final con Badges de Estado y Alineación)
+ * MODAL: Ficha de Animales (Versión Final con Titular vs Solicitante)
  * Ubicación: js/pages/admin/facturacion/Modals/animalModal.js
  */
 import { API } from '../../../../api.js';
@@ -25,7 +25,6 @@ export const openAnimalModal = async (idformA) => {
         if (d.is_exento == 1) {
             badgesHTML = '<span class="badge bg-info text-dark shadow-sm">EXENTO</span>';
         } else {
-            // 1. Badge de Estado de Pago
             if (debe <= 0 ) {
                 badgesHTML += '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>';
             } else if (pagado > 0) {
@@ -33,7 +32,6 @@ export const openAnimalModal = async (idformA) => {
             } else {
                 badgesHTML += '<span class="badge bg-danger shadow-sm">SIN PAGAR</span>';
             }
-            // 2. Badge de Descuento (Si existe)
             if (descuento > 0) {
                 badgesHTML += `<span class="badge bg-dark ms-1 shadow-sm">-${descuento}% DESC.</span>`;
             }
@@ -47,7 +45,7 @@ export const openAnimalModal = async (idformA) => {
                         <div class="d-flex align-items-center w-100 justify-content-between pe-4">
                             <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-medical me-2 text-success"></i>PEDIDO #${idformA}</h5>
                             <div class="text-end">
-                                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">Dinero a Favor del Investigador:</small>
+                                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">Saldo del Titular del Protocolo:</small>
                                 <span class="badge bg-success fs-5" id="mdl-ani-saldo-txt">$ ${saldo.toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
                                 <input type="hidden" id="mdl-ani-saldo-val" value="${saldo}">
                             </div>
@@ -63,13 +61,17 @@ export const openAnimalModal = async (idformA) => {
                                     ${badgesHTML}
                                 </div>
 
-                                <h6 class="text-success fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">Modificación del Formulario (Datos del Pedido)</h6>
+                                <h6 class="text-success fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">Información de Responsables y Protocolo</h6>
                                 
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label class="small fw-bold text-muted">INVESTIGADOR RESPONSABLE</label>
-                                        <div class="form-control bg-white border-0 border-bottom rounded-0 ps-0 fw-bold text-primary">${d.solicitante || 'N/A'}</div>
+                                        <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">Titular del Protocolo (Paga)</label>
+                                        <div class="form-control bg-white border-0 border-bottom rounded-0 ps-0 fw-bold text-primary fs-5">${d.titular_nombre || 'N/A'}</div>
+                                        <div class="mt-1">
+                                            <small class="text-muted"><i class="bi bi-person-badge me-1"></i>Hizo el pedido: <b>${d.solicitante || 'N/A'}</b></small>
+                                        </div>
                                     </div>
+
                                     <div class="col-md-7">
                                         <label class="small fw-bold text-muted">TIPO DE PEDIDO</label>
                                         <div class="form-control bg-white border-0 border-bottom rounded-0 ps-0">${d.nombre_tipo || 'N/A'}</div>
@@ -127,10 +129,6 @@ export const openAnimalModal = async (idformA) => {
                                     <div class="col-md-6 mt-3">
                                         <label class="small fw-bold text-muted">FECHA RETIRO (REAL)</label>
                                         <div class="form-control bg-white border-0 border-bottom rounded-0 ps-0 small">${d.fecha_fin || '-'}</div>
-                                    </div>
-                                    <div class="col-12 mt-3">
-                                        <label class="small fw-bold text-muted">ACLARACIÓN USUARIO</label>
-                                        <div class="p-2 bg-white border rounded small text-muted" style="min-height: 40px;">${d.aclaracion_usuario || 'Sin comentarios.'}</div>
                                     </div>
                                 </div>
                             </div>

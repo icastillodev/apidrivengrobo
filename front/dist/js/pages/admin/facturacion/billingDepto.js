@@ -171,60 +171,87 @@ function getHeaderHTML(prot) {
 }
 function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
-    aplicarEstilosTablas(); // Aseguramos que los estilos existan
+    aplicarEstilosTablas(); 
 
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos (Formularios)</h6>
-        <table class="table table-bordered table-billing mb-4 tabla-finanzas">
-            <thead class="table-light text-center">
-                <tr>
-                    <th style="width:3%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
-                    <th style="width:5%">ID</th>
-                    <th style="width:10%">Estado</th> 
-                    <th style="width:12%">Solicitante</th>
-                    <th style="width:18%">Detalle / Concepto</th>
-                    <th style="width:10%">Total</th>
-                    <th style="width:10%">Pagado</th>
-                    <th style="width:10%">Debe</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${formularios.map(f => {
-                    const total = parseFloat(f.total || 0);
-                    const pagado = parseFloat(f.pagado || 0);
-                    const isExento = (f.is_exento == 1 || f.exento == 1);
-                    
-                    // REGLA: Si es exento, debe es 0. Si no, resta total - pagado
-                    const debe = isExento ? 0 : Math.max(0, total - pagado);
+        <div class="table-responsive">
+            <table class="table table-bordered table-billing mb-4 tabla-finanzas">
+                <thead class="table-light text-center">
+                    <tr>
+                        <th style="width:2%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
+                        <th style="width:5%">ID</th>
+                        <th style="width:8%">Estado</th> 
+                        <th style="width:12%">Solicitante</th>
+                        <th style="width:15%">Especie</th>
+                        <th style="width:15%">Detalle / Concepto</th>
+                        <th style="width:18%">Cantidad</th>
+                        <th style="width:8%">Total</th>
+                        <th style="width:8%">Pagado</th>
+                        <th style="width:8%">Debe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${formularios.map(f => {
+                        const total = parseFloat(f.total || 0);
+                        const pagado = parseFloat(f.pagado || 0);
+                        const isExento = (f.is_exento == 1 || f.exento == 1);
+                        const debe = isExento ? 0 : Math.max(0, total - pagado);
 
-                    // Badge de Descuento
-                    const dctoHTML = (f.descuento > 0) ? `<span class="badge-discount">-${f.descuento}%</span>` : '';
+                        const isReactivo = (f.categoria && f.categoria.toLowerCase().includes('reactivo'));
+                        const tipoModal = isReactivo ? 'REACTIVO' : 'ANIMAL';
 
-                    let estadoBadge = isExento ? '<span class="badge bg-info text-dark">EXENTO</span>' : 
-                                     (debe <= 0 ? '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>' : 
-                                     (pagado > 0 ? '<span class="badge bg-warning text-dark">PAGO PARCIAL</span>' : 
-                                     '<span class="badge bg-danger">SIN PAGAR</span>'));
+                        // --- 1. LÓGICA COLUMNA ESPECIE (nombre_especie:nombre_subespecie) ---
+                        const especie = f.nombre_especie || '---';
+                        const subespecie = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
+                        const especieDisplay = especie + subespecie;
 
-                    const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
-                    const tipoModal = (f.categoria && f.categoria.toLowerCase().includes('reactivo')) ? 'REACTIVO' : 'ANIMAL';
+                        // --- 2. LÓGICA COLUMNA CANTIDAD ---
+                        let cantidadDisplay = '';
+                        if (isReactivo) {
+                            /** * Formato: NombreInsumo (TipoInsumo) CantidadInsumo - cant_organo un.
+                             */
+                            const nombre = f.NombreInsumo || 'Insumo';
+                            const tipo = f.TipoInsumo || ''; // ej: ml, gr
+                            const cantInsumo = f.CantidadInsumo || 0;
+                            const organos = f.cant_organo || 0;
+                            
+                            cantidadDisplay = `<span class="text-info fw-bold">${nombre}</span>  <b>${cantInsumo}</b><small class="text-muted">(${tipo})</small> - ${organos} un.`;
+                        } else {
+                            /** * Formato: cant_animal un.
+                             */
+                            const totalA = f.cant_animal || 0;
+                            cantidadDisplay = `<b class="fs-6">${totalA}</b> <small class="text-muted">un.</small>`;
+                        }
 
-                    return `
-                        <tr class="text-center align-middle" style="${rowStyle}" 
-                            onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('${tipoModal}', ${f.id})">
-                            <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                            <td class="small text-muted fw-bold">${f.id}</td>
-                            <td>${estadoBadge}</td>
-                            <td class="small">${f.solicitante}</td>
-                            <td class="text-start ps-3 small">${f.detalle_display}</td>
-                            <td class="text-end fw-bold">$ ${total.toFixed(2)} ${dctoHTML}</td>
-                            <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
-                            <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
-                        </tr>`;
-                }).join('')}
-            </tbody>
-        </table>`;
+                        const dctoHTML = (f.descuento > 0) ? `<span class="badge-discount">-${f.descuento}%</span>` : '';
+
+                        let estadoBadge = isExento ? '<span class="badge bg-info text-dark">EXENTO</span>' : 
+                                         (debe <= 0 ? '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>' : 
+                                         (pagado > 0 ? '<span class="badge bg-warning text-dark">PAGO PARCIAL</span>' : 
+                                         '<span class="badge bg-danger">SIN PAGAR</span>'));
+
+                        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+
+                        return `
+                            <tr class="text-center align-middle" style="${rowStyle}" 
+                                onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('${tipoModal}', ${f.id})">
+                                <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
+                                <td class="small text-muted fw-bold">${f.id}</td>
+                                <td>${estadoBadge}</td>
+                                <td class="small">${f.solicitante}</td>
+                                <td class="small text-secondary">${especieDisplay}</td>
+                                <td class="text-start ps-3 small">${f.detalle_display || '---'}</td>
+                                <td class="small text-dark">${cantidadDisplay}</td>
+                                <td class="text-end fw-bold">$ ${total.toFixed(2)} ${dctoHTML}</td>
+                                <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+                                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+                            </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>`;
 }
-
 function getAlojTableHTML(alojamientos, idProt) {
     if (!alojamientos || alojamientos.length === 0) return '';
     
@@ -245,22 +272,24 @@ function getAlojTableHTML(alojamientos, idProt) {
         const isDone = (debe <= 0);
         const investigador = window.currentReportData.protocolos.find(p => p.idProt == idProt)?.investigador || 'N/A';
 
-        return `
-            <tr class="text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
-                <td>
-                    <input type="checkbox" class="check-item-aloj" 
-                           data-prot="${idProt}" data-id="${a.historia}" data-monto="${debe}" 
-                           ${isDone ? 'disabled' : ''}>
-                </td>
-                <td>${a.historia}</td>
-                <td>${estadoHTML}</td> <td class="text-start ps-3 small">${investigador}</td>
-                <td>${a.especie}</td>
-                <td class="small">${a.periodo}</td>
-                <td class="fw-bold">${a.dias}</td>
-                <td class="text-end">$ ${total.toFixed(2)}</td>
-                <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
-                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
-            </tr>`;
+    return `
+        <tr onclick="window.abrirEdicionFina('ALOJ', ${a.historia})" class="pointer text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
+            <td>
+                <input type="checkbox" class="check-item-aloj" 
+                    onclick="event.stopPropagation();" 
+                    data-prot="${idProt}" data-id="${a.historia}" data-monto="${debe}" 
+                    ${isDone ? 'disabled' : ''}>
+            </td>
+            <td>${a.historia}</td>
+            <td>${estadoHTML}</td> 
+            <td class="text-start ps-3 small">${investigador}</td>
+            <td>${a.especie}</td>
+            <td class="small">${a.periodo}</td>
+            <td class="fw-bold">${a.dias}</td>
+            <td class="text-end">$ ${total.toFixed(2)}</td>
+            <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+            <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+        </tr>`;
     }).join('');
 
     return `
@@ -671,94 +700,7 @@ window.downloadInsumosPDF = async () => {
 
 
 
-/**
- * Genera el reporte PDF Global del Departamento
- * Requiere jsPDF y autoTable cargados en el HTML
- */
-window.downloadGlobalPDF = async () => {
-    if (!currentReportData) return;
-    
-    showLoader();
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
 
-    // 1. Cabezal
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text("REPORTE FINANCIERO GLOBAL DEL DEPARTAMENTO", 105, 22, { align: "center" });
-    doc.line(20, 25, 190, 25);
-
-    // 2. Resumen Dashboard
-    const t = currentReportData.totales;
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text("RESUMEN DE TOTALES", 20, 35);
-    
-    doc.autoTable({
-        startY: 38,
-        head: [['DEUDA TOTAL', 'ANIMALES', 'ALOJAMIENTO', 'INSUMOS', 'PAGADO']],
-        body: [[`$ ${t.globalDeuda}`, `$ ${t.deudaAnimales}`, `$ ${t.deudaAlojamiento}`, `$ ${t.deudaInsumos}`, `$ ${t.totalPagado}`]],
-        theme: 'grid',
-        headStyles: { fillColor: [70, 70, 70] },
-        styles: { halign: 'center', fontSize: 9 }
-    });
-
-    // 3. Tabla Investigadores
-    let currentY = doc.lastAutoTable.finalY + 10;
-    doc.text("SALDOS POR INVESTIGADOR", 20, currentY);
-
-    const invMap = {}; // Re-agrupamos para el PDF
-    currentReportData.insumosGenerales?.forEach(i => {
-        if (!invMap[i.IdUsrA]) invMap[i.IdUsrA] = { n: i.solicitante, d: 0, s: i.saldoInv || 0 };
-        invMap[i.IdUsrA].d += i.debe;
-    });
-    currentReportData.protocolos.forEach(p => {
-        if (!invMap[p.idUsr]) invMap[p.idUsr] = { n: p.investigador, d: 0, s: p.saldoInv || 0 };
-        invMap[p.idUsr].d += (p.deudaAnimales + p.deudaAlojamiento);
-    });
-
-    const bodyInv = Object.keys(invMap).map(id => [id, invMap[id].n, `$ ${invMap[id].d.toFixed(2)}`, `$ ${parseFloat(invMap[id].s).toFixed(2)}`]);
-
-    doc.autoTable({
-        startY: currentY + 3,
-        head: [['ID', 'Investigador', 'Deuda', 'Saldo']],
-        body: bodyInv,
-        theme: 'striped',
-        headStyles: { fillColor: [26, 93, 59] },
-        styles: { fontSize: 8 }
-    });
-
-    // 4. Detalle Protocolos
-    currentY = doc.lastAutoTable.finalY + 12;
-    currentReportData.protocolos.forEach(prot => {
-        if (currentY > 250) { doc.addPage(); currentY = 20; }
-        doc.setFontSize(9);
-        doc.text(`Prot. ${prot.nprotA} - ${prot.investigador}`, 20, currentY);
-        
-        const items = [
-            ...prot.formularios.map(f => ["FORM", f.id, f.detalle_display.replace(/<[^>]*>/g, ""), `$ ${f.total}`, `$ ${f.debe}`]),
-            ...prot.alojamientos.map(a => ["ALOJ", a.historia, `Alojamiento ${a.especie}`, `$ ${a.total}`, `$ ${a.debe}`])
-        ];
-
-        doc.autoTable({
-            startY: currentY + 2,
-            head: [['Tipo', 'ID', 'Detalle', 'Total', 'Falta']],
-            body: items,
-            margin: { left: 25 },
-            styles: { fontSize: 7 },
-            headStyles: { fillColor: [100, 100, 100] }
-        });
-        currentY = doc.lastAutoTable.finalY + 10;
-    });
-
-    doc.save("Reporte_Global.pdf");
-    hideLoader();
-};
 /**
  * Exportación a CSV/Excel con datos de saldos y IDs
  */
@@ -871,3 +813,4 @@ function aplicarEstilosTablas() {
     `;
     document.head.appendChild(style);
 }
+

@@ -215,5 +215,102 @@ public function getAnimalDetail($id) {
     } else {
         $this->jsonResponse('error', 'Error al procesar el ajuste en la base de datos');
     }
+    }
+/**
+ * NUEVO: Pago Individual de Insumos/Reactivos
+ */
+public function ajustarPagoInsumo() {
+    $input = $this->getRequestData();
+    if (!isset($input['id'], $input['monto'], $input['accion'])) {
+        $this->jsonResponse('error', 'Datos incompletos para insumos');
+    }
+
+    // Llamamos a la función específica del modelo para insumos
+    $res = $this->model->procesarAjustePagoInsumo($input['id'], $input['monto'], $input['accion']);
+
+    if ($res) {
+        $this->jsonResponse('success', 'Pago de insumo procesado');
+    } else {
+        $this->jsonResponse('error', 'Error en base de datos (Insumos)');
+    }
+}
+/**
+ * Obtiene el saldo actual de la tabla dinero para un usuario de forma independiente
+ * Ubicación: App\Controllers\BillingController.php
+ */
+public function getInvestigatorBalance($id) {
+    try {
+        // No creamos un "new" aquí, usamos $this->model que ya tiene la DB
+        $saldo = $this->model->getSaldoByInvestigador($id);
+
+        // Usamos el helper jsonResponse que ya existe en tu controlador
+        return $this->jsonResponse('success', ['SaldoDinero' => $saldo]);
+    } catch (\Exception $e) {
+        return $this->jsonResponse('error', 'Error al obtener saldo: ' . $e->getMessage());
+    }
+}
+/**
+ * Procesa el pago o quita de dinero en una historia de alojamiento
+ * Ubicación: App\Controllers\BillingController.php
+ */
+public function ajustarPagoAloj() {
+    $input = $this->getRequestData(); // Obtiene id, monto, accion desde el JS
+
+    if (!isset($input['id'], $input['monto'], $input['accion'])) {
+        $this->jsonResponse('error', 'Datos insuficientes para procesar el pago.');
+    }
+
+    // Llamamos a la lógica del modelo
+    $res = $this->model->procesarAjustePagoAloj(
+        $input['id'], 
+        $input['monto'], 
+        $input['accion']
+    );
+
+    if ($res) {
+        $this->jsonResponse('success', 'Transacción de alojamiento completada.');
+    } else {
+        $this->jsonResponse('error', 'No se pudo procesar el pago en el bioterio.');
+    }
+}
+
+/**
+ * Obtiene el detalle técnico y financiero de un reactivo para el modal
+ * Ubicación: App\Controllers\BillingController.php
+ */
+public function getReactiveDetail($id) {
+    try {
+        // El modelo ya se instancia en el constructor con la DB
+        $data = $this->model->getReactiveDetailById($id);
+        
+        if (!$data) {
+            return $this->jsonResponse('error', 'No se encontró el reactivo solicitado.');
+        }
+
+        return $this->jsonResponse('success', $data);
+    } catch (\Exception $e) {
+        return $this->jsonResponse('error', 'Error interno: ' . $e->getMessage());
+    }
+}
+/**
+ * Obtiene el detalle de insumos para el modal de edición fina
+ * Ubicación: App\Controllers\BillingController.php
+ */
+public function getInsumoDetail($id) {
+    try {
+        // Usamos el modelo que ya se instancia en el constructor (__construct)
+        $data = $this->model->getInsumoDetailById($id);
+
+        if (!$data) {
+            return $this->jsonResponse('error', 'No se encontraron datos para el insumo #' . $id);
+        }
+
+        // Retornamos el éxito con los datos que espera el JS
+        return $this->jsonResponse('success', $data);
+        
+    } catch (\Exception $e) {
+        // Esto evitará el error 500 y te dirá exactamente qué falló
+        return $this->jsonResponse('error', 'Error en el servidor: ' . $e->getMessage());
+    }
 }
 }

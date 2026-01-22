@@ -36,21 +36,25 @@ class AlojamientoModel {
      * Obtiene todos los tramos de una historia.
      * Incluye datos de Protocolo, Especie e Investigador para el resumen frontal.
      */
-    public function getHistory($historiaId) {
-        $sql = "SELECT a.*, p.nprotA, e.EspeNombreA, 
-                       CONCAT(pers.NombreA, ' ', pers.ApellidoA) as Investigador 
-                FROM alojamiento a
-                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-                INNER JOIN especiee e ON p.especie = e.idespA
-                LEFT JOIN personae pers ON a.IdUsrA = pers.IdUsrA
-                WHERE a.historia = ?
-                ORDER BY a.fechavisado ASC";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$historiaId]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
-
+public function getHistory($historiaId) {
+    $sql = "SELECT a.*, 
+                   p.nprotA, 
+                   p.IdUsrA as IdTitularProtocolo, -- EL QUE PAGA
+                   e.EspeNombreA, 
+                   CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA) as TitularProtocolo,
+                   CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA) as ResponsableTecnico
+            FROM alojamiento a
+            INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+            INNER JOIN especiee e ON a.TipoAnimal = e.idespA -- Mejor usar el del tramo
+            INNER JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA -- Dueño del protocolo
+            LEFT JOIN personae u_resp ON a.IdUsrA = u_resp.IdUsrA -- Responsable del tramo
+            WHERE a.historia = ?
+            ORDER BY a.fechavisado ASC";
+    
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$historiaId]);
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
 // api/src/Models/Alojamiento/AlojamientoModel.php
 
 public function saveAlojamiento($data) {

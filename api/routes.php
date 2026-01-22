@@ -168,3 +168,14 @@ $router->post('/billing/update-alojamiento', 'BillingController@updateAlojamient
 $router->get('/billing/generate-pdf-ficha', 'BillingController@generatePdfFicha');
 // En la sección de Facturación y Cobranzas
 $router->post('/billing/ajustar-pago-individual', 'BillingController@ajustarPagoIndividual');
+
+// Cambia {id} por :id para mantener la consistencia del router
+$router->get('/billing/get-investigator-balance/:id', 'BillingController@getInvestigatorBalance');
+/**
+ * Ruta para procesar pagos/devoluciones de alojamiento
+ */
+$router->post('/billing/ajustar-pago-aloj', 'BillingController@ajustarPagoAloj');
+$router->get('/billing/detail-insumo/:id', 'BillingController@getInsumoDetail');
+
+// NUEVA Ruta para Insumos y Reactivos
+$router->post('/billing/ajustar-pago-insumo', 'BillingController@ajustarPagoInsumo');

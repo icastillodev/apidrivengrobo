@@ -374,32 +374,56 @@ window.renderHistorialFooter = (history, historiaId) => {
 // 7. MODIFICACIÓN DE TRAMOS INDIVIDUALES
 // ***************************************************
 window.modificarTramo = (idAlojamiento) => {
+    // 1. Validar datos en el caché global
     const row = currentHistoryData.find(h => h.IdAlojamiento == idAlojamiento);
     if (!row) return;
 
-    bootstrap.Modal.getInstance(document.getElementById('modal-historial')).hide();
+    // 2. Cerrar el modal de historial de forma segura
+    const modalHistEl = document.getElementById('modal-historial');
+    const modalHist = bootstrap.Modal.getInstance(modalHistEl);
+    if (modalHist) modalHist.hide();
 
-    const esChica = parseInt(row.totalcajachica) > 0;
-    const contChica = document.getElementById('edit-caja-ch').closest('.col-6');
-    const contGrande = document.getElementById('edit-caja-gr').closest('.col-6');
-
-    if (esChica) {
-        contChica.classList.replace('d-none', 'd-block');
-        contGrande.classList.replace('d-block', 'd-none');
-        document.getElementById('edit-caja-ch').value = row.totalcajachica;
-    } else {
-        contChica.classList.replace('d-block', 'd-none');
-        contGrande.classList.replace('d-none', 'd-block');
-        document.getElementById('edit-caja-gr').value = row.totalcajagrande;
+    // 3. INYECTAR DATOS DEL ALOJAMIENTO EN EL HEADER
+    const header = document.getElementById('edit-header-data');
+    if (header) {
+        header.innerHTML = `
+            <div class="d-flex justify-content-between mb-1">
+                <span><b>ID Registro:</b> #${row.IdAlojamiento}</span>
+                <span><b>ID Historia:</b> #${row.historia}</span>
+            </div>
+            <div class="text-truncate"><b>Protocolo:</b> ${row.nprotA}</div>
+            <div class="text-truncate"><b>Investigador:</b> ${row.Investigador}</div>
+        `;
     }
 
+    // 4. LÓGICA DE VISIBILIDAD (Uso de IDs directos para evitar el error 'style')
+    const esChica = parseInt(row.totalcajachica) > 0;
+    const contChica = document.getElementById('cont-edit-chica');
+    const contGrande = document.getElementById('cont-edit-grande');
+
+    if (esChica) {
+        contChica.style.display = 'block';
+        contGrande.style.display = 'none';
+        document.getElementById('edit-caja-ch').value = row.totalcajachica;
+        document.getElementById('edit-caja-gr').value = 0;
+    } else {
+        contChica.style.display = 'none';
+        contGrande.style.display = 'block';
+        document.getElementById('edit-caja-gr').value = row.totalcajagrande;
+        document.getElementById('edit-caja-ch').value = 0;
+    }
+
+    // 5. LLENAR LOS INPUTS DEL FORMULARIO
     document.getElementById('edit-id-alojamiento').value = row.IdAlojamiento;
     document.getElementById('edit-historia').value = row.historia;
     document.getElementById('edit-fecha-inicio').value = row.fechavisado;
     document.getElementById('edit-obs').value = row.observaciones || '';
 
+    // 6. Abrir el modal de modificación
     new bootstrap.Modal(document.getElementById('modal-modificar-tramo')).show();
 };
+
+
 
 window.updateTramoData = async (event) => {
     if (event) event.preventDefault();
@@ -459,24 +483,99 @@ window.abrirConfiguracion = () => {
     });
 };
 
+// ***************************************************
+// EXPORTACIÓN A PDF: FICHA TÉCNICA DETALLADA
+// ***************************************************
 window.exportarFichaPDF = async () => {
+    // 1. Validar datos
+    if (!window.currentHistoryData || window.currentHistoryData.length === 0) {
+        return Swal.fire('Error', 'No hay datos de historial para exportar.', 'error');
+    }
+
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    const first = currentHistoryData[0];
+    const history = window.currentHistoryData;
+    const first = history[0]; 
+
+    showLoader();
+
+    // 2. Determinar Tipo de Caja General (para el encabezado)
+    const esChicaGral = parseFloat(first.totalcajachica) > 0;
+    const tipoCajaGral = esChicaGral ? 'CAJA CHICA' : 'CAJA GRANDE';
+
+    // 3. Generar filas con ID de alojamiento individual
+    const tablaFilas = history.map(h => {
+        const esChica = parseFloat(h.totalcajachica) > 0;
+        const cant = esChica ? h.totalcajachica : h.totalcajagrande;
+        return `
+            <tr>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">#${h.IdAlojamiento}</td>
+                <td style="border: 1px solid #ddd; padding: 6px;">${h.fechavisado}</td>
+                <td style="border: 1px solid #ddd; padding: 6px;">${h.hastafecha || 'VIGENTE'}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; text-align: center;">${cant}</td>
+                <td style="border: 1px solid #ddd; padding: 6px; font-style: italic;">${h.observaciones || '-'}</td>
+            </tr>`;
+    }).join('');
+
+    // 4. Plantilla del PDF
     const pdfTemplate = `
-        <div style="font-family: Arial; padding: 20px;">
-            <h2 style="color: #1a5d3b; text-align: center;">GROBO - ${inst}</h2>
-            <h4 style="text-align: center;">FICHA HISTÓRICA DE ALOJAMIENTO #${first.historia}</h4>
-            <hr>
-            <p><strong>Investigador:</strong> ${first.Investigador}</p>
-            <p><strong>Protocolo:</strong> ${first.nprotA}</p>
-            <p><strong>Especie:</strong> ${first.EspeNombreA}</p>
+        <div style="font-family: Arial, sans-serif; padding: 30px; color: #333;">
+            <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${inst}</h2>
+                <h4 style="margin: 5px 0; color: #555;">FICHA HISTÓRICA DE ALOJAMIENTO - HISTORIA #${first.historia}</h4>
+            </div>
+            
+            <div style="background: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                <table style="width: 100%; font-size: 13px; line-height: 1.6;">
+                    <tr>
+                        <td><strong>Investigador:</strong> ${first.Investigador}</td>
+                        <td><strong>Protocolo:</strong> [${first.nprotA}] ${first.tituloA || ''}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Especie:</strong> ${first.EspeNombreA}</td>
+                        <td style="color: #1a5d3b;"><strong>Tipo de Caja:</strong> ${tipoCajaGral}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h5 style="color: #1a5d3b; margin-bottom: 10px; text-transform: uppercase;">Cronología de Registros (Tramos)</h5>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead>
+                    <tr style="background-color: #1a5d3b; color: white;">
+                        <th style="border: 1px solid #ddd; padding: 8px;">ID REG.</th>
+                        <th style="border: 1px solid #ddd; padding: 8px;">DESDE</th>
+                        <th style="border: 1px solid #ddd; padding: 8px;">HASTA</th>
+                        <th style="border: 1px solid #ddd; padding: 8px;">CANT.</th>
+                        <th style="border: 1px solid #ddd; padding: 8px;">OBSERVACIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tablaFilas}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; font-size: 9px; color: #888; text-align: right;">
+                Generado el: ${new Date().toLocaleString()} | Bioterios Grobo System
+            </div>
         </div>
     `;
-    html2pdf().from(pdfTemplate).save(`Ficha_H${first.historia}.pdf`);
-};
 
-window.verPaginaQR = (historiaId) => {
-    window.open(`../../front/paginas/admin/qr_alojamiento.html?h=${historiaId}`, '_blank');
+    // 5. Configuración de descarga
+    const opt = {
+        margin: 0.5,
+        filename: `Ficha_Grobo_H${first.historia}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    try {
+        await html2pdf().set(opt).from(pdfTemplate).save();
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'No se pudo generar el PDF.', 'error');
+    } finally {
+        hideLoader();
+    }
 };
 
 const getInstitucionSegura = () => parseInt(localStorage.getItem('instId')) || 1;
@@ -927,40 +1026,52 @@ window.eliminarTramo = async (idAlojamiento, historiaId) => {
 
 
 // ***************************************************
-// FUNCIÓN: openModalActualizar (ACTUALIZADA AL NUEVO MODAL)
+// FUNCIÓN: openModalActualizar (CON CABECERA E INFO DE TIPO)
 // ***************************************************
 window.openModalActualizar = (historiaId, desdeHistorial = false) => {
-    // 1. Buscamos los datos actuales de la historia en el caché
+    // 1. Buscamos los datos maestros en el caché principal
     const actual = dataFull.find(a => a.historia == historiaId);
     if (!actual) return;
 
-    // 2. Si venimos del historial, cerramos ese modal para que no se pisen
+    // 2. Si venimos del historial, cerramos ese modal
     if (desdeHistorial) {
         const modalHistEl = document.getElementById('modal-historial');
         const modalHist = bootstrap.Modal.getInstance(modalHistEl);
         if (modalHist) modalHist.hide();
     }
 
-    // 3. Mapeamos los datos a los IDs de TU NUEVO MODAL
-    // Fecha: Seteamos la fecha de hoy por defecto
-    document.getElementById('reg-fecha-qr').valueAsDate = new Date();
+    // 3. INYECTAR DATOS DEL ALOJAMIENTO EN EL HEADER
+    const header = document.getElementById('act-info-header');
+    if (header) {
+        header.innerHTML = `
+            <div class="d-flex justify-content-between mb-1">
+                <span class="fw-bold text-dark">HISTORIA #${actual.historia}</span>
+                <span class="badge bg-primary">${actual.EspeNombreA}</span>
+            </div>
+            <div class="text-truncate"><b>Protocolo:</b> ${actual.nprotA}</div>
+            <div class="text-truncate"><b>Investigador:</b> ${actual.Investigador}</div>
+        `;
+    }
 
-    // Cantidad: Detectamos si usa caja chica o grande para mostrar la cantidad actual
+    // 4. LÓGICA DE TIPO DE CAJA Y ETIQUETA
     const esChica = parseFloat(actual.totalcajachica) > 0;
-    const cantActual = esChica ? actual.totalcajachica : actual.totalcajagrande;
-    document.getElementById('reg-cantidad-qr').value = cantActual;
+    const labelTipo = document.getElementById('act-label-tipo');
+    
+    if (labelTipo) {
+        labelTipo.innerText = esChica ? "CANT. CAJAS CHICAS" : "CANT. CAJAS GRANDES";
+    }
 
-    // Observaciones: Limpiamos el campo para la nueva actualización
+    // 5. MAPEO DE VALORES INICIALES
+    document.getElementById('reg-fecha-qr').valueAsDate = new Date();
+    document.getElementById('reg-cantidad-qr').value = esChica ? actual.totalcajachica : actual.totalcajagrande;
     document.getElementById('reg-obs-qr').value = "";
 
-    // 4. Guardamos la historia en el dataset del modal para que 'guardarNuevoTramo' sepa cuál es
+    // 6. PERSISTENCIA Y APERTURA
     const modalEl = document.getElementById('modal-actualizar-qr');
     modalEl.dataset.historia = historiaId;
 
-    // 5. Abrimos el modal correcto
     new bootstrap.Modal(modalEl).show();
 };
-
 // ***************************************************
 // GUARDAR NUEVO TRAMO (Corrección de error 'f is undefined')
 // ***************************************************
@@ -1045,60 +1156,60 @@ window.guardarNuevoTramo = async () => {
 
 
 // ***************************************************
-// FUNCIÓN: MODIFICAR TRAMO (Versión Blindada)
+// 7. MODIFICACIÓN DE TRAMOS INDIVIDUALES
+// ***************************************************
+// ***************************************************
+// 7. MODIFICACIÓN DE TRAMOS INDIVIDUALES
 // ***************************************************
 window.modificarTramo = (idAlojamiento) => {
-    console.log("🟢 Iniciando modificarTramo para ID:", idAlojamiento); // Esto DEBE aparecer en consola
-
-    // 1. Validar datos
-    if (!window.currentHistoryData || window.currentHistoryData.length === 0) {
-        console.error("❌ Error: No hay datos cargados en el historial.");
-        return;
-    }
-
+    // 1. Buscamos el registro en el caché global del historial
     const row = window.currentHistoryData.find(h => h.IdAlojamiento == idAlojamiento);
-    if (!row) {
-        console.error("❌ Error: No se encontró el tramo", idAlojamiento);
-        return;
-    }
+    if (!row) return;
 
-    // 2. Cerrar historial de forma segura
+    // 2. Cerramos el historial para evitar conflictos visuales
     const modalHistEl = document.getElementById('modal-historial');
-    if (modalHistEl) {
-        const inst = bootstrap.Modal.getInstance(modalHistEl) || new bootstrap.Modal(modalHistEl);
-        inst.hide();
+    const modalHist = bootstrap.Modal.getInstance(modalHistEl);
+    if (modalHist) modalHist.hide();
+
+    // 3. INYECTAR DATOS DEL ALOJAMIENTO (HEADER)
+    const infoHeader = document.getElementById('edit-info-header');
+    if (infoHeader) {
+        infoHeader.innerHTML = `
+            <div class="d-flex justify-content-between mb-1">
+                <span><b>Reg:</b> #${row.IdAlojamiento}</span>
+                <span><b>Hist:</b> #${row.historia}</span>
+            </div>
+            <div class="text-truncate"><b>Protocolo:</b> ${row.nprotA}</div>
+            <div class="text-truncate"><b>Investigador:</b> ${row.Investigador}</div>
+            <div><b>Especie:</b> ${row.EspeNombreA}</div>
+        `;
     }
 
-    // 3. Preparar Modal de Modificación (IDs exactos de tu HTML)
-    try {
-        const esChica = parseInt(row.totalcajachica) > 0;
-        
-        // Elementos del modal de modificación
-        const inputChica = document.getElementById('edit-caja-ch');
-        const inputGrande = document.getElementById('edit-caja-gr');
+    // 4. LÓGICA DE VISIBILIDAD (Uso de IDs directos para evitar errores)
+    const esChica = parseInt(row.totalcajachica) > 0;
+    const divChica = document.getElementById('div-chica');
+    const divGrande = document.getElementById('div-grande');
 
-        if (esChica) {
-            inputChica.closest('.col-6').style.display = 'block';
-            inputGrande.closest('.col-6').style.display = 'none';
-            inputChica.value = row.totalcajachica;
-        } else {
-            inputGrande.closest('.col-6').style.display = 'block';
-            inputChica.closest('.col-6').style.display = 'none';
-            inputGrande.value = row.totalcajagrande;
-        }
-
-        document.getElementById('edit-id-alojamiento').value = row.IdAlojamiento;
-        document.getElementById('edit-historia').value = row.historia;
-        document.getElementById('edit-fecha-inicio').value = row.fechavisado;
-        document.getElementById('edit-obs').value = row.observaciones || '';
-
-        // 4. Mostrar modal
-        const modalModif = new bootstrap.Modal(document.getElementById('modal-modificar-tramo'));
-        modalModif.show();
-        
-    } catch (err) {
-        console.error("❌ Error configurando el modal de modificación:", err);
+    if (esChica) {
+        divChica.style.display = 'block';
+        divGrande.style.display = 'none';
+        document.getElementById('edit-caja-ch').value = row.totalcajachica;
+        document.getElementById('edit-caja-gr').value = 0;
+    } else {
+        divChica.style.display = 'none';
+        divGrande.style.display = 'block';
+        document.getElementById('edit-caja-gr').value = row.totalcajagrande;
+        document.getElementById('edit-caja-ch').value = 0;
     }
+
+    // 5. LLENAR LOS CAMPOS DEL FORMULARIO
+    document.getElementById('edit-id-alojamiento').value = row.IdAlojamiento;
+    document.getElementById('edit-historia').value = row.historia;
+    document.getElementById('edit-fecha-inicio').value = row.fechavisado;
+    document.getElementById('edit-obs').value = row.observaciones || '';
+
+    // 6. Abrir el modal
+    new bootstrap.Modal(document.getElementById('modal-modificar-tramo')).show();
 };
 // ***************************************************
 // 2. GUARDAR EDICIÓN (Petición API)
