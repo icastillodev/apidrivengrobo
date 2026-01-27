@@ -30,6 +30,7 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
     $sql = "SELECT f.idformA as id, 
             CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
             f.fechainicioA as fecha, 
+            f.fecRetiroA,
             e.EspeNombreA as nombre_especie,
             se.SubEspeNombreA as nombre_subespecie,
             tf.categoriaformulario as categoria,
@@ -568,5 +569,169 @@ public function procesarAjustePagoInsumo($id, $monto, $accion) {
         error_log("Error SQL Insumos: " . $e->getMessage());
         return false;
     }
+}
+
+/**
+ * MODELO: Extensiones para Facturación por Investigador
+ * Ubicación: App\Models\Billing\BillingModel.php
+ */
+
+
+
+/**
+ * Obtiene los datos de perfil y el saldo real de la tabla dinero para un investigador
+ */
+public function getBasicUserInfo($idUsr, $idInst) {
+    $sql = "SELECT 
+                p.IdUsrA, 
+                CONCAT(p.ApellidoA, ', ', p.NombreA) as NombreCompleto,
+                COALESCE(d.SaldoDinero, 0) as SaldoDinero
+            FROM personae p
+            LEFT JOIN dinero d ON p.IdUsrA = d.IdUsrA AND d.IdInstitucion = ?
+            WHERE p.IdUsrA = ? LIMIT 1";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$idInst, $idUsr]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Obtiene la lista de protocolos donde el usuario es el TITULAR (el que paga)
+ */
+public function getProtocolosByInvestigador($idUsr, $idInst) {
+    $sql = "SELECT idprotA, nprotA, tituloA, 
+                   CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
+            FROM protocoloexpe p
+            JOIN personae u ON p.IdUsrA = u.IdUsrA
+            WHERE p.IdUsrA = ? AND p.IdInstitucion = ?";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$idUsr, $idInst]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Obtiene formularios de Insumos Generales (depto 0 / fuera de protocolo) 
+ * donde el investigador es el solicitante.
+ */
+public function getInsumosByUser($idUsr, $idInst, $desde = null, $hasta = null) {
+    $sql = "SELECT 
+                f.idformA as id,
+                f.IdUsrA, 
+                MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
+                MAX(d.SaldoDinero) as saldoInv, 
+                GROUP_CONCAT(CONCAT(i.NombreInsumo, ' (', fi.cantidad, ' ', i.TipoInsumo, ')') SEPARATOR ' | ') as detalle_completo,
+                MAX(pif.preciototal) as total_item,
+                MAX(pif.totalpago) as pagado,
+                MAX(tf.exento) as is_exento
+            FROM formularioe f
+            JOIN personae u ON f.IdUsrA = u.IdUsrA
+            LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion
+            JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
+            JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
+            JOIN insumo i ON fi.IdInsumo = i.idInsumo
+            JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            WHERE f.IdUsrA = ? 
+            AND f.IdInstitucion = ?
+            AND f.estado = 'Entregado'
+            AND (f.depto = 0 OR f.depto IS NULL)";
+    
+    $params = [$idUsr, $idInst];
+    if ($desde && $hasta) {
+        $sql .= " AND f.fechainicioA BETWEEN ? AND ?";
+        array_push($params, $desde, $hasta);
+    }
+
+    $sql .= " GROUP BY f.idformA";
+    
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($rows as &$r) {
+        $r['total_item'] = (float)$r['total_item'];
+        $r['pagado'] = (float)$r['pagado']; 
+        $r['debe'] = ($r['is_exento'] == 1) ? 0 : ($r['total_item'] - $r['pagado']);
+    }
+    return $rows;
+}
+
+/**
+ * Selector Inteligente: Trae investigadores que tienen:
+ * 1. Protocolos con formularios entregados.
+ * 2. Alojamientos vinculados.
+ * 3. Insumos entregados.
+ */
+public function getActiveInvestigators($idInst) {
+    $sql = "SELECT DISTINCT u.IdUsrA, u.ApellidoA, u.NombreA
+            FROM personae u
+            WHERE u.IdUsrA IN (
+                -- Caso 1: Son dueños de protocolos con formularios entregados
+                SELECT p.IdUsrA FROM protocoloexpe p 
+                JOIN protformr pf ON p.idprotA = pf.idprotA
+                JOIN formularioe f ON pf.idformA = f.idformA
+                WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
+                
+                UNION
+                
+                -- Caso 2: Tienen alojamientos en sus protocolos
+                SELECT p.IdUsrA FROM protocoloexpe p
+                JOIN alojamiento a ON p.idprotA = a.idprotA
+                WHERE p.IdInstitucion = ?
+                
+                UNION
+                
+                -- Caso 3: Pidieron insumos generales entregados
+                SELECT f.IdUsrA FROM formularioe f
+                WHERE f.estado = 'Entregado' AND f.IdInstitucion = ? 
+                AND f.tipoA IN (SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario LIKE '%insumo%')
+            )
+            ORDER BY u.ApellidoA ASC";
+            
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$idInst, $idInst, $idInst]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+/**
+ * Selector de Protocolos: Trae protocolos que tengan movimientos
+ */
+public function getActiveProtocols($idInst) {
+    $sql = "SELECT DISTINCT 
+                p.idprotA, 
+                p.nprotA, 
+                p.tituloA, 
+                CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
+            FROM protocoloexpe p
+            INNER JOIN personae u ON p.IdUsrA = u.IdUsrA
+            INNER JOIN protformr pf ON p.idprotA = pf.idprotA
+            INNER JOIN formularioe f ON pf.idformA = f.idformA
+            WHERE p.IdInstitucion = ? 
+              AND f.estado = 'Entregado'
+            ORDER BY p.nprotA DESC";
+            
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$idInst]);
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
+/**
+ * Obtiene la información del responsable y departamento de un protocolo
+ * CORREGIDO: Nombre de columna de departamento
+ */
+public function getProtocolHeaderInfo($idProt) {
+    $sql = "SELECT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
+                   CONCAT(u.ApellidoA, ', ', u.NombreA) as Responsable,
+                   d.NombreDeptoA as Departamento, -- Cambiado de nombreA a NombreDeptoA
+                   COALESCE(din.SaldoDinero, 0) as SaldoPI
+            FROM protocoloexpe p
+            JOIN personae u ON p.IdUsrA = u.IdUsrA
+            JOIN departamentoe d ON p.departamento = d.iddeptoA
+            LEFT JOIN dinero din ON u.IdUsrA = din.IdUsrA AND p.IdInstitucion = din.IdInstitucion
+            WHERE p.idprotA = ? LIMIT 1";
+            
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$idProt]);
+    $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+    // Si d.NombreDeptoA sigue fallando, podrías intentar usar d.nombreA o d.departamento
+    // pero basándome en tu estructura, NombreDeptoA es lo más probable.
+    return $result;
 }
 }

@@ -27,9 +27,16 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
 
         if (res.status === 'success') {
             input.value = ''; 
-            // Recarga global para actualizar los visores de saldo en toda la pantalla
-            await window.cargarFacturacionDepto(); 
             
+            // --- REFRESCO INTELIGENTE ---
+            if (typeof window.cargarFacturacionProtocolo === "function") {
+                await window.cargarFacturacionProtocolo();
+            } else if (typeof window.cargarFacturacionInvestigador === "function") {
+                await window.cargarFacturacionInvestigador();
+            } else if (typeof window.cargarFacturacionDepto === "function") {
+                await window.cargarFacturacionDepto();
+            }
+
             Swal.fire({
                 title: 'Saldo Actualizado',
                 icon: 'success',
@@ -117,33 +124,26 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
     try {
         showLoader();
         const res = await API.request('/billing/process-payment', 'POST', {
-            idUsr,
-            monto,
-            items,
-            instId: localStorage.getItem('instId') || 1
+            idUsr, monto, items, instId: localStorage.getItem('instId') || 1
         });
 
         if (res.status === 'success') {
-            // Cerramos el loader y mostramos éxito
             hideLoader();
-            await Swal.fire({
-                title: '¡Pago Procesado!',
-                text: 'El saldo ha sido actualizado y los ítems marcados como pagados.',
-                icon: 'success',
-                confirmButtonText: 'Genial'
-            });
+            await Swal.fire('¡Pago Procesado!', 'El saldo ha sido actualizado.', 'success');
 
-            // RECARGA: Esto hará que las filas pasen a color VERDE
-            if (window.cargarFacturacionDepto) {
+            // --- REFRESCO INTELIGENTE ---
+            if (typeof window.cargarFacturacionProtocolo === "function") {
+                await window.cargarFacturacionProtocolo();
+            } else if (typeof window.cargarFacturacionInvestigador === "function") {
+                await window.cargarFacturacionInvestigador();
+            } else if (typeof window.cargarFacturacionDepto === "function") {
                 await window.cargarFacturacionDepto();
             }
         } else {
-            Swal.fire('Error', res.message || 'No se pudo procesar el pago.', 'error');
+            Swal.fire('Error', res.message, 'error');
         }
     } catch (e) {
         console.error(e);
-        Swal.fire('Error de Red', 'No se pudo conectar con el servidor.', 'error');
-    } finally {
         hideLoader();
     }
 }

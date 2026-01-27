@@ -375,142 +375,7 @@ return `
             </div>
         </div>`;
 }
-/**
- * EXPORTACIONES
- */
-/**
- * Genera una ficha PDF detallada del protocolo seleccionado
- * Versión corregida: Evita hojas en blanco mediante validación de nulos
- */
-/**
- * Genera la ficha PDF individual del protocolo
- * Corrección: Blindaje contra recursos faltantes (404) y errores de renderizado
- */
-/**
- * Generación Programática de PDF (jsPDF + autoTable)
- * Más robusto, sin errores de renderizado y con control total de tablas.
- */
-window.downloadProtocoloPDF = async (idProt) => {
-    const prot = currentReportData.protocolos.find(p => p.idProt == idProt);
-    if (!prot) return;
 
-    showLoader();
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-
-    // 1. Configuración de Estilo Inicial
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(26, 93, 59); // Verde Bioterio
-    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
-
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text("ESTADO DE CUENTA POR PROTOCOLO", 105, 22, { align: "center" });
-
-    // Línea separadora
-    doc.setDrawColor(26, 93, 59);
-    doc.line(20, 25, 190, 25);
-
-    // 2. Información del Protocolo
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.text(`Protocolo: ${prot.tituloA} (N° ${prot.nprotA})`, 20, 35);
-    doc.text(`Investigador: ${prot.investigador}`, 20, 41);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Generado: ${new Date().toLocaleString()}`, 20, 47);
-
-    let currentY = 55;
-
-    // 3. Tabla de Pedidos (Formularios)
-    if (prot.formularios && prot.formularios.length > 0) {
-        doc.setFont("helvetica", "bold");
-        doc.text("PEDIDOS Y FORMULARIOS", 20, currentY);
-        
-        const bodyForms = prot.formularios.map(f => [
-            f.id,
-            f.fecha,
-            (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
-            (f.cantidad_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
-            `$ ${parseFloat(f.total).toFixed(2)}`,
-            `$ ${parseFloat(f.debe).toFixed(2)}`
-        ]);
-
-        doc.autoTable({
-            startY: currentY + 2,
-            head: [['ID', 'Fecha', 'Concepto', 'Cant.', 'Total', 'Falta']],
-            body: bodyForms,
-            theme: 'striped',
-            headStyles: { fillColor: [26, 93, 59] },
-            styles: { fontSize: 8 },
-            columnStyles: { 
-                4: { halign: 'right' }, 
-                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
-            }
-        });
-        currentY = doc.lastAutoTable.finalY + 10;
-    }
-
-    // 4. Tabla de Alojamientos
-    if (prot.alojamientos && prot.alojamientos.length > 0) {
-        doc.setFont("helvetica", "bold");
-        doc.text("HISTORIAL DE ALOJAMIENTO", 20, currentY);
-
-        const bodyAloj = prot.alojamientos.map(a => [
-            `#${a.historia}`,
-            a.especie,
-            a.periodo,
-            a.dias,
-            `$ ${parseFloat(a.total).toFixed(2)}`,
-            `$ ${parseFloat(a.debe).toFixed(2)}`
-        ]);
-
-        doc.autoTable({
-            startY: currentY + 2,
-            head: [['Hist', 'Especie', 'Período', 'Días', 'Total', 'Falta']],
-            body: bodyAloj,
-            theme: 'grid',
-            headStyles: { fillColor: [70, 70, 70] },
-            styles: { fontSize: 8 },
-            columnStyles: { 
-                4: { halign: 'right' }, 
-                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
-            }
-        });
-        currentY = doc.lastAutoTable.finalY + 15;
-    }
-
-    // 5. Resumen Financiero Final
-    const sumTotal = parseFloat(prot.formularios.reduce((s, f) => s + parseFloat(f.total || 0), 0) + 
-                               prot.alojamientos.reduce((s, a) => s + parseFloat(a.total || 0), 0)).toFixed(2);
-    
-    const sumDebe = parseFloat(prot.deudaAnimales + prot.deudaAlojamiento).toFixed(2);
-    const sumPago = (parseFloat(sumTotal) - parseFloat(sumDebe)).toFixed(2);
-
-    // Dibujar cuadro de totales
-    doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(120, currentY, 70, 30, 'FD');
-
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text("TOTAL PROTOCOLO:", 125, currentY + 7);
-    doc.text("TOTAL PAGADO:", 125, currentY + 15);
-    doc.text("TOTAL FALTA:", 125, currentY + 23);
-
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(0);
-    doc.text(`$ ${sumTotal}`, 185, currentY + 7, { align: "right" });
-    doc.setTextColor(26, 93, 59);
-    doc.text(`$ ${sumPago}`, 185, currentY + 15, { align: "right" });
-    doc.setTextColor(200, 0, 0);
-    doc.text(`$ ${sumDebe}`, 185, currentY + 23, { align: "right" });
-
-    // Guardar archivo
-    doc.save(`Ficha_Financiera_${prot.nprotA}.pdf`);
-    hideLoader();
-};
 
 
 /**
@@ -667,36 +532,6 @@ function actualizarSumaInsumos() {
     if (display) display.innerText = `$ ${suma.toFixed(2)}`;
 }
 
-window.downloadInsumosPDF = async () => {
-    const insumos = currentReportData.insumosGenerales;
-    if (!insumos || insumos.length === 0) return;
-
-    showLoader();
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Configuración del cuerpo con saltos de línea para los agrupados
-    const body = insumos.map(i => [
-        i.id,
-        i.solicitante,
-        i.detalle_completo.split(' | ').join('\n'), // Convierte el separador en salto de línea para el PDF
-        `$ ${parseFloat(i.total_item).toFixed(2)}`,
-        `$ ${parseFloat(i.debe).toFixed(2)}`
-    ]);
-
-    doc.autoTable({
-        startY: 30,
-        head: [['ID', 'Solicitante', 'Detalle de Insumos (Concepto + Cantidad)', 'Total', 'Falta']],
-        body: body,
-        theme: 'striped',
-        headStyles: { fillColor: [13, 110, 253] },
-        styles: { fontSize: 8, overflow: 'linebreak' }, // Importante: linebreak para múltiples ítems
-        columnStyles: { 2: { cellWidth: 80 } } 
-    });
-
-    doc.save(`Reporte_Insumos_Depto.pdf`);
-    hideLoader();
-};
 
 
 
@@ -814,3 +649,237 @@ function aplicarEstilosTablas() {
     document.head.appendChild(style);
 }
 
+
+/**
+ * Genera la ficha PDF individual del protocolo
+ * Corrección: Blindaje contra currentReportData null y mapeo de variables real
+ */
+window.downloadProtocoloPDF = async (idProt) => {
+    // 1. Validar que la data exista (Evita el error que mencionaste)
+    if (!window.currentReportData || !window.currentReportData.protocolos) {
+        return Swal.fire('Error', 'Los datos aún no se han cargado. Por favor, espera un segundo.', 'warning');
+    }
+
+    const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
+    if (!prot) return Swal.fire('Error', 'No se encontró la información del protocolo.', 'error');
+
+    showLoader();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+    const verdeBioterio = [26, 93, 59];
+
+    // --- ENCABEZADO ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(verdeBioterio[0], verdeBioterio[1], verdeBioterio[2]);
+    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text("ESTADO DE CUENTA POR PROTOCOLO", 105, 22, { align: "center" });
+    doc.line(20, 25, 190, 25);
+
+    // --- INFO DEL PROTOCOLO ---
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(`Protocolo: ${prot.tituloA} (N° ${prot.nprotA})`, 20, 35);
+    doc.text(`Investigador: ${prot.investigador}`, 20, 41);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generado: ${new Date().toLocaleString()}`, 20, 47);
+
+    let currentY = 55;
+
+    // --- TABLA DE PEDIDOS (FORMULARIOS) ---
+    if (prot.formularios && prot.formularios.length > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.text("PEDIDOS Y FORMULARIOS", 20, currentY);
+        
+        const bodyForms = prot.formularios.map(f => {
+            const isRea = f.categoria?.toLowerCase().includes('reactivo');
+            
+            // Lógica de Especie (Misma que en la tabla)
+            const esp = f.nombre_especie || '---';
+            const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
+            
+            // Lógica de Cantidad Real (Usando tus variables cant_animal, NombreInsumo, etc.)
+            const cantStr = isRea 
+                ? `${f.NombreInsumo} (${f.TipoInsumo}) ${f.CantidadInsumo} - ${f.cant_organo} un.`
+                : `${f.cant_animal} un.`;
+
+            return [
+                f.id,
+                esp + sub,
+                (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""), // Limpiar HTML
+                cantStr,
+                `$ ${parseFloat(f.total).toFixed(2)}`,
+                `$ ${parseFloat(f.debe).toFixed(2)}`
+            ];
+        });
+
+        doc.autoTable({
+            startY: currentY + 2,
+            head: [['ID', 'Especie', 'Concepto', 'Cant.', 'Total', 'Falta']],
+            body: bodyForms,
+            theme: 'striped',
+            headStyles: { fillColor: verdeBioterio },
+            styles: { fontSize: 7 },
+            columnStyles: { 
+                4: { halign: 'right' }, 
+                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
+            }
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    // --- TABLA DE ALOJAMIENTOS ---
+    if (prot.alojamientos && prot.alojamientos.length > 0) {
+        if (currentY > 240) { doc.addPage(); currentY = 20; }
+        doc.setFont("helvetica", "bold");
+        doc.text("HISTORIAL DE ALOJAMIENTO", 20, currentY);
+
+        const bodyAloj = prot.alojamientos.map(a => [
+            `#${a.historia}`,
+            a.especie,
+            a.periodo || `${a.fecha_ingreso} / ${a.fecha_salida || '...' }`,
+            a.dias || '-',
+            `$ ${parseFloat(a.total).toFixed(2)}`,
+            `$ ${parseFloat(a.debe).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            startY: currentY + 2,
+            head: [['Hist', 'Especie', 'Período', 'Días', 'Total', 'Falta']],
+            body: bodyAloj,
+            theme: 'grid',
+            headStyles: { fillColor: [70, 70, 70] },
+            styles: { fontSize: 7 },
+            columnStyles: { 
+                4: { halign: 'right' }, 
+                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
+            }
+        });
+        currentY = doc.lastAutoTable.finalY + 15;
+    }
+
+    // --- RESUMEN FINANCIERO DEL PROTOCOLO ---
+    if (currentY > 250) { doc.addPage(); currentY = 20; }
+
+    const sumTotal = parseFloat(
+        (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + 
+        (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
+    ).toFixed(2);
+    
+    const sumDebe = parseFloat(prot.deudaAnimales + prot.deudaReactivos + prot.deudaAlojamiento).toFixed(2);
+    const sumPago = (parseFloat(sumTotal) - parseFloat(sumDebe)).toFixed(2);
+
+    doc.setDrawColor(200);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(120, currentY, 70, 25, 'FD');
+
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text("SUBTOTAL ACUMULADO:", 125, currentY + 7);
+    doc.text("TOTAL ABONADO:", 125, currentY + 13);
+    doc.text("SALDO DEUDOR:", 125, currentY + 19);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    doc.text(`$ ${sumTotal}`, 185, currentY + 7, { align: "right" });
+    doc.setTextColor(verdeBioterio[0], verdeBioterio[1], verdeBioterio[2]);
+    doc.text(`$ ${sumPago}`, 185, currentY + 13, { align: "right" });
+    doc.setTextColor(200, 0, 0);
+    doc.text(`$ ${sumDebe}`, 185, currentY + 19, { align: "right" });
+
+    doc.save(`Ficha_Protocolo_${prot.nprotA}.pdf`);
+    hideLoader();
+};
+
+
+/**
+ * Genera el reporte PDF de todos los Insumos Generales del departamento
+ * Corrección: Blindaje de datos y estilo institucional.
+ */
+window.downloadInsumosPDF = async () => {
+    // 1. Blindaje contra datos nulos
+    if (!window.currentReportData || !window.currentReportData.insumosGenerales) {
+        return Swal.fire('Aviso', 'No hay datos de insumos cargados para este periodo.', 'info');
+    }
+
+    const insumos = window.currentReportData.insumosGenerales;
+    if (insumos.length === 0) return Swal.fire('Aviso', 'No hay insumos para reportar.', 'info');
+
+    showLoader();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF(); // Vertical está bien aquí porque son menos columnas
+    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+    const deptoNombre = document.getElementById('select-depto')?.selectedOptions[0]?.text || 'GENERAL';
+    const azulInsumos = [13, 110, 253]; // Azul para identificar el módulo de insumos
+
+    // --- ENCABEZADO ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(azulInsumos[0], azulInsumos[1], azulInsumos[2]);
+    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text("REPORTE DE INSUMOS GENERALES Y SUMINISTROS", 105, 22, { align: "center" });
+    doc.setFontSize(9);
+    doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 105, 27, { align: "center" });
+    doc.line(20, 30, 190, 30);
+
+    // --- PROCESAMIENTO DE DATOS ---
+    const body = insumos.map(i => [
+        i.id,
+        i.solicitante,
+        // Convertimos el separador de la base de datos en saltos de línea reales para la celda
+        (i.detalle_completo || "").split(' | ').join('\n'), 
+        `$ ${parseFloat(i.total_item || 0).toFixed(2)}`,
+        `$ ${parseFloat(i.pagado || 0).toFixed(2)}`,
+        `$ ${parseFloat(i.debe || 0).toFixed(2)}`
+    ]);
+
+    // --- TABLA ---
+    doc.autoTable({
+        startY: 35,
+        head: [['ID', 'Solicitante', 'Detalle de Productos / Cantidades', 'Total', 'Pagado', 'Debe']],
+        body: body,
+        theme: 'striped',
+        headStyles: { fillColor: azulInsumos },
+        styles: { 
+            fontSize: 8, 
+            overflow: 'linebreak', // Permite que el detalle largo salte de línea
+            cellPadding: 3 
+        },
+        columnStyles: { 
+            2: { cellWidth: 70 }, // Ancho generoso para la descripción de insumos
+            3: { halign: 'right' },
+            4: { halign: 'right' },
+            5: { halign: 'right', fontStyle: 'bold' }
+        }
+    });
+
+    // --- TOTALES AL FINAL DE LA TABLA ---
+    const finalY = doc.lastAutoTable.finalY + 10;
+    const totalDeudaInsumos = insumos.reduce((acc, curr) => acc + parseFloat(curr.debe || 0), 0);
+
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL DEUDA PENDIENTE INSUMOS: $ ${totalDeudaInsumos.toFixed(2)}`, 190, finalY, { align: "right" });
+
+    // --- PIE DE PÁGINA ---
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Generado el: ${new Date().toLocaleString()}`, 20, 285);
+        doc.text(`Página ${i} de ${pageCount}`, 190, 285, { align: "right" });
+    }
+
+    doc.save(`Reporte_Insumos_${deptoNombre}.pdf`);
+    hideLoader();
+};

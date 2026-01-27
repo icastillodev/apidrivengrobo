@@ -313,4 +313,173 @@ public function getInsumoDetail($id) {
         return $this->jsonResponse('error', 'Error en el servidor: ' . $e->getMessage());
     }
 }
+
+/* INVESTIGADOR */
+/**
+ * Reporte financiero filtrado por Investigador (Titular)
+ */
+/**
+ * Procesa el reporte consolidado para un Investigador específico.
+ * Filtra por Titular de protocolos y pedidos directos de insumos.
+ */
+public function getInvestigadorReport() {
+    $input = $this->getRequestData();
+    
+    $idUsr  = $input['idUsr']  ?? 0;
+    $desde  = $input['desde']  ?? null;
+    $hasta  = $input['hasta']  ?? null;
+    $instId = $_SESSION['IdInstitucion'] ?? 1;
+
+    if (!$idUsr) {
+        $this->jsonResponse('error', 'ID de investigador no proporcionado.');
+    }
+
+    try {
+        // 1. Obtener Perfil y Saldo Global del Investigador
+        $perfil = $this->model->getBasicUserInfo($idUsr, $instId);
+
+        // 2. Obtener sus Protocolos (Donde él es el Titular/Pagador)
+        $protocolosRaw = $this->model->getProtocolosByInvestigador($idUsr, $instId);
+        
+        $reporteProtocolos = [];
+        $deudaAniGlobal = 0;
+        $deudaReaGlobal = 0;
+        $deudaAlojGlobal = 0;
+        $totalPagadoGlobal = 0;
+
+        foreach ($protocolosRaw as $p) {
+            $idProt = $p['idprotA'];
+            
+            // Traemos formularios y alojamientos de este protocolo en el rango de fechas
+            $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+            $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+
+            if (!empty($formularios) || !empty($alojamientos)) {
+                $sumDebeAni = 0;
+                $sumDebeRea = 0;
+                $sumPagadoProt = 0;
+
+                foreach ($formularios as $f) {
+                    $montoDebe = (float)$f['debe'];
+                    $montoPagado = (float)$f['pagado'];
+                    $cat = strtolower($f['categoria'] ?? '');
+
+                    if (strpos($cat, 'reactivo') !== false) {
+                        $sumDebeRea += $montoDebe;
+                    } else {
+                        $sumDebeAni += $montoDebe;
+                    }
+                    $sumPagadoProt += $montoPagado;
+                }
+
+                $sumDebeAloj = array_sum(array_column($alojamientos, 'debe'));
+                $sumPagadoAloj = array_sum(array_column($alojamientos, 'pagado'));
+
+                $reporteProtocolos[] = [
+                    'idProt'           => $idProt,
+                    'nprotA'           => $p['nprotA'],
+                    'tituloA'          => $p['tituloA'],
+                    'investigador'     => $p['Investigador'],
+                    'idUsr'            => $idUsr,
+                    'saldoInv'         => $perfil['SaldoDinero'], // Inyectamos el saldo real del titular
+                    'deudaAnimales'    => $sumDebeAni,
+                    'deudaReactivos'   => $sumDebeRea,
+                    'deudaAlojamiento' => $sumDebeAloj,
+                    'formularios'      => $formularios,
+                    'alojamientos'     => $alojamientos
+                ];
+
+                // Acumuladores para el Dashboard superior
+                $deudaAniGlobal  += $sumDebeAni;
+                $deudaReaGlobal  += $sumDebeRea;
+                $deudaAlojGlobal += $sumDebeAloj;
+                $totalPagadoGlobal += ($sumPagadoProt + $sumPagadoAloj);
+            }
+        }
+
+        // 3. Insumos Generales (Pedidos directos del usuario fuera de protocolo)
+        $insumosGenerales = $this->model->getInsumosByUser($idUsr, $instId, $desde, $hasta);
+        $deudaInsGlobal = array_sum(array_column($insumosGenerales, 'debe'));
+        $totalPagadoGlobal += array_sum(array_column($insumosGenerales, 'pagado'));
+
+        // 4. Respuesta estructurada para billingInvestigador.js
+        $this->jsonResponse('success', [
+            'perfil' => $perfil,
+            'totales' => [
+                'globalDeuda'      => ($deudaAniGlobal + $deudaReaGlobal + $deudaAlojGlobal + $deudaInsGlobal),
+                'deudaAnimales'    => $deudaAniGlobal,
+                'deudaReactivos'   => $deudaReaGlobal,
+                'deudaAlojamiento' => $deudaAlojGlobal,
+                'deudaInsumos'     => $deudaInsGlobal,
+                'totalPagado'      => $totalPagadoGlobal
+            ],
+            'insumosGenerales' => $insumosGenerales,
+            'protocolos'       => $reporteProtocolos
+        ]);
+
+    } catch (\Exception $e) {
+        $this->jsonResponse('error', 'Error al procesar reporte: ' . $e->getMessage());
+    }
+}
+
+public function getProtocolReport() {
+    $input = $this->getRequestData();
+    $idProt = $input['idProt'] ?? 0;
+    $desde  = $input['desde']  ?? null;
+    $hasta  = $input['hasta']  ?? null;
+
+    if (!$idProt) $this->jsonResponse('error', 'ID de protocolo no proporcionado.');
+
+    try {
+        // 1. Info del cabezal (Quien paga y de qué depto es)
+        $info = $this->model->getProtocolHeaderInfo($idProt);
+        
+        // 2. Movimientos (Usamos las funciones que ya tenemos y funcionan perfecto)
+        $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+        $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+
+        // 3. Totales
+        $deudaAni = 0; $deudaRea = 0; $pagadoTotal = 0;
+
+        foreach ($formularios as $f) {
+            if (strpos(strtolower($f['categoria']), 'reactivo') !== false) $deudaRea += (float)$f['debe'];
+            else $deudaAni += (float)$f['debe'];
+            $pagadoTotal += (float)$f['pagado'];
+        }
+        
+        $deudaAloj = array_sum(array_column($alojamientos, 'debe'));
+        $pagadoTotal += array_sum(array_column($alojamientos, 'pagado'));
+
+        $this->jsonResponse('success', [
+            'info' => $info,
+            'formularios' => $formularios,
+            'alojamientos' => $alojamientos,
+            'totales' => [
+                'deudaAnimales'    => $deudaAni,
+                'deudaReactivos'   => $deudaRea,
+                'deudaAlojamiento' => $deudaAloj,
+                'deudaTotal'       => ($deudaAni + $deudaRea + $deudaAloj),
+                'totalPagado'      => $pagadoTotal
+            ]
+        ]);
+    } catch (\Exception $e) {
+        $this->jsonResponse('error', $e->getMessage());
+    }
+}
+// api/src/Controllers/BillingController.php
+
+public function listActiveProtocols() {
+    // Capturamos el ID de institución de la URL (?inst=1)
+    $instId = $_GET['inst'] ?? 1;
+
+    try {
+        // Llamamos al método del modelo que creamos antes
+        $data = $this->model->getActiveProtocols($instId);
+        
+        // Usamos el helper que ya tienes en el controlador
+        $this->jsonResponse('success', $data);
+    } catch (\Exception $e) {
+        $this->jsonResponse('error', $e->getMessage());
+    }
+}
 }

@@ -243,4 +243,34 @@ class UserController {
         ]);
         exit;
     }
+// En UserController.php
+
+public function listInvestigators() {
+    $instId = $_GET['inst'] ?? 1;
+
+    // IMPORTANTE: Instanciamos el modelo de facturación aquí mismo
+    // Asegúrate de pasarle la conexión a la base de datos ($this->db)
+    $billingModel = new \App\Models\Billing\BillingModel($this->db);
+
+    try {
+        // Ahora usamos la variable local, no $this->billingModel
+        $data = $billingModel->getActiveInvestigators($instId); 
+        
+        $this->jsonResponse('success', $data);
+    } catch (\Exception $e) {
+        $this->jsonResponse('error', $e->getMessage());
+    }
+}
+/**
+     * Helper para estandarizar las respuestas JSON de la API
+     */
+    private function jsonResponse($status, $data = null) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'status' => $status,
+            'data' => ($status === 'success') ? $data : null,
+            'message' => ($status === 'error') ? $data : ''
+        ]);
+        exit;
+    }
 }

@@ -179,3 +179,43 @@ $router->get('/billing/detail-insumo/:id', 'BillingController@getInsumoDetail');
 
 // NUEVA Ruta para Insumos y Reactivos
 $router->post('/billing/ajustar-pago-insumo', 'BillingController@ajustarPagoInsumo');
+
+
+
+
+// ============================================================
+// SECCIÓN: Facturación por Investigador (Gecko Devs 2026)
+// ============================================================
+
+/** * 1. Selector de Investigadores:
+ * Trae solo usuarios que son responsables de pago (con deudas o protocolos)
+ */
+$router->get('/users/list-investigators', 'UserController@listInvestigators');
+
+/**
+ * 2. Reporte Consolidado:
+ * Procesa toda la deuda de un investigador agrupada por sus protocolos
+ */
+$router->post('/billing/investigador-report', 'BillingController@getInvestigadorReport');
+
+/**
+ * 3. Gestión de Saldo Directo:
+ * Permite al administrador cargar o quitar dinero de la billetera del investigador
+ */
+$router->post('/billing/balance', 'BillingController@updateBalance');
+
+/**
+ * 4. Pagos Masivos de Protocolo:
+ * Ejecuta la transacción de pagar múltiples ítems seleccionados
+ */
+$router->post('/billing/process-payment', 'BillingController@processPayment');
+
+/**
+ * 5. Detalle de Saldo Individual (Para modales):
+ */
+$router->get('/billing/get-investigator-balance/:id', 'BillingController@getInvestigatorBalance');
+
+
+
+$router->get('/billing/list-active-protocols', 'BillingController@listActiveProtocols');
+$router->post('/billing/protocol-report', 'BillingController@getProtocolReport');

@@ -3,53 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estado de Cuenta Investigador - Gecko Dev</title>
+    <title>Facturación por Investigador - Gecko Devs</title>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <style>
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
         .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
-        
-        /* Estilos de Cuenta Corriente */
-        .saldo-card { border-left: 8px solid #198754; transition: all 0.3s; }
-        .deuda-card { border-left: 8px solid #dc3545; transition: all 0.3s; }
-        .stat-value { font-family: 'Lato'; font-weight: 900; }
-        
-        .sticky-balance { 
-            position: sticky; 
-            top: 0; 
-            z-index: 1010; 
-            background: rgba(255, 255, 255, 0.9); 
-            backdrop-filter: blur(10px);
-            border-bottom: 2px solid #1a5d3b;
-        }
-
-        .input-money { 
-            max-width: 120px; 
-            text-align: right; 
-            font-weight: 700; 
-            border-color: #badbcc;
-        }
+        .stat-card { transition: all 0.3s ease; border-top: 5px solid #0d6efd; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+        .titulo-seccion { border-left: 6px solid #0d6efd; padding-left: 15px; }
+        .table-billing { font-size: 11px; }
+        .balance-badge { font-size: 1.2rem; padding: 10px 20px; border-radius: 10px; }
     </style>
 
     <script type="module">
-        import { initBillingPersona } from '../../../dist/js/pages/admin/facturacion/billingInvestigador.js';
+        import { initBillingInvestigador } from '../../../dist/js/pages/admin/facturacion/investigador/billingInvestigador.js';
         import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
-        import { showLoader } from '../../../dist/js/components/LoaderComponent.js';
 
         document.addEventListener('DOMContentLoaded', () => {
-            showLoader();
             Auth.checkAccess([1, 2, 4]); 
             initMenu();
-            initBillingPersona(); 
+            initBillingInvestigador(); 
         });
     </script>
 </head>
@@ -63,98 +45,113 @@
                     <li class="breadcrumb-item text-muted">Admin</li>
                     <li class="breadcrumb-item text-muted">Facturación</li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-dark px-2 py-1">Por Investigador</span>
+                        <span class="badge bg-primary px-2 py-1">Por Investigador</span>
                     </li>
                 </ol>
             </nav>
 
-            <div class="row align-items-center mb-4 pb-3 border-bottom g-3">
-                <div class="col-md-5">
-                    <h5 class="fw-bold m-0"><i class="bi bi-person-vcard-fill text-success me-2"></i>Estado de Cuenta Individual</h5>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h5 class="fw-bold m-0"><i class="bi bi-person-vcard text-primary me-2"></i>Estado de Cuenta del Investigador</h5>
+                    <p class="text-muted small mb-0">Gestión de deudas agrupadas por protocolos y suministros individuales.</p>
                 </div>
-                <div class="col-md-7">
-                    <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Investigador:</span>
-                        <select id="sel-investigador" class="form-select border-success shadow-none fw-bold"></select>
-                        <button class="btn btn-success px-4 fw-bold uppercase" style="font-size: 11px;" onclick="window.cargarFacturacionPersona()">
-                            <i class="bi bi-search me-1"></i> Visualizar
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="balance-panel" class="row g-3 mb-4 d-none p-3 bg-light rounded border shadow-sm mx-0">
-                <div class="col-md-3">
-                    <div class="card saldo-card border-0 shadow-sm p-3 h-100">
-                        <span class="small text-muted fw-bold uppercase" style="font-size: 9px;">Saldo Disponible (A Favor)</span>
-                        <h3 id="txt-saldo-actual" class="text-success stat-value m-0">$ 0.00</h3>
-                    </div>
-                </div>
-
-                <div class="col-md-5 border-start border-end px-4">
-                    <label class="small fw-bold text-muted uppercase d-block mb-2" style="font-size: 9px;">Ajustar Saldo de Cuenta (+/-)</label>
-                    <div class="d-flex gap-2">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white fw-bold">$</span>
-                            <input type="number" id="input-ajuste-monto" class="form-control input-money" placeholder="0.00">
-                        </div>
-                        <button class="btn btn-sm btn-outline-success fw-bold text-uppercase" style="font-size: 9px;" onclick="window.ajustarSaldoPersona('add')">
-                            <i class="bi bi-plus-circle me-1"></i> Cargar
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger fw-bold text-uppercase" style="font-size: 9px;" onclick="window.ajustarSaldoPersona('sub')">
-                            <i class="bi bi-dash-circle me-1"></i> Descontar
-                        </button>
-                    </div>
-                    <small class="text-muted italic d-block mt-2" style="font-size: 10px;">* El ajuste impacta directamente en el balance del investigador.</small>
-                </div>
-
-                <div class="col-md-4 text-end d-flex flex-column justify-content-center">
-                    <label class="small fw-bold text-muted uppercase mb-1" style="font-size: 9px;">Acción Masiva</label>
-                    <button id="btn-pagar-masivo" class="btn btn-primary fw-bold py-2 shadow" disabled onclick="window.pagarSeleccionadosPersona()">
-                        <i class="bi bi-credit-card-2-back me-2"></i> LIQUIDAR SELECCIÓN (<span id="lbl-total-sel">$ 0.00</span>)
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm" onclick="window.downloadGlobalPDF()">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> REPORTE INDIVIDUAL
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" onclick="window.abrirAyudaBilling()">
+                        <i class="bi bi-question-circle me-1"></i> AYUDA
                     </button>
                 </div>
             </div>
 
-            <div id="investigador-results">
-                <div class="text-center py-5 text-muted opacity-50">
-                    <i class="bi bi-person-bounding-box fs-1"></i>
-                    <p class="mt-2 fw-bold uppercase" style="font-size: 11px;">Busque un investigador para gestionar sus deudas y saldos</p>
+            <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
+
+                    <div class="col-md-3">
+                        <div class="input-group shadow-sm"></div>
+                        <label class="form-label fw-bold">Investigador Responsable</label>
+                        <input type="text" id="busqueda-investigador" class="form-control mb-2" placeholder="Filtrar por nombre o ID...">
+                        
+                        <select id="sel-investigador" class="form-select border-primary shadow-sm">
+                            <option value="">-- SELECCIONAR INVESTIGADOR --</option>
+                        </select>
+                    </div>
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Desde:</span>
+                        <input type="date" id="f-desde" class="form-control form-control-sm shadow-none">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Hasta:</span>
+                        <input type="date" id="f-hasta" class="form-control form-control-sm shadow-none">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex gap-3 bg-white p-1 rounded border shadow-sm px-3" style="height: 31px; align-items: center;">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="chk-animales" checked>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;">ANIMALES/REA</label>
+                        </div>
+                        <div class="form-check form-switch m-0 border-start ps-4">
+                            <input class="form-check-input" type="checkbox" id="chk-insumos" checked>
+                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;">INSUMOS</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <button class="btn btn-primary btn-sm w-100 fw-bold shadow-sm" onclick="window.cargarFacturacionInvestigador()">
+                        <i class="bi bi-search"></i>
+                    </button>
                 </div>
             </div>
 
+            <div id="dashboard-area" class="mb-5 d-none">
+                <h4 id="dashboard-investigador-titulo" class="fw-bold text-dark mb-4 mt-2 uppercase" style="letter-spacing: 1px;"></h4>
+    
+                    <div id="txt-periodo" class="text-muted small mb-3"></div>
+                    </div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h6 class="text-muted fw-bold uppercase" style="font-size: 11px; letter-spacing: 2px;">
+                        RESUMEN FINANCIERO: <span id="txt-periodo" class="text-dark"></span>
+                    </h6>
+                <div id="contenedor-saldo-maestro" class="text-end">
+                    </div>
+                </div>
+
+                <div id="stats-container" class="row g-3 mb-4 justify-content-center"></div>
+            </div>
+
+            <div id="billing-results" class="mt-2">
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-person-search display-1 opacity-25"></i>
+                    <p class="mt-3">Seleccione un investigador y rango de fechas para ver el detalle de cobros.</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modal-investigador-help" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="modal-billing-help" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow-lg border-top border-5 border-primary">
                 <div class="modal-header bg-light py-2">
-                    <h5 class="modal-title fw-bold text-primary">Guía: Cuenta Corriente de Investigador</h5>
+                    <h5 class="modal-title fw-bold text-primary">Ayuda: Facturación por Investigador</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4">
-                    <div class="help-item mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-1 uppercase" style="font-size: 11px;">1. Saldo Disponible</h6>
-                        <p class="small text-muted">Es el dinero "a favor" que el investigador tiene en el bioterio. Se puede usar para pagar deudas de forma instantánea sin necesidad de transferencias externas en cada pedido.</p>
-                    </div>
-                    <div class="help-item mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-1 uppercase" style="font-size: 11px;">2. Carga y Descuento</h6>
-                        <p class="small text-muted">Use los botones <strong>CARGAR</strong> para ingresar dinero (ej. tras una transferencia bancaria) y <strong>DESCONTAR</strong> para realizar ajustes manuales o correcciones.</p>
-                    </div>
-                    <div class="help-item mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-1 uppercase" style="font-size: 11px;">3. Pago con Saldo</h6>
-                        <p class="small text-muted">Seleccione los ítems adeudados en la tabla y haga clic en el botón azul. El sistema restará el total de la deuda del saldo disponible automáticamente.</p>
-                    </div>
-                    <div class="text-center mt-4">
-                        <button class="btn btn-primary px-5 fw-bold" data-bs-dismiss="modal">ENTENDIDO</button>
-                    </div>
+                <div class="modal-body p-4 text-secondary">
+                    <p>Esta sección consolida todos los gastos de un <b>Titular de Protocolo</b>.</p>
+                    <ul>
+                        <li><b>Saldos:</b> El saldo mostrado arriba es el total disponible del investigador en la institución.</li>
+                        <li><b>Agrupación:</b> Los consumos se agrupan por protocolo para facilitar la rendición de cuentas.</li>
+                        <li><b>PDF Individual:</b> Puede generar un estado de cuenta específico para el investigador desde el botón superior rojo.</li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="modal-helper-container"></div>
+    <div id="modal-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
