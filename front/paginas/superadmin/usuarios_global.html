@@ -3,29 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Administración</title>
-    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <title>Directorio Maestro de Usuarios - Gecko Devs</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.tailwindcss.com"></script>
 
-</head>
-<body class="bg-gray-50">
-fdasafsdafsd
-    <main class="container mx-auto mt-10 p-6">
-        <h1 class="text-2xl font-bold">Bienvenido al Bioterio</h1>
-        <p class="text-gray-600">Seleccione una opción del menú superior para comenzar.</p>
-    </main>
-    <script src="../../dist/js/config.js"></script>
-    <script src="../../dist/js/api.js"></script>
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+        .badge-gecko { background-color: #1a5d3b !important; }
+        .page-link { color: #1a5d3b; border: none; margin: 0 2px; border-radius: 4px; }
+        .page-item.active .page-link { background-color: #1a5d3b !important; border: none; }
+    </style>
+
     <script type="module">
-        // Importamos el menú desde la nueva ubicación en dist
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        
-        // Verificación rápida: si no hay sesión iniciada, volvemos al login
-        if (!localStorage.getItem('userRole')) {
-            window.location.href = '../../index.html'; 
-        } else {
-            // Esto cargará el menú dinámico de la base de datos
-            initMenu();
-        }
+        import { initSuperUsuarios } from '../../dist/js/pages/superadmin/usuarios.js';
+        import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+                initSuperMenu();
+                initSuperUsuarios();
+        });
     </script>
+</head>
+<body>
+
+<div class="container my-5">
+    <div class="card shadow-sm border-0 p-4 p-md-5">
+        
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                <li class="breadcrumb-item text-muted">GECKO DEVS</li>
+                <li class="breadcrumb-item text-muted">SUPERADMIN</li>
+                <li class="breadcrumb-item active">
+                    <span class="badge badge-gecko px-2 py-1 text-white">Directorio Global de Usuarios</span>
+                </li>
+            </ol>
+        </nav>
+
+        <div class="row align-items-end mb-4 pb-3 border-bottom">
+            <div class="col-lg-8">
+                <h1 class="h4 text-secondary text-uppercase mb-4">Gestión de Personal en Red</h1>
+                <div class="input-group shadow-sm" style="max-width: 600px;">
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtro Global:</span>
+                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Buscar por ID, Sede, Rol, Nombre o Email...">
+                    <button id="btn-search" class="btn btn-success fw-bold px-4 badge-gecko text-white">Buscar</button>
+                </div>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <button onclick="abrirModalCrear()" class="btn btn-primary btn-sm fw-bold px-4 uppercase me-1">Nuevo Usuario</button>
+                <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase text-xs">Excel</button>
+            </div>
+        </div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle border" style="font-size: 12px;">
+        <thead class="table-light">
+            <tr class="text-uppercase" style="font-size: 11px;">
+                <th class="py-3 px-3">ID</th>
+                <th class="py-3 px-3">Institución</th>
+                <th class="py-3 px-3">Apellido y Nombre</th>
+                <th class="py-3 px-3">Correo / Usuario</th>
+                <th class="py-3 px-3 text-center">Rol</th>
+                </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+</div>
+
+        <nav class="mt-5">
+            <ul id="pagination" class="pagination pagination-sm justify-content-center"></ul>
+        </nav>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-user" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 border-top border-5 border-success shadow-lg">
+            <div class="modal-header bg-dark text-white py-2">
+                <h5 class="modal-title small fw-bold text-uppercase">Ficha de Usuario Global</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="form-user">
+                    <input type="hidden" id="IdUsrA">
+                    <div class="row g-3">
+                        <div class="col-12 bg-light p-3 rounded border-start border-4 border-primary mb-2">
+                            <label class="form-label text-muted small fw-bold text-uppercase">Nombre de Usuario (Login)</label>
+                            <div class="input-group has-validation">
+                                <span class="input-group-text"><i class="bi bi-person-badge-fill"></i></span>
+                                <input type="text" id="UsrA" class="form-control fw-bold" required placeholder="Ej: n_perez">
+                                <span id="user-status-icon" class="input-group-text bg-white d-none">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                </span>
+                            </div>
+                            <div id="user-feedback" class="form-text smaller fw-bold mt-1"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold uppercase">Nombre</label>
+                            <input type="text" id="NombreA" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold uppercase">Apellido</label>
+                            <input type="text" id="ApellidoA" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-muted small fw-bold uppercase">Email corporativo</label>
+                            <input type="email" id="EmailA" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-success small fw-bold uppercase">Asignar Sede</label>
+                            <select id="IdInstitucion" class="form-select form-select-sm border-success" required></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold uppercase">Rol en el sistema</label>
+                            <select id="IdTipoUsrA" class="form-select form-select-sm" required></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-bold uppercase">Habilitación</label>
+                            <select id="confirmado" class="form-select form-select-sm">
+                                <option value="1">Cuenta Activa</option>
+                                <option value="0">Cuenta Inactiva</option>
+                            </select>
+                        </div>
+                        <div id="hint-pass" class="col-12 mt-3 d-none">
+                            <div class="alert alert-warning py-2 mb-0" style="font-size: 11px;">
+                                <i class="bi bi-key-fill"></i> Clave inicial automática: <strong>12345678</strong>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light p-3 d-flex justify-content-between">
+                <button type="button" onclick="resetPassword()" id="btn-reset" class="btn btn-warning btn-sm fw-bold">RESET CLAVE</button>
+                <div>
+                    <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal">CERRAR</button>
+                    <button type="button" onclick="guardarUsuario()" class="btn btn-success btn-sm fw-bold px-4 badge-gecko text-white">GUARDAR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -8,14 +8,12 @@
     <link rel="stylesheet" href="dist/style/css/styles.css">
     <link rel="stylesheet" href="./dist/style/css/tilwind.css">
     
-    <script type="module">
-        import { Auth } from './dist/js/auth.js';
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Usamos el método que NO busca slug en la URL
-            Auth.initSuperAdmin();
-        });
-    </script>
+<script type="module">
+    import { SuperAuth } from './dist/js/superAuth.js';
+    document.addEventListener('DOMContentLoaded', () => {
+        SuperAuth.init();
+    });
+</script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
 

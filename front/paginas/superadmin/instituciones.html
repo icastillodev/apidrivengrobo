@@ -3,29 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Administración</title>
-    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
-
+    <title>Gestión de Sedes - Panel Maestro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../dist/css/style.css">
 </head>
-<body class="bg-gray-50">
-fdasafsdafsd
-    <main class="container mx-auto mt-10 p-6">
-        <h1 class="text-2xl font-bold">Bienvenido al Bioterio</h1>
-        <p class="text-gray-600">Seleccione una opción del menú superior para comenzar.</p>
+<body class="bg-light">
+
+    <main class="container py-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold text-dark">Gestión de Instituciones</h2>
+                <p class="text-muted">Administra las sedes activas en la red Bioterios Grobo.</p>
+            </div>
+            <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalCrear()">
+                <i class="bi bi-plus-circle me-2"></i>NUEVA INSTITUCIÓN
+            </button>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" id="busqueda" class="form-control border-start-0" placeholder="Buscar por nombre, ID o localidad...">
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">ID</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" style="min-width: 200px;">Institución / Sede</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Contacto</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ubicación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th> <th class="py-3 text-xs font-bold text-gray-500 uppercase">Facturación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Últ. Pago</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">CEUAS</th>
+                                <th class="text-center text-xs font-bold text-gray-500 uppercase">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-sedes">
+                            </tbody>
+                    </table>
+                </div>
+        </div>
     </main>
-    <script src="../../dist/js/config.js"></script>
-    <script src="../../dist/js/api.js"></script>
-    <script type="module">
-        // Importamos el menú desde la nueva ubicación en dist
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        
-        // Verificación rápida: si no hay sesión iniciada, volvemos al login
-        if (!localStorage.getItem('userRole')) {
-            window.location.href = '../../index.html'; 
-        } else {
-            // Esto cargará el menú dinámico de la base de datos
-            initMenu();
-        }
-    </script>
+
+    <div class="modal fade" id="modalInst" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="modalLabel">Detalles de la Institución</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="form-inst">
+                        <input type="hidden" id="IdInstitucion">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Nombre Corto (Sede)</label>
+                                <input type="text" id="NombreInst" class="form-control" required placeholder="Ej: URBE">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Correo Electrónico</label>
+                                <input type="email" id="InstCorreo" class="form-control" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Nombre Completo Institucional</label>
+                                <input type="text" id="NombreCompletoInst" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">País</label>
+                                <input type="text" id="Pais" class="form-control" value="Uruguay">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Localidad</label>
+                                <input type="text" id="Localidad" class="form-control">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Moneda</label>
+                                <select id="Moneda" class="form-select">
+                                    <option value="UYU">Peso Uruguayo (UYU)</option>
+                                    <option value="USD">Dólar (USD)</option>
+                                    <option value="ARS">Peso Argentino (ARS)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">Web Oficial</label>
+                                <input type="url" id="Web" class="form-control" placeholder="https://...">
+                            </div>
+                            <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Dependencia (Grupo)</label>
+                                <input type="text" id="DependenciaInstitucion" class="form-control" placeholder="Ej: UDELAR">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">URL del Logo</label>
+                                <input type="text" id="Logo" class="form-control" placeholder="https://...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Permitir Otros CEUAS</label>
+                                <select id="otrosceuas" class="form-select">
+                                    <option value="1">SÍ (Permitir)</option>
+                                    <option value="2">NO (Bloqueado)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Tipo de App</label>
+                                <select id="TipoApp" class="form-select">
+                                    <option value="1">1 - Común</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Estado Sede</label>
+                                <select id="Activo" class="form-select">
+                                    <option value="1">Activa</option>
+                                    <option value="0">Inactiva (Bloqueada)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Fecha Último Pago</label>
+                                <input type="date" id="UltimoPago" class="form-control">
+                            </div>
+                            <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ciclo / Contrato</th>
+
+                            <div class="row g-3 mt-2 border-t pt-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold text-primary">Ciclo Facturación</label>
+                                    <select id="TipoFacturacion" class="form-select border-primary">
+                                        <option value="1">Mensual (1 mes)</option>
+                                        <option value="3">Trimestral (3 meses)</option>
+                                        <option value="6">Semestral (6 meses)</option>
+                                        <option value="12">Anual (12 meses)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold text-primary">Fecha Contrato</label>
+                                    <input type="date" id="FechaContrato" class="form-control border-primary">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Último Pago</label>
+                                    <input type="date" id="UltimoPago" class="form-control">
+                                </div>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th>
+
+                                <div class="col-12">
+                                    <label class="form-label fw-bold">Detalles / Observaciones Internas</label>
+                                    <textarea id="Detalle" class="form-control" rows="2" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
+                                </div>
+                          </div>
+                        </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">CANCELAR</button>
+                    <button type="button" class="btn btn-primary px-4 fw-bold" onclick="guardarCambios()">GUARDAR INSTITUCIÓN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold">
+                <i class="bi bi-check-circle-fill me-2"></i> <span id="toast-msg">Datos actualizados correctamente</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="../../dist/js/pages/superadmin/instituciones.js"></script>
 </body>
 </html>

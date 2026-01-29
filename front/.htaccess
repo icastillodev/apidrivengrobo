@@ -1,15 +1,18 @@
 RewriteEngine On
 RewriteBase /URBE-API-DRIVEN/front/
 
-# 1. SI EL ARCHIVO O CARPETA EXISTE FÍSICAMENTE, CÁRGALO NORMALMENTE
+# PRIORIDAD 1: SuperAdmin login virtual
+RewriteRule ^admingrobogecko/?$ superadmin_login.html [L]
+
+# PRIORIDAD 2: Archivos físicos (CSS, JS, Imágenes)
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# 2. SI ES UNA RUTA DINÁMICA (COMO EL SLUG /front/urbe), ENVÍA AL INDEX
-# Pero excluye explícitamente tus carpetas de recursos
-RewriteCond %{REQUEST_URI} !(\.css|\.js|\.png|\.jpg|\.jpeg|\.svg|\.gif)$
-RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|paginas|assets|resources)
+# PRIORIDAD 3: Slugs de Sedes (urbe, gecko, etc)
+# Si no es un archivo real y no es la carpeta dist/paginas, mandamos al index
+RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|paginas|assets)
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
+
+# Fallback general
 RewriteRule ^ index.html [L]
-# Si el usuario escribe /admingrobogecko, lo mandamos al login de superadmin
-RewriteRule ^admingrobogecko$ superadmin_login.html [L]

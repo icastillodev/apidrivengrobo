@@ -3,29 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Administración</title>
-    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <title>Dashboard Maestro - Bioterios Grobo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/css/style.css"> </head>
+<body class="bg-light">
 
-</head>
-<body class="bg-gray-50">
-fdasafsdafsd
-    <main class="container mx-auto mt-10 p-6">
-        <h1 class="text-2xl font-bold">Bienvenido al Bioterio</h1>
-        <p class="text-gray-600">Seleccione una opción del menú superior para comenzar.</p>
+    <main class="container py-5">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="fw-bold text-dark">Panel de Control Maestro</h2>
+                <p class="text-muted">Gestión global de instituciones y configuración del sistema.</p>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-5">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-3 me-3">
+                            <i class="bi bi-buildings text-primary fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-0">Sedes Activas</h6>
+                            <h3 class="fw-bold mb-0" id="stat-sedes">--</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                            <i class="bi bi-people text-success fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-0">Usuarios Globales</h6>
+                            <h3 class="fw-bold mb-0" id="stat-usuarios">--</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-warning bg-opacity-10 p-3 rounded-3 me-3">
+                            <i class="bi bi-file-earmark-medical text-warning fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-0">Protocolos Totales</h6>
+                            <h3 class="fw-bold mb-0" id="stat-protocolos">--</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-3 me-3">
+                            <i class="bi bi-exclamation-triangle text-danger fs-3"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-0">Alertas Sistema</h6>
+                            <h3 class="fw-bold mb-0">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card border-0 shadow-sm h-100 p-4">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-gear-fill me-2 text-primary"></i>Administración de Sedes</h5>
+                    <p class="text-muted">Crea nuevas instituciones, configura sus monedas, tipos de formularios y severidades por defecto.</p>
+                    <a href="instituciones.html" class="btn btn-outline-primary fw-bold mt-auto">
+                        IR A GESTIÓN DE SEDES
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card border-0 shadow-sm h-100 p-4">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock-fill me-2 text-success"></i>Seguridad y Logs</h5>
+                    <p class="text-muted">Revisa los últimos accesos al sistema y gestiona los permisos maestros de los administradores locales.</p>
+                    <a href="logs.html" class="btn btn-outline-success fw-bold mt-auto">
+                        VER AUDITORÍA
+                    </a>
+                </div>
+            </div>
+        </div>
     </main>
-    <script src="../../dist/js/config.js"></script>
-    <script src="../../dist/js/api.js"></script>
-    <script type="module">
-        // Importamos el menú desde la nueva ubicación en dist
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+
+<script type="module">
+// Dentro de tu tag <script type="module"> existente en el HTML
+
+import { SuperAuth } from '../../dist/js/superAuth.js';
+import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+import { API } from '../../dist/js/api.js'; // Importamos la API para los datos
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Validamos acceso (Pasamos [1] porque es solo para SuperAdmin)
+    if (SuperAuth.checkMasterAccess([1])) {
         
-        // Verificación rápida: si no hay sesión iniciada, volvemos al login
-        if (!localStorage.getItem('userRole')) {
-            window.location.href = '../../index.html'; 
-        } else {
-            // Esto cargará el menú dinámico de la base de datos
-            initMenu();
+        // 2. Cargamos el Menú Maestro
+        initSuperMenu(); 
+        
+        // 3. Cargamos Estadísticas Globales
+        try {
+            // Este endpoint debe devolver el conteo total de la red Grobo
+            const res = await API.request('/superadmin/global-stats'); 
+            
+            if (res.status === 'success') {
+                document.getElementById('stat-sedes').innerText = res.data.totalSedes;
+                document.getElementById('stat-usuarios').innerText = res.data.totalUsuarios;
+                document.getElementById('stat-protocolos').innerText = res.data.totalProtocolos;
+            }
+        } catch (error) {
+            console.error("Error al cargar métricas globales:", error);
+            // Fallback elegante
+            ['stat-sedes', 'stat-usuarios', 'stat-protocolos'].forEach(id => {
+                document.getElementById(id).innerText = "Err";
+            });
         }
-    </script>
+    }
+});
+</script>
 </body>
 </html>

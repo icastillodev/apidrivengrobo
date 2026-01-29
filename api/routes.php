@@ -13,7 +13,7 @@ $router->post('/confirm-account', 'UserController@confirmAccount');
 $router->get('/check-username', 'UserController@checkUsername');
 $router->get('/maintenance', 'UserController@maintenance');
 
-
+$router->get('/superadmin/global-stats', 'InstitucionController@getGlobalStats');
 // api/routes.php
 
 // Ruta para solicitar el enlace de recuperación (la que te dio el 404)
@@ -219,3 +219,29 @@ $router->get('/billing/get-investigator-balance/:id', 'BillingController@getInve
 
 $router->get('/billing/list-active-protocols', 'BillingController@listActiveProtocols');
 $router->post('/billing/protocol-report', 'BillingController@getProtocolReport');
+
+
+// --- RUTAS DE GESTIÓN DE INSTITUCIONES ---
+$router->get('/superadmin/instituciones', 'InstitucionController@list');
+$router->post('/superadmin/instituciones/create', 'InstitucionController@create');
+$router->post('/superadmin/instituciones/update', 'InstitucionController@update');
+
+// --- RUTAS DE SUPERADMIN: USUARIOS ---
+
+// 1. Obtener la lista de todos los usuarios de todas las sedes
+$router->get('/superadmin/usuarios', 'UsuarioController@list');
+
+// 2. Crear un nuevo usuario (Contraseña genérica: 12345678)
+$router->post('/superadmin/usuarios/create', 'UsuarioController@create');
+
+// 3. Actualizar datos, rol o institución de un usuario existente
+$router->post('/superadmin/usuarios/update', 'UsuarioController@update');
+
+// 4. Resetear contraseña a 12345678 (Ruta que faltaba para el botón amarillo)
+$router->post('/superadmin/usuarios/reset-pass', 'UsuarioController@resetPass');
+
+$router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUsername');
+
+
+// SECCIÓN: Selector de Formularios (Lógica Multi-Dependencia)
+$router->get('/forms/selector', 'FormSelectorController@getSelectorData');

@@ -1,4 +1,6 @@
 import { Auth } from '../auth.js';
+// Detecta la ruta raíz hasta /paginas/ de forma dinámica
+const BASE_URL = window.location.pathname.substring(0, window.location.pathname.indexOf('/paginas/') + 9);
 
 const MENU_TEMPLATES = {
     1: { label: 'Usuarios', svg: `<svg viewBox="0 0 640 512"><path d="M320 16a104 104 0 1 1 0 208a104 104 0 1 1 0-208M96 88a72 72 0 1 1 0 144a72 72 0 1 1 0-144M0 416c0-70.7 57.3-128 128-128c12.8 0 25.2 1.9 36.9 5.4C132 330.2 112 378.8 112 432v16c0 11.4 2.4 22.2 6.7 32H32c-17.7 0-32-14.3-32-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32v-16c0-53.2-20-101.8-52.9-138.6c11.7-3.5 24.1-5.4 36.9-5.4c70.7 0 128 57.3 128 128v32c0 17.7-14.3 32-32 32zM472 160a72 72 0 1 1 144 0a72 72 0 1 1-144 0M160 432c0-88.4 71.6-160 160-160s160 71.6 160 160v16c0 17.7-14.3 32-32 32H192c-17.7 0-32-14.3-32-32z"/></svg>`, path: 'admin/usuarios.html' },
@@ -10,23 +12,22 @@ const MENU_TEMPLATES = {
     7: { label: 'Alojamientos', svg: `<svg viewBox="0 0 576 512"><path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1v16.2c0 22.1-17.9 40-40 40h-16c-1.1 0-2.2 0-3.3-.1c-1.4.1-2.8.1-4.2.1L416 512h-24c-22.1 0-40-17.9-40-40v-88c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v88c0 22.1-17.9 40-40 40h-55.9c-1.5 0-3-.1-4.5-.2c-1.2.1-2.4.2-3.6.2h-16c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9.1-2.8v-69.7h-32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7l255.4 224.5c8 7 12 15 11 24"/></svg>`, path: 'admin/alojamientos.html' },
     8: { label: 'Estadísticas', svg: `<svg viewBox="0 0 24 24"><path d="M20 13.75a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75v6.75H14V4.25c0-.728-.002-1.2-.048-1.546c-.044-.325-.115-.427-.172-.484c-.057-.057-.159-.128-.484-.172C12.949 2.002 12.478 2 11.75 2c-.728 0-1.2.002-1.546.048c-.325.044-.427.115-.484.172c-.057.057-.128.159-.172.484c-.046.347-.048.818-.048 1.546V20.5H8V8.75A.75.75 0 0 0 7.25 8h-3a.75.75 0 0 0-.75.75V20.5H1.75a.75.75 0 0 0 0 1.5h20a.75.75 0 0 0 0-1.5H20v-6.75Z"/></svg>`, path: 'admin/estadisticas.html' },
     9: { label: 'Config. Admin', svg: `<svg viewBox="0 0 24 24"><path d="M12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5m7 2c0-1.1.9-2 2-2V9.5c-1.1 0-2-.9-2-2s.9-2 2-2V4c0-1.1-.9-2-2-2h-3c0 1.1-.9 2-2 2s-2-.9-2-2H4c-1.1 0-2 .9-2 2v1.5c1.1 0 2 .9 2 2s-.9 2-2 2V15c1.1 0 2 .9 2 2s-.9 2-2 2V20c0 1.1.9 2 2 2h3c0-1.1-.9-2 2-2s2 .9 2 2h3c1.1 0 2-.9 2-2v-2.5z"/></svg>`, path: 'admin/configuraciones.html' },
-    10: { label: 'Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'admin/formularios.html' },
-    11: { label: 'Mis Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M13 1.07l1 1 .03.02L18.41 7.5c.39.39.39 1.02 0 1.41L13 14.34l-1-1L17 8.5 13 4.5V2H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 4h3v1h-3V4z"/></svg>`, path: 'investigador/mis-formularios.html' },
-    12: { label: 'Mis Alojam.', svg: `<svg viewBox="0 0 576 512"><path d="M280.37 148.26L96 300.11V464a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V344a16 16 0 0 1 16-16h88a16 16 0 0 1 16 16v120a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V300.11zM571 225.47L488 153.47V48a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v51.33L313.43 14.3a16 16 0 0 0-20.48 0L4.38 225.47a16 16 0 0 0 2.06 22.44l15.11 12.65a16 16 0 0 0 22.59-2.22L288 64.82l243.86 203.52a16 16 0 0 0 22.59 2.22l15.11-12.65a16 16 0 0 0 1.44-22.44z"/></svg>`, path: 'investigador/mis-alojamientos.html' },
+    10: { label: 'Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'usuario/formularios.html' },
+    11: { label: 'Mis Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M13 1.07l1 1 .03.02L18.41 7.5c.39.39.39 1.02 0 1.41L13 14.34l-1-1L17 8.5 13 4.5V2H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 4h3v1h-3V4z"/></svg>`, path: 'usuario/mis-formularios.html' },
+    12: { label: 'Mis Alojam.', svg: `<svg viewBox="0 0 576 512"><path d="M280.37 148.26L96 300.11V464a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V344a16 16 0 0 1 16-16h88a16 16 0 0 1 16 16v120a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V300.11zM571 225.47L488 153.47V48a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v51.33L313.43 14.3a16 16 0 0 0-20.48 0L4.38 225.47a16 16 0 0 0 2.06 22.44l15.11 12.65a16 16 0 0 0 22.59-2.22L288 64.82l243.86 203.52a16 16 0 0 0 22.59 2.22l15.11-12.65a16 16 0 0 0 1.44-22.44z"/></svg>`, path: 'usuario/mis-alojamientos.html' },
     13: { label: 'Mi Historial', svg: `<svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>`, path: 'investigador/historial-pagos.html' },
-    14: { label: 'Mis Reservas', svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'investigador/mis-reservas.html' },
-    100: { label: 'Instituciones', svg: `<svg viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>`, path: 'superadmin/instituciones.html' },
-    
-    // --- DROPDOWNS ---
-    201: { 
-        label: 'Perfil', 
-        svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>`,
+    14: { label: 'Mis Reservas', svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'usuario/mis-reservas.html' },
+    55: { 
+        label: 'Mi Investigador', 
+        svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,
         isDropdown: true,
         children: [
-            { label: 'Configurar', path: 'admin/perfil.html' },
-            { label: 'Salir', path: 'logout' }
+            { label: 'Mis formularios', path: 'investigador/mis-formularios.html' },
+            { label: 'Mis alojamientos', path: 'investigador/mis-alojamientos.html' },
+            { label: 'Mis reservas', path: 'usuario/mis-reservas.html' }
         ]
     },
+
     202: { 
         label: 'Contable', 
         svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,
@@ -44,6 +45,26 @@ const MENU_TEMPLATES = {
         children: [
             { label: 'Mis Protocolos', path: 'admin/mis-protocolos.html' },
             { label: 'Prot. Confirmados', path: 'admin/protocolos-confirmados.html' }
+        ]
+    },
+    998: { 
+        label: 'Ayuda', 
+        svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+        isDropdown: true,
+        children: [
+            { label: 'Capacitación', path: 'ayuda/capacitacion.html' },
+            { label: 'Ticket/Contacto', path: 'ayuda/contacto.html' },
+            { label: 'Preguntas frecuentes', path: 'ayuda/faq.html' },
+            { label: 'Ventas', path: 'ayuda/ventas.html' }
+        ]
+    },    // --- DROPDOWNS ---
+    999: { 
+        label: 'Perfil', 
+        svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>`,
+        isDropdown: true,
+        children: [
+            { label: 'Configurar', path: 'admin/perfil.html' },
+            { label: 'Salir', path: 'logout' }
         ]
     }
 };
@@ -105,49 +126,95 @@ function updateBadge(menuId, count) {
 }
 
 /**
- * INICIALIZACIÓN DEL MENÚ
+ * INICIALIZACIÓN DEL MENÚ GLOBAL
+ * Coordina la carga de permisos y renderizado dinámico.
  */
 export async function initMenu() {
+    // 1. Recuperamos credenciales de acceso del localStorage
     const roleId = parseInt(localStorage.getItem('userLevel')); 
-    const instId = localStorage.getItem('instId');
-    if (isNaN(roleId)) return;
+    const instId = localStorage.getItem('instId') || 0; 
+    
+    if (isNaN(roleId)) {
+        console.error("MenuComponent: No se detectó un userLevel válido. Abortando renderizado.");
+        return;
+    }
+
+    // 2. Creamos la estructura visual del Header
+    // Eliminamos cualquier header previo para evitar duplicados en cambios de sesión
+    const existingHeader = document.querySelector('header.gecko-header');
+    if (existingHeader) existingHeader.remove();
 
     const header = document.createElement('header');
-    header.className = "w-full";
-    header.innerHTML = `<nav class="w-full d-flex justify-content-center align-items-center position-relative">
-            <ul id="main-menu" class="nav border border-top-0 border-2 border-success bg-white p-1 rounded-bottom shadow-sm mt-0"></ul>
+    header.className = "w-full gecko-header";
+    header.innerHTML = `
+        <nav class="w-full d-flex justify-content-center align-items-center position-relative">
+            <ul id="main-menu" class="nav border border-top-0 border-2 border-success bg-white p-1 rounded-bottom shadow-sm mt-0">
+            </ul>
         </nav>`;
     document.body.prepend(header);
+    
     const menuList = document.getElementById('main-menu');
 
     try {
-        // Solo pedimos la estructura del menú
-        const resMenu = await fetch(`/URBE-API-DRIVEN/api/menu?role=${roleId}&inst=${instId}`).then(r => r.json());
+        // 3. Consulta a la API (Backend)
+        // Pasamos el role y la inst para que el PHP filtre en la base de datos
+        const response = await fetch(`/URBE-API-DRIVEN/api/menu?role=${roleId}&inst=${instId}`);
+        const resMenu = await response.json();
 
-        if (resMenu.status === "success" || Array.isArray(resMenu.data)) {
-            let ids = resMenu.data || [];
-            
-            // Reglas de visibilidad de NETWISE
-            if ([1, 2].includes(roleId)) {
-                [2, 3, 4, 5, 9, 10, 202, 203].forEach(id => { if(!ids.includes(id)) ids.push(id); });
+        if (resMenu.status === "success") {
+            // NORMALIZACIÓN: Convertimos todo a Number. 
+            // Esto es vital porque la DB puede devolver strings y el JS no los reconocería.
+            let ids = (resMenu.data || []).map(id => Number(id));
+
+            console.log("Gecko Debug: IDs recibidos del servidor:", ids);
+
+            // 4. REGLAS DE NEGOCIO (Seguridad en el cliente)
+            // El ID 9 (Configuración) es exclusivo para SuperAdmin (1) y Admin Inst (2)
+            if (![1, 2].includes(roleId)) {
+                ids = ids.filter(id => id !== 9);
             }
-            if(!ids.includes(201)) ids.push(201);
 
-            // Renderizamos los ítems limpios (sin badges iniciales)
-            ids.forEach(id => renderItem(menuList, id, 0));
+            // 5. MENÚS GLOBALES (Fijos)
+            // Forzamos que Perfil (201) y Ayuda (204) estén siempre presentes
+            if (!ids.includes(999)) ids.push(999); 
+            if (!ids.includes(998)) ids.push(998); 
+
+            // 6. RENDERIZADO
+            menuList.innerHTML = ''; // Limpiamos el <ul>
+            
+            ids.forEach(id => {
+                // Buscamos el template en MENU_TEMPLATES y lo inyectamos al DOM
+                renderItem(menuList, id, 0);
+            });
+
+            // 7. ACTIVACIÓN
+            // Una vez que los elementos existen en el DOM, activamos los clicks de los dropdowns
             setupDropdownLogic();
         }
-    } catch (err) { console.error("MenuComponent: Error al renderizar."); }
+    } catch (err) { 
+        console.error("MenuComponent: Error en la secuencia de carga.", err); 
+    }
 }
-
 function getCorrectPath(rawPath) {
     if (rawPath === 'logout') return 'javascript:Auth.logout();';
-    const pathParts = window.location.pathname.split('/').filter(p => p);
-    const paginasIndex = pathParts.indexOf('paginas');
-    if (paginasIndex === -1) return rawPath;
-    const currentFolder = pathParts[paginasIndex + 1]; 
-    const targetParts = rawPath.split('/');
-    return currentFolder === targetParts[0] ? targetParts[1] : `../${targetParts[0]}/${targetParts[1]}`;
+
+    // 1. Obtenemos la ruta actual del navegador
+    const currentPath = window.location.pathname;
+
+    // 2. Buscamos en qué posición de la URL está tu carpeta "/paginas/"
+    const paginasIndex = currentPath.indexOf('/paginas/');
+
+    if (paginasIndex !== -1) {
+        // 3. Extraemos la base dinámica (ej: "/URBE-API-DRIVEN/front/paginas/")
+        // El + 9 es para incluir la palabra "paginas/" en la base
+        const basePath = currentPath.substring(0, paginasIndex + 9);
+
+        // 4. Retornamos la ruta absoluta: Base + el camino del menú
+        return basePath + rawPath;
+    }
+
+    // Si por alguna razón no encuentra "/paginas/", devuelve el path original
+    return rawPath;
 }
 
 function renderItem(container, id, count = 0) {
@@ -241,3 +308,4 @@ style.innerHTML = `
     .notif-dot { position: absolute; top: -5px; right: -8px; width: 17px; height: 17px; border-radius: 4px; font-size: 9px; font-weight: 900; border: 2px solid white; z-index: 10; }
 `;
 document.head.appendChild(style);
+

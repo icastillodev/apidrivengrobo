@@ -21,4 +21,5 @@ class InstitutionModel {
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
 }

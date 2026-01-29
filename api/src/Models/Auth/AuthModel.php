@@ -31,25 +31,27 @@ class AuthModel {
     }
 
 
-    public function getSuperAdminByUsername($username) {
-        // Unimos usuarioe con tienetipor para verificar el rol 3
-        $sql = "SELECT u.UsrA as Nombre, u.password_secure as Password 
-                FROM usuarioe u 
-                JOIN tienetipor t ON u.IdUsrA = t.IdUsrA 
-                WHERE u.UsrA = ? AND t.IdTipousrA = 1 
-                LIMIT 1";
-                
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$username]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    public function updateActivityMetadata($userId) {
+public function getSuperAdminByUsername($username) {
+    // IMPORTANTE: Agregamos u.IdUsrA a la consulta
+    $sql = "SELECT u.IdUsrA, u.UsrA as Nombre, u.password_secure as Password 
+            FROM usuarioe u 
+            JOIN tienetipor t ON u.IdUsrA = t.IdUsrA 
+            WHERE u.UsrA = ? AND t.IdTipousrA = 1 
+            LIMIT 1";
+            
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([$username]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+
+public function updateActivityMetadata($userId) {
     // Actualizamos la fecha y aseguramos que esté en 1 (Activo)
     $sql = "UPDATE actividade SET UltentradaA = NOW(), ActivoA = 1 WHERE IdUsrA = ?";
     $stmt = $this->db->prepare($sql);
     return $stmt->execute([$userId]);
     }
-    public function runMaintenance($instId) {
+public function runMaintenance($instId) {
     // 1. Verificar si pasó un mes
     $stmt = $this->db->prepare("SELECT FechaDepuracion FROM institucion WHERE IdInstitucion = ?");
     $stmt->execute([$instId]);
@@ -90,4 +92,5 @@ class AuthModel {
 
     return true;
 }
+
 } 

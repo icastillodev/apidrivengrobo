@@ -8,15 +8,15 @@ class MenuModel {
         $this->db = $db;
     }
 
-    public function getPermissions($instId, $roleId) {
-        // Cambiamos NombreMenu por IdMenu para que coincida con el catálogo del controlador
-        $sql = "SELECT IdMenu FROM menudistr 
-                WHERE IdInstitucion = ? AND IdTipoUsrA = ? AND Activo = 1";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $roleId]);
-        
-        // Retorna [1, 2, 4, 8...]
-        return $stmt->fetchAll(\PDO::FETCH_COLUMN);
-    }
+public function getPermissions($instId, $roleId) {
+    // Traemos el IdMenu que es donde pusiste el número
+    $sql = "SELECT NombreMenu FROM menudistr 
+            WHERE IdInstitucion = ? AND IdTipoUsrA = ? AND Activo = 1";
+    
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([(int)$instId, (int)$roleId]);
+    
+    // Esto devuelve un array simple de números: [11, 12, 13...]
+    return $stmt->fetchAll(\PDO::FETCH_COLUMN);
+}
 }
