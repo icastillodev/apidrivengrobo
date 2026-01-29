@@ -245,3 +245,11 @@ $router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUser
 
 // SECCIÓN: Selector de Formularios (Lógica Multi-Dependencia)
 $router->get('/forms/selector', 'FormSelectorController@getSelectorData');
+
+
+
+// Búsqueda y selección
+$router->get('/animals/search-protocols', 'AnimalController@searchProtocols');
+$router->get('/animals/protocol-details', 'AnimalController@getProtocolDetails');
+// Guardado
+$router->post('/animals/create-order', 'AnimalController@createOrder');

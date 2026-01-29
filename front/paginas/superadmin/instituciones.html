@@ -40,7 +40,9 @@
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase" style="min-width: 200px;">Institución / Sede</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Contacto</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ubicación</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th> <th class="py-3 text-xs font-bold text-gray-500 uppercase">Facturación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th> 
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Facturación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Servicios</th> 
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Últ. Pago</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">CEUAS</th>
                                 <th class="text-center text-xs font-bold text-gray-500 uppercase">Estado</th>
@@ -151,7 +153,51 @@
                                     <input type="date" id="UltimoPago" class="form-control">
                                 </div>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th>
-
+                                <div class="col-12 mt-3">
+                                    <h6 class="fw-bold text-primary border-bottom pb-2">Configuración de Servicios</h6>
+                                    <div class="row g-2">
+                                        <div class="col-md-2 col-4">
+                                            <label class="form-label small fw-bold">Alojamiento</label>
+                                            <select id="Serv_Alojamiento" class="form-select form-select-sm">
+                                                <option value="1">Todos (1)</option>
+                                                <option value="2">Solo Admin (2)</option>
+                                                <option value="3">OFF (3)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 col-4">
+                                            <label class="form-label small fw-bold">Animales</label>
+                                            <select id="Serv_Animales" class="form-select form-select-sm">
+                                                <option value="1">Todos (1)</option>
+                                                <option value="2">Solo Admin (2)</option>
+                                                <option value="3">OFF (3)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 col-4">
+                                            <label class="form-label small fw-bold">Reactivos</label>
+                                            <select id="Serv_Reactivos" class="form-select form-select-sm">
+                                                <option value="1">Todos (1)</option>
+                                                <option value="2">Solo Admin (2)</option>
+                                                <option value="3">OFF (3)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 col-4">
+                                            <label class="form-label small fw-bold">Reservas</label>
+                                            <select id="Serv_Reservas" class="form-select form-select-sm">
+                                                <option value="1">Todos (1)</option>
+                                                <option value="2">Solo Admin (2)</option>
+                                                <option value="3">OFF (3)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 col-4">
+                                            <label class="form-label small fw-bold">Insumos</label>
+                                            <select id="Serv_Insumos" class="form-select form-select-sm">
+                                                <option value="1">Todos (1)</option>
+                                                <option value="2">Solo Admin (2)</option>
+                                                <option value="3">OFF (3)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="col-12">
                                     <label class="form-label fw-bold">Detalles / Observaciones Internas</label>
                                     <textarea id="Detalle" class="form-control" rows="2" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>

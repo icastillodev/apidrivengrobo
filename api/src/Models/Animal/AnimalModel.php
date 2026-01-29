@@ -309,4 +309,220 @@ public function updateFull($data) {
         $stmtData->execute([$adminId, $id]);
         return $stmtData->fetch(\PDO::FETCH_ASSOC);
     }
+
+
+    /* INVESTIGADOR */
+
+    // ************************************************************************
+    // 1. BÚSQUEDA Y CONFIGURACIÓN INICIAL
+    // ************************************************************************
+    
+    /**
+     * Obtiene la configuración de la institución (PDF precios, flag Otros CEUAS)
+     * y la lista de protocolos VIGENTES y con SALDO POSITIVO.
+     */
+    public function getActiveProtocolsForUser($instId, $userId) {
+        // A. Configuración Institucional (Link PDF y Permiso Otros CEUAS)
+        $stmtConfig = $this->db->prepare("SELECT otrosceuas, tituloprecios FROM institucion WHERE IdInstitucion = ?");
+        $stmtConfig->execute([$instId]);
+        $config = $stmtConfig->fetch(PDO::FETCH_ASSOC);
+
+        // B. Protocolos Activos
+        // Reglas: Misma Institución + Fecha Fin >= Hoy + Cantidad Animales > 0
+        $sql = "SELECT 
+                    p.idprotA, 
+                    p.nprotA, 
+                    p.tituloA, 
+                    CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable
+                FROM protocoloexpe p
+                INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
+                WHERE p.IdInstitucion = ? 
+                AND p.FechaFinProtA >= CURDATE() 
+                AND p.CantidadAniA > 0 
+                ORDER BY p.nprotA DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        
+        return [
+            'config' => $config,
+            'protocols' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+        ];
+    }
+
+    // ************************************************************************
+    // 2. DETALLE Y ÁRBOL DE ESPECIES (CASCADA)
+    // ************************************************************************
+
+    /**
+     * Obtiene info detallada de un protocolo y sus especies permitidas.
+     */
+    public function getDetailsAndSpecies($protId) {
+        // A. Info General (Saldo, Depto, Responsable)
+        $stmtInfo = $this->db->prepare("
+            SELECT 
+                p.idprotA, p.tituloA, p.nprotA, p.CantidadAniA as saldo,
+                CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable,
+                COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto
+            FROM protocoloexpe p
+            INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
+            LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
+            LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+            WHERE p.idprotA = ?
+        ");
+        $stmtInfo->execute([$protId]);
+        $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+
+        // B. Especies Aprobadas (Solo las vinculadas al protocolo)
+        $sqlEsp = "SELECT 
+                    e.idespA, e.EspeNombreA,
+                    s.idsubespA, s.SubEspeNombreA
+                   FROM protesper pe
+                   INNER JOIN especiee e ON pe.idespA = e.idespA
+                   INNER JOIN subespecie s ON e.idespA = s.idespA
+                   WHERE pe.idprotA = ? AND s.Existe = 1
+                   ORDER BY e.EspeNombreA, s.SubEspeNombreA";
+        
+        $stmtEsp = $this->db->prepare($sqlEsp);
+        $stmtEsp->execute([$protId]);
+        $rows = $stmtEsp->fetchAll(PDO::FETCH_ASSOC);
+
+        return ['info' => $info, 'species' => $this->buildSpeciesTree($rows)];
+    }
+
+    /**
+     * Para modo "Otros CEUAS": Trae TODAS las especies de la institución.
+     */
+    public function getAllSpeciesForInst($instId) {
+        $sql = "SELECT 
+                    e.idespA, e.EspeNombreA,
+                    s.idsubespA, s.SubEspeNombreA
+                FROM especiee e
+                INNER JOIN subespecie s ON e.idespA = s.idespA
+                WHERE e.IdInstitucion = ? AND s.Existe = 1
+                ORDER BY e.EspeNombreA, s.SubEspeNombreA";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Devolvemos solo el árbol, sin info de protocolo
+        return $this->buildSpeciesTree($rows);
+    }
+
+    // ************************************************************************
+    // 3. LÓGICA DE GUARDADO TRANSACCIONAL
+    // ************************************************************************
+
+    public function saveOrder($data) {
+        $this->db->beginTransaction();
+        
+        try {
+            // A. Obtener el ID del Tipo de Formulario para 'Animal vivo'
+            // Esto asegura integridad referencial con la tabla tipoformularios
+            $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE nombreTipo = 'Animal vivo' AND IdInstitucion = ? LIMIT 1");
+            $stmtType->execute([$data['instId']]);
+            $tipoId = $stmtType->fetchColumn();
+
+            if (!$tipoId) throw new Exception("Error de configuración: No existe el tipo 'Animal vivo' en esta institución.");
+
+            // B. Insertar en FORMULARIOE (Cabecera)
+            $sqlForm = "INSERT INTO formularioe (
+                tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, 
+                aclaraA, IdUsrA, IdInstitucion, estado, raza
+            ) VALUES (
+                ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?
+            )";
+            
+            $stmt = $this->db->prepare($sqlForm);
+            $stmt->execute([
+                $tipoId,
+                $data['idsubespA'],
+                $data['edad'],
+                $data['peso'],
+                $data['fecha_retiro'], // YYYY-MM-DD
+                $data['aclaracion'],
+                $data['userId'],
+                $data['instId'],
+                $data['raza']
+            ]);
+            
+            $idForm = $this->db->lastInsertId();
+
+            // C. Insertar en SEXOE (Detalle de Cantidades 1:1)
+            $sqlSex = "INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)";
+            $this->db->prepare($sqlSex)->execute([
+                $idForm,
+                $data['macho'], 
+                $data['hembra'], 
+                $data['indistinto'], 
+                $data['total']
+            ]);
+
+            // D. Lógica de Vinculación y Stock
+            $isExternal = isset($data['is_external']) && $data['is_external'] == 1;
+
+            if (!$isExternal && !empty($data['idprotA'])) {
+                // CASO 1: Protocolo Local -> Vinculamos y Descontamos
+                
+                // 1. Crear relación en protformr
+                $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")
+                         ->execute([$idForm, $data['idprotA']]);
+
+                // 2. Descontar saldo del protocolo
+                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
+                         ->execute([$data['total'], $data['idprotA']]);
+            
+            } else {
+                // CASO 2: Otros CEUAS (Externo)
+                // Aquí podrías guardar un flag en formularioe si tuvieras un campo 'es_externo'
+                // O insertar en protformr con un protocolo dummy si el sistema lo requiere.
+                // Por ahora, según tu lógica, simplemente NO descontamos stock.
+                
+                // Opcional: Si en el futuro agregas un campo 'es_otros_ceuas' a formularioe, 
+                // harías el UPDATE aquí.
+            }
+
+            $this->db->commit();
+            return $idForm;
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    // ************************************************************************
+    // 4. HELPER PRIVADO
+    // ************************************************************************
+
+    /**
+     * Convierte un array plano SQL en un árbol jerárquico para el Select JS
+     */
+    private function buildSpeciesTree($rows) {
+        $tree = [];
+        foreach ($rows as $r) {
+            $idEsp = $r['idespA'];
+            
+            if (!isset($tree[$idEsp])) {
+                $tree[$idEsp] = [
+                    'name' => $r['EspeNombreA'],
+                    'subs' => []
+                ];
+            }
+
+            // Agregamos la subespecie al array 'subs'
+            $tree[$idEsp]['subs'][] = [
+                'id' => $r['idsubespA'],
+                'name' => $r['SubEspeNombreA']
+            ];
+        }
+        // Retornamos 'array_values' para que sea un Array JSON [ {}, {} ] y no un Objeto { "15": {}, "20": {} }
+        return array_values($tree);
+    }
+
+
+
+
+
 }

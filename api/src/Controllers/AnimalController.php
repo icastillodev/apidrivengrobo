@@ -157,4 +157,68 @@ class AnimalController {
             echo json_encode(['status' => 'error', 'message' => 'Error al procesar el envío de correos']);
         }
     }
+
+
+    /* INVESTIGADOR */ 
+    public function searchProtocols() {
+            if (ob_get_length()) ob_clean();
+            header('Content-Type: application/json');
+            
+            $instId = $_GET['inst'] ?? 0;
+            $userId = $_GET['user'] ?? 0;
+
+            try {
+                // Obtenemos protocolos activos y la config de la institución (Otros CEUAS y PDF)
+                $data = $this->model->getActiveProtocolsForUser($instId, $userId);
+                echo json_encode(['status' => 'success', 'data' => $data]);
+            } catch (\Exception $e) {
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            }
+            exit;
+        }
+
+        public function getProtocolDetails() {
+            if (ob_get_length()) ob_clean();
+            header('Content-Type: application/json');
+            
+            $protId = $_GET['id'] ?? null;
+            $isOtrosCeuas = $_GET['otros_ceuas'] ?? 0;
+            $instId = $_GET['inst'] ?? 0;
+
+            try {
+                if ($isOtrosCeuas == 1) {
+                    // Si es Otros CEUAS, traemos TODAS las especies de la institución
+                    $data = $this->model->getAllSpeciesForInst($instId);
+                } else {
+                    // Si es protocolo normal, traemos sus especies aprobadas y cupos
+                    $data = $this->model->getDetailsAndSpecies($protId);
+                }
+                echo json_encode(['status' => 'success', 'data' => $data]);
+            } catch (\Exception $e) {
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            }
+            exit;
+        }
+
+        public function createOrder() {
+            if (ob_get_length()) ob_clean();
+            header('Content-Type: application/json');
+            
+            // Decodificamos el JSON del body (porque enviaremos estructura compleja)
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            try {
+                $idForm = $this->model->saveOrder($data);
+                
+                // Envío de Correo (Simulado por ahora, se integra con MailService)
+                // Aquí iría la lógica del MailService usando el email del usuario logueado
+                
+                echo json_encode(['status' => 'success', 'id' => $idForm]);
+            } catch (\Exception $e) {
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            }
+            exit;
+        }
+
 }

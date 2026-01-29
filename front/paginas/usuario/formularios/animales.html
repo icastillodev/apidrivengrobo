@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Animales - GROBO</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
+    
+    <style>
+        .step-section { transition: all 0.3s ease; }
+        .hidden-step { display: none; opacity: 0; }
+        .visible-step { display: block; opacity: 1; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .protocol-card { border-left: 5px solid #1a5d3b; background: #f8fff9; }
+        .info-label { font-size: 10px; text-transform: uppercase; font-weight: bold; color: #6c757d; }
+        .info-value { font-weight: bold; color: #212529; }
+    </style>
+
+    <script type="module">
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { initAnimalForm } from '../../../dist/js/pages/usuario/formularios/animales.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!Auth.checkAccess([1, 2, 3])) return;
+            await initMenu();
+            NotificationManager.init();
+            initAnimalForm();
+        });
+    </script>
+</head>
+<body class="bg-light">
+
+    <div class="container my-5 pb-5">
+        
+        <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
+            <div>
+                <h4 class="fw-bold text-success mb-0 text-uppercase">Solicitud de Animales Vivos</h4>
+                <small class="text-muted">Complete los pasos para generar su pedido</small>
+            </div>
+            <a id="link-precios" href="#" target="_blank" class="btn btn-outline-success btn-sm fw-bold shadow-sm d-none">
+                <i class="bi bi-file-earmark-pdf me-1"></i> VER PRECIOS
+            </a>
+        </div>
+
+        <div id="step-1-protocol" class="card shadow-sm border-0 mb-4 visible-step">
+            <div class="card-body p-4">
+                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Protocolo Aprobado</label>
+                
+                <div class="position-relative mb-3">
+                    <input type="text" id="protocol-search" class="form-control form-control-lg border-success" placeholder="Buscar por N°, Título o Investigador..." autocomplete="off">
+                    <div id="protocol-list" class="list-group position-absolute w-100 shadow-lg d-none" style="z-index: 1000; max-height: 300px; overflow-y: auto;"></div>
+                </div>
+
+                <div class="d-flex gap-2 justify-content-between">
+                    <button type="button" class="btn btn-link text-decoration-none text-muted small" data-bs-toggle="modal" data-bs-target="#modal-protocol-help">
+                        <i class="bi bi-question-circle"></i> ¿No aparece tu protocolo aquí?
+                    </button>
+                    
+                    <button id="btn-otros-ceuas" type="button" class="btn btn-warning btn-sm fw-bold text-dark shadow-sm d-none">
+                        <i class="bi bi-exclamation-triangle me-1"></i> OTROS CEUAS
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-2-form" class="hidden-step">
+            
+            <div class="card protocol-card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <h5 id="info-titulo" class="fw-bold mb-1">...</h5>
+                            <span id="info-nprot" class="badge bg-success mb-2">...</span>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <span class="info-label d-block">Investigador</span>
+                                    <span id="info-investigador" class="info-value">...</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <span class="info-label d-block">Departamento</span>
+                                    <span id="info-depto" class="info-value">...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 border-start text-center">
+                            <span class="info-label d-block mb-2">Cupo Disponible</span>
+                            <h2 id="info-saldo" class="display-4 fw-bold text-success mb-0">0</h2>
+                            <small class="text-muted">animales</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form id="animal-form">
+                <input type="hidden" id="selected-prot-id" name="idprotA">
+                <input type="hidden" id="is-otros-ceuas" name="is_external" value="0">
+
+                <div class="card shadow-sm border-0 p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Especie</label>
+                            <select id="select-especie" class="form-select fw-bold text-primary" required disabled>
+                                <option value="">Seleccione...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Cepa / Subespecie</label>
+                            <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
+                                <option value="">Primero seleccione especie...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Raza / Línea</label>
+                            <input type="text" id="input-raza" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
+                            <input type="text" id="input-peso" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Edad</label>
+                            <input type="text" id="input-edad" class="form-control" required>
+                        </div>
+
+                        <div class="col-12"><hr class="text-muted my-2"></div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Machos</label>
+                            <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Hembras</label>
+                            <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Indistinto</label>
+                            <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-success text-uppercase text-center w-100">TOTAL</label>
+                            <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
+                        </div>
+
+                        <div class="col-12"><hr class="text-muted my-2"></div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Fecha de Retiro</label>
+                            <input type="date" id="input-fecha" class="form-control" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Aclaraciones / Observaciones</label>
+                            <textarea id="input-aclaracion" class="form-control" rows="1"></textarea>
+                        </div>
+
+                        <div class="col-12 mt-4 text-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="location.reload()">CANCELAR</button>
+                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">REVISAR Y ENVIAR</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <div class="modal fade" id="modal-protocol-help" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">Ayuda con Protocolos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <p class="mb-4">Si tu protocolo no aparece en la lista, puede que haya expirado o no tenga cupo disponible.</p>
+                    <div class="d-grid gap-2">
+                        <a href="#" class="btn btn-outline-primary fw-bold">VER TODOS LOS PROTOCOLOS APROBADOS</a>
+                        <a href="#" class="btn btn-success fw-bold">SOLICITAR APROBACIÓN DE NUEVO PROTOCOLO</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</body>
+</html>
