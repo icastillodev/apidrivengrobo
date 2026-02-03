@@ -34,19 +34,25 @@ class PreciosController {
         exit;
     }
 
-    public function updateAll() {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+// En PreciosController.php -> updateAll()
+public function updateAll() {
+    if (ob_get_length()) ob_clean();
+    header('Content-Type: application/json');
+    
+    $input = json_decode(file_get_contents('php://input'), true);
 
-        try {
-            $success = $this->model->updateTariff($input['data'], $input['jornada'], $input['instId']);
-            echo json_encode(['status' => $success ? 'success' : 'error']);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-        }
-        exit;
+    try {
+        // Capturar tituloprecios
+        $titulo = $input['tituloprecios'] ?? '';
+        
+        // Pasar el titulo al modelo
+        $success = $this->model->updateTariff($input['data'], $input['jornada'], $titulo, $input['instId']);
+        
+        echo json_encode(['status' => $success ? 'success' : 'error']);
+    } catch (\Exception $e) {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
+    exit;
+}
 }

@@ -200,25 +200,83 @@ class AnimalController {
             exit;
         }
 
-        public function createOrder() {
-            if (ob_get_length()) ob_clean();
-            header('Content-Type: application/json');
-            
-            // Decodificamos el JSON del body (porque enviaremos estructura compleja)
-            $data = json_decode(file_get_contents('php://input'), true);
+public function createOrder() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        $data = json_decode(file_get_contents('php://input'), true);
 
-            try {
-                $idForm = $this->model->saveOrder($data);
-                
-                // Envío de Correo (Simulado por ahora, se integra con MailService)
-                // Aquí iría la lógica del MailService usando el email del usuario logueado
-                
-                echo json_encode(['status' => 'success', 'id' => $idForm]);
-            } catch (\Exception $e) {
-                http_response_code(500);
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            }
-            exit;
+        try {
+            // 1. Guardar el Pedido (Como ya lo tenías)
+            $idForm = $this->model->saveOrder($data);
+            
+            // 2. PREPARAR DATOS PARA EL EMAIL
+            // Necesitamos los nombres de texto, no los IDs. 
+            // Podemos hacer pequeñas consultas rápidas o modificar el saveOrder para que devuelva info.
+            // Opción Rápida: Consultar lo necesario para el mail.
+            
+            // Obtener datos usuario e institución
+            $userInfo = $this->getUserAndInstInfo($data['userId'], $data['instId']);
+            
+            // Obtener nombres de especie/subespecie
+            $names = $this->model->getNamesForMail($data['idsubespA'], $data['idprotA']);
+
+            // Armar el array de datos para el MailService
+            $mailData = [
+                'id' => $idForm,
+                'protocolo' => $names['nprot'] . ' - ' . $names['titulo'],
+                'especie' => $names['especie'],
+                'cepa' => $names['subespecie'],
+                'detalles' => "Raza: {$data['raza']}, Peso: {$data['peso']}, Edad: {$data['edad']}",
+                'machos' => $data['macho'],
+                'hembras' => $data['hembra'],
+                'indistintos' => $data['indistinto'],
+                'total' => $data['total'],
+                'fecha_retiro' => $data['fecha_retiro'],
+                'aclaracion' => $data['aclaracion']
+            ];
+
+            // 3. ENVIAR CORREO
+            $mailService = new \App\Models\Services\MailService();
+            $mailService->sendAnimalOrderConfirmation(
+                $userInfo['EmailA'],     // Para
+                $userInfo['NombreA'],    // Nombre Usuario
+                $userInfo['NombreInst'], // Institución
+                $mailData                // Array de datos
+            );
+            
+            echo json_encode(['status' => 'success', 'id' => $idForm]);
+
+        } catch (\Exception $e) {
+            // Si falla el mail, NO fallamos el pedido, solo logueamos
+            // Si falla el saveOrder, sí va al catch normal.
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+        exit;
+    }
+
+    // --- Helpers privados para el Controller ---
+
+    private function getUserAndInstInfo($userId, $instId) {
+        // Asumiendo que tienes acceso a $this->db o $this->model->db
+        // Si no, agrégalo en el modelo y llámalo desde ahí.
+        // Aquí uso una lógica genérica:
+        return $this->model->getUserAndInstInfo($userId, $instId);
+    }
+
+        // Obtiene TODOS los datos necesarios para armar el PDF en el cliente
+    public function getPDFData() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $instId = $_GET['inst'] ?? 0;
+        try {
+            $data = $this->model->getDataForTarifario($instId);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 
 }

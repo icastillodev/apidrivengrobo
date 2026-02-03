@@ -321,18 +321,15 @@ public function updateFull($data) {
      * Obtiene la configuración de la institución (PDF precios, flag Otros CEUAS)
      * y la lista de protocolos VIGENTES y con SALDO POSITIVO.
      */
-    public function getActiveProtocolsForUser($instId, $userId) {
-        // A. Configuración Institucional (Link PDF y Permiso Otros CEUAS)
+public function getActiveProtocolsForUser($instId, $userId) {
+        // A. Configuración Institucional
         $stmtConfig = $this->db->prepare("SELECT otrosceuas, tituloprecios FROM institucion WHERE IdInstitucion = ?");
         $stmtConfig->execute([$instId]);
-        $config = $stmtConfig->fetch(PDO::FETCH_ASSOC);
+        $config = $stmtConfig->fetch(\PDO::FETCH_ASSOC);
 
         // B. Protocolos Activos
-        // Reglas: Misma Institución + Fecha Fin >= Hoy + Cantidad Animales > 0
         $sql = "SELECT 
-                    p.idprotA, 
-                    p.nprotA, 
-                    p.tituloA, 
+                    p.idprotA, p.nprotA, p.tituloA, 
                     CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable
                 FROM protocoloexpe p
                 INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
@@ -340,13 +337,18 @@ public function updateFull($data) {
                 AND p.FechaFinProtA >= CURDATE() 
                 AND p.CantidadAniA > 0 
                 ORDER BY p.nprotA DESC";
-        
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         
+        // C. Datos del Usuario Actual (Email) - NUEVO
+        $stmtUser = $this->db->prepare("SELECT EmailA FROM personae WHERE IdUsrA = ?");
+        $stmtUser->execute([$userId]);
+        $userEmail = $stmtUser->fetchColumn();
+
         return [
             'config' => $config,
-            'protocols' => $stmt->fetchAll(PDO::FETCH_ASSOC)
+            'protocols' => $stmt->fetchAll(\PDO::FETCH_ASSOC),
+            'user_email' => $userEmail // Enviamos el email al JS
         ];
     }
 
@@ -357,13 +359,14 @@ public function updateFull($data) {
     /**
      * Obtiene info detallada de un protocolo y sus especies permitidas.
      */
-    public function getDetailsAndSpecies($protId) {
-        // A. Info General (Saldo, Depto, Responsable)
+public function getDetailsAndSpecies($protId) {
+        // A. Info General (Igual que antes)
         $stmtInfo = $this->db->prepare("
             SELECT 
-                p.idprotA, p.tituloA, p.nprotA, p.CantidadAniA as saldo,
+                p.idprotA, p.tituloA, p.nprotA, p.CantidadAniA as saldo, p.FechaFinProtA,
                 CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable,
-                COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto
+                COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto,
+                (SELECT COALESCE(SUM(s.totalA), 0) FROM protformr pf JOIN sexoe s ON pf.idformA = s.idformA WHERE pf.idprotA = p.idprotA) as usados
             FROM protocoloexpe p
             INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
             LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
@@ -373,15 +376,19 @@ public function updateFull($data) {
         $stmtInfo->execute([$protId]);
         $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
-        // B. Especies Aprobadas (Solo las vinculadas al protocolo)
+        // B. Especies y Subespecies (CORREGIDO)
+        // Solo trae lo que está en 'protesper' Y tiene subespecies activas (Existe != 2)
         $sqlEsp = "SELECT 
-                    e.idespA, e.EspeNombreA,
-                    s.idsubespA, s.SubEspeNombreA
+                    e.idespA, 
+                    e.EspeNombreA,
+                    s.idsubespA, 
+                    s.SubEspeNombreA
                    FROM protesper pe
                    INNER JOIN especiee e ON pe.idespA = e.idespA
                    INNER JOIN subespecie s ON e.idespA = s.idespA
-                   WHERE pe.idprotA = ? AND s.Existe = 1
-                   ORDER BY e.EspeNombreA, s.SubEspeNombreA";
+                   WHERE pe.idprotA = ? 
+                   AND s.Existe != 2  -- Regla de Oro: Solo activas
+                   ORDER BY e.EspeNombreA ASC, s.SubEspeNombreA ASC";
         
         $stmtEsp = $this->db->prepare($sqlEsp);
         $stmtEsp->execute([$protId]);
@@ -390,6 +397,30 @@ public function updateFull($data) {
         return ['info' => $info, 'species' => $this->buildSpeciesTree($rows)];
     }
 
+    // HELPER: Agrupa las filas planas en un árbol JSON
+    private function buildSpeciesTree($rows) {
+        $tree = [];
+        foreach ($rows as $r) {
+            $idEsp = $r['idespA'];
+            
+            // Si es la primera vez que vemos esta especie, la creamos
+            if (!isset($tree[$idEsp])) {
+                $tree[$idEsp] = [
+                    'id' => $idEsp,
+                    'name' => $r['EspeNombreA'],
+                    'subs' => []
+                ];
+            }
+
+            // Agregamos la subespecie a su lista
+            $tree[$idEsp]['subs'][] = [
+                'id' => $r['idsubespA'],
+                'name' => $r['SubEspeNombreA']
+            ];
+        }
+        // Reindexamos para que JS reciba un array limpio: [ {especie...}, {especie...} ]
+        return array_values($tree);
+    }
     /**
      * Para modo "Otros CEUAS": Trae TODAS las especies de la institución.
      */
@@ -414,24 +445,49 @@ public function updateFull($data) {
     // 3. LÓGICA DE GUARDADO TRANSACCIONAL
     // ************************************************************************
 
+// --- CAMBIO 2: Guardar el ID numérico del Depto ---
     public function saveOrder($data) {
         $this->db->beginTransaction();
         
         try {
-            // A. Obtener el ID del Tipo de Formulario para 'Animal vivo'
-            // Esto asegura integridad referencial con la tabla tipoformularios
+            // A. Obtener Tipo Formulario
             $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE nombreTipo = 'Animal vivo' AND IdInstitucion = ? LIMIT 1");
             $stmtType->execute([$data['instId']]);
             $tipoId = $stmtType->fetchColumn();
 
-            if (!$tipoId) throw new Exception("Error de configuración: No existe el tipo 'Animal vivo' en esta institución.");
+            if (!$tipoId) throw new \Exception("Error: No existe el tipo 'Animal vivo' configurado.");
 
-            // B. Insertar en FORMULARIOE (Cabecera)
+            // B. RECUPERAR ID DEPARTAMENTO DEL PROTOCOLO (Corrección Integer Value)
+            $finalDepto = 0; // Valor por defecto (integer)
+            
+            if (!empty($data['idprotA'])) {
+                // Buscamos el ID numérico en la tabla relacional protdeptor
+                $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
+                $stmtDepto->execute([$data['idprotA']]);
+                $protDepto = $stmtDepto->fetchColumn();
+                
+                if ($protDepto) {
+                    $finalDepto = $protDepto;
+                }
+            }
+            
+            // Si es 'Otros CEUAS' o no tiene depto, intentamos usar el del usuario (si es numérico)
+            if ($finalDepto == 0) {
+                $stmtUserLab = $this->db->prepare("SELECT LabA FROM personae WHERE IdUsrA = ?");
+                $stmtUserLab->execute([$data['userId']]);
+                $lab = $stmtUserLab->fetchColumn();
+                // Validamos que sea numérico para evitar el error 1366
+                if (is_numeric($lab)) {
+                    $finalDepto = $lab;
+                }
+            }
+
+            // C. Insertar Formulario
             $sqlForm = "INSERT INTO formularioe (
                 tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, 
-                aclaraA, IdUsrA, IdInstitucion, estado, raza
+                aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto
             ) VALUES (
-                ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?
+                ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?, 0, ?
             )";
             
             $stmt = $this->db->prepare($sqlForm);
@@ -440,89 +496,123 @@ public function updateFull($data) {
                 $data['idsubespA'],
                 $data['edad'],
                 $data['peso'],
-                $data['fecha_retiro'], // YYYY-MM-DD
+                $data['fecha_retiro'],
                 $data['aclaracion'],
                 $data['userId'],
                 $data['instId'],
-                $data['raza']
+                $data['raza'],
+                $finalDepto // Ahora enviamos un INT seguro
             ]);
             
             $idForm = $this->db->lastInsertId();
 
-            // C. Insertar en SEXOE (Detalle de Cantidades 1:1)
+            // D. Insertar Sexo
             $sqlSex = "INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)";
             $this->db->prepare($sqlSex)->execute([
                 $idForm,
-                $data['macho'], 
-                $data['hembra'], 
-                $data['indistinto'], 
-                $data['total']
+                $data['macho'], $data['hembra'], $data['indistinto'], $data['total']
             ]);
 
-            // D. Lógica de Vinculación y Stock
+            // E. Vinculación y Stock
             $isExternal = isset($data['is_external']) && $data['is_external'] == 1;
 
             if (!$isExternal && !empty($data['idprotA'])) {
-                // CASO 1: Protocolo Local -> Vinculamos y Descontamos
-                
-                // 1. Crear relación en protformr
                 $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")
                          ->execute([$idForm, $data['idprotA']]);
 
-                // 2. Descontar saldo del protocolo
+                         
                 $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
                          ->execute([$data['total'], $data['idprotA']]);
-            
-            } else {
-                // CASO 2: Otros CEUAS (Externo)
-                // Aquí podrías guardar un flag en formularioe si tuvieras un campo 'es_externo'
-                // O insertar en protformr con un protocolo dummy si el sistema lo requiere.
-                // Por ahora, según tu lógica, simplemente NO descontamos stock.
-                
-                // Opcional: Si en el futuro agregas un campo 'es_otros_ceuas' a formularioe, 
-                // harías el UPDATE aquí.
             }
 
             $this->db->commit();
             return $idForm;
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->db->rollBack();
             throw $e;
         }
     }
-
     // ************************************************************************
     // 4. HELPER PRIVADO
     // ************************************************************************
 
-    /**
-     * Convierte un array plano SQL en un árbol jerárquico para el Select JS
-     */
-    private function buildSpeciesTree($rows) {
-        $tree = [];
-        foreach ($rows as $r) {
-            $idEsp = $r['idespA'];
-            
-            if (!isset($tree[$idEsp])) {
-                $tree[$idEsp] = [
-                    'name' => $r['EspeNombreA'],
-                    'subs' => []
-                ];
-            }
 
-            // Agregamos la subespecie al array 'subs'
-            $tree[$idEsp]['subs'][] = [
-                'id' => $r['idsubespA'],
-                'name' => $r['SubEspeNombreA']
+
+    public function getDataForTarifario($instId) {
+            // 1. Datos Institución
+            $stmtInst = $this->db->prepare("SELECT NombreInst, PrecioJornadaTrabajoExp, tituloprecios FROM institucion WHERE IdInstitucion = ?");
+            $stmtInst->execute([$instId]);
+            $institucion = $stmtInst->fetch(\PDO::FETCH_ASSOC);
+
+            // 2. Especies (Padres)
+            $stmtEsp = $this->db->prepare("SELECT idespA, EspeNombreA, Panimal, PalojamientoChica, PalojamientoGrande FROM especiee WHERE IdInstitucion = ? ORDER BY EspeNombreA");
+            $stmtEsp->execute([$instId]);
+            $especies = $stmtEsp->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 3. Subespecies (Hijos)
+            $stmtSub = $this->db->prepare("SELECT idsubespA, idespA, SubEspeNombreA, Psubanimal, Existe FROM subespecie WHERE Existe != 2");
+            $stmtSub->execute(); // Traemos todas y filtramos en JS o filtramos por JOIN si prefieres optimizar
+            $subespecies = $stmtSub->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 4. Insumos Experimentales
+            $stmtInsExp = $this->db->prepare("SELECT NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1");
+            $stmtInsExp->execute([$instId]);
+            
+            // 5. Insumos Comunes
+            $stmtIns = $this->db->prepare("SELECT NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumo WHERE IdInstitucion = ? AND Existencia = 1");
+            $stmtIns->execute([$instId]);
+
+            return [
+                'institucion' => $institucion,
+                'especies' => $especies,
+                'subespecies' => $subespecies,
+                'insumosExp' => $stmtInsExp->fetchAll(\PDO::FETCH_ASSOC),
+                'insumos' => $stmtIns->fetchAll(\PDO::FETCH_ASSOC)
             ];
         }
-        // Retornamos 'array_values' para que sea un Array JSON [ {}, {} ] y no un Objeto { "15": {}, "20": {} }
-        return array_values($tree);
+
+// Recupera email, nombre y nombre de institución
+    public function getUserAndInstInfo($userId, $instId) {
+        $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst 
+                FROM personae p 
+                JOIN institucion i ON i.IdInstitucion = ?
+                WHERE p.IdUsrA = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId, $userId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 
+    // Recupera nombres de Especie, Subespecie y Protocolo
+    public function getNamesForMail($idSub, $idProt) {
+        // 1. Especie y Sub
+        $sqlEsp = "SELECT e.EspeNombreA, s.SubEspeNombreA 
+                   FROM subespecie s 
+                   JOIN especiee e ON s.idespA = e.idespA 
+                   WHERE s.idsubespA = ?";
+        $stmt = $this->db->prepare($sqlEsp);
+        $stmt->execute([$idSub]);
+        $esp = $stmt->fetch(\PDO::FETCH_ASSOC);
 
+        // 2. Protocolo (Si existe)
+        $nprot = "Sin Protocolo";
+        $titulo = "Externo / Otros CEUAS";
+        
+        if (!empty($idProt)) {
+            $stmtP = $this->db->prepare("SELECT nprotA, tituloA FROM protocoloexpe WHERE idprotA = ?");
+            $stmtP->execute([$idProt]);
+            $prot = $stmtP->fetch(\PDO::FETCH_ASSOC);
+            if ($prot) {
+                $nprot = $prot['nprotA'];
+                $titulo = $prot['tituloA'];
+            }
+        }
 
-
-
+        return [
+            'especie' => $esp['EspeNombreA'] ?? 'N/A',
+            'subespecie' => $esp['SubEspeNombreA'] ?? 'N/A',
+            'nprot' => $nprot,
+            'titulo' => $titulo
+        ];
+    }
 }
