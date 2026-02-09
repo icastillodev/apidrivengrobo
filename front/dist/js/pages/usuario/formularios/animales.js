@@ -19,7 +19,6 @@ export async function initAnimalForm() {
         activateOtherCeuasMode();
     };
 
-    // Función global de reset
     window.resetSelection = () => {
         document.getElementById('step-2').classList.add('hidden-section');
         document.getElementById('step-1').classList.remove('hidden-section');
@@ -31,21 +30,35 @@ export async function initAnimalForm() {
     };
 
     try {
-        // Cargar PDF Data
         const resPDF = await API.request(`/animals/pdf-data?inst=${instId}`);
         if (resPDF && resPDF.status === 'success') {
             dataFull = resPDF.data;
             setupPDFButton();
         }
 
-        // Cargar Protocolos, Config y EMAIL DEL USUARIO
         const resProt = await API.request(`/animals/search-protocols?inst=${instId}&user=${userId}`);
         if (resProt && resProt.status === 'success') {
-            const { config, protocols, user_email } = resProt.data;
+            const { config, protocols, user_email, form_types } = resProt.data;
             protocolsList = protocols;
-            
-            // Guardamos el email real que vino de la base de datos
             if(user_email) currentUserEmail = user_email;
+
+            // 1. LLENAR SELECTOR DE TIPOS (NUEVO)
+            const typeSel = document.getElementById('select-tipo-form');
+            if(typeSel) {
+                typeSel.innerHTML = '<option value="">Seleccione tipo...</option>';
+                if (form_types && form_types.length > 0) {
+                    form_types.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.IdTipoFormulario;
+                        opt.text = t.nombreTipo;
+                        typeSel.appendChild(opt);
+                    });
+                    if (form_types.length === 1) typeSel.selectedIndex = 1;
+                } else {
+                    typeSel.innerHTML = '<option value="">Error: Sin tipos configurados</option>';
+                    typeSel.disabled = true;
+                }
+            }
 
             if (config && config.otrosceuas == 1) {
                 const btn = document.getElementById('btn-otros-ceuas');
@@ -62,7 +75,6 @@ export async function initAnimalForm() {
     const form = document.getElementById('animal-form');
     if(form) form.onsubmit = handleReview;
 }
-
 /* --- MÓDULO PDF (CORREGIDO) --- */
 function setupPDFButton() {
     // Buscamos el elemento correcto del HTML nuevo: id="btn-tarifario"
@@ -415,6 +427,11 @@ async function handleReview(e) {
     
     if (total <= 0) return Swal.fire('Error', 'Debe solicitar al menos 1 animal.', 'warning');
 
+    // VALIDACIÓN TIPO DE FORMULARIO
+    const typeSel = document.getElementById('select-tipo-form');
+    if (!typeSel.value) return Swal.fire('Falta Información', 'Debe seleccionar el Tipo de Solicitud.', 'warning');
+    const typeText = typeSel.options[typeSel.selectedIndex].text;
+
     const isExt = document.getElementById('is-otros-ceuas').value === "1";
     if (!isExt) {
         const saldoEl = document.getElementById('info-saldo');
@@ -422,7 +439,6 @@ async function handleReview(e) {
         if (total > saldo) return Swal.fire('Sin Cupo', `El protocolo solo dispone de ${saldo} animales.`, 'error');
     }
 
-    // Captura de datos
     const fecha = document.getElementById('input-fecha').value;
     const aclaracion = document.getElementById('input-aclaracion').value || 'Sin observaciones.';
     
@@ -438,36 +454,21 @@ async function handleReview(e) {
     const protocoloTxt = document.getElementById('info-nprot').innerText;
     const tituloProt = document.getElementById('info-titulo').innerText;
 
-    // HTML del Resumen MEJORADO
     const resumenHtml = `
         <div class="text-start bg-light p-3 rounded" style="font-size: 0.9rem;">
             <div class="mb-3 border-bottom pb-2">
-                <strong class="text-success">${protocoloTxt}</strong><br>
+                <span class="badge bg-success mb-1">${typeText}</span><br>
+                <strong class="text-dark">${protocoloTxt}</strong><br>
                 <small class="text-muted d-block text-truncate">${tituloProt}</small>
             </div>
             
             <table class="table table-sm table-bordered mb-2 bg-white small">
                 <tbody>
-                    <tr>
-                        <td class="bg-light fw-bold text-muted" width="30%">Especie</td>
-                        <td>${txtEspecie}</td>
-                    </tr>
-                    <tr>
-                        <td class="bg-light fw-bold text-muted">Cepa</td>
-                        <td>${txtSub}</td>
-                    </tr>
-                    <tr>
-                        <td class="bg-light fw-bold text-muted">Raza/Línea</td>
-                        <td>${raza}</td>
-                    </tr>
-                    <tr>
-                        <td class="bg-light fw-bold text-muted">Peso</td>
-                        <td>${peso}</td>
-                    </tr>
-                    <tr>
-                        <td class="bg-light fw-bold text-muted">Edad</td>
-                        <td>${edad}</td>
-                    </tr>
+                    <tr><td class="bg-light fw-bold text-muted" width="30%">Especie</td><td>${txtEspecie}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">Cepa</td><td>${txtSub}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">Raza/Línea</td><td>${raza}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">Peso</td><td>${peso}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">Edad</td><td>${edad}</td></tr>
                 </tbody>
             </table>
 
@@ -512,34 +513,33 @@ async function handleReview(e) {
 async function submitOrder() {
     Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
     
+    // Obtenemos targetInst de la URL si existe (Selector Multi-Sede)
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetInst = urlParams.get('targetInst') || localStorage.getItem('instId');
+
     const fd = {
-        instId: localStorage.getItem('instId'), // O targetInst si usas el selector
+        instId: targetInst,
         userId: localStorage.getItem('userId'),
+        
+        // NUEVO CAMPO IMPORTANTE
+        idTipoFormulario: document.getElementById('select-tipo-form').value,
+        
         idprotA: document.getElementById('selected-prot-id').value,
         is_external: document.getElementById('is-otros-ceuas').value,
-        
-        // Datos Formulario
         idsubespA: document.getElementById('select-subespecie').value,
         raza: document.getElementById('input-raza').value,
         peso: document.getElementById('input-peso').value,
         edad: document.getElementById('input-edad').value,
         fecha_retiro: document.getElementById('input-fecha').value,
         aclaracion: document.getElementById('input-aclaracion').value,
-        
-        // Cantidades
         macho: document.getElementById('qty-macho').value,
         hembra: document.getElementById('qty-hembra').value,
         indistinto: document.getElementById('qty-indistinto').value,
         total: document.getElementById('qty-total').value
     };
 
-    // Ajuste para selector multi-sede (si aplica)
-    const urlParams = new URLSearchParams(window.location.search);
-    if(urlParams.get('targetInst')) fd.instId = urlParams.get('targetInst');
-
     try {
         const res = await API.request('/animals/create-order', 'POST', fd);
-        
         if (res.status === 'success') {
             await Swal.fire({
                 title: '¡Solicitud Creada!',
@@ -548,11 +548,8 @@ async function submitOrder() {
                 confirmButtonColor: '#1a5d3b',
                 confirmButtonText: 'IR A MIS FORMULARIOS'
             });
-            
-            // REDIRECCIÓN CORREGIDA: Sube un nivel (de /formularios/ a /usuario/)
-            window.location.href = '../mis-formularios.html'; 
-            // Nota: Verifica si el archivo se llama "misformularios.html" o "mis-formularios.html"
-            // Si es "misformularios.html" usa: window.location.href = '../misformularios.html';
+            // Redirección corregida
+            window.location.href = '../misformularios.html';
         } else {
             Swal.fire('Error', res.message, 'error');
         }

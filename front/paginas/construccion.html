@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>En Construcción - GROBO</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .construction-icon { font-size: 5rem; color: #f59e0b; } /* Color Ámbar warning */
+    </style>
+
+    <script type="module">
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../dist/js/auth.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Permitimos acceso a todos los roles (1, 2, 3) ya que es una página genérica
+            if (!Auth.checkAccess([1, 2, 3])) return;
+            
+            await initMenu();
+            NotificationManager.init();
+        });
+    </script>
+</head>
+<body class="bg-light">
+
+    <div class="container d-flex flex-column justify-content-center align-items-center min-vh-100 pb-5">
+        
+        <div class="text-center animate-fade-in-up">
+            <div class="mb-4">
+                <i class="bi bi-cone-striped construction-icon"></i>
+            </div>
+
+            <h1 class="fw-black text-dark text-uppercase mb-3" style="letter-spacing: 2px;">
+                Sección en Desarrollo
+            </h1>
+
+            <p class="text-muted fs-5 mb-5" style="max-width: 600px;">
+                Estamos trabajando arduamente para traerte esta funcionalidad pronto.<br>
+                El equipo de <strong class="text-success">GROBO</strong> está ajustando los últimos detalles.
+            </p>
+
+            <div class="d-flex gap-3 justify-content-center">
+                <button onclick="history.back()" class="btn btn-outline-secondary fw-bold px-4 shadow-sm">
+                    <i class="bi bi-arrow-left me-2"></i> VOLVER ATRÁS
+                </button>
+                
+                <a href="usuario/dashboard.html" class="btn btn-success fw-bold px-4 shadow-sm">
+                    <i class="bi bi-house-door me-2"></i> IR AL INICIO
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-5 text-muted small text-uppercase fw-bold opacity-50">
+            GROBO &copy; 2026
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

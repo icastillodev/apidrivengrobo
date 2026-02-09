@@ -35,6 +35,31 @@ $router->post('/users/update', 'UserController@update');
 $router->post('/users/reset-pass', 'UserController@resetPassword'); 
 $router->get('/users/list-investigators', 'UserController@listInvestigators'); // Selector de investigadores
 
+// ============================================================
+// SECCIÓN: Mis Formularios (Visor Unificado Investigador)
+// ============================================================
+$router->get('/user/my-forms', 'UserFormsController@getMyForms');
+$router->get('/user/form-detail/:id', 'UserFormsController@getFormDetail');
+
+// ============================================================
+// SECCIÓN: Mis Protocolos (Visor Unificado)
+// ============================================================
+$router->get('/user/my-protocols', 'UserProtocolsController@getAll');
+$router->get('/user/protocol-detail/:id', 'UserProtocolsController@getDetail');
+
+
+// ============================================================
+// SECCIÓN: Perfil de Usuario (Mi Cuenta)
+// ============================================================
+$router->get('/user/profile', 'UserProfileController@getProfile');
+$router->post('/user/profile/update', 'UserProfileController@updateProfile');
+$router->post('/user/profile/change-password', 'UserProfileController@changePassword');
+
+// ============================================================
+// SECCIÓN: Mis Alojamientos (Visor Usuario)
+// ============================================================
+$router->get('/user/my-housings', 'UserHousingController@getAll');
+$router->get('/user/housing-detail/:id', 'UserHousingController@getDetail');
 
 // ============================================================
 // SECCIÓN: Protocolos
@@ -77,6 +102,11 @@ $router->get('/reactivos/last-notification', 'ReactivoController@getLastNotifica
 $router->post('/reactivos/send-notification', 'ReactivoController@sendNotification');
 $router->get('/reactivos/usage', 'ReactivoController@getUsageData');
 
+$router->get('/reactivos/init', 'ReactivosController@getInitData');
+$router->get('/reactivos/protocol-info', 'ReactivosController@getProtocolInfo');
+$router->post('/reactivos/create', 'ReactivosController@createOrder');
+$router->get('/reactivos/pdf-data', 'ReactivosController@getPDFData');
+
 
 // ============================================================
 // SECCIÓN: Insumos Experimentales
@@ -89,6 +119,9 @@ $router->post('/insumos/update-status', 'InsumoController@updateStatus');
 $router->post('/insumos/update-full', 'InsumoController@updateFull');
 $router->post('/insumos/send-notification', 'InsumoController@sendNotification');
 
+// Pedidos de Insumos por Departamento
+$router->get('/insumos-form/init', 'InsumoFormularioController@getInitData');
+$router->post('/insumos-form/save', 'InsumoFormularioController@createOrder');
 
 // ============================================================
 // SECCIÓN: Tarifario Institucional (PRECIOS)
@@ -180,3 +213,7 @@ $router->post('/superadmin/usuarios/create', 'UsuarioController@create');
 $router->post('/superadmin/usuarios/update', 'UsuarioController@update');
 $router->post('/superadmin/usuarios/reset-pass', 'UsuarioController@resetPass');
 $router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUsername');
+
+
+
+

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Insumos - GROBO</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; }
+        .hidden-section { display: none; }
+        .result-item { cursor: pointer; transition: background 0.2s; }
+        .result-item:hover { background-color: #f0f7ff; }
+        .table-input { border: none; background: transparent; font-weight: bold; }
+        .table-input:focus { outline: none; border-bottom: 2px solid #0d6efd; }
+    </style>
+
+    <script type="module">
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { initInsumosForm } from '../../../dist/js/pages/usuario/formularios/insumos.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!Auth.checkAccess([1, 2, 3])) return;
+            await initMenu();
+            NotificationManager.init();
+            initInsumosForm();
+        });
+    </script>
+</head>
+<body class="bg-light">
+
+    <div class="container my-5 pb-5">
+        <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
+            <div>
+                <h4 class="fw-bold text-primary mb-0 text-uppercase">Solicitud de Insumos Experimentales</h4>
+                <small class="text-muted">Institución: <span id="lbl-institution-name" class="fw-bold text-dark">...</span></small>
+            </div>
+            <button id="btn-tarifario" class="btn btn-outline-primary btn-sm fw-bold shadow-sm d-none">
+                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
+            </button>
+        </div>
+
+        <div id="step-1" class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Departamento Solicitante</label>
+                <div class="position-relative">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-building"></i></span>
+                        <input type="text" id="depto-search" class="form-control form-control-lg border-start-0" placeholder="Escriba el nombre del departamento..." autocomplete="off">
+                    </div>
+                    <div id="depto-list" class="list-group position-absolute w-100 shadow-lg mt-1 d-none" style="z-index: 1000; max-height: 250px; overflow-y: auto;"></div>
+                </div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-link text-decoration-none text-muted small p-0" data-bs-toggle="modal" data-bs-target="#modal-depto-help">
+                        <i class="bi bi-question-circle"></i> ¿No aparece tu departamento aquí?
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-2" class="hidden-section">
+            <div class="mb-3">
+                <button type="button" class="btn btn-link text-decoration-none text-muted p-0 fw-bold small" onclick="window.resetSelection()">
+                    <i class="bi bi-arrow-left"></i> CAMBIAR DEPARTAMENTO
+                </button>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4" style="background: #f0f7ff; border-left: 5px solid #0d6efd !important;">
+                <div class="card-body p-3">
+                    <h6 class="text-muted small mb-1 text-uppercase">Departamento:</h6>
+                    <h5 id="info-depto" class="fw-bold mb-0 text-dark">---</h5>
+                </div>
+            </div>
+
+            <form id="insumos-form">
+                <input type="hidden" id="selected-depto-id">
+                <input type="hidden" id="id-tipo-form"> 
+
+                <div class="card shadow-sm border-0 overflow-hidden">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4 py-3 small text-muted text-uppercase">Insumo / Artículo</th>
+                                <th class="py-3 small text-muted text-uppercase text-center" style="width: 200px;">Cantidad</th>
+                                <th class="pe-4 py-3 text-end" style="width: 80px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="insumos-table-body"></tbody>
+                    </table>
+                    <div class="p-3 bg-light border-top">
+                        <button type="button" id="btn-add-row" class="btn btn-sm btn-primary fw-bold rounded-pill px-3">
+                            <i class="bi bi-plus-lg me-1"></i> AGREGAR OTRO INSUMO
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body p-3">
+                                <label for="fecha-retiro" class="form-label fw-bold small text-muted text-uppercase">Fecha Estimada de Retiro</label>
+                                <input type="date" id="fecha-retiro" class="form-control fw-bold text-primary" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body p-3">
+                                <label for="aclaracion-pedido" class="form-label fw-bold small text-muted text-uppercase">Aclaraciones / Observaciones</label>
+                                <textarea id="aclaracion-pedido" class="form-control" rows="1" placeholder="Aclaraciones para el pedido..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()">CANCELAR</button>
+                    <button type="submit" class="btn btn-primary px-5 fw-bold shadow">ENVIAR SOLICITUD</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<div class="modal fade" id="modal-depto-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-dark">Ayuda de Departamentos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <i class="bi bi-envelope-exclamation text-primary fs-1 mb-3"></i>
+                    <p class="text-muted">Si tu departamento no figura en la lista, es posible que no esté dado de alta en esta sede.</p>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <a id="mail-to-inst" href="#" class="btn btn-primary fw-bold text-white text-decoration-none py-2">
+                            <i class="bi bi-send me-2"></i> ENVIAR MENSAJE A LA INSTITUCIÓN
+                        </a>
+                    </div>
+                    
+                    <div class="mt-3 pt-3 border-top">
+                        <small class="text-muted">El correo se enviará a:</small><br>
+                        <span id="lbl-inst-correo" class="fw-bold text-dark">...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

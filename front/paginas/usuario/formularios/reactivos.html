@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Reactivos - GROBO</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
+    
+    <style>
+        .hidden-section { display: none; }
+        .protocol-result-item { cursor: pointer; transition: background 0.2s; }
+        .protocol-result-item:hover { background-color: #f0fdf4; }
+    </style>
+
+    <script type="module">
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { initReactivosForm } from '../../../dist/js/pages/usuario/formularios/reactivos.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!Auth.checkAccess([1, 2, 3])) return;
+            await initMenu();
+            NotificationManager.init();
+            initReactivosForm();
+        });
+    </script>
+</head>
+<body class="bg-light">
+
+    <div class="container my-5 pb-5">
+        
+        <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
+            <div>
+                <h4 class="fw-bold text-success mb-0 text-uppercase">Solicitud de Reactivos Biológicos</h4>
+                <small class="text-muted">Institución: <span id="lbl-institution-name" class="fw-bold">...</span></small>
+            </div>
+            <button id="btn-tarifario" class="btn btn-outline-success btn-sm fw-bold shadow-sm d-none">
+                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
+            </button>
+        </div>
+
+        <div id="step-1" class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Protocolo</label>
+                <div class="position-relative">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" id="protocol-search" class="form-control form-control-lg border-start-0" placeholder="Buscar protocolo..." autocomplete="off">
+                    </div>
+                    <div id="protocol-list" class="list-group position-absolute w-100 shadow-lg mt-1 d-none" style="z-index: 1000; max-height: 250px; overflow-y: auto;"></div>
+                </div>
+                
+                <div class="mt-2">
+                    <button type="button" class="btn btn-link text-decoration-none text-muted small p-0" data-bs-toggle="modal" data-bs-target="#modal-protocol-help">
+                        <i class="bi bi-question-circle"></i> ¿No aparece tu protocolo aquí?
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-2" class="hidden-section">
+            
+            <div class="mb-3">
+                <button type="button" class="btn btn-link text-decoration-none text-muted p-0 fw-bold small" onclick="window.resetSelection()">
+                    <i class="bi bi-arrow-left"></i> SELECCIONAR OTRO PROTOCOLO
+                </button>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4" style="background: #f8fff9; border-left: 5px solid #1a5d3b !important;">
+                <div class="card-body p-4">
+                    <h5 id="info-titulo" class="fw-bold mb-1 text-dark">...</h5>
+                    <span id="info-nprot" class="badge bg-success">...</span>
+                    <span id="info-vencimiento" class="badge bg-light text-muted border ms-2">...</span>
+                    <div class="mt-2 text-muted small">
+                        Investigador: <strong id="info-investigador" class="text-dark">...</strong>
+                    </div>
+                </div>
+            </div>
+
+<form id="reactivos-form">
+                <input type="hidden" id="selected-prot-id">
+                <input type="hidden" id="id-tipo-form"> 
+
+                <div class="card shadow-sm border-0 p-4">
+                    <div class="row g-3">
+                        
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Reactivo / Insumo</label>
+                            <select id="select-insumo" class="form-select border-success fw-bold text-primary" required>
+                                <option value="">Cargando catálogo...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Cantidad a Solicitar</label>
+                            <input type="number" id="input-cantidad" class="form-control text-center fw-bold bg-light border-success" min="1" required placeholder="0">
+                            <small class="text-muted d-block text-end mt-1" style="font-size: 0.75rem;">
+                                <span id="lbl-medida-disp" class="fw-bold text-dark">---</span>
+                            </small>
+                        </div>
+
+                        <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Raza / Línea</label>
+                            <input type="text" id="input-raza" class="form-control" placeholder="-">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
+                            <input type="text" id="input-peso" class="form-control" placeholder="-">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Edad</label>
+                            <input type="text" id="input-edad" class="form-control" placeholder="-">
+                        </div>
+
+                        <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
+
+                        <div class="col-12">
+                             <label class="form-label fw-bold small text-muted text-uppercase mb-2">
+                                Animales que se van a utilizar <span class="badge bg-danger ms-1" style="font-size: 0.6rem;">QUITA CUPO DE PROTOCOLO</span>
+                             </label>
+                             <div class="form-text mt-0 mb-3 small">Si el reactivo requiere el uso de animales, indíquelos aquí para descontar cupo. Si es solo retiro de insumo, deje en 0.</div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-center w-100">MACHOS</label>
+                            <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-center w-100">HEMBRAS</label>
+                            <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted text-center w-100">INDISTINTO</label>
+                            <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-success text-center w-100">TOTAL</label>
+                            <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
+                        </div>
+
+                        <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Fecha de Retiro</label>
+                            <input type="date" id="input-fecha" class="form-control" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Aclaraciones</label>
+                            <textarea id="input-aclaracion" class="form-control" rows="1" placeholder="Observaciones..."></textarea>
+                        </div>
+
+                        <div class="col-12 mt-4 text-end">
+                            <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()">CANCELAR</button>
+                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">ENVIAR PEDIDO</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-protocol-help" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-dark">Ayuda con Protocolos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <p class="text-muted mb-4">Si tu protocolo no aparece, verifica que esté vigente.</p>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary fw-bold">VER PROTOCOLOS APROBADOS</button>
+                        <button class="btn btn-success fw-bold">SOLICITAR NUEVO PROTOCOLO</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

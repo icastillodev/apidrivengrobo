@@ -173,4 +173,110 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data) {
 
         return $this->executeSend($to, $subject, $body);
     }
+    /**
+     * Envío de confirmación para Reactivos/Insumos
+     */
+    public function sendReactivoOrderConfirmation($to, $nombre, $instName, $data) {
+        $subject = "Solicitud de reactivos #" . $data['id'] . " - " . strtoupper($instName);
+
+        $detalleHtml = "
+            Hola <b>$nombre</b>,<br><br>
+            Hemos recibido correctamente tu solicitud de reactivos/insumos.<br><br>
+
+            <div style='background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #e9ecef;'>
+                <div style='border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;'>
+                    <h3 style='margin: 0; color: #1a5d3b;'>Pedido #{$data['id']}</h3>
+                    <p style='margin: 5px 0 0; color: #555; font-size: 13px;'>Protocolo: <strong>{$data['protocolo']}</strong></p>
+                </div>
+
+                <table style='width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 15px;'>
+                    <tr>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee; color: #666; width: 40%;'>Insumo:</td>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; color: #1a5d3b;'>{$data['insumo']}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee; color: #666;'>Cantidad:</td>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;'>{$data['cantidad']}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee; color: #666;'>Fecha Retiro:</td>
+                        <td style='padding: 8px; border-bottom: 1px solid #eee;'>{$data['fecha_retiro']}</td>
+                    </tr>
+                </table>
+                
+                <div style='background-color: #fff3cd; padding: 10px; font-size: 13px; margin-top: 15px; border-left: 3px solid #ffc107;'>
+                    <strong>Aclaraciones:</strong><br>
+                    <i style='color: #555;'>" . ($data['aclaracion'] ?: 'Sin observaciones.') . "</i>
+                </div>
+            </div>
+        ";
+
+        // Sin botón de acción
+        $body = $this->getTemplate("Confirmación de Solicitud", $detalleHtml, "", "");
+
+        return $this->executeSend($to, $subject, $body);
+    }
+
+/**
+     * Envía la confirmación profesional para Pedido de Insumos Experimentales
+     */
+    public function sendInsumoExpOrder($to, $nombre, $instName, $data) {
+        $subject = "Solicitud Insumos #" . $data['id'] . " - " . strtoupper($instName);
+        $fecha = date('d/m/Y H:i');
+
+        // Construir tabla de ítems con diseño limpio
+        $itemsHtml = "";
+        foreach ($data['items'] as $item) {
+            $itemsHtml .= "
+            <tr>
+                <td style='padding: 8px; border-bottom: 1px solid #eee; color: #333;'>{$item['nombre']}</td>
+                <td style='padding: 8px; border-bottom: 1px solid #eee; text-align: center; font-weight: bold;'>{$item['cantidad']}</td>
+                <td style='padding: 8px; border-bottom: 1px solid #eee; text-align: center; color: #777; font-size: 11px;'>{$item['unidad']}</td>
+            </tr>";
+        }
+
+        // Diseño estilo GROBO (Verde Institucional)
+        $body = "
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;'>
+            <div style='background-color: #1a5d3b; padding: 20px; text-align: center;'>
+                <h2 style='color: #ffffff; margin: 0; font-size: 20px;'>SOLICITUD DE INSUMOS</h2>
+                <p style='color: #a8e6cf; margin: 5px 0 0 0; font-size: 12px;'>GROBO - " . strtoupper($instName) . "</p>
+            </div>
+
+            <div style='padding: 20px; background-color: #ffffff;'>
+                <p style='color: #555; font-size: 14px;'>Hola <strong>$nombre</strong>,</p>
+                <p style='color: #555; font-size: 14px;'>Se ha registrado tu solicitud para el departamento <strong>{$data['deptoName']}</strong>.</p>
+
+                <div style='background-color: #f9f9f9; padding: 15px; border-radius: 6px; margin: 20px 0;'>
+                    <p style='margin: 5px 0; font-size: 13px;'><strong>🆔 N° Pedido:</strong> #{$data['id']}</p>
+                    <p style='margin: 5px 0; font-size: 13px;'><strong>📅 Fecha:</strong> {$fecha}</p>
+                    <p style='margin: 5px 0; font-size: 13px;'><strong>📅 Retiro Estimado:</strong> " . ($data['fecRetiroA'] ?? 'A coordinar') . "</p>
+                    " . ($data['aclaraA'] ? "<p style='margin: 5px 0; font-size: 13px; color: #d9534f;'><strong>📝 Nota:</strong> {$data['aclaraA']}</p>" : "") . "
+                </div>
+
+                <table style='width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px;'>
+                    <thead>
+                        <tr style='background-color: #f0f0f0;'>
+                            <th style='padding: 8px; text-align: left; color: #444;'>Descripción</th>
+                            <th style='padding: 8px; text-align: center; color: #444;'>Cant.</th>
+                            <th style='padding: 8px; text-align: center; color: #444;'>Unidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        $itemsHtml
+                    </tbody>
+                </table>
+                
+                <div style='margin-top: 30px; text-align: center;'>
+                    <a href='http://localhost/URBE-API-DRIVEN/front/paginas/login.html' style='background-color: #1a5d3b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 12px;'>IR AL SISTEMA</a>
+                </div>
+            </div>
+
+            <div style='background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #e0e0e0;'>
+                Este es un correo automático generado por el sistema GROBO.
+            </div>
+        </div>";
+
+        return $this->executeSend($to, $subject, $body);
+    }
 }

@@ -317,17 +317,14 @@ public function updateFull($data) {
     // 1. BÚSQUEDA Y CONFIGURACIÓN INICIAL
     // ************************************************************************
     
-    /**
-     * Obtiene la configuración de la institución (PDF precios, flag Otros CEUAS)
-     * y la lista de protocolos VIGENTES y con SALDO POSITIVO.
-     */
-public function getActiveProtocolsForUser($instId, $userId) {
-        // A. Configuración Institucional
+// --- CAMBIO 1: Traer Tipos de Formulario ---
+    public function getActiveProtocolsForUser($instId, $userId) {
+        // A. Configuración
         $stmtConfig = $this->db->prepare("SELECT otrosceuas, tituloprecios FROM institucion WHERE IdInstitucion = ?");
         $stmtConfig->execute([$instId]);
         $config = $stmtConfig->fetch(\PDO::FETCH_ASSOC);
 
-        // B. Protocolos Activos
+        // B. Protocolos
         $sql = "SELECT 
                     p.idprotA, p.nprotA, p.tituloA, 
                     CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable
@@ -340,15 +337,28 @@ public function getActiveProtocolsForUser($instId, $userId) {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         
-        // C. Datos del Usuario Actual (Email) - NUEVO
+        // C. Email Usuario
         $stmtUser = $this->db->prepare("SELECT EmailA FROM personae WHERE IdUsrA = ?");
         $stmtUser->execute([$userId]);
         $userEmail = $stmtUser->fetchColumn();
 
+        // D. TIPOS DE FORMULARIO (NUEVO)
+        // Filtramos por Categoria = 'Animal vivo' e Institución
+        $stmtTypes = $this->db->prepare("
+            SELECT IdTipoFormulario, nombreTipo 
+            FROM tipoformularios 
+            WHERE categoriaformulario = 'Animal vivo' 
+            AND IdInstitucion = ?
+            ORDER BY nombreTipo ASC
+        ");
+        $stmtTypes->execute([$instId]);
+        $formTypes = $stmtTypes->fetchAll(\PDO::FETCH_ASSOC);
+
         return [
             'config' => $config,
             'protocols' => $stmt->fetchAll(\PDO::FETCH_ASSOC),
-            'user_email' => $userEmail // Enviamos el email al JS
+            'user_email' => $userEmail,
+            'form_types' => $formTypes // <--- Enviamos la lista al JS
         ];
     }
 
@@ -446,43 +456,41 @@ public function getDetailsAndSpecies($protId) {
     // ************************************************************************
 
 // --- CAMBIO 2: Guardar el ID numérico del Depto ---
-    public function saveOrder($data) {
+public function saveOrder($data) {
         $this->db->beginTransaction();
         
         try {
-            // A. Obtener Tipo Formulario
-            $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE nombreTipo = 'Animal vivo' AND IdInstitucion = ? LIMIT 1");
-            $stmtType->execute([$data['instId']]);
-            $tipoId = $stmtType->fetchColumn();
-
-            if (!$tipoId) throw new \Exception("Error: No existe el tipo 'Animal vivo' configurado.");
-
-            // B. RECUPERAR ID DEPARTAMENTO DEL PROTOCOLO (Corrección Integer Value)
-            $finalDepto = 0; // Valor por defecto (integer)
+            // A. VALIDACIÓN DE TIPO (Seguridad)
+            // Verificamos que el ID enviado realmente pertenezca a 'Animal vivo' y a la institución
+            $stmtCheck = $this->db->prepare("
+                SELECT IdTipoFormulario 
+                FROM tipoformularios 
+                WHERE IdTipoFormulario = ? 
+                AND categoriaformulario = 'Animal vivo' 
+                AND IdInstitucion = ?
+            ");
+            $stmtCheck->execute([$data['idTipoFormulario'], $data['instId']]);
             
+            if (!$stmtCheck->fetchColumn()) {
+                throw new \Exception("Error: El tipo de formulario seleccionado no es válido.");
+            }
+
+            // B. Recuperar ID Depto (Igual que antes)
+            $finalDepto = 0;
             if (!empty($data['idprotA'])) {
-                // Buscamos el ID numérico en la tabla relacional protdeptor
                 $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
                 $stmtDepto->execute([$data['idprotA']]);
                 $protDepto = $stmtDepto->fetchColumn();
-                
-                if ($protDepto) {
-                    $finalDepto = $protDepto;
-                }
+                if ($protDepto) $finalDepto = $protDepto;
             }
-            
-            // Si es 'Otros CEUAS' o no tiene depto, intentamos usar el del usuario (si es numérico)
             if ($finalDepto == 0) {
                 $stmtUserLab = $this->db->prepare("SELECT LabA FROM personae WHERE IdUsrA = ?");
                 $stmtUserLab->execute([$data['userId']]);
                 $lab = $stmtUserLab->fetchColumn();
-                // Validamos que sea numérico para evitar el error 1366
-                if (is_numeric($lab)) {
-                    $finalDepto = $lab;
-                }
+                if (is_numeric($lab)) $finalDepto = $lab;
             }
 
-            // C. Insertar Formulario
+            // C. Insertar Formulario (Usando $data['idTipoFormulario'])
             $sqlForm = "INSERT INTO formularioe (
                 tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, 
                 aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto
@@ -492,7 +500,7 @@ public function getDetailsAndSpecies($protId) {
             
             $stmt = $this->db->prepare($sqlForm);
             $stmt->execute([
-                $tipoId,
+                $data['idTipoFormulario'], // <--- AQUÍ VA EL ID SELECCIONADO
                 $data['idsubespA'],
                 $data['edad'],
                 $data['peso'],
@@ -501,26 +509,23 @@ public function getDetailsAndSpecies($protId) {
                 $data['userId'],
                 $data['instId'],
                 $data['raza'],
-                $finalDepto // Ahora enviamos un INT seguro
+                $finalDepto
             ]);
             
             $idForm = $this->db->lastInsertId();
 
-            // D. Insertar Sexo
+            // D. Insertar Sexo (Igual que antes)
             $sqlSex = "INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)";
             $this->db->prepare($sqlSex)->execute([
                 $idForm,
                 $data['macho'], $data['hembra'], $data['indistinto'], $data['total']
             ]);
 
-            // E. Vinculación y Stock
+            // E. Vinculación y Stock (Igual que antes)
             $isExternal = isset($data['is_external']) && $data['is_external'] == 1;
-
             if (!$isExternal && !empty($data['idprotA'])) {
                 $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")
                          ->execute([$idForm, $data['idprotA']]);
-
-                         
                 $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
                          ->execute([$data['total'], $data['idprotA']]);
             }
