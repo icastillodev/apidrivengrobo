@@ -1007,3 +1007,66 @@ video {
     justify-content: center;
   }
 }
+
+
+/* --- VARIABLES DE COLOR (Día / Noche) --- */
+:root, [data-bs-theme="light"] {
+    --gecko-body-bg: #f4f7f6; /* Tu color original */
+    --gecko-card-bg: #ffffff;
+    --gecko-text: #212529;
+    --gecko-border: #dee2e6;
+    --gecko-sidebar-width: 260px;
+    --gecko-sidebar-bg: #ffffff;
+}
+
+[data-bs-theme="dark"] {
+    --gecko-body-bg: #121212; /* Contraste oscuro fuerte */
+    --gecko-card-bg: #1e1e1e;
+    --gecko-text: #e0e0e0;
+    --gecko-border: #333333;
+    --gecko-sidebar-bg: #1a1d20;
+}
+
+body {
+    background-color: var(--gecko-body-bg) !important;
+    color: var(--gecko-text) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* --- ESTILOS MENU LATERAL (Bootstrap-ified) --- */
+.gecko-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: var(--gecko-sidebar-width);
+    background-color: var(--gecko-sidebar-bg);
+    border-right: 1px solid var(--gecko-border);
+    z-index: 1040;
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+}
+
+/* En móviles, el sidebar se oculta por defecto */
+@media (max-width: 768px) {
+    .gecko-sidebar { transform: translateX(-100%); }
+    .gecko-sidebar.open { transform: translateX(0); }
+}
+
+/* Ajuste del contenido principal cuando hay Sidebar */
+body.with-sidebar {
+    padding-left: 0; /* Móvil */
+}
+@media (min-width: 769px) {
+    body.with-sidebar {
+        padding-left: var(--gecko-sidebar-width); /* Escritorio empuja el contenido */
+    }
+}
+
+/* --- ESTILOS MENU TOP (Legacy) --- */
+.gecko-header-top {
+    position: relative;
+    z-index: 1030;
+    background-color: transparent;
+    margin-bottom: 20px;
+}

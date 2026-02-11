@@ -19,10 +19,20 @@ $router->post('/update-password-recovery', 'UserController@updatePasswordRecover
 
 
 // ============================================================
-// SECCIÓN: Menú y Notificaciones
+// SECCIÓN: Menú y Notificaciones , busqueda global
 // ============================================================
 $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
+
+
+// Rutas de Búsqueda Global
+$router->get('/api/search/global', 'GlobalSearchController@search');
+
+
+
+
+
+
 
 
 // ============================================================
@@ -34,6 +44,8 @@ $router->get('/users/forms', 'UserController@getForms');
 $router->post('/users/update', 'UserController@update');      
 $router->post('/users/reset-pass', 'UserController@resetPassword'); 
 $router->get('/users/list-investigators', 'UserController@listInvestigators'); // Selector de investigadores
+
+$router->post('/user/config/update', 'UserConfigController@updatePreferences');
 
 // ============================================================
 // SECCIÓN: Mis Formularios (Visor Unificado Investigador)

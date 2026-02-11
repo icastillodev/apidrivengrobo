@@ -1,6 +1,9 @@
 import { Auth } from '../auth.js';
-// Detecta la ruta raíz hasta /paginas/ de forma dinámica
-const BASE_URL = window.location.pathname.substring(0, window.location.pathname.indexOf('/paginas/') + 9);
+import { GeckoVoice } from './GeckoVoice.js';
+import { executeGlobalSearch } from './GeckoSearch.js'; // Importamos el buscador
+
+
+
 
 const MENU_TEMPLATES = {
     1: { label: 'Usuarios', svg: `<svg viewBox="0 0 640 512"><path d="M320 16a104 104 0 1 1 0 208a104 104 0 1 1 0-208M96 88a72 72 0 1 1 0 144a72 72 0 1 1 0-144M0 416c0-70.7 57.3-128 128-128c12.8 0 25.2 1.9 36.9 5.4C132 330.2 112 378.8 112 432v16c0 11.4 2.4 22.2 6.7 32H32c-17.7 0-32-14.3-32-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32v-16c0-53.2-20-101.8-52.9-138.6c11.7-3.5 24.1-5.4 36.9-5.4c70.7 0 128 57.3 128 128v32c0 17.7-14.3 32-32 32zM472 160a72 72 0 1 1 144 0a72 72 0 1 1-144 0M160 432c0-88.4 71.6-160 160-160s160 71.6 160 160v16c0 17.7-14.3 32-32 32H192c-17.7 0-32-14.3-32-32z"/></svg>`, path: 'admin/usuarios.html' },
@@ -71,48 +74,220 @@ const MENU_TEMPLATES = {
     }
 };
 
+const DEFAULTS = {
+    THEME: 'light',
+    LANG: localStorage.getItem('institutionLang') || 'es', 
+    MENU_LAYOUT: 'menu_top',
+    FONT_SIZE: 'chica' // Nuevo default
+};
+
+/* ==========================================================================
+   GESTOR DE PREFERENCIAS (Usuario: Tema, Idioma, Menú, Letra, Voz)
+   ========================================================================== */
+const UserPreferences = {
+    userId: localStorage.getItem('userId'),
+    
+    icons: {
+        moon: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z"/></svg>`,
+        sun: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10zm0-5a1 1 0 0 0 1 1v3a1 1 0 0 0-2 0V3a1 1 0 0 0 1-1zm0 19a1 1 0 0 0-1 1v3a1 1 0 0 0 2 0v-3a1 1 0 0 0-1-1zm10-10a1 1 0 0 0-1-1h-3a1 1 0 0 0 0 2h3a1 1 0 0 0 1-1zM5 12a1 1 0 0 0-1-1H1a1 1 0 0 0 0 2h3a1 1 0 0 0 1-1zm13.364 7.778a1 1 0 0 0-1.414 0l-2.121 2.121a1 1 0 0 0 1.414 1.414l2.121-2.21a1 1 0 0 0 0-1.414zM6.157 4.737l-2.121 2.121a1 1 0 0 0 1.414 1.414l2.121-2.121a1 1 0 0 0-1.414-1.414zm11.314 0a1 1 0 0 0 0 1.414l2.121 2.121a1 1 0 0 0 1.414-1.414l-2.121-2.121a1 1 0 0 0-1.414 0zM6.157 19.07l2.121-2.121a1 1 0 0 0-1.414-1.414l-2.121 2.121a1 1 0 0 0 1.414 1.414z"/></svg>`,
+        gecko: `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-5.5 3a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm11 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM3.5 11.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm17 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM12 11c3 1.5 4 4.5 4 8s-1.5 5-4 5-4-1.5-4-5 1-6.5 4-8z"/></svg>`,
+        
+        // --- NUEVOS ICONOS DE LETRA (A con flechas) ---
+        // A Chica (Normal)
+        font_chica: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4L5 20h2l2-5h7l2 5h2L12 4zm-3.5 9L12 6.5 15.5 13h-7z"/></svg>`,
+        // A Mediana (con 1 flecha)
+        font_mediana: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11 4L4 20h2l2-5h7l2 5h2L11 4zm-3.5 9L11 6.5 14.5 13h-7z"/><path d="M19 12l-4-4v3h-3v2h3v3z"/></svg>`,
+        // A Grande (con doble flecha)
+        font_grande: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4L3 20h2l2-5h7l2 5h2L10 4zm-3.5 9L10 6.5 13.5 13h-7z"/><path d="M18 8l-4-4v3h-3v2h3v3zM22 12l-4-4v3h-3v2h3v3z"/></svg>`
+    },
+
+    config: {
+        theme: localStorage.getItem('theme') || DEFAULTS.THEME,
+        lang: localStorage.getItem('lang') || DEFAULTS.LANG,
+        menu: localStorage.getItem('menuLayout') || DEFAULTS.MENU_LAYOUT,
+        fontSize: localStorage.getItem('fontSize') || 'chica',
+        gecko_ok: localStorage.getItem('gecko_ok') || 2
+    },
+
+    init: async () => {
+        UserPreferences.config.theme = localStorage.getItem('theme') || DEFAULTS.THEME;
+        UserPreferences.config.lang = localStorage.getItem('lang') || DEFAULTS.LANG;
+        UserPreferences.config.menu = localStorage.getItem('menuLayout') || DEFAULTS.MENU_LAYOUT;
+        
+        const savedFont = localStorage.getItem('fontSize');
+        UserPreferences.config.fontSize = ['chica', 'mediana', 'grande'].includes(savedFont) ? savedFont : 'chica';
+        UserPreferences.config.gecko_ok = localStorage.getItem('gecko_ok') || 2;
+
+        UserPreferences.applyTheme(UserPreferences.config.theme);
+        UserPreferences.applyLanguageVisuals(UserPreferences.config.lang);
+        UserPreferences.applyFontSize(UserPreferences.config.fontSize);
+        UserPreferences.applyVoiceVisuals(UserPreferences.config.gecko_ok);
+        
+        return UserPreferences.config.menu;
+    },
+
+    // --- LÓGICA DE TAMAÑO DE LETRA ---
+    cycleFontSize: async () => {
+        const sizes = ['chica', 'mediana', 'grande'];
+        let current = UserPreferences.config.fontSize;
+        let currentIndex = sizes.indexOf(current);
+        if (currentIndex === -1) currentIndex = 0;
+
+        let nextIndex = (currentIndex + 1) % sizes.length;
+        const newSize = sizes[nextIndex];
+
+        UserPreferences.config.fontSize = newSize;
+        UserPreferences.applyFontSize(newSize);
+        await UserPreferences.saveBackend({ fontSize: newSize });
+    },
+
+    applyFontSize: (size) => {
+        document.documentElement.setAttribute('data-font-size', size);
+        localStorage.setItem('fontSize', size);
+        
+        const btn = document.getElementById('btn-font-switch');
+        if (btn) {
+            // Usa el icono correspondiente
+            btn.innerHTML = UserPreferences.icons[`font_${size}`] || UserPreferences.icons.font_chica;
+            btn.title = `Tamaño: ${size.toUpperCase()}`;
+        }
+    },
+
+    // --- LÓGICA DE TEMA ---
+    toggleTheme: async () => {
+        const newTheme = UserPreferences.config.theme === 'dark' ? 'light' : 'dark';
+        UserPreferences.config.theme = newTheme;
+        UserPreferences.applyTheme(newTheme);
+        await UserPreferences.saveBackend({ theme: newTheme });
+    },
+
+    applyTheme: (theme) => {
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        localStorage.setItem('theme', theme);
+        const iconContainer = document.getElementById('pref-icon-theme');
+        if (iconContainer) iconContainer.innerHTML = theme === 'dark' ? UserPreferences.icons.moon : UserPreferences.icons.sun;
+    },
+
+    // --- LÓGICA DE VOZ ---
+    toggleVoice: async () => {
+        const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+        if (isFirefox) {
+            if(window.GeckoVoice) window.GeckoVoice.showUnsupportedBrowserModal();
+            return; 
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            UserPreferences.applyVoiceVisuals('error');
+            if(window.GeckoVoice) window.GeckoVoice.showErrorModal('not-allowed');
+            return;
+        }
+
+        if (UserPreferences.config.gecko_ok == 1) {
+            UserPreferences.config.gecko_ok = 2;
+            if(window.GeckoVoice) window.GeckoVoice.stop();
+        } else {
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+                UserPreferences.config.gecko_ok = 1;
+                if(window.GeckoVoice) window.GeckoVoice.init();
+            } catch (err) {
+                UserPreferences.applyVoiceVisuals('error');
+                if(window.GeckoVoice) window.GeckoVoice.showErrorModal('not-allowed');
+                return;
+            }
+        }
+
+        localStorage.setItem('gecko_ok', UserPreferences.config.gecko_ok);
+        UserPreferences.applyVoiceVisuals(UserPreferences.config.gecko_ok);
+        await UserPreferences.saveBackend({ gecko_ok: UserPreferences.config.gecko_ok });
+    },
+
+    applyVoiceVisuals: (state) => {
+        const btn = document.getElementById('btn-voice-switch');
+        if (!btn) return;
+        btn.classList.remove('voice-status-1', 'voice-status-2', 'voice-status-null', 'voice-status-error');
+        if (state == 'error') {
+            btn.classList.add('voice-status-error');
+            btn.style.color = "#000000"; 
+        } else if (state == 1) {
+            btn.classList.add('voice-status-1');
+            btn.style.color = "#1a5d3b"; 
+        } else {
+            btn.classList.add('voice-status-2');
+            btn.style.color = "#888888"; 
+        }
+    },
+
+    // ... (setLanguage, applyLanguageVisuals, toggleMenuLayout, saveBackend IGUAL QUE ANTES) ...
+    setLanguage: async (lang) => {
+        UserPreferences.config.lang = lang;
+        localStorage.setItem('lang', lang);
+        UserPreferences.applyLanguageVisuals(lang);
+        await UserPreferences.saveBackend({ lang: lang });
+    },
+    applyLanguageVisuals: (lang) => {
+        const img = document.getElementById('pref-current-flag');
+        if (img) {
+            const flags = { 'es': 'es.png', 'en': 'us.png', 'pt': 'br.png' };
+            img.src = `https://flagcdn.com/w40/${flags[lang] || 'es.png'}`;
+        }
+    },
+    toggleMenuLayout: async () => {
+        const newLayout = UserPreferences.config.menu === 'menu_top' ? 'menu_lateral' : 'menu_top';
+        UserPreferences.config.menu = newLayout;
+        localStorage.setItem('menuLayout', newLayout);
+        await UserPreferences.saveBackend({ menu: newLayout });
+        window.location.reload();
+    },
+    saveBackend: async (data) => {
+        if (!UserPreferences.userId) return;
+        const fd = new FormData();
+        fd.append('userId', UserPreferences.userId);
+        if (data.theme) fd.append('theme', data.theme);
+        if (data.lang) fd.append('lang', data.lang);
+        if (data.menu) fd.append('menu', data.menu);
+        if (data.fontSize) fd.append('fontSize', data.fontSize);
+        if (data.gecko_ok) fd.append('gecko_ok', data.gecko_ok);
+        try {
+            await fetch('/URBE-API-DRIVEN/api/user/config/update', { method: 'POST', body: fd });
+        } catch (e) { console.error("Error persistencia:", e); }
+    }
+};
 /**
- * REFRESCAR NOTIFICACIONES GLOBAL (Tiempo Real)
- * Consulta la API y actualiza los badges de los 4 módulos principales.
+ * REFRESCAR NOTIFICACIONES GLOBAL
  */
 export async function refreshMenuNotifications() {
     const instId = localStorage.getItem('instId');
     if (!instId) return;
 
     try {
-        // Consultamos el endpoint de notificaciones de NETWISE
         const res = await fetch(`/URBE-API-DRIVEN/api/menu/notifications?inst=${instId}`).then(r => r.json());
         
         if (res.status === "success" && res.data) {
-            // Actualización individual por ID de menú
-            updateBadge(2, res.data.protocolos || 0); // Protocolos (ID 2)
-            updateBadge(3, res.data.animales || 0);   // Animales (ID 3)
-            updateBadge(4, res.data.reactivos || 0);  // Reactivos (ID 4)
-            updateBadge(5, res.data.insumos || 0);    // Insumos (ID 5)
+            updateBadge(2, res.data.protocolos || 0);
+            updateBadge(3, res.data.animales || 0);
+            updateBadge(4, res.data.reactivos || 0);
+            updateBadge(5, res.data.insumos || 0);
         }
-    } catch (e) {
-        console.warn("Fallo en el refresco automático de badges:", e);
-    }
+    } catch (e) { console.warn(e); }
 }
 
 /**
- * POSICIONAR BADGE ROJO (notif-dot)
- * Encuentra el icono en el DOM y le inyecta el contador.
+ * POSICIONAR BADGE ROJO
  */
 function updateBadge(menuId, count) {
     const item = MENU_TEMPLATES[menuId];
     if (!item) return;
 
-    // Buscamos el link por nombre de archivo para evitar errores de ruta
     const fileName = item.path.split('/').pop();
     const menuLink = document.querySelector(`a[href*="${fileName}"] .menu-icon`);
     
     if (!menuLink) return;
-
     let dot = menuLink.querySelector('.notif-dot');
     
     if (count > 0) {
-        // Si hay pendientes, creamos o actualizamos el círculo rojo
         if (!dot) {
             menuLink.insertAdjacentHTML('beforeend', 
                 `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm">${count}</div>`
@@ -122,101 +297,79 @@ function updateBadge(menuId, count) {
             dot.style.display = 'flex';
         }
     } else if (dot) {
-        // Si el conteo es 0, ocultamos el badge
         dot.style.display = 'none';
     }
 }
 
-/**
- * INICIALIZACIÓN DEL MENÚ GLOBAL
- * Coordina la carga de permisos y renderizado dinámico.
- */
 export async function initMenu() {
-    // 1. Recuperamos credenciales de acceso del localStorage
     const roleId = parseInt(localStorage.getItem('userLevel')); 
     const instId = localStorage.getItem('instId') || 0; 
     
-    if (isNaN(roleId)) {
-        console.error("MenuComponent: No se detectó un userLevel válido. Abortando renderizado.");
-        return;
-    }
+    if (isNaN(roleId)) return;
 
-    // 2. Creamos la estructura visual del Header
-    // Eliminamos cualquier header previo para evitar duplicados en cambios de sesión
-    const existingHeader = document.querySelector('header.gecko-header');
-    if (existingHeader) existingHeader.remove();
+    // 1. Cargar Configuración base
+    const menuLayout = await UserPreferences.init();
 
-    const header = document.createElement('header');
-    header.className = "w-full gecko-header";
-    header.innerHTML = `
-        <nav class="w-full d-flex justify-content-center align-items-center position-relative">
-            <ul id="main-menu" class="nav border border-top-0 border-2 border-success bg-white p-1 rounded-bottom shadow-sm mt-0">
-            </ul>
-        </nav>`;
-    document.body.prepend(header);
-    
-    const menuList = document.getElementById('main-menu');
+    // 2. Exponer Globales (Importante para onlick HTML)
+    window.GeckoVoice = GeckoVoice;
+    window.executeGlobalSearch = executeGlobalSearch;
+    window.setAppLang = UserPreferences.setLanguage;
 
     try {
-        // 3. Consulta a la API (Backend)
-        // Pasamos el role y la inst para que el PHP filtre en la base de datos
         const response = await fetch(`/URBE-API-DRIVEN/api/menu?role=${roleId}&inst=${instId}`);
         const resMenu = await response.json();
 
         if (resMenu.status === "success") {
-            // NORMALIZACIÓN: Convertimos todo a Number. 
-            // Esto es vital porque la DB puede devolver strings y el JS no los reconocería.
             let ids = (resMenu.data || []).map(id => Number(id));
+            if (![1, 2].includes(roleId)) ids = ids.filter(id => id !== 9);
+            [999, 998, 10].forEach(fixedId => { if(!ids.includes(fixedId)) ids.push(fixedId); });
 
-            console.log("Gecko Debug: IDs recibidos del servidor:", ids);
-
-            // 4. REGLAS DE NEGOCIO (Seguridad en el cliente)
-            // El ID 9 (Configuración) es exclusivo para SuperAdmin (1) y Admin Inst (2)
-            if (![1, 2].includes(roleId)) {
-                ids = ids.filter(id => id !== 9);
-            }
-
-            // 5. MENÚS GLOBALES (Fijos)
-            // Forzamos que Perfil (201) y Ayuda (204) estén siempre presentes
-            if (!ids.includes(999)) ids.push(999); 
-            if (!ids.includes(998)) ids.push(998); 
-            if (!ids.includes(10)) ids.push(10); 
-
-            // 6. RENDERIZADO
-            menuList.innerHTML = ''; // Limpiamos el <ul>
-            
-            ids.forEach(id => {
-                // Buscamos el template en MENU_TEMPLATES y lo inyectamos al DOM
-                renderItem(menuList, id, 0);
+            // Limpieza DOM
+            const elementsToRemove = ['header.gecko-header', '#gecko-sidebar-element', '#gecko-mobile-toggle', '#gecko-mobile-toggle-top'];
+            elementsToRemove.forEach(selector => {
+                const el = document.querySelector(selector);
+                if (el) el.remove();
             });
 
-            // 7. ACTIVACIÓN
-            // Una vez que los elementos existen en el DOM, activamos los clicks de los dropdowns
-            setupDropdownLogic();
+            // Renderizado
+            if (menuLayout === 'menu_lateral') {
+                renderSideMenuStructure(document.body, ids);
+            } else {
+                renderTopMenuStructure(document.body, ids);
+            }
+
+            setupEventListeners();
+            
+            // --- LÓGICA DE INICIO DE VOZ ---
+            // Solo intentamos iniciar si está activo en BD
+            if (localStorage.getItem('gecko_ok') == 1) {
+                // Si es Firefox, forzamos apagado y mostramos modal si es la primera carga
+                if (navigator.userAgent.toLowerCase().includes('firefox')) {
+                    console.warn("Gecko Voice: Firefox detectado. Deshabilitando.");
+                    localStorage.setItem('gecko_ok', 2);
+                    GeckoVoice.showUnsupportedBrowserModal();
+                    UserPreferences.applyVoiceVisuals('error');
+                } else {
+                    // Navegador OK, iniciamos
+                    GeckoVoice.init();
+                }
+            }
+
+            // Aplicar estilos finales
+            UserPreferences.applyTheme(UserPreferences.config.theme);
+            UserPreferences.applyLanguageVisuals(UserPreferences.config.lang);
+            UserPreferences.applyFontSize(UserPreferences.config.fontSize);
         }
-    } catch (err) { 
-        console.error("MenuComponent: Error en la secuencia de carga.", err); 
-    }
+    } catch (err) { console.error("MenuComponent Error:", err); }
 }
 function getCorrectPath(rawPath) {
     if (rawPath === 'logout') return 'javascript:Auth.logout();';
-
-    // 1. Obtenemos la ruta actual del navegador
     const currentPath = window.location.pathname;
-
-    // 2. Buscamos en qué posición de la URL está tu carpeta "/paginas/"
     const paginasIndex = currentPath.indexOf('/paginas/');
-
     if (paginasIndex !== -1) {
-        // 3. Extraemos la base dinámica (ej: "/URBE-API-DRIVEN/front/paginas/")
-        // El + 9 es para incluir la palabra "paginas/" en la base
         const basePath = currentPath.substring(0, paginasIndex + 9);
-
-        // 4. Retornamos la ruta absoluta: Base + el camino del menú
         return basePath + rawPath;
     }
-
-    // Si por alguna razón no encuentra "/paginas/", devuelve el path original
     return rawPath;
 }
 
@@ -224,7 +377,6 @@ function renderItem(container, id, count = 0) {
     const item = MENU_TEMPLATES[id];
     if (!item) return;
 
-    // IDs que requieren estructura de notificación obligatoria
     const targetIds = [2, 3, 4, 5]; 
     const isTarget = targetIds.includes(Number(id));
 
@@ -254,13 +406,9 @@ function renderItem(container, id, count = 0) {
             </li>`;
     } else {
         const finalPath = getCorrectPath(item.path);
-        
-        // ESTRUCTURA FORZADA: Si es uno de los 4 menús, creamos el div SIEMPRE
-        // Si el count es 0, lo ocultamos con CSS inicialmente pero el elemento EXISTE.
         let badgeHTML = '';
         if (isTarget) {
-            badgeHTML = `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm" 
-                              style="${count > 0 ? 'display: flex;' : 'display: none;'}">${count}</div>`;
+            badgeHTML = `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm" style="${count > 0 ? 'display: flex;' : 'display: none;'}">${count}</div>`;
         } else if (count > 0) {
             badgeHTML = `<div class="notif-dot bg-danger text-white d-flex align-items-center justify-content-center shadow-sm">${count}</div>`;
         }
@@ -284,6 +432,7 @@ function setupDropdownLogic() {
         btn.onclick = (e) => {
             e.stopPropagation();
             const menu = btn.nextElementSibling;
+            if(!menu) return; // Por si acaso
             const isHidden = menu.classList.contains('hidden');
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
             if (isHidden) menu.classList.remove('hidden');
@@ -296,19 +445,497 @@ function setupDropdownLogic() {
     };
 }
 
+
 const style = document.createElement('style');
 style.innerHTML = `
-    .gecko-nav-link { color: #555 !important; transition: all 0.2s; border-radius: 12px; min-width: 95px; cursor: pointer; }
-    .gecko-nav-link:hover { background-color: #1a5d3b !important; color: #fff !important; }
-    .gecko-nav-link:hover svg { fill: #fff !important; color: #fff !important; }
-    .menu-icon svg { width: 32px; height: 32px; fill: #404040; transition: fill 0.2s; }
-    .menu-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
-    .dropdown-menu-gecko { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; background: #fff; z-index: 1000; border-radius: 12px; margin-top: 10px; }
+    /* === BASE === */
+    body { transition: background-color 0.3s, color 0.3s, padding-left 0.3s ease; min-height: 100vh; }
+    .table-responsive { overflow-x: auto !important; -webkit-overflow-scrolling: touch; border-radius: 8px; }
+    table { min-width: 850px; }
+
+    /* === ICONOS (GRIS POR DEFECTO) === */
+    .menu-icon svg { width: 24px; height: 24px; fill: #888888 !important; transition: fill 0.2s; }
+    
+    /* === HOVER CUADRADO VERDE SUAVE (TOP Y SIDE) === */
+    .gecko-nav-link, .gecko-sidebar .nav-link { 
+        transition: all 0.2s; 
+        border-radius: 6px !important; /* Cuadrado con puntas apenas redondeadas */
+    }
+    .gecko-nav-link:hover, .gecko-sidebar .nav-link:hover { 
+        background-color: rgba(26, 93, 59, 0.1) !important; 
+        color: #1a5d3b !important; 
+    }
+    .gecko-nav-link:hover .menu-icon svg, .gecko-sidebar .nav-link:hover .menu-icon svg { 
+        fill: #1a5d3b !important; 
+    }
+
+    /* === MENU TOP PILL SIN BORDES ARRIBA === */
+    .custom-menu-pill {
+        border-width: 0 2px 2px 2px !important; 
+        border-style: solid !important;
+        border-bottom-left-radius: 12px !important; 
+        border-bottom-right-radius: 12px !important;
+        border-top-left-radius: 0 !important;
+        border-top-right-radius: 0 !important;
+        background-color: var(--bs-body-bg);
+    }
+
+    /* === SIDEBAR IZQUIERDA FIJA (NO ARRIBA) === */
+    .gecko-sidebar { 
+        position: fixed !important; top: 0; left: 0; height: 100vh; width: 260px; 
+        z-index: 1050; transition: transform 0.3s ease; 
+        background-color: var(--bs-body-bg);
+    }
+    @media (min-width: 769px) {
+        body.with-sidebar { padding-left: 260px !important; }
+    }
+
+    /* === BADGES (NUMERITOS) === */
+    .notif-dot { 
+        top: -5px; right: -8px; width: 18px; height: 18px; border-radius: 50%; 
+        font-size: 10px; font-weight: 900; border: 2px solid white; 
+        display: flex; align-items: center; justify-content: center; z-index: 10;
+    }
+/* === DROPDOWNS SÓLIDOS CON HOVER === */
+    .dropdown-menu-gecko { 
+        position: absolute; 
+        min-width: 200px; 
+        background-color: #ffffff !important; /* Fondo sólido */
+        z-index: 3000 !important; 
+        border-radius: 8px; 
+        border: 1px solid rgba(0,0,0,0.15); 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+        padding: 0.5rem;
+    }
     .dropdown-menu-gecko.hidden { display: none; }
-    .dropdown-item-gecko { color: #404040; transition: 0.2s; font-weight: 600; }
-    .dropdown-item-gecko:hover { background-color: #1a5d3b; color: #fff !important; }
-    /* Estilos del Badge Rojo de NETWISE */
-    .notif-dot { position: absolute; top: -5px; right: -8px; width: 17px; height: 17px; border-radius: 4px; font-size: 9px; font-weight: 900; border: 2px solid white; z-index: 10; }
+    .dropdown-item-gecko { 
+        border-radius: 4px; 
+        margin-bottom: 2px;
+        transition: 0.2s;
+    }
+    /* === MODO OSCURO TOTAL === */
+    [data-bs-theme="dark"] body { background-color: #121212 !important; color: #e5e5e5 !important; }
+    [data-bs-theme="dark"] .geckos-link { color: #888888 !important; border-color: #444 !important; }
+    [data-bs-theme="dark"] .table-light, [data-bs-theme="dark"] thead.table-light tr th { background-color: #252525 !important; color: #fff !important; border-color: #444 !important; }
+    [data-bs-theme="dark"] .bg-light, [data-bs-theme="dark"] .input-group-text, [data-bs-theme="dark"] .form-check.bg-light { background-color: #1e1e1e !important; color: #adb5bd !important; border: 1px solid #333 !important; }
+    [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select { background-color: #0f0f0f !important; color: #fff !important; border-color: #444 !important; }
+    [data-bs-theme="dark"] .dropdown-menu-gecko { background-color: #1e1e1e; border-color: #333; }
+    [data-bs-theme="dark"] .notif-dot { border-color: #1e1e1e; }
+
+    /* DROPDOWNS ALTOS */
+    .dropdown-menu-gecko { z-index: 3000 !important; }
+
+
+/* === LUPITA BUSCADOR (TOP) - AJUSTE DE ANCHO === */
+/* === LUPITA BUSCADOR (TOP) - MÁS ALTA Y CENTRADA === */
+    #btn-toggle-search-top {
+        margin: 10px auto 0 !important; /* Un poquito más de margen superior */
+        background-color: #ffffff !important;
+        border: 1px solid rgba(26, 93, 59, 0.15) !important;
+        border-radius: 8px !important; 
+        
+        /* Ajuste de tamaño: 110px de ancho y 40px de alto para que sea más robusto */
+        width: 110px !important; 
+        height: 40px !important;
+        
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important; 
+        
+        transition: all 0.3s ease; 
+        padding: 0; 
+        color: #1a5d3b !important; 
+        box-shadow: 0 3px 6px rgba(0,0,0,0.05);
+    }
+
+    #btn-toggle-search-top:hover {
+        background-color: #1a5d3b !important;
+        color: #ffffff !important;
+        border-color: #1a5d3b !important;
+        cursor: pointer;
+    }
+
+    /* Ajuste del panel desplegable para que no se pegue tanto al botón nuevo */
+    #search-container-top {
+        position: absolute;
+        top: 110%; /* Lo bajamos un poquito más por el nuevo alto del botón */
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 350px;
+        z-index: 4000;
+        border-color: #1a5d3b !important;
+        background-color: var(--bs-body-bg);
+    }
+    /* === GECKO VOICE BUTTON STATES === */
+    #btn-voice-switch { transition: 0.3s; }
+    .voice-status-1 img { filter: none; } /* Verde original */
+    .voice-status-1 { color: #1a5d3b !important; border-color: #1a5d3b !important; }
+    
+    .voice-status-2 img, .voice-status-null img { filter: grayscale(1) opacity(0.4); }
+    .voice-status-2 { color: #888 !important; }
+
+    .voice-status-error img { filter: brightness(0); }
+    .voice-status-error { color: #000 !important; }
+
+    /* === BUSCADOR PANEL === */
+    .search-panel-float {
+        position: absolute; top: 100%; width: 320px; z-index: 4000;
+        margin-top: 12px; border-color: #1a5d3b !important;
+    }
+
+    /* Resto de estilos base (Badges, Dark Mode, etc.) ... */
+    .notif-dot { position: absolute; top: -5px; right: -8px; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; font-weight: 900; border: 2px solid white; display: flex; align-items: center; justify-content: center; }
+    [data-bs-theme="dark"] body { background-color: #121212 !important; color: #e5e5e5 !important; }
+
+/* === TAMAÑOS DE FUENTE DINÁMICOS (NUEVO) === */
+    :root {
+        --gecko-font-size: 15px; /* Default un poco más grande */
+    }
+    
+    /* Reglas para cambiar la variable */
+    [data-font-size="chica"] { --gecko-font-size: 15px; }
+    [data-font-size="mediana"] { --gecko-font-size: 17px; }
+    [data-font-size="grande"] { --gecko-font-size: 20px; }
+
+    /* Aplicar la variable a TODO, incluyendo tablas */
+    body, .btn, .form-control, .form-select, .nav-link, .dropdown-item-gecko, table, th, td, .table {
+        font-size: var(--gecko-font-size) !important;
+    }
+    
+    /* Ajustes proporcionales para títulos */
+    h1 { font-size: calc(var(--gecko-font-size) * 1.8) !important; }
+    h2 { font-size: calc(var(--gecko-font-size) * 1.6) !important; }
+    h3 { font-size: calc(var(--gecko-font-size) * 1.4) !important; }
+    h4 { font-size: calc(var(--gecko-font-size) * 1.2) !important; }
+    h5, h6 { font-size: calc(var(--gecko-font-size) * 1.1) !important; }
+
+    /* Transición suave para el icono de letra */
+    #btn-font-switch svg { transition: transform 0.2s ease; }
 `;
 document.head.appendChild(style);
+function renderTopMenuStructure(container, menuIds) {
+    document.body.classList.remove('with-sidebar');
+    const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
+
+    const header = document.createElement('header');
+    header.className = "w-full gecko-header gecko-header-top bg-transparent mb-2"; 
+    header.innerHTML = `
+        <div class="container-fluid pt-2 pb-1">
+            <div class="d-flex justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
+                <div class="d-flex align-items-center gap-3">
+                    <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
+                    <span class="text-secondary fw-black text-uppercase border-start ps-3">${instName}</span>
+                </div>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link">GECKOS.uy</a>
+            </div>
+
+            <nav class="w-full d-flex flex-column align-items-center position-relative">
+                <div class="d-flex align-items-center position-relative">
+                    <button id="gecko-mobile-toggle-top" class="btn btn-link text-success d-md-none position-absolute start-0 ms-n4">
+                        <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                    <ul id="main-menu-ul" class="nav border-success bg-body p-1 shadow-sm align-items-center d-none d-md-flex gap-1 custom-menu-pill">
+                    </ul>
+                </div>
+
+                <button id="btn-toggle-search-top" class="btn btn-link text-success p-0 mt-1 d-none d-md-block" title="Buscador Global">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+                </button>
+
+                <div id="search-container-top" class="hidden search-panel-float shadow border rounded-3 p-2 bg-body">
+                    <div class="input-group">
+                        <input type="text" id="input-search-top" class="form-control form-control-sm border-0 bg-transparent" placeholder="Buscador global...">
+                        <button class="btn btn-success btn-sm px-3 rounded-2" onclick="window.executeGlobalSearch('top')">BUSCAR</button>
+                    </div>
+                    <div id="search-results-top" class="search-results-list small mt-2"></div>
+                </div>
+            </nav>
+        </div>
+        
+        <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                <span class="fw-bold text-success small">${instName}</span>
+                <button class="btn-close" id="gecko-close-sidebar"></button>
+            </div>
+            <ul class="nav flex-column p-3" id="mobile-menu-ul"></ul>
+        </aside>
+    `;
+    
+    document.body.prepend(header);
+    const ulDesktop = document.getElementById('main-menu-ul');
+    const ulMobile = document.getElementById('mobile-menu-ul');
+    
+    menuIds.forEach(id => {
+        ulDesktop.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'top'));
+        ulMobile.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side'));
+    });
+    ulDesktop.insertAdjacentHTML('beforeend', buildControlsHTML('top'));
+    ulMobile.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
+}
+function renderSideMenuStructure(container, menuIds) {
+    document.body.classList.add('with-sidebar');
+    const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
+
+    const sidebar = document.createElement('aside');
+    sidebar.id = "gecko-sidebar-element";
+    sidebar.className = "gecko-sidebar d-flex flex-column flex-shrink-0 p-3 border-end shadow-sm";
+    
+    sidebar.innerHTML = `
+        <div class="d-flex flex-column mb-4 border-bottom pb-3">
+            <div class="d-flex justify-content-between align-items-center w-100">
+                <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
+                <button class="btn-close d-md-none" id="gecko-close-sidebar"></button>
+            </div>
+        </div>
+
+        <div class="px-2 mb-4">
+            <div class="input-group border rounded-pill bg-body px-2 py-1 shadow-sm">
+                <input type="text" id="input-search-side" class="form-control form-control-sm border-0 bg-transparent" placeholder="Buscador global...">
+                <button class="btn btn-link text-success p-0 ms-1" onclick="window.executeGlobalSearch('side')">
+                    <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+                </button>
+            </div>
+            <div id="search-results-side" class="search-results-list small mt-2"></div>
+        </div>
+        
+        <ul class="nav nav-pills flex-column mb-auto gap-1" id="side-menu-ul"></ul>
+        
+        <div class="mt-auto border-top pt-3 text-center">
+            <div class="mb-3 px-2">
+                <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 9px; opacity: 0.8;">GROBO - ERP DISEÑADO PARA BIOTERIOS</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 10px;">Desarrollado por <b>GECKOS.uy</b></a>
+            </div>
+            <ul class="nav nav-pills flex-column" id="side-controls-ul"></ul>
+        </div>
+    `;
+
+    document.body.prepend(sidebar);
+
+    // 4. Botón hamburguesa para abrir el menú en móviles (Flotante)
+    const mobileToggle = document.createElement('button');
+    mobileToggle.id = "gecko-mobile-toggle";
+    mobileToggle.className = "btn btn-success position-fixed top-0 start-0 m-2 d-md-none z-3 shadow";
+    mobileToggle.innerHTML = '<svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>';
+    mobileToggle.onclick = (e) => {
+        e.stopPropagation();
+        sidebar.classList.add('open');
+    };
+    document.body.prepend(mobileToggle);
+
+    // 5. Inyectar los items del menú
+    const ul = document.getElementById('side-menu-ul');
+    menuIds.forEach(id => {
+        ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side'));
+    });
+    
+    // 6. Inyectar botones de control
+    const controlsUl = document.getElementById('side-controls-ul');
+    controlsUl.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
+}
+// --- FUNCIÓN PARA CONSTRUIR CADA ITEM (CON BADGES) ---
+function buildMenuItemHTML(id, layout) {
+    const item = MENU_TEMPLATES[id];
+    if (!item) return '';
+
+    const path = item.path ? getCorrectPath(item.path) : '#';
+    const isSide = layout === 'side';
+    
+    const liClass = isSide ? 'nav-item mb-1 w-100 position-relative' : 'nav-item position-relative';
+    // Quitamos fw-bold pesado, usamos un peso intermedio (600)
+    const linkClass = isSide 
+        ? 'nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2' 
+        : 'gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body';
+    
+    const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">
+                        ${item.svg}
+                        <div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div>
+                      </div>`;
+                      
+    const labelHTML = `<span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span>`;
+
+    if (item.isDropdown && item.children) {
+        const arrowIcon = `<svg class="ms-1" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
+        const childrenHTML = item.children.map(child => `
+            <li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;">${child.label}</a></li>
+        `).join('');
+
+        const ulStyle = isSide ? 'position: static; background: transparent; padding-left: 30px;' : 'position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px;';
+
+        return `
+        <li class="${liClass}">
+            <a href="javascript:void(0);" class="${linkClass} dropdown-toggle-gecko d-flex ${isSide ? 'align-items-center justify-content-between' : 'flex-column align-items-center'}">
+                ${isSide ? `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}` : `<div>${iconHTML}</div> <div class="d-flex align-items-center">${labelHTML} ${arrowIcon}</div>`}
+            </a>
+            <ul class="dropdown-menu-gecko hidden list-unstyled border-0 rounded-3 mt-1 shadow" style="${ulStyle}">
+                ${childrenHTML}
+            </ul>
+        </li>`;
+    }
+    return `<li class="${liClass}"><a href="${path}" class="${linkClass}">${iconHTML} ${labelHTML}</a></li>`;
+}
+
+
+function buildControlsHTML(layout) {
+    const isSide = layout === 'side';
+    const btnClass = isSide 
+        ? "btn btn-outline-secondary d-flex align-items-center justify-content-center border-opacity-25 btn-control-gecko" 
+        : "btn btn-link text-decoration-none p-0 me-2 text-body d-flex align-items-center justify-content-center btn-control-gecko";
+    
+    const btnStyle = isSide ? 'width: 38px; height: 38px; padding: 0; border-radius: 50%;' : 'width: 32px; height: 32px; padding: 0;';
+
+    const geckoOk = localStorage.getItem('gecko_ok') || '2';
+    const themeIcon = (localStorage.getItem('theme') || 'light') === 'dark' ? UserPreferences.icons.moon : UserPreferences.icons.sun;
+    const currentLang = localStorage.getItem('lang') || 'es';
+    const flagCode = currentLang === 'en' ? 'us' : (currentLang === 'pt' ? 'br' : 'es');
+    
+    // RECUPERAR TAMAÑO GUARDADO PARA EL ICONO INICIAL
+    const currentSize = localStorage.getItem('fontSize') || 'chica';
+    const fontIcon = UserPreferences.icons[`font_${currentSize}`] || UserPreferences.icons.font_chica;
+
+    return `
+    <li class="${isSide ? 'd-flex justify-content-center gap-2 w-100 mt-3 pb-3 flex-wrap' : 'nav-item d-flex align-items-center ms-2 ps-2 border-start border-secondary-subtle'}">
+        
+        <button id="btn-voice-switch" class="${btnClass} voice-status-${geckoOk}" style="${btnStyle}" title="Gecko Voice">
+            <span class="d-flex align-items-center justify-content-center">
+                ${UserPreferences.icons.gecko}
+            </span>
+        </button>
+
+        <button id="btn-font-switch" class="${btnClass}" style="${btnStyle}" title="Tamaño de letra">
+            ${fontIcon}
+        </button>
+
+        <button id="btn-theme-switch" class="${btnClass}" style="${btnStyle}" title="Tema">
+            <span id="pref-icon-theme">${themeIcon}</span>
+        </button>
+
+        <div class="position-relative dropdown-container-gecko ${!isSide ? 'mx-1' : ''}">
+            <button class="dropdown-toggle-gecko btn btn-light rounded-circle border shadow-sm p-0 d-flex align-items-center justify-content-center overflow-hidden" style="${isSide ? 'width:38px; height:38px;' : 'width:28px; height:28px;'}">
+                <img id="pref-current-flag" src="https://flagcdn.com/w40/${flagCode}.png" style="width: 100%; height: 100%; object-fit: cover;">
+            </button>
+            <ul class="dropdown-menu-gecko hidden shadow p-2 border list-unstyled" style="position: absolute; min-width: 140px; z-index: 1050; ${isSide ? 'bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px;' : 'top: 120%; right: 0;'}">
+                <li><a href="#" onclick="window.setAppLang('es')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded mb-1"><img src="https://flagcdn.com/w40/es.png" width="20" class="me-2 shadow-sm"> Español</a></li>
+                <li><a href="#" onclick="window.setAppLang('en')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded mb-1"><img src="https://flagcdn.com/w40/us.png" width="20" class="me-2 shadow-sm"> English</a></li>
+                <li><a href="#" onclick="window.setAppLang('pt')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded"><img src="https://flagcdn.com/w40/br.png" width="20" class="me-2 shadow-sm"> Português</a></li>
+            </ul>
+        </div>
+
+        <button id="btn-layout-switch" class="${btnClass}" style="${btnStyle}" title="Cambiar Diseño">
+            <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v1h14V2a1 1 0 0 0-1-1H2z"/></svg>
+        </button>
+    </li>`;
+}
+function setupEventListeners() {
+    window.Auth = Auth;
+    
+    // 1. Exponer funciones globales necesarias para el HTML (onclicks)
+    window.GeckoVoice = GeckoVoice; 
+    window.executeGlobalSearch = executeGlobalSearch;
+
+    // 2. Botón de cierre (X) para Sidebar Móvil
+    const closeBtn = document.getElementById('gecko-close-sidebar');
+    if(closeBtn) closeBtn.onclick = () => document.getElementById('gecko-sidebar-element').classList.remove('open');
+
+    // 3. Lógica del Buscador en el Top Menu (Lupita Toggle)
+    const btnSearchTop = document.getElementById('btn-toggle-search-top');
+    const containerSearchTop = document.getElementById('search-container-top');
+    
+    if(btnSearchTop && containerSearchTop) {
+        btnSearchTop.onclick = (e) => {
+            e.stopPropagation();
+            const isHidden = containerSearchTop.classList.toggle('hidden');
+            if(!isHidden) {
+                // Pequeño delay para asegurar que el input sea visible antes del focus
+                setTimeout(() => document.getElementById('input-search-top').focus(), 50);
+            }
+        };
+    }
+
+    // 4. Detectar tecla Enter en los inputs de búsqueda (Top y Side)
+    ['input-search-top', 'input-search-side'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) {
+            el.onkeydown = (e) => {
+                if(e.key === 'Enter') {
+                    // Llamamos a la función importada de GeckoSearch.js
+                    executeGlobalSearch(id.includes('top') ? 'top' : 'side');
+                }
+            };
+        }
+    });
+
+    // 5. Cierre por click externo (Sidebar, Dropdowns y Buscador Top)
+    document.addEventListener('click', (e) => {
+        // A. Cerrar Sidebar móvil
+        const sidebar = document.getElementById('gecko-sidebar-element');
+        if (sidebar && sidebar.classList.contains('open')) {
+            const bSide = document.getElementById('gecko-mobile-toggle');
+            const bTop = document.getElementById('gecko-mobile-toggle-top');
+            // Si el click NO fue en el sidebar ni en los botones de abrir
+            if (!sidebar.contains(e.target) && (!bSide || !bSide.contains(e.target)) && (!bTop || !bTop.contains(e.target))) {
+                sidebar.classList.remove('open');
+            }
+        }
+
+        // B. Cerrar Buscador Top
+        if (containerSearchTop && !containerSearchTop.contains(e.target) && e.target !== btnSearchTop) {
+            containerSearchTop.classList.add('hidden');
+        }
+        
+        // C. Cerrar Dropdowns de módulos al hacer click fuera
+        if (!e.target.closest('.dropdown-menu-gecko') && !e.target.closest('.dropdown-toggle-gecko')) {
+            document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
+        }
+    });
+
+    // 6. Botones de configuración (Píldora de utilidades)
+    const actions = {
+        'btn-voice-switch': () => UserPreferences.toggleVoice(),
+        'btn-font-switch': () => UserPreferences.cycleFontSize(),
+        'btn-theme-switch': () => UserPreferences.toggleTheme(),
+        'btn-layout-switch': () => UserPreferences.toggleMenuLayout()
+    };
+
+    Object.entries(actions).forEach(([id, fn]) => {
+        const btn = document.getElementById(id);
+        if(btn) {
+            btn.onclick = (e) => { 
+                e.preventDefault(); 
+                fn(); 
+            };
+        }
+    });
+
+    // 7. Lógica de apertura de Dropdowns (Click en flechitas o items con hijos)
+    document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const currentMenu = btn.nextElementSibling;
+            if(!currentMenu) return;
+            
+            const isHidden = currentMenu.classList.contains('hidden');
+            
+            // Cerrar todos los otros primero
+            document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
+            
+            // Abrir el actual si estaba cerrado
+            if(isHidden) currentMenu.classList.remove('hidden');
+        };
+    });
+
+    // 8. Auto-arranque de Voz (Si está activo en BD y no es Firefox)
+    // Usamos setTimeout para asegurar que el DOM esté listo
+    setTimeout(() => {
+        const isVoiceActive = localStorage.getItem('gecko_ok') == 1;
+        const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+        
+        if (isVoiceActive && !isFirefox && window.GeckoVoice) {
+            window.GeckoVoice.init();
+        }
+    }, 500);
+
+    // 9. Cargar notificaciones (numeritos rojos)
+    refreshMenuNotifications();
+}
 
