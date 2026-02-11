@@ -5,12 +5,20 @@ let insumosList = [];
 let userEmail = "";
 let dataFull = null; // Para el PDF
 
+/* --- HELPER: Obtener Institución del Contexto --- */
+function getContextInstId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('targetInst') || localStorage.getItem('instId');
+}
+
 export async function initReactivosForm() {
-    const instId = localStorage.getItem('instId');
+    // 1. Usamos el ID correcto
+    const instId = getContextInstId();
     const userId = localStorage.getItem('userId');
-    const instName = localStorage.getItem('NombreInst');
     
-    document.getElementById('lbl-institution-name').innerText = instName;
+    // Fallback visual inicial
+    const lblInst = document.getElementById('lbl-institution-name');
+    if(lblInst) lblInst.innerText = localStorage.getItem('NombreInst') || '...';
 
     window.resetSelection = () => {
         document.getElementById('step-2').classList.add('hidden-section');
@@ -22,20 +30,25 @@ export async function initReactivosForm() {
     };
 
     try {
-        // 1. Cargar Data para PDF (Mismo endpoint que animales)
-        // Nota: Asegúrate de que el backend tenga la ruta /reactivos/pdf-data apuntando al método que devuelve precios globales
+        // 2. Cargar Data para PDF con el ID correcto
         const resPDF = await API.request(`/reactivos/pdf-data?inst=${instId}`);
         if(resPDF.status === 'success') {
             dataFull = resPDF.data;
             setupPDFButton();
+
+            // --- CORRECCIÓN VISUAL ---
+            // Actualizamos el nombre con el que vino de la API
+            if (dataFull.institucion && dataFull.institucion.NombreInst) {
+                if(lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
+            }
         }
 
-        // 2. Cargar Datos Iniciales
+        // 3. Cargar Datos Iniciales (Protocolos e Insumos) con el ID correcto
         const res = await API.request(`/reactivos/init?inst=${instId}&user=${userId}`);
         if (res.status === 'success') {
             const data = res.data;
             protocolsList = data.protocols;
-            insumosList = data.insumos; // Ya vienen filtrados por habilitado=1 desde el backend
+            insumosList = data.insumos; 
             userEmail = data.user_email;
             
             if(data.id_tipo_default) {
@@ -114,7 +127,7 @@ async function selectProtocol(p) {
     } catch(e) { console.error(e); }
 }
 
-/* --- LOGICA INSUMOS (SIN CORCHETES) --- */
+/* --- LOGICA INSUMOS --- */
 function setupInsumosDropdown() {
     const sel = document.getElementById('select-insumo');
     const medidaLbl = document.getElementById('lbl-medida-disp');
@@ -132,14 +145,10 @@ function setupInsumosDropdown() {
         const opt = document.createElement('option');
         opt.value = i.IdInsumoexp;
         
-        // FORMATO LIMPIO: Nombre + Cantidad + Tipo
-        // Ejemplo: Buffer PBS 500 ml
         const cant = i.CantidadInsumo || '';
         const tipo = i.TipoInsumo || '';
         
         opt.text = `${i.NombreInsumo} ${cant} ${tipo}`.trim();
-        
-        // Etiqueta informativa abajo del input
         opt.dataset.medida = `cada ${cant} ${tipo}`.trim();
         sel.appendChild(opt);
     });
@@ -172,14 +181,17 @@ function setupPDFButton() {
     if(lbl) lbl.innerText = titulo;
     
     btn.classList.remove('d-none');
-    btn.onclick = generateGlobalPDF; // Usamos función local
+    btn.onclick = generateGlobalPDF;
 }
 
-// Función idéntica a la de Animales para generar el PDF de precios
 function generateGlobalPDF() {
     if (!dataFull) return;
 
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+    // Usamos el nombre real de la institución target
+    const inst = (dataFull.institucion && dataFull.institucion.NombreInst) 
+                 ? dataFull.institucion.NombreInst.toUpperCase() 
+                 : (localStorage.getItem('NombreInst') || 'INSTITUCIÓN');
+
     const fechaActual = new Date().toLocaleDateString();
     const tituloDoc = (dataFull.institucion && dataFull.institucion.tituloprecios) 
         ? dataFull.institucion.tituloprecios 
@@ -327,9 +339,13 @@ async function handleReview(e) {
 async function submitOrder() {
     Swal.fire({ title: 'Enviando...', didOpen: () => Swal.showLoading() });
     
+    // 3. Obtenemos el targetInst correcto para el envío
+    const targetInst = getContextInstId();
+
     const fd = {
-        instId: localStorage.getItem('instId'),
+        instId: targetInst, // <--- Correcto
         userId: localStorage.getItem('userId'),
+        
         idTipoFormulario: document.getElementById('id-tipo-form').value,
         idprotA: document.getElementById('selected-prot-id').value,
         

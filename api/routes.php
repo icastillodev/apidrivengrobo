@@ -198,6 +198,80 @@ $router->get('/forms/selector', 'FormSelectorController@getSelectorData');
 
 
 // ============================================================
+// ADMIN: INSUMOS EXPERIMENTALES
+// ============================================================
+$router->get('/admin/config/insumos-exp/all', 'AdminConfigInsumoExpController@getAll');
+$router->get('/admin/config/insumos-exp/species', 'AdminConfigInsumoExpController@getSpeciesList'); // Para llenar el select
+$router->post('/admin/config/insumos-exp/save', 'AdminConfigInsumoExpController@save');
+$router->post('/admin/config/insumos-exp/delete', 'AdminConfigInsumoExpController@delete');
+$router->post('/admin/config/insumos-exp/toggle', 'AdminConfigInsumoExpController@toggle');
+
+// ============================================================
+// ADMIN: CONFIGURACIÓN INSUMOS
+// ============================================================
+$router->get('/admin/config/insumos/all', 'AdminConfigInsumoController@getAll');
+$router->post('/admin/config/insumos/save', 'AdminConfigInsumoController@save');
+$router->post('/admin/config/insumos/delete', 'AdminConfigInsumoController@delete');
+$router->post('/admin/config/insumos/toggle', 'AdminConfigInsumoController@toggle');
+
+
+// ============================================================
+// ADMIN: CONFIGURACIÓN TIPOS DE FORMULARIO
+// ============================================================
+$router->get('/admin/config/form-types/all', 'AdminConfigFormTypesController@getAll');
+$router->post('/admin/config/form-types/save', 'AdminConfigFormTypesController@save');
+$router->post('/admin/config/form-types/delete', 'AdminConfigFormTypesController@delete');
+
+// ============================================================
+// ADMIN: CONFIGURACIÓN PROTOCOLOS (TIPOS Y SEVERIDADES)
+// ============================================================
+$router->get('/admin/config/protocols-conf/init', 'AdminConfigProtocoloController@init');
+
+// Tipos de Protocolo
+$router->post('/admin/config/protocols-conf/type/save', 'AdminConfigProtocoloController@saveType');
+$router->post('/admin/config/protocols-conf/type/delete', 'AdminConfigProtocoloController@deleteType');
+
+// Severidades
+$router->post('/admin/config/protocols-conf/severity/save', 'AdminConfigProtocoloController@saveSeverity');
+$router->post('/admin/config/protocols-conf/severity/delete', 'AdminConfigProtocoloController@deleteSeverity');
+
+// ============================================================
+// ADMIN: USUARIOS, ROLES Y MENÚS
+// ============================================================
+$router->get('/admin/config/roles/init', 'AdminConfigRolesController@init');
+$router->post('/admin/config/roles/update-user-role', 'AdminConfigRolesController@updateUserRole');
+$router->post('/admin/config/roles/toggle-menu', 'AdminConfigRolesController@toggleMenuAccess');
+
+// ============================================================
+// ADMIN: Especies y subespecies
+// ============================================================
+$router->get('/admin/config/especies/all', 'AdminConfigEspeciesController@getAll');
+$router->post('/admin/config/especies/save', 'AdminConfigEspeciesController@saveEspecie');
+$router->post('/admin/config/especies/delete', 'AdminConfigEspeciesController@deleteEspecie');
+$router->post('/admin/config/subespecies/save', 'AdminConfigEspeciesController@saveSubespecie');
+$router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController@toggleSubespecie');
+
+
+// ============================================================
+// ADMIN: CONFIGURACIÓN INSTITUCIÓN
+// ============================================================
+$router->get('/admin/config/institution', 'AdminConfigInstitutionController@get');
+$router->post('/admin/config/institution/update', 'AdminConfigInstitutionController@update');
+
+// ============================================================
+// ADMIN: CONFIGURACIÓN DEPARTAMENTOS Y ORGANISMOS
+// ============================================================
+$router->get('/admin/config/deptos-init', 'AdminConfigDeptoController@getAll');
+
+// Organismos
+$router->post('/admin/config/org/save', 'AdminConfigDeptoController@saveOrg');
+$router->post('/admin/config/org/delete', 'AdminConfigDeptoController@deleteOrg');
+
+// Departamentos
+$router->post('/admin/config/depto/save', 'AdminConfigDeptoController@saveDepto');
+$router->post('/admin/config/depto/delete', 'AdminConfigDeptoController@deleteDepto');
+
+// ============================================================
 // SECCIÓN: SUPERADMIN (Gestión Global)
 // ============================================================
 $router->get('/superadmin/global-stats', 'InstitucionController@getGlobalStats');

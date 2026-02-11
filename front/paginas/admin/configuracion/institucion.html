@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración Institucional - GROBO</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
+
+    <script type="module">
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { initConfigInstitution } from '../../../dist/js/pages/admin/configuracion/config_institucion.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if(!Auth.checkAccess([1,2])) return;
+            await initMenu();
+            NotificationManager.init();
+            initConfigInstitution();
+            
+        });
+    </script>
+</head>
+<body class="bg-light">
+    
+    <div class="container my-5 px-4">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 text-uppercase small fw-bold">
+                        <li class="breadcrumb-item"><a href="config.html" class="text-decoration-none text-muted">Configuración</a></li>
+                        <li class="breadcrumb-item active text-primary">Institución</li>
+                    </ol>
+                </nav>
+                <h4 class="fw-black text-dark m-0">DATOS DE LA SEDE</h4>
+            </div>
+            <button type="submit" form="form-institution" class="btn btn-primary fw-bold shadow-sm px-4">
+                <i class="bi bi-save me-2"></i> GUARDAR CAMBIOS
+            </button>
+        </div>
+
+        <form id="form-institution">
+            <div class="row g-4">
+                
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h6 class="fw-bold text-primary mb-0"><i class="bi bi-building me-2"></i>IDENTIDAD CORPORATIVA</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-muted uppercase">Nombre Completo (Razón Social)</label>
+                                <input type="text" name="NombreCompletoInst" id="in-nombre" class="form-control fw-bold" required>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-muted uppercase">Sitio Web</label>
+                                    <input type="text" name="Web" id="in-web" class="form-control" placeholder="www.ejemplo.com">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-muted uppercase">Correo Oficial</label>
+                                    <input type="email" name="InstCorreo" id="in-correo" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h6 class="fw-bold text-info mb-0"><i class="bi bi-geo-alt me-2"></i>UBICACIÓN Y CONTACTO</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label small fw-bold text-muted uppercase">Dirección Física</label>
+                                    <input type="text" name="InstDir" id="in-dir" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-muted uppercase">Teléfono / Contacto</label>
+                                    <input type="text" name="InstContacto" id="in-contacto" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-muted uppercase">Localidad / Ciudad</label>
+                                    <input type="text" name="Localidad" id="in-localidad" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-muted uppercase">País</label>
+                                    <input type="text" name="Pais" id="in-pais" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h6 class="fw-bold text-dark mb-0"><i class="bi bi-sliders me-2"></i>CONFIGURACIÓN</h6>
+                        </div>
+                        <div class="card-body p-4">
+                            
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold text-muted uppercase">Moneda Predeterminada</label>
+                                <select name="Moneda" id="sel-moneda" class="form-select fw-bold">
+                                    <option value="UYU">$UY - Peso Uruguayo</option>
+                                    <option value="USD">U$S - Dólar Americano</option>
+                                    <option value="EUR">€ - Euro</option>
+                                    <option value="BRL">R$ - Real Brasileño</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold text-muted uppercase">Precio Jornada Exp.</label>
+                                <div class="input-group">
+                                    <span class="input-group-text fw-bold border-0 bg-light">$</span>
+                                    <input type="number" name="PrecioJornadaTrabajoExp" id="in-precio" class="form-control fw-bold" step="0.01">
+                                </div>
+                                <div class="form-text small mt-1">Costo base para cálculos de horas extra o trabajos especiales.</div>
+                            </div>
+
+                            <div class="p-3 bg-light rounded border">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="check-otrosceuas" name="otrosceuas_check">
+                                    <label class="form-check-label fw-bold ms-2" for="check-otrosceuas">Habilitar "Otros CEUAS"</label>
+                                </div>
+                                <p class="small text-muted mt-2 mb-0" style="font-size: 11px;">
+                                    Permite a los investigadores cargar solicitudes vinculadas a protocolos externos no registrados en el sistema.
+                                </p>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </form>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

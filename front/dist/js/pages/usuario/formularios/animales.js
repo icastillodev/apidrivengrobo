@@ -3,16 +3,25 @@ import { API } from '../../../api.js';
 let protocolsList = [];
 let speciesData = [];
 let dataFull = null;
-let currentUserEmail = "No disponible"; // Variable global para el email
+let currentUserEmail = "No disponible"; 
+
+/* --- HELPER: Obtener Institución del Contexto --- */
+function getContextInstId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('targetInst') || localStorage.getItem('instId');
+}
 
 export async function initAnimalForm() {
-    const instId = localStorage.getItem('instId');
+    // 1. Usamos el ID correcto (URL o Storage)
+    const instId = getContextInstId();
     const userId = localStorage.getItem('userId');
-    const instName = localStorage.getItem('NombreInst') || 'Institución';
-
-    const lblInst = document.getElementById('lbl-institution-name');
-    if(lblInst) lblInst.innerText = instName;
     
+    // Referencia al label del título
+    const lblInst = document.getElementById('lbl-institution-name');
+    
+    // Inicialmente ponemos "Cargando..." o el del storage temporalmente para que no se vea vacío
+    if(lblInst) lblInst.innerText = localStorage.getItem('NombreInst') || '...';
+
     window.confirmOtrosCeuas = () => {
         const modalEl = document.getElementById('modal-otros-ceuas');
         if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
@@ -30,10 +39,18 @@ export async function initAnimalForm() {
     };
 
     try {
+        // 2. Llamamos a la API con el ID correcto
         const resPDF = await API.request(`/animals/pdf-data?inst=${instId}`);
+        
         if (resPDF && resPDF.status === 'success') {
             dataFull = resPDF.data;
             setupPDFButton();
+
+            // --- CORRECCIÓN VISUAL ---
+            // Actualizamos el nombre con el que vino REALMENTE de la base de datos
+            if (dataFull.institucion && dataFull.institucion.NombreInst) {
+                if(lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
+            }
         }
 
         const resProt = await API.request(`/animals/search-protocols?inst=${instId}&user=${userId}`);
@@ -42,7 +59,7 @@ export async function initAnimalForm() {
             protocolsList = protocols;
             if(user_email) currentUserEmail = user_email;
 
-            // 1. LLENAR SELECTOR DE TIPOS (NUEVO)
+            // LLENAR SELECTOR DE TIPOS
             const typeSel = document.getElementById('select-tipo-form');
             if(typeSel) {
                 typeSel.innerHTML = '<option value="">Seleccione tipo...</option>';
@@ -75,16 +92,14 @@ export async function initAnimalForm() {
     const form = document.getElementById('animal-form');
     if(form) form.onsubmit = handleReview;
 }
+
 /* --- MÓDULO PDF (CORREGIDO) --- */
 function setupPDFButton() {
-    // Buscamos el elemento correcto del HTML nuevo: id="btn-tarifario"
     const btn = document.getElementById('btn-tarifario');
     const lbl = document.getElementById('lbl-tarifario-titulo');
     
-    // Si no existe el botón o no llegaron datos, no hacemos nada (evita el error null)
     if (!btn || !dataFull) return;
 
-    // Título dinámico desde BD
     const titulo = (dataFull.institucion && dataFull.institucion.tituloprecios) 
         ? dataFull.institucion.tituloprecios 
         : 'VER TARIFARIO';
@@ -92,15 +107,17 @@ function setupPDFButton() {
     if (lbl) lbl.innerText = titulo;
     
     btn.classList.remove('d-none');
-    // NO usamos .href, usamos onclick
     btn.onclick = exportPreciosPDF;
 }
 
-// TU FUNCIÓN DE PDF INTEGRADA
 window.exportPreciosPDF = () => {
     if (!dataFull) return;
 
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+    // Aquí usamos el nombre que vino de la API, no del storage
+    const inst = (dataFull.institucion && dataFull.institucion.NombreInst) 
+                 ? dataFull.institucion.NombreInst.toUpperCase() 
+                 : 'INSTITUCIÓN';
+                 
     const fechaActual = new Date().toLocaleDateString();
     const tituloDoc = (dataFull.institucion && dataFull.institucion.tituloprecios) 
         ? dataFull.institucion.tituloprecios 
@@ -185,21 +202,15 @@ window.exportPreciosPDF = () => {
 };
 
 /* --- BÚSQUEDA Y SELECCIÓN --- */
-
-/* --- BÚSQUEDA Y SELECCIÓN (ACTUALIZADO) --- */
-
 function setupSearch() {
     const input = document.getElementById('protocol-search');
     const list = document.getElementById('protocol-list');
     
     if (!input || !list) return;
 
-    // Función unificada de renderizado
     const renderList = (items) => {
         list.innerHTML = '';
-        
         if (!items || items.length === 0) {
-            // Mensaje opcional si no hay nada
             if (protocolsList.length > 0) {
                 list.innerHTML = '<div class="list-group-item text-muted small">No se encontraron coincidencias.</div>';
                 list.classList.remove('d-none');
@@ -212,7 +223,7 @@ function setupSearch() {
         items.forEach(p => {
             const item = document.createElement('div');
             item.className = "list-group-item list-group-item-action protocol-result-item p-3";
-            item.style.cursor = "pointer"; // Asegura cursor de mano
+            item.style.cursor = "pointer";
             item.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
@@ -224,12 +235,11 @@ function setupSearch() {
                     </span>
                 </div>`;
             
-            // Al hacer click: Seleccionar y cerrar lista
             item.onmousedown = (e) => { 
-                e.preventDefault(); // Evita que el 'blur' del input cierre la lista antes de tiempo
+                e.preventDefault();
                 selectProtocol(p);
                 list.classList.add('d-none');
-                input.value = ''; // Limpiar buscador (opcional)
+                input.value = '';
             };
             
             list.appendChild(item);
@@ -237,17 +247,12 @@ function setupSearch() {
         list.classList.remove('d-none');
     };
 
-    // LOGICA PRINCIPAL: Filtrar o Mostrar Todo
     const handleInput = () => {
         const term = input.value.toLowerCase().trim();
-        
-        // Si está vacío, mostramos TODOS
         if (term === '') {
             renderList(protocolsList);
             return;
         }
-
-        // Si hay texto, filtramos
         const filtered = protocolsList.filter(p => 
             p.nprotA.toLowerCase().includes(term) || 
             p.tituloA.toLowerCase().includes(term) ||
@@ -256,24 +261,18 @@ function setupSearch() {
         renderList(filtered);
     };
 
-    // Eventos:
-    // 1. Al escribir (input)
     input.addEventListener('input', handleInput);
-    
-    // 2. Al hacer click/foco (focus) -> Muestra todo si está vacío
     input.addEventListener('focus', handleInput);
-
-    // 3. Cerrar al hacer click fuera
     document.addEventListener('click', (e) => {
         if (!input.contains(e.target) && !list.contains(e.target)) {
             list.classList.add('d-none');
         }
     });
 }
+
 async function selectProtocol(p) {
     document.getElementById('step-1').classList.add('hidden-section');
     document.getElementById('step-2').classList.remove('hidden-section');
-    
     document.getElementById('selected-prot-id').value = p.idprotA;
     document.getElementById('is-otros-ceuas').value = "0";
 
@@ -283,14 +282,12 @@ async function selectProtocol(p) {
             const { info, species } = res.data;
             speciesData = species;
 
-            // Datos Básicos
             document.getElementById('info-titulo').innerText = info.tituloA;
             document.getElementById('info-nprot').innerText = `Protocolo N° ${info.nprotA}`;
             document.getElementById('info-nprot').className = "badge bg-success";
             document.getElementById('info-investigador').innerText = info.Responsable;
             document.getElementById('info-depto').innerText = info.Depto;
 
-            // Fecha de Vencimiento
             if (info.FechaFinProtA) {
                 const [y, m, d] = info.FechaFinProtA.split('-');
                 document.getElementById('info-vencimiento').innerText = `Vence: ${d}/${m}/${y}`;
@@ -298,7 +295,6 @@ async function selectProtocol(p) {
                 document.getElementById('info-vencimiento').innerText = 'Sin fecha fin';
             }
 
-            // Matemática de Cupos
             const saldo = parseInt(info.saldo) || 0;
             const usados = parseInt(info.usados) || 0;
             const totalOriginal = saldo + usados;
@@ -310,13 +306,13 @@ async function selectProtocol(p) {
         }
     } catch (e) { console.error(e); }
 }
+
 async function activateOtherCeuasMode() {
-    const instId = localStorage.getItem('instId');
-    const userName = localStorage.getItem('userName') || 'Usuario'; // Corregido key storage
+    const instId = getContextInstId(); // Usamos el helper también aquí por seguridad
+    const userName = localStorage.getItem('userFull') || 'Usuario'; 
 
     document.getElementById('step-1').classList.add('hidden-section');
     document.getElementById('step-2').classList.remove('hidden-section');
-    
     document.getElementById('selected-prot-id').value = "";
     document.getElementById('is-otros-ceuas').value = "1";
 
@@ -324,14 +320,11 @@ async function activateOtherCeuasMode() {
     document.getElementById('info-total-orig').innerText = "---";
     document.getElementById('info-saldo').innerText = "∞";  
 
-
-    // Info Card Mock
     document.getElementById('info-titulo').innerText = "SOLICITUD EXTERNA / OTROS CEUAS";
     document.getElementById('info-nprot').innerText = "SIN PROTOCOLO VINCULADO";
     document.getElementById('info-nprot').className = "badge bg-warning text-dark mb-2";
     document.getElementById('info-investigador').innerText = userName;
     document.getElementById('info-depto').innerText = "Responsable Financiero";
-    document.getElementById('info-saldo').innerText = "∞";
 
     try {
         const res = await API.request(`/animals/protocol-details?otros_ceuas=1&inst=${instId}`);
@@ -342,71 +335,57 @@ async function activateOtherCeuasMode() {
     } catch (e) { console.error(e); }
 }
 
-/* --- LOGICA FORMULARIO --- */
-/* --- CASCADA INTELIGENTE Y CÁLCULOS --- */
-
 function populateSpeciesSelect() {
     const sel = document.getElementById('select-especie');
     const subSel = document.getElementById('select-subespecie');
-    const instName = localStorage.getItem('NombreInst') || 'la institución';
+    
+    // Obtenemos el nombre dinámicamente si ya cargó dataFull, si no fallback
+    const instName = (dataFull && dataFull.institucion) ? dataFull.institucion.NombreInst : 'la institución';
 
-    // Limpieza inicial
     sel.innerHTML = '<option value="">Seleccione...</option>';
     subSel.innerHTML = '<option value="">Primero seleccione especie...</option>';
     sel.disabled = false;
     subSel.disabled = true;
 
-    // CASO 0: No hay especies asignadas (o todas están Existe=2)
     if (!speciesData || speciesData.length === 0) {
         sel.innerHTML = `<option value="">Sin especie asignada, hablar con admin ${instName}</option>`;
-        sel.classList.add('text-danger', 'fw-bold'); // Alerta visual roja
+        sel.classList.add('text-danger', 'fw-bold');
         sel.disabled = true;
         return;
     } else {
         sel.classList.remove('text-danger', 'fw-bold');
     }
 
-    // CASO NORMAL: Llenar el Dropdown
     speciesData.forEach(s => {
         const opt = document.createElement('option');
-        // Guardamos todo el array de subespecies en el value para no volver a consultar la API
-        // Usamos encodeURIComponent por seguridad si hay caracteres raros, aunque JSON.stringify suele bastar
         opt.value = JSON.stringify(s.subs); 
         opt.text = s.name;
         sel.appendChild(opt);
     });
 
-    // EVENTO DE CAMBIO (Cascada Especie -> Subespecie)
     sel.onchange = (e) => {
         subSel.innerHTML = '<option value="">Seleccione Subespecie...</option>';
         subSel.disabled = true;
 
         if (e.target.value) {
             const subs = JSON.parse(e.target.value);
-            
             subs.forEach(sub => {
                 const opt = document.createElement('option');
-                opt.value = sub.id; // idsubespA
+                opt.value = sub.id; 
                 opt.text = sub.name;
                 subSel.appendChild(opt);
             });
-            
             subSel.disabled = false;
-
-            // AUTO-SELECT SUBESPECIE (Si es única)
             if (subs.length === 1) {
                 subSel.selectedIndex = 1;
-                // Efecto visual flash para que note que se seleccionó sola
                 subSel.style.backgroundColor = "#e8f5e9"; 
                 setTimeout(() => subSel.style.backgroundColor = "", 500);
             }
         }
     };
 
-    // AUTO-SELECT ESPECIE (Si es única)
     if (speciesData.length === 1) {
         sel.selectedIndex = 1;
-        // Disparamos el evento manualmente para que se ejecute el onchange de arriba
         sel.dispatchEvent(new Event('change'));
     }
 }
@@ -427,7 +406,6 @@ async function handleReview(e) {
     
     if (total <= 0) return Swal.fire('Error', 'Debe solicitar al menos 1 animal.', 'warning');
 
-    // VALIDACIÓN TIPO DE FORMULARIO
     const typeSel = document.getElementById('select-tipo-form');
     if (!typeSel.value) return Swal.fire('Falta Información', 'Debe seleccionar el Tipo de Solicitud.', 'warning');
     const typeText = typeSel.options[typeSel.selectedIndex].text;
@@ -510,20 +488,18 @@ async function handleReview(e) {
 
     if (result.isConfirmed) submitOrder();
 }
+
 async function submitOrder() {
     Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
     
-    // Obtenemos targetInst de la URL si existe (Selector Multi-Sede)
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetInst = urlParams.get('targetInst') || localStorage.getItem('instId');
+    // Usamos el Helper para asegurar consistencia
+    const targetInst = getContextInstId();
 
     const fd = {
         instId: targetInst,
         userId: localStorage.getItem('userId'),
         
-        // NUEVO CAMPO IMPORTANTE
         idTipoFormulario: document.getElementById('select-tipo-form').value,
-        
         idprotA: document.getElementById('selected-prot-id').value,
         is_external: document.getElementById('is-otros-ceuas').value,
         idsubespA: document.getElementById('select-subespecie').value,
@@ -548,7 +524,6 @@ async function submitOrder() {
                 confirmButtonColor: '#1a5d3b',
                 confirmButtonText: 'IR A MIS FORMULARIOS'
             });
-            // Redirección corregida
             window.location.href = '../misformularios.html';
         } else {
             Swal.fire('Error', res.message, 'error');

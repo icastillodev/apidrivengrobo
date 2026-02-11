@@ -72,8 +72,8 @@ class InstitucionModel {
             ]);
 
             // 3. Crear Menús Base (Todos en Activo=1 inicialmente)
-            $menusFull = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 203];
-            $menusInvestigador = [11, 12, 14, 203];
+            $menusFull = [1, 2, 3, 4, 5, 6, 7, 8, 9, 55, 202];
+            $menusInvestigador = [11, 12, 14, 15];
 
             $sqlMenu = "INSERT INTO menudistr (IdInstitucion, IdTipoUsrA, NombreMenu, Activo) VALUES (?, ?, ?, 1)";
             $stmtMenu = $this->db->prepare($sqlMenu);
@@ -178,7 +178,7 @@ class InstitucionModel {
         $sev = [['Severo', 'Nivel máximo'], ['Leve', 'Dolor breve'], ['Moderada', 'Dolor moderado'], ['Sin recuperación', 'Anestesia']];
         $st = $this->db->prepare("INSERT INTO tiposeveridad (NombreSeveridad, detalle, IdInstitucion) VALUES (?, ?, ?)");
         foreach ($sev as $s) $st->execute([$s[0], $s[1], $idInst]);
-        $frms = [['Animal vivo', 0, 1], ['Otros reactivos', 0, 2], ['Insumos', 1, 3]];
+        $frms = [['Animal vivo', 0, 'Animal vivo'], ['Otros reactivos', 0, 'Otros reactivos biologicos'], ['Insumos', 0, 'Insumos']];
         $sf = $this->db->prepare("INSERT INTO tipoformularios (nombreTipo, exento, IdInstitucion, categoriaformulario, descuento) VALUES (?, ?, ?, ?, 0)");
         foreach ($frms as $f) $sf->execute([$f[0], $f[1], $idInst, $f[2]]);
     }

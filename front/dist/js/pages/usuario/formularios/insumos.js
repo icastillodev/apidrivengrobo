@@ -5,10 +5,19 @@ let catalogInsumos = [];
 let selectedItems = []; 
 let dataFull = null; // Almacén para el PDF de precios e info institucional
 
+/* --- HELPER: Obtener Institución del Contexto --- */
+function getContextInstId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('targetInst') || localStorage.getItem('instId');
+}
+
 export async function initInsumosForm() {
-    const instId = localStorage.getItem('instId');
-    const instName = localStorage.getItem('NombreInst');
-    document.getElementById('lbl-institution-name').innerText = instName;
+    // 1. Usamos el ID correcto
+    const instId = getContextInstId();
+    
+    // Referencia al título (Ponemos el del storage temporalmente)
+    const lblInst = document.getElementById('lbl-institution-name');
+    if(lblInst) lblInst.innerText = localStorage.getItem('NombreInst') || '...';
 
     // Resetear formulario
     window.resetSelection = () => {
@@ -19,26 +28,32 @@ export async function initInsumosForm() {
     };
 
     try {
+        // 2. Carga de datos con el ID correcto
         const res = await API.request(`/insumos-form/init?inst=${instId}`);
+        
         if (res.status === 'success') {
             const data = res.data;
             deptosList = data.departamentos;
             catalogInsumos = data.insumos;
             dataFull = data; // Guardamos todo para el PDF
 
+            // --- CORRECCIÓN VISUAL ---
+            // Actualizamos el nombre con el que vino de la API (la institución target)
+            if (data.institucion && data.institucion.NombreInst) {
+                if(lblInst) lblInst.innerText = data.institucion.NombreInst;
+            }
+
             document.getElementById('id-tipo-form').value = data.id_tipo_default;
             
             // Configurar Modal de Correo
             const correo = (data.institucion && data.institucion.InstCorreo) ? data.institucion.InstCorreo : '';
-            const asunto = "WEB GROBO SOLICITUD DE DEPARTAMENTO"; // Exactamente como pediste
+            const asunto = "WEB GROBO SOLICITUD DE DEPARTAMENTO"; 
             
             document.getElementById('lbl-inst-correo').innerText = correo || 'No configurado';
             
             if (correo) {
-                // Generamos el mailto dinámico
                 document.getElementById('mail-to-inst').href = `mailto:${correo}?subject=${encodeURIComponent(asunto)}`;
             } else {
-                // Si no hay correo, deshabilitamos el botón visualmente
                 const btnMail = document.getElementById('mail-to-inst');
                 btnMail.classList.add('disabled');
                 btnMail.href = '#';
@@ -173,10 +188,13 @@ function setupPDFButton() {
 }
 
 function generateInsumosPDF(data) {
-    const inst = localStorage.getItem('NombreInst');
+    // CAMBIO: Usamos el nombre real de la institución target
+    const inst = (data.institucion && data.institucion.NombreInst) 
+                 ? data.institucion.NombreInst.toUpperCase() 
+                 : (localStorage.getItem('NombreInst') || 'INSTITUCIÓN');
+
     const fecha = new Date().toLocaleDateString();
     
-    // Generar filas de tabla para el PDF
     const rows = data.insumos.map(i => `
         <tr>
             <td style="padding: 6px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
@@ -206,11 +224,9 @@ async function handleSubmit(e) {
     e.preventDefault();
     const cleanItems = selectedItems.filter(i => i.idInsumo !== "");
     
-    // Captura de nuevos campos
     const fechaRetiro = document.getElementById('fecha-retiro').value;
     const aclaracion = document.getElementById('aclaracion-pedido').value;
 
-    // Validación extra
     if(cleanItems.length === 0) {
         return Swal.fire('Atención', 'Seleccione al menos un insumo válido.', 'warning');
     }
@@ -230,16 +246,16 @@ async function handleSubmit(e) {
     if (confirm.isConfirmed) {
         Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
         
+        // 3. CAMBIO IMPORTANTE: Usamos el ID correcto para el envío
+        const targetInst = getContextInstId();
+
         const payload = {
-            instId: localStorage.getItem('instId'),
+            instId: targetInst, // <--- Correcto
             userId: localStorage.getItem('userId'),
             idDepto: document.getElementById('selected-depto-id').value,
             idTipoFormulario: document.getElementById('id-tipo-form').value,
-            
-            // Nuevos datos enviados al backend
             fecRetiroA: fechaRetiro,
             aclaraA: aclaracion,
-            
             items: cleanItems
         };
 
