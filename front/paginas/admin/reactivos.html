@@ -24,6 +24,7 @@
         import { Auth } from '../../dist/js/auth.js';
         import { showLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             showLoader();
@@ -31,6 +32,9 @@
             initMenu();
             NotificationManager.init();
             initReactivosPage(); 
+            setTimeout(() => {
+            checkUrlParamsAndOpen();
+        }, 300);
         });
     </script>
 </head>

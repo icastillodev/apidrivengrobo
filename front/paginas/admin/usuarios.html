@@ -27,6 +27,7 @@
     import { Auth } from '../../dist/js/auth.js';
     import { showLoader } from '../../dist/js/components/LoaderComponent.js'; // <-- Importar
     import { NotificationManager } from '../../dist/js/NotificationManager.js';
+    import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             showLoader(); // <-- Ejecutar al inicio
@@ -38,6 +39,9 @@
         NotificationManager.init();
         // ¡IMPORTANTE! Aquí es donde se dispara la carga de usuarios
         initUsuariosPage();
+        setTimeout(() => {
+            checkUrlParamsAndOpen();
+        }, 300);
     });
 </script>
     

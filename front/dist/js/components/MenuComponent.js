@@ -13,7 +13,7 @@ const MENU_TEMPLATES = {
     5: { label: 'Insumos', svg: `<svg viewBox="0 0 20 20"><path d="M10.428 2.212a.645.645 0 0 0-.857 0a5.716 5.716 0 0 0-1.926 4.35a.5.5 0 0 0 .246.425A7.407 7.407 0 0 1 9.628 8.41a.5.5 0 0 0 .743 0a7.408 7.408 0 0 1 1.737-1.421a.5.5 0 0 0 .245-.425a5.716 5.716 0 0 0-1.925-4.351Zm-7.412 9.996a.663.663 0 0 1 .606-.72A6.364 6.364 0 0 1 10 15.326a6.364 6.364 0 0 1 6.377-3.838c.366.03.64.352.606.72A6.368 6.368 0 0 1 10.64 18h-.465a.665.665 0 0 1-.176-.024a.665.665 0 0 1-.177.024h-.465a6.368 6.368 0 0 1-6.342-5.792ZM10 10.826a6.364 6.364 0 0 0-6.378-3.838a.663.663 0 0 0-.606.72a6.35 6.35 0 0 0 .765 2.5a.5.5 0 0 0 .434.258a7.357 7.357 0 0 1 5.368 2.394a.5.5 0 0 0 .417.16a.5.5 0 0 0 .416-.16a7.357 7.357 0 0 1 5.368-2.394a.5.5 0 0 0 .434-.259a6.35 6.35 0 0 0 .765-2.499a.663.663 0 0 0-.606-.72A6.364 6.364 0 0 0 10 10.826Z"/></svg>`, path: 'admin/insumos.html' },
     6: { label: 'Reservas', svg: `<svg viewBox="0 0 26 26"><path d="M7 0c-.551 0-1 .449-1 1v3c0 .551.449 1 1 1c.551 0 1-.449 1-1V1c0-.551-.449-1-1-1zm12 0c-.551 0-1 .449-1 1v3c0 .551.449 1 1 1c.551 0 1-.449 1-1V1c0-.551-.449-1-1-1zM3 2C1.344 2 0 3.344 0 5v18c0 1.656 1.344 3 3 3h20c1.656 0 3-1.344 3-3V5c0-1.656-1.344-3-3-3h-2v2a2 2 0 0 1-4 0V2H9v2a2 2 0 0 1-4 0V2H3zM2 9h22v14c0 .551-.449 1-1 1H3c-.551 0-1-.449-1-1V9zm7 3v2.313h4.813l-3.782 7.656H13.5l3.469-8.438V12H9z"/></svg>`, path: 'construccion.html' },
     7: { label: 'Alojamientos', svg: `<svg viewBox="0 0 576 512"><path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1v16.2c0 22.1-17.9 40-40 40h-16c-1.1 0-2.2 0-3.3-.1c-1.4.1-2.8.1-4.2.1L416 512h-24c-22.1 0-40-17.9-40-40v-88c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v88c0 22.1-17.9 40-40 40h-55.9c-1.5 0-3-.1-4.5-.2c-1.2.1-2.4.2-3.6.2h-16c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9.1-2.8v-69.7h-32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7l255.4 224.5c8 7 12 15 11 24"/></svg>`, path: 'admin/alojamientos.html' },
-    8: { label: 'Estadísticas', svg: `<svg viewBox="0 0 24 24"><path d="M20 13.75a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75v6.75H14V4.25c0-.728-.002-1.2-.048-1.546c-.044-.325-.115-.427-.172-.484c-.057-.057-.159-.128-.484-.172C12.949 2.002 12.478 2 11.75 2c-.728 0-1.2.002-1.546.048c-.325.044-.427.115-.484.172c-.057.057-.128.159-.172.484c-.046.347-.048.818-.048 1.546V20.5H8V8.75A.75.75 0 0 0 7.25 8h-3a.75.75 0 0 0-.75.75V20.5H1.75a.75.75 0 0 0 0 1.5h20a.75.75 0 0 0 0-1.5H20v-6.75Z"/></svg>`, path: 'construccion.html' },
+    8: { label: 'Estadísticas', svg: `<svg viewBox="0 0 24 24"><path d="M20 13.75a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75v6.75H14V4.25c0-.728-.002-1.2-.048-1.546c-.044-.325-.115-.427-.172-.484c-.057-.057-.159-.128-.484-.172C12.949 2.002 12.478 2 11.75 2c-.728 0-1.2.002-1.546.048c-.325.044-.427.115-.484.172c-.057.057-.128.159-.172.484c-.046.347-.048.818-.048 1.546V20.5H8V8.75A.75.75 0 0 0 7.25 8h-3a.75.75 0 0 0-.75.75V20.5H1.75a.75.75 0 0 0 0 1.5h20a.75.75 0 0 0 0-1.5H20v-6.75Z"/></svg>`, path: 'admin/estadisticas.html' },
     9: { label: 'Config. Admin', svg: `<svg viewBox="0 0 24 24"><path d="M12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5m7 2c0-1.1.9-2 2-2V9.5c-1.1 0-2-.9-2-2s.9-2 2-2V4c0-1.1-.9-2-2-2h-3c0 1.1-.9 2-2 2s-2-.9-2-2H4c-1.1 0-2 .9-2 2v1.5c1.1 0 2 .9 2 2s-.9 2-2 2V15c1.1 0 2 .9 2 2s-.9 2-2 2V20c0 1.1.9 2 2 2h3c0-1.1-.9-2 2-2s2 .9 2 2h3c1.1 0 2-.9 2-2v-2.5z"/></svg>`, path: 'admin/configuracion/config.html' },
     10: { label: 'Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'usuario/formularios.html' },
     11: { label: 'Mis Formularios', svg: `<svg viewBox="0 0 24 24"><path d="M13 1.07l1 1 .03.02L18.41 7.5c.39.39.39 1.02 0 1.41L13 14.34l-1-1L17 8.5 13 4.5V2H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 4h3v1h-3V4z"/></svg>`, path: 'usuario/misformularios.html' },
@@ -611,6 +611,19 @@ style.innerHTML = `
 
     /* Transición suave para el icono de letra */
     #btn-font-switch svg { transition: transform 0.2s ease; }
+    /* === BUSCADOR TOP: SIEMPRE ARRIBA (Z-INDEX EXTREMO) === */
+#search-container-top {
+    z-index: 10600 !important; /* Supera a Modales (1055) y Overlays (1040) */
+    position: fixed !important; /* Fixed para que no se mueva con el scroll */
+    top: 70px !important; /* Ajuste para que no tape el header */
+}
+
+/* === BUSCADOR SIDE: SIEMPRE VISIBLE === */
+/* Asegura que el input del menú lateral también resalte si es necesario */
+#input-search-side {
+    position: relative;
+    z-index: 10600; 
+}
 `;
 document.head.appendChild(style);
 function renderTopMenuStructure(container, menuIds) {

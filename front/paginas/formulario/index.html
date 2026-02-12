@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro de Nueva Institución - GROBO</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module" src="../../dist/js/formularioregistroinst.js"></script>
+</head>
+<body class="bg-light">
+    <div class="container my-5" style="max-width: 900px;">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-dark text-white p-4">
+                <h2 id="display-nombre-inst" class="h4 mb-0 font-bold uppercase italic">Cargando Formulario...</h2>
+                <p id="display-encargado" class="small mb-0 opacity-75"></p>
+            </div>
+            
+<div class="card-body p-4">
+    <form id="form-full-registro">
+        <input type="hidden" id="id_form_config">
+
+        <h6 class="text-success font-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">1. Datos de la Sede (Tabla Institución)</h6>
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label class="form-label small font-bold text-muted">NOMBRE DE LA SEDE (NombreInst)</label>
+                <input type="text" name="inst_NombreInst" class="form-control form-control-sm" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small font-bold text-muted">NOMBRE COMPLETO (NombreCompletoInst)</label>
+                <input type="text" name="inst_NombreCompletoInst" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small font-bold text-muted">MONEDA</label>
+                <input type="text" name="inst_Moneda" class="form-control form-control-sm" placeholder="ARS, USD">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small font-bold text-muted">PAÍS</label>
+                <input type="text" name="inst_Pais" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small font-bold text-muted">LOCALIDAD</label>
+                <input type="text" name="inst_Localidad" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small font-bold text-muted">PRECIO JORNADA</label>
+                <input type="number" step="any" name="inst_PrecioJornadaTrabajoExp" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small font-bold text-muted">DIRECCIÓN (InstDir)</label>
+                <input type="text" name="inst_InstDir" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small font-bold text-muted">CONTACTO (InstContacto)</label>
+                <input type="text" name="inst_InstContacto" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small font-bold text-muted">EMAIL (InstCorreo)</label>
+                <input type="email" name="inst_InstCorreo" class="form-control form-control-sm">
+            </div>
+        </div>
+
+        <h6 class="text-success font-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">2. Especies y Precios Base</h6>
+        <div id="contenedor-especies" class="mb-3"></div>
+        <button type="button" class="btn btn-outline-success btn-sm font-bold mb-4" id="btn-add-especie">+ AGREGAR ESPECIE</button>
+
+        <div class="d-flex justify-content-end gap-3 border-top pt-4">
+            <button type="button" class="btn btn-secondary px-4 font-bold" id="btn-save-draft">GUARDAR BORRADOR</button>
+            <button type="button" class="btn btn-success px-5 font-bold shadow" id="btn-confirm-reg">CONFIRMAR Y ENVIAR</button>
+        </div>
+    </form>
+</div>
+        </div>
+    </div>
+</body>
+</html>

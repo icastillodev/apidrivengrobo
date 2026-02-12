@@ -1,18 +1,14 @@
 RewriteEngine On
 RewriteBase /URBE-API-DRIVEN/front/
 
-# PRIORIDAD 1: SuperAdmin login virtual
-RewriteRule ^admingrobogecko/?$ superadmin_login.html [L]
-
-# PRIORIDAD 2: Archivos físicos (CSS, JS, Imágenes)
+# 1. EXCEPCIÓN PARA ARCHIVOS FÍSICOS (Evita el error MIME y 404 de CSS/JS)
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# PRIORIDAD 3: Slugs de Sedes (urbe, gecko, etc)
-# Si no es un archivo real y no es la carpeta dist/paginas, mandamos al index
-RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|paginas|assets)
-RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
+# 2. REGLA PARA EL FORMULARIO DE REGISTRO
+RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html?inst=$1 [L,QSA]
 
-# Fallback general
-RewriteRule ^ index.html [L]
+# 3. REGLA PARA SEDES (Login)
+RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|paginas|assets|resources)
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]

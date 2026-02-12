@@ -31,12 +31,16 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             Auth.checkAccess([1, 2, 4]); // Accesos para Admin y Bioterio
             initMenu();
             NotificationManager.init();
             initInsumosPage(); 
+            setTimeout(() => {
+            checkUrlParamsAndOpen();
+        }, 300);
         });
     </script>
 </head>

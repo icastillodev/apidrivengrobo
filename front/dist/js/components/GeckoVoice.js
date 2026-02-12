@@ -1,6 +1,6 @@
 /**
  * GECKO VOICE CONTROL SYSTEM - Professional Edition 2026
- * Lógica pura. Sin logs de escucha y ruteo inteligente por Rol.
+ * Lógica pura. Sin complicaciones de UI innecesarias.
  */
 
 import { GeckoCommands } from './GeckoCommands.js';
@@ -12,25 +12,19 @@ export const GeckoVoice = {
     lastCommand: "",
     isRestarting: false,
     errorCount: 0,
-
-    // Cache de triggers aplanados (para rendimiento)
     flatTriggers: { search: [], select: [], modify: [] },
 
-    // Logo SVG
     geckoLogoSVG: `<svg viewBox="0 0 24 24" fill="#1a5d3b" style="width:70px; height:70px;"><path d="M12 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-5.5 3a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm11 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM3.5 11.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm17 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM12 11c3 1.5 4 4.5 4 8s-1.5 5-4 5-4-1.5-4-5 1-6.5 4-8z"/></svg>`,
 
     init() {
         GeckoVoice.injectStyles();
-        GeckoVoice.prepareTriggers(); // Pre-procesar idiomas
+        GeckoVoice.prepareTriggers();
 
-        // 1. FILTRO DE NAVEGADOR
         const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
         if (isFirefox) {
-            // Si intenta activar en Firefox, bloqueo y aviso.
             if (localStorage.getItem('gecko_ok') == 1) {
                 localStorage.setItem('gecko_ok', 2);
                 GeckoVoice.showUnsupportedBrowserModal();
-                
                 const btn = document.getElementById('btn-voice-switch');
                 if (btn) {
                     btn.classList.remove('voice-status-1');
@@ -56,14 +50,12 @@ export const GeckoVoice = {
             
             GeckoVoice.recognition.onerror = (event) => {
                 if (event.error === 'no-speech') return;
-                
                 if (event.error === 'network' || event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                     GeckoVoice.errorCount++;
                     if (GeckoVoice.errorCount >= 2) {
                         GeckoVoice.stop();
                         localStorage.setItem('gecko_ok', 2);
                         GeckoVoice.showErrorModal(event.error);
-                        
                         const btn = document.getElementById('btn-voice-switch');
                         if(btn) btn.classList.replace('voice-status-1', 'voice-status-error');
                     }
@@ -82,19 +74,13 @@ export const GeckoVoice = {
 
             GeckoVoice.createUI();
             GeckoVoice.recognition.start();
-            // console.log("Gecko Voice: Motor iniciado."); // LOG QUITADO
             return true;
-        } catch (e) {
-            console.error("Fallo crítico voz.", e);
-            return false;
-        }
+        } catch (e) { return false; }
     },
 
-    // Aplanar los triggers de todos los idiomas en un solo array por acción
     prepareTriggers() {
         ['search', 'select', 'modify'].forEach(action => {
             const trigs = GeckoCommands.triggers[action];
-            // Unimos arrays de es, en, pt en uno solo
             GeckoVoice.flatTriggers[action] = [...trigs.es, ...trigs.en, ...trigs.pt];
         });
     },
@@ -115,18 +101,16 @@ export const GeckoVoice = {
         }
 
         const textDetected = (final || interim).trim();
-        // LOG QUITADO: console.log("🎤 Oído:", textDetected);
 
-        // 1. DETECCIÓN WAKEWORD
+        // 1. WAKEWORD
         const detectedWake = GeckoCommands.wakewords.find(w => textDetected.includes(w));
-
         if (detectedWake && !GeckoVoice.isListeningCommand) {
             GeckoVoice.showUI();
             GeckoVoice.isListeningCommand = true;
             return;
         }
 
-        // 2. DETECCIÓN COMANDO
+        // 2. COMANDO
         if (GeckoVoice.isListeningCommand) {
             let command = textDetected;
             GeckoCommands.wakewords.forEach(w => { command = command.replace(w, '').trim(); });
@@ -134,10 +118,8 @@ export const GeckoVoice = {
             if (command.length > 1) {
                 const box = document.getElementById('gecko-voice-transcript');
                 if(box) box.innerText = command;
-                
                 const btn = document.getElementById('btn-gecko-confirm');
                 if(btn) btn.style.display = 'block';
-                
                 GeckoVoice.lastCommand = command;
             }
         }
@@ -149,15 +131,22 @@ export const GeckoVoice = {
     },
 
     executeAction(input) {
-        // A. BUSCADOR GLOBAL (Usa la lista aplanada)
+        // A. BUSCADOR GLOBAL (Simple: Si dice buscar, busca)
         if (GeckoVoice.flatTriggers.search.some(s => input.startsWith(s))) {
-            const query = input.split(' ').slice(1).join(' ');
+            // Quitamos la palabra "buscar" para dejar solo el término
+            const trigger = GeckoVoice.flatTriggers.search.find(s => input.startsWith(s)) || '';
+            const query = input.replace(trigger, '').trim();
+            
             GeckoVoice.hideUI();
+
+            // Lógica simple: Usa el top search por defecto
             const searchInput = document.getElementById('input-search-top');
             if (searchInput) {
                 document.getElementById('search-container-top').classList.remove('hidden');
                 searchInput.value = query;
-                window.executeGlobalSearch('top');
+                searchInput.focus();
+                // Si hay texto, ejecuta
+                if(query.length > 0) window.executeGlobalSearch('top');
             }
             return;
         }
@@ -173,30 +162,17 @@ export const GeckoVoice = {
             return;
         }
 
-        // C. NAVEGACIÓN POR ROL
+        // C. NAVEGACIÓN
         const userLevel = parseInt(localStorage.getItem('userLevel')) || 0;
-        let routeMap = {};
-
-        // Definición de roles permitidos para Admin
         const adminRoles = [1, 2, 4, 5, 6];
-
-        if (userLevel === 3) {
-            routeMap = GeckoCommands.routes.user; // Mapa de Investigador
-        } else if (adminRoles.includes(userLevel)) {
-            routeMap = GeckoCommands.routes.admin; // Mapa de Admin
-        } else {
-            // Fallback genérico o vacío
-            routeMap = GeckoCommands.routes.admin; 
-        }
+        const routeMap = (userLevel === 3) ? GeckoCommands.routes.user : (adminRoles.includes(userLevel) ? GeckoCommands.routes.admin : {});
 
         for (const [keyword, path] of Object.entries(routeMap)) {
             if (input.includes(keyword)) {
                 const id = input.match(/\d+/);
                 const isEdit = GeckoVoice.flatTriggers.modify.some(m => input.includes(m));
-                
                 let url = GeckoVoice.getCorrectPath(path);
                 if (id) url += `?id=${id[0]}${isEdit ? '&action=edit' : ''}`;
-                
                 window.location.href = url;
                 return;
             }
@@ -204,43 +180,86 @@ export const GeckoVoice = {
         GeckoVoice.hideUI();
     },
 
-    // --- MODALES (NO FIREFOX) ---
+// --- MODAL DE COMPATIBILIDAD (Con Cierre al tocar afuera y X) ---
     showUnsupportedBrowserModal() {
+        GeckoVoice.injectStyles();
         GeckoVoice.createUI();
+        
         const overlay = document.getElementById('gecko-voice-overlay');
-        overlay.style.display = 'flex';
+        overlay.style.display = 'flex'; 
+
+        // 1. LÓGICA: CERRAR AL TOCAR AFUERA
+        overlay.onclick = (e) => {
+            // Si el click es exactamente en el overlay (fondo oscuro) y no en el contenido
+            if (e.target === overlay) {
+                window.GeckoVoice.hideUI();
+            }
+        };
 
         const container = document.querySelector('.gecko-voice-content');
         container.innerHTML = `
-            <div class="modal-gecko-body text-center">
-                <div class="mb-3">${GeckoVoice.geckoLogoSVG}</div>
-                <h5 class="text-danger fw-bold">NAVEGADOR NO COMPATIBLE</h5>
+            <div style="position: absolute; top: 20px; right: 20px; cursor: pointer; padding: 5px; z-index: 10;" 
+                 onclick="window.GeckoVoice.hideUI()" title="Cerrar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: 0.2s;">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </div>
+
+            <div class="modal-gecko-body text-center w-100">
+                <div class="mb-3 d-flex justify-content-center">${GeckoVoice.geckoLogoSVG}</div>
+                <h4 class="fw-black text-dark mb-3">NAVEGADOR NO COMPATIBLE</h4>
                 
-                <div class="alert alert-light border text-start small mt-4 mb-4" style="background:#fff5f5; color:#555;">
-                    <p class="mb-2"><b>Firefox no soporta</b> el motor de procesamiento de voz requerido para esta función.</p>
-                    <p class="mb-0">La función se ha desactivado. Por favor inicia sesión en:</p>
+                <div class="alert alert-light border small py-2 mb-4 mx-auto" style="background-color: #f8f9fa; color: #666;">
+                    La tecnología de voz "Manos Libres" requiere un motor en la nube específico.
                 </div>
 
-                <div class="d-flex justify-content-center gap-4 mb-4 grayscale-icons">
-                    <div class="text-center">
-                        <img src="https://cdnjs.cloudflare.com/ajax/libs/simple-icons/8.8.0/googlechrome.svg" width="30" alt="Chrome">
-                        <div class="small mt-1 text-muted" style="font-size:10px">Chrome</div>
+                <div class="row g-4 justify-content-center mb-4">
+                    <div class="col-12">
+                        <h6 class="text-success fw-bold small mb-3">
+                            ✅ RECOMENDADOS (COMPATIBLES)
+                        </h6>
+                        <div class="d-flex justify-content-center gap-4 compatible-list">
+                            <div class="text-center">
+                                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlechrome.svg" width="40">
+                                <div class="icon-label text-success">Chrome</div>
+                            </div>
+                            <div class="text-center">
+                                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftedge.svg" width="40">
+                                <div class="icon-label text-success">Edge</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-center">
-                        <img src="https://cdnjs.cloudflare.com/ajax/libs/simple-icons/8.8.0/microsoftedge.svg" width="30" alt="Edge">
-                        <div class="small mt-1 text-muted" style="font-size:10px">Edge</div>
+
+                    <div class="col-8 border-top opacity-25 mx-auto"></div>
+
+                    <div class="col-12">
+                        <h6 class="text-danger fw-bold small mb-3">
+                            ❌ NO SOPORTADOS
+                        </h6>
+                        <div class="d-flex justify-content-center gap-4 incompatible-list">
+                            <div class="text-center">
+                                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/firefoxbrowser.svg" width="32">
+                                <div class="icon-label">Firefox</div>
+                            </div>
+                            <div class="text-center">
+                                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/brave.svg" width="32">
+                                <div class="icon-label">Brave</div>
+                            </div>
+                            <div class="text-center">
+                                <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/opera.svg" width="32">
+                                <div class="icon-label">Opera</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <button class="btn btn-dark btn-sm px-5 rounded-pill shadow-sm" onclick="window.GeckoVoice.hideUI()">
+                <button class="btn btn-dark btn-sm px-5 rounded-pill shadow fw-bold" onclick="window.GeckoVoice.hideUI()">
                     ENTENDIDO
                 </button>
             </div>
         `;
         
-        const style = document.createElement('style');
-        style.innerHTML = `.grayscale-icons img { filter: grayscale(0); }`;
-        document.head.appendChild(style);
         const pulse = container.querySelector('.gecko-pulse-ring');
         if(pulse) pulse.style.display = 'none';
     },
@@ -249,23 +268,13 @@ export const GeckoVoice = {
         GeckoVoice.createUI();
         const overlay = document.getElementById('gecko-voice-overlay');
         overlay.style.display = 'flex';
-        
         const uiText = GeckoCommands.ui[GeckoVoice.currentLang] || GeckoCommands.ui.es;
-        
-        // Mensaje genérico para Chrome/Edge bloqueado
-        let stepsHTML = `
-            <p class="small mb-3 text-secondary text-center">${uiText.mic_blocked}</p>
-            <div class="text-center">
-                <img src="https://cdn-icons-png.flaticon.com/512/2983/2983794.png" width="50" style="opacity:0.5;">
-            </div>
-        `;
-
         const container = document.querySelector('.gecko-voice-content');
         container.innerHTML = `
             <div class="modal-gecko-body">
                 <div class="text-center mb-3">${GeckoVoice.geckoLogoSVG}</div>
                 <h5 class="text-danger fw-bold text-center">ERROR</h5>
-                <div class="steps-container mt-4">${stepsHTML}</div>
+                <p class="small mb-3 text-secondary text-center mt-4">${uiText.mic_blocked}</p>
                 <div class="text-center mt-4">
                     <button class="btn btn-outline-secondary btn-sm px-5 rounded-pill" onclick="window.GeckoVoice.hideUI()">Cerrar</button>
                 </div>
@@ -275,7 +284,6 @@ export const GeckoVoice = {
         if(pulse) pulse.style.display = 'none';
     },
 
-    // --- UI HELPERS ---
     createUI() {
         if (document.getElementById('gecko-voice-overlay')) return;
         const uiText = GeckoCommands.ui[GeckoVoice.currentLang] || GeckoCommands.ui.es;
@@ -319,33 +327,80 @@ export const GeckoVoice = {
         GeckoVoice.lastCommand = "";
     },
 
-    copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => { alert("Copiado"); });
-    },
-
     getCorrectPath(path) {
         const idx = window.location.pathname.indexOf('/paginas/');
         return idx !== -1 ? window.location.pathname.substring(0, idx + 9) + path : path;
     },
 
-    injectStyles() {
-        if (document.getElementById('gecko-voice-styles')) return;
+injectStyles() {
+        // Cambiamos el ID para forzar la actualización de estilos
+        if (document.getElementById('gecko-voice-styles-v2')) return;
+        
         const style = document.createElement('style');
-        style.id = 'gecko-voice-styles';
+        style.id = 'gecko-voice-styles-v2';
         style.innerHTML = `
-            #gecko-voice-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 10000; display: none; align-items: center; justify-content: center; }
-            .gecko-voice-content { background: white; width: 90%; max-width: 550px; min-height: auto; border-radius: 30px; border: 2px solid #1a5d3b; padding: 2.5rem; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
-            .transcript-box { font-size: 2rem; color: #1a5d3b; margin: 1.5rem 0; min-height: 3rem; word-wrap: break-word; }
-            .gecko-pulse-ring { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #1a5d3b; position: absolute; top: 10%; animation: geckoRipple 1.5s infinite ease-out; }
-            @keyframes geckoRipple { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+            /* OVERLAY: CENTRADO ABSOLUTO OBLIGATORIO */
+            #gecko-voice-overlay { 
+                position: fixed !important; 
+                top: 0 !important; 
+                left: 0 !important; 
+                width: 100vw !important; 
+                height: 100vh !important; 
+                background: rgba(0,0,0,0.85) !important; 
+                backdrop-filter: blur(8px); 
+                z-index: 99999 !important; /* Encima de todo */
+                display: none; 
+                
+                /* FLEXBOX PARA CENTRAR */
+                align-items: center !important; 
+                justify-content: center !important; 
+                flex-direction: column !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* CAJA DEL MODAL */
+            .gecko-voice-content { 
+                background: white; 
+                width: 90%; 
+                max-width: 550px; 
+                border-radius: 25px; 
+                border: 4px solid #1a5d3b; 
+                padding: 2.5rem; 
+                position: relative; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                text-align: center; 
+                box-shadow: 0 25px 60px rgba(0,0,0,0.6); 
+                animation: geckoPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            }
+
+            @keyframes geckoPopIn {
+                from { opacity: 0; transform: scale(0.8); }
+                to { opacity: 1; transform: scale(1); }
+            }
+
+            /* ICONOS */
+            .grayscale-icons img { transition: transform 0.2s; filter: grayscale(100%); opacity: 0.7; }
+            .grayscale-icons img:hover { transform: scale(1.1); filter: grayscale(0%); opacity: 1; }
+            
+            /* Colores específicos al hacer hover o por clase */
+            .compatible-list img { filter: none !important; opacity: 1 !important; }
+            .incompatible-list img { filter: grayscale(100%) opacity(0.5); }
+            
+            .icon-label { font-size: 10px; margin-top: 5px; font-weight: 700; color: #555; text-transform: uppercase; }
+            
+            .gecko-pulse-ring { 
+                width: 100px; height: 100px; border-radius: 50%; border: 3px solid #1a5d3b; 
+                position: absolute; top: 20%; animation: geckoRipple 1.5s infinite ease-out; 
+            }
+            @keyframes geckoRipple { 
+                0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } 
+            }
         `;
         document.head.appendChild(style);
     },
 
-    stop() {
-        if (GeckoVoice.recognition) {
-            try { GeckoVoice.recognition.stop(); } catch(e){}
-        }
-        GeckoVoice.hideUI();
-    }
+    stop() { if (GeckoVoice.recognition) try{GeckoVoice.recognition.stop();}catch(e){} GeckoVoice.hideUI(); }
 };

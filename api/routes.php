@@ -25,8 +25,8 @@ $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
 
 
-// Rutas de Búsqueda Global
-$router->get('/api/search/global', 'GlobalSearchController@search');
+// Rutas de Búsqueda Global (CORREGIDO: Sin el /api/ inicial)
+$router->get('/search/global', 'GlobalSearchController@search');
 
 
 
@@ -283,6 +283,13 @@ $router->post('/admin/config/org/delete', 'AdminConfigDeptoController@deleteOrg'
 $router->post('/admin/config/depto/save', 'AdminConfigDeptoController@saveDepto');
 $router->post('/admin/config/depto/delete', 'AdminConfigDeptoController@deleteDepto');
 
+
+// ============================================================
+// SECCIÓN: Estadísticas (Agregado al final o en su sección)
+// ============================================================
+$router->get('/stats/dashboard', 'StatisticsController@getStats');
+
+
 // ============================================================
 // SECCIÓN: SUPERADMIN (Gestión Global)
 // ============================================================
@@ -301,5 +308,19 @@ $router->post('/superadmin/usuarios/reset-pass', 'UsuarioController@resetPass');
 $router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUsername');
 
 
+// ============================================================
+// SECCIÓN: SUPERADMIN - GESTIÓN DE FORMULARIOS DE REGISTRO
+// ============================================================
 
+// Listado de formularios creados y su estado
+$router->get('/superadmin/form-registros/all', 'FormRegistroController@listAll');
+
+// Crear un nuevo acceso (Link) para una institución
+$router->post('/superadmin/form-registros/create-link', 'FormRegistroController@createConfig');
+
+// Obtener TODO el detalle EAV de un formulario específico (agrupado)
+$router->get('/superadmin/form-registros/detail/:id', 'FormRegistroController@getFullDetail');
+
+// Eliminar o desactivar un link de registro
+$router->post('/superadmin/form-registros/delete', 'FormRegistroController@deleteConfig');
 

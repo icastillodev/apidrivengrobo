@@ -40,12 +40,16 @@
         import { Auth } from '../../dist/js/auth.js';
         import '../../dist/js/pages/admin/registroAlojamiento.js';
         import '../../dist/js/pages/admin/configuracionAlojamiento.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         
         document.addEventListener('DOMContentLoaded', () => {
             Auth.checkAccess([1, 2, 4]);
             initMenu();
             initAlojamientosPage(); 
         });
+        setTimeout(() => {
+            checkUrlParamsAndOpen();
+        }, 300);
     </script>
 </head>
 <body class="hold-transition sidebar-mini">
