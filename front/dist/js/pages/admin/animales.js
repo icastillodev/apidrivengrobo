@@ -172,7 +172,7 @@ function getFilteredAndSortedData() {
 }
 
 /**
- * 2. MODAL DE DETALLE (REFRACTORIZADO EN PARTES)
+ * 2. MODAL DE DETALLE (CORREGIDO)
  */
 window.openAnimalModal = async (a) => {
     const instId = localStorage.getItem('instId');
@@ -187,12 +187,18 @@ window.openAnimalModal = async (a) => {
     formDataCache = resMaster.data;
     const sex = resSex.data || { machoA: 0, hembraA: 0, indistintoA: 0, totalA: 0 };
     const lastNotify = resNotify.data;
-    const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+
+    // --- CORRECCIÓN IDENTIDAD ---
+    // Evitamos que salga "null" si falla el localStorage
+    const userFull = localStorage.getItem('userFull') || 'Usuario';
+    const userId = localStorage.getItem('userId') || '?';
+    const identity = `${userFull} (ID: ${userId})`;
 
     // ENSAMBLADO MODULAR
     let html = renderModalHeader(a);
     html += renderResearcherContact(a);
     html += `<input type="hidden" id="current-idformA" value="${a.idformA}">`;
+    // Pasamos la identidad limpia
     html += renderAdminSection(a, identity);
     html += renderNotificationSection(lastNotify, a.idformA);
     html += renderOrderModificationSection(a, sex, formDataCache);
@@ -229,7 +235,12 @@ function renderResearcherContact(a) {
     </div>`;
 }
 
+// --- CORRECCIÓN VISUALIZACIÓN "REVISADO POR" ---
 function renderAdminSection(a, identity) {
+    // Si a.QuienVio es null/vacío, mostramos el texto por defecto.
+    // Si tiene dato, mostramos el dato.
+    const visorTexto = (a.QuienVio && a.QuienVio !== 'null') ? a.QuienVio : "Sin visor asignado";
+
     return `
     <div class="bg-light p-3 rounded border shadow-sm mb-3">
         <div class="row g-3">
@@ -248,8 +259,8 @@ function renderAdminSection(a, identity) {
                 </div>
             </div>
             <div class="col-md-6">
-                <label class="form-label small fw-bold text-muted uppercase">Revisado por (Auto)</label>
-                <input type="text" id="modal-quienvisto" class="form-control form-control-sm bg-light fw-bold text-primary" value="${a.QuienVio || identity}" readonly>
+                <label class="form-label small fw-bold text-muted uppercase">Revisado por</label>
+                <input type="text" id="modal-quienvisto" class="form-control form-control-sm bg-light fw-bold text-primary" value="${visorTexto}" readonly>
             </div>
             <div class="col-12">
                 <label class="form-label small fw-bold text-muted uppercase">Aclaración Admin (Auto-guardado)</label>
@@ -330,13 +341,16 @@ function renderOrderModificationSection(a, sex, cache) {
     </form>`;
 }
 
-/* --- LOGICA DINAMICA (EVENTOS) --- */
-
+// --- ACTUALIZACIÓN DINÁMICA ---
 window.updateAnimalStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
     const statusSelect = document.getElementById('modal-status');
     const aclara = document.getElementById('modal-aclaracionadm').value;
-    const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+    
+    // Generamos la identidad fresca para enviar al backend
+    const userFull = localStorage.getItem('userFull') || 'Admin';
+    const userId = localStorage.getItem('userId') || '?';
+    const identity = `${userFull} (ID: ${userId})`;
 
     const fd = new FormData();
     fd.append('idformA', id);
@@ -347,6 +361,7 @@ window.updateAnimalStatusQuick = async () => {
     try {
         const res = await API.request(`/animals/update-status`, 'POST', fd);
         if (res.status === 'success') {
+            // Al guardar éxito, actualizamos el input visualmente con el nombre actual
             document.getElementById('modal-quienvisto').value = identity;
             document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value);
             syncAllData(); 
@@ -452,22 +467,16 @@ window.saveFullAnimalForm = async (e) => {
 };
 
 /**
- * NOTIFICACIÓN POR CORREO - GROBO
- */
-/**
- * NOTIFICACIÓN POR CORREO - GROBO
- * Corrige bloqueo de teclado y gestiona el flujo de recarga post-envío.
+ * NOTIFICACIÓN POR CORREO - GROBO (CON LOADER DE CARGA)
  */
 window.openNotifyPopup = async (idformA) => {
-    // 1. OBTENER EL MODAL DE BOOTSTRAP QUE ESTÁ ABIERTO
+    // 1. GESTIÓN DE FOCO (Para evitar conflictos con Bootstrap)
     const animalModalEl = document.getElementById('modal-animal');
     const modalInstance = bootstrap.Modal.getInstance(animalModalEl);
-
-    // 2. DESACTIVAR EL FOCO FORZADO TEMPORALMENTE
-    // Guardamos la configuración original para restaurarla después
     const originalFocus = modalInstance._config.focus;
     modalInstance._config.focus = false;
 
+    // 2. INPUT DE MENSAJE
     const { value: nota } = await window.Swal.fire({
         title: 'Enviar Notificación',
         input: 'textarea',
@@ -476,24 +485,33 @@ window.openNotifyPopup = async (idformA) => {
         showCancelButton: true,
         confirmButtonText: 'Enviar Correo',
         confirmButtonColor: '#1a5d3b',
-        // 3. ASEGURAR EL FOCO AL ABRIR EL POPUP
         didOpen: () => {
             const input = window.Swal.getInput();
             if (input) {
                 input.focus();
-                // Detenemos la propagación para que Bootstrap no escuche las teclas
                 input.addEventListener('keydown', (e) => e.stopPropagation());
             }
         },
         willClose: () => {
-            // 4. RESTAURAR EL FOCO ORIGINAL AL CERRAR
             modalInstance._config.focus = originalFocus;
         }
     });
 
+    // 3. PROCESO DE ENVÍO CON FEEDBACK VISUAL
     if (nota) {
         const instId = localStorage.getItem('instId');
         const adminId = localStorage.getItem('userId');
+
+        // --- AQUÍ ESTÁ LA MAGIA: MOSTRAR "ENVIANDO..." ---
+        window.Swal.fire({
+            title: 'Enviando...',
+            text: 'Conectando con el servidor de correo, por favor espere.',
+            allowOutsideClick: false, // Bloquea clics fuera
+            allowEscapeKey: false,    // Bloquea tecla ESC
+            didOpen: () => {
+                window.Swal.showLoading(); // Muestra el spinner girando
+            }
+        });
 
         try {
             const res = await API.request('/animals/send-notification', 'POST', { 
@@ -501,22 +519,23 @@ window.openNotifyPopup = async (idformA) => {
             });
             
             if (res.status === 'success') {
-                // GUARDAMOS EL ID EN SESSIONSTORAGE PARA REABRIR EL MODAL AL RECARGAR
                 sessionStorage.setItem('reopenAnimalId', idformA);
 
+                // El nuevo Swal reemplaza automáticamente al de "Cargando"
                 window.Swal.fire({
                     title: '¡Enviado!',
-                    text: 'Los correos han sido enviados. La página se actualizará.',
+                    text: 'Los correos han sido enviados correctamente.',
                     icon: 'success',
-                    confirmButtonColor: '#1a5d3b'
+                    timer: 2000, // Se cierra solo a los 2 seg
+                    showConfirmButton: false
                 }).then(() => {
-                    location.reload(); // Recarga la página
+                    location.reload(); 
                 });
             } else {
-                window.Swal.fire('Error', 'La API respondió con error: ' + res.message, 'error');
+                window.Swal.fire('Error', res.message || 'Fallo en el servidor', 'error');
             }
         } catch (e) { 
-            window.Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+            window.Swal.fire('Error', 'Fallo de conexión', 'error');
         }
     }
 };

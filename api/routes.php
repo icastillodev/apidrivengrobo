@@ -13,6 +13,9 @@ $router->post('/confirm-account', 'UserController@confirmAccount');
 $router->get('/check-username', 'UserController@checkUsername');
 $router->get('/maintenance', 'UserController@maintenance');
 
+// api/routes.php
+$router->post('/verify-2fa', 'AuthController@verify2FA');
+
 // Recuperación de Contraseña
 $router->post('/forgot-password', 'UserController@forgotPassword');
 $router->post('/update-password-recovery', 'UserController@updatePasswordRecovery');
@@ -95,6 +98,11 @@ $router->post('/animals/save-notification', 'AnimalController@saveNotification')
 $router->post('/animals/update-full', 'AnimalController@updateFull'); 
 $router->get('/animals/protocol-species', 'AnimalController@getSpeciesByProtocol'); 
 $router->get('/animals/get-sex-data', 'AnimalController@getSexData'); 
+
+
+// --- AGREGAR ESTA LÍNEA QUE FALTABA ---
+$router->post('/animals/send-notification', 'AnimalController@sendNotification');
+
 
 // Búsqueda y Creación de Pedidos (Investigador)
 $router->get('/animals/pdf-data', 'AnimalController@getPDFData'); // Nuevo para el Tarifario

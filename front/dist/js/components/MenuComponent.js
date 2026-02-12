@@ -2,7 +2,10 @@ import { Auth } from '../auth.js';
 import { GeckoVoice } from './GeckoVoice.js';
 import { executeGlobalSearch } from './GeckoSearch.js'; // Importamos el buscador
 
+// --- NUEVO HELPER PARA LEER SESIÓN (Session o Local) ---
+const getSession = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
 
+const BASE_URL = window.location.pathname.substring(0, window.location.pathname.indexOf('/paginas/') + 9);
 
 
 const MENU_TEMPLATES = {
@@ -49,7 +52,8 @@ const MENU_TEMPLATES = {
         isDropdown: true,
         children: [
             { label: 'Mis Protocolos', path: 'admin/mis-protocolos.html' },
-            { label: 'Prot. Confirmados', path: 'admin/protocolos-confirmados.html' }
+            { label: 'Todos los protocolos', path: 'admin/protocolos-confirmados.html' },
+            { label: 'Solicitar nuevo protocolo', path: 'admin/protocolos-confirmados.html' }
         ]
     },
     998: { 
@@ -302,17 +306,24 @@ function updateBadge(menuId, count) {
 }
 
 export async function initMenu() {
-    const roleId = parseInt(localStorage.getItem('userLevel')); 
-    const instId = localStorage.getItem('instId') || 0; 
+    // 1. OBTENCIÓN HÍBRIDA DE CREDENCIALES
+    const roleId = parseInt(getSession('userLevel')); 
+    const instId = getSession('instId') || 0; 
     
-    if (isNaN(roleId)) return;
+    console.log("🚀 InitMenu -> Rol:", roleId, "| Inst:", instId);
 
-    // 1. Cargar Configuración base
+    if (isNaN(roleId)) {
+        console.warn("Menú detenido: No hay rol de usuario definido.");
+        return;
+    }
+
+    // 2. Cargar Configuración base
     const menuLayout = await UserPreferences.init();
 
-    // 2. Exponer Globales (Importante para onlick HTML)
+    // 3. Exponer Globales (Importante para onclick HTML)
     window.GeckoVoice = GeckoVoice;
-    window.executeGlobalSearch = executeGlobalSearch;
+    // Aseguramos que executeGlobalSearch exista antes de asignarlo, o lo definimos vacío para evitar error
+    window.executeGlobalSearch = (typeof executeGlobalSearch !== 'undefined') ? executeGlobalSearch : () => console.log("Buscador no cargado");
     window.setAppLang = UserPreferences.setLanguage;
 
     try {
@@ -321,17 +332,21 @@ export async function initMenu() {
 
         if (resMenu.status === "success") {
             let ids = (resMenu.data || []).map(id => Number(id));
+            
+            // Filtros de seguridad visual
             if (![1, 2].includes(roleId)) ids = ids.filter(id => id !== 9);
+            
+            // IDs Fijos (Configuración, Salir, etc)
             [999, 998, 10].forEach(fixedId => { if(!ids.includes(fixedId)) ids.push(fixedId); });
 
-            // Limpieza DOM
+            // Limpieza DOM previa
             const elementsToRemove = ['header.gecko-header', '#gecko-sidebar-element', '#gecko-mobile-toggle', '#gecko-mobile-toggle-top'];
             elementsToRemove.forEach(selector => {
                 const el = document.querySelector(selector);
                 if (el) el.remove();
             });
 
-            // Renderizado
+            // Renderizado según Preferencia
             if (menuLayout === 'menu_lateral') {
                 renderSideMenuStructure(document.body, ids);
             } else {
@@ -341,7 +356,7 @@ export async function initMenu() {
             setupEventListeners();
             
             // --- LÓGICA DE INICIO DE VOZ ---
-            // Solo intentamos iniciar si está activo en BD
+            // Leemos gecko_ok de localStorage porque es una preferencia de dispositivo, no de sesión
             if (localStorage.getItem('gecko_ok') == 1) {
                 // Si es Firefox, forzamos apagado y mostramos modal si es la primera carga
                 if (navigator.userAgent.toLowerCase().includes('firefox')) {
@@ -625,10 +640,30 @@ style.innerHTML = `
     z-index: 10600; 
 }
 `;
+
+// FUNCIÓN HELPER PARA OBTENER EL TEXTO DEL USUARIO
+function getUserDisplayText() {
+    const user = getSession('userName') || 'Usuario';
+    const id = getSession('userId') || '?';
+    // Intentamos obtener el nombre completo, si no existe usamos el user
+    const full = getSession('userFull') || user; 
+    
+    // Formato solicitado: usuario (id) - Nombre Apellido
+    // OJO: Si userFull es igual a user (porque no tiene nombre real), evitamos redundancia
+    if (full === user) {
+        return `${user} (${id})`;
+    }
+    return `${user} (${id}) - ${full}`;
+}
+
+
 document.head.appendChild(style);
 function renderTopMenuStructure(container, menuIds) {
     document.body.classList.remove('with-sidebar');
     const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
+    
+    // OBTENEMOS EL TEXTO DEL USUARIO
+    const userText = getUserDisplayText();
 
     const header = document.createElement('header');
     header.className = "w-full gecko-header gecko-header-top bg-transparent mb-2"; 
@@ -637,7 +672,10 @@ function renderTopMenuStructure(container, menuIds) {
             <div class="d-flex justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
                 <div class="d-flex align-items-center gap-3">
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
-                    <span class="text-secondary fw-black text-uppercase border-start ps-3">${instName}</span>
+                    <div class="d-flex flex-column lh-1 border-start ps-3">
+                        <span class="text-secondary fw-black text-uppercase">${instName}</span>
+                        <span class="text-muted fw-bold mt-1" style="font-size: 10px;">${userText}</span>
+                    </div>
                 </div>
                 <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link">GECKOS.uy</a>
             </div>
@@ -667,7 +705,10 @@ function renderTopMenuStructure(container, menuIds) {
         
         <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
             <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
-                <span class="fw-bold text-success small">${instName}</span>
+                <div class="d-flex flex-column">
+                    <span class="fw-bold text-success small text-uppercase">${instName}</span>
+                    <span class="text-muted" style="font-size: 9px;">${userText}</span>
+                </div>
                 <button class="btn-close" id="gecko-close-sidebar"></button>
             </div>
             <ul class="nav flex-column p-3" id="mobile-menu-ul"></ul>
@@ -675,6 +716,7 @@ function renderTopMenuStructure(container, menuIds) {
     `;
     
     document.body.prepend(header);
+    // ... (resto de la inyección de items igual) ...
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
     
@@ -688,6 +730,9 @@ function renderTopMenuStructure(container, menuIds) {
 function renderSideMenuStructure(container, menuIds) {
     document.body.classList.add('with-sidebar');
     const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
+    
+    // OBTENEMOS EL TEXTO DEL USUARIO
+    const userText = getUserDisplayText();
 
     const sidebar = document.createElement('aside');
     sidebar.id = "gecko-sidebar-element";
@@ -696,8 +741,11 @@ function renderSideMenuStructure(container, menuIds) {
     sidebar.innerHTML = `
         <div class="d-flex flex-column mb-4 border-bottom pb-3">
             <div class="d-flex justify-content-between align-items-center w-100">
-                <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
-                <button class="btn-close d-md-none" id="gecko-close-sidebar"></button>
+                <div class="d-flex flex-column" style="overflow: hidden;">
+                    <span class="fs-5 fw-black text-success text-uppercase lh-1 text-truncate" title="${instName}">${instName}</span>
+                    <span class="text-muted mt-1 text-truncate" style="font-size: 11px; font-weight: 600;" title="${userText}">${userText}</span>
+                </div>
+                <button class="btn-close d-md-none ms-2" id="gecko-close-sidebar"></button>
             </div>
         </div>
 
@@ -723,8 +771,7 @@ function renderSideMenuStructure(container, menuIds) {
     `;
 
     document.body.prepend(sidebar);
-
-    // 4. Botón hamburguesa para abrir el menú en móviles (Flotante)
+    // ... (resto de la lógica sidebar igual) ...
     const mobileToggle = document.createElement('button');
     mobileToggle.id = "gecko-mobile-toggle";
     mobileToggle.className = "btn btn-success position-fixed top-0 start-0 m-2 d-md-none z-3 shadow";
@@ -735,13 +782,11 @@ function renderSideMenuStructure(container, menuIds) {
     };
     document.body.prepend(mobileToggle);
 
-    // 5. Inyectar los items del menú
     const ul = document.getElementById('side-menu-ul');
     menuIds.forEach(id => {
         ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side'));
     });
     
-    // 6. Inyectar botones de control
     const controlsUl = document.getElementById('side-controls-ul');
     controlsUl.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
 }

@@ -271,43 +271,57 @@ public function updateFull($data) {
         $stmt->execute([$protId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
-    /**
+
+/**
      * Guarda la notificación y prepara el objeto de datos para el email.
+     * ADAPTADO PARA ANIMALES (Especies/Subespecies)
      */
     public function saveNotificationAndGetMailDetails($data) {
         $id = $data['idformA'];
         $nota = $data['nota'];
+        $instId = $data['instId'];
         $adminId = $data['adminId'];
 
         // 1. Registro histórico en la tabla de notificaciones
-        $stmt = $this->db->prepare("INSERT INTO notificacione (idformA, NotaNotificacion, fecha, IdInstitucion) VALUES (?, ?, NOW(), ?)");
-        $stmt->execute([$id, $nota, $data['instId']]);
+        // Usamos 'Formulario Animales' como TipoNotificacion
+        $stmt = $this->db->prepare("INSERT INTO notificacioncorreo (TipoNotificacion, NotaNotificacion, fecha, ID, IdInstitucion, estado) 
+                                    VALUES ('Formulario Animales', ?, NOW(), ?, ?, ?)");
+        
+        // Primero obtenemos el estado actual para guardarlo en el historial
+        $stmtState = $this->db->prepare("SELECT estado FROM formularioe WHERE idformA = ?");
+        $stmtState->execute([$id]);
+        $currentState = $stmtState->fetchColumn() ?: 'Sin estado';
+
+        $stmt->execute([$nota, $id, $instId, $currentState]);
 
         // 2. Consulta de datos para el cuerpo del correo
+        // Joins adaptados para ANIMALES (subespecie, especiee, sexoe)
         $sql = "SELECT 
                     pe.EmailA as email_inv,
                     pe.NombreA as investigador,
                     adm.EmailA as email_admin,
-                    adm.NombreA as admin_nombre,
                     f.estado,
                     px.nprotA,
-                    px.tituloA as protocolo_titulo,
-                    se.SubEspeNombreA as especie,
-                    sx.totalA as total,
+                    -- Concatenamos Especie y Cepa
+                    CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as especie_completa,
+                    sx.totalA as total_animales,
                     i.NombreInst as institucion
                 FROM formularioe f
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
-                INNER JOIN personae adm ON adm.IdUsrA = ?
-                INNER JOIN protformr pf ON f.idformA = pf.idformA
-                INNER JOIN protocoloexpe px ON pf.idprotA = px.idprotA
-                INNER JOIN subespecie se ON f.idsubespA = se.idsubespA
-                INNER JOIN sexoe sx ON f.idformA = sx.idformA
-                INNER JOIN institucione i ON f.IdInstitucion = i.IdInstitucion
+                LEFT JOIN personae adm ON adm.IdUsrA = ?
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+                -- Relación de Especies
+                LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
+                LEFT JOIN especiee e ON se.idespA = e.idespA
+                -- Relación de Cantidades
+                LEFT JOIN sexoe sx ON f.idformA = sx.idformA
+                INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
                 WHERE f.idformA = ?";
                 
         $stmtData = $this->db->prepare($sql);
         $stmtData->execute([$adminId, $id]);
-        return $stmtData->fetch(\PDO::FETCH_ASSOC);
+        return $stmtData->fetch(PDO::FETCH_ASSOC);
     }
 
 

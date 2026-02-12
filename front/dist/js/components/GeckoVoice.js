@@ -130,54 +130,80 @@ export const GeckoVoice = {
         GeckoVoice.executeAction(GeckoVoice.lastCommand);
     },
 
-    executeAction(input) {
-        // A. BUSCADOR GLOBAL (Simple: Si dice buscar, busca)
-        if (GeckoVoice.flatTriggers.search.some(s => input.startsWith(s))) {
-            // Quitamos la palabra "buscar" para dejar solo el término
-            const trigger = GeckoVoice.flatTriggers.search.find(s => input.startsWith(s)) || '';
-            const query = input.replace(trigger, '').trim();
-            
+async executeAction(input) {
+        console.log("🦎 GeckoVoice: Consultando a NeMo...", input);
+        
+        // 1. Mostrar estado "Pensando" en la UI
+        const statusEl = document.getElementById('gecko-voice-status');
+        if(statusEl) statusEl.innerText = "Procesando...";
+
+        try {
+            // 2. Llamada a tu API intermedia (Hostinger -> VPS)
+            // Ojo: Crearemos este endpoint en PHP más abajo
+            const response = await fetch('/URBE-API-DRIVEN/api/voice/process.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    command: input,
+                    userLevel: localStorage.getItem('userLevel'),
+                    lang: GeckoVoice.currentLang
+                })
+            });
+
+            const data = await response.json();
             GeckoVoice.hideUI();
 
-            // Lógica simple: Usa el top search por defecto
+            if (data.status === 'success') {
+                GeckoVoice.handleAiAction(data.action);
+            } else {
+                console.warn("NeMo no entendió:", data.message);
+                // Fallback: Si la IA falla, usamos tu lógica antigua de búsqueda local
+                GeckoVoice.fallbackLegacySearch(input);
+            }
+
+        } catch (e) {
+            console.error("Error conectando con IA:", e);
+            GeckoVoice.hideUI();
+            alert("Error de conexión con el servidor de voz.");
+        }
+    },
+
+    // Nueva función para ejecutar lo que diga la IA
+    handleAiAction(aiJson) {
+        console.log("🤖 Acción IA:", aiJson);
+
+        // CASO A: NAVEGACIÓN (Ir a una URL con parámetros)
+        if (aiJson.action === 'navigate') {
+            let finalUrl = aiJson.target;
+            
+            // Si hay parámetros (id, historia, action), los agregamos
+            if (aiJson.params) {
+                const query = new URLSearchParams(aiJson.params).toString();
+                finalUrl += `?${query}`;
+            }
+            window.location.href = finalUrl;
+        }
+
+        // CASO B: BÚSQUEDA GLOBAL (Disparar tu buscador existente)
+        else if (aiJson.action === 'search') {
             const searchInput = document.getElementById('input-search-top');
             if (searchInput) {
                 document.getElementById('search-container-top').classList.remove('hidden');
-                searchInput.value = query;
-                searchInput.focus();
-                // Si hay texto, ejecuta
-                if(query.length > 0) window.executeGlobalSearch('top');
-            }
-            return;
-        }
-
-        // B. SELECCIÓN NUMÉRICA
-        if (GeckoVoice.flatTriggers.select.some(s => input.startsWith(s))) {
-            const num = input.match(/\d+/);
-            if (num) {
-                const items = document.querySelectorAll('.search-result-item');
-                if (items[num[0]-1]) items[num[0]-1].click();
-            }
-            GeckoVoice.hideUI();
-            return;
-        }
-
-        // C. NAVEGACIÓN
-        const userLevel = parseInt(localStorage.getItem('userLevel')) || 0;
-        const adminRoles = [1, 2, 4, 5, 6];
-        const routeMap = (userLevel === 3) ? GeckoCommands.routes.user : (adminRoles.includes(userLevel) ? GeckoCommands.routes.admin : {});
-
-        for (const [keyword, path] of Object.entries(routeMap)) {
-            if (input.includes(keyword)) {
-                const id = input.match(/\d+/);
-                const isEdit = GeckoVoice.flatTriggers.modify.some(m => input.includes(m));
-                let url = GeckoVoice.getCorrectPath(path);
-                if (id) url += `?id=${id[0]}${isEdit ? '&action=edit' : ''}`;
-                window.location.href = url;
-                return;
+                searchInput.value = aiJson.query; // El término limpio que extrajo NeMo
+                window.executeGlobalSearch('top'); // Tu función existente
             }
         }
-        GeckoVoice.hideUI();
+
+        // CASO C: ACCIÓN DIRECTA (Ej: Imprimir QR)
+        else if (aiJson.action === 'print_qr') {
+            // Si ya estamos en la página correcta, ejecutamos
+            if (typeof showQrModal === 'function') {
+                showQrModal(aiJson.id);
+            } else {
+                // Si no, vamos a la página con el parámetro action=qr
+                window.location.href = `/paginas/usuario/misalojamientos.html?historia=${aiJson.id}&action=qr`;
+            }
+        }
     },
 
 // --- MODAL DE COMPATIBILIDAD (Con Cierre al tocar afuera y X) ---

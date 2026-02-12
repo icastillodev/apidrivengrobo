@@ -14,7 +14,7 @@ class AuthController {
 
     /**
      * LOGIN UNIFICADO (Sedes y SuperAdmin)
-     * Gecko Devs 2026 - Maneja el bypass de institución mediante 'instSlug' => 'master'
+     * Soporta 2FA para roles 1 y 2.
      */
     public function login() {
         if (ob_get_length()) ob_clean();
@@ -27,66 +27,95 @@ class AuthController {
             exit;
         }
 
-        // --- 1. CASO ESPECIAL: LOGIN SUPERADMIN (MAESTRO) ---
-        if ($data['instSlug'] === 'master') {
+        // --- 1. LOGIN SUPERADMIN (Panel Maestro) ---
+        if ($data['instSlug'] === 'master' || $data['instSlug'] === 'superadmin') {
             $res = $this->service->attemptSuperAdminLogin($data['user'], $data['pass']);
-            
-            header('Content-Type: application/json');
-            if ($res['status']) {
-                $user = $res['user'];
-                echo json_encode([
-                    'status'   => 'success',
-                    'token'    => bin2hex(random_bytes(16)), 
-                    'userId'   => $user['IdUsrA'] ?? 999, // ID del SuperAdmin
-                    'userName' => $user['UsrA'] ?? $user['Nombre'], 
-                    'userFull' => $user['Nombre'] ?? $user['UsrA'],
-                    'role'     => 1, // Forzamos Rol 1 (SuperAdmin)
-                    'instId'   => 0  // Institución 0 (Global)
-                ]);
-            } else {
-                echo json_encode(['status' => 'error', 'message' => $res['message']]);
-            }
+        } 
+        // --- 2. LOGIN NORMAL (Por Sede) ---
+        else {
+            $res = $this->service->authenticate($data['user'], $data['pass'], $data['instSlug']);
+        }
+        
+        header('Content-Type: application/json');
+
+        // A. ERROR
+        if (!$res['status']) {
+            echo json_encode(['status' => 'error', 'message' => $res['message']]);
             exit;
         }
 
-        // --- 2. LOGIN NORMAL (POR SEDE) ---
-        $res = $this->service->authenticate($data['user'], $data['pass'], $data['instSlug']);
-        
-        header('Content-Type: application/json');
-        if ($res['status']) {
-            $user = $res['user'];
+        // B. REQUIERE 2FA (Roles 1 y 2)
+        if ($res['status'] === '2fa_required') {
             echo json_encode([
-                'status'   => 'success',
-                'token'    => bin2hex(random_bytes(16)),
-                'userId'   => $user['IdUsrA'],
-                'userName' => $user['UsrA'],
-                'userFull' => $user['Nombre'] ?? $user['UsrA'],
-                'role'     => $user['role'],
-                'instId'   => $user['IdInstitucion']
+                'status' => '2fa_required',
+                'userId' => $res['userId'],
+                'message' => 'Código de seguridad enviado al correo'
             ]);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => $res['message']]);
+            exit;
         }
+
+        // C. ÉXITO DIRECTO (Roles 3+)
+        $user = $res['user'];
+        echo json_encode([
+            'status'   => 'success',
+            'token'    => bin2hex(random_bytes(16)),
+            'userId'   => $user['IdUsrA'],
+            'userName' => $user['UsrA'],
+            'userFull' => $user['Nombre'] ?? $user['UsrA'],
+            'role'     => $user['role'],
+            'instId'   => $user['IdInstitucion']
+        ]);
         exit;
     }
 
     /**
-     * Mantenemos este método por compatibilidad si tienes rutas directas,
-     * pero ahora el login() principal puede manejar ambos.
+     * VERIFICACIÓN DE CÓDIGO 2FA
+     * Nuevo Endpoint
      */
+    public function verify2FA() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $data = json_decode(file_get_contents("php://input"), true);
+        
+        if (!isset($data['userId'], $data['code'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Faltan datos']);
+            exit;
+        }
+
+        // Validamos el código
+        $user = $this->service->verify2FACode($data['userId'], $data['code']);
+
+        if ($user) {
+            // Si hay un contexto de institución forzado (ej: SuperAdmin entrando a una sede)
+            $finalInstId = $user['IdInstitucion'];
+            if (isset($data['instId']) && $data['instId'] != 'null' && $user['role'] == 1) {
+                $finalInstId = $data['instId'];
+            }
+
+            echo json_encode([
+                'status'   => 'success',
+                'token'    => bin2hex(random_bytes(16)),
+                'userId'   => $user['IdUsrA'],
+                'userName' => $user['UsrA'], // Asegurado en el Service
+                'userFull' => $user['NombreA'] ?? $user['UsrA'],
+                'role'     => $user['role'],
+                'instId'   => $finalInstId
+            ]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Código inválido o expirado']);
+        }
+        exit;
+    }
+
     public function loginSuperAdmin() {
-        // Redirigimos internamente al login normal con el flag master
         $this->login();
     }
 
-    /**
-     * VALIDA SI LA INSTITUCIÓN EXISTE PARA CARGAR EL LOGIN PERSONALIZADO
-     */
     public function validateInstitution($slug) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        // El SuperAdmin es una ruta virtual, no se valida contra DB aquí
         if ($slug === 'superadmin' || $slug === 'admingrobogecko') {
             echo json_encode(["status" => "success", "data" => ["id" => 0, "nombre" => "MAESTRO"]]);
             exit;

@@ -1,0 +1,1 @@
+{"command":"Quiero ver el historial de la caja 45","lang":"es"}

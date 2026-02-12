@@ -233,12 +233,25 @@ window.openProtocolModal = async (p = null) => {
                         <label class="form-label small fw-bold text-muted uppercase">Fecha Vencimiento *</label>
                         <input type="date" name="FechaFinProtA" class="form-control" value="${p?.FechaFinProtA || ''}">
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted uppercase">Fecha Vencimiento *</label>
+                        <input type="date" name="FechaFinProtA" class="form-control" value="${p?.FechaFinProtA || ''}">
+                    </div>
                     <div class="col-12 mt-4">
                         <label class="form-label small fw-bold text-muted uppercase">Especies Asociadas *</label>
                         <div id="species-container">
-                            ${currentSpeciesIds.length > 0 ? currentSpeciesIds.map(id => window.renderSpeciesRow(id)).join('') : window.renderSpeciesRow()}
+                            ${currentSpeciesIds.length > 0 
+                                // CORRECCIÓN AQUÍ: item.idespA
+                                ? currentSpeciesIds.map(item => window.renderSpeciesRow(item.idespA)).join('') 
+                                : window.renderSpeciesRow()}
                         </div>
+                        <button type="button" class="btn btn-outline-success btn-sm mt-2" onclick="window.addSpeciesRow()">
+                            <i class="bi bi-plus-lg"></i> Agregar Especie
+                        </button>
                     </div>
+                </div>
+            </form>
+        </div>
                 </div>
             </form>
         </div>

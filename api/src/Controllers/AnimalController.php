@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Animal\AnimalModel;
+use App\Models\Services\MailService;
 
 class AnimalController {
     private $model;
@@ -108,54 +109,72 @@ class AnimalController {
     exit;
     }
 
-    public function sendNotification() {
-        // Recibir datos del frontend
+public function sendNotification() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
         $data = json_decode(file_get_contents('php://input'), true);
         
-        // Obtener detalles del pedido desde el Modelo
-        $info = $this->model->saveNotificationAndGetMailDetails($data);
-        
-        if (!$info) {
-            echo json_encode(['status' => 'error', 'message' => 'No se encontraron datos del pedido']);
-            return;
+        $idformA = $data['idformA'] ?? $data['id'] ?? null;
+        $nota = $data['nota'] ?? null;
+
+        if (!$idformA || $nota === null) {
+            echo json_encode(['status' => 'error', 'message' => 'Información insuficiente: ID no reconocido']);
+            exit;
         }
 
-        // Usar la plantilla profesional de GROBO
-        $template = "
-        <div style='font-family: Arial; max-width: 600px; border: 1px solid #eee; border-radius: 10px; overflow: hidden;'>
-            <div style='background: #1a5d3b; color: white; padding: 20px; text-align: center;'>
-                <h1 style='margin: 0;'>GROBO - {$info['institucion']}</h1>
-            </div>
-            <div style='padding: 20px;'>
-                <h3>Actualización de Pedido #{$data['idformA']}</h3>
-                <p>Estimado/a <b>{$info['investigador']}</b>:</p>
-                <p>Se ha registrado una nueva actividad en su solicitud de <b>Animal Vivo</b>:</p>
-                <div style='background: #f4f4f4; padding: 15px; border-left: 5px solid #1a5d3b; margin: 15px 0;'>
-                    <b>Estado:</b> {$info['estado']}<br>
-                    <b>Observación Admin:</b> {$data['nota']}
+        try {
+            // Aseguramos que el array que va al modelo tenga 'idformA'
+            $data['idformA'] = $idformA;
+            
+            // Llamamos al modelo actualizado
+            $info = $this->model->saveNotificationAndGetMailDetails($data);
+            
+            if (!$info) {
+                echo json_encode(['status' => 'error', 'message' => 'No se encontró el pedido #' . $idformA]);
+                exit;
+            }
+
+            $mailService = new MailService();
+            $instName = strtoupper($info['institucion'] ?? 'URBE');
+            $subject = "Solicitud Animales #{$idformA} - " . strtoupper($info['estado']) . " ({$instName})";
+            
+            // Construimos el bloque HTML interno (Igual que en Reactivos pero con datos de animales)
+            $message = "
+                Hola <b>{$info['investigador']}</b>,<br><br>
+                Tu solicitud de <b>Animales Vivos</b> ha sido actualizada.<br><br>
+                <div style='background: #f8f9fa; padding: 20px; border-top: 4px solid #1a5d3b; border-radius: 4px; margin: 15px 0;'>
+                    <p style='margin: 0 0 10px 0; font-size: 16px;'><b>ID PEDIDO:</b> <span style='color: #1a5d3b;'>#{$idformA}</span></p>
+                    <p style='margin: 0 0 10px 0; font-size: 16px;'><b>ESTADO ACTUAL:</b> {$info['estado']}</p>
+                    <hr style='border: 0; border-top: 1px solid #ddd; margin: 15px 0;'>
+                    <p style='margin: 0;'><b>Comentario Administrativo:</b><br><i>{$nota}</i></p>
                 </div>
                 <p style='font-size: 12px; color: #666;'>
-                    <b>Detalles:</b> Protocolo {$info['nprotA']} | {$info['especie']} ({$info['total']} animales)
+                    <b>Protocolo:</b> " . ($info['nprotA'] ?? 'Sin protocolo') . " <br>
+                    <b>Especie:</b> {$info['especie_completa']} <br>
+                    <b>Cantidad Total:</b> {$info['total_animales']} animales
                 </p>
-            </div>
-            <div style='background: #f1f1f1; padding: 10px; text-align: center; font-size: 11px; color: #999;'>
-                Este es un correo automático generado por el sistema GROBO.
-            </div>
-        </div>";
+            ";
 
-        $mail = new \App\Services\MailService();
-        
-        // Enviar al Investigador
-        $envioInv = $mail->send($info['email_inv'], "Actualización Pedido #{$data['idformA']} - GROBO", $template);
-        
-        // Enviar Copia al Admin logueado
-        $envioAdm = $mail->send($info['email_admin'], "[COPIA ADMIN] Pedido #{$data['idformA']}", $template);
+            // Envolvemos en el template oficial de GROBO
+            // El link lleva al login para que revisen el detalle
+            $linkSistema = "http://localhost/URBE-API-DRIVEN/front/paginas/login.html"; // Ajusta esto a tu dominio real en producción
+            $body = $mailService->getTemplate("Actualización de Pedido", $message, $linkSistema, "VER EN SISTEMA");
+            
+            // Envío al Investigador
+            $success = $mailService->executeSend($info['email_inv'], $subject, $body);
 
-        if ($envioInv && $envioAdm) {
-            echo json_encode(['status' => 'success']);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'Error al procesar el envío de correos']);
+            // Opcional: Enviar copia al admin si tiene correo configurado
+            if (!empty($info['email_admin'])) {
+                $mailService->executeSend($info['email_admin'], "[COPIA] $subject", $body);
+            }
+
+            echo json_encode(['status' => $success ? 'success' : 'error']);
+
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
         }
+        exit;
     }
 
 

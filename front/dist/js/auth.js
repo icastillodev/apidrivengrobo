@@ -155,58 +155,143 @@ export const Auth = {
  * Procesa el ingreso al sistema (Gecko Devs 2026)
  * Maneja accesos por sede y acceso maestro para SuperAdmin
  */
-// --- REDIRECCIÓN Y LOGIN ---
 async handleLogin(e) {
-    e.preventDefault();
-    const box = document.getElementById('msg-alert');
-    if (box) box.classList.add('hidden');
+        e.preventDefault();
+        const box = document.getElementById('msg-alert');
+        if (box) box.classList.add('hidden');
 
-    const payload = {
-        user: document.getElementById('username').value,
-        pass: document.getElementById('password').value,
-        instSlug: this.slug // Aquí va el slug de la sede (ej: 'urbe')
-    };
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const remember = document.getElementById('remember-me')?.checked || false;
 
-    try {
-        const res = await API.request('/login', 'POST', payload);
-        
-        if (res?.status === 'success') {
-            const role = parseInt(res.role);
+        const payload = {
+            user: username,
+            pass: password,
+            instSlug: this.slug
+        };
 
-            // 1. PERSISTENCIA DE SESIÓN
-            localStorage.setItem('token', res.token || 'valid');
-            localStorage.setItem('userLevel', role); // Sigue siendo 1 (SuperAdmin)
-            localStorage.setItem('userName', res.userName);
-            localStorage.setItem('userId', res.userId);
-            localStorage.setItem('instId', res.instId); // La API devuelve el ID de la sede actual
-            localStorage.setItem('NombreInst', this.slug);
+        // 1. FEEDBACK: PROCESANDO
+        window.Swal.fire({
+            title: 'Iniciando Sesión',
+            text: 'Verificando credenciales...',
+            allowOutsideClick: false,
+            didOpen: () => { window.Swal.showLoading(); }
+        });
 
-            // 2. REDIRECCIÓN DINÁMICA
-            if (role === 1) {
-                // COMO ENTRA POR UNA SEDE: Lo mandamos al dashboard de ADMIN local
-                // Aunque sea Nivel 1, el dashboard de admin le mostrará los datos de esa sede
-                console.log("SuperAdmin entrando como Admin de Sede...");
-                window.location.href = '/URBE-API-DRIVEN/front/paginas/admin/dashboard.html';
+        try {
+            const res = await API.request('/login', 'POST', payload);
+            
+            if (res?.status === 'success') {
+                window.Swal.close();
+                this.completeLoginProcess(res, remember);
+
+            } else if (res?.status === '2fa_required') {
+                // 2. FEEDBACK: CÓDIGO ENVIADO (Mensaje Claro)
+                window.Swal.fire({
+                    title: 'Verificación de Seguridad',
+                    html: `
+                        <p class="mb-2">Se ha enviado un código de acceso a los correos registrados como <b>ADMINISTRADOR</b>.</p>
+                        <p class="text-sm text-gray-500 font-bold">⚠️ Revisa tu bandeja de entrada y la carpeta de SPAM.</p>
+                        <p class="text-xs text-gray-400 mt-2">Tip: Marca "Recordar mi sesión" para evitar este paso en el futuro.</p>
+                    `,
+                    icon: 'warning',
+                    confirmButtonText: 'ENTENDIDO',
+                    confirmButtonColor: '#1a5d3b'
+                }).then(() => {
+                    // Solo después de dar OK mostramos el input del código
+                    document.getElementById('temp-user-id').value = res.userId;
+                    this.tempRemember = remember; 
+                    
+                    const modal = document.getElementById('modal-2fa');
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    document.getElementById('code-2fa').focus();
+                    
+                    document.getElementById('form-2fa').onsubmit = (ev) => this.handle2FA(ev);
+                });
+
             } else {
-                // Redirección normal para otros roles
-                const folder = (role === 3) ? 'usuario' : 'admin';
-                window.location.href = `/URBE-API-DRIVEN/front/paginas/${folder}/dashboard.html`;
+                window.Swal.close();
+                if (box) { 
+                    box.innerText = (res.message || 'Error desconocido').toUpperCase(); 
+                    box.classList.remove('hidden'); 
+                }
             }
-        } else {
-            if (box) { box.innerText = res.message.toUpperCase(); box.classList.remove('hidden'); }
+        } catch (err) { 
+            window.Swal.close();
+            console.error("Error en login:", err); 
         }
-    } catch (err) { console.error("Error en login de sede:", err); }
-},
-    logout() {
-        // 1. Recuperamos el slug antes de borrar todo para saber a dónde redirigir
-        const slug = localStorage.getItem('NombreInst') || 'urbe';
+    },
 
-        // 2. Limpieza total de seguridad de NETWISE
-        localStorage.removeItem('token');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('userLevel');
-        localStorage.removeItem('userName');
-        localStorage.setItem('isLoggedIn', 'false');
+    async handle2FA(e) {
+        e.preventDefault();
+        const userId = document.getElementById('temp-user-id').value;
+        const code = document.getElementById('code-2fa').value;
+        const instId = localStorage.getItem('instId'); // Contexto actual
+
+        try {
+            const res = await API.request('/verify-2fa', 'POST', { userId, code, instId });
+            
+            if (res?.status === 'success') {
+                this.completeLoginProcess(res, this.tempRemember);
+            } else {
+                alert('CÓDIGO INCORRECTO O EXPIRADO');
+                document.getElementById('code-2fa').value = '';
+            }
+        } catch (err) { console.error(err); }
+    },// 3. PROCESO FINAL DE LOGIN (CORRECCIÓN CRÍTICA DE DATOS)
+// 3. PROCESO FINAL DE LOGIN
+    completeLoginProcess(res, remember) {
+        const role = parseInt(res.role);
+        
+        // Determinar almacenamiento (Recordarme vs Sesión volátil)
+        // El Superadmin siempre usa sessionStorage por seguridad, salvo que quieras cambiarlo
+        const storage = (remember && role !== 1) ? localStorage : sessionStorage;
+
+        // Limpieza cruzada para evitar conflictos
+        if (storage === localStorage) sessionStorage.clear();
+        else localStorage.removeItem('token'); 
+
+        // GUARDADO DE DATOS
+        storage.setItem('token', res.token);
+        storage.setItem('userLevel', role);
+        storage.setItem('userName', res.userName);
+        storage.setItem('userFull', res.userFull || res.userName);
+        storage.setItem('userId', res.userId);
+        
+        // VITAL: Guardamos el ID de la institución donde estamos parados
+        storage.setItem('instId', res.instId); 
+        storage.setItem('NombreInst', this.slug);
+
+        console.log("✅ Login Exitoso. Rol:", role, "Inst:", res.instId, "Slug:", this.slug);
+
+        // --- LÓGICA DE REDIRECCIÓN INTELIGENTE ---
+        
+        if (role === 1) {
+            // CASO A: Superadmin en su panel maestro
+            if (this.slug === 'superadmin' || this.slug === 'master') {
+                console.log("👑 SuperAdmin -> Panel Global");
+                window.location.href = '/URBE-API-DRIVEN/front/paginas/superadmin/dashboard.html';
+            } 
+            // CASO B: Superadmin entrando a una Sede (Actúa como Admin Local)
+            else {
+                console.log("🕵️ SuperAdmin -> Panel Sede:", this.slug);
+                window.location.href = '/URBE-API-DRIVEN/front/paginas/admin/dashboard.html';
+            }
+        } 
+        // CASO C: Usuarios normales (Admin Sede, Investigador, etc)
+        else {
+            const folder = (role === 3) ? 'usuario' : 'admin';
+            window.location.href = `/URBE-API-DRIVEN/front/paginas/${folder}/dashboard.html`;
+        }
+    },
+    logout() {
+        // 1. Recuperamos el slug de donde esté guardado (Session o Local)
+        const slug = sessionStorage.getItem('NombreInst') || localStorage.getItem('NombreInst') || 'urbe';
+
+        // 2. Limpieza TOTAL de seguridad (Ambos almacenamientos)
+        localStorage.clear();
+        sessionStorage.clear();
 
         // 3. Redirección absoluta al login de la institución
         window.location.href = `/URBE-API-DRIVEN/front/${slug}/`;
@@ -228,40 +313,43 @@ async handleLogin(e) {
  * @param {Array} allowed - Array de niveles permitidos (ej: [1, 2])
  */
 checkAccess(allowed) {
-    const token = localStorage.getItem('token');
-    const userLevel = parseInt(localStorage.getItem('userLevel'));
-    const inst = localStorage.getItem('NombreInst');
-    
-    // 1. Si no hay token o nivel, es un intento de acceso anónimo
-    if (!token || isNaN(userLevel)) {
-        console.warn("Acceso denegado: No hay sesión activa.");
-        this.redirectToLogin(inst);
-        return false;
-    }
+        // Helper interno: Busca en Session primero, si no está, busca en Local
+        const getValue = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
 
-    // 2. PASE VIP PARA SUPERADMIN (Nivel 1)
-    // El SuperAdmin entra a cualquier lado, sea el panel maestro o una sede
-    if (userLevel === 1) {
-        return true; 
-    }
+        const token = getValue('token');
+        const userLevel = parseInt(getValue('userLevel'));
+        const inst = getValue('NombreInst');
+        
+        // 1. Si no hay token o nivel, es un intento de acceso anónimo
+        if (!token || isNaN(userLevel)) {
+            console.warn("Acceso denegado: No hay sesión activa.");
+            this.redirectToLogin(inst);
+            return false;
+        }
 
-    // 3. VALIDACIÓN DE ROLES PARA OTROS USUARIOS
-    if (!allowed.includes(userLevel)) {
-        console.error("Acceso denegado: Nivel de usuario insuficiente.");
-        this.redirectToLogin(inst);
-        return false;
-    }
+        // 2. PASE VIP PARA SUPERADMIN (Nivel 1)
+        // El SuperAdmin entra a cualquier lado, sea el panel maestro o una sede
+        if (userLevel === 1) {
+            return true; 
+        }
 
-    // 4. VALIDACIÓN DE SEDE (Para evitar saltos entre instituciones)
-    // Si no es superadmin, DEBE tener una institución cargada en el storage
-    if (!inst || inst === 'superadmin' || inst === 'SISTEMA GLOBAL') {
-        console.error("Acceso denegado: Contexto de institución inválido.");
-        this.redirectToLogin('');
-        return false;
-    }
+        // 3. VALIDACIÓN DE ROLES PARA OTROS USUARIOS
+        if (!allowed.includes(userLevel)) {
+            console.error("Acceso denegado: Nivel de usuario insuficiente.");
+            this.redirectToLogin(inst);
+            return false;
+        }
 
-    return true; // Acceso concedido
-},
+        // 4. VALIDACIÓN DE SEDE (Para evitar saltos entre instituciones)
+        // Si no es superadmin, DEBE tener una institución cargada en el storage
+        if (!inst || inst === 'superadmin' || inst === 'SISTEMA GLOBAL') {
+            console.error("Acceso denegado: Contexto de institución inválido.");
+            this.redirectToLogin('');
+            return false;
+        }
+
+        return true; // Acceso concedido
+    },
 
 /**
  * Función auxiliar para redirección limpia

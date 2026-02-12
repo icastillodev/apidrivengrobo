@@ -95,12 +95,19 @@ function getFilteredAndSortedData() {
 
     let data = allUsers.filter(u => {
         if (!term) return true;
+        
+        // Búsqueda especial para CEUAS
         if (filterType === 'OtrosCEUAS') {
-            if (term === 'otros ceuas') return u.OtrosCeuaCount > 0;
+            if (term.includes('otro')) return u.OtrosCeuaCount > 0;
             if (term === 'no') return u.OtrosCeuaCount == 0;
             return true;
         }
-        const val = filterType === 'all' ? JSON.stringify(u).toLowerCase() : String(u[filterType] || '').toLowerCase();
+
+        // Búsqueda general o por columna
+        const val = filterType === 'all' 
+            ? `${u.Usuario} ${u.ApellidoA} ${u.NombreA} ${u.Correo}`.toLowerCase() 
+            : String(u[filterType] || '').toLowerCase();
+            
         return val.includes(term);
     });
 
@@ -130,6 +137,9 @@ function renderTable() {
 
     if (pageData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron usuarios</td></tr>`;
+        // IMPORTANTE: Incluso si no hay datos, debemos limpiar la paginación
+        const pagContainer = document.getElementById('pagination');
+        if(pagContainer) pagContainer.innerHTML = '';
         return;
     }
 
@@ -150,10 +160,17 @@ function renderTable() {
         `;
         tbody.appendChild(tr);
     });
-    updateHeaderIcons();
-    renderPagination(data.length);
-}
 
+    updateHeaderIcons();
+    
+    // ***************************************************
+    // FIX: PASAR ARGUMENTOS FALTANTES
+    // ***************************************************
+    renderPagination(data.length, 'pagination', renderTable);
+    
+    // Ocultamos el loader si existe (opcional pero recomendado)
+    if (typeof hideLoader === 'function') hideLoader();
+}
 function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
@@ -217,7 +234,7 @@ function renderPagination(totalRows, containerId, targetRenderTable) {
 // --- GESTIÓN DEL MODAL ---
 
 window.openUserModal = async (u) => {
-const instId = localStorage.getItem('instId');
+    const instId = localStorage.getItem('instId');
     const instName = localStorage.getItem('NombreInst') || 'URBE - Gestión';
     const modalElement = document.getElementById('modal-user');
     const content = document.getElementById('modal-content');
@@ -228,14 +245,16 @@ const instId = localStorage.getItem('instId');
             <div class="spinner-border text-success" role="status"></div>
             <p class="mt-2 text-muted">Obteniendo historial completo...</p>
         </div>`;
-    const myModal = new bootstrap.Modal(modalElement);
+    
+    // Usamos getOrCreateInstance para evitar duplicidad de modales
+    const myModal = bootstrap.Modal.getOrCreateInstance(modalElement);
     myModal.show();
 
-    // 2. Carga paralela de datos (Añadimos instId a las rutas)
+    // 2. Carga paralela de datos (RUTA DE DEPARTAMENTOS CORREGIDA)
     const [resProt, resForms, resDeptos] = await Promise.all([
         API.request(`/users/protocols?id=${u.IdUsrA}&inst=${instId}`),
         API.request(`/users/forms?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/institutions/departments?inst=${instId}`)
+        API.request(`/deptos/list?inst=${instId}`) // <--- CAMBIO AQUÍ
     ]);
 
     const protocolos = resProt.status === 'success' ? resProt.data : [];
@@ -278,13 +297,10 @@ const instId = localStorage.getItem('instId');
                         <select name="iddeptoA" class="form-select form-select-sm fw-bold">
                             <option value="">-- Sin Departamento Asignado --</option>
                             ${departamentos.map(d => {
-                                // Comparamos con == (doble igual) por si uno es string y el otro número
                                 const isSelected = (u.iddeptoA == d.iddeptoA) ? 'selected' : '';
-                                return `
-                                    <option value="${d.iddeptoA}" ${isSelected}>
-                                        ${d.NombreDeptoA} ${d.DetalledeptoA ? `(${d.DetalledeptoA})` : ''}
-                                    </option>
-                                `;
+                                return `<option value="${d.iddeptoA}" ${isSelected}>
+                                            ${d.NombreDeptoA} ${d.DetalledeptoA ? `(${d.DetalledeptoA})` : ''}
+                                        </option>`;
                             }).join('')}
                         </select>
                     </div>
@@ -297,7 +313,7 @@ const instId = localStorage.getItem('instId');
 
             <hr class="my-5">
 
-<div class="mt-5">
+            <div class="mt-5">
                 <h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2">
                     <i class="bi bi-file-earmark-medical me-2"></i>Protocolos a su cargo
                 </h6>
@@ -352,20 +368,19 @@ const instId = localStorage.getItem('instId');
                 </div>
             </div>
 
-<div class="mt-5 pt-3 border-top d-flex flex-wrap gap-2 justify-content-between">
-            <div class="d-flex gap-2">
-                <button class="btn btn-danger btn-sm fw-bold px-3 uppercase" onclick="downloadPDF(${u.IdUsrA}, 'total')">
-                    <i class="bi bi-file-pdf"></i> PDF Total
-                </button>
-                <button class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="downloadPDF(${u.IdUsrA}, 'simple')">
-                    <i class="bi bi-person-badge"></i> Solo Ficha
-                </button>
+            <div class="mt-5 pt-3 border-top d-flex flex-wrap gap-2 justify-content-between">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-danger btn-sm fw-bold px-3 uppercase" onclick="event.preventDefault(); downloadPDF(${u.IdUsrA}, 'total')">
+                        <i class="bi bi-file-pdf"></i> PDF Total
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="event.preventDefault(); downloadPDF(${u.IdUsrA}, 'simple')">
+                        <i class="bi bi-person-badge"></i> Solo Ficha
+                    </button>
+                </div>
+                <button type="button" class="btn btn-light btn-sm fw-bold text-muted uppercase" data-bs-dismiss="modal">Cerrar</button>
             </div>
-            <button type="button" class="btn btn-light btn-sm fw-bold text-muted uppercase" data-bs-dismiss="modal">Cerrar</button>
-        </div>
     `;
 };
-
 // --- ACCIONES ---
 
 window.saveUserData = async (id) => {
