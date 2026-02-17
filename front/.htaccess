@@ -1,14 +1,22 @@
+Options -Indexes
 RewriteEngine On
-RewriteBase /URBE-API-DRIVEN/front/
 
-# 1. EXCEPCIÓN PARA ARCHIVOS FÍSICOS (Evita el error MIME y 404 de CSS/JS)
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
+# 1. EXCEPCIÓN SOLO PARA ARCHIVOS FÍSICOS
+# El cambio está aquí: Quitamos la línea que decía "RewriteCond %{REQUEST_FILENAME} -d"
+# Ahora, si alguien intenta entrar a /paginas/, como es carpeta y no archivo,
+# Apache ignorará esta regla y seguirá bajando hasta llegar al 404.
+RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# 2. REGLA PARA EL FORMULARIO DE REGISTRO
+# 2. REGLA FORMULARIO DE REGISTRO
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html?inst=$1 [L,QSA]
 
-# 3. REGLA PARA SEDES (Login)
-RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|paginas|assets|resources)
+# 3. REGLA LOGIN POR SEDE (Slug)
+# Excluye rutas reservadas del sistema para no confundir slugs con carpetas
+RewriteCond %{REQUEST_URI} !/(dist|paginas|assets|resources|node_modules)
 RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
+
+# 4. ERROR 404 HÍBRIDO (El "Catch-All")
+# Como quitamos la excepción de carpetas arriba, cualquier intento de entrar
+# a /paginas, /dist, /assets directamente caerá aquí.
+RewriteRule ^.*$ paginas/error404.html [L]

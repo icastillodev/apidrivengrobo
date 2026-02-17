@@ -11,6 +11,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
 
+    <style>
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #198754; 
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+        .current-logo-box {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .table-services td { vertical-align: middle; font-size: 13px; }
+        .table-services th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+        }
+    </style>
+
     <script type="module">
         import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
@@ -21,31 +53,49 @@
             if(!Auth.checkAccess([1,2])) return;
             await initMenu();
             NotificationManager.init();
-            initConfigInstitution();
             
+            const instId = localStorage.getItem('instId');
+            if(instId) {
+                initConfigInstitution(instId);
+            } else {
+                Swal.fire('Error Crítico', 'No se ha identificado la institución.', 'error');
+            }
         });
     </script>
 </head>
 <body class="bg-light">
     
-    <div class="container my-5 px-4">
+<div class="container my-5 px-4">
         
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
+                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item active">
+                    <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Configuración Institución</span>
+                </li>
+            </ol>
+        </nav>
+
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 text-uppercase small fw-bold">
-                        <li class="breadcrumb-item"><a href="config.html" class="text-decoration-none text-muted">Configuración</a></li>
-                        <li class="breadcrumb-item active text-primary">Institución</li>
-                    </ol>
-                </nav>
                 <h4 class="fw-black text-dark m-0">DATOS DE LA SEDE</h4>
+                <p class="text-muted small mb-0 mt-1">Gestión global de parámetros institucionales</p>
             </div>
-            <button type="submit" form="form-institution" class="btn btn-primary fw-bold shadow-sm px-4">
-                <i class="bi bi-save me-2"></i> GUARDAR CAMBIOS
-            </button>
+            
+            <div class="d-flex gap-2">
+                <a href="config.html" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
+                    <i class="bi bi-arrow-left me-2"></i> VOLVER A CONFIGURACIONES
+                </a>
+
+                <button type="submit" form="form-institution" class="btn btn-primary fw-bold shadow-sm px-4" style="background-color: #1a5d3b; border-color: #1a5d3b;">
+                    <i class="bi bi-save me-2"></i> GUARDAR CAMBIOS
+                </button>
+            </div>
         </div>
 
-        <form id="form-institution">
+        <form id="form-institution" enctype="multipart/form-data">
             <div class="row g-4">
                 
                 <div class="col-lg-8">
@@ -71,7 +121,7 @@
                         </div>
                     </div>
 
-                    <div class="card border-0 shadow-sm">
+                    <div class="card border-0 shadow-sm h-100">
                         <div class="card-header bg-white border-0 py-3">
                             <h6 class="fw-bold text-info mb-0"><i class="bi bi-geo-alt me-2"></i>UBICACIÓN Y CONTACTO</h6>
                         </div>
@@ -106,7 +156,46 @@
                         <div class="card-body p-4">
                             
                             <div class="mb-4">
-                                <label class="form-label small fw-bold text-muted uppercase">Moneda Predeterminada</label>
+                                <label class="form-label small fw-bold text-muted uppercase">Logo Institucional</label>
+                                
+                                <div id="current-logo-container" class="current-logo-box d-none">
+                                    <span class="badge bg-light text-dark border position-absolute top-0 start-0 m-2" style="font-size: 9px;">ACTUAL</span>
+                                    <img id="img-current" src="" alt="Logo Actual" class="img-fluid" style="max-height: 80px;">
+                                </div>
+
+                                <div class="upload-area p-3 text-center position-relative" id="drop-area">
+                                    <input type="file" name="LogoInst" id="in-logo" accept="image/png" class="d-none">
+                                    <div id="preview-container" class="mb-2 d-none">
+                                        <p class="small text-success fw-bold mb-1">Nuevo archivo:</p>
+                                        <img id="img-preview" src="" alt="Preview Nuevo" class="img-fluid" style="max-height: 80px; opacity: 0.8;">
+                                    </div>
+                                    <div id="upload-msg">
+                                        <i class="bi bi-cloud-arrow-up fs-3 text-muted"></i>
+                                        <p class="small text-muted mb-0" style="font-size: 11px;">
+                                            Click o Arrastrar<br><span class="text-danger">(PNG Max 3MB)</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="check-logopdf" name="LogoEnPdf">
+                                    <label class="form-check-label small" for="check-logopdf">Mostrar logo en reportes PDF</label>
+                                </div>
+                            </div>
+
+                            <hr class="text-muted opacity-10 my-4">
+
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold text-muted uppercase">Idioma Predeterminado</label>
+                                <select name="idioma" id="sel-idioma" class="form-select">
+                                    <option value="es">Español (Spanish)</option>
+                                    <option value="en">English (Inglés)</option>
+                                    <option value="pt">Português (Portugués)</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label small fw-bold text-muted uppercase">Moneda</label>
                                 <select name="Moneda" id="sel-moneda" class="form-select fw-bold">
                                     <option value="UYU">$UY - Peso Uruguayo</option>
                                     <option value="USD">U$S - Dólar Americano</option>
@@ -115,31 +204,70 @@
                                 </select>
                             </div>
 
-                            <div class="mb-4">
-                                <label class="form-label small fw-bold text-muted uppercase">Precio Jornada Exp.</label>
-                                <div class="input-group">
-                                    <span class="input-group-text fw-bold border-0 bg-light">$</span>
-                                    <input type="number" name="PrecioJornadaTrabajoExp" id="in-precio" class="form-control fw-bold" step="0.01">
-                                </div>
-                                <div class="form-text small mt-1">Costo base para cálculos de horas extra o trabajos especiales.</div>
-                            </div>
+                            <hr class="text-muted opacity-10 my-4">
 
                             <div class="p-3 bg-light rounded border">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="check-otrosceuas" name="otrosceuas_check">
-                                    <label class="form-check-label fw-bold ms-2" for="check-otrosceuas">Habilitar "Otros CEUAS"</label>
+                                    <label class="form-check-label fw-bold ms-2" for="check-otrosceuas">Otros CEUAS</label>
                                 </div>
                                 <p class="small text-muted mt-2 mb-0" style="font-size: 11px;">
-                                    Permite a los investigadores cargar solicitudes vinculadas a protocolos externos no registrados en el sistema.
+                                    Permite solicitudes de protocolos externos.
                                 </p>
                             </div>
 
                         </div>
                     </div>
                 </div>
-
             </div>
-        </form>
+        </form> 
+        <div class="row g-4 mt-1">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold text-success mb-0"><i class="bi bi-list-check me-2"></i>CATÁLOGO DE SERVICIOS</h6>
+                        <span class="badge bg-light text-muted border">Gestión Interna</span>
+                    </div>
+                    <div class="card-body p-4">
+                        
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-md-6">
+                                <label class="small text-muted fw-bold">Nombre Servicio</label>
+                                <input type="text" id="srv-nombre" class="form-control form-control-sm" placeholder="Ej: Microcirugía, Hospedaje...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small text-muted fw-bold">Medida</label>
+                                <input type="text" id="srv-medida" class="form-control form-control-sm" placeholder="Hora/Kg">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small text-muted fw-bold">Cant.</label>
+                                <input type="number" id="srv-cant" class="form-control form-control-sm" value="1" min="1">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" id="btn-add-service" class="btn btn-sm btn-success w-100 fw-bold">
+                                    <i class="bi bi-plus-lg"></i> Agregar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive border rounded bg-white">
+                            <table class="table table-hover table-services mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Servicio</th>
+                                        <th>Referencia</th>
+                                        <th class="text-center" style="width: 80px;">Estado</th>
+                                        <th class="text-end" style="width: 50px;">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-services-body">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     </div>
 

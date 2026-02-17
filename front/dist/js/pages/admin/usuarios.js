@@ -7,10 +7,19 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'IdUsrA', direction: 'none' }; 
 
 export async function initUsuariosPage() {
-    const instId = localStorage.getItem('instId');
+    // 1. OBTENCIÓN ROBUSTA DE ID (Corrección del error null)
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
+    
     console.log("🚀 Iniciando carga de usuarios para Inst:", instId);
     
+    // Si no hay ID, detenemos para evitar llamada rota a la API
+    if (!instId) {
+        console.error("❌ Error crítico: No se identificó la institución en la sesión.");
+        return;
+    }
+    
     try {
+        // Llamada a la API
         const res = await API.request(`/users/institution?inst=${instId}`);
         console.log("📦 Respuesta recibida:", res);
         
@@ -18,10 +27,11 @@ export async function initUsuariosPage() {
             // Guardamos y ordenamos los datos
             allUsers = res.data.sort((a, b) => a.IdUsrA - b.IdUsrA);
             
-            // Debug: Hacemos los datos accesibles en consola DESPUÉS de cargar
+            // Debug global
             window.allUsers = allUsers; 
             console.log("✅ Datos procesados. Total:", allUsers.length);
 
+            // Renderizado inicial
             checkOtrosCeuaVisibility();
             setupSortHeaders();
             renderTable();
@@ -32,7 +42,8 @@ export async function initUsuariosPage() {
         console.error("❌ Error crítico al inicializar página:", error);
     }
 
-    // Configuración del buscador
+    // 2. CONFIGURACIÓN DE EVENTOS
+    // Buscador
     const btnSearch = document.getElementById('btn-search');
     if (btnSearch) {
         btnSearch.onclick = () => {
@@ -47,6 +58,7 @@ export async function initUsuariosPage() {
         btnExcel.onclick = exportToExcel;
     }
 
+    // Inicializar modal de ayuda
     initAyuda();
 }
 

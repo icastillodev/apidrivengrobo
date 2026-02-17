@@ -1,8 +1,22 @@
 RewriteEngine On
-# Si el archivo existe (como una imagen), cárgalo
+
+# 1. SEGURIDAD: Ocultar listado de directorios
+# Evita que si entran a /api/src/ vean tus archivos PHP
+Options -Indexes
+
+# 2. CORS (Opcional pero recomendado para API)
+# Permite que el Front consuma la API sin bloqueos básicos
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+</IfModule>
+
+# 3. EXCEPCIÓN DE ARCHIVOS FÍSICOS
+# Si existe el archivo (ej: una imagen subida), sírvelo.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Si no existe, manda todo al index.php de la API
+# 4. ENRUTADOR PRINCIPAL
+# Todo lo demás se envía a index.php
 RewriteRule ^ index.php [QSA,L]

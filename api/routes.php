@@ -59,8 +59,12 @@ $router->get('/user/form-detail/:id', 'UserFormsController@getFormDetail');
 // ============================================================
 // SECCIÓN: Mis Protocolos (Visor Unificado)
 // ============================================================
-$router->get('/user/my-protocols', 'UserProtocolsController@getAll');
-$router->get('/user/protocol-detail/:id', 'UserProtocolsController@getDetail');
+// USUARIO: GESTIÓN DE PROTOCOLOS
+$router->get('/user/protocols/config', 'ControllerusuarioTodosProtocolos@getConfig');
+$router->get('/user/protocols/all-lists', 'ControllerusuarioTodosProtocolos@getAllLists');
+$router->post('/user/protocols/create-internal', 'ControllerusuarioTodosProtocolos@createInternal');
+$router->get('/user/protocols/network-targets', 'ControllerusuarioTodosProtocolos@getNetworkTargets');
+$router->post('/user/protocols/create-network-request', 'ControllerusuarioTodosProtocolos@createNetworkRequest');
 
 
 // ============================================================
@@ -85,7 +89,9 @@ $router->post('/protocols/save', 'ProtocolController@save');
 $router->get('/protocols/current-species', 'ProtocolController@getSpeciesByProtocol');
 $router->get('/protocolos/search-alojamiento', 'ProtocolController@searchForAlojamiento');
 $router->get('/protocolos/search', 'ProtocolController@search');
-
+$router->get('/protocols/requests/count', 'ProtocolController@getPendingCount');
+$router->get('/user/protocols/species-detail', 'ControllerusuarioTodosProtocolos@getSpeciesDetail');
+$router->post('/user/protocols/update-internal', 'ControllerusuarioTodosProtocolos@updateInternal');
 
 // ============================================================
 // SECCIÓN: Animales (Pedidos)
@@ -233,7 +239,7 @@ $router->get('/admin/config/insumos/all', 'AdminConfigInsumoController@getAll');
 $router->post('/admin/config/insumos/save', 'AdminConfigInsumoController@save');
 $router->post('/admin/config/insumos/delete', 'AdminConfigInsumoController@delete');
 $router->post('/admin/config/insumos/toggle', 'AdminConfigInsumoController@toggle');
-
+$router->get('/admin/config/insumos/types', 'AdminConfigInsumoController@get_types');
 
 // ============================================================
 // ADMIN: CONFIGURACIÓN TIPOS DE FORMULARIO
@@ -278,6 +284,11 @@ $router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController
 $router->get('/admin/config/institution', 'AdminConfigInstitutionController@get');
 $router->post('/admin/config/institution/update', 'AdminConfigInstitutionController@update');
 
+// --- AGREGAR ESTAS DOS LÍNEAS NUEVAS ---
+$router->post('/admin/config/institution/service/add', 'AdminConfigInstitutionController@add_service');
+$router->post('/admin/config/institution/service/delete', 'AdminConfigInstitutionController@delete_service');
+$router->post('/admin/config/institution/service/toggle', 'AdminConfigInstitutionController@toggle_service');
+
 // ============================================================
 // ADMIN: CONFIGURACIÓN DEPARTAMENTOS Y ORGANISMOS
 // ============================================================
@@ -290,6 +301,33 @@ $router->post('/admin/config/org/delete', 'AdminConfigDeptoController@deleteOrg'
 // Departamentos
 $router->post('/admin/config/depto/save', 'AdminConfigDeptoController@saveDepto');
 $router->post('/admin/config/depto/delete', 'AdminConfigDeptoController@deleteDepto');
+
+
+// ADMIN: ALOJAMIENTOS Y CLINICA
+$router->get('/admin/config/alojamiento/details', 'AdminConfigAlojamientoController@getDetails');
+
+// Tipos
+$router->post('/admin/config/alojamiento/type/save', 'AdminConfigAlojamientoController@saveType');
+$router->post('/admin/config/alojamiento/type/delete', 'AdminConfigAlojamientoController@deleteType');
+
+// Categorias (Variables Clinicas)
+$router->post('/admin/config/alojamiento/cat/save', 'AdminConfigAlojamientoController@saveCat');
+$router->post('/admin/config/alojamiento/cat/delete', 'AdminConfigAlojamientoController@deleteCat');
+$router->post('/admin/config/alojamiento/type/toggle', 'AdminConfigAlojamientoController@toggleType'); // Cambiado de delete a toggle
+$router->post('/admin/config/alojamiento/cat/toggle', 'AdminConfigAlojamientoController@toggleCat');
+
+
+// ADMIN: RESERVAS Y ESPACIOS
+$router->get('/admin/config/reservas/sala/all', 'AdminConfigReservasController@getAllSalas');
+$router->get('/admin/config/reservas/sala/detail', 'AdminConfigReservasController@getSalaDetail');
+$router->post('/admin/config/reservas/sala/save', 'AdminConfigReservasController@saveSala');
+$router->post('/admin/config/reservas/sala/toggle', 'AdminConfigReservasController@toggleSala');
+$router->post('/admin/config/reservas/sala/global-type', 'AdminConfigReservasController@updateGlobalTimeType');
+
+$router->get('/admin/config/reservas/inst/all', 'AdminConfigReservasController@getAllInst');
+$router->post('/admin/config/reservas/inst/save', 'AdminConfigReservasController@saveInst');
+$router->post('/admin/config/reservas/inst/toggle', 'AdminConfigReservasController@toggleInst');
+
 
 
 // ============================================================
@@ -314,6 +352,8 @@ $router->post('/superadmin/usuarios/create', 'UsuarioController@create');
 $router->post('/superadmin/usuarios/update', 'UsuarioController@update');
 $router->post('/superadmin/usuarios/reset-pass', 'UsuarioController@resetPass');
 $router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUsername');
+
+
 
 
 // ============================================================

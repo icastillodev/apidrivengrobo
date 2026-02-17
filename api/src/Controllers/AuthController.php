@@ -62,6 +62,7 @@ class AuthController {
             'userId'   => $user['IdUsrA'],
             'userName' => $user['UsrA'],
             'userFull' => $user['Nombre'] ?? $user['UsrA'],
+            'userApe' => $user['ApellidoA'] ?? $user['UsrA'],
             'role'     => $user['role'],
             'instId'   => $user['IdInstitucion']
         ]);
@@ -99,6 +100,7 @@ class AuthController {
                 'userId'   => $user['IdUsrA'],
                 'userName' => $user['UsrA'], // Asegurado en el Service
                 'userFull' => $user['NombreA'] ?? $user['UsrA'],
+                'userApe' => $user['ApellidoA'] ?? $user['UsrA'],
                 'role'     => $user['role'],
                 'instId'   => $finalInstId
             ]);
@@ -131,7 +133,8 @@ class AuthController {
                     "nombre" => $instData['NombreInst'],
                     "nombre_completo" => $instData['NombreCompletoInst'],
                     "dependencia" => $instData['DependenciaInstitucion'],
-                    "web" => $instData['Web']
+                    "web" => $instData['Web'],
+                    "Logo" => $instData['Logo']
                 ]
             ]);
         } else {

@@ -4,13 +4,13 @@ export function initConfigDashboard() {
     const lbl = document.getElementById('lbl-inst-name');
     if(lbl) lbl.innerText = instName;
 
-    // 2. Definición de Módulos (Data Driven)
+    // 2. Definición de Módulos
     const modules = [
         {
             title: "Institución",
-            desc: "Datos generales, logo, correos de contacto y firma institucional.",
+            desc: "Datos generales, Logos, Correos, Servicios/Procesos y configuración de reportes PDF.",
             icon: "bi-building",
-            theme: "theme-primary",
+            theme: "theme-primary", // Azul
             border: "border-primary",
             link: "institucion.html"
         },
@@ -18,7 +18,7 @@ export function initConfigDashboard() {
             title: "Usuarios y Roles",
             desc: "Gestión de permisos, alta de investigadores y roles de sistema.",
             icon: "bi-people-fill",
-            theme: "theme-dark",
+            theme: "theme-dark", // Negro
             border: "border-dark",
             link: "roles.html"
         },
@@ -26,23 +26,42 @@ export function initConfigDashboard() {
             title: "Departamentos",
             desc: "Administración de áreas, laboratorios y centros de costos.",
             icon: "bi-diagram-3",
-            theme: "theme-info",
+            theme: "theme-info", // Cyan
             border: "border-info",
             link: "departamentos.html"
         },
         {
-            title: "Especies / Subespecies",
-            desc: "Catálogo biológico, cepas disponibles y lista de precios.",
-            icon: "bi-tencent-qq", // Icono similar a animal/mascota
-            theme: "theme-success",
+            // MÓDULO 4: SOLO BIOLOGÍA
+            title: "Especies y Cepas",
+            desc: "Catálogo de especies, subespecies (cepas) y sus precios base.",
+            icon: "bi-tencent-qq", // Icono más biológico
+            theme: "theme-success", // Verde
             border: "border-success",
             link: "especies.html"
+        },
+        {
+            // MÓDULO 5: NUEVO - ALOJAMIENTOS Y CLÍNICA
+            title: "Alojamientos y Clínica",
+            desc: "Tipos de cajas/jaulas por especie y variables de Historia Clínica (HC).",
+            icon: "bi-hospital", // Icono clínico/hospitalario
+            theme: "theme-orange", // Naranja (Diferente a especies)
+            border: "border-warning",
+            link: "alojamientos.html" 
+        },
+        {
+            // MÓDULO 6: NUEVO - RESERVAS
+            title: "Reservas y Espacios",
+            desc: "Gestión de Salones, Instrumentos y horarios disponibles (L-V).",
+            icon: "bi-calendar-range", // Calendario
+            theme: "theme-pink", // Rosa/Magenta
+            border: "border-danger",
+            link: "reservas.html"
         },
         {
             title: "Protocolos Config",
             desc: "Reglas de severidad, tipos de protocolos y validaciones.",
             icon: "bi-file-medical",
-            theme: "theme-danger",
+            theme: "theme-danger", // Rojo
             border: "border-danger",
             link: "protocolos-config.html"
         },
@@ -50,7 +69,7 @@ export function initConfigDashboard() {
             title: "Tipos Formularios",
             desc: "Configuración de solicitudes, descuentos y exenciones.",
             icon: "bi-ui-checks",
-            theme: "theme-warning",
+            theme: "theme-warning", // Amarillo
             border: "border-warning",
             link: "tipos-form.html"
         },
@@ -58,16 +77,16 @@ export function initConfigDashboard() {
             title: "Insumos Grales.",
             desc: "Catálogo de insumos básicos (Cajas, viruta, alimento).",
             icon: "bi-box-seam",
-            theme: "theme-teal",
-            border: "border-secondary", // Teal border custom si quieres
+            theme: "theme-teal", // Verde azulado
+            border: "border-secondary",
             link: "insumos.html"
         },
         {
             title: "Insumos Exp.",
             desc: "Reactivos biológicos y materiales experimentales.",
             icon: "bi-eyedropper",
-            theme: "theme-purple",
-            border: "border-primary", // O un borde morado si defines la clase
+            theme: "theme-purple", // Morado
+            border: "border-primary",
             link: "insumos-exp.html"
         }
     ];
@@ -80,11 +99,10 @@ function renderGrid(modules) {
     container.innerHTML = '';
 
     modules.forEach(m => {
-        // Usamos las clases de borde de bootstrap: border-primary, etc.
         const borderClass = m.border ? `border-top border-5 ${m.border}` : '';
 
         const col = document.createElement('div');
-        col.className = "col-md-6 col-lg-4 col-xl-3"; // Responsive Grid
+        col.className = "col-md-6 col-lg-4 col-xl-3"; 
         
         col.innerHTML = `
             <div class="card h-100 shadow-sm card-config-option p-4 text-center ${borderClass}" onclick="location.href='${m.link}'">

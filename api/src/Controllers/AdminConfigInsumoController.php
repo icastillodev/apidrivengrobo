@@ -24,16 +24,14 @@ class AdminConfigInsumoController {
         exit;
     }
 
-    public function save() {
-        $this->processRequest('save');
-    }
-
-    public function delete() {
+    // NUEVO ENDPOINT: Para llenar el select del modal
+    public function get_types() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        $instId = $_GET['inst'] ?? 0;
         try {
-            $res = $this->model->delete($_POST['id']);
-            echo json_encode(['status' => 'success', 'mode' => $res]); // 'deleted' o 'deactivated'
+            $data = $this->model->getInsumoTypes($instId);
+            echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -41,8 +39,20 @@ class AdminConfigInsumoController {
         exit;
     }
 
-    public function toggle() {
-        $this->processRequest('toggleStatus');
+    public function save() { $this->processRequest('save'); }
+    public function toggle() { $this->processRequest('toggleStatus'); }
+
+    public function delete() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $res = $this->model->delete($_POST['id']);
+            echo json_encode(['status' => 'success', 'mode' => $res]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 
     private function processRequest($method) {

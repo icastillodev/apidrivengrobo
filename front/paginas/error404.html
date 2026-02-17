@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página no encontrada - GROBO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col justify-center items-center text-center p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full border-t-4 border-amber-500">
+        <h1 class="text-6xl font-black text-gray-200 mb-4">404</h1>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2 uppercase">¡Ups! Te perdiste</h2>
+        <p class="text-gray-500 mb-8 text-sm">La página que buscas no existe o no tienes acceso.</p>
+
+        <div id="status-msg" class="animate-pulse mb-6 text-amber-600 font-bold text-xs uppercase tracking-widest">
+            Analizando credenciales...
+        </div>
+        
+        <button id="manual-redirect" class="hidden bg-black text-white px-6 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-gray-800 transition-all">
+            Volver al Sitio
+        </button>
+    </div>
+
+<script type="module">
+        // 1. DEFINIR LA RUTA BASE DINÁMICA (Para evitar error MIME)
+        const isLocal = window.location.hostname === 'localhost';
+        const basePath = isLocal ? '/URBE-API-DRIVEN/front/' : '/front/';
+        
+        // 2. IMPORTAR AUTH DINÁMICAMENTE
+        import(basePath + 'dist/js/auth.js')
+            .then(module => {
+                const Auth = module.Auth;
+                
+                const statusMsg = document.getElementById('status-msg');
+                const manualBtn = document.getElementById('manual-redirect');
+
+                // 3. VERIFICAR SESIÓN (Local o Session)
+                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                const role = parseInt(localStorage.getItem('userLevel') || sessionStorage.getItem('userLevel'));
+
+                if (token && !isNaN(role)) {
+                    statusMsg.innerText = "Sesión activa. Redirigiendo al Dashboard...";
+                    console.log("404: Usuario logueado detectado. Redirigiendo...");
+                    
+                    setTimeout(() => {
+                        Auth.autoRedirectIfLogged(role);
+                    }, 1000);
+                } else {
+                    // 4. SIN SESIÓN: VOLVER AL LOGIN
+                    statusMsg.innerText = "No hay sesión. Volviendo al inicio...";
+                    const savedInst = localStorage.getItem('NombreInst') || sessionStorage.getItem('NombreInst');
+                    
+                    let targetUrl = basePath;
+                    if (savedInst && savedInst !== 'superadmin' && savedInst !== 'SISTEMA GLOBAL') {
+                        targetUrl = `${basePath}${savedInst}/`;
+                    }
+
+                    setTimeout(() => {
+                        window.location.href = targetUrl;
+                    }, 2000);
+
+                    manualBtn.onclick = () => window.location.href = targetUrl;
+                    manualBtn.classList.remove('hidden');
+                }
+            })
+            .catch(err => {
+                console.error("Error crítico cargando Auth:", err);
+                // Fallback de emergencia si falla la importación
+                window.location.href = basePath; 
+            });
+    </script>
+</body>
+</html>

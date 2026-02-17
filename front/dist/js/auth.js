@@ -1,9 +1,18 @@
-// front/dist/js/auth.js
 import { API } from './api.js';
 
-/**
- * Determina si debe mostrar el nombre largo de la institución
- */
+// --- LISTA DE DATOS QUE DEBEN VIAJAR EN LA SESIÓN ---
+// Estos son los datos que guardaremos en Cookie si no hay "Recordarme"
+const SESSION_KEYS = [
+    'token', 
+    'userLevel', 
+    'userId', 
+    'userName', 
+    'userFull', 
+    'userApe', 
+    'instId', 
+    'NombreInst'
+];
+
 const shouldShowFullName = (short, full) => {
     if (!full || full.trim() === "" || full.length < 4) return false;
     return full.toLowerCase().trim() !== short.toLowerCase().trim();
@@ -11,64 +20,107 @@ const shouldShowFullName = (short, full) => {
 
 export const Auth = {
     slug: null,
+    tempRemember: false,
+    resendTimer: null,
 
-    // Localizado dentro del objeto export const Auth = { ... } en auth.js
+    // --- HELPER BÁSICO ---
+    getVal(key) {
+        return sessionStorage.getItem(key) || localStorage.getItem(key);
+    },
+
+    getBasePath() {
+        return (window.location.hostname === 'localhost') 
+            ? '/URBE-API-DRIVEN/front/' 
+            : '/front/';
+    },
+
+    // =========================================================================
+    //  HIDRATACIÓN POTENTE (Recupera TODOS los datos de la Cookie)
+    // =========================================================================
+    hydrateSession() {
+        // Solo hidratamos si falta información crítica en la sesión
+        if (!sessionStorage.getItem('token') && !localStorage.getItem('token')) {
+            const cookieToken = this.getCookie('token');
+            
+            if (cookieToken) {
+                console.log("💧 Auth: Restaurando sesión completa desde Cookies...");
+                
+                // Recorremos la lista maestra y restauramos todo a sessionStorage
+                SESSION_KEYS.forEach(key => {
+                    const val = this.getCookie(key);
+                    if (val) {
+                        sessionStorage.setItem(key, val);
+                        
+                        // Si es dato de contexto (Institución), aseguramos copia en LocalStorage
+                        // para que el redireccionamiento de 404 funcione.
+                        if (key === 'instId' || key === 'NombreInst') {
+                            localStorage.setItem(key, val);
+                        }
+                    }
+                });
+            }
+        }
+    },
+
+    // =========================================================================
+    //  INIT & CHECK ACCESS
+    // =========================================================================
 
     async init() {
-        
         try {
+            // 1. HIDRATAR ANTES DE NADA
+            this.hydrateSession();
+
             const path = window.location.pathname;
+            if (path.includes('/paginas/')) return; 
 
-            // --- 1. DETECCIÓN DE SUPERADMIN (BYPASS GECKO DEVS) ---
-            // Si la URL es la del panel maestro, no validamos institución
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
-                this.slug = 'superadmin'; // Slug reservado para el maestro
+                this.slug = 'superadmin';
                 localStorage.setItem('NombreInst', 'SISTEMA GLOBAL');
-                
-                this.updateElements({
-                    'inst-welcome': 'SISTEMA MAESTRO',
-                    'inst-full-name': 'Panel de Gestión Multi-Sede'
-                });
-
+                this.autoRedirectIfLogged(1);
+                this.updateElements({ 'inst-welcome': 'SISTEMA MAESTRO', 'inst-full-name': 'Panel de Gestión Multi-Sede' });
                 this.renderLogin(); 
-                console.log("Modo SuperAdmin Activado: Validaciones de sede omitidas.");
-                return; // CORTAMOS AQUÍ: Evitamos que intente buscar la inst en la API
+                return; 
             }
 
-            // --- 2. DETECCIÓN DE INSTITUCIÓN NORMAL ---
-            const urlParams = new URLSearchParams(window.location.search);
-            let slugContext = urlParams.get('inst');
-
-            if (!slugContext) {
-                // Limpiamos la ruta para extraer el slug (ej: /front/urbe/ -> urbe)
-                const parts = path.split('/').filter(p => p && p !== "index.html" && p !== "registro.html" && p !== "front");
-                // Si después de 'front' hay algo, ese es nuestro slug
-                const pathParts = path.replace(/^\/|\/$/g, '').split('/');
-                const fIdx = pathParts.indexOf('front');
-                if (fIdx !== -1 && pathParts[fIdx + 1]) {
-                    slugContext = pathParts[fIdx + 1];
-                }
-            }
-
-            // Si no hay nada en URL, probamos con el último guardado
+            let slugContext = null;
+            const pathParts = window.location.pathname.split('/'); 
+            const frontIndex = pathParts.indexOf('front');
+            
+            if (frontIndex !== -1 && pathParts[frontIndex + 1]) slugContext = pathParts[frontIndex + 1];
+            if (!slugContext) slugContext = new URLSearchParams(window.location.search).get('inst');
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
-            // Bloqueo de seguridad si la ruta es inválida
-            if (!slugContext || slugContext === 'paginas' || slugContext === 'dist') {
+            if (!slugContext || ['dist', 'assets', 'resources', 'paginas', 'index.html'].includes(slugContext)) {
                 this.showErrorState();
                 return;
             }
 
-            // --- 3. VALIDACIÓN CONTRA API ---
             this.slug = slugContext.toLowerCase();
+            
+            const storedToken = this.getVal('token');
+            const storedInst = this.getVal('NombreInst');
+            
+            if (storedToken && storedInst === this.slug) {
+                console.log("Sesión activa detectada. Redirigiendo...");
+                const role = parseInt(this.getVal('userLevel'));
+                this.autoRedirectIfLogged(role);
+                return; 
+            }
+
             const res = await API.request(`/validate-inst/${this.slug}`);
             
             if (res && res.status === 'success') {
                 const inst = res.data;
+                
+                // GUARDADO DE CONTEXTO
                 localStorage.setItem('instId', inst.id);
                 localStorage.setItem('NombreInst', this.slug);
+                if (!storedToken) {
+                    sessionStorage.setItem('instId', inst.id);
+                    sessionStorage.setItem('NombreInst', this.slug);
+                }
 
-                // Limpieza y formato de nombres
                 const cleanShortName = inst.nombre.replace(/APP\s+/i, '').toUpperCase();
                 const displayName = shouldShowFullName(inst.nombre, inst.nombre_completo) ? inst.nombre_completo : cleanShortName;
                 
@@ -76,17 +128,14 @@ export const Auth = {
                     'inst-welcome': cleanShortName,
                     'inst-full-name': shouldShowFullName(inst.nombre, inst.nombre_completo) ? inst.nombre_completo : "",
                     'reg-inst-name': `REGISTRO: ${cleanShortName}`,
-                    'reg-inst-full-name': shouldShowFullName(inst.nombre, inst.nombre_completo) ? inst.nombre_completo : "",
-                    'reg-inst-description-name': displayName
+                    'reg-inst-description-name': displayName,
+                    'logo-url': inst.Logo 
                 });
 
-                // Configurar Enlaces Dinámicos
                 const regLink = document.getElementById('link-registro-dinamico');
                 if (regLink) regLink.href = `paginas/registro.html?inst=${this.slug}`;
-                
                 const btnVolver = document.getElementById('btn-volver-login');
-                if (btnVolver) btnVolver.href = `/URBE-API-DRIVEN/front/${this.slug}`;
-
+                if (btnVolver) btnVolver.href = `${this.getBasePath()}${this.slug}`;
                 const webLink = document.getElementById('inst-web-link');
                 if (webLink && inst.web && inst.web.length > 5) {
                     const container = document.getElementById('web-link-container');
@@ -97,65 +146,33 @@ export const Auth = {
 
                 this.renderLogin();
             } else {
-                console.error("Sede no válida en DB:", this.slug);
                 this.showErrorState();
             }
         } catch (e) { 
             console.error("Auth Init Error:", e);
             this.showErrorState(); 
         }
-    },async initSuperAdmin() {
-        // Modo Maestro: No hay validación de base de datos aquí
-        this.slug = 'superadmin'; 
-        localStorage.setItem('NombreInst', 'SISTEMA MAESTRO');
-        localStorage.setItem('instId', '0'); // ID 0 indica "Global" para el sistema
-
-        this.updateElements({
-            'inst-welcome': 'BIENVENIDO MAESTRO',
-            'inst-full-name': 'Acceso al Control Global de Sedes'
-        });
-
-        this.renderLogin();
-    },async initSuperAdmin() {
-        this.slug = 'superadmin';
-        localStorage.setItem('NombreInst', 'SISTEMA MAESTRO');
-        localStorage.setItem('instId', '0'); // ID 0 reservado para SuperAdmin
-
-        this.updateElements({
-            'inst-welcome': 'BIENVENIDO MAESTRO',
-            'inst-full-name': 'Panel Maestro de Gestión Global'
-        });
-
-        this.renderLogin();
-    },
-
-    /**
-     * Muestra el panel de error y bloquea el login si no hay institución válida
-     */
-    showErrorState() {
-        localStorage.removeItem('NombreInst');
-        localStorage.removeItem('instId');
-        const err = document.getElementById('error-state');
-        const cont = document.getElementById('auth-content');
-        if (err) err.classList.remove('hidden');
-        if (cont) cont.classList.add('hidden');
     },
 
     updateElements(map) {
         for (const [id, val] of Object.entries(map)) {
+            if (id === 'logo-url') {
+                const logoContainer = document.getElementById('logo-container');
+                const logoImg = document.getElementById('inst-logo');
+                if (val && val.length > 4 && logoContainer && logoImg) {
+                    const basePath = this.getBasePath(); 
+                    const src = val.includes('http') ? val : `${basePath}dist/multimedia/imagenes/logos/${val}`;
+                    logoImg.src = src;
+                    logoContainer.classList.remove('hidden');
+                }
+                continue;
+            }
             const el = document.getElementById(id);
             if (el) el.innerText = val;
         }
     },
 
-    /**
-     * Procesa el ingreso al sistema
-     */
-/**
- * Procesa el ingreso al sistema (Gecko Devs 2026)
- * Maneja accesos por sede y acceso maestro para SuperAdmin
- */
-async handleLogin(e) {
+    async handleLogin(e) {
         e.preventDefault();
         const box = document.getElementById('msg-alert');
         if (box) box.classList.add('hidden');
@@ -167,10 +184,9 @@ async handleLogin(e) {
         const payload = {
             user: username,
             pass: password,
-            instSlug: this.slug
+            instSlug: this.slug || localStorage.getItem('NombreInst')
         };
 
-        // 1. FEEDBACK: PROCESANDO
         window.Swal.fire({
             title: 'Iniciando Sesión',
             text: 'Verificando credenciales...',
@@ -186,30 +202,24 @@ async handleLogin(e) {
                 this.completeLoginProcess(res, remember);
 
             } else if (res?.status === '2fa_required') {
-                // 2. FEEDBACK: CÓDIGO ENVIADO (Mensaje Claro)
                 window.Swal.fire({
                     title: 'Verificación de Seguridad',
-                    html: `
-                        <p class="mb-2">Se ha enviado un código de acceso a los correos registrados como <b>ADMINISTRADOR</b>.</p>
-                        <p class="text-sm text-gray-500 font-bold">⚠️ Revisa tu bandeja de entrada y la carpeta de SPAM.</p>
-                        <p class="text-xs text-gray-400 mt-2">Tip: Marca "Recordar mi sesión" para evitar este paso en el futuro.</p>
-                    `,
+                    html: `<p>Código enviado al correo.</p>`,
                     icon: 'warning',
                     confirmButtonText: 'ENTENDIDO',
                     confirmButtonColor: '#1a5d3b'
                 }).then(() => {
-                    // Solo después de dar OK mostramos el input del código
                     document.getElementById('temp-user-id').value = res.userId;
                     this.tempRemember = remember; 
-                    
                     const modal = document.getElementById('modal-2fa');
                     modal.classList.remove('hidden');
                     modal.classList.add('flex');
                     document.getElementById('code-2fa').focus();
-                    
                     document.getElementById('form-2fa').onsubmit = (ev) => this.handle2FA(ev);
+                    
+                    const resendLink = document.getElementById('resend-link');
+                    if(resendLink) resendLink.onclick = (ev) => { ev.preventDefault(); this.resendCode(res.userId); };
                 });
-
             } else {
                 window.Swal.close();
                 if (box) { 
@@ -223,79 +233,130 @@ async handleLogin(e) {
         }
     },
 
+    async resendCode(userId) {
+        window.Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Reenviando código...', showConfirmButton: false, timer: 1500 });
+        this.startResendTimer(180);
+    },
+
+    startResendTimer(seconds) {
+        const link = document.getElementById('resend-link');
+        const timerSpan = document.getElementById('resend-timer');
+        let remaining = seconds;
+        if (!link || !timerSpan) return;
+
+        link.classList.add('hidden');
+        timerSpan.classList.remove('hidden');
+        if (this.resendTimer) clearInterval(this.resendTimer);
+
+        this.resendTimer = setInterval(() => {
+            remaining--;
+            const m = Math.floor(remaining / 60);
+            const s = remaining % 60;
+            timerSpan.innerText = `Espera ${m}:${s < 10 ? '0' : ''}${s}`;
+            if (remaining <= 0) {
+                clearInterval(this.resendTimer);
+                timerSpan.classList.add('hidden');
+                link.classList.remove('hidden');
+            }
+        }, 1000);
+    },
+
     async handle2FA(e) {
         e.preventDefault();
         const userId = document.getElementById('temp-user-id').value;
         const code = document.getElementById('code-2fa').value;
-        const instId = localStorage.getItem('instId'); // Contexto actual
+        const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId'); 
 
         try {
             const res = await API.request('/verify-2fa', 'POST', { userId, code, instId });
-            
             if (res?.status === 'success') {
+                if (this.resendTimer) clearInterval(this.resendTimer);
                 this.completeLoginProcess(res, this.tempRemember);
             } else {
-                alert('CÓDIGO INCORRECTO O EXPIRADO');
+                alert('CÓDIGO INCORRECTO');
                 document.getElementById('code-2fa').value = '';
             }
         } catch (err) { console.error(err); }
-    },// 3. PROCESO FINAL DE LOGIN (CORRECCIÓN CRÍTICA DE DATOS)
-// 3. PROCESO FINAL DE LOGIN
+    },
+
+    // --- 4. GESTIÓN DE SESIÓN COMPLETA ---
     completeLoginProcess(res, remember) {
         const role = parseInt(res.role);
         
-        // Determinar almacenamiento (Recordarme vs Sesión volátil)
-        // El Superadmin siempre usa sessionStorage por seguridad, salvo que quieras cambiarlo
-        const storage = (remember && role !== 1) ? localStorage : sessionStorage;
+        // 1. Limpieza inicial
+        localStorage.clear(); 
+        sessionStorage.clear();
+        this.clearAllCookies();
 
-        // Limpieza cruzada para evitar conflictos
-        if (storage === localStorage) sessionStorage.clear();
-        else localStorage.removeItem('token'); 
+        // 2. Preparar el objeto de datos unificado
+        // Mapeamos lo que viene de la API a nuestras Keys estándar
+        const sessionData = {
+            token: res.token,
+            userLevel: role,
+            userId: res.userId,
+            userName: res.userName,
+            userFull: res.userFull || res.userName,
+            userApe: res.userApe || '',
+            instId: res.instId,
+            NombreInst: this.slug || localStorage.getItem('NombreInst')
+        };
 
-        // GUARDADO DE DATOS
-        storage.setItem('token', res.token);
-        storage.setItem('userLevel', role);
-        storage.setItem('userName', res.userName);
-        storage.setItem('userFull', res.userFull || res.userName);
-        storage.setItem('userId', res.userId);
-        
-        // VITAL: Guardamos el ID de la institución donde estamos parados
-        storage.setItem('instId', res.instId); 
-        storage.setItem('NombreInst', this.slug);
+        // 3. Guardado según preferencia
+        if (remember) {
+            // MODO RECORDARME: Todo a LocalStorage (Persistente)
+            console.log("✅ Login: Modo Persistente (LocalStorage)");
+            SESSION_KEYS.forEach(key => {
+                if (sessionData[key] !== undefined) {
+                    localStorage.setItem(key, sessionData[key]);
+                }
+            });
+        } else {
+            // MODO SESIÓN: Todo a Cookies (Compartido) + Session (Rápido)
+            console.log("✅ Login: Modo Sesión Temporal (Cookies)");
+            
+            SESSION_KEYS.forEach(key => {
+                if (sessionData[key] !== undefined) {
+                    // Guardamos en Cookie (sin expiración = sesión)
+                    this.setCookie(key, sessionData[key], null);
+                    // Guardamos en SessionStorage para acceso inmediato
+                    sessionStorage.setItem(key, sessionData[key]);
+                }
+            });
 
-        console.log("✅ Login Exitoso. Rol:", role, "Inst:", res.instId, "Slug:", this.slug);
+            // Excepción: El Contexto siempre debe estar en LocalStorage para evitar 404
+            localStorage.setItem('instId', sessionData.instId);
+            localStorage.setItem('NombreInst', sessionData.NombreInst);
+        }
 
-        // --- LÓGICA DE REDIRECCIÓN INTELIGENTE ---
-        
+        this.autoRedirectIfLogged(role);
+    },
+
+    autoRedirectIfLogged(role) {
+        if (!this.getVal('token')) return;
+        const basePath = this.getBasePath();
+
         if (role === 1) {
-            // CASO A: Superadmin en su panel maestro
-            if (this.slug === 'superadmin' || this.slug === 'master') {
-                console.log("👑 SuperAdmin -> Panel Global");
-                window.location.href = '/URBE-API-DRIVEN/front/paginas/superadmin/dashboard.html';
-            } 
-            // CASO B: Superadmin entrando a una Sede (Actúa como Admin Local)
-            else {
-                console.log("🕵️ SuperAdmin -> Panel Sede:", this.slug);
-                window.location.href = '/URBE-API-DRIVEN/front/paginas/admin/dashboard.html';
+            if (this.slug === 'superadmin' || this.slug === 'master' || this.getVal('NombreInst') === 'SISTEMA GLOBAL') {
+                window.location.href = `${basePath}paginas/superadmin/dashboard.html`;
+            } else {
+                window.location.href = `${basePath}paginas/admin/dashboard.html`;
             }
-        } 
-        // CASO C: Usuarios normales (Admin Sede, Investigador, etc)
-        else {
+        } else {
             const folder = (role === 3) ? 'usuario' : 'admin';
-            window.location.href = `/URBE-API-DRIVEN/front/paginas/${folder}/dashboard.html`;
+            window.location.href = `${basePath}paginas/${folder}/dashboard.html`;
         }
     },
-    logout() {
-        // 1. Recuperamos el slug de donde esté guardado (Session o Local)
-        const slug = sessionStorage.getItem('NombreInst') || localStorage.getItem('NombreInst') || 'urbe';
 
-        // 2. Limpieza TOTAL de seguridad (Ambos almacenamientos)
+    logout() {
+        const slug = this.getVal('NombreInst') || 'urbe';
+        
         localStorage.clear();
         sessionStorage.clear();
-
-        // 3. Redirección absoluta al login de la institución
-        window.location.href = `/URBE-API-DRIVEN/front/${slug}/`;
+        this.clearAllCookies();
+        
+        this.redirectToLogin(slug);
     },
+
     renderLogin() {
         const form = document.getElementById('login-form');
         if (form) { 
@@ -304,59 +365,85 @@ async handleLogin(e) {
         }
     },
 
-    /**
-     * Validación de permisos para páginas internas
-     */
-// --- VALIDACIÓN DE ACCESO ---
-/**
- * Validador de Acceso Robusto
- * @param {Array} allowed - Array de niveles permitidos (ej: [1, 2])
- */
-checkAccess(allowed) {
-        // Helper interno: Busca en Session primero, si no está, busca en Local
-        const getValue = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
+    checkAccess(allowed) {
+        // 1. HIDRATAR (Vital)
+        this.hydrateSession();
 
-        const token = getValue('token');
-        const userLevel = parseInt(getValue('userLevel'));
-        const inst = getValue('NombreInst');
+        const token = this.getVal('token');
+        const userLevel = parseInt(this.getVal('userLevel'));
+        const inst = this.getVal('NombreInst');
         
-        // 1. Si no hay token o nivel, es un intento de acceso anónimo
         if (!token || isNaN(userLevel)) {
             console.warn("Acceso denegado: No hay sesión activa.");
             this.redirectToLogin(inst);
             return false;
         }
 
-        // 2. PASE VIP PARA SUPERADMIN (Nivel 1)
-        // El SuperAdmin entra a cualquier lado, sea el panel maestro o una sede
-        if (userLevel === 1) {
-            return true; 
-        }
+        if (userLevel === 1) return true; 
 
-        // 3. VALIDACIÓN DE ROLES PARA OTROS USUARIOS
         if (!allowed.includes(userLevel)) {
-            console.error("Acceso denegado: Nivel de usuario insuficiente.");
-            this.redirectToLogin(inst);
+            console.error("Nivel insuficiente.");
+            this.autoRedirectIfLogged(userLevel); 
             return false;
         }
 
-        // 4. VALIDACIÓN DE SEDE (Para evitar saltos entre instituciones)
-        // Si no es superadmin, DEBE tener una institución cargada en el storage
         if (!inst || inst === 'superadmin' || inst === 'SISTEMA GLOBAL') {
-            console.error("Acceso denegado: Contexto de institución inválido.");
-            this.redirectToLogin('');
+            console.error("Contexto inválido.");
+            this.logout();
             return false;
         }
 
-        return true; // Acceso concedido
+        return true; 
     },
 
-/**
- * Función auxiliar para redirección limpia
- */
-redirectToLogin(slug) {
-    const cleanSlug = (slug && slug !== 'superadmin') ? slug : '';
-    // Usamos ruta absoluta para no rompernos en subcarpetas
-    window.location.href = `/URBE-API-DRIVEN/front/${cleanSlug}`;
-}
+    redirectToLogin(slug) {
+        const basePath = this.getBasePath();
+        const cleanSlug = (slug && slug !== 'superadmin' && slug !== 'SISTEMA GLOBAL') ? slug : '';
+        window.location.href = cleanSlug ? `${basePath}${cleanSlug}/` : basePath;
+    },
+
+    showErrorState() {
+        this.clearAllCookies(); // Limpieza por si acaso
+        localStorage.removeItem('NombreInst');
+        
+        const err = document.getElementById('error-state');
+        const cont = document.getElementById('auth-content');
+        if (err) err.classList.remove('hidden');
+        if (cont) cont.classList.add('hidden');
+    },
+
+    // --- COOKIES UTILS ---
+    setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        // Encode para soportar espacios y caracteres especiales en nombres
+        const valEncoded = encodeURIComponent(value || "");
+        document.cookie = name + "=" + valEncoded + expires + "; path=/; SameSite=Lax";
+    },
+
+    getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for(let i=0;i < ca.length;i++) {
+            let c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) {
+                // Decode para leer correctamente
+                return decodeURIComponent(c.substring(nameEQ.length,c.length));
+            }
+        }
+        return null;
+    },
+
+    deleteCookie(name) {
+        document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    },
+
+    clearAllCookies() {
+        SESSION_KEYS.forEach(k => this.deleteCookie(k));
+    }
 };

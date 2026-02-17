@@ -11,7 +11,24 @@ class AdminConfigInsumoModel {
     }
 
     public function getAll($instId) {
-        $sql = "SELECT * FROM insumo WHERE IdInstitucion = ? ORDER BY NombreInsumo ASC";
+        // Hacemos un LEFT JOIN para traer el nombre del Tipo de Formulario en lugar del ID numérico
+        // Si CategoriaInsumo es 0 o null, mostrará NULL en NombreCategoria
+        $sql = "SELECT i.*, t.nombreTipo as NombreCategoria 
+                FROM insumo i 
+                LEFT JOIN tipoformularios t ON i.CategoriaInsumo = t.IdTipoFormulario
+                WHERE i.IdInstitucion = ? 
+                ORDER BY i.NombreInsumo ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // NUEVO MÉTODO: Obtener los tipos de formulario 'Insumos' para el select
+    public function getInsumoTypes($instId) {
+        $sql = "SELECT IdTipoFormulario, nombreTipo 
+                FROM tipoformularios 
+                WHERE IdInstitucion = ? AND categoriaformulario = 'Insumos' 
+                ORDER BY nombreTipo ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -22,18 +39,20 @@ class AdminConfigInsumoModel {
         $nombre = $data['NombreInsumo'];
         $cantidad = $data['CantidadInsumo'] ?? 1;
         $tipo = $data['TipoInsumo'] ?? 'Unid.';
-        $categoria = $data['CategoriaInsumo'] ?? 'General';
+        
+        // Aquí guardamos el ID del tipo de formulario (INT)
+        // Si viene vacío o 0, guardamos NULL o 0 según tu estructura. Asumiremos 0 para "General".
+        $categoria = !empty($data['CategoriaInsumo']) ? $data['CategoriaInsumo'] : 0;
+        
         $existencia = $data['Existencia'] ?? 1;
         $instId = $data['instId'];
 
         if (empty($id)) {
-            // INSERT: Precio=0, Orden=1 por defecto
             $sql = "INSERT INTO insumo (NombreInsumo, CantidadInsumo, TipoInsumo, CategoriaInsumo, IdInstitucion, Existencia, PrecioInsumo, OrdenInsumos) 
                     VALUES (?, ?, ?, ?, ?, ?, 0, 1)";
             $stmt = $this->db->prepare($sql);
             return $stmt->execute([$nombre, $cantidad, $tipo, $categoria, $instId, $existencia]);
         } else {
-            // UPDATE
             $sql = "UPDATE insumo SET NombreInsumo=?, CantidadInsumo=?, TipoInsumo=?, CategoriaInsumo=?, Existencia=? 
                     WHERE idInsumo=?";
             $stmt = $this->db->prepare($sql);
@@ -42,21 +61,16 @@ class AdminConfigInsumoModel {
     }
 
     public function delete($id) {
-        // 1. VERIFICAR USO EN HISTORIAL
-        // Ajusta "pedido_insumos" al nombre real de la tabla detalle de tus pedidos de insumos
-        // Si no tienes el nombre exacto, el catch del error de FK en la base de datos también serviría, 
-        // pero es mejor prevenirlo aquí.
+        // Verificar uso en historial (insumospedidos)
         $stmt = $this->db->prepare("SELECT COUNT(*) FROM insumospedidos WHERE idInsumo = ?"); 
         $stmt->execute([$id]);
         $used = $stmt->fetchColumn() > 0;
 
         if ($used) {
-            // Soft Delete: Desactivar (Existencia = 2)
             $sql = "UPDATE insumo SET Existencia = 2 WHERE idInsumo = ?";
             $this->db->prepare($sql)->execute([$id]);
             return 'deactivated';
         } else {
-            // Hard Delete
             $sql = "DELETE FROM insumo WHERE idInsumo = ?";
             $this->db->prepare($sql)->execute([$id]);
             return 'deleted';
@@ -65,7 +79,7 @@ class AdminConfigInsumoModel {
 
     public function toggleStatus($data) {
         $id = $data['idInsumo'];
-        $status = $data['status']; // Viene 1 o 2
+        $status = $data['status'];
         $sql = "UPDATE insumo SET Existencia = ? WHERE idInsumo = ?";
         return $this->db->prepare($sql)->execute([$status, $id]);
     }

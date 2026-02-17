@@ -19,12 +19,23 @@
     <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
         <section class="w-full max-w-5xl bg-black p-[6px] gap-x-3 rounded-xl flex-col md:flex-row flex shadow-2xl overflow-hidden">
             
-            <div class="w-full md:w-[40%] h-auto md:h-[80vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+<div class="w-full md:w-[40%] h-auto md:h-[80vh] rounded-lg flex flex-col justify-between text-white p-8 bg-gradient-to-b from-gray-900 to-black">
+                
+                <div class="w-full opacity-50 hover:opacity-100 transition-opacity duration-700">
+                    <p class="text-[9px] text-gray-500 uppercase tracking-[2px] font-bold mb-2">
+                        <span class="text-amber-600">●</span> Política de Cookies
+                    </p>
+                    <p class="text-[9px] text-gray-600 leading-relaxed text-justify font-medium">
+                        Este sistema utiliza cookies técnicas locales estrictamente necesarias para gestionar la seguridad de su sesión y navegación. No se utilizan rastreadores de terceros ni cookies publicitarias. Al acceder, acepta el uso operativo de las mismas.
+                    </p>
+                </div>
+
                 <div class="text-center pb-4">
+                    <a href="https://www.appgrobo.com">
                     <h1 class="text-4xl font-bold mb-2 tracking-tighter italic">G.R.O.B.O.</h1>
-                    <h2 class="text-sm font-light mb-6 text-amber-500 uppercase tracking-widest">Gestor de Reactivos Biológicos Online</h2>
+                    <h2 class="text-sm font-light mb-6 text-amber-500 uppercase tracking-widest">Gestor de Reactivos Biológicos Online</h2></a>
                     <p class="text-[#888] leading-relaxed text-[11px] text-justify border-t border-gray-800 pt-6">
-                        Desarrollado por <strong>NETWISE</strong>, GROBO es una aplicación web que permite gestionar protocolos, gastos y peticiones referentes al uso de animales, alineada a estándares de la CNEA.
+                        Desarrollado por <strong>Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación con la direccion de Martin Breijo</strong>, GROBO es una ERP web que permite gestionar protocolos, gastos y peticiones referentes al uso de animales, alineada a estándares de la CNEA.
                     </p>
                 </div>
             </div>
@@ -56,6 +67,10 @@
                     <div class="flex-1 flex flex-col justify-center px-8 pb-8">
                         <div class="max-w-sm mx-auto w-full">
                             <div class="text-center mb-8">
+                                <div id="logo-container" class="mb-4 hidden flex justify-center" >
+                                    <img id="inst-logo" src="" alt="Logo Sede" class="h-16 w-auto object-contain" style="height: 6vw;">
+                                </div>
+
                                 <h2 id="inst-welcome" class="text-3xl font-black text-gray-900 mb-0 uppercase tracking-tighter italic">Validando...</h2>
                                 <p id="inst-full-name" class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-4"></p>
                                 <p class="text-gray-500 text-sm italic font-medium">Ingresa tus credenciales para continuar</p>
@@ -66,43 +81,45 @@
                                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Usuario</label>
                                     <input type="text" id="username" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all" required>
                                 </div>
+                                <div class="relative">
+                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Contraseña</label>
                                     <div class="relative">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest">Contraseña</label>
-                                            <div class="relative">
-                                                <input type="password" id="password" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all pr-10" required>
-                                                <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-amber-600 focus:outline-none">
-                                                    <svg id="eye-icon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                    <svg id="eye-off-icon" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.59M5.22 5.22a3 3 0 00-4.24 4.24M6.343 6.343l-.707-.707m12.728 12.728L12 12m0 0l3.75-3.75M12 12h.008v.008H12V12zm0 0L9.88 9.88" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </div>
+                                        <input type="password" id="password" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all pr-10" required>
+                                        <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-amber-600 focus:outline-none">
+                                            <svg id="eye-icon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <svg id="eye-off-icon" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.574-2.59M5.22 5.22a3 3 0 00-4.24 4.24M6.343 6.343l-.707-.707m12.728 12.728L12 12m0 0l3.75-3.75M12 12h.008v.008H12V12zm0 0L9.88 9.88" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 <script>
-                                        function togglePassword() {
-                                            const input = document.getElementById('password');
-                                            const iconEye = document.getElementById('eye-icon');
-                                            const iconOff = document.getElementById('eye-off-icon');
-                                            
-                                            if (input.type === "password") {
-                                                input.type = "text";
-                                                iconEye.classList.add('hidden');
-                                                iconOff.classList.remove('hidden');
-                                            } else {
-                                                input.type = "password";
-                                                iconEye.classList.remove('hidden');
-                                                iconOff.classList.add('hidden');
-                                            }
+                                    function togglePassword() {
+                                        const input = document.getElementById('password');
+                                        const iconEye = document.getElementById('eye-icon');
+                                        const iconOff = document.getElementById('eye-off-icon');
+                                        
+                                        if (input.type === "password") {
+                                            input.type = "text";
+                                            iconEye.classList.add('hidden');
+                                            iconOff.classList.remove('hidden');
+                                        } else {
+                                            input.type = "password";
+                                            iconEye.classList.remove('hidden');
+                                            iconOff.classList.add('hidden');
                                         }
-                                    </script>
+                                    }
+                                </script>
+                                
                                 <div class="flex items-center ml-1 py-2">
                                     <input id="remember-me" type="checkbox" class="w-4 h-4 text-amber-600 bg-gray-100 border-gray-300 rounded focus:ring-amber-500 cursor-pointer">
                                     <label for="remember-me" class="ml-2 text-[11px] font-bold text-gray-500 uppercase tracking-wide cursor-pointer select-none">Recordar mi sesión</label>
                                 </div>
+
                                 <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-4 rounded-xl font-bold shadow-lg uppercase text-xs tracking-[2px] active:scale-95 transition-all">Entrar al Sistema</button>
                                 
                                 <div class="text-center mt-4">
@@ -111,7 +128,7 @@
                                 <div id="msg-alert" class="mt-4 p-3 bg-red-50 text-red-600 text-[10px] uppercase font-bold rounded-lg border border-red-100 hidden text-center italic tracking-tighter"></div>
                             </form>
 
-                            <div id="modal-2fa" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center z-50 backdrop-blur-sm">
+                        <div id="modal-2fa" class="fixed inset-0 bg-black bg-opacity-90 hidden items-center justify-center z-50 backdrop-blur-sm">
                                 <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full text-center relative border border-amber-500/30">
                                     <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -125,16 +142,26 @@
                                         
                                         <button type="submit" class="w-full bg-black hover:bg-gray-900 text-white py-4 rounded-xl font-bold shadow-lg uppercase text-xs tracking-[2px] transition-all">Verificar Código</button>
                                     </form>
-                                    <button onclick="window.location.reload()" class="mt-4 text-[10px] text-gray-400 hover:text-red-500 uppercase font-bold tracking-widest">Cancelar</button>
+
+                                    <div class="mt-4 text-xs text-gray-500 border-t border-gray-100 pt-3">
+                                        ¿No recibiste el código? 
+                                        <a href="#" id="resend-link" class="text-amber-600 font-bold underline ml-1 hover:text-amber-700 transition-colors">Enviar nuevamente</a>
+                                        <span id="resend-timer" class="text-gray-400 font-bold ml-1 hidden"></span>
+                                    </div>
+
+                                    <button onclick="window.location.reload()" class="mt-6 text-[10px] text-gray-400 hover:text-red-500 uppercase font-bold tracking-widest">Cancelar</button>
                                 </div>
                             </div>
+
+
+
                         </div>
                     </div>
                 </div>
 
                 <div class="p-6 border-t border-gray-50 mt-auto">
                     <div class="flex justify-between items-center text-[10px] text-gray-300 uppercase tracking-[2px] font-bold">
-                        <span>© 2026 NETWISE</span>
+                        <span>© 2026 Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</span>
                     </div>
                 </div>
             </div>

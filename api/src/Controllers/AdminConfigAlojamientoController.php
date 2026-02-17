@@ -1,28 +1,30 @@
 <?php
 namespace App\Controllers;
 
-use App\Models\AdminConfig\AdminConfigInstitutionModel;
+use App\Models\AdminConfig\AdminConfigAlojamientoModel;
 
-class AdminConfigInstitutionController {
+class AdminConfigAlojamientoController {
     private $model;
 
     public function __construct($db) {
-        $this->model = new AdminConfigInstitutionModel($db);
+        $this->model = new AdminConfigAlojamientoModel($db);
     }
 
-    public function get() {
+    public function getDetails() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $instId = $_GET['inst'] ?? 0;
-        if (!$instId) {
-            echo json_encode(['status' => 'error', 'message' => 'Falta ID Institución']);
+        $espId = $_GET['esp'] ?? 0;
+        if(!$espId) {
+            echo json_encode(['status' => 'error', 'message' => 'Falta ID Especie']);
             exit;
         }
 
         try {
-            $data = $this->model->getInstitution($instId);
-            $data['servicios'] = $this->model->getServices($instId);
+            $data = [
+                'types' => $this->model->getTypes($espId),
+                'categories' => $this->model->getCategories($espId)
+            ];
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -31,31 +33,22 @@ class AdminConfigInstitutionController {
         exit;
     }
 
-    public function update() {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-        
-        $data = $_POST;
-        $files = $_FILES; 
-        
-        try {
-            $this->model->updateInstitution($data, $files);
-            echo json_encode(['status' => 'success', 'message' => 'Actualizado']);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-        }
-        exit;
-    }
+    // --- TYPES ---
+    public function saveType() { $this->handleSave('saveType'); }
+    public function toggleType() { $this->handleToggle('toggleType'); }
+    public function deleteType() { $this->handleDelete('deleteType'); }
 
-    public function add_service() {
+    // --- CATEGORIES ---
+    public function saveCat() { $this->handleSave('saveCategory'); }
+    public function toggleCat() { $this->handleToggle('toggleCategory'); }
+    public function deleteCat() { $this->handleDelete('deleteCategory'); }
+
+    // --- HELPERS ---
+    private function handleSave($method) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $input = json_decode(file_get_contents('php://input'), true);
-        
         try {
-            if(empty($input['nombre']) || empty($input['instId'])) throw new \Exception("Datos incompletos");
-            $this->model->addService($input);
+            $this->model->$method($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -64,14 +57,13 @@ class AdminConfigInstitutionController {
         exit;
     }
 
-    public function delete_service() {
+    private function handleToggle($method) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $input = json_decode(file_get_contents('php://input'), true);
-        
         try {
             if(empty($input['id'])) throw new \Exception("ID faltante");
-            $this->model->deleteService($input['id']);
+            $this->model->$method($input['id'], $input['status']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -80,17 +72,16 @@ class AdminConfigInstitutionController {
         exit;
     }
 
-    public function toggle_service() {
+    private function handleDelete($method) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $input = json_decode(file_get_contents('php://input'), true);
-        
         try {
             if(empty($input['id'])) throw new \Exception("ID faltante");
-            $this->model->toggleService($input['id']);
+            $this->model->$method($input['id']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
-            http_response_code(500);
+            // No enviamos 500 para permitir que el JS muestre la alerta 'warning' personalizada
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

@@ -65,8 +65,9 @@ public function getSuperAdminByUsername($username) {
         return $this->db->prepare($sql)->execute([$code, $userId]);
     }
 
-    public function verifyAndGetUser2FA($userId, $code) {
-        $sql = "SELECT u.IdUsrA, u.IdInstitucion, u.UsrA, t.IdTipousrA as role, p.NombreA 
+public function verifyAndGetUser2FA($userId, $code) {
+        // AGREGAMOS p.ApellidoA AQUÍ
+        $sql = "SELECT u.IdUsrA, u.IdInstitucion, u.UsrA, t.IdTipousrA as role, p.NombreA, p.ApellidoA 
                 FROM usuarioe u
                 JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
                 LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA

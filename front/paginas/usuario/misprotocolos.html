@@ -4,115 +4,219 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Protocolos - GROBO</title>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
-        .clickable-row { cursor: pointer !important; transition: background 0.2s; }
-        .clickable-row:hover { background-color: #e2e6ea !important; }
-        .badge-status { font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 4px; }
-        .inst-badge { font-size: 9px; background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 5px; font-weight: bold; text-transform: uppercase; }
-        .page-link { color: #333; border: none; margin: 0 2px; border-radius: 4px !important; font-weight: bold; font-size: 12px; }
-        .page-link:hover { background-color: #e9ecef; color: #1a5d3b; }
-        .page-item.active .page-link { background-color: #1a5d3b; color: white; }
+        .table-hover tbody tr:hover { background-color: #f8f9fa !important; cursor: pointer; }
+        .nav-pills .nav-link.active { background-color: #0d6efd; color: white; font-weight: 800; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-pills .nav-link { color: #6c757d; font-weight: 600; border: 1px solid transparent; background: #fff; }
+        .nav-pills .nav-link:hover { background-color: #e9ecef; }
+        .select-search-input { border-radius: 0.375rem 0.375rem 0 0; border-bottom: none; background: #f8f9fa; }
+        .network-option { transition: all 0.2s; border: 1px solid #dee2e6; cursor: pointer; }
+        .network-option:hover { background-color: #e9ecef; border-color: #adb5bd; }
+        .network-option.selected { background-color: #cfe2ff; border-color: #0d6efd; }
+        .cursor-help { cursor: help; }
     </style>
 
     <script type="module">
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        import { Auth } from '../../dist/js/auth.js';
-        import { NotificationManager } from '../../dist/js/NotificationManager.js';
-        import { initMisProtocolos } from '../../dist/js/pages/usuario/misProtocolos.js';
+        import { initUserProtocols } from '../../../dist/js/pages/usuario/user_protocolos.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { showLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (!Auth.checkAccess([1, 2, 3])) return;
-            await initMenu();
+        document.addEventListener('DOMContentLoaded', () => {
+            showLoader();
+            if(!Auth.checkAccess([1, 2, 3, 4])) return; 
+            initMenu();
             NotificationManager.init();
-            initMisProtocolos();
+            initUserProtocols();
         });
     </script>
 </head>
-<body class="bg-light">
-    <div class="container-fluid my-5 px-4 px-md-5">
-        
-        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-            <div>
-                <h4 class="fw-bold mb-0 text-dark">MIS PROTOCOLOS</h4>
-                <div class="d-flex gap-3 align-items-center mt-1">
-                    <small class="text-muted">Gestión científica global</small>
-                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary px-2" id="count-total">Total: 0</span>
-                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-2" id="count-approved">Aprobados: 0</span>
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <button id="btn-export-excel" class="btn btn-success btn-sm fw-bold shadow-sm">
-                    <i class="bi bi-file-earmark-excel me-1"></i> EXCEL
-                </button>
-                <a href="../construccion.html" class="btn btn-primary btn-sm fw-bold shadow-sm">
-                    <i class="bi bi-plus-circle me-1"></i> SOLICITAR NUEVO PROTOCOLO
-                </a>
-            </div>
-        </div>
+<body>
+    <div class="container my-5">
+        <div class="card shadow-sm border-0 p-4">
+            
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread"></li>
+                    <li class="breadcrumb-item text-muted">Investigador</li>
+                    <li class="breadcrumb-item active"><span class="badge bg-primary px-2 py-1">Mis Protocolos</span></li>
+                </ol>
+            </nav>
 
-        <div class="card shadow-sm border-0 p-3 mb-4">
-            <div class="row g-2">
-                <div class="col-md-3 d-none" id="container-filter-inst">
-                    <select id="filter-inst" class="form-select form-select-sm fw-bold text-primary border-primary">
-                        <option value="all">TODAS LAS INSTITUCIONES</option>
-                    </select>
-                </div>
-                <div class="col-md-5">
-                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Buscar por Título, ID, Especie, Responsable...">
-                </div>
-                <div class="col-md-4 text-end align-self-center">
-                    <span class="text-muted small fw-bold" id="dynamic-counter">Cargando...</span>
+            <div id="stats-bar" class="d-flex align-items-center mb-4 small text-muted"></div>
+
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-center mb-4 gap-3">
+                <ul class="nav nav-pills p-1 rounded shadow-sm bg-light" id="view-tabs">
+                    <li class="nav-item me-2"><button class="nav-link active px-4 small uppercase" onclick="window.switchView('my')"><i class="bi bi-person-fill me-2"></i> Mis Protocolos</button></li>
+                    <li class="nav-item me-2"><button class="nav-link px-4 small uppercase" onclick="window.switchView('local')"><i class="bi bi-building me-2"></i> Institución Actual</button></li>
+                    <li class="nav-item d-none" id="tab-network-li"><button class="nav-link px-4 small uppercase" onclick="window.switchView('network')"><i class="bi bi-globe me-2"></i> Red / Multicentro</button></li>
+                </ul>
+
+                <div class="dropdown">
+                    <button class="btn btn-primary fw-bold shadow-sm dropdown-toggle px-4" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-plus-circle me-2"></i> SOLICITUD PROTOCOLO
+                    </button>
+                    <ul class="dropdown-menu shadow border-0 mt-1 p-2">
+                        <li>
+                            <a class="dropdown-item rounded fw-bold py-2" href="#" onclick="window.openNewProtocolModal()">
+                                <i class="bi bi-file-earmark-plus me-2 text-primary"></i> Solicitar Nuevo (Interno)
+                            </a>
+                        </li>
+                        <li class="d-none" id="action-create-external-li">
+                            <a class="dropdown-item rounded fw-bold py-2 text-primary" href="#" onclick="window.openCreateExternalModal()">
+                                <i class="bi bi-globe2 me-2"></i> Solicitar en OTRA Institución (Red)
+                            </a>
+                        </li>
+                        <li class="d-none" id="action-network-li">
+                            <hr class="dropdown-divider">
+                            <a class="dropdown-item rounded fw-bold py-2 text-secondary" href="#" onclick="window.openNetworkRequestModal()">
+                                <i class="bi bi-share-fill me-2"></i> Solicitar Aprobación en RED
+                            </a>
+                        </li>
+                    </ul>
                 </div>
             </div>
-        </div>
 
-        <div class="card shadow-sm border-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size: 11px;">
-                    <thead class="table-light text-uppercase">
+            <div class="row align-items-end mb-3 border-bottom pb-3">
+                <div class="col-12">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
+                        <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
+                            <option value="all">Todo (Texto)</option>
+                            <option value="nprotA">N° Protocolo</option>
+                            <option value="tituloA">Título</option>
+                            <option value="InvestigadorACargA">Inv. Cargo</option>
+                            <option value="TipoNombre">Tipo</option>
+                            <option value="Origen">Origen</option>
+                        </select>
+                        <div id="dynamic-search-container" class="flex-grow-1">
+                            <input type="text" id="search-input" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">
+                        </div>
+                        <button id="btn-search" class="btn btn-dark fw-bold px-3"><i class="bi bi-search"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle border" style="font-size: 11px;">
+                    <thead class="table-light text-uppercase text-secondary">
                         <tr>
-                            <th class="ps-3">ID</th>
-                            <th>N° Prot</th>
-                            <th>Institución</th>
-                            <th style="min-width: 150px;">Título</th>
-                            <th>Responsable</th>
-                            <th class="text-center">Cant.</th>
-                            <th>Especies</th>
-                            <th>Depto</th>
-                            <th>Tipo</th>
-                            <th>Vencimiento</th>
-                            <th>Estado</th>
-                            <th class="text-end pe-3">PDF</th>
+                            <th class="py-3 px-2">ID</th>
+                            <th class="py-3 px-2">N° Prot.</th>
+                            <th class="py-3 px-2">Título</th>
+                            <th class="py-3 px-2 text-primary">Responsable (Usuario)</th>
+                            <th class="py-3 px-2">Inv. Referente</th>
+                            <th class="py-3 px-2 text-center">Tipo</th>
+                            <th class="py-3 px-2 text-center">Origen</th>
+                            <th class="py-3 px-2 text-center">Estado</th> 
+                            <th class="py-3 px-2">Vence</th>
+                            <th class="py-3 px-2 text-end">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body"></tbody>
+                    <tbody id="table-protocols"></tbody>
                 </table>
             </div>
-            <div class="p-3 border-top d-flex justify-content-center">
-                <ul id="pagination" class="pagination pagination-sm mb-0"></ul>
+
+            <nav aria-label="Page navigation"><ul id="pagination" class="pagination pagination-sm justify-content-center m-0"></ul></nav>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-detail" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg border-top border-5 border-info">
+                <div id="detail-content" class="modal-body p-4"></div>
+                <div class="modal-footer border-0 bg-light p-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modal-visor" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal fade" id="modal-new-prot" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-success text-white py-2">
-                    <h5 class="modal-title fw-bold fs-6">Detalle de Protocolo</h5>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold fs-6" id="modal-new-prot-title">NUEVA SOLICITUD</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4" id="modal-visor-body"></div>
-                <div class="modal-footer bg-light py-2 justify-content-between">
-                    <div id="modal-actions"></div>
-                    <button type="button" class="btn btn-secondary btn-sm fw-bold px-4" data-bs-dismiss="modal">CERRAR</button>
+                <div class="modal-body p-4">
+                    <div id="user-info-badge" class="alert alert-primary py-2 small fw-bold mb-3 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-person-badge me-2"></i> Usted será el RESPONSABLE ADMINISTRATIVO de este protocolo.</span>
+                        <span class="badge bg-white text-primary" id="current-user-display">ID: Cargando...</span>
+                    </div>
+                    <div id="alert-edit-mode" class="alert alert-warning py-2 small fw-bold mb-3 d-none"><i class="bi bi-pencil-square me-2"></i> MODO EDICIÓN</div>
+                    
+                    <form id="form-new-prot">
+                        <input type="hidden" name="idprotA" id="edit-prot-id">
+                        <input type="hidden" name="IdInstitucion" id="form-inst-id"> <input type="hidden" name="external_mode" id="external-mode-flag" value="0">
+
+                        <div id="external-inst-selector" class="mb-3 d-none">
+                            <label class="form-label small fw-bold text-primary">INSTITUCIÓN DESTINO (RED)</label>
+                            <select id="select-target-inst" class="form-select fw-bold border-primary" onchange="window.loadExternalConfig(this.value)">
+                                <option value="">-- Seleccione Institución --</option>
+                            </select>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-9"><label class="form-label small fw-bold text-muted">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
+                            <div class="col-md-3"><label class="form-label small fw-bold text-muted">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">INVESTIGADOR A CARGO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">SEVERIDAD</label><select name="severidad" id="new-sev" class="form-select"></select></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">FECHA INICIO</label><input type="date" name="FechaIniProtA" id="inp-ini" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">FECHA VENCIMIENTO</label><input type="date" name="FechaFinProtA" id="inp-fin" class="form-control"></div>
+                            <div class="col-12 mt-3">
+                                <div class="bg-light p-3 rounded border">
+                                    <h6 class="fw-bold small text-muted mb-2">ESPECIES ASOCIADAS</h6>
+                                    <div id="new-species-container"></div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="window.addNewSpeciesRow()"><i class="bi bi-plus-lg"></i> Agregar Especie</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-end">
+                            <button type="submit" class="btn btn-primary px-5 fw-bold" id="btn-save-prot">ENVIAR SOLICITUD</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-network-req" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title fw-bold fs-6">COMPARTIR EN RED</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-4"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Solo puede enviar a la red sus <strong>propios protocolos</strong> vigentes y aprobados localmente.</p>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-muted small">1. SELECCIONE PROTOCOLO</label>
+                        <input type="text" class="form-control form-control-sm mb-1" placeholder="Buscar..." onkeyup="window.filterMyProtocols(this)">
+                        <select id="select-my-prot" class="form-select" size="4" onchange="window.showProtDetails()"></select>
+                    </div>
+                    <div id="prot-details-preview" class="bg-light p-3 rounded border mb-4 d-none">
+                        <h6 class="fw-bold text-dark mb-1" id="preview-title"></h6>
+                        <span class="small text-muted">ID: <strong id="preview-id"></strong> | Vence: <strong id="preview-date"></strong></span>
+                    </div>
+                    <div id="step-3-network" class="d-none">
+                        <label class="form-label fw-bold text-muted small">2. DESTINOS</label>
+                        <div id="network-inst-list" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                    <div class="mt-4 text-end"><button type="button" class="btn btn-info text-white px-5 fw-bold" onclick="window.sendNetworkRequest()" id="btn-send-net" disabled>ENVIAR</button></div>
                 </div>
             </div>
         </div>

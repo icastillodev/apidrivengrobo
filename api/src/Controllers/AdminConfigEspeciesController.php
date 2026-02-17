@@ -25,6 +25,7 @@ class AdminConfigEspeciesController {
 
     public function saveEspecie() {
         if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         try {
             $this->model->saveEspecie($_POST);
             echo json_encode(['status' => 'success']);
@@ -36,6 +37,7 @@ class AdminConfigEspeciesController {
 
     public function deleteEspecie() {
         if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         try {
             $res = $this->model->deleteEspecie($_POST['idEsp']);
             echo json_encode(['status' => 'success', 'mode' => $res]);
@@ -47,6 +49,7 @@ class AdminConfigEspeciesController {
 
     public function saveSubespecie() {
         if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         try {
             $this->model->saveSubespecie($_POST);
             echo json_encode(['status' => 'success']);
@@ -58,6 +61,7 @@ class AdminConfigEspeciesController {
 
     public function toggleSubespecie() {
         if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         try {
             $this->model->toggleSubespecie($_POST['idSub'], $_POST['status']);
             echo json_encode(['status' => 'success']);

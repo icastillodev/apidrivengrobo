@@ -1070,3 +1070,10 @@ body.with-sidebar {
     background-color: transparent;
     margin-bottom: 20px;
 }
+
+/* ... tus estilos anteriores ... */
+
+/* NUEVOS TEMAS PARA LOS NUEVOS MÓDULOS */
+.theme-indigo { color: #6610f2; background-color: rgba(102, 16, 242, 0.1); }
+.theme-pink   { color: #d63384; background-color: rgba(214, 51, 132, 0.1); }
+.theme-orange { color: #fd7e14; background-color: rgba(253, 126, 20, 0.1); }
