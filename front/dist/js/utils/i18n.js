@@ -34,3 +34,21 @@ export async function loadLanguage(lang = null) {
         return false;
     }
 }
+// Agrega esto a tu i18n.js o a un archivo de utilidades central
+export const translatePage = () => {
+    const elements = document.querySelectorAll('[data-i18n]');
+
+    elements.forEach(el => {
+        const path = el.getAttribute('data-i18n');
+        const keys = path.split('.');
+        
+        let text = window.txt;
+        keys.forEach(key => { text = text ? text[key] : null; });
+
+        if (text) {
+            // USAMOS innerHTML para que respete los <strong> o <br>
+            if (el.tagName === 'INPUT') el.placeholder = text;
+            else el.innerHTML = text; 
+        }
+    });
+};

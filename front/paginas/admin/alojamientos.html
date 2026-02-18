@@ -35,21 +35,54 @@
     </style>
 
     <script type="module">
-        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js';
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        
+        // Lógica administrativa de alojamientos y sus submódulos de registro/configuración
+        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js';
         import '../../dist/js/pages/admin/registroAlojamiento.js';
         import '../../dist/js/pages/admin/configuracionAlojamiento.js';
-        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            Auth.checkAccess([1, 2, 4]);
-            initMenu();
-            initAlojamientosPage(); 
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt esté disponible para evitar errores en el menú e interfaz
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos y Técnicos de Bioterio)
+                Auth.checkAccess([1, 2, 4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica maestra de alojamientos
+                    initAlojamientosPage();
+                    
+                    console.log("✅ Administración de Alojamientos inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay de estabilidad para abrir cajas o configuraciones desde la URL)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de página de Alojamientos:", error);
+            } finally {
+                hideLoader();
+            }
         });
-        setTimeout(() => {
-            checkUrlParamsAndOpen();
-        }, 300);
     </script>
 </head>
 <body class="hold-transition sidebar-mini">

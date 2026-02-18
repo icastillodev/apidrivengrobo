@@ -1,7 +1,9 @@
 import { Auth } from '../auth.js';
 import { API } from '../api.js'; // <--- ESTA ES LA IMPORTACIÓN CRÍTICA QUE FALTABA
 import { GeckoVoice } from './GeckoVoice.js';
-import { executeGlobalSearch } from './GeckoSearch.js';
+import { executeGlobalSearch,initGlobalSearchUI } from './GeckoSearch.js';
+import { HotkeyManager } from '../utils/hotkeys.js';
+
 
 // --- HELPER PARA LEER SESIÓN ---
 const getSession = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -15,11 +17,9 @@ const getBasePath = () => {
 
 // --- GENERADOR DE RUTAS ABSOLUTAS ---
 // Esto evita que te mande al 404 o a la raíz. Siempre apunta a 'paginas/'
-function getCorrectPath(rawPath) {
+export function getCorrectPath(rawPath) {
     if (!rawPath || rawPath === '#') return 'javascript:void(0);';
     if (rawPath === 'logout') return 'javascript:Auth.logout();';
-    
-    // Construye: /URBE-API-DRIVEN/front/paginas/admin/usuarios.html
     return `${getBasePath()}paginas/${rawPath}`;
 }
 
@@ -256,12 +256,19 @@ export async function initMenu() {
         return;
     }
 
-    // --- AQUÍ ESTÁ EL CAMBIO CRÍTICO ---
-    // Definimos los templates DENTRO de la función, cuando window.txt ya existe.
-    if (!window.txt) {
-        console.error("❌ Idioma no cargado. Ejecuta await loadLanguage() antes de initMenu().");
-        return;
+    const resultsTop = document.getElementById('search-results-top');
+    
+    if(resultsTop) {
+        resultsTop.innerHTML = '';      // Vaciar contenido
+        resultsTop.classList.add('d-none'); // Ocultar visualmente
     }
+
+        // --- AQUÍ ESTÁ EL CAMBIO CRÍTICO ---
+        // Definimos los templates DENTRO de la función, cuando window.txt ya existe.
+        if (!window.txt) {
+            console.error("❌ Idioma no cargado. Ejecuta await loadLanguage() antes de initMenu().");
+            return;
+        }
 
     const MENU_TEMPLATES = {
         1: { label: window.txt.menu.users, svg: `<svg viewBox="0 0 640 512"><path d="M320 16a104 104 0 1 1 0 208a104 104 0 1 1 0-208M96 88a72 72 0 1 1 0 144a72 72 0 1 1 0-144M0 416c0-70.7 57.3-128 128-128c12.8 0 25.2 1.9 36.9 5.4C132 330.2 112 378.8 112 432v16c0 11.4 2.4 22.2 6.7 32H32c-17.7 0-32-14.3-32-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32v-16c0-53.2-20-101.8-52.9-138.6c11.7-3.5 24.1-5.4 36.9-5.4c70.7 0 128 57.3 128 128v32c0 17.7-14.3 32-32 32zM472 160a72 72 0 1 1 144 0a72 72 0 1 1-144 0M160 432c0-88.4 71.6-160 160-160s160 71.6 160 160v16c0 17.7-14.3 32-32 32H192c-17.7 0-32-14.3-32-32z"/></svg>`, path: 'admin/usuarios.html' },
@@ -279,6 +286,8 @@ export async function initMenu() {
         13: { label: window.txt.menu.my_history, svg: `<svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>`, path: 'construccion.html' },
         14: { label: window.txt.menu.my_reservations, svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'usuario/construccion.html' },
         15: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'admin/protocolos.html' },
+        203: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,path: 'usuario/misprotocolos.html' },
+        
         55: { 
             label: window.txt.menu.investigator_group, 
             svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,
@@ -301,17 +310,8 @@ export async function initMenu() {
                 { label: 'Historial Pagos', path: 'construccion.html' }
             ]
         },
-        203: { 
-            label: 'Protocolos Totales', 
-            svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,
-            isDropdown: true,
-            children: [
-                { label: window.txt.menu.my_protocols, path: 'admin/mis-protocolos.html' },
-                { label: 'Todos los protocolos', path: 'admin/protocolos-confirmados.html' },
-                { label: 'Solicitar nuevo protocolo', path: 'admin/protocolos-confirmados.html' }
-            ]
-        },
-        998: { 
+
+            998: { 
             label: window.txt.menu.help_group, 
             svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
             isDropdown: true,
@@ -381,6 +381,8 @@ export async function initMenu() {
             UserPreferences.applyFontSize(UserPreferences.config.fontSize);
         }
     } catch (err) { console.error("MenuComponent Error:", err); }
+
+    initGlobalSearchUI();
 }
 function getUserDisplayText() {
     const user = getSession('userName') || 'Usuario';
@@ -389,15 +391,15 @@ function getUserDisplayText() {
     const apellido = getSession('userApe'); 
 
     let fullName = user;
-    if (nombre && apellido && nombre !== user) {
+   // if (nombre && apellido && nombre !== user) {
         fullName = `${nombre} ${apellido}`;
-    } else if (nombre && nombre !== user) {
+  /*  } else if (nombre && nombre !== user) {
         fullName = nombre;
     }
 
     if (fullName === user) {
         return `${user} (${id})`;
-    }
+    }*/
     return `${user} (${id}) - ${fullName}`;
 }
 
@@ -612,6 +614,11 @@ function buildControlsHTML(layout) {
         <button id="btn-layout-switch" class="${btnClass}" style="${btnStyle}" title="Cambiar Diseño">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v1h14V2a1 1 0 0 0-1-1H2z"/></svg>
         </button>
+    </li>
+    <li class="${isSide ? 'd-flex justify-content-center gap-2 w-100 mt-3 pb-3 flex-wrap' : 'nav-item d-flex align-items-center ms-2 ps-2 border-start border-secondary-subtle'}">
+        <button id="btn-hotkeys-help" class="${btnClass}" style="${btnStyle}" title="Atajos de Teclado">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
+        </button>
     </li>`;
 }
 
@@ -619,6 +626,8 @@ function setupEventListeners() {
     window.Auth = Auth;
     window.GeckoVoice = GeckoVoice; 
     window.executeGlobalSearch = executeGlobalSearch;
+
+    HotkeyManager.init();
 
     const closeBtn = document.getElementById('gecko-close-sidebar');
     if(closeBtn) closeBtn.onclick = () => document.getElementById('gecko-sidebar-element').classList.remove('open');
@@ -670,7 +679,8 @@ function setupEventListeners() {
         'btn-voice-switch': () => UserPreferences.toggleVoice(),
         'btn-font-switch': () => UserPreferences.cycleFontSize(),
         'btn-theme-switch': () => UserPreferences.toggleTheme(),
-        'btn-layout-switch': () => UserPreferences.toggleMenuLayout()
+        'btn-layout-switch': () => UserPreferences.toggleMenuLayout(),
+        'btn-hotkeys-help': () => showHotkeysModal()
     };
 
     Object.entries(actions).forEach(([id, fn]) => {
@@ -800,4 +810,57 @@ function applyGlobalHeadConfigs() {
     }
     // Apunta a tu carpeta de recursos multimedia
     favicon.href = `${basePath}dist/multimedia/imagenes/grobo/favicon.ico`; 
+}
+
+
+function showHotkeysModal() {
+    const hotkeys = HotkeyManager.getVisibleHotkeys();
+    
+    // Si ya existe un modal de ayuda, lo removemos para refrescar
+    const oldModal = document.getElementById('modalHotkeys');
+    if (oldModal) oldModal.remove();
+
+    const rows = hotkeys.map(h => `
+        <tr>
+            <td><kbd class="bg-dark text-light border-0 shadow-sm">${h.keys}</kbd></td>
+            <td class="small fw-bold text-secondary text-uppercase">${h.desc}</td>
+        </tr>
+    `).join('');
+
+    const modalHTML = `
+    <div class="modal fade" id="modalHotkeys" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M0 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5zm13.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm-3-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm-3-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm-3-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zM2 9.5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1zm5 4a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1z"/></svg>
+                        Atajos de Teclado (Hotkeys)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" style="min-width: 100% !important;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%;">Combinación</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center bg-light">
+                    <span class="text-muted small">Optimiza tu flujo de trabajo con GROBO</span>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const m = new bootstrap.Modal(document.getElementById('modalHotkeys'));
+    m.show();
 }

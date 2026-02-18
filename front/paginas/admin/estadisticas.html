@@ -32,18 +32,50 @@
 
 
     <script type="module">
-        import { initStatsPage } from '../../dist/js/pages/admin/geckoStats.js';
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
-        import { showLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        // Lógica de estadísticas (Charts, reportes y métricas globales)
+        import { initStatsPage } from '../../dist/js/pages/admin/geckoStats.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            Auth.checkAccess([1, 2, 4]); // Roles permitidos
-            initMenu();
-            NotificationManager.init();
-            initStatsPage(); 
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Detiene la ejecución hasta que el diccionario esté disponible para los gráficos
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos y Superadmin)
+                Auth.checkAccess([1, 2, 4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de estadísticas avanzada
+                    initStatsPage();
+                    
+                    console.log("✅ Panel de Estadísticas inicializado correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay para permitir la renderización de contenedores de gráficos)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de página de Estadísticas:", error);
+            } finally {
+                hideLoader();
+            }
         });
     </script>
 </head>

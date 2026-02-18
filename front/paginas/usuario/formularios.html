@@ -20,27 +20,50 @@
     </style>
 
     <script type="module">
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
         // Importamos la lógica específica de esta página
         import { initFormSelector } from '../../dist/js/pages/usuario/formSelector.js';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            
-            // 1. Validar Sesión (Nivel 3 = Investigador/Usuario)
-            if (!Auth.checkAccess([1, 2, 3])) return;
 
-            // 2. Cargar Menú y Notificaciones
-            await initMenu();
-            NotificationManager.init();
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt esté listo
+                await loadLanguage(); 
 
-            // 3. Iniciar el Selector de Formularios
-            await initFormSelector();
-            
-            hideLoader();
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
+                Auth.checkAccess([1, 2, 3,4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización del selector (donde se cargan los tipos de protocolos/pedidos)
+                    await initFormSelector();
+                    
+                    console.log("✅ Selector de Formularios inicializado correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay para permitir que los botones del selector se inyecten en el DOM)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de formSelector:", error);
+            } finally {
+                hideLoader();
+            }
         });
     </script>
 </head>

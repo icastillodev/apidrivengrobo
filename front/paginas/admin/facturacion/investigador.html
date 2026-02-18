@@ -24,14 +24,50 @@
     </style>
 
     <script type="module">
-        import { initBillingInvestigador } from '../../../dist/js/pages/admin/facturacion/investigador/billingInvestigador.js';
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        // Lógica específica de facturación por investigador
+        import { initBillingInvestigador } from '../../../dist/js/pages/admin/facturacion/investigador/billingInvestigador.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
-            Auth.checkAccess([1, 2, 4]); 
-            initMenu();
-            initBillingInvestigador(); 
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt esté listo para el menú y la tabla
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos y de Auditoría)
+                Auth.checkAccess([1, 2, 4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de cuentas corrientes por investigador
+                    initBillingInvestigador();
+                    
+                    console.log("✅ Facturación por Investigador inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay para permitir la carga de saldos y transacciones históricas)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de BillingInvestigador:", error);
+            } finally {
+                hideLoader();
+            }
         });
     </script>
 </head>

@@ -66,18 +66,51 @@
     </style>
 
     <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
-        import { initConfigDashboard } from '../../../dist/js/pages/admin/configuracion/config.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
-        document.addEventListener('DOMContentLoaded', () => {
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        // Lógica específica del panel de configuración global
+        import { initConfigDashboard } from '../../../dist/js/pages/admin/configuracion/config.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            if(!Auth.checkAccess([1,2])) return; // Solo Admin
-            initMenu();
-            initConfigDashboard();
-            NotificationManager.init();
-            setTimeout(hideLoader, 500); 
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos hasta que window.txt esté listo para evitar errores de traducción
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Solo Administradores)
+                Auth.checkAccess([1, 2]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica del dashboard de configuración
+                    initConfigDashboard();
+                    
+                    console.log("✅ Dashboard de Configuración inicializado correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay para permitir que los formularios de configuración se carguen)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de ConfigDashboard:", error);
+            } finally {
+                // Eliminamos la espera arbitraria de 500ms y cerramos al terminar el flujo real
+                hideLoader();
+            }
         });
     </script>
 </head>

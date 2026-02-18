@@ -23,5 +23,169 @@ export const es = {
         config: "Configurar",
         logout: "Salir",
         help_group: "Ayuda"
+    },
+    bread: {
+        users: "Administración de Usuarios",
+        protocols: "Gestión de Protocolos",
+        animals: "Catálogo de Animales",
+        reagents: "Gestión de Reactivos",
+        supplies: "Administración de Insumos",
+        reservations: "Panel de Reservas",
+        accommodations: "Control de Alojamientos",
+        stats: "Estadísticas Avanzadas",
+        prices: "Lista de Precios",
+        billing: "Módulo de Facturación",
+        config: "Configuración del Sistema",
+        dashboard: "Panel Principal",
+        my_accommodations: "Mis Alojamientos"
+    },
+    generales: {
+        filtrarpor: "Filtrar por:",
+        buscar: "Buscar",
+        escribebuscar: "Escribe para buscar...",
+        todosloscampos: "TODOS LOS CAMPOS",
+        id: "ID",
+        investigador: "Investigador",
+        nprotocolo: "N° Protocolo",
+        quienvio: "QUIÉN VIO",
+        excel: "EXCEL",
+        ayuda: "AYUDA",
+        especie: "Especie",
+        animales: "Animales",
+        anim_short: "Anim.",
+        reactivo: "Reactivo",
+        cantidad: "Cantidad",
+        cant_short: "Cant.",
+        inicio: "Inicio",
+        retiro: "Retiro",
+        aclaracion: "Aclaración",
+    },
+    excel_export: {
+        title: "Exportar a Excel",
+        instruction: "Seleccione el rango de fechas basado en la <strong>Fecha de Inicio</strong> del pedido.",
+        label_from: "Desde:",
+        label_to: "Hasta:",
+        btn_cancel: "CANCELAR",
+        btn_generate: "GENERAR ARCHIVO"
+    },
+    estadosformularios: {
+        estado: "Estado",
+        todosestados: "TODOS LOS ESTADOS",
+        sinestado: "Sin estado",
+        proceso: "Proceso",
+        reservado: "Reservado",
+        listoparaentrega: "Listo para entrega",
+        entregado: "Entregado",
+        suspendido: "Suspendido",
+    },
+    reactivos: {
+        title: "Gestión de Reactivos Biológicos",
+        table: {
+            no_species: "Sin especie",
+            not_assigned: "No asignado",
+            others_ceuas: "OTROS CEUAS"
+        },
+        help: {
+            title: "Guía de Gestión de Reactivos Biológicos",
+            item1_title: "1. BÚSQUEDA Y SEGUIMIENTO",
+            item1_desc: "Localice pedidos rápidamente utilizando la barra superior. Puede filtrar por <strong>Investigador, N° de Protocolo o Estado</strong>. Los resultados se actualizan en tiempo real en la grilla principal.",
+            item2_title: "2. ESTADOS Y ACLARACIONES ADMIN",
+            item2_desc: "Dentro de cada pedido, puede actualizar el estado (Proceso, Reservado, Entregado, etc.). La <strong>Aclaración Administrativa</strong> se guarda automáticamente al salir del campo de texto (blur), manteniendo el registro siempre al día.",
+            item3_title: "3. MODIFICACIÓN TÉCNICA Y STOCK",
+            item3_desc: "En la sección técnica, puede corregir el <strong>Reactivo Biológico</strong> asignado, ajustar la <strong>Cantidad Solicitada</strong> y registrar el total de <strong>Animales Utilizados</strong>. Al guardar estos cambios, el sistema sincroniza automáticamente los saldos con el protocolo correspondiente.",
+            item4_title: "4. NOTIFICACIONES AL INVESTIGADOR",
+            item4_desc: "Utilice el botón <strong>NOTIFICAR</strong> para abrir el popup de correo. Al escribir una observación y confirmar, se enviará un email profesional al investigador con el estado actual y los detalles técnicos de su solicitud.",
+            item5_title: "5. DOCUMENTACIÓN (PDF Y EXCEL)",
+            item5_desc: "El botón <strong>PDF</strong> genera una ficha técnica oficial para el archivo del Bioterio. El botón <strong>EXCEL</strong> permite exportar el historial de reactivos filtrados por rango de fechas para reportes administrativos.",
+            btn_close: "ENTENDIDO"
+        },
+        modal: {
+            detail_title: "Detalle Reactivo Biológico",
+            email: "Email",
+            phone: "Celular",
+            dept: "Depto",
+            order_status: "Estado Pedido",
+            reviewed_by: "Revisado por",
+            admin_notes: "Aclaración Administrativa",
+            last_notify: "ÚLTIMA NOTIFICACIÓN POR CORREO",
+            not_notified: "No hay historial de correos enviados",
+            notified_status: "Estado notificado",
+            notify_btn: "NOTIFICAR",
+            tech_mod: "MODIFICACIÓN TÉCNICA (DATOS DEL PEDIDO)",
+            external_warning: "⚠️ PROTOCOLO DE OTROS CEUAS (EXTERNO)",
+            protocol_label: "N° Protocolo (Aprobados)",
+            filter_placeholder: "Filtrar...",
+            select_proto: "Seleccione protocolo...",
+            reagent_label: "Reactivo Biológico",
+            qty_req: "Cant. Solicitada",
+            animals_used: "Animales Utilizados",
+            start_date: "Fecha Inicio",
+            end_date: "Fecha Retiro",
+            save_btn: "GUARDAR CAMBIOS"
+        },
+        status: {
+            none: "Sin estado",
+            process: "Proceso",
+            ready: "Listo para entrega",
+            delivered: "Entregado",
+            suspended: "Suspendido",
+            reserved: "Reservado"
+        },
+        alerts: {
+            tech_update_title: "¡Actualizado!",
+            tech_update_msg: "Los datos técnicos se guardaron correctamente.",
+            tech_error: "Error al cargar los datos del pedido.",
+            excel_warn: "Debe seleccionar un rango de fechas.",
+            no_results: "No hay registros en ese rango."
+        }
+    },
+    solicitudprotocolo: {
+        titulo: "Solicitudes de Protocolo",
+        subtitulo: "Gestión de aprobaciones pendientes",
+        tabla: {
+            id: "ID",
+            tipo: "Tipo",
+            protocolo: "Protocolo",
+            investigador: "Investigador / Solicitante",
+            origen: "Origen",
+            acciones: "Ver",
+            tipo_interna: "INTERNA",
+            tipo_red: "RED",
+            desconocido: "Desconocido",
+            resp_corto: "Resp:",
+            prot_id_corto: "N°:"
+        },
+        vacio: {
+            titulo: "¡Todo al día!",
+            mensaje: "No hay solicitudes pendientes de revisión."
+        },
+        modal: {
+            titulo: "Detalle de Solicitud",
+            label_titulo: "Título del Protocolo",
+            label_investigador: "Investigador Responsable",
+            label_director: "Director / Resp. Proyecto",
+            label_depto: "Departamento",
+            label_tipo: "Tipo",
+            label_cant: "Cant. Animales",
+            label_especies: "Especies",
+            label_vencimiento: "Vencimiento",
+            label_origen: "Institución de Origen",
+            label_mensaje: "MENSAJE / OBSERVACIONES",
+            placeholder: "Escriba el motivo, correcciones necesarias o comentarios...",
+            // Variable {email} para reemplazar
+            ayuda_mensaje: "Se enviará una notificación a: {email}",
+            btn_cancelar: "Cancelar",
+            btn_rechazar: "RECHAZAR",
+            btn_aprobar: "APROBAR",
+            titulo_aprobado: "¡Aprobado!",
+            titulo_rechazado: "Rechazado",
+            btn_ver_protocolo: "VER PROTOCOLO",
+            label_nprot: "N° Protocolo",      // <--- NUEVO
+            label_inicio: "Fecha Inicio",
+            texto_procesado: "Se ha procesado la solicitud y notificado al usuario."
+        },
+        alertas: {
+            error: "Error al procesar la solicitud."
+        }
     }
 };

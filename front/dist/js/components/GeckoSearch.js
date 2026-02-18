@@ -44,20 +44,15 @@ export async function executeGlobalSearch(type) {
     // 1. ANALIZAR
     const analysis = GeckoSearchEngine.analyze(input.value);
 
-    // 2. COMANDOS (Si es PDF/QR directo)
-    if (analysis.type === 'command') {
-        executeCommand(analysis);
-        input.value = '';
-        resultsBox.innerHTML = '';
-        return;
-    }
-
+    // 2. LIMPIEZA INICIAL (Si está vacío, OCULTAR CAJA)
     if (analysis.term.length < 1) { 
         resultsBox.innerHTML = '';
+        resultsBox.classList.add('d-none'); // <--- CLAVE: Ocultar visualmente
         return;
     }
 
-    // 3. SPINNER
+    // 3. SPINNER (Mostrar caja)
+    resultsBox.classList.remove('d-none'); // <--- CLAVE: Mostrar visualmente
     resultsBox.innerHTML = `<div class="p-3 text-center text-success"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>`;
 
     try {
@@ -180,4 +175,16 @@ function renderItem(url, title, subtitle, badge = '') {
             </div>
             <div class="ms-2">${badge}</div>
         </a>`;
+}
+
+export function initGlobalSearchUI() {
+    const ids = ['search-results-top', 'search-results-side']; // IDs posibles
+    ids.forEach(id => {
+        const box = document.getElementById(id);
+        if(box) {
+            box.innerHTML = '';         // Vaciar contenido fantasma
+            box.classList.add('d-none'); // Forzar ocultamiento Bootstrap
+            box.style.display = 'none';  // Forzar ocultamiento CSS inline (por si acaso)
+        }
+    });
 }

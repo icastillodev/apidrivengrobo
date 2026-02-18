@@ -12,24 +12,56 @@
     <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
 
     <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
-        import { initConfigProtocolos } from '../../../dist/js/pages/admin/configuracion/config_protocolos.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        // Lógica específica para la configuración de flujos y tipos de protocolos
+        import { initConfigProtocolos } from '../../../dist/js/pages/admin/configuracion/config_protocolos.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            if(!Auth.checkAccess([1,2])) return;
-            initMenu();
-            NotificationManager.init();
-            
-            const instName = localStorage.getItem('NombreInst') || 'Institución';
-            const bread = document.getElementById('institucionbread');
-            if(bread) bread.innerText = instName;
 
-            initConfigProtocolos();
-            setTimeout(hideLoader, 500);
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt sea accesible globalmente
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Administradores)
+                Auth.checkAccess([1, 2]); 
+
+                // 3. ACTUALIZACIÓN DE UI (Breadcrumbs dinámicos)
+                const instName = localStorage.getItem('NombreInst') || 'Institución';
+                const bread = document.getElementById('institucionbread');
+                if (bread) bread.innerText = instName;
+
+                // 4. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de flujos de protocolos
+                    initConfigProtocolos();
+                    
+                    console.log("✅ Configuración de Protocolos inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 5. ROUTER (Delay de estabilidad para detectar parámetros en la URL)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de ConfigProtocolos:", error);
+            } finally {
+                // Liberamos la interfaz inmediatamente después de la carga real del módulo
+                hideLoader();
+            }
         });
     </script>
 </head>

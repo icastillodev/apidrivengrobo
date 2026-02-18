@@ -137,10 +137,11 @@ window.openReactivoModal = async (r) => {
 /* --- MÓDULOS DE RENDERIZADO DEL MODAL --- */
 
 function renderModalHeader(r) {
+    const t = window.txt.reactivos.modal;
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div>
-            <h5 class="fw-bold mb-0">Detalle Reactivo Biológico</h5>
+            <h5 class="fw-bold mb-0">${t.detail_title}</h5>
             <span class="small text-muted">ID: <strong>${r.idformA}</strong> | Investigador: ${r.Investigador}</span>
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
@@ -151,82 +152,68 @@ function renderModalHeader(r) {
  * MÓDULO DE CONTACTO - AHORA CON DEPARTAMENTO
  */
 function renderResearcherContact(r) {
+    const t = window.txt.reactivos.modal;
     return `
     <div class="row g-2 mb-3 small border-bottom pb-3 text-center">
-        <div class="col-md-4 text-truncate">
-            <strong>Email:</strong> ${r.EmailInvestigador || '---'}
-        </div>
-        <div class="col-md-4">
-            <strong>Celular:</strong> ${r.CelularInvestigador || '---'}
-        </div>
-        <div class="col-md-4 text-truncate">
-            <strong>Depto:</strong> <span class="text-primary fw-bold">${r.Departamento || '---'}</span>
-        </div>
+        <div class="col-md-4 text-truncate"><strong>${t.email}:</strong> ${r.EmailInvestigador || '---'}</div>
+        <div class="col-md-4"><strong>${t.phone}:</strong> ${r.CelularInvestigador || '---'}</div>
+        <div class="col-md-4 text-truncate"><strong>${t.dept}:</strong> <span class="text-primary fw-bold">${r.Departamento || '---'}</span></div>
     </div>`;
 }
 
 function renderAdminSection(r, identity) {
+    const t = window.txt.reactivos;
     const estado = (r.estado || "Sin estado").trim();
     return `
     <div class="bg-light p-3 rounded border shadow-sm mb-3">
         <div class="row g-3">
             <div class="col-md-6">
-                <label class="form-label small fw-bold text-muted uppercase">Estado Pedido</label>
+                <label class="form-label small fw-bold text-muted uppercase">${t.modal.order_status}</label>
                 <div class="d-flex align-items-center gap-2">
                     <select id="modal-status" class="form-select form-select-sm fw-bold" onchange="window.updateReactivoStatusQuick()">
-                        <option value="Sin estado" ${estado === 'Sin estado' ? 'selected' : ''}>Sin estado</option>
-                        <option value="Proceso" ${estado === 'Proceso' ? 'selected' : ''}>Proceso</option>
-                        <option value="Listo para entrega" ${estado === 'Listo para entrega' ? 'selected' : ''}>Listo para entrega</option>
-                        <option value="Entregado" ${estado === 'Entregado' ? 'selected' : ''}>Entregado</option>
-                        <option value="Suspendido" ${estado === 'Suspendido' ? 'selected' : ''}>Suspendido</option>
-                        <option value="Reservado" ${estado === 'Reservado' ? 'selected' : ''}>Reservado</option>
+                        <option value="Sin estado" ${estado === 'Sin estado' ? 'selected' : ''}>${t.status.none}</option>
+                        <option value="Proceso" ${estado === 'Proceso' ? 'selected' : ''}>${t.status.process}</option>
+                        <option value="Listo para entrega" ${estado === 'Listo para entrega' ? 'selected' : ''}>${t.status.ready}</option>
+                        <option value="Entregado" ${estado === 'Entregado' ? 'selected' : ''}>${t.status.delivered}</option>
+                        <option value="Suspendido" ${estado === 'Suspendido' ? 'selected' : ''}>${t.status.suspended}</option>
+                        <option value="Reservado" ${estado === 'Reservado' ? 'selected' : ''}>${t.status.reserved}</option>
                     </select>
                     <div id="modal-status-badge-container">${getStatusBadge(estado)}</div>
                 </div>
             </div>
             <div class="col-md-6">
-                <label class="form-label small fw-bold text-muted uppercase">Revisado por</label>
+                <label class="form-label small fw-bold text-muted uppercase">${t.modal.reviewed_by}</label>
                 <input type="text" id="modal-quienvisto" class="form-control form-control-sm bg-light fw-bold text-primary" value="${r.quienvisto || identity}" readonly>
             </div>
             <div class="col-12">
-                <label class="form-label small fw-bold text-muted uppercase">Aclaración Administrativa</label>
+                <label class="form-label small fw-bold text-muted uppercase">${t.modal.admin_notes}</label>
                 <textarea id="modal-aclaracionadm" class="form-control form-control-sm" rows="2" onblur="window.updateReactivoStatusQuick()">${r.aclaracionadm || ''}</textarea>
             </div>
         </div>
     </div>`;
 }
-
 /**
  * Renderiza la sección usando el estado guardado en la notificación
  */
 function renderNotificationSection(lastNotify, idformA) {
+    const t = window.txt.reactivos.modal;
     const hasData = lastNotify && lastNotify.NotaNotificacion;
-    
-    // El atributo lastNotify.estado ahora viene directamente de la tabla notificacioncorreo
     const badgeHtml = hasData ? getStatusBadge(lastNotify.estado) : '';
 
     return `
     <div class="alert alert-success border-success mb-3 p-3 shadow-sm">
         <div class="d-flex justify-content-between align-items-center">
             <div style="max-width: 80%;">
-                <p class="mb-1 fw-bold small uppercase">
-                    <i class="bi bi-envelope-check me-1"></i> ÚLTIMA NOTIFICACIÓN POR CORREO:
-                </p>
+                <p class="mb-1 fw-bold small uppercase"><i class="bi bi-envelope-check me-1"></i> ${t.last_notify}:</p>
                 <div class="mb-0 small" style="font-size: 11px;">
                     ${hasData ? `
                         <span class="text-muted fw-bold">${lastNotify.fecha}:</span> 
                         <span class="text-dark">${lastNotify.NotaNotificacion}</span>
-                        <div class="mt-1">
-                            <span class="small text-muted me-1">Estado notificado:</span> ${badgeHtml}
-                        </div>
-                    ` : `
-                        <span class="text-muted italic">No hay historial de correos enviados.</span>
-                    `}
+                        <div class="mt-1"><span class="small text-muted me-1">${t.notified_status}:</span> ${badgeHtml}</div>
+                    ` : `<span class="text-muted italic">${t.not_notified}</span>`}
                 </div>
             </div>
-            <button class="btn btn-sm btn-success fw-bold px-3 shadow-sm" onclick="window.openNotifyPopupReactivo(${idformA})">
-                NOTIFICAR
-            </button>
+            <button class="btn btn-sm btn-success fw-bold px-3 shadow-sm" onclick="window.openNotifyPopupReactivo(${idformA})">${t.notify_btn}</button>
         </div>
     </div>`;
 }
@@ -237,58 +224,48 @@ function renderNotificationSection(lastNotify, idformA) {
  * RENDERIZADO TÉCNICO - VERSIÓN FINAL PRECISIÓN TÉCNICA
  */
 function renderOrderModificationSection(r, usage, cache) {
+    const t = window.txt.reactivos.modal;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
     const isExterno = r.EsOtrosCeuas == 1;
 
     return `
-    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 11px;">MODIFICACIÓN TÉCNICA (DATOS DEL PEDIDO)</h6>
-    
-    <div class="alert alert-danger py-1 px-2 mb-3 fw-bold" style="font-size: 10px; display: ${isExterno ? 'block' : 'none'};">
-        ⚠️ PROTOCOLO DE OTROS CEUAS (EXTERNO)
-    </div>
+    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 11px;">${t.tech_mod}</h6>
+    <div class="alert alert-danger py-1 px-2 mb-3 fw-bold" style="font-size: 10px; display: ${isExterno ? 'block' : 'none'};">${t.external_warning}</div>
 
     <form id="form-reactivo-full">
         <input type="hidden" name="idformA" value="${r.idformA}">
         <div class="row g-3">
             <div class="col-md-12">
-                <label class="form-label small fw-bold uppercase">N° Protocolo (Aprobados)</label>
-                <input type="text" class="form-control form-control-sm mb-1" placeholder="Filtrar..." onkeyup="window.filterProtocolList(this)">
+                <label class="form-label small fw-bold uppercase">${t.protocol_label}</label>
+                <input type="text" class="form-control form-control-sm mb-1" placeholder="${t.filter_placeholder}" onkeyup="window.filterProtocolList(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm">
-                    <option value="">Seleccione protocolo...</option>
+                    <option value="">${t.select_proto}</option>
                     ${protocolos.map(p => {
                         const isSelected = (p.idprotA == r.idprotA) ? 'selected' : '';
                         return `<option value="${p.idprotA}" ${isSelected}>${p.nprotA} - ${p.tituloA} (ID:${p.idprotA})</option>`;
                     }).join('')}
                 </select>
             </div>
-
             <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">Reactivo Biológico</label>
+                <label class="form-label small fw-bold uppercase">${t.reagent_bio}</label>
                 <select name="idinsumoA" class="form-select form-select-sm">
-                    ${reactivos.map(i => `
-                        <option value="${i.IdInsumoexp}" ${r.Reactivo === i.NombreInsumo ? 'selected' : ''}>
-                            ${i.NombreInsumo} [${i.TipoInsumo}]
-                        </option>`).join('')}
+                    ${reactivos.map(i => `<option value="${i.IdInsumoexp}" ${r.Reactivo === i.NombreInsumo ? 'selected' : ''}>${i.NombreInsumo} [${i.TipoInsumo}]</option>`).join('')}
                 </select>
             </div>
-
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase">Cant. Solicitada (${r.Medida || ''})</label>
+                <label class="form-label small fw-bold uppercase">${t.qty_req} (${r.Medida || ''})</label>
                 <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${usage.organo || 0}">
             </div>
-
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase">Animales Utilizados</label>
+                <label class="form-label small fw-bold uppercase">${t.animals_used}</label>
                 <input type="number" name="totalA" class="form-control form-control-sm fw-bold text-danger" value="${usage.totalA || 0}">
             </div>
-
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">Fecha Inicio</label><input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}"></div>
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">Fecha Retiro</label><input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}"></div>
-
+            <div class="col-md-6"><label class="form-label small fw-bold uppercase">${t.start_date}</label><input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}"></div>
+            <div class="col-md-6"><label class="form-label small fw-bold uppercase">${t.end_date}</label><input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}"></div>
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
                 <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadReactivoPDF(${r.idformA})">PDF</button>
-                <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">GUARDAR CAMBIOS</button>
+                <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">${t.save_btn}</button>
             </div>
         </div>
     </form>`;
@@ -365,10 +342,15 @@ window.saveFullReactivoForm = async (e) => {
 
     try {
         const res = await API.request(`/reactivos/update-full?inst=${instId}`, 'POST', fd);
-        if (res.status === 'success') {
-            window.Swal.fire({ title: '¡Actualizado!', text: 'Los datos técnicos se guardaron correctamente.', icon: 'success', confirmButtonColor: '#1a5d3b' })
-            .then(() => { location.reload(); });
-        }
+    if (res.status === 'success') {
+        const t = window.txt.reactivos.alerts;
+        window.Swal.fire({ 
+            title: t.tech_update_title, 
+            text: t.tech_update_msg, 
+            icon: 'success', 
+            confirmButtonColor: '#1a5d3b' 
+        }).then(() => { location.reload(); });
+    }
     } catch (err) { console.error("❌ Error actualización técnica:", err); }
 };
 
@@ -485,6 +467,7 @@ function renderTable() {
     const tbody = document.getElementById('table-body-reactivos');
     const data = getFilteredAndSortedData(); 
     const pageData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+    const t = window.txt.reactivos; // Alias corto
 
     tbody.innerHTML = '';
     pageData.forEach(r => {
@@ -493,7 +476,7 @@ function renderTable() {
         tr.onclick = () => window.openReactivoModal(r);
 
         const badgeCeua = (r.EsOtrosCeuas == 1) 
-            ? `<div class="mt-1"><span class="badge bg-danger shadow-sm" style="font-size: 8px;">OTROS CEUAS</span></div>` 
+            ? `<div class="mt-1"><span class="badge bg-danger shadow-sm" style="font-size: 8px;">${t.table.others_ceuas}</span></div>` 
             : '';
 
         tr.innerHTML = `
@@ -504,10 +487,10 @@ function renderTable() {
                 ${badgeCeua}
             </td>
             <td class="py-2 px-2 small text-uppercase text-muted" style="font-size: 10px;">
-                ${r.Especie || '<span class="opacity-50 italic">Sin especie</span>'}
+                ${r.Especie || `<span class="opacity-50 italic">${t.table.no_species}</span>`}
             </td>
             <td class="py-2 px-2 text-center small fw-bold text-muted">${r.AnimalesUsados || 0}</td>
-            <td class="py-2 px-2 small fw-bold text-dark">${r.Reactivo || 'No asignado'}</td> 
+            <td class="py-2 px-2 small fw-bold text-dark">${r.Reactivo || t.table.not_assigned}</td> 
             <td class="py-2 px-2 text-center">
                 <span class="fw-bold text-primary" style="font-size: 11px;">${r.CantidadReactivo || 0}</span>
                 <span class="text-muted fw-bold" style="font-size: 10px;">${r.Medida || ''}</span> 
@@ -678,8 +661,9 @@ window.processExcelExportReactivos = () => {
     const end = document.getElementById('excel-end-date-reactivo').value;
     const nombreInst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
 
+    const t = window.txt.reactivos.alerts;
     if (!start || !end) {
-        window.Swal.fire('Atención', 'Debe seleccionar un rango de fechas.', 'warning');
+        window.Swal.fire('Atención', t.excel_warn, 'warning');
         return;
     }
 
@@ -693,7 +677,7 @@ window.processExcelExportReactivos = () => {
     });
 
     if (data.length === 0) {
-        window.Swal.fire('Sin resultados', 'No hay registros en ese rango.', 'info');
+        window.Swal.fire('Sin resultados', t.no_results, 'info');
         return;
     }
 

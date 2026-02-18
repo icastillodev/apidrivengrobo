@@ -80,6 +80,7 @@ $router->post('/user/profile/change-password', 'UserProfileController@changePass
 $router->get('/user/my-housings', 'UserHousingController@getAll');
 $router->get('/user/housing-detail/:id', 'UserHousingController@getDetail');
 
+// ...
 // ============================================================
 // SECCIÓN: Protocolos
 // ============================================================
@@ -92,6 +93,12 @@ $router->get('/protocolos/search', 'ProtocolController@search');
 $router->get('/protocols/requests/count', 'ProtocolController@getPendingCount');
 $router->get('/user/protocols/species-detail', 'ControllerusuarioTodosProtocolos@getSpeciesDetail');
 $router->post('/user/protocols/update-internal', 'ControllerusuarioTodosProtocolos@updateInternal');
+
+// ============================================================
+// SECCIÓN: Admin - Solicitudes de Protocolos (Aprobación/Rechazo)
+// ============================================================
+$router->get('/admin/requests/list', 'ControllerAdminSolicitudes@getList');
+$router->post('/admin/requests/process', 'ControllerAdminSolicitudes@process');
 
 // ============================================================
 // SECCIÓN: Animales (Pedidos)
@@ -260,6 +267,7 @@ $router->post('/admin/config/protocols-conf/type/delete', 'AdminConfigProtocoloC
 // Severidades
 $router->post('/admin/config/protocols-conf/severity/save', 'AdminConfigProtocoloController@saveSeverity');
 $router->post('/admin/config/protocols-conf/severity/delete', 'AdminConfigProtocoloController@deleteSeverity');
+
 
 // ============================================================
 // ADMIN: USUARIOS, ROLES Y MENÚS

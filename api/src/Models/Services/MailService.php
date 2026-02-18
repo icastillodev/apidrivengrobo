@@ -279,4 +279,53 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data) {
 
         return $this->executeSend($to, $subject, $body);
     }
+        /**
+         * Envía la resolución (Aprobación/Rechazo) de una solicitud de protocolo
+         */
+        public function sendProtocolDecision($to, $nombre, $tituloProt, $estado, $mensajeAdmin, $instName) {
+            // Configuración visual según estado (1 = Aprobado, 2 = Rechazado/Observado)
+            $isApproved = ($estado == 1);
+            $statusText = $isApproved ? "APROBADO" : "RECHAZADO / OBSERVADO";
+            $color      = $isApproved ? "#1a5d3b" : "#dc3545"; // Verde Institucional vs Rojo
+            $bgBadge    = $isApproved ? "#d4edda" : "#f8d7da";
+            $icon       = $isApproved ? "✅" : "⚠️";
+
+            $subject = "Resolución de Protocolo: $statusText - " . strtoupper($instName);
+            
+            // Link directo a la lista de protocolos del usuario
+            $link = "http://localhost/URBE-API-DRIVEN/front/paginas/usuario/mis_protocolos.html";
+
+            $htmlContent = "
+                Hola <b>$nombre</b>,<br><br>
+                El Comité/Administración de <b>$instName</b> ha procesado tu solicitud para el protocolo:<br>
+                
+                <div style='background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0; border: 1px solid #eee;'>
+                    <h3 style='margin: 0; color: #333; font-size: 16px;'>$tituloProt</h3>
+                </div>
+
+                <div style='background-color: $bgBadge; border-left: 5px solid $color; padding: 15px; margin-bottom: 20px;'>
+                    <p style='margin: 0; font-size: 12px; color: #555; text-transform: uppercase; font-weight: bold;'>Estado de la Solicitud</p>
+                    <h2 style='margin: 5px 0 0; color: $color; font-size: 20px;'>$icon $statusText</h2>
+                </div>
+            ";
+
+            // Si hay mensaje del admin, lo mostramos en un bloque destacado
+            if (!empty($mensajeAdmin)) {
+                $htmlContent .= "
+                <div style='border: 1px solid #ddd; border-radius: 4px; overflow: hidden;'>
+                    <div style='background-color: #eee; padding: 8px 15px; font-weight: bold; font-size: 13px; color: #555;'>
+                        Comentarios / Motivo:
+                    </div>
+                    <div style='padding: 15px; background-color: #fff; color: #333; font-style: italic;'>
+                        " . nl2br($mensajeAdmin) . "
+                    </div>
+                </div>";
+            } else {
+                $htmlContent .= "<p style='color: #777; font-size: 13px;'><i>Sin comentarios adicionales.</i></p>";
+            }
+
+            $body = $this->getTemplate("Resolución de Solicitud", $htmlContent, $link, "VER MIS PROTOCOLOS");
+
+            return $this->executeSend($to, $subject, $body);
+        }
 }

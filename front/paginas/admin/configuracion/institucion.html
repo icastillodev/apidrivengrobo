@@ -44,21 +44,60 @@
     </style>
 
     <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
-        import { initConfigInstitution } from '../../../dist/js/pages/admin/configuracion/config_institucion.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        // Lógica específica de configuración de la institución (Datos legales, logo, etc.)
+        import { initConfigInstitution } from '../../../dist/js/pages/admin/configuracion/config_institucion.js';
 
         document.addEventListener('DOMContentLoaded', async () => {
-            if(!Auth.checkAccess([1,2])) return;
-            await initMenu();
-            NotificationManager.init();
-            
-            const instId = localStorage.getItem('instId');
-            if(instId) {
-                initConfigInstitution(instId);
-            } else {
-                Swal.fire('Error Crítico', 'No se ha identificado la institución.', 'error');
+            showLoader();
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos hasta que window.txt esté listo para evitar errores en el menú y alertas
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Roles de Administración)
+                Auth.checkAccess([1, 2]); 
+
+                // 3. CAPTURA DE IDENTIFICADOR
+                const instId = localStorage.getItem('instId');
+
+                // 4. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // 5. INICIALIZACIÓN DE LÓGICA DE PÁGINA
+                    if (instId) {
+                        initConfigInstitution(instId);
+                        console.log(`✅ Configuración para Institución ID: ${instId} inicializada.`);
+                    } else {
+                        // Si no hay instId, lanzamos error para que lo atrape el catch
+                        throw new Error(window.txt.error?.no_institution || "No se ha identificado la institución.");
+                    }
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 6. ROUTER (Delay de estabilidad para abrir pestañas específicas de configuración)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de ConfigInstitution:", error);
+                // Si window.txt existe, intentamos mostrar una alerta amigable
+                if (window.Swal) {
+                    Swal.fire('Error', error.message, 'error');
+                }
+            } finally {
+                hideLoader();
             }
         });
     </script>

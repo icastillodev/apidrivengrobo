@@ -19,19 +19,53 @@
         .table-input:focus { outline: none; border-bottom: 2px solid #0d6efd; }
     </style>
 
-    <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
-        import { Auth } from '../../../dist/js/auth.js';
-        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
-        import { initInsumosForm } from '../../../dist/js/pages/usuario/formularios/insumos.js';
+<script type="module">
+    import { Auth } from '../../../dist/js/auth.js';
+    import { API } from '../../../dist/js/api.js';
+    import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+    import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+    import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+    import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+    import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+    // Lógica específica del formulario de insumos
+    import { initInsumosForm } from '../../../dist/js/pages/usuario/formularios/insumos.js';
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (!Auth.checkAccess([1, 2, 3])) return;
-            await initMenu();
-            NotificationManager.init();
-            initInsumosForm();
-        });
-    </script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        showLoader();
+
+        try {
+            // 1. CARGA CRÍTICA: Idioma
+            // Bloqueamos la ejecución hasta que window.txt esté listo
+            await loadLanguage(); 
+
+            // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
+            Auth.checkAccess([1, 2, 3 ,4, 5,6]); 
+
+            // 3. INICIALIZACIÓN DE COMPONENTES
+            if (window.txt) {
+                initMenu();
+                NotificationManager.init();
+                
+                // Inicialización de la lógica del formulario de insumos (fungibles, materiales, etc.)
+                initInsumosForm();
+                
+                console.log("✅ Formulario de Insumos inicializado.");
+            } else {
+                throw new Error("El objeto de idioma window.txt no se generó.");
+            }
+
+            // 4. ROUTER (Delay para detectar si es una edición o una nueva solicitud)
+            setTimeout(() => {
+                checkUrlParamsAndOpen();
+            }, 300);
+
+        } catch (error) {
+            console.error("❌ Fallo en inicialización de Formulario Insumos:", error);
+        } finally {
+            hideLoader();
+        }
+    });
+</script>
 </head>
 <body class="bg-light">
 

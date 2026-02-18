@@ -15,17 +15,52 @@
         .form-control:focus { border-color: #1a5d3b; box-shadow: 0 0 0 0.25rem rgba(26, 93, 59, 0.25); }
     </style>
 
-    <script type="module">
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        import { Auth } from '../../dist/js/auth.js';
-        import { initProfile } from '../../dist/js/pages/usuario/perfil.js';
+<script type="module">
+    import { Auth } from '../../dist/js/auth.js';
+    import { API } from '../../dist/js/api.js';
+    import { initMenu } from '../../dist/js/components/MenuComponent.js';
+    import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+    import { NotificationManager } from '../../dist/js/NotificationManager.js';
+    import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+    import { loadLanguage } from '../../dist/js/utils/i18n.js';
+    import { initProfile } from '../../dist/js/pages/usuario/perfil.js';
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            if (!Auth.checkAccess([1, 2, 3])) return;
-            await initMenu();
-            initProfile();
-        });
-    </script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        showLoader();
+
+        try {
+            // 1. CARGA CRÍTICA: Idioma
+            // Bloqueamos hasta que window.txt esté listo para las etiquetas del perfil
+            await loadLanguage(); 
+
+            // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
+            Auth.checkAccess([1, 2, 3 , 4, , 5 , 6]); 
+
+            // 3. INICIALIZACIÓN DE COMPONENTES
+            if (window.txt) {
+                initMenu();
+                NotificationManager.init();
+                
+                // Inicialización de la lógica del Perfil (Carga de datos del usuario, etc.)
+                initProfile();
+                
+                console.log("✅ Página de Perfil inicializada.");
+            } else {
+                throw new Error("El objeto de idioma window.txt no se generó.");
+            }
+
+            // 4. ROUTER (Delay de estabilidad para abrir tabs específicas si vienen por URL)
+            setTimeout(() => {
+                checkUrlParamsAndOpen();
+            }, 300);
+
+        } catch (error) {
+            console.error("❌ Fallo en inicialización de Perfil:", error);
+        } finally {
+            hideLoader();
+        }
+    });
+</script>
 </head>
 <body class="bg-light">
     <div class="container my-5 px-4">

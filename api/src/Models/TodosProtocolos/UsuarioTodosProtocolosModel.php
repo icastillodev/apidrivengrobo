@@ -7,39 +7,30 @@ use Exception;
 class UsuarioTodosProtocolosModel {
     private $db;
 
-    public function __construct($db) {
-        $this->db = $db;
-    }
+    public function __construct($db) { $this->db = $db; }
 
-    // --- CONFIGURACIÓN Y SELECTORES ---
+    // --- CONFIGURACIÓN ---
     public function getConfig($instId) {
-        // 1. Departamentos
+        $stmtI = $this->db->prepare("SELECT DependenciaInstitucion, NombreCompletoInst FROM institucion WHERE IdInstitucion = ?");
+        $stmtI->execute([$instId]);
+        $instData = $stmtI->fetch(PDO::FETCH_ASSOC);
+        $dep = $instData['DependenciaInstitucion'] ?? null;
+
         $depts = $this->db->prepare("SELECT iddeptoA, NombreDeptoA FROM departamentoe WHERE IdInstitucion = ? ORDER BY NombreDeptoA"); 
         $depts->execute([$instId]);
         
-        // 2. Tipos
-        $types = $this->db->prepare("SELECT idtipoprotocolo, NombreTipoprotocolo FROM tipoprotocolo WHERE IdInstitucion = ?"); 
+        $types = $this->db->prepare("SELECT idtipoprotocolo, NombreTipoprotocolo FROM tipoprotocolo WHERE IdInstitucion = ? ORDER BY NombreTipoprotocolo");
         $types->execute([$instId]);
 
-        // 3. Severidades (Filtrado por institución)
-        $sev = $this->db->prepare("SELECT IdSeveridadTipo, NombreSeveridad FROM tiposeveridad WHERE IdInstitucion = ?");
+        $sev = $this->db->prepare("SELECT IdSeveridadTipo, NombreSeveridad FROM tiposeveridad WHERE IdInstitucion = ?"); 
         $sev->execute([$instId]);
         
-        // 4. Especies
         $esp = $this->db->prepare("SELECT idespA, EspeNombreA FROM especiee WHERE IdInstitucion = ?"); 
         $esp->execute([$instId]);
 
-        // 5. Info Institución y Red
-        $stmtI = $this->db->prepare("SELECT DependenciaInstitucion, NombreCompletoInst, NombreInst FROM institucion WHERE IdInstitucion = ?");
-        $stmtI->execute([$instId]);
-        $instData = $stmtI->fetch(PDO::FETCH_ASSOC);
-        
-        $dep = $instData['DependenciaInstitucion'];
         $netInsts = [];
-        
-        // Si hay dependencia, buscar hermanas
-        if($dep) {
-            $stmtN = $this->db->prepare("SELECT NombreInst, IdInstitucion FROM institucion WHERE DependenciaInstitucion = ? AND IdInstitucion != ? AND Activo = 1");
+        if(!empty($dep)) {
+            $stmtN = $this->db->prepare("SELECT IdInstitucion, NombreInst FROM institucion WHERE DependenciaInstitucion = ? AND IdInstitucion != ? AND Activo = 1");
             $stmtN->execute([$dep, $instId]);
             $netInsts = $stmtN->fetchAll(PDO::FETCH_ASSOC);
         }
@@ -49,90 +40,90 @@ class UsuarioTodosProtocolosModel {
             'types' => $types->fetchAll(PDO::FETCH_ASSOC),
             'severities' => $sev->fetchAll(PDO::FETCH_ASSOC),
             'species' => $esp->fetchAll(PDO::FETCH_ASSOC),
-            'has_network' => !empty($dep),
+            'has_network' => (!empty($dep) && count($netInsts) > 0),
             'network_institutions' => $netInsts,
-            'NombreCompletoInst' => $instData['NombreCompletoInst'] ?? 'Institución Actual'
+            'NombreCompletoInst' => $instData['NombreCompletoInst']
         ];
     }
 
-    // --- CAMPOS COMUNES ---
-    // (Incluye 0 as AnimalesUsados para evitar errores si no hay tabla de pedidos aún)
+    // --- QUERY BASE ---
     private function getCommonFields() {
         return "p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, p.FechaFinProtA as Vencimiento, 
-                p.variasInst, p.protocoloexpe as IsExterno, p.CantidadAniA,
+                p.variasInst, p.protocoloexpe as IsExterno, p.CantidadAniA, p.IdUsrA,
                 t.NombreTipoprotocolo as TipoNombre,
-                CONCAT(pers.NombreA, ' ', pers.ApellidoA) as ResponsableName,
-                i_orig.NombreCompletoInst as Origen,
+                COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA, CONCAT('ID: ', p.IdUsrA)) as ResponsableName,
+                i_orig.NombreCompletoInst as Origen, i_orig.NombreInst as InstitucionOrigen,
                 
+                -- ANIMALES (0 hasta confirmar columna)
                 0 as AnimalesUsados, 
-
-                (SELECT CONCAT(d.NombreDeptoA, IF(o.NombreOrganismoSimple IS NOT NULL, CONCAT(' - [', o.NombreOrganismoSimple, ']'), ''))
-                 FROM protdeptor pd 
-                 JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA 
-                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
-                 WHERE pd.idprotA = p.idprotA LIMIT 1) as DeptoFormat";
+                
+                (SELECT CONCAT(d.NombreDeptoA, IF(o.NombreOrganismoSimple IS NOT NULL, CONCAT(' - [', o.NombreOrganismoSimple, ']'), '')) FROM protdeptor pd JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo WHERE pd.idprotA = p.idprotA LIMIT 1) as DeptoFormat";
     }
 
-    /**
-     * 1. MIS PROTOCOLOS (Filtrado por Usuario)
-     */
+    // 1. MIS PROTOCOLOS (CORREGIDO: Muestra todo lo del usuario)
     public function getMyProtocols($instId, $userId) {
         $fields = $this->getCommonFields();
         $sql = "SELECT $fields, 
-                       sp.Aprobado, 
-                       sp.DetalleAdm,
-                       -- Cálculo Origen: Si tiene flag 2 o está en protinstr => RED
+                       -- MANUALES: Si no hay solicitud, es Aprobado (1)
                        CASE 
-                            WHEN p.variasInst = 2 OR (SELECT COUNT(*) FROM protinstr pi WHERE pi.idprotA = p.idprotA) > 0 THEN 'RED'
-                            ELSE 'PROPIA'
+                           WHEN sp.idSolicitudProtocolo IS NULL THEN 1 
+                           ELSE sp.Aprobado 
+                       END as Aprobado,
+                       
+                       sp.DetalleAdm,
+                       sr.Aprobado as AprobadoRed,
+                       
+                       CASE 
+                           WHEN p.variasInst = 2 OR (SELECT COUNT(*) FROM protinstr pi WHERE pi.idprotA = p.idprotA) > 0 THEN 'RED' 
+                           ELSE 'PROPIA' 
                        END as OrigenCalculado
 
                 FROM protocoloexpe p
                 LEFT JOIN tipoprotocolo t ON p.tipoprotocolo = t.idtipoprotocolo
                 LEFT JOIN personae pers ON p.IdUsrA = pers.IdUsrA
+                LEFT JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
                 LEFT JOIN institucion i_orig ON p.IdInstitucion = i_orig.IdInstitucion
-                -- Solicitud propia (Tipo 1) para ver estado
-                LEFT JOIN solicitudprotocolo sp ON p.idprotA = sp.idprotA AND sp.TipoPedido = 1
                 
-                WHERE p.IdInstitucion = ? AND p.IdUsrA = ? 
+                -- JOIN Solicitud Local
+                LEFT JOIN solicitudprotocolo sp ON p.idprotA = sp.idprotA AND sp.TipoPedido = 1
+                -- JOIN Solicitud Red
+                LEFT JOIN solicitudprotocolo sr ON p.idprotA = sr.idprotA AND sr.TipoPedido = 2
+                
+                -- CORRECCIÓN: FILTRAR SOLO POR USUARIO (Quitar filtro de institución)
+                WHERE p.IdUsrA = ? 
                 ORDER BY p.idprotA DESC";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $userId]);
+        // Solo pasamos userId, ya no instId
+        $stmt->execute([$userId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * 2. INSTITUCIÓN ACTUAL (Todos los vigentes en esta sede)
-     */
+    // 2. INSTITUCIÓN ACTUAL
     public function getLocalProtocols($instId) {
         $fields = $this->getCommonFields();
         
         // A) PROPIOS
-        // Lógica: Creados en esta institución (p.IdInstitucion = ?)
-        // Y (No tienen solicitud O Tienen solicitud Tipo 1 Aprobada)
         $sqlA = "SELECT $fields, 'PROPIA' as OrigenCalculado
                  FROM protocoloexpe p
                  LEFT JOIN tipoprotocolo t ON p.tipoprotocolo = t.idtipoprotocolo
                  LEFT JOIN personae pers ON p.IdUsrA = pers.IdUsrA
+                 LEFT JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
                  LEFT JOIN institucion i_orig ON p.IdInstitucion = i_orig.IdInstitucion
                  LEFT JOIN solicitudprotocolo sp ON p.idprotA = sp.idprotA AND sp.TipoPedido = 1
                  WHERE p.IdInstitucion = ? 
-                   AND (sp.idSolicitudProtocolo IS NULL OR sp.Aprobado = 1)";
+                 AND (sp.idSolicitudProtocolo IS NULL OR sp.Aprobado = 1)";
 
-        // B) RED (Externos aprobados aquí)
-        // Lógica: Están en protinstr (vinculados a esta inst)
-        // Y tienen Solicitud Tipo 2 Aprobada
+        // B) RED
         $sqlB = "SELECT $fields, 'RED' as OrigenCalculado
                  FROM protinstr pi
                  JOIN protocoloexpe p ON pi.idprotA = p.idprotA
-                 JOIN solicitudprotocolo sp ON p.idprotA = sp.idprotA
                  LEFT JOIN tipoprotocolo t ON p.tipoprotocolo = t.idtipoprotocolo
                  LEFT JOIN personae pers ON p.IdUsrA = pers.IdUsrA
+                 LEFT JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
                  LEFT JOIN institucion i_orig ON p.IdInstitucion = i_orig.IdInstitucion
                  WHERE pi.IdInstitucion = ? 
-                   AND sp.TipoPedido = 2 
-                   AND sp.Aprobado = 1";
+                 AND EXISTS (SELECT 1 FROM solicitudprotocolo s WHERE s.idprotA = p.idprotA AND s.TipoPedido = 2 AND s.Aprobado = 1)";
 
         $sql = "($sqlA) UNION ($sqlB) ORDER BY idprotA DESC";
         
@@ -141,129 +132,31 @@ class UsuarioTodosProtocolosModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * 3. RED (Visor Global)
-     */
+    // 3. RED GLOBAL
     public function getNetworkProtocols($instId) {
-        $stmtD = $this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion = ?");
-        $stmtD->execute([$instId]);
-        $dep = $stmtD->fetchColumn();
-
+        $d = $this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion = ?");
+        $d->execute([$instId]); $dep = $d->fetchColumn();
         if (!$dep) return [];
 
         $fields = $this->getCommonFields();
-        // Todos los de la misma dependencia que NO son míos
         $sql = "SELECT $fields, 'RED' as OrigenCalculado
                 FROM protocoloexpe p
                 JOIN institucion i_orig ON p.IdInstitucion = i_orig.IdInstitucion
                 LEFT JOIN tipoprotocolo t ON p.tipoprotocolo = t.idtipoprotocolo
                 LEFT JOIN personae pers ON p.IdUsrA = pers.IdUsrA
-                
-                WHERE i_orig.DependenciaInstitucion = ? 
-                  AND p.IdInstitucion != ? 
+                LEFT JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
+                LEFT JOIN solicitudprotocolo sp_orig ON p.idprotA = sp_orig.idprotA AND sp_orig.TipoPedido = 1
+                WHERE i_orig.DependenciaInstitucion = ? AND p.IdInstitucion != ? 
+                AND (sp_orig.Aprobado = 1 OR sp_orig.idSolicitudProtocolo IS NULL)
                 ORDER BY p.idprotA DESC";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$dep, $instId]);
+        $stmt = $this->db->prepare($sql); $stmt->execute([$dep, $instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // --- MÉTODOS AUXILIARES ---
-
-    public function getProtocolSpecies($id) {
-        $sql = "SELECT e.idespA, e.EspeNombreA FROM protesper pe 
-                JOIN especiee e ON pe.idespA = e.idespA 
-                WHERE pe.idprotA = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$id]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function getNetworkTargets($instId) {
-        $stmt = $this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion = ?");
-        $stmt->execute([$instId]);
-        $red = $stmt->fetchColumn();
-        if (!$red) return [];
-        $sql = "SELECT IdInstitucion, NombreInst FROM institucion WHERE DependenciaInstitucion = ? AND IdInstitucion != ? AND Activo = 1 ORDER BY NombreInst ASC";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$red, $instId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    // --- ESCRITURA ---
-
-    public function createInternal($data, $userId) {
-        $this->db->beginTransaction();
-        try {
-            // Insert Protocolo
-            $sql = "INSERT INTO protocoloexpe (tituloA, nprotA, InvestigadorACargA, departamento, tipoprotocolo, CantidadAniA, severidad, FechaIniProtA, FechaFinProtA, IdInstitucion, IdUsrA, variasInst, protocoloexpe) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], 
-                $data['departamento'], $data['tipoprotocolo'], $data['CantidadAniA'], 
-                $data['severidad'], $data['FechaIniProtA'], $data['FechaFinProtA'], 
-                $data['IdInstitucion'], $userId
-            ]);
-            $protId = $this->db->lastInsertId();
-
-            // Especies
-            if (isset($data['especies']) && is_array($data['especies'])) {
-                $stmtE = $this->db->prepare("INSERT INTO protesper (idprotA, idespA) VALUES (?, ?)");
-                foreach ($data['especies'] as $espId) if ($espId) $stmtE->execute([$protId, $espId]);
-            }
-            
-            // Crear Solicitud (Tipo 1)
-            $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA, Aprobado, TipoPedido) VALUES (?, 3, 1)")->execute([$protId]);
-            
-            $this->db->commit();
-        } catch (Exception $e) { $this->db->rollBack(); throw $e; }
-    }
-
-    public function updateInternal($data) {
-        $this->db->beginTransaction();
-        try {
-            $id = $data['idprotA'];
-            // Update Protocolo
-            $sql = "UPDATE protocoloexpe SET tituloA=?, nprotA=?, InvestigadorACargA=?, departamento=?, tipoprotocolo=?, CantidadAniA=?, severidad=?, FechaIniProtA=?, FechaFinProtA=? WHERE idprotA=?";
-            $this->db->prepare($sql)->execute([
-                $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], 
-                $data['departamento'], $data['tipoprotocolo'], $data['CantidadAniA'], 
-                $data['severidad'], $data['FechaIniProtA'], $data['FechaFinProtA'], $id
-            ]);
-
-            // Update Especies
-            $this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);
-            if (isset($data['especies']) && is_array($data['especies'])) {
-                $stmtE = $this->db->prepare("INSERT INTO protesper (idprotA, idespA) VALUES (?, ?)");
-                foreach ($data['especies'] as $espId) if ($espId) $stmtE->execute([$id, $espId]);
-            }
-            
-            // Reenviar Solicitud (Estado 3)
-            $this->db->prepare("UPDATE solicitudprotocolo SET Aprobado = 3, DetalleAdm = NULL WHERE idprotA = ? AND TipoPedido = 1")->execute([$id]);
-            
-            $this->db->commit();
-        } catch (Exception $e) { $this->db->rollBack(); throw $e; }
-    }
-
-    public function createNetworkRequest($data) {
-        $this->db->beginTransaction();
-        try {
-            $protId = $data['idprotA'];
-            // Marcar en trámite red
-            $this->db->prepare("UPDATE protocoloexpe SET variasInst = 2 WHERE idprotA = ?")->execute([$protId]);
-            
-            // Crear enlaces protinstr
-            $stmtRel = $this->db->prepare("INSERT INTO protinstr (idprotA, IdInstitucion) VALUES (?, ?)");
-            foreach ($data['targets'] as $targetInstId) {
-                $check = $this->db->prepare("SELECT COUNT(*) FROM protinstr WHERE idprotA=? AND IdInstitucion=?"); 
-                $check->execute([$protId, $targetInstId]);
-                if($check->fetchColumn() == 0) $stmtRel->execute([$protId, $targetInstId]);
-            }
-            
-            // Crear Solicitud Tipo 2
-            $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA, Aprobado, TipoPedido) VALUES (?, 3, 2)")->execute([$protId]);
-            
-            $this->db->commit();
-        } catch (Exception $e) { $this->db->rollBack(); throw $e; }
-    }
+    // ESCRITURA
+    public function getProtocolSpecies($id){$s=$this->db->prepare("SELECT e.idespA, e.EspeNombreA FROM protesper pe JOIN especiee e ON pe.idespA=e.idespA WHERE pe.idprotA=?");$s->execute([$id]);return $s->fetchAll(PDO::FETCH_ASSOC);}
+    public function createInternal($d,$u){$this->db->beginTransaction();try{$s=$this->db->prepare("INSERT INTO protocoloexpe (tituloA,nprotA,InvestigadorACargA,departamento,tipoprotocolo,CantidadAniA,severidad,FechaIniProtA,FechaFinProtA,IdInstitucion,IdUsrA,variasInst,protocoloexpe) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,0)");$s->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$d['IdInstitucion'],$u]);$p=$this->db->lastInsertId();if(isset($d['especies'])&&is_array($d['especies'])){$e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");foreach($d['especies'] as $esp)if($esp)$e->execute([$p,$esp]);}$this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,1)")->execute([$p]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
+    public function updateInternal($d){$this->db->beginTransaction();try{$id=$d['idprotA'];$this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$id]);$this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);if(isset($d['especies'])&&is_array($d['especies'])){$e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");foreach($d['especies'] as $esp)if($esp)$e->execute([$id,$esp]);}$this->db->prepare("UPDATE solicitudprotocolo SET Aprobado=3,DetalleAdm=NULL WHERE idprotA=? AND TipoPedido=1")->execute([$id]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
+    public function getNetworkTargets($instId){$s=$this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion=?");$s->execute([$instId]);$r=$s->fetchColumn();if(!$r)return[];$s=$this->db->prepare("SELECT IdInstitucion,NombreInst FROM institucion WHERE DependenciaInstitucion=? AND IdInstitucion!=? AND Activo=1 ORDER BY NombreInst ASC");$s->execute([$r,$instId]);return $s->fetchAll(PDO::FETCH_ASSOC);}
+    public function createNetworkRequest($d){$this->db->beginTransaction();try{$p=$d['idprotA'];$this->db->prepare("UPDATE protocoloexpe SET variasInst=2 WHERE idprotA=?")->execute([$p]);if(!empty($d['targets'])&&is_array($d['targets'])){$r=$this->db->prepare("INSERT INTO protinstr (idprotA,IdInstitucion) VALUES (?,?)");foreach($d['targets'] as $t){$c=$this->db->prepare("SELECT COUNT(*) FROM protinstr WHERE idprotA=? AND IdInstitucion=?");$c->execute([$p,$t]);if($c->fetchColumn()==0)$r->execute([$p,$t]);}}$this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,2)")->execute([$p]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
 }

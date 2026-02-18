@@ -23,20 +23,50 @@
     </style>
 
     <script type="module">
-        import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js';
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../dist/js/auth.js';
-        import { showLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        // Lógica administrativa de protocolos (Gestión de revisiones y aprobaciones)
+        import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            Auth.checkAccess([1, 2, 4]);
-            initMenu();
-            NotificationManager.init();
-            initProtocolosPage();
-            setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos hasta que window.txt esté listo para las etiquetas de la tabla
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos)
+                Auth.checkAccess([1, 2, 4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de gestión de protocolos
+                    initProtocolosPage();
+                    
+                    console.log("✅ Administración de Protocolos inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay de estabilidad para abrir un protocolo específico vía URL)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de página de Protocolos:", error);
+            } finally {
+                hideLoader();
+            }
         });
     </script>
 </head>
@@ -89,7 +119,7 @@
                 </div>
                 
                 <div class="col-lg-5 text-lg-end mt-3 mt-lg-0 d-flex justify-content-end gap-2">
-                    <button class="btn btn-outline-dark btn-sm fw-bold position-relative px-3" onclick="window.location.href='solicitudes_protocolo.html'">
+                    <button class="btn btn-outline-dark btn-sm fw-bold position-relative px-3" onclick="window.location.href='solicitud_protocolo.html'">
                         <i class="bi bi-inbox-fill me-1"></i> Solicitudes
                         <span id="badge-requests" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">0</span>
                     </button>

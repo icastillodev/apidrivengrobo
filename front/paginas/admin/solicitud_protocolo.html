@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitudes de Protocolo - GROBO</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .cursor-pointer { cursor: pointer; transition: background 0.2s; }
+        .table-hover tbody tr:hover { background-color: #e2e6ea !important; }
+        .badge-type-internal { background-color: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+        .badge-type-network { background-color: #cff4fc; color: #055160; border: 1px solid #9eeaf9; }
+        #search-results-top:empty { display: none !important; }
+    </style>
+
+    <script type="module">
+        import { Auth } from '../../../dist/js/auth.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
+        import { initAdminRequests } from '../../../dist/js/pages/admin/solicitudesprotocolo/main.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+            try {
+                await loadLanguage(); 
+                Auth.checkAccess([1, 2]); 
+
+                if (window.txt) {
+                    translatePage(); 
+                    initMenu();
+                    NotificationManager.init();
+                    initAdminRequests();
+                    console.log("✅ Admin Solicitudes inicializado.");
+                } else { throw new Error("Error cargando idioma."); }
+
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
+
+            } catch (error) { console.error("❌ Error Init:", error); } 
+            finally { hideLoader(); }
+        });
+    </script>
+</head>
+<body>
+
+    <div class="container-fluid my-5 px-4 px-md-5">
+        <div class="card shadow-sm border-0 p-4">
+            
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread"></li>
+                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item active">
+                        <span class="badge bg-primary" data-i18n="solicitudprotocolo.titulo"></span>
+                    </li>
+                </ol>
+            </nav>
+
+            <div class="mb-4">
+                <h5 class="fw-bold m-0" data-i18n="solicitudprotocolo.titulo"></h5>
+                <small class="text-muted" data-i18n="solicitudprotocolo.subtitulo"></small>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border" style="font-size: 13px;">
+                    <thead class="table-light text-uppercase text-secondary">
+                        <tr>
+                            <th class="py-3 px-3" data-i18n="solicitudprotocolo.tabla.id"></th>
+                            <th class="py-3 px-3" data-i18n="solicitudprotocolo.tabla.tipo"></th>
+                            <th class="py-3 px-3" data-i18n="solicitudprotocolo.tabla.protocolo"></th>
+                            <th class="py-3 px-3" data-i18n="solicitudprotocolo.tabla.investigador"></th>
+                            <th class="py-3 px-3" data-i18n="solicitudprotocolo.tabla.origen"></th>
+                            <th class="py-3 px-3 text-end" data-i18n="solicitudprotocolo.tabla.acciones"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-requests"></tbody>
+                </table>
+            </div>
+            
+            <div id="empty-state" class="text-center py-5 d-none">
+                <div class="mb-3"><i class="bi bi-check-circle display-4 text-success opacity-25"></i></div>
+                <h6 class="text-muted fw-bold" data-i18n="solicitudprotocolo.vacio.titulo"></h6>
+                <p class="text-muted small" data-i18n="solicitudprotocolo.vacio.mensaje"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-details" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-white border-bottom pb-3">
+                    <div>
+                        <h5 class="modal-title fw-bold" data-i18n="solicitudprotocolo.modal.titulo"></h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="modal-body p-4">
+                    <div class="mb-4 d-flex justify-content-between align-items-center bg-light p-3 rounded">
+                        <div id="view-badge"></div>
+                        <div class="text-end small text-muted font-monospace" id="view-sol-id"></div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-12">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_titulo"></label>
+                            <div class="fs-6 text-dark fw-bold" id="view-titulo"></div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_nprot"></label>
+                            <div class="fs-5 fw-bold text-primary font-monospace" id="view-nprot"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_inicio"></label>
+                            <div class="text-dark fw-bold" id="view-inicio"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_vencimiento"></label>
+                            <div class="text-dark fw-bold" id="view-vence"></div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_investigador"></label>
+                            <div class="fw-bold text-dark"><i class="bi bi-person-fill text-primary me-2"></i><span id="view-investigator"></span></div>
+                            <div class="small text-muted ms-4" id="view-email"></div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_director"></label>
+                            <div class="text-dark" id="view-director"></div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_depto"></label>
+                            <div class="text-dark" id="view-depto"></div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_especies"></label>
+                            <div class="text-dark fst-italic" id="view-especies"></div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_tipo"></label>
+                            <div class="text-dark fw-bold" id="view-tipo"></div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="small text-muted fw-bold text-uppercase border-bottom d-block pb-1 mb-2" data-i18n="solicitudprotocolo.modal.label_cant"></label>
+                            <div class="text-dark fw-bold" id="view-cant"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded border mb-4 shadow-sm">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-light rounded-circle p-2 me-3"><i class="bi bi-building text-secondary fs-5"></i></div>
+                            <div>
+                                <span class="d-block small text-muted fw-bold text-uppercase" data-i18n="solicitudprotocolo.modal.label_origen"></span>
+                                <span class="fw-bold text-dark" id="view-origin"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="text-muted opacity-25">
+
+                    <form id="form-decision">
+                        <input type="hidden" name="idSolicitud" id="decision-id">
+                        <input type="hidden" name="decision" id="decision-val">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary small text-uppercase" data-i18n="solicitudprotocolo.modal.label_mensaje"></label>
+                            <textarea name="mensaje" class="form-control bg-light" rows="3" required></textarea>
+                            <div class="form-text small text-muted mt-1">
+                                <i class="bi bi-envelope-at me-1"></i> <span id="msg-help-text"></span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end pt-2">
+                            <button type="button" class="btn btn-outline-secondary px-4 fw-bold" data-bs-dismiss="modal" data-i18n="solicitudprotocolo.modal.btn_cancelar"></button>
+                            
+                            <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm" onclick="document.getElementById('decision-val').value=2">
+                                <i class="bi bi-x-lg me-1"></i> <span data-i18n="solicitudprotocolo.modal.btn_rechazar"></span>
+                            </button>
+                            
+                            <button type="submit" class="btn btn-success px-4 fw-bold shadow-sm" onclick="document.getElementById('decision-val').value=1">
+                                <i class="bi bi-check-lg me-1"></i> <span data-i18n="solicitudprotocolo.modal.btn_aprobar"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -48,15 +48,46 @@
     </style>
 
     <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            Auth.checkAccess([1, 2, 4]); 
-            initMenu();
-            setTimeout(hideLoader, 500); // Simulación de carga estética
+
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt esté listo para evitar el error de installHook
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos)
+                Auth.checkAccess([1, 2, 4,5,6]); 
+
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    console.log("✅ Componentes de navegación inicializados correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay de estabilidad para parámetros de URL)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de página:", error);
+            } finally {
+                // Quitamos el loader pase lo que pase para evitar bloqueos de UI
+                hideLoader();
+            }
         });
     </script>
 </head>

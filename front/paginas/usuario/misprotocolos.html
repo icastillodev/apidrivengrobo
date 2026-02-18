@@ -24,21 +24,48 @@
         .cursor-help { cursor: help; }
     </style>
 
-    <script type="module">
-        import { initUserProtocols } from '../../../dist/js/pages/usuario/user_protocolos.js';
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
-        import { Auth } from '../../../dist/js/auth.js';
-        import { showLoader } from '../../../dist/js/components/LoaderComponent.js';
-        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+<script type="module">
+    import { initUserProtocols } from '../../../dist/js/pages/usuario/modulesprotocolos/main.js';
+    import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+    import { Auth } from '../../../dist/js/auth.js';
+    import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+    import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+    import { loadLanguage } from '../../../dist/js/utils/i18n.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
-            showLoader();
-            if(!Auth.checkAccess([1, 2, 3, 4])) return; 
-            initMenu();
-            NotificationManager.init();
-            initUserProtocols();
-        });
-    </script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        showLoader();
+
+        try {
+            // 1. CARGA CRÍTICA: Idioma
+            // Detiene la ejecución hasta que window.txt esté listo para el menú y la página
+            await loadLanguage(); 
+
+            // 2. VALIDACIÓN DE ACCESO
+            // Permite acceso a niveles 1, 2, 3 y 4
+            Auth.checkAccess([1, 2, 3, 4, 5 ,6]);
+
+            // 3. INICIALIZACIÓN DE COMPONENTES
+            // Solo si el idioma cargó correctamente para evitar errores de traducción
+            if (window.txt) {
+                initMenu();
+                NotificationManager.init();
+                
+                // Inicialización específica de la página de protocolos
+                initUserProtocols();
+                
+                console.log("✅ Página de Protocolos inicializada correctamente.");
+            } else {
+                throw new Error("El objeto de idioma window.txt no se generó.");
+            }
+
+        } catch (error) {
+            console.error("❌ Fallo en la inicialización de Protocolos:", error);
+        } finally {
+            // El loader se oculta pase lo que pase
+            hideLoader();
+        }
+    });
+</script>
 </head>
 <body>
     <div class="container my-5">
@@ -91,14 +118,15 @@
                 <div class="col-12">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
-                        <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
-                            <option value="all">Todo (Texto)</option>
-                            <option value="nprotA">N° Protocolo</option>
-                            <option value="tituloA">Título</option>
-                            <option value="InvestigadorACargA">Inv. Cargo</option>
-                            <option value="TipoNombre">Tipo</option>
-                            <option value="Origen">Origen</option>
-                        </select>
+                            <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
+                                <option value="all">Todo (Texto)</option>
+                                <option value="nprotA">N° Protocolo</option>
+                                <option value="tituloA">Título</option>
+                                <option value="InvestigadorACargA">Inv. Cargo</option>
+                                <option value="TipoNombre">Tipo</option>
+                                <option value="Origen">Origen</option>
+                                <option value="Estado" id="opt-filter-estado" class="d-none">Estado</option>
+                            </select>
                         <div id="dynamic-search-container" class="flex-grow-1">
                             <input type="text" id="search-input" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">
                         </div>

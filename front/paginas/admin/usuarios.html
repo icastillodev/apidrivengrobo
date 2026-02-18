@@ -21,35 +21,53 @@
         .modal { z-index: 1050 !important; }
     </style>
 
-<script type="module">
-    import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js';
-    import { initMenu } from '../../dist/js/components/MenuComponent.js';
-    import { Auth } from '../../dist/js/auth.js';
-    import { showLoader } from '../../dist/js/components/LoaderComponent.js';
-    import { NotificationManager } from '../../dist/js/NotificationManager.js';
-    import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-    import { loadLanguage } from '../../dist/js/utils/i18n.js';
+    <script type="module">
+        import { Auth } from '../../dist/js/auth.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        // Lógica administrativa de usuarios (Alta, baja, modificación y asignación de roles)
+        import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js';
 
-    // 1. AGREGA "async" AQUÍ
-    document.addEventListener('DOMContentLoaded', async () => {
-        showLoader();
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
 
-        // 2. AGREGA "await" AQUÍ. 
-        // Esto detiene todo el programa hasta que window.txt exista.
-        await loadLanguage(); 
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución para asegurar que las traducciones de roles estén listaás
+                await loadLanguage(); 
 
-        Auth.checkAccess([1, 2, 4, 5, 6]);
-        
-        // 3. Ahora initMenu corre seguro porque window.txt ya está cargado
-        initMenu();
+                // 2. VALIDACIÓN DE ACCESO (Niveles administrativos y de gestión)
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
-        NotificationManager.init();
-        initUsuariosPage();
-        setTimeout(() => {
-            checkUrlParamsAndOpen();
-        }, 300);
-    });
-</script>
+                // 3. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de gestión de usuarios
+                    initUsuariosPage();
+                    
+                    console.log("✅ Administración de Usuarios inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 4. ROUTER (Delay para permitir que la tabla de usuarios se renderice)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de página de Usuarios:", error);
+            } finally {
+                hideLoader();
+            }
+        });
+    </script>
     
 </head>
 <body>

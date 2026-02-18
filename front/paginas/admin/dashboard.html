@@ -60,69 +60,78 @@
         </section>
     </main>
 
-    <script type="module">
-        import { Auth } from '/URBE-API-DRIVEN/front/dist/js/auth.js';
-        import { API } from '/URBE-API-DRIVEN/front/dist/js/api.js';
-        import { initMenu } from '/URBE-API-DRIVEN/front/dist/js/components/MenuComponent.js';
-        import { showLoader, hideLoader } from '/URBE-API-DRIVEN/front/dist/js/components/LoaderComponent.js';
-        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+<script type="module">
+import { Auth } from '../../dist/js/auth.js';
+    import { API } from '../../dist/js/api.js';
+    import { initMenu } from '../../dist/js/components/MenuComponent.js';
+    import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+    import { NotificationManager } from '../../dist/js/NotificationManager.js';
+    import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+    import { loadLanguage } from '../../dist/js/utils/i18n.js';
 
-
-        /**
-         * Mapeo Oficial de Roles (según imagen proporcionada)
-         */
-        const getRoleBadgeText = (level) => {
-            const roles = {
-                1: 'Super Administrador', // Super administrador plataforma GROBO
-                2: 'Administrador Institución', // Administrador institucion
-                3: 'Usuario de la Plataforma', // Usuario de la plataforma
-                4: 'Sub Administrador', // Sub administrador
-                5: 'Asistente', // Asistente
-                6: 'Laboratorio' // Laboratorio
-            };
-            const roleName = roles[level] || 'Usuario Externo';
-            return `${roleName} (${level})`;
+    const getRoleBadgeText = (level) => {
+        const roles = {
+            1: 'Super Administrador',
+            2: 'Administrador Institución',
+            3: 'Usuario de la Plataforma',
+            4: 'Sub Administrador',
+            5: 'Asistente',
+            6: 'Laboratorio'
         };
+        return `${roles[level] || 'Usuario Externo'} (${level})`;
+    };
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            showLoader(); 
+    document.addEventListener('DOMContentLoaded', async () => {
+        showLoader();
+
+        try {
+            // 1. CARGA CRÍTICA: Idioma (Debe ser lo primero)
+            // Asegúrate que loadLanguage() devuelva el fetch
+            await loadLanguage(); 
+
+            // 2. VALIDACIÓN DE SESIÓN
+            // Se hace después del idioma por si el checkAccess lanza un alert/error traducido
+            Auth.checkAccess([1, 2, 4, 5, 6]); 
+
+            const userId = localStorage.getItem('userId');
+            const userFull = localStorage.getItem('userFull');
+            const instId = localStorage.getItem('instId');
+            const userLevel = localStorage.getItem('userLevel');
+
+            // 3. ACTUALIZACIÓN DE UI
+            document.getElementById('display-user-name').innerText = userFull || 'Usuario Desconocido';
+            document.getElementById('display-user-id').innerText = `USR-${userId || '000'}`;
             
-            try {
-                // 1. Validar acceso administrativo
-                Auth.checkAccess([1, 2, 4, 5, 6]); 
+            const levelInt = parseInt(userLevel);
+            const roleBadge = document.getElementById('display-user-role');
+            const roleSmall = document.getElementById('display-role-number');
+            
+            if (roleBadge) roleBadge.innerText = getRoleBadgeText(levelInt);
+            if (roleSmall) roleSmall.innerText = levelInt;
 
-                const userId = localStorage.getItem('userId');
-                const userFull = localStorage.getItem('userFull');
-                const instId = localStorage.getItem('instId');
-                const userLevel = localStorage.getItem('userLevel');
+            // 4. MANTENIMIENTO (Segundo plano, no bloqueante)
+            API.request(`/maintenance?instId=${instId}`, 'GET')
+                .then(res => { if(res.executed) console.log(`NETWISE: Depuración completada.`); })
+                .catch(() => {});
 
-                // 2. Mantenimiento Automático (Manejado por UserController)
-                API.request(`/maintenance?instId=${instId}`, 'GET')
-                    .then(res => {
-                        if(res.executed) console.log(`NETWISE: Depuración completada (${res.purged} eliminados).`);
-                    })
-                    .catch(err => console.warn("Mantenimiento postergado."));
-
-                // 3. Renderizar Interfaz
-                document.getElementById('display-user-name').innerText = userFull || 'Usuario Desconocido';
-                document.getElementById('display-user-id').innerText = `USR-${userId || '000'}`;
-                
-                const levelInt = parseInt(userLevel);
-                const roleBadge = document.getElementById('display-user-role');
-                const roleSmall = document.getElementById('display-role-number');
-                
-                if (roleBadge) roleBadge.innerText = getRoleBadgeText(levelInt);
-                if (roleSmall) roleSmall.innerText = levelInt;
-
+            // 5. INICIALIZACIÓN DE COMPONENTES
+            // Verificamos si window.txt existe antes de llamar al menú para evitar el crash
+            if (window.txt) {
                 initMenu();
                 NotificationManager.init();
-            } catch (error) {
-                console.error("Fallo en inicialización de Dashboard:", error);
-            } finally {
-                hideLoader();
+            } else {
+                throw new Error("El objeto de idioma window.txt no se generó.");
             }
-        });
-    </script>
+
+        } catch (error) {
+            console.error("❌ Fallo en inicialización:", error);
+            // Si el error es de Auth, checkAccess ya suele redirigir, 
+            // pero si es de idioma, aquí podrías manejar un fallback.
+        } finally {
+            hideLoader();
+        }
+    });
+</script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

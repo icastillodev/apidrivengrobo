@@ -19,25 +19,56 @@
     </style>
 
     <script type="module">
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
-        import { initConfigDeptos } from '../../../dist/js/pages/admin/configuracion/config_departamentos.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        // Lógica específica de configuración de departamentos/cátedras
+        import { initConfigDeptos } from '../../../dist/js/pages/admin/configuracion/config_departamentos.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-            if(!Auth.checkAccess([1,2])) return; 
-            initMenu();
-            NotificationManager.init();
-            
-            // Llenar Breadcrumb
-            const instName = localStorage.getItem('NombreInst') || 'Institución';
-            const bread = document.getElementById('institucionbread');
-            if(bread) bread.innerText = instName;
 
-            initConfigDeptos();
-            setTimeout(hideLoader, 500); 
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                // Bloqueamos la ejecución hasta que window.txt sea accesible globalmente
+                await loadLanguage(); 
+
+                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Roles Administrativos)
+                Auth.checkAccess([1, 2]); 
+
+                // 3. ACTUALIZACIÓN DE UI (Breadcrumbs)
+                const instName = localStorage.getItem('NombreInst') || 'Institución';
+                const bread = document.getElementById('institucionbread');
+                if (bread) bread.innerText = instName;
+
+                // 4. INICIALIZACIÓN DE COMPONENTES
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // Inicialización de la lógica de gestión de departamentos
+                    initConfigDeptos();
+                    
+                    console.log("✅ Configuración de Departamentos inicializada correctamente.");
+                } else {
+                    throw new Error("El objeto de idioma window.txt no se generó.");
+                }
+
+                // 5. ROUTER (Delay de estabilidad para abrir edición de departamentos vía URL)
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
+
+            } catch (error) {
+                console.error("❌ Fallo en inicialización de ConfigDeptos:", error);
+            } finally {
+                // Quitamos el loader al finalizar el flujo de carga real
+                hideLoader();
+            }
         });
     </script>
 </head>
