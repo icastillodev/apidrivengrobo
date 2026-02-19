@@ -1,190 +1,203 @@
-/**
- * GECKO SEARCH COMPONENT (UI)
- * Versión Final: Genera enlaces con ?id=... y ?action=...
- */
-import { GeckoI18n } from './GeckoI18n.js';
 import { GeckoSearchEngine } from './GeckoSearchEngine.js';
+import { GeckoVoice } from './GeckoVoice.js';
 
-// --- RUTAS ---
-const ROUTE_MAP = {
-    admin: {
-        usuarios: 'admin/usuarios.html',
-        protocolos: 'admin/protocolos.html',
-        animales: 'admin/animales.html',
-        insumos: 'admin/insumos.html',
-        reactivos: 'admin/reactivos.html',
-        alojamientos: 'admin/alojamientos.html',
-        reservas: 'construccion.html'
+export const GeckoSearch = {
+    overlay: null,
+    box: null,
+    input: null,
+    results: null,
+    voiceBtn: null,
+    triggerEl: null,
+
+    init() {
+        this.overlay = document.getElementById('gecko-omni-overlay');
+        if (this.overlay) {
+            this.box = this.overlay.querySelector('.gecko-omni-box');
+            this.input = document.getElementById('gecko-omni-input');
+            this.results = document.getElementById('gecko-omni-results');
+            this.voiceBtn = document.getElementById('gecko-omni-voice-btn');
+        }
+        
+        if (this.input) {
+            this.input.oninput = (e) => this.executeSearch(e.target.value);
+            this.input.onkeydown = (e) => {
+                if (e.key === 'Escape') this.close();
+                if (e.key === 'Enter') this.executeSearch(e.target.value);
+            };
+        }
+
+        if (this.voiceBtn) {
+            this.voiceBtn.onclick = () => {
+                if (GeckoVoice.isListeningCommand) GeckoVoice.stop();
+                else GeckoVoice.startListening();
+            };
+        }
     },
-    user: {
-        usuarios: 'usuario/perfil.html',
-        protocolos: 'usuario/misprotocolos.html',
-        animales: 'usuario/misalojamientos.html',
-        insumos: 'usuario/misformularios.html',
-        alojamientos: 'usuario/misalojamientos.html',
-        reservas: 'usuario/construccion.html'
-    }
-};
 
-// --- ICONOS ---
-const ICONS = {
-    book: `<i class="bi bi-book"></i>`,
-    user: `<i class="bi bi-person"></i>`,
-    box: `<i class="bi bi-box-seam"></i>`,
-    flask: `<i class="bi bi-eyedropper"></i>`,
-    file: `<i class="bi bi-file-earmark-text"></i>`
-};
+    open() {
+        if (!this.overlay) this.init();
+        this.triggerEl = document.getElementById('gecko-search-trigger');
 
-export async function executeGlobalSearch(type) {
-    const input = document.getElementById(`input-search-${type}`);
-    const resultsBox = document.getElementById(`search-results-${type}`);
-    
-    if (!input || !resultsBox) return;
+        // --- ANIMACIÓN DE APERTURA (MORPHING) ---
+        // 1. Tomamos las coordenadas exactas del botón disparador
+        const rect = this.triggerEl.getBoundingClientRect();
+        
+        // 2. Colocamos la caja oculta exactamente encima del botón
+        this.box.style.transition = 'none'; // Reseteamos transición
+        this.box.style.top = `${rect.top}px`;
+        this.box.style.left = `${rect.left}px`;
+        this.box.style.width = `${rect.width}px`;
+        this.box.style.height = `${rect.height}px`;
+        this.box.style.borderRadius = '50px'; // Redondo al principio
+        
+        // 3. Mostramos el overlay y ocultamos el botón real
+        this.overlay.classList.add('show');
+        this.triggerEl.style.opacity = '0'; 
 
-    // 1. ANALIZAR
-    const analysis = GeckoSearchEngine.analyze(input.value);
+        // 4. Forzamos al navegador a pintar este frame (Reflow)
+        void this.box.offsetWidth;
 
-    // 2. LIMPIEZA INICIAL (Si está vacío, OCULTAR CAJA)
-    if (analysis.term.length < 1) { 
-        resultsBox.innerHTML = '';
-        resultsBox.classList.add('d-none'); // <--- CLAVE: Ocultar visualmente
-        return;
-    }
+        // 5. Animamos hacia la posición final (Centro)
+        this.box.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+        
+        const finalWidth = Math.min(800, window.innerWidth * 0.95);
+        const finalLeft = (window.innerWidth - finalWidth) / 2;
+        
+        this.box.style.top = '100px'; 
+        this.box.style.left = `${finalLeft}px`;
+        this.box.style.width = `${finalWidth}px`;
+        this.box.style.height = 'auto'; 
+        this.box.style.minHeight = '56px';
+        this.box.style.borderRadius = '16px'; // Cuadrado suave
+        
+        this.box.classList.add('open');
 
-    // 3. SPINNER (Mostrar caja)
-    resultsBox.classList.remove('d-none'); // <--- CLAVE: Mostrar visualmente
-    resultsBox.innerHTML = `<div class="p-3 text-center text-success"><span class="spinner-border spinner-border-sm"></span> Buscando...</div>`;
+        setTimeout(() => this.input.focus(), 100);
+        document.body.style.overflow = 'hidden'; 
+    },
 
-    try {
-        const instId = localStorage.getItem('instId');
-        const userId = localStorage.getItem('userId');
-        const userLevel = parseInt(localStorage.getItem('userLevel')) || 3;
-        const isAdmin = [1, 2, 4, 5, 6].includes(userLevel);
-        const routes = isAdmin ? ROUTE_MAP.admin : ROUTE_MAP.user;
+close() {
+        if (!this.overlay) return;
+        
+        // 1. OBTENER POSICIÓN ACTUAL DEL TRIGGER (Por si hubo scroll)
+        const rect = this.triggerEl.getBoundingClientRect();
+        
+        // 2. Ocultar contenido interno PRIMERO (para que no se vea feo al encoger)
+        this.box.classList.remove('open'); 
+        
+        // 3. ANIMAR DE REGRESO A LA FORMA DEL BOTÓN
+        this.box.style.top = `${rect.top}px`;
+        this.box.style.left = `${rect.left}px`;
+        this.box.style.width = `${rect.width}px`;
+        this.box.style.height = `${rect.height}px`;
+        this.box.style.borderRadius = '50px'; // Vuelve a ser redondo
+        this.box.style.opacity = '0'; // Se desvanece al final del viaje
 
-        // 4. API
-        const params = new URLSearchParams({
-            q: analysis.term,
-            scope: analysis.scope,
-            inst: instId,
-            role: userLevel,
-            uid: userId
-        });
+        // 4. LIMPIEZA FINAL (Esperar a que termine la animación css de 0.4s)
+        setTimeout(() => {
+            this.overlay.classList.remove('show');
+            this.triggerEl.style.opacity = '1'; // El botón original reaparece suavemente
+            document.body.style.overflow = '';
+            
+            // Limpiar inputs y estilos
+            if(this.input) this.input.value = '';
+            if(this.results) this.renderEmpty();
+            
+            // Quitar estilos inline para la próxima apertura
+            this.box.style = ''; 
+        }, 380); // Un poco menos de 0.4s para evitar parpadeo
+    },
 
-        const response = await fetch(`/URBE-API-DRIVEN/api/search/global?${params.toString()}`);
-        if (!response.ok) throw new Error("Error server");
-        const res = await response.json();
+    async executeSearch(term) {
+        if (!term || term.length < 1) {
+            this.renderEmpty();
+            return;
+        }
+        this.renderSpinner();
+        const analysis = GeckoSearchEngine.analyze(term);
 
-        if (res.status === "success") {
-            const d = res.data;
-            let html = '';
-            let found = false;
+        try {
+            const instId = localStorage.getItem('instId');
+            const params = new URLSearchParams({
+                q: analysis.term,
+                scope: analysis.scope,
+                inst: instId,
+                role: localStorage.getItem('userLevel'),
+                uid: localStorage.getItem('userId')
+            });
 
-            // --- A. PEDIDOS / FORMULARIOS (Tu caso 4687) ---
-            if (d.formularios?.length > 0) {
-                found = true;
-                html += renderSectionHeader('Pedidos / Formularios', ICONS.file);
-                d.formularios.forEach(f => {
-                    const url = getPath(routes.insumos) + `?id=${f.idformA}&action=view`; // action=view para disparar modal
-                    const solicitante = f.ApellidoA ? `Solic: ${f.ApellidoA}` : '';
-                    const estado = `<span class="badge bg-secondary" style="font-size:9px">${f.estado}</span>`;
-                    html += renderItem(url, `Pedido #${f.idformA}`, `${f.tipoA} - ${solicitante}`, estado);
-                });
+            const response = await fetch(`/URBE-API-DRIVEN/api/search/global?${params.toString()}`);
+            const res = await response.json();
+
+            if (res.status === 'success') {
+                this.renderResults(res.data, term);
+            } else {
+                this.renderNoResults(term);
             }
+        } catch (e) {
+            this.results.innerHTML = `<div class="p-3 text-center text-danger small">Error de conexión</div>`;
+        }
+    },
 
-            // --- B. PROTOCOLOS ---
-            if (d.protocolos?.length > 0) {
-                found = true;
-                html += renderSectionHeader('Protocolos', ICONS.book);
-                d.protocolos.forEach(p => {
-                    const isPdf = analysis.term.toLowerCase().includes('pdf');
-                    // Si es PDF, action=pdf, si no action=edit (para abrir modal)
-                    const action = isPdf ? 'pdf' : 'edit';
-                    const url = getPath(routes.protocolos) + `?id=${p.idprotA}&action=${action}`;
-                    const inv = p.ApellidoA ? `Inv: ${p.ApellidoA}` : '';
-                    html += renderItem(url, `#${p.nprotA}`, `${p.tituloA} ${inv}`, isPdf?'<span class="badge bg-danger">PDF</span>':'');
-                });
-            }
+    renderResults(data, term) {
+        let html = '';
+        let hasResults = false;
 
-            // --- C. ALOJAMIENTOS ---
-            if (d.alojamientos?.length > 0) {
-                found = true;
-                html += renderSectionHeader('Alojamientos', ICONS.box);
-                d.alojamientos.forEach(a => {
-                    const isQr = analysis.term.toLowerCase().includes('qr');
-                    const action = isQr ? 'qr' : 'view';
-                    const url = getPath(routes.alojamientos) + `?historia=${a.historia}&action=${action}`; // Usamos 'historia' o 'id' segun tu lógica
-                    const info = `Prot: ${a.nprotA||a.idprotA} ${a.ApellidoA ? '('+a.ApellidoA+')' : ''}`;
-                    html += renderItem(url, `Historia: ${a.historia}`, info, isQr?'<span class="badge bg-dark">QR</span>':'');
-                });
-            }
+        if (data.protocolos?.length > 0) {
+            hasResults = true;
+            html += `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">Protocolos</div>`;
+            data.protocolos.forEach(p => {
+                html += `
+                    <a href="/URBE-API-DRIVEN/front/paginas/admin/protocolos.html?id=${p.idprotA}&action=edit" class="omni-item">
+                        <span class="omni-item-icon"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zm5.5 1.5v2a1 1 0 0 0 1 1h2l-3-3z"/></svg></span>
+                        <div class="d-flex flex-column" style="overflow:hidden;">
+                            <span class="fw-bold text-truncate">${p.tituloA}</span>
+                            <span class="small text-muted">Prot #${p.nprotA}</span>
+                        </div>
+                        <span class="omni-meta">PROT</span>
+                    </a>`;
+            });
+        }
+        
+        html += this.getAiOption(term);
 
-            // --- D. USUARIOS ---
-            if (isAdmin && d.usuarios?.length > 0) {
-                found = true;
-                html += renderSectionHeader('Usuarios', ICONS.user);
-                d.usuarios.forEach(u => {
-                    const url = `${getPath(routes.usuarios)}?id=${u.IdUsrA}&action=edit`;
-                    html += renderItem(url, `${u.ApellidoA}, ${u.NombreA}`, u.EmailA);
-                });
-            }
+        if (!hasResults && html.indexOf('omni-item') === -1) this.renderNoResults(term);
+        else this.results.innerHTML = html;
+    },
 
-            // --- E. INSUMOS STOCK ---
-            if (d.insumos?.length > 0) {
-                found = true;
-                html += renderSectionHeader('Catálogo', ICONS.flask);
-                d.insumos.forEach(i => {
-                    const url = getPath(routes.insumos) + `?id=${i.idInsumo}&action=stock`; 
-                    html += renderItem(url, i.NombreInsumo, `Stock: ${i.CantidadInsumo}`);
-                });
-            }
+    getAiOption(term) {
+        return `
+            <div class="omni-item mt-2 border-top pt-2" onclick="GeckoVoice.executeAction('${term}')">
+                <span class="omni-item-icon text-success"><svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg></span>
+                <div class="d-flex flex-column">
+                    <span class="fw-bold text-success">Preguntar a Gecko AI</span>
+                    <span class="small text-muted" style="font-size:10px;">"${term}"</span>
+                </div>
+                <span class="omni-meta bg-success text-white border-0">IA</span>
+            </div>`;
+    },
 
-            resultsBox.innerHTML = found ? html : `<div class="p-3 text-muted small text-center fst-italic">No se encontraron coincidencias.</div>`;
+    renderEmpty() { this.results.innerHTML = `<div class="gecko-omni-empty"></div>`; },
+    renderSpinner() { this.results.innerHTML = `<div class="p-4 text-center"><div class="spinner-border text-success spinner-border-sm"></div></div>`; },
+    renderNoResults(term) {
+        this.results.innerHTML = `<div class="gecko-omni-empty">Sin resultados locales.<br><button class="btn btn-sm btn-outline-success mt-2" onclick="GeckoVoice.executeAction('${term}')">Consultar IA</button></div>`;
+    },
+    setInput(text) {
+        if (!this.input) this.init();
+        this.input.value = text;
+        this.executeSearch(text);
+    },
+    setListening(isListening) {
+        if (!this.voiceBtn) this.init();
+        if (isListening) {
+            this.voiceBtn.classList.add('listening');
+            this.input.placeholder = "Escuchando...";
         } else {
-            resultsBox.innerHTML = `<div class="p-3 text-muted small text-center">Sin resultados</div>`;
+            this.voiceBtn.classList.remove('listening');
+            this.input.placeholder = "Busca...";
         }
-
-    } catch (e) {
-        console.error(e);
-        resultsBox.innerHTML = `<div class="p-2 text-danger small text-center">Error conexión</div>`;
     }
-}
+};
 
-// --- HELPERS ---
-function executeCommand(analysis) {
-    // Redirigir a pagina correspondiente con action
-    // Implementar si usas comandos directos
-}
-
-function getPath(p) {
-    const idx = window.location.pathname.indexOf('/paginas/');
-    if (idx !== -1) return window.location.pathname.substring(0, idx + 9) + p;
-    return `/URBE-API-DRIVEN/front/paginas/${p}`;
-}
-
-function renderSectionHeader(title, icon) {
-    return `<div class="d-flex align-items-center gap-2 text-uppercase text-muted fw-bold mt-2 mb-1 border-bottom pb-1 mx-2" style="font-size: 0.75rem;">${icon} ${title}</div>`;
-}
-
-function renderItem(url, title, subtitle, badge = '') {
-    return `
-        <a href="${url}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0 px-3 py-2">
-            <div style="overflow: hidden;">
-                <div class="fw-bold text-dark text-truncate" style="max-width: 230px;">${title}</div>
-                <small class="d-block text-muted text-truncate" style="max-width: 230px;">${subtitle}</small>
-            </div>
-            <div class="ms-2">${badge}</div>
-        </a>`;
-}
-
-export function initGlobalSearchUI() {
-    const ids = ['search-results-top', 'search-results-side']; // IDs posibles
-    ids.forEach(id => {
-        const box = document.getElementById(id);
-        if(box) {
-            box.innerHTML = '';         // Vaciar contenido fantasma
-            box.classList.add('d-none'); // Forzar ocultamiento Bootstrap
-            box.style.display = 'none';  // Forzar ocultamiento CSS inline (por si acaso)
-        }
-    });
-}
+window.GeckoSearch = GeckoSearch;
+export function initGlobalSearchUI() { GeckoSearch.init(); }
