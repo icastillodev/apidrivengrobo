@@ -12,9 +12,11 @@ class AlojamientoModel {
      * Obtiene la última actualización de cada alojamiento activo o finalizado.
      * Vincula con 'personae' para obtener el nombre del Investigador.
      */
-    public function getAllGrouped($instId) {
+public function getAllGrouped($instId) {
+        // Hacemos JOIN con tipoalojamiento y extraemos el nombre correcto del investigador
         $sql = "SELECT a.*, p.nprotA, p.tituloA, e.EspeNombreA, e.idespA,
-                       CONCAT(pers.NombreA, ' ', pers.ApellidoA) as Investigador
+                       t.NombreTipoAlojamiento,
+                       COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), 'Sin Asignar') as Investigador
                 FROM alojamiento a
                 INNER JOIN (
                     SELECT historia, MAX(IdAlojamiento) as max_id 
@@ -23,6 +25,7 @@ class AlojamientoModel {
                 ) last_a ON a.IdAlojamiento = last_a.max_id
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 INNER JOIN especiee e ON p.especie = e.idespA
+                LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
                 LEFT JOIN personae pers ON a.IdUsrA = pers.IdUsrA
                 WHERE a.IdInstitucion = ?
                 ORDER BY a.historia DESC";
@@ -37,70 +40,131 @@ class AlojamientoModel {
      * Incluye datos de Protocolo, Especie e Investigador para el resumen frontal.
      */
 public function getHistory($historiaId) {
-    $sql = "SELECT a.*, 
-                   p.nprotA, 
-                   p.IdUsrA as IdTitularProtocolo, -- EL QUE PAGA
-                   e.EspeNombreA, 
-                   CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA) as TitularProtocolo,
-                   CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA) as ResponsableTecnico
-            FROM alojamiento a
-            INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-            INNER JOIN especiee e ON a.TipoAnimal = e.idespA -- Mejor usar el del tramo
-            INNER JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA -- Dueño del protocolo
-            LEFT JOIN personae u_resp ON a.IdUsrA = u_resp.IdUsrA -- Responsable del tramo
-            WHERE a.historia = ?
-            ORDER BY a.fechavisado ASC";
-    
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute([$historiaId]);
-    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-}
+        // Hacemos JOIN con tipoalojamiento y unimos u_resp y u_tit para el Investigador
+        $sql = "SELECT a.*, 
+                       p.nprotA, 
+                       p.tituloA,
+                       p.IdUsrA as IdTitularProtocolo, 
+                       e.EspeNombreA, 
+                       t.NombreTipoAlojamiento,
+                       COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador
+                FROM alojamiento a
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                INNER JOIN especiee e ON a.TipoAnimal = e.idespA 
+                LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
+                LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA 
+                LEFT JOIN personae u_resp ON a.IdUsrA = u_resp.IdUsrA 
+                WHERE a.historia = ?
+                ORDER BY a.fechavisado ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$historiaId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
 // api/src/Models/Alojamiento/AlojamientoModel.php
 
 public function saveAlojamiento($data) {
-    $this->db->beginTransaction();
-    try {
-        $isUpdate = isset($data['is_update']) && ($data['is_update'] === true || $data['is_update'] === "true");
+        $this->db->beginTransaction();
 
-        if ($isUpdate) {
-            $this->closePreviousRecord($data['historia'], $data['fechavisado']);
+        try {
+            $isUpdate = isset($data['is_update']) && ($data['is_update'] === true || $data['is_update'] === "true");
+
+            if ($isUpdate) {
+                // Cerramos facturación del tramo anterior
+                $this->closePreviousRecord($data['historia'], $data['fechavisado']);
+            }
+
+            // Aplicamos default 1 si viene 0 o null en TipoAlojamiento (Tu requerimiento)
+            $idTipoAlojamiento = (!empty($data['IdTipoAlojamiento']) && $data['IdTipoAlojamiento'] > 0) ? (int)$data['IdTipoAlojamiento'] : 1;
+
+            // Extraemos precios actuales del catálogo para congelar el Snapshot económico
+            $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
+            $stmtPrecio->execute([$idTipoAlojamiento]);
+            $precioMomento = $stmtPrecio->fetchColumn() ?: 0;
+
+            // INSERTAR EL NUEVO TRAMO ADMINISTRATIVO
+            $sql = "INSERT INTO alojamiento (
+                fechavisado, IdUsrA, observaciones, TipoAnimal, idprotA, historia, IdInstitucion,
+                IdTipoAlojamiento, CantidadCaja, PrecioCajaMomento, finalizado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                $data['fechavisado'],
+                (int)$data['IdUsrA'],
+                $data['observaciones'] ?? '', 
+                (int)$data['TipoAnimal'],
+                (int)$data['idprotA'],
+                (int)$data['historia'],
+                (int)$data['IdInstitucion'],
+                $idTipoAlojamiento,
+                (int)$data['CantidadCaja'],
+                (float)$precioMomento
+            ]);
+
+            $idNewTramo = $this->db->lastInsertId();
+
+            // -------------------------------------------------------------------------
+            // MOTOR DE CONTINUIDAD FÍSICA (CLONACIÓN DE CAJAS Y ANIMALES)
+            // -------------------------------------------------------------------------
+            if ($isUpdate && isset($data['continuidad']) && !empty($data['continuidad']['cajas'])) {
+                $cajasViejasIds = $data['continuidad']['cajas']; // Array de IDs de cajas del tramo viejo
+                $unidadesViejasIds = $data['continuidad']['unidades'] ?? []; // Array de animales marcados
+
+                foreach ($cajasViejasIds as $oldIdCaja) {
+                    // 1. Obtener la data de la caja vieja
+                    $stmtGetCaja = $this->db->prepare("SELECT * FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
+                    $stmtGetCaja->execute([$oldIdCaja]);
+                    $oldCaja = $stmtGetCaja->fetch(\PDO::FETCH_ASSOC);
+
+                    if ($oldCaja) {
+                        // 2. Clonarla asignándola al NUEVO tramo
+                        $stmtInsertCaja = $this->db->prepare("INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento) VALUES (?, ?, ?, ?)");
+                        $stmtInsertCaja->execute([
+                            $data['fechavisado'], // Se usa la fecha del nuevo tramo
+                            $oldCaja['Detalle'],
+                            $oldCaja['NombreCaja'],
+                            $idNewTramo // ¡Clave! Vinculada al nuevo registro
+                        ]);
+                        $newIdCaja = $this->db->lastInsertId();
+
+                // 3. Clonar los animales (Unidades) que estaban en esta caja Y fueron seleccionados
+                        $stmtGetUnits = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
+                        $stmtGetUnits->execute([$oldIdCaja]);
+                        $unidadesCaja = $stmtGetUnits->fetchAll(\PDO::FETCH_ASSOC);
+
+                        foreach ($unidadesCaja as $oldUnit) {
+                            if (in_array($oldUnit['IdEspecieAlojUnidad'], $unidadesViejasIds)) {
+                                // AÑADIMOS IdUnidadAlojamiento PARA QUE HEREDE EL NÚMERO BIOLÓGICO
+                                $stmtInsertUnit = $this->db->prepare("
+                                    INSERT INTO especie_alojamiento_unidad 
+                                    (IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento) 
+                                    VALUES (?, ?, ?, ?)
+                                ");
+                                $stmtInsertUnit->execute([
+                                    $oldUnit['IdUnidadAlojamiento'], // <- El ID local se mantiene inmutable
+                                    $oldUnit['NombreEspecieAloj'],
+                                    $oldUnit['DetalleEspecieAloj'],
+                                    $newIdCaja // Se mete en la nueva caja clonada
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Auditoría
+            $this->db->prepare("INSERT INTO registroalojamiento (IdUsrA, IdAlojamiento, TipoRegistro, FechaRegistro) VALUES (?, ?, 'ACTUALIZACION_TRAMO', NOW())")
+                     ->execute([(int)$data['IdUsrA'], $idNewTramo]);
+
+            $this->db->commit();
+            return $idNewTramo;
+            
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw new \Exception("Error SQL en Model: " . $e->getMessage());
         }
-
-        $sql = "INSERT INTO alojamiento (
-            fechavisado, totalcajachica, totalcajagrande, preciocajachica, preciocajagrande,
-            IdUsrA, observaciones, TipoAnimal, idprotA, historia, IdInstitucion, 
-            finalizado, coloniapropia
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            $data['fechavisado'], 
-            (int)($data['totalcajachica'] ?? 0), 
-            (int)($data['totalcajagrande'] ?? 0), 
-            (int)($data['preciocajachica'] ?? 0), 
-            (int)($data['preciocajagrande'] ?? 0), 
-            (int)$data['IdUsrA'],
-            $data['observaciones'] ?? '', 
-            1, // TipoAnimal: Forzamos un entero 1 (NOT NULL en tu DB)
-            (int)$data['idprotA'], 
-            (int)$data['historia'], 
-            (int)$data['IdInstitucion'],
-            (int)($data['coloniapropia'] ?? 0)
-        ]);
-
-        $idNew = $this->db->lastInsertId();
-        
-        // Auditoría obligatoria
-        $this->db->prepare("INSERT INTO registroalojamiento (IdUsrA, IdAlojamiento, TipoRegistro, FechaRegistro) VALUES (?, ?, 'ACTUALIZACION_SISTEMA', NOW())")
-                 ->execute([(int)$data['IdUsrA'], $idNew]);
-
-        $this->db->commit();
-        return $idNew; // Retornamos el ID para confirmar éxito real
-    } catch (\Exception $e) {
-        $this->db->rollBack();
-        throw new \Exception("Error SQL en Model: " . $e->getMessage());
     }
-}
 
             /**
              * Cierra el tramo anterior y define sus días finales para facturación
@@ -153,72 +217,85 @@ public function saveAlojamiento($data) {
         /**
          * Actualiza datos de una fila y recalcula la cronología
          */
-        public function updateRow($data) {
-            $this->db->beginTransaction();
-            try {
-                $sql = "UPDATE alojamiento SET 
-                        fechavisado = ?, 
-                        totalcajachica = ?, 
-                        totalcajagrande = ?, 
-                        observaciones = ? 
-                        WHERE IdAlojamiento = ?";
-                
-                $this->db->prepare($sql)->execute([
-                    $data['fechavisado'],
-                    $data['totalcajachica'],
-                    $data['totalcajagrande'],
-                    $data['observaciones'],
-                    $data['IdAlojamiento']
-                ]);
+public function updateRow($data) {
+        $this->db->beginTransaction();
+        try {
+            // Actualizamos usando la nueva arquitectura: CantidadCaja
+            $sql = "UPDATE alojamiento SET 
+                    fechavisado = ?, 
+                    CantidadCaja = ?, 
+                    observaciones = ? 
+                  WHERE IdAlojamiento = ?";
+            
+            $this->db->prepare($sql)->execute([
+                $data['fechavisado'],
+                (int)$data['CantidadCaja'],
+                $data['observaciones'],
+                (int)$data['IdAlojamiento']
+            ]);
 
-                $this->recalculateHistory($data['historia']);
+            // Forzamos la re-evaluación contable de toda la estadía
+            $this->recalculateHistory($data['historia']);
 
-                $this->db->commit();
-                return true;
-            } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) { 
+            $this->db->rollBack(); 
+            throw $e; 
         }
+    }
 
-        /**
-         * MOTOR DE RECALCULADO: Ajusta hastafecha, días y totales de toda la historia
-         */
-        public function recalculateHistory($historiaId) {
-            $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY fechavisado ASC";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$historiaId]);
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+/**
+     * MOTOR DE RECÁLCULO FINANCIERO:
+     * Ordena cronológicamente la historia. Si la fila 2 cambia su fecha de inicio, 
+     * automáticamente acorta o alarga el 'hastafecha' de la fila 1.
+     * Luego multiplica (Días * CantidadCaja * PrecioCajaMomento) para cada fila.
+     */
+    public function recalculateHistory($historiaId) {
+        // Obtenemos todos los tramos ordenados por fecha
+        $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY fechavisado ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$historiaId]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-            $totalRows = count($rows);
-            foreach ($rows as $i => $row) {
-                $next = $rows[$i + 1] ?? null;
-                
-                // Lógica de fechas:
-                // Si hay un tramo siguiente, este termina cuando empieza el otro.
-                // Si es el último: si está finalizado usa su hastafecha, sino usa NULL (continuidad).
-                $hasta = null;
-                if ($next) {
-                    $hasta = $next['fechavisado'];
-                } else {
-                    $hasta = ($row['finalizado'] == 1) ? $row['hastafecha'] : null;
-                }
+        foreach ($rows as $i => $row) {
+            $next = $rows[$i + 1] ?? null;
+            
+            $hasta = null;
+            if ($next) {
+                // Si hay un tramo siguiente, este termina EXACTAMENTE el día que el otro empieza
+                $hasta = $next['fechavisado'];
+            } else {
+                // Si es el último, revisamos si la historia fue finalizada
+                $hasta = ($row['finalizado'] == 1) ? $row['hastafecha'] : null;
+            }
 
-                // Cálculo de días (Si no hay hasta, calculamos hasta HOY para el registro dinámico)
-                $fechaFinCalculo = $hasta ?: date('Y-m-d');
-                $diff = strtotime($fechaFinCalculo) - strtotime($row['fechavisado']);
-                $dias = max(0, floor($diff / 86400));
+            // Calculamos días (Si no está cerrado, calcula hasta el día de HOY en vivo)
+            $fechaFinCalculo = $hasta ?: date('Y-m-d');
+            $diff = strtotime($fechaFinCalculo) - strtotime($row['fechavisado']);
+            $dias = max(0, floor($diff / 86400));
 
-                // Cálculo de precio
-                $total = ($row['totalcajachica'] * $row['preciocajachica'] + 
-                        $row['totalcajagrande'] * $row['preciocajagrande']) * $dias;
+            // MULTIPLICACIÓN MATEMÁTICA CON LAS NUEVAS VARIABLES
+            $precio = (float)$row['PrecioCajaMomento'];
+            $cajas = (int)$row['CantidadCaja'];
+            
+            $totalPago = $dias * $cajas * $precio;
 
-                // Actualizamos la fila con los nuevos cálculos de auditoría
-                $updateSql = "UPDATE alojamiento SET 
+            // Actualizamos la fila en la BD con los números congelados
+            $updateSql = "UPDATE alojamiento SET 
                             hastafecha = ?, 
                             totaldiasdefinidos = ?, 
                             totalpago = ? 
-                            WHERE IdAlojamiento = ?";
-                $this->db->prepare($updateSql)->execute([$hasta, $dias, $total, $row['IdAlojamiento']]);
-            }
+                          WHERE IdAlojamiento = ?";
+                          
+            $this->db->prepare($updateSql)->execute([
+                $hasta, 
+                $dias, 
+                $totalPago, 
+                $row['IdAlojamiento']
+            ]);
         }
+    }
 
         public function finalizarHistoria($historiaId, $fechaCierre) {
             $this->db->beginTransaction();
@@ -312,4 +389,25 @@ public function updateHistoryConfig($data) {
         throw $e;
     }
 }
+public function updatePrice($idAlojamiento, $nuevoPrecio) {
+        $this->db->beginTransaction();
+        try {
+            // Actualizamos el precio congelado de ESE tramo específico
+            $this->db->prepare("UPDATE alojamiento SET PrecioCajaMomento = ? WHERE IdAlojamiento = ?")
+                     ->execute([$nuevoPrecio, $idAlojamiento]);
+            
+            // Sacamos el ID de la Historia para recalcular toda la contabilidad
+            $stmt = $this->db->prepare("SELECT historia FROM alojamiento WHERE IdAlojamiento = ?");
+            $stmt->execute([$idAlojamiento]);
+            $historia = $stmt->fetchColumn();
+
+            $this->recalculateHistory($historia);
+
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) { 
+            $this->db->rollBack(); 
+            throw $e; 
+        }
+    }
 }

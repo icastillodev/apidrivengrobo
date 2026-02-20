@@ -12,11 +12,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
     <link rel="stylesheet" href="../../dist/css/adminlte.min.css">
-    
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
         .p-4 { padding: 1.5rem !important; }
-        /* Bordes de estado laterales */
         .status-vigente { border-left: 5px solid #1a5d3b; }
         .status-finalizado { border-left: 5px solid #dc3545; opacity: 0.8; }
         .pointer { cursor: pointer; }
@@ -27,10 +26,7 @@
             background: rgba(255,255,255,0.8); z-index: 9999;
             display: flex; align-items: center; justify-content: center;
         }
-        /* Agrandamos el modal XL para que los detalles no se desfasen */
-        @media (min-width: 1200px) {
-            .modal-xl { max-width: 80%; } 
-        }
+        @media (min-width: 1200px) { .modal-xl { max-width: 80%; } }
         .badge-historia { font-size: 1.1rem; padding: 10px 15px; }
     </style>
 
@@ -38,47 +34,50 @@
         import { Auth } from '../../dist/js/auth.js';
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { getRoleName } from '../../dist/js/components/menujs/MenuConfig.js';
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         
-        // Lógica administrativa de alojamientos y sus submódulos de registro/configuración
+        // Importamos el maestro orquestador de alojamientos
         import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js';
-        import '../../dist/js/pages/admin/registroAlojamiento.js';
-        import '../../dist/js/pages/admin/configuracionAlojamiento.js';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
-
             try {
                 // 1. CARGA CRÍTICA: Idioma
-                // Bloqueamos la ejecución hasta que window.txt esté disponible para evitar errores en el menú e interfaz
                 await loadLanguage(); 
+                
+                // 2. VALIDACIÓN DE ACCESO
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
-                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos y Técnicos de Bioterio)
-                Auth.checkAccess([1, 2, 4,5,6]); 
-
-                // 3. INICIALIZACIÓN DE COMPONENTES
                 if (window.txt) {
+                    // 3. TRADUCCIÓN DE LA INTERFAZ
+                    translatePage();
+                    
+                    // 4. LÓGICA DE BREADCRUMB 
+                    const levelId = Auth.getVal('userLevel'); 
+                    const roleEl = document.getElementById('role-bread');
+                    if (roleEl) roleEl.innerText = getRoleName(levelId);
+                    
+                    const instEl = document.getElementById('institucionbread');
+                    if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
+
+                    // 5. INICIALIZACIÓN DE COMPONENTES
                     initMenu();
                     NotificationManager.init();
-                    
-                    // Inicialización de la lógica maestra de alojamientos
                     initAlojamientosPage();
                     
-                    console.log("✅ Administración de Alojamientos inicializada correctamente.");
                 } else {
-                    throw new Error("El objeto de idioma window.txt no se generó.");
+                    throw new Error("window.txt no disponible");
                 }
 
-                // 4. ROUTER (Delay de estabilidad para abrir cajas o configuraciones desde la URL)
-                setTimeout(() => {
-                    checkUrlParamsAndOpen();
-                }, 300);
+                // 6. ROUTER 
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
 
             } catch (error) {
-                console.error("❌ Fallo en inicialización de página de Alojamientos:", error);
+                console.error("❌ Fallo en inicialización:", error);
             } finally {
                 hideLoader();
             }
@@ -92,43 +91,44 @@
 
     <div class="p-4">
         <div class="card shadow-sm border-0 p-4">
+            
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted" id="institucionbread"></li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread">CARGANDO...</li>
+                    <li class="breadcrumb-item text-muted" id="role-bread"></li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Control alojamientos</span>
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="bread.accommodations">Control alojamientos</span>
                     </li>
                 </ol>
             </nav>
 
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i>Gestión de Alojamientos</h5>
+                <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i><span data-i18n="alojamientos.title">Gestión de Alojamientos</span></h5>
                 <div class="d-flex gap-2">
                     <button id="btn-ayuda-alojamiento" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm">
-                        <i class="bi bi-question-circle me-1"></i> AYUDA
+                        <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda">AYUDA</span>
                     </button>
                     <button class="btn btn-outline-success btn-sm fw-bold shadow-sm" onclick="window.exportExcelAlojamientos()">
-                        <i class="bi bi-file-earmark-excel me-1"></i> EXCEL
+                        <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="generales.excel">EXCEL</span>
                     </button>
                     <button class="btn btn-success btn-sm fw-bold shadow-sm" onclick="window.openModalRegistro()">
-                        <i class="bi bi-plus-lg me-1"></i> REGISTRAR ALOJAMIENTO
+                        <i class="bi bi-plus-lg me-1"></i> <span data-i18n="alojamientos.btn_register">REGISTRAR ALOJAMIENTO</span>
                     </button>
                 </div>
             </div>
 
             <div class="row g-2 mb-4 p-3 bg-light rounded shadow-sm">
                 <div class="col-md-6">
-                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;">Búsqueda Global</label>
-                    <input type="text" id="search-alojamiento" class="form-control form-control-sm" placeholder="Buscar por protocolo o investigador..." oninput="window.renderAlojamientosTable()">
+                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.search_global">Búsqueda Global</label>
+                    <input type="text" id="search-alojamiento" class="form-control form-control-sm" placeholder="..." oninput="window.renderAlojamientosTable()">
                 </div>
                 <div class="col-md-3">
-                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;">Estado</label>
+                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>
                     <select id="filter-estado" class="form-select form-select-sm" onchange="window.renderAlojamientosTable()">
-                        <option value="">Todos los Estados</option>
-                        <option value="0" selected>Vigentes</option>
-                        <option value="1">Finalizados</option>
+                        <option value="" data-i18n="estadosformularios.todosestados">Todos los Estados</option>
+                        <option value="0" selected data-i18n="alojamientos.status_active">Vigentes</option>
+                        <option value="1" data-i18n="alojamientos.status_finished">Finalizados</option>
                     </select>
                 </div>
             </div>
@@ -137,69 +137,29 @@
                 <table class="table table-hover align-middle border">
                     <thead class="bg-dark text-white small uppercase">
                         <tr>
-                                <th data-key="historia" data-sortable="true">Historia</th>
-                                <th data-key="fechavisado" data-sortable="true">Inicio</th> 
-                                <th data-key="nprotA" data-sortable="true">Protocolo</th>
-                                <th data-key="Investigador" data-sortable="true">Investigador</th>
-                                <th data-key="EspeNombreA" data-sortable="true">Especie</th>
-                                <th class="text-center">Cajas (Tipo/Cant)</th>
-                                <th class="text-center">Días Aloj.</th>
-                                <th>Observaciones</th>
-                                <th data-key="finalizado" data-sortable="true">Estado</th>
-                                <th class="text-end">Acciones</th>
-                            </tr>
+                            <th data-key="historia" data-sortable="true" data-i18n="alojamientos.th_history">Historia</th>
+                            <th data-key="fechavisado" data-sortable="true" data-i18n="generales.inicio">Inicio</th> 
+                            <th data-key="nprotA" data-sortable="true" data-i18n="generales.nprotocolo">Protocolo</th>
+                            <th data-key="Investigador" data-sortable="true" data-i18n="generales.investigador">Investigador</th>
+                            <th data-key="EspeNombreA" data-sortable="true" data-i18n="generales.especie">Especie</th>
+                            <th class="text-center" data-i18n="alojamientos.th_boxes">Cajas (Tipo/Cant)</th>
+                            <th class="text-center" data-i18n="alojamientos.th_days">Días Aloj.</th>
+                            <th data-i18n="alojamientos.th_obs">Observaciones</th>
+                            <th data-key="finalizado" data-sortable="true" data-i18n="alojamientos.status">Estado</th>
+                            <th class="text-end" data-i18n="alojamientos.th_actions">Acciones</th>
+                        </tr>
                     </thead>
                     <tbody id="tbody-alojamientos"></tbody>
                 </table>
-                                <nav aria-label="Page navigation" class="mt-4">
+                <nav aria-label="Page navigation" class="mt-4">
                     <ul id="pagination-alojamiento" class="pagination pagination-sm justify-content-center"></ul>
                 </nav>
-
             </div>
         </div>
     </div>
 
-<!-- MODAL ACTUALIZACION -->
-
-<div class="modal fade" id="modal-actualizar-qr" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-primary text-white py-2">
-                <h6 class="modal-title fw-bold">ACTUALIZAR ESTADÍA</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div id="act-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm">
-                    </div>
-
-                <div class="row g-3">
-                    <div class="col-6">
-                        <label class="small fw-bold text-uppercase text-muted" style="font-size: 10px;">Fecha del Cambio</label>
-                        <input type="date" id="reg-fecha-qr" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-6">
-                        <label id="act-label-tipo" class="small fw-bold text-primary text-uppercase" style="font-size: 10px;">Cantidad</label>
-                        <input type="number" id="reg-cantidad-qr" class="form-control form-control-sm fw-bold border-primary" min="1">
-                    </div>
-                    <div class="col-12">
-                        <label class="small fw-bold text-uppercase text-muted" style="font-size: 10px;">Observaciones del nuevo tramo</label>
-                        <textarea id="reg-obs-qr" class="form-control form-control-sm" rows="2" placeholder="Detalle el cambio (ej: cambio de sector, reducción de animales...)"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer bg-light border-top-0">
-                <button class="btn btn-success w-100 fw-bold shadow-sm" onclick="window.guardarNuevoTramo()">
-                    <i class="bi bi-plus-circle me-1"></i> AGREGAR NUEVO TRAMO
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- -->
-
-<!-- MODAL HISTORIA  -->
-<div class="modal fade" id="modal-historial" tabindex="-1">
+    <!--MODAL HISTORIAL-->
+<div class="modal fade" id="modal-historial">
     <div class="modal-dialog modal-xl">
         <div class="modal-content border-0">
             <div class="modal-header bg-dark text-white py-2">
@@ -209,18 +169,18 @@
             <div class="modal-body">
                 <div class="d-flex justify-content-end gap-2 mb-3">
                     <button class="btn btn-sm btn-outline-danger fw-bold" onclick="window.exportarFichaPDF()">
-                        <i class="bi bi-file-pdf me-1"></i> PDF FICHA
+                        <i class="bi bi-file-pdf me-1"></i> <span data-i18n="alojamientos.btn_pdf">PDF FICHA</span>
                     </button>
                     <button class="btn btn-sm btn-outline-dark fw-bold" onclick="window.verPaginaQR()">
-                        <i class="bi bi-qr-code me-1"></i> QR PÁGINA
+                        <i class="bi bi-qr-code me-1"></i> <span data-i18n="alojamientos.btn_qr">QR PÁGINA</span>
                     </button>
                     <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="window.abrirConfiguracion()">
-                        <i class="bi bi-gear-fill me-1"></i> CONFIGURACIÓN
+                        <i class="bi bi-gear-fill me-1"></i> <span data-i18n="alojamientos.btn_config">CONFIGURACIÓN</span>
                     </button>
                 </div>
 
                 <div id="historial-summary" class="row g-3 mb-4 p-3 bg-light rounded border mx-0 shadow-sm">
-                    </div>
+                </div>
                 
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle text-center shadow-sm">
@@ -239,52 +199,75 @@
                         <tbody id="tbody-historial" class="small"></tbody>
                     </table>
                 </div>
-
-
             </div>
-
             <div class="modal-footer d-flex justify-content-between bg-light" id="historial-footer"></div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="modal-actualizar-qr" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title fw-bold" data-i18n="alojamientos.upd_title">ACTUALIZAR ESTADÍA</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div id="act-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm"></div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-uppercase text-muted" data-i18n="alojamientos.upd_date">Fecha del Cambio</label>
+                        <input type="date" id="reg-fecha-qr" class="form-control form-control-sm border-primary shadow-sm">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-primary text-uppercase" data-i18n="alojamientos.upd_qty">Cantidad de Cajas</label>
+                        <input type="number" id="reg-cantidad-qr" class="form-control form-control-sm fw-bold border-primary shadow-sm" min="1">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="small fw-bold text-muted text-uppercase" data-i18n="alojamientos.upd_type">Tipo de Aloj.</label>
+                        <input type="text" id="reg-tipo-nombre-qr" class="form-control form-control-sm bg-light text-muted fw-bold" readonly>
+                    </div>
+                    <div class="col-12 mt-4">
+                        <div id="arbol-continuidad-container" class="p-3 border rounded bg-white shadow-sm"></div>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <label class="small fw-bold text-uppercase text-muted" data-i18n="alojamientos.upd_obs">Observaciones del nuevo tramo</label>
+                        <textarea id="reg-obs-qr" class="form-control form-control-sm" rows="2"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-top-0">
+                <button class="btn btn-success w-100 fw-bold shadow-sm" onclick="window.guardarNuevoTramo()">
+                    <i class="bi bi-plus-circle me-1"></i> <span data-i18n="alojamientos.btn_save_clone">GUARDAR NUEVO TRAMO</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-
-
-<!-- MODAL MODIFICACION -->
-<div class="modal fade" id="modal-modificar-tramo" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modal-modificar-tramo" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white py-2">
-                <h6 class="modal-title fw-bold">Modificar Tramo de Historia</h6>
+                <h6 class="modal-title fw-bold" data-i18n="alojamientos.mod_title">Modificar Tramo de Historia</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <div id="edit-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm">
-                    </div>
-
+                <div id="edit-info-header" class="alert alert-secondary py-2 px-3 mb-3 small border-0 shadow-sm"></div>
                 <form id="form-modificar-tramo">
                     <input type="hidden" id="edit-id-alojamiento">
                     <input type="hidden" id="edit-historia">
-                    
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="small fw-bold text-muted">Fecha de Inicio (Tramo)</label>
+                            <label class="small fw-bold text-muted" data-i18n="alojamientos.mod_start_date">Fecha de Inicio (Tramo)</label>
                             <input type="date" id="edit-fecha-inicio" class="form-control">
                         </div>
-
-                        <div class="col-12" id="div-chica">
-                            <label class="small fw-bold text-primary">CANT. CAJAS CHICAS</label>
-                            <input type="number" id="edit-caja-ch" class="form-control fw-bold border-primary" min="0">
-                        </div>
-
-                        <div class="col-12" id="div-grande">
-                            <label class="small fw-bold text-primary">CANT. CAJAS GRANDES</label>
-                            <input type="number" id="edit-caja-gr" class="form-control fw-bold border-primary" min="0">
-                        </div>
-
                         <div class="col-12">
-                            <label class="small fw-bold text-muted">Observaciones</label>
+                            <label class="small fw-bold text-primary text-uppercase" data-i18n="alojamientos.mod_qty">CANTIDAD (UNIDADES)</label>
+                            <input type="number" id="edit-caja-cant" class="form-control fw-bold border-primary" min="1">
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold text-muted" data-i18n="alojamientos.mod_obs">Observaciones</label>
                             <textarea id="edit-obs" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
@@ -292,202 +275,95 @@
             </div>
             <div class="modal-footer bg-light border-top-0">
                 <button type="button" class="btn btn-primary btn-sm fw-bold px-4" onclick="window.updateTramoData()">
-                    <i class="bi bi-save me-1"></i> GUARDAR CAMBIOS
+                    <i class="bi bi-save me-1"></i> <span data-i18n="alojamientos.btn_save_changes">GUARDAR CAMBIOS</span>
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-
-<!-- REGISTRO ALOJAMIENTOS COMIENZA ACA -->
-
- <div class="modal fade" id="modal-registro" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modal-registro" aria-hidden="true">
     <div class="modal-dialog modal-lg border-0">
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-success text-white py-2">
                 <div>
-                    <h6 id="modal-registro-title" class="modal-title fw-bold m-0">NUEVO REGISTRO DE ALOJAMIENTO</h6>
-                    <small class="opacity-75">Control de estadía y bioseguridad</small>
+                    <h6 id="modal-registro-title" class="modal-title fw-bold m-0" data-i18n="alojamientos.reg_title">NUEVO REGISTRO DE ALOJAMIENTO</h6>
+                    <small class="opacity-75" data-i18n="alojamientos.reg_subtitle">Control de estadía y bioseguridad</small>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-
-            <div class="modal-body p-4">
-                <form id="form-alojamiento">
-                    <div class="section-step mb-4">
-                        <input type="hidden" id="reg-idprotA">
-                        <input type="hidden" id="reg-IdUsrA">
-                        <label class="small fw-bold text-success text-uppercase" style="font-size: 11px;">1. Localizar Protocolo Vigente</label>
-                        <div class="input-group shadow-sm mb-2">
-                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                            <input type="text" id="reg-search-prot" class="form-control border-start-0" placeholder="Buscar por N°, Título o ID...">
-                        </div>
-                        <select id="reg-select-prot" class="form-select shadow-sm" size="4">
-                            <option value="" disabled selected>Seleccione un protocolo de la lista...</option>
-                        </select>
-                    </div>
-
-                    <div id="step-details" class="d-none animate__animated animate__fadeIn">
-                        <hr class="my-4">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">2. Responsable del Alojamiento</label>
-                                <input type="text" id="reg-search-usr" class="form-control form-control-sm mb-1" placeholder="Filtrar usuario...">
-                                <select id="reg-select-usr" class="form-select form-select-sm shadow-sm">
-                                    <option value="">-- Seleccionar Usuario --</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">3. Especie Aprobada</label>
-                                <div id="container-especie">
-                                    <select id="reg-select-esp" class="form-select form-select-sm shadow-sm"></select>
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">4. Tipo de Caja</label>
-                                <div id="container-caja">
-                                    </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">5. Cantidad de Cajas</label>
-                                <input type="number" id="reg-cant-cajas" class="form-control form-control-sm" value="1" min="1">
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">6. Fecha Inicio</label>
-                                <input type="date" id="reg-fecha-ini" class="form-control form-control-sm">
-                            </div>
-
-                            <div class="col-12">
-                                <label class="small fw-bold text-uppercase" style="font-size: 10px;">7. Observaciones</label>
-                                <textarea id="reg-observaciones" class="form-control" rows="2" placeholder="Detalles de la ubicación o estado..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
-            <div class="modal-footer bg-light border-top-0">
-                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal">CANCELAR</button>
-                <button type="button" class="btn btn-sm btn-success fw-bold px-4 shadow-sm" onclick="window.registrarAlojamientoFinal()">
-                    <i class="bi bi-save me-1"></i> GUARDAR REGISTRO
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<!-- CONFIGURACION -->
- <div class="modal fade" id="modal-configuracion-global" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-md border-0">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-dark text-white py-2">
-                <div>
-                    <h6 class="modal-title fw-bold m-0 text-uppercase">Configuración Global: Historia #<span id="cfg-title-id"></span></h6>
-                    <small class="opacity-75">Los cambios afectarán a todos los tramos de esta estadía</small>
-                </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body p-4">
-                <form id="form-config-global">
-                    <input type="hidden" id="cfg-historia-id">
-                    
+                <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="small fw-bold text-muted text-uppercase">1. Nuevo Protocolo Asociado</label>
-                            <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-1" placeholder="Buscar protocolo...">
-                            <select id="cfg-select-prot" class="form-select form-select-sm shadow-sm"></select>
+                            <label class="small fw-bold">PROTOCOLO VIGENTE</label>
+                            <input type="text" id="reg-search-prot" class="form-control form-control-sm mb-1" placeholder="Buscar por título o protocolo...">
+                            <select id="reg-protocolo" class="form-select form-select-sm" size="4"></select>
                         </div>
-
+                        
                         <div class="col-12">
-                            <label class="small fw-bold text-muted text-uppercase">2. Investigador Responsable</label>
-                            <input type="text" id="cfg-search-usr" class="form-control form-control-sm mb-1" placeholder="Buscar investigador...">
-                            <select id="cfg-select-usr" class="form-select form-select-sm shadow-sm"></select>
-                        </div>
-
-                        <div class="col-12">
-                            <label class="small fw-bold text-muted text-uppercase">3. Especie</label>
-                            <div id="cfg-container-especie">
+                            <label class="small fw-bold">USUARIO RESPONSABLE</label>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" id="btn-user-select">
+                                    <span>Seleccione un usuario...</span>
+                                </button>
+                                <div class="dropdown-menu w-100 p-2 shadow-sm">
+                                    <input type="text" id="reg-user-search" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, usuario o nombre...">
+                                    <div id="reg-user-list" style="max-height: 150px; overflow-y: auto;"></div>
                                 </div>
+                            </div>
+                            <input type="hidden" id="reg-usuario-hidden">
                         </div>
 
+                        <div class="col-6">
+                            <label class="small fw-bold">ESPECIE</label>
+                            <select id="reg-especie" class="form-select form-select-sm border-primary disabled" disabled></select>
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold">TIPO DE ALOJAMIENTO</label>
+                            <select id="reg-tipo" class="form-select form-select-sm border-success disabled" disabled></select>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="small fw-bold">FECHA DE INGRESO</label>
+                            <input type="date" id="reg-fecha" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold">CANT. INICIAL DE CAJAS</label>
+                            <input type="number" id="reg-cantidad" class="form-control form-control-sm" min="1" value="1">
+                        </div>
                         <div class="col-12">
-                            <label class="small fw-bold text-muted text-uppercase">4. Tipo de Caja</label>
-                            <div id="cfg-container-caja">
-                                </div>
+                            <label class="small fw-bold">OBSERVACIONES</label>
+                            <textarea id="reg-obs" class="form-control form-control-sm" rows="2"></textarea>
                         </div>
                     </div>
-                </form>
-            </div>
-
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-dismiss="modal">CANCELAR</button>
-                <button type="button" class="btn btn-sm btn-dark fw-bold px-4 shadow-sm" onclick="window.guardarConfiguracionGlobal()">
-                    <i class="bi bi-save-fill me-1"></i> APLICAR CAMBIOS GLOBALES
+                </div>
+            <div class="modal-footer bg-light border-top-0">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal" data-i18n="alojamientos.btn_cancel">CANCELAR</button>
+                <button type="button" id="btn-save-reg" class="btn btn-sm btn-success fw-bold px-4 shadow-sm d-none" onclick="window.saveAlojamiento()">
+                    <i class="bi bi-save me-1"></i> <span data-i18n="alojamientos.btn_save_reg">GUARDAR REGISTRO</span>
                 </button>
             </div>
         </div>
     </div>
 </div>
-
-<!-- AYUDA-->
-
 <div class="modal fade" id="modal-alojamiento-help" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title fw-bold">Guía de Gestión de Alojamientos</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-dark py-2">
+                <h6 class="modal-title fw-bold" data-i18n="alojamientos.help_title"><i class="bi bi-question-circle"></i> Ayuda del Módulo</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="help-item mb-4">
-                    <h6 class="fw-bold text-success border-bottom pb-1">1. HISTORIA CLÍNICA (ID)</h6>
-                    <p class="small text-muted">Cada alojamiento tiene un ID único llamado "Historia". Al hacer clic en una fila, se abre el historial completo de cambios de cajas y precios de esa estadía.</p>
-                </div>
-                <div class="help-item mb-4">
-                    <h6 class="fw-bold text-success border-bottom pb-1">2. ACTUALIZACIÓN DE ESTADÍA</h6>
-                    <p class="small text-muted">Use el botón <strong>ACTUALIZAR</strong> para registrar cambios en el número de cajas. El sistema cerrará el tramo anterior automáticamente y calculará los costos hasta la fecha.</p>
-                </div>
-                <div class="help-item mb-4">
-                    <h6 class="fw-bold text-success border-bottom pb-1">3. CÓDIGOS QR</h6>
-                    <p class="small text-muted">El botón <strong>QR</strong> abre una ficha técnica digital. Esta URL es la que debe imprimirse y pegarse físicamente en las cajas de la sala de bioterio.</p>
-                </div>
-                <div class="text-center mt-4">
-                    <button class="btn btn-success px-5 fw-bold" data-bs-dismiss="modal">ENTENDIDO</button>
-                </div>
+            <div class="modal-body small text-muted">
+                <p data-i18n="alojamientos.help_p1">Este módulo gestiona el costo y la ubicación física de los animales de experimentación.</p>
+                <ul class="mb-0">
+                    <li class="mb-2"><b class="text-dark" data-i18n="alojamientos.help_li1_title">Registrar:</b> <span data-i18n="alojamientos.help_li1_desc">Abre una nueva historia de alojamiento ligada a un protocolo.</span></li>
+                    <li class="mb-2"><b class="text-dark" data-i18n="alojamientos.help_li2_title">Actualizar:</b> <span data-i18n="alojamientos.help_li2_desc">Cierra el ciclo contable actual y abre uno nuevo, permitiendo mutar cajas y animales.</span></li>
+                    <li><b class="text-dark" data-i18n="alojamientos.help_li3_title">Trazabilidad:</b> <span data-i18n="alojamientos.help_li3_desc">Dentro de la historia, haz clic en una fila para cargar variables clínicas a sujetos individuales.</span></li>
+                </ul>
             </div>
         </div>
     </div>
 </div>
-<!-- ALOJAMIENTOS EXCEL -->
-<div class="modal fade" id="modal-excel-alojamiento" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-success text-white py-2">
-                <h6 class="modal-title fw-bold small uppercase">Exportar Alojamientos</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-3">
-                <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 9px;">Desde (Fecha Inicio):</label>
-                <input type="date" id="excel-start-date-aloj" class="form-control form-control-sm mb-2 shadow-sm">
-                
-                <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 9px;">Hasta (Fecha Inicio):</label>
-                <input type="date" id="excel-end-date-aloj" class="form-control form-control-sm shadow-sm">
-            </div>
-            <div class="modal-footer p-2 border-top-0">
-                <button type="button" class="btn btn-light btn-sm px-3 fw-bold uppercase" style="font-size: 10px;" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success btn-sm px-3 fw-bold uppercase" style="font-size: 10px;" onclick="window.processExcelExportAlojamientos()">Descargar Excel</button>
-            </div>
-        </div>
-    </div>
-</div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -127,4 +127,20 @@ class ProtocolModel {
         $stmt->execute([$idprotA]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    public function getProtocolosValidos($instId) {
+        // Trae los protocolos de la institución que NO estén rechazados (2) ni pendientes (3) en la tabla solicitud.
+        // Si no existen en la tabla solicitud (LEFT JOIN es NULL), significa que fueron manuales y están aprobados.
+        $sql = "
+            SELECT p.*, 
+                   COALESCE(CONCAT(u.NombreA, ' ', u.ApellidoA), p.InvestigadorACargA) as InvestigadorACargA
+            FROM protocoloexpe p
+            LEFT JOIN personae u ON p.IdUsrA = u.IdUsrA
+            LEFT JOIN solicitud s ON p.idprotA = s.idprotA
+            WHERE p.IdInstitucion = ? 
+            AND (s.id_solicitud IS NULL OR s.estado NOT IN (2, 3))
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
 }

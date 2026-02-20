@@ -47,35 +47,59 @@ function getBaseStyles() {
         
         .dropdown-menu-gecko { position: absolute; min-width: 200px; background-color: #ffffff !important; z-index: 3000 !important; border-radius: 8px; border: 1px solid rgba(0,0,0,0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 0.5rem; }
         .dropdown-menu-gecko.hidden { display: none; }
+        // Dentro de getBaseStyles agregar/modificar:
+.dropdown-menu-gecko {
+    background-color: var(--bs-body-bg) !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+    padding: 8px !important;
+}
+
+/* Efecto flechita para el popup lateral */
+.gecko-sidebar .dropdown-menu-gecko::before {
+    content: "";
+    position: absolute;
+    top: 15px;
+    left: -6px;
+    width: 12px;
+    height: 12px;
+    background: var(--bs-body-bg);
+    border-left: 1px solid rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    transform: rotate(45deg);
+}
     `;
 }
 
 function getSidebarStyles() {
     return `
-        /* SIDEBAR FLEXIBLE */
         .gecko-sidebar { 
             position: fixed !important; top: 0; left: 0; 
             height: 100vh; width: 260px; z-index: 1050; 
             transition: transform 0.3s ease; 
             background-color: var(--bs-body-bg);
-            display: flex; flex-direction: column; /* Clave para distribuir espacio */
-            padding-bottom: 10px !important; /* Espacio al final */
+            display: flex; flex-direction: column;
+            padding-bottom: 10px !important;
+            /* IMPORTANTE: Permitir que los hijos se vean fuera */
+            overflow: visible !important; 
         }
         
-        /* Lista de menú scrolleable pero oculta la barra */
         #side-menu-ul {
-            flex-grow: 1; /* Ocupa todo el espacio disponible */
-            overflow-y: auto;
-            scrollbar-width: thin; /* Firefox */
-            min-height: 0; /* Permite encogerse en Flexbox */
+            flex-grow: 1;
+            /* Cambiamos auto por visible para que el flyout no se corte */
+            /* Si tienes MUCHOS ítems y necesitas scroll, hay que usar una técnica de portal JS, 
+               pero para una cantidad normal, visible funciona */
+            overflow-y: visible; 
+            min-height: 0;
+            padding: 0;
         }
-        #side-menu-ul::-webkit-scrollbar { width: 4px; }
-        #side-menu-ul::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
 
-        /* Ítems más compactos en sidebar */
-        .gecko-sidebar .nav-link { padding-top: 6px !important; padding-bottom: 6px !important; }
-        .gecko-sidebar .nav-item { margin-bottom: 2px !important; }
+        /* Si el mouse está sobre el ítem o el submenú, lo mantenemos visible (si usas hover) */
+        .group-gecko-item:hover .dropdown-menu-gecko.hidden {
+            /* Esto es opcional si manejas el toggle por JS, déjalo si quieres soporte hover */
+        }
 
+        .gecko-sidebar .nav-link { padding-top: 8px !important; padding-bottom: 8px !important; }
+        
         @media (min-width: 769px) { body.with-sidebar { padding-left: 260px !important; } }
     `;
 }

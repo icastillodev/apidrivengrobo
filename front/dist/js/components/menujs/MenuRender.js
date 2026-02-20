@@ -161,12 +161,14 @@ export function renderTopMenuStructure(container, menuIds, templates) {
 }
 
 function buildMenuItemHTML(id, layout, templates) {
-    // Igual que antes...
     const item = templates[id]; 
     if (!item) return '';
     const path = item.path ? getCorrectPath(item.path) : '#';
     const isSide = layout === 'side';
-    const liClass = isSide ? 'nav-item mb-1 w-100 position-relative' : 'nav-item position-relative';
+    
+    // Agregamos position-relative al li para que el popup se posicione respecto a él
+    const liClass = isSide ? 'nav-item mb-1 w-100 position-relative group-gecko-item' : 'nav-item position-relative';
+    
     const linkClass = isSide 
         ? 'nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2' 
         : 'gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body';
@@ -178,18 +180,25 @@ function buildMenuItemHTML(id, layout, templates) {
     const labelHTML = `<span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span>`;
 
     if (item.isDropdown && item.children) {
-        const arrowIcon = `<svg class="ms-1" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
+        // En lateral, rotamos la flechita para que apunte a la derecha
+        const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor; ${isSide ? 'transform: rotate(-90deg);' : ''}"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
+        
         const childrenHTML = item.children.map(child => `
             <li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;">${child.label}</a></li>
         `).join('');
-        const ulStyle = isSide ? 'position: static; background: transparent; padding-left: 30px;' : 'position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px;';
+
+        // --- CAMBIO CLAVE AQUÍ ---
+        // Si es lateral, usamos position: absolute, left: 100% para que salga hacia afuera
+        const ulStyle = isSide 
+            ? 'position: absolute; top: 0; left: 100%; min-width: 200px; margin-left: 10px; z-index: 3000;' 
+            : 'position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px;';
 
         return `
         <li class="${liClass}">
             <a href="javascript:void(0);" class="${linkClass} dropdown-toggle-gecko d-flex ${isSide ? 'align-items-center justify-content-between' : 'flex-column align-items-center'}">
                 ${isSide ? `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}` : `<div>${iconHTML}</div> <div class="d-flex align-items-center">${labelHTML} ${arrowIcon}</div>`}
             </a>
-            <ul class="dropdown-menu-gecko hidden list-unstyled border-0 rounded-3 mt-1 shadow" style="${ulStyle}">
+            <ul class="dropdown-menu-gecko hidden list-unstyled border shadow-lg rounded-3" style="${ulStyle}">
                 ${childrenHTML}
             </ul>
         </li>`;

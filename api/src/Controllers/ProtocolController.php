@@ -203,4 +203,28 @@ class ProtocolController {
         }
         exit;
     }
+    /**
+     * Endpoint para listar protocolos (Usado por el Registro de Alojamientos)
+     */
+public function list() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $instId = $_GET['inst'] ?? null;
+
+        if (!$instId) {
+            echo json_encode(['status' => 'error', 'message' => 'ID_INST_REQUIRED']);
+            exit;
+        }
+
+        try {
+            // Inyección de dependencia hacia el Model
+            $data = $this->model->getByInstitution($instId);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'DB_QUERY_FAILURE: ' . $e->getMessage()]);
+        }
+        exit;
+    }
 }

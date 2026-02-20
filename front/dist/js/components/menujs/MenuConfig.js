@@ -12,14 +12,30 @@ export function getCorrectPath(rawPath) {
     return `${getBasePath()}paginas/${rawPath}`;
 }
 
+export function getRoleName(level) {
+    // Accedemos al objeto global cargado por tu i18n.js
+    // Si window.txt.roles no existe todavía, devolvemos el número como fallback
+    if (window.txt && window.txt.roles) {
+        return window.txt.roles[level] || `Rol ${level}`;
+    }
+    return `${level}`;
+}
+
 export function getUserDisplayText() {
     const user = getSession('userName') || 'Usuario';
     const id = getSession('userId') || '?';
     const nombre = getSession('userFull'); 
     const apellido = getSession('userApe'); 
+    const level = getSession('userLevel'); // Trae el número (1, 2, 3...)
+
+    // Obtenemos la palabra traducida
+    const rolTraducido = getRoleName(level);
+
     let fullName = user;
     if (nombre && apellido) fullName = `${nombre} ${apellido}`;
-    return `${user} (${id}) - ${fullName}`;
+
+    // Ahora devolvemos la palabra en lugar del número
+    return `${user} (${id}) - ${fullName} - ${rolTraducido}`;
 }
 
 // --- CONFIGURACIÓN Y PREFERENCIAS ---

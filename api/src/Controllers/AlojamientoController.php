@@ -145,4 +145,23 @@ public function updateConfig() {
     }
     exit;
 }
+public function updatePrice() {
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($data['IdAlojamiento']) || !isset($data['precio'])) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Faltan datos']);
+            exit;
+        }
+
+        try {
+            $this->model->updatePrice($data['IdAlojamiento'], $data['precio']);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

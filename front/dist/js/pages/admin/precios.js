@@ -1,154 +1,134 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 
-let dataFull = { especies: [], subespecies: [], insumos: [], insumosExp: [], institucion: {} };
+let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {} };
 
 export async function initPreciosPage() {
     const instId = localStorage.getItem('instId');
     try {
         showLoader();
+        
+        // Carga de traducciones en el DOM si no usan data-i18n directo
+        if(window.txt && window.txt.precios) {
+            document.getElementById('lbl-bread-precio').innerText = window.txt.bread.prices;
+            document.getElementById('lbl-titulo-pag').innerText = window.txt.precios.title;
+            document.getElementById('lbl-titulo-pdf').innerText = window.txt.precios.pdf_title;
+            document.getElementById('lbl-buscador').innerText = window.txt.precios.search;
+            document.getElementById('search-input-precios').placeholder = window.txt.precios.search_placeholder;
+            document.getElementById('lbl-sec-ani').innerText = window.txt.precios.sec_animals;
+            document.getElementById('lbl-sec-insexp').innerText = window.txt.precios.sec_ins_exp;
+            document.getElementById('lbl-sec-inscom').innerText = window.txt.precios.sec_ins_com;
+            document.getElementById('lbl-sec-serv').innerText = window.txt.precios.sec_services;
+            document.getElementById('lbl-btn-guardar').innerText = window.txt.precios.btn_save;
+        }
+
         const res = await API.request(`/precios/all-data?inst=${instId}`);
         if (res && res.status === 'success') {
             dataFull = res.data;
-            
-            // CARGA DE VALORES INSTITUCIONALES
-            const inputJornada = document.getElementById('jornada-precio');
-            if (inputJornada) inputJornada.value = dataFull.institucion.PrecioJornadaTrabajoExp || 0;
-            
-            // CARGA DEL NUEVO CAMPO TITULO
             const inputTitulo = document.getElementById('titulo-precios');
             if (inputTitulo) inputTitulo.value = dataFull.institucion.tituloprecios || '';
-            
-            renderAllPriceTables();
+            window.renderAllPriceTables();
         }
+    } catch (e) { 
+        console.error("Error cargando precios:", e); 
+    } finally {
         hideLoader();
-    } catch (e) { console.error("Error:", e); hideLoader(); }
+    }
 }
 
-/**
- * RENDERIZADO DE ANIMALES (NOMBRES FIJOS)
- */
 window.renderAllPriceTables = () => {
     const term = document.getElementById('search-input-precios').value.toLowerCase().trim();
+    const txtP = window.txt?.precios || {};
+    
+    // 1. RENDER ANIMALES Y ALOJAMIENTO
     const tbodyAn = document.getElementById('tbody-precios-animales');
     let htmlAn = '';
 
     dataFull.especies.forEach(e => {
-        const subVinculadas = dataFull.subespecies.filter(s => 
-            String(s.idespA) === String(e.idespA) && String(s.Existe) !== "2"
-        );
+        const subs = dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA) && String(s.Existe) !== "2");
+        const alojamientos = dataFull.tiposAlojamiento.filter(a => String(a.idespA) === String(e.idespA));
 
-        const tienePrecioBase = parseFloat(e.Panimal) > 0 || parseFloat(e.PalojamientoChica) > 0 || parseFloat(e.PalojamientoGrande) > 0;
         const cumpleBusqueda = e.EspeNombreA.toLowerCase().includes(term);
-        const esVisible = tienePrecioBase || subVinculadas.length > 0;
+        const tieneHijos = subs.length > 0 || alojamientos.length > 0;
 
-        if (esVisible && cumpleBusqueda) {
-            
-            // FILA ESPECIE: Nombre FIJO
+        if (cumpleBusqueda || tieneHijos) {
             htmlAn += `
                 <tr class="table-light fw-bold" data-id="${e.idespA}" data-type="especie" style="border-left: 5px solid #1a5d3b;">
                     <td class="bg-light">
-                        <i class="bi bi-tag-fill text-success me-2"></i>
-                        <span class="text-uppercase">${e.EspeNombreA}</span> <small class="text-muted">(BASE)</small>
+                        <i class="bi bi-tag-fill text-success me-2"></i><span class="text-uppercase">${e.EspeNombreA}</span>
                     </td>
-                    <td><input type="number" class="form-control form-control-sm pan" value="${e.Panimal}"></td>
-                    <td><input type="number" class="form-control form-control-sm pch" value="${e.PalojamientoChica}"></td>
-                    <td><input type="number" class="form-control form-control-sm pgr" value="${e.PalojamientoGrande}"></td>
+                    <td class="text-center text-muted small">${txtP.badge_base || 'ESPECIE (BASE)'}</td>
+                    <td><input type="number" class="form-control form-control-sm precio-input" value="${e.Panimal}"></td>
                 </tr>`;
 
-            // FILAS SUBESPECIES: Nombre FIJO
-            if (subVinculadas.length > 0) {
+            subs.forEach(s => {
                 htmlAn += `
-                    <tr class="bg-light small fw-bold text-muted">
-                        <td class="ps-4 italic text-primary">Variedad / Subespecie</td>
-                        <td class="text-primary">Precio Animal</td>
-                        <td colspan="2" class="bg-white border-0"></td> 
+                    <tr data-id="${s.idsubespA}" data-type="subespecie">
+                        <td class="ps-5 small"><i class="bi bi-arrow-return-right me-2 text-secondary"></i>${s.SubEspeNombreA}</td>
+                        <td class="text-center text-primary small">${txtP.badge_var || 'VAR. / SUBESPECIE'}</td>
+                        <td><input type="number" class="form-control form-control-sm precio-input" value="${s.Psubanimal}"></td>
                     </tr>`;
+            });
 
-                subVinculadas.forEach(s => {
-                    htmlAn += `
-                        <tr data-id="${s.idsubespA}" data-type="subespecie">
-                            <td class="ps-5 small">
-                                <i class="bi bi-arrow-return-right me-2 text-secondary"></i>${s.SubEspeNombreA}
-                            </td>
-                            <td><input type="number" class="form-control form-control-sm pan" value="${s.Psubanimal}"></td>
-                            <td colspan="2" class="bg-white border-0"></td> 
-                        </tr>`;
-                });
-            }
+            alojamientos.forEach(a => {
+                htmlAn += `
+                    <tr data-id="${a.IdTipoAlojamiento}" data-type="alojamiento">
+                        <td class="ps-5 small"><i class="bi bi-house-door me-2 text-warning"></i>${a.NombreTipoAlojamiento} <span class="text-muted ms-2" style="font-size:10px;">${a.DetalleTipoAlojamiento || ''}</span></td>
+                        <td class="text-center text-warning small fw-bold">${txtP.badge_aloj || 'ALOJAMIENTO'}</td>
+                        <td><input type="number" class="form-control form-control-sm precio-input" value="${a.PrecioXunidad}"></td>
+                    </tr>`;
+            });
         }
     });
-
-    if (htmlAn !== '') {
-        htmlAn += `
-            <tr class="bg-white">
-                <td colspan="4" class="text-end p-3">
-                    <small class="text-danger fw-bold italic">
-                        * Nota: Los elementos con valores en cero (0) en Precio Animal, Caja Chica o Caja Grande serán omitidos en el reporte PDF.
-                    </small>
-                </td>
-            </tr>`;
-    }
-
-    tbodyAn.innerHTML = htmlAn || '<tr><td colspan="4" class="text-center p-3 text-muted">No se encontraron registros activos.</td></tr>';
+    tbodyAn.innerHTML = htmlAn || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_data || 'No se encontraron registros.'}</td></tr>`;
     
-    if (typeof renderSuppliesTables === 'function') renderSuppliesTables(term);
-};
-
-/**
- * RENDER DE INSUMOS (NOMBRES FIJOS)
- */
-function renderSuppliesTables(term) {
-    const renderInsumo = (i, type) => `
-        <tr data-id="${type === 'exp' ? i.IdInsumoexp : i.idInsumo}" data-type="${type === 'exp' ? 'insumo-exp' : 'insumo'}">
+    // 2. RENDER INSUMOS
+    const renderInsumo = (i, type, idField) => `
+        <tr data-id="${i[idField]}" data-type="${type}">
             <td class="small">${i.NombreInsumo}</td>
             <td class="small text-center fw-bold">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
-            <td><input type="number" class="form-control form-control-sm precio" value="${i.PrecioInsumo}"></td>
+            <td><input type="number" class="form-control form-control-sm precio-input" value="${i.PrecioInsumo}"></td>
         </tr>`;
 
-    document.getElementById('tbody-insumos-exp').innerHTML = dataFull.insumosExp
-        .filter(i => i.NombreInsumo.toLowerCase().includes(term))
-        .map(i => renderInsumo(i, 'exp')).join('');
+    document.getElementById('tbody-insumos-exp').innerHTML = dataFull.insumosExp.filter(i => i.NombreInsumo.toLowerCase().includes(term)).map(i => renderInsumo(i, 'insumo-exp', 'IdInsumoexp')).join('');
+    document.getElementById('tbody-insumos-comunes').innerHTML = dataFull.insumos.filter(i => i.NombreInsumo.toLowerCase().includes(term)).map(i => renderInsumo(i, 'insumo', 'idInsumo')).join('');
 
-    document.getElementById('tbody-insumos-comunes').innerHTML = dataFull.insumos
-        .filter(i => i.NombreInsumo.toLowerCase().includes(term))
-        .map(i => renderInsumo(i, 'comun')).join('');
-}
+    // 3. RENDER SERVICIOS
+    const tbodyServ = document.getElementById('tbody-servicios');
+    let htmlServ = '';
+    dataFull.servicios.filter(s => s.NombreServicioInst.toLowerCase().includes(term)).forEach(s => {
+        htmlServ += `
+            <tr data-id="${s.IdServicioInst}" data-type="servicio">
+                <td class="fw-bold text-danger">${s.NombreServicioInst}</td>
+                <td class="text-center small text-muted">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'Unidad'}</td>
+                <td><input type="number" class="form-control form-control-sm precio-input fw-bold text-danger" value="${s.Precio}"></td>
+            </tr>`;
+    });
+    tbodyServ.innerHTML = htmlServ || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_services || 'Sin servicios configurados.'}</td></tr>`;
+};
 
 window.saveAllPrices = async () => {
     const items = [];
-    
-    // Animales
-    document.querySelectorAll('#tbody-precios-animales tr[data-id]').forEach(tr => {
-        items.push({
-            type: tr.dataset.type,
-            id: tr.dataset.id,
-            pan: tr.querySelector('.pan')?.value || 0,
-            pch: tr.querySelector('.pch')?.value || 0,
-            pgr: tr.querySelector('.pgr')?.value || 0
-        });
-    });
-
-    // Insumos
-    document.querySelectorAll('[data-type^="insumo"]').forEach(tr => {
-        items.push({
-            type: tr.dataset.type,
-            id: tr.dataset.id,
-            precio: tr.querySelector('.precio').value
-        });
+    document.querySelectorAll('tr[data-id]').forEach(tr => {
+        const input = tr.querySelector('.precio-input');
+        if(input) {
+            items.push({ type: tr.dataset.type, id: tr.dataset.id, precio: input.value || 0 });
+        }
     });
 
     try {
         showLoader();
         await API.request('/precios/update-all', 'POST', {
             instId: localStorage.getItem('instId'),
-            jornada: document.getElementById('jornada-precio').value,
-            tituloprecios: document.getElementById('titulo-precios').value, // NUEVO CAMPO
+            tituloprecios: document.getElementById('titulo-precios').value,
             data: items
         });
         
-        window.Swal.fire('Guardado', 'Tarifas actualizadas correctamente.', 'success')
-            .then(() => { initPreciosPage(); });
+        window.Swal.fire(
+            window.txt?.precios?.alert_saved || 'Guardado', 
+            window.txt?.precios?.alert_success || 'Tarifas actualizadas correctamente.', 
+            'success'
+        ).then(() => { initPreciosPage(); });
             
     } catch (e) { hideLoader(); }
 };
@@ -156,32 +136,37 @@ window.saveAllPrices = async () => {
 window.exportPreciosPDF = () => {
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const fechaActual = new Date().toLocaleDateString();
-    
-    // USAMOS EL TÍTULO PERSONALIZADO O EL DEFAULT
-    const tituloDoc = dataFull.institucion.tituloprecios || 'TARIFARIO OFICIAL';
+    const tituloDoc = document.getElementById('titulo-precios').value || dataFull.institucion.tituloprecios || 'TARIFARIO OFICIAL';
 
     let animalRows = '';
     dataFull.especies.forEach(e => {
-        const pAni = parseFloat(e.Panimal) || 0;
-        const pChi = parseFloat(e.PalojamientoChica) || 0;
-        const pGra = parseFloat(e.PalojamientoGrande) || 0;
+        const subs = dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA) && String(s.Existe) !== "2");
+        const aloj = dataFull.tiposAlojamiento.filter(a => String(a.idespA) === String(e.idespA));
+        
+        const hasContent = parseFloat(e.Panimal) > 0 || subs.some(s => parseFloat(s.Psubanimal) > 0) || aloj.some(a => parseFloat(a.PrecioXunidad) > 0);
 
-        if (pAni > 0 || pChi > 0 || pGra > 0) {
+        if (hasContent) {
             animalRows += `
-                <tr style="background-color: #f2f2f2; font-weight: bold;">
-                    <td style="padding: 8px; border: 1px solid #ddd;">${e.EspeNombreA}</td>
-                    <td style="text-align: center; border: 1px solid #ddd;">${pAni > 0 ? '$ ' + pAni : '---'}</td>
-                    <td style="text-align: center; border: 1px solid #ddd;">${pChi > 0 ? '$ ' + pChi : '---'}</td>
-                    <td style="text-align: center; border: 1px solid #ddd;">${pGra > 0 ? '$ ' + pGra : '---'}</td>
+                <tr style="background-color: #1a5d3b; color: white; font-weight: bold;">
+                    <td style="padding: 6px; border: 1px solid #ddd;" colspan="2">${e.EspeNombreA} (BASE)</td>
+                    <td style="text-align: center; border: 1px solid #ddd;">${parseFloat(e.Panimal) > 0 ? '$ ' + e.Panimal : '---'}</td>
                 </tr>`;
 
-            const sub = dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA) && parseFloat(s.Psubanimal) > 0 && String(s.Existe) !== "2");
-            sub.forEach(s => {
+            subs.filter(s => parseFloat(s.Psubanimal) > 0).forEach(s => {
+                animalRows += `
+                    <tr style="background-color: #fcfcfc;">
+                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px;">└ VARIEDAD: ${s.SubEspeNombreA}</td>
+                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center;">Animal</td>
+                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px;">$ ${s.Psubanimal}</td>
+                    </tr>`;
+            });
+
+            aloj.filter(a => parseFloat(a.PrecioXunidad) > 0).forEach(a => {
                 animalRows += `
                     <tr>
-                        <td style="padding: 6px 6px 6px 30px; border: 1px solid #ddd; font-size: 11px;">└ ${s.SubEspeNombreA}</td>
-                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px;">$ ${s.Psubanimal}</td>
-                        <td colspan="2" style="border: 1px solid #ddd; background: #fafafa;"></td>
+                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px; color:#b8860b;">└ ALOJ: ${a.NombreTipoAlojamiento} ${a.DetalleTipoAlojamiento ? `(${a.DetalleTipoAlojamiento})` : ''}</td>
+                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center; color:#b8860b;">Alojamiento</td>
+                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px; font-weight:bold;">$ ${a.PrecioXunidad}</td>
                     </tr>`;
             });
         }
@@ -189,9 +174,16 @@ window.exportPreciosPDF = () => {
 
     const renderInsumoPDF = (lista) => lista.filter(i => parseFloat(i.PrecioInsumo) > 0).map(i => `
         <tr>
-            <td style="padding: 6px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">$ ${i.PrecioInsumo}</td>
+            <td style="padding: 4px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center;">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold;">$ ${i.PrecioInsumo}</td>
+        </tr>`).join('');
+
+    const renderServiciosPDF = () => dataFull.servicios.filter(s => parseFloat(s.Precio) > 0).map(s => `
+        <tr>
+            <td style="padding: 4px; border: 1px solid #ddd; color: #d9534f; font-weight: bold;">${s.NombreServicioInst}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center;">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'U'}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #d9534f;">$ ${s.Precio}</td>
         </tr>`).join('');
 
     const template = `
@@ -202,33 +194,35 @@ window.exportPreciosPDF = () => {
                 <p style="font-size: 11px; color: #666;">Fecha: ${fechaActual}</p>
             </div>
 
-            <div style="margin-bottom: 10px; font-weight: bold; color: #1a5d3b;">ALOJAMIENTO: CAJA CHICA Y CAJA GRANDE</div>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px;">
+            <h4 style="font-size: 13px; color: #1a5d3b; margin-bottom:5px;">1. ANIMALES Y ALOJAMIENTO</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px;">
                 <thead>
-                    <tr style="background: #1a5d3b; color: white;">
-                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">ESPECIE / VARIEDAD</th>
-                        <th>PRECIO ANIMAL</th><th>CAJA CHICA</th><th>CAJA GRANDE</th>
+                    <tr style="background: #e9ecef;">
+                        <th style="padding: 6px; border: 1px solid #ddd; text-align: left;">Descripción</th>
+                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px;">Tipo</th>
+                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px;">Precio</th>
                     </tr>
                 </thead>
-                <tbody>${animalRows}</tbody>
+                <tbody>${animalRows || '<tr><td colspan="3" style="text-align:center;">Sin datos</td></tr>'}</tbody>
             </table>
 
-            <h4 style="font-size: 14px; color: #0d6efd; border-bottom: 1px solid #eee;">INSUMOS EXPERIMENTALES</h4>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+            <h4 style="font-size: 13px; color: #0d6efd; margin-bottom:5px; border-bottom: 1px solid #eee;">2. INSUMOS EXPERIMENTALES</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
                 <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
                 ${renderInsumoPDF(dataFull.insumosExp)}
             </table>
 
-            <h4 style="font-size: 14px; color: #6c757d; border-bottom: 1px solid #eee;">INSUMOS COMUNES</h4>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+            <h4 style="font-size: 13px; color: #6c757d; margin-bottom:5px; border-bottom: 1px solid #eee;">3. INSUMOS COMUNES</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
                 <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
                 ${renderInsumoPDF(dataFull.insumos)}
             </table>
 
-            <div style="padding: 10px; background: #fff4f4; border: 1px solid #f5c2c2; font-size: 14px;">
-                <strong>JORNAL DE TRABAJO EXPERIMENTAL:</strong> 
-                <span style="color: #d9534f; font-weight: bold; float: right;">$ ${dataFull.institucion.PrecioJornadaTrabajoExp || 0}</span>
-            </div>
+            <h4 style="font-size: 13px; color: #d9534f; margin-bottom:5px; border-bottom: 1px solid #eee;">4. SERVICIOS INSTITUCIONALES</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+                <tr style="background: #fff4f4; color: #d9534f;"><th>Servicio</th><th>Medida</th><th>Precio</th></tr>
+                ${renderServiciosPDF()}
+            </table>
         </div>`;
 
     html2pdf().set({ margin: 10, filename: `Tarifario_${inst}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
@@ -236,23 +230,28 @@ window.exportPreciosPDF = () => {
 
 window.exportPreciosExcel = () => {
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    const headers = ["Categoría", "Nombre / Variedad", "Precio Animal", "Caja Chica", "Caja Grande", "Medida/Cant"];
+    const headers = ["Categoría", "Nombre / Detalle", "Tipo", "Medida/Cant", "Precio"];
     const csvRows = [headers.join(";")];
 
     dataFull.especies.forEach(e => {
-        csvRows.push(["ESPECIE", e.EspeNombreA, e.Panimal, e.PalojamientoChica, e.PalojamientoGrande, "BASE"].join(";"));
+        csvRows.push(["ANIMALES", e.EspeNombreA, "ESPECIE BASE", "1 U", e.Panimal].join(";"));
+        
         dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA)).forEach(s => {
-            csvRows.push(["SUBESPECIE", s.SubEspeNombreA, s.Psubanimal, "0", "0", "VARIEDAD"].join(";"));
+            csvRows.push(["ANIMALES", `└ ${s.SubEspeNombreA}`, "VARIEDAD", "1 U", s.Psubanimal].join(";"));
+        });
+        
+        dataFull.tiposAlojamiento.filter(a => String(a.idespA) === String(e.idespA)).forEach(a => {
+            csvRows.push(["ALOJAMIENTO", `└ ${a.NombreTipoAlojamiento} ${a.DetalleTipoAlojamiento || ''}`, "TIPO ALOJ.", "1 U", a.PrecioXunidad].join(";"));
         });
     });
 
-    dataFull.insumosExp.forEach(i => csvRows.push(["INSUMO-EXP", i.NombreInsumo, i.PrecioInsumo, "0", "0", `${i.CantidadInsumo} ${i.TipoInsumo}`].join(";")));
-    dataFull.insumos.forEach(i => csvRows.push(["INSUMO-COMUN", i.NombreInsumo, i.PrecioInsumo, "0", "0", `${i.CantidadInsumo} ${i.TipoInsumo}`].join(";")));
-    csvRows.push(["JORNADA", "JORNAL DE TRABAJO", dataFull.institucion.PrecioJornadaTrabajoExp, "0", "0", "DIA/TEC"].join(";"));
+    dataFull.insumosExp.forEach(i => csvRows.push(["INSUMO-EXP", i.NombreInsumo, "EXPERIMENTAL", `${i.CantidadInsumo} ${i.TipoInsumo}`, i.PrecioInsumo].join(";")));
+    dataFull.insumos.forEach(i => csvRows.push(["INSUMO-COMUN", i.NombreInsumo, "COMUN", `${i.CantidadInsumo} ${i.TipoInsumo}`, i.PrecioInsumo].join(";")));
+    dataFull.servicios.forEach(s => csvRows.push(["SERVICIOS", s.NombreServicioInst, "SERVICIO", `${s.CantidadPorMedidaInst} ${s.MedidaServicioInst}`, s.Precio].join(";")));
 
     const csvContent = "\uFEFF" + csvRows.join("\r\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
-    link.download = `Revision_Tarifario_${inst}.csv`;
+    link.download = `Tarifario_${inst}.csv`;
     link.click();
 };

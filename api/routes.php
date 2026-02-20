@@ -177,6 +177,34 @@ $router->post('/alojamiento/update-row', 'AlojamientoController@updateRow');
 $router->post('/alojamiento/desfinalizar', 'AlojamientoController@desfinalizar');
 $router->post('/alojamiento/update-config', 'AlojamientoController@updateConfig');
 
+// ============================================================
+// SECCIÓN: Trazabilidad Biológica (Alojamiento)
+// ============================================================
+$router->get('/trazabilidad/get-arbol', 'TrazabilidadController@getArbol');
+$router->post('/trazabilidad/save-observation', 'TrazabilidadController@saveObservation');
+$router->post('/trazabilidad/add-caja', 'TrazabilidadController@addCaja');
+
+$router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
+$router->post('/trazabilidad/rename-subject', 'TrazabilidadController@renameSubject');
+
+// ============================================================
+// SECCIÓN: Protocolos (Para el Registro de Alojamiento)
+// ============================================================
+$router->get('/protocoloexpe/list', 'ProtocolController@getByInstitution'); // O el nombre que tenga tu controlador de protocolos
+
+// ============================================================
+// SECCIÓN: Trazabilidad Biológica (Nuevas acciones CRUD)
+// ============================================================
+$router->post('/trazabilidad/rename-box', 'TrazabilidadController@renameBox');
+$router->post('/trazabilidad/delete-box', 'TrazabilidadController@deleteBox');
+$router->post('/trazabilidad/delete-subject', 'TrazabilidadController@deleteSubject');
+
+$router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
+$router->get('/trazabilidad/get-past-boxes', 'TrazabilidadController@getPastBoxes');
+$router->post('/trazabilidad/clone-past-boxes', 'TrazabilidadController@clonePastBoxes');
+$router->post('/alojamiento/update-price', 'AlojamientoController@updatePrice');
+
+$router->get('/alojamiento/export', 'AlojamientoExportController@export');
 
 // ============================================================
 // SECCIÓN: Facturación y Cobranzas (Billing)

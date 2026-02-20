@@ -431,14 +431,7 @@ window.downloadReactivoPDF = async (id) => {
                 </p>
             </div>
             
-            <div style="margin-top: 60px; display: flex; justify-content: space-between;">
-                <div style="width: 200px; border-top: 1px solid #999; text-align: center; font-size: 10px; padding-top: 5px;">
-                    Firma Responsable Bioterio
-                </div>
-                <div style="width: 200px; border-top: 1px solid #999; text-align: center; font-size: 10px; padding-top: 5px;">
-                    Sello Institucional
-                </div>
-            </div>
+
         </div>
     `;
 
