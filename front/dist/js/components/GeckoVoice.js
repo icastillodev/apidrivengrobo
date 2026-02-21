@@ -56,7 +56,7 @@ export const GeckoVoice = {
         GeckoSearch.setListening(false);
     },
 
-    handleResult(event) {
+handleResult(event) {
         let interim = "";
         let final = "";
 
@@ -67,41 +67,32 @@ export const GeckoVoice = {
 
         const textDetected = (final || interim).trim();
 
-        // 1. WAKEWORD "Gecko"
+        // 1. WAKEWORD "Gecko" (Despertar)
         const detectedWake = GeckoCommands.wakewords.find(w => textDetected.includes(w));
         if (detectedWake && !this.isListeningCommand) {
             this.startListening();
             return;
         }
 
-        // 2. COMANDO
+        // 2. PROCESAR COMANDO FINAL
         if (this.isListeningCommand) {
             let command = textDetected;
             GeckoCommands.wakewords.forEach(w => { command = command.replace(w, '').trim(); });
             
-            if (command.length > 0) {
-                // CONTEXTO: ¿Estamos en un modal o en el buscador?
-                const activeModal = document.querySelector('.modal.show');
+            // Mostrar lo que va escuchando en el buscador (feedback visual)
+            GeckoSearch.setInput(command); 
 
-                if (activeModal) {
-                    // --- MODO RELLENADO DE FORMULARIO ---
-                    if (final.length > 0) {
-                        // Buscar input activo o textarea
-                        const activeInput = activeModal.querySelector('input:focus, textarea:focus') || activeModal.querySelector('input[type="text"], textarea');
-                        if (activeInput) {
-                            activeInput.value = command; // Rellenar
-                            // Disparar evento input para validaciones
-                            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            this.stop();
-                        }
-                    }
-                } else {
-                    // --- MODO BUSCADOR GLOBAL ---
-                    GeckoSearch.setInput(command); 
-                    if (final.length > 0) {
-                        this.stop(); 
-                    }
-                }
+            // CUANDO EL USUARIO TERMINA DE HABLAR (isFinal)
+            if (final.length > 0 && command.length > 0) {
+                console.log("🎤 Frase final capturada:", command);
+                
+                // Apagamos el micrófono
+                this.stop(); 
+                
+                // 🚀 ENVIAMOS EL TEXTO A LA IA (El Dispatcher)
+                import('./GeckoAiDispatcher.js').then(module => {
+                    module.GeckoAiDispatcher.sendCommand(command);
+                }).catch(err => console.error("Error cargando Dispatcher:", err));
             }
         }
     },

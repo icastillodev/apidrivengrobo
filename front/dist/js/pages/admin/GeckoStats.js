@@ -64,23 +64,18 @@ async function loadStats() {
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> CARGANDO...`;
     }
 
-    // Cache buster para evitar datos viejos
-    const url = `/URBE-API-DRIVEN/api/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`;
-
     try {
-        const response = await fetch(url);
-        const res = await response.json();
+        // ✅ USANDO EL MOTOR SEGURO API.request
+        const res = await API.request(`/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`);
 
         if (res.status === 'success') {
             rawData = res.data;
             document.getElementById('stats-content').style.display = 'block';
             
-            // Generar paleta de colores fija para los departamentos
             generateDeptColors(rawData.por_departamento);
 
-            // Renderizar todos los componentes
             renderGlobalCards();
-            renderSpeciesCounters(); // Top 4 Números Grandes
+            renderSpeciesCounters();
             renderTable();
             renderMainChart();
             renderSpeciesChart();

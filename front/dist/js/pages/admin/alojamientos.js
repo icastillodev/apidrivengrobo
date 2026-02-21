@@ -11,6 +11,10 @@ import { RegistroUI } from './alojamientos/RegistroUI.js';
 import { ExportUI } from './alojamientos/ExportUI.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
 
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+const url = `${basePath}pages/qr-alojamiento.html?historia=${id}`;
+
+
 // --- ESTADO GLOBAL (Fuente de Verdad) ---
 export const AlojamientoState = {
     dataFull: [],
@@ -52,6 +56,6 @@ window.toggleTrazabilidad = (idAlojamiento, idEspecie) => {
 window.verPaginaQR = (historiaId = null) => {
     const id = historiaId || (AlojamientoState.currentHistoryData[0]?.historia);
     if (!id) return console.error("Sin ID de historia para QR.");
-    const url = `../../paginas/qr-alojamiento.html?historia=${id}`;
+    const url = `../../pages/qr-alojamiento.html?historia=${id}`;
     window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
 };

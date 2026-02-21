@@ -70,14 +70,20 @@ class GeminiService {
         }
 
         // Extraer la respuesta de la IA
+        // Dentro de askGemini() en GeminiService.php
         if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
             $iaResponse = $result['candidates'][0]['content']['parts'][0]['text'];
             
-            // Verificamos que realmente sea un JSON válido antes de devolverlo
+            // 🚀 PARCHE CRÍTICO: Limpiar el markdown oculto que manda Gemini
+            $iaResponse = str_replace(['```json', '```'], '', $iaResponse);
+            $iaResponse = trim($iaResponse);
+            
+            // Verificamos que realmente sea un JSON válido
             $jsonCheck = json_decode($iaResponse, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $jsonCheck;
             } else {
+                error_log("Error JSON Gemini: " . $iaResponse);
                 throw new Exception("La IA no devolvió un formato JSON válido.");
             }
         }

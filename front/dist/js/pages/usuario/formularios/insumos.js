@@ -4,7 +4,7 @@ let deptosList = [];
 let catalogInsumos = [];
 let selectedItems = []; 
 let dataFull = null; // Almacén para el PDF de precios e info institucional
-
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 /* --- HELPER: Obtener Institución del Contexto --- */
 function getContextInstId() {
     const params = new URLSearchParams(window.location.search);
@@ -263,7 +263,7 @@ async function handleSubmit(e) {
             const res = await API.request('/insumos-form/save', 'POST', payload);
             if (res.status === 'success') {
                 await Swal.fire('¡Enviado!', `El pedido #${res.id} ha sido registrado.`, 'success');
-                window.location.href = '../misformularios.html';
+                window.location.href = `${basePath}pages/usuario/misformularios.html`;
             } else {
                  Swal.fire('Error', res.message || 'Error desconocido', 'error');
             }

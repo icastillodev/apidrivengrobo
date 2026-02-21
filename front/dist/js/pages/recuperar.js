@@ -1,5 +1,6 @@
 // front/dist/js/pages/recuperar.js
 import { API } from '../api.js';
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 export async function initRecuperar() {
     // 1. Detectar Institución
@@ -8,7 +9,7 @@ export async function initRecuperar() {
 
     // 2. Personalizar UI
     document.getElementById('inst-label').innerText = `Institución: ${instName}`;
-    const loginPath = `/URBE-API-DRIVEN/front/${slug}/`;
+    const loginPath = `${basePath}${slug}/`;
     document.getElementById('link-volver-login').href = loginPath;
     document.getElementById('btn-volver-exito').href = loginPath;
 

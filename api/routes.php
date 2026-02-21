@@ -32,7 +32,7 @@ $router->get('/menu/notifications', 'NotificationController@getMenuNotifications
 $router->get('/search/global', 'GlobalSearchController@search');
 
 
-
+$router->post('/ia/procesar', [new App\Controllers\Ai\AiController($db), 'processCommand']);
 
 
 

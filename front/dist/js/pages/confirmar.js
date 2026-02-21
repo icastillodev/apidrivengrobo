@@ -1,5 +1,7 @@
 // front/dist/js/pages/confirmar.js
 import { API } from '../api.js';
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+
 
 export async function initConfirmacion() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -20,7 +22,7 @@ export async function initConfirmacion() {
             
             // 2. Corregir la ruta del botón para que no vaya al general
             const btnLogin = document.getElementById('btn-ir-login');
-            btnLogin.href = `/URBE-API-DRIVEN/front/${slug}`; // Ruta institucional específica
+            btnLogin.href = `${basePath}${slug}/`; // Ruta institucional específica
             
             showStatus('success');
         } else {

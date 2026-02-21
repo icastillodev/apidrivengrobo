@@ -1,6 +1,6 @@
 // front/dist/js/pages/resetear.js
 import { API } from '../api.js';
-
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 export async function initReset() {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
@@ -49,7 +49,7 @@ export async function initReset() {
             if (res.status === 'success') {
                 document.getElementById('reset-form-container').classList.add('hidden');
                 document.getElementById('reset-success').classList.remove('hidden');
-                document.getElementById('btn-login-final').href = `/URBE-API-DRIVEN/front/${slug}/`;
+                document.getElementById('btn-login-final').href = `${basePath}${slug}/`;
             } else {
                 Swal.fire("Error", res.message, "error");
             }

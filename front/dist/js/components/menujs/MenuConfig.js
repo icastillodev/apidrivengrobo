@@ -4,7 +4,7 @@ import { Auth } from '../../auth.js';
 // --- HELPERS ---
 export const getSession = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
 
-const getBasePath = () => (window.location.hostname === 'localhost') ? '/URBE-API-DRIVEN/front/' : '/front/';
+const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 export function getCorrectPath(rawPath) {
     if (!rawPath || rawPath === '#') return 'javascript:void(0);';

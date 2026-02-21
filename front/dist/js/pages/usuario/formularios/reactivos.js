@@ -4,7 +4,7 @@ let protocolsList = [];
 let insumosList = [];
 let userEmail = "";
 let dataFull = null; // Para el PDF
-
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 /* --- HELPER: Obtener Institución del Contexto --- */
 function getContextInstId() {
     const params = new URLSearchParams(window.location.search);
@@ -375,7 +375,7 @@ async function submitOrder() {
                 confirmButtonColor: '#1a5d3b',
                 confirmButtonText: 'IR A MIS FORMULARIOS'
             });
-            window.location.href = '../misformularios.html';
+            window.location.href = `${basePath}pages/usuario/misformularios.html`;
         } else {
             Swal.fire('Error', res.message, 'error');
         }

@@ -1,18 +1,20 @@
-export async function initFormularios() {
-    const instId = localStorage.getItem('instId');
-    const container = document.getElementById('main-content');
+import { API } from '../api.js'; // No olvides importarla aquí también
 
-    try {
-        const response = await fetch(`/URBE-API-DRIVEN/api/institution-linked?inst=${instId}`);
-        const res = await response.json();
-        
-        if (res.status === "success") {
-            renderSedes(container, res.data);
+    export async function initFormularios() {
+        const instId = localStorage.getItem('instId');
+        const container = document.getElementById('main-content');
+
+        try {
+            // API.request ya te devuelve el objeto listo
+            const res = await API.request(`/institution-linked?inst=${instId}`);
+
+            if (res && res.status === "success") {
+                renderSedes(container, res.data);
+            }
+        } catch (err) {
+            console.error("Gecko Error: Fallo al cargar sedes vinculadas.", err);
         }
-    } catch (err) {
-        console.error("Gecko Error: Fallo al cargar sedes vinculadas.", err);
     }
-}
 
 function renderSedes(container, sedes) {
     if (sedes.length === 0) {

@@ -30,8 +30,7 @@ export const Auth = {
 
     getBasePath() {
         return (window.location.hostname === 'localhost') 
-            ? '/URBE-API-DRIVEN/front/' 
-            : '/front/';
+        ? '/URBE-API-DRIVEN/front/' : '/';
     },
 
     // =========================================================================

@@ -1,5 +1,8 @@
 import { API } from './api.js';
 
+// Constante híbrida para el enrutamiento
+const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+
 export const SuperAuth = {
     async init() {
         console.log("Gecko Devs: Modo SuperAdmin Independiente.");
@@ -34,8 +37,8 @@ export const SuperAuth = {
                 localStorage.setItem('userName', res.userName);
                 localStorage.setItem('userId', res.userId);
 
-                // Directo al dashboard de superadmin
-                window.location.href = '/URBE-API-DRIVEN/front/paginas/superadmin/dashboard.html';
+                // Directo al dashboard de superadmin usando ruta dinámica
+                window.location.href = getBasePath() + 'paginas/superadmin/dashboard.html';
             } else {
                 if (box) { 
                     box.innerText = "ACCESO MAESTRO DENEGADO"; 
@@ -59,8 +62,8 @@ export const SuperAuth = {
             localStorage.removeItem('userName');
             localStorage.setItem('isLoggedIn', 'false');
 
-            // Redirección al login de SuperAdmin
-            window.location.href = '/URBE-API-DRIVEN/front/superadmin_login.html';
+            // Redirección al login de SuperAdmin con ruta dinámica
+            window.location.href = getBasePath() + 'superadmin_login.html';
         },
 
         checkMasterAccess(allowedRoles = [1]) {
@@ -68,14 +71,14 @@ export const SuperAuth = {
             const userLevel = parseInt(localStorage.getItem('userLevel'));
 
             if (!token || isNaN(userLevel)) {
-                window.location.href = '/URBE-API-DRIVEN/front/superadmin_login.html';
+                window.location.href = getBasePath() + 'superadmin_login.html';
                 return false;
             }
 
             if (userLevel === 1) return true; 
 
             if (!allowedRoles.includes(userLevel)) {
-                window.location.href = '/URBE-API-DRIVEN/front/';
+                window.location.href = getBasePath();
                 return false;
             }
             return true; 

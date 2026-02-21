@@ -1,6 +1,7 @@
 // front/dist/js/pages/registro.js
 import { Auth } from '../auth.js';
 import { API } from '../api.js';
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 let isUserValid = false;
 let isPassValid = false;
@@ -121,7 +122,7 @@ export async function initRegistro() {
                     confirmButtonColor: '#000',
                     confirmButtonText: 'VOLVER AL LOGIN'
                 }).then(() => {
-                    window.location.href = `/URBE-API-DRIVEN/front/${instSlug}`;
+                    window.location.href = `${basePath}${instSlug}/`;
                 });
             } else {
                 btnSubmit.disabled = false;

@@ -655,153 +655,148 @@ function aplicarEstilosTablas() {
  * Corrección: Blindaje contra currentReportData null y mapeo de variables real
  */
 window.downloadProtocoloPDF = async (idProt) => {
-    // 1. Validar que la data exista (Evita el error que mencionaste)
-    if (!window.currentReportData || !window.currentReportData.protocolos) {
-        return Swal.fire('Error', 'Los datos aún no se han cargado. Por favor, espera un segundo.', 'warning');
+    if (!window.currentReportData || !window.currentReportData.protocolos || window.currentReportData.protocolos.length === 0) {
+        return Swal.fire('Aviso', 'Primero debe realizar una consulta para exportar los datos.', 'info');
     }
 
+    // Buscamos el protocolo exacto en el array
     const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
-    if (!prot) return Swal.fire('Error', 'No se encontró la información del protocolo.', 'error');
+    if (!prot) {
+        return Swal.fire('Error', 'No se encontró la información del protocolo.', 'error');
+    }
 
     showLoader();
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    const verdeBioterio = [26, 93, 59];
 
-    // --- ENCABEZADO ---
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(verdeBioterio[0], verdeBioterio[1], verdeBioterio[2]);
-    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+        const verdeGecko = [25, 135, 84];
 
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text("ESTADO DE CUENTA POR PROTOCOLO", 105, 22, { align: "center" });
-    doc.line(20, 25, 190, 25);
-
-    // --- INFO DEL PROTOCOLO ---
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.text(`Protocolo: ${prot.tituloA} (N° ${prot.nprotA})`, 20, 35);
-    doc.text(`Investigador: ${prot.investigador}`, 20, 41);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Generado: ${new Date().toLocaleString()}`, 20, 47);
-
-    let currentY = 55;
-
-    // --- TABLA DE PEDIDOS (FORMULARIOS) ---
-    if (prot.formularios && prot.formularios.length > 0) {
+        // --- ENCABEZADO ---
         doc.setFont("helvetica", "bold");
-        doc.text("PEDIDOS Y FORMULARIOS", 20, currentY);
-        
-        const bodyForms = prot.formularios.map(f => {
-            const isRea = f.categoria?.toLowerCase().includes('reactivo');
-            
-            // Lógica de Especie (Misma que en la tabla)
-            const esp = f.nombre_especie || '---';
-            const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
-            
-            // Lógica de Cantidad Real (Usando tus variables cant_animal, NombreInsumo, etc.)
-            const cantStr = isRea 
-                ? `${f.NombreInsumo} (${f.TipoInsumo}) ${f.CantidadInsumo} - ${f.cant_organo} un.`
-                : `${f.cant_animal} un.`;
+        doc.setFontSize(18);
+        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
+        doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
 
-            return [
-                f.id,
-                esp + sub,
-                (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""), // Limpiar HTML
-                cantStr,
-                `$ ${parseFloat(f.total).toFixed(2)}`,
-                `$ ${parseFloat(f.debe).toFixed(2)}`
-            ];
-        });
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text("ESTADO DE CUENTA DETALLADO POR PROTOCOLO", 105, 22, { align: "center" });
+        doc.setDrawColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
+        doc.line(20, 25, 190, 25);
 
-        doc.autoTable({
-            startY: currentY + 2,
-            head: [['ID', 'Especie', 'Concepto', 'Cant.', 'Total', 'Falta']],
-            body: bodyForms,
-            theme: 'striped',
-            headStyles: { fillColor: verdeBioterio },
-            styles: { fontSize: 7 },
-            columnStyles: { 
-                4: { halign: 'right' }, 
-                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
-            }
-        });
-        currentY = doc.lastAutoTable.finalY + 10;
-    }
+        // --- INFO DEL RESPONSABLE Y PROTOCOLO ---
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text(`PROTOCOLO:`, 20, 35);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${prot.tituloA} (${prot.nprotA})`, 50, 35);
 
-    // --- TABLA DE ALOJAMIENTOS ---
-    if (prot.alojamientos && prot.alojamientos.length > 0) {
-        if (currentY > 240) { doc.addPage(); currentY = 20; }
         doc.setFont("helvetica", "bold");
-        doc.text("HISTORIAL DE ALOJAMIENTO", 20, currentY);
+        doc.text(`RESPONSABLE:`, 20, 41);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${prot.investigador} (ID: ${prot.idUsr})`, 50, 41);
 
-        const bodyAloj = prot.alojamientos.map(a => [
-            `#${a.historia}`,
-            a.especie,
-            a.periodo || `${a.fecha_ingreso} / ${a.fecha_salida || '...' }`,
-            a.dias || '-',
-            `$ ${parseFloat(a.total).toFixed(2)}`,
-            `$ ${parseFloat(a.debe).toFixed(2)}`
-        ]);
+        doc.setFont("helvetica", "bold");
+        doc.text(`FECHA REPORTE:`, 20, 47);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${new Date().toLocaleString()}`, 50, 47);
 
-        doc.autoTable({
-            startY: currentY + 2,
-            head: [['Hist', 'Especie', 'Período', 'Días', 'Total', 'Falta']],
-            body: bodyAloj,
-            theme: 'grid',
-            headStyles: { fillColor: [70, 70, 70] },
-            styles: { fontSize: 7 },
-            columnStyles: { 
-                4: { halign: 'right' }, 
-                5: { halign: 'right', fontStyle: 'bold', textColor: [200, 0, 0] } 
-            }
-        });
-        currentY = doc.lastAutoTable.finalY + 15;
+        let currentY = 55;
+
+        // --- TABLA DE PEDIDOS (ANIMALES Y REACTIVOS) ---
+        if (prot.formularios && prot.formularios.length > 0) {
+            const bodyForms = prot.formularios.map(f => {
+                const isEx = (f.is_exento == 1 || f.exento == 1);
+                const total = parseFloat(f.total || 0);
+                const pagadoReal = parseFloat(f.pagado || 0);
+                
+                return [
+                    isEx ? `#${f.id} (EX)` : `#${f.id}`,
+                    f.nombre_especie || '---',
+                    (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
+                    `$ ${total.toFixed(2)}`,
+                    `$ ${isEx ? total.toFixed(2) : pagadoReal.toFixed(2)}`,
+                    `$ ${isEx ? '0.00' : (total - pagadoReal).toFixed(2)}`
+                ];
+            });
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
+                body: bodyForms,
+                theme: 'grid',
+                headStyles: { fillColor: verdeGecko },
+                styles: { fontSize: 8 },
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+            });
+            currentY = doc.lastAutoTable.finalY + 10;
+        }
+
+        // --- TABLA DE ALOJAMIENTOS ---
+        if (prot.alojamientos && prot.alojamientos.length > 0) {
+            const bodyAloj = prot.alojamientos.map(a => [
+                `H-${a.historia}`,
+                a.especie,
+                `Alojamiento: ${a.periodo}`,
+                `$ ${parseFloat(a.total).toFixed(2)}`,
+                `$ ${parseFloat(a.pagado).toFixed(2)}`,
+                `$ ${parseFloat(a.debe).toFixed(2)}`
+            ]);
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Hist.', 'Especie', 'Periodo Alojamiento', 'Total', 'Pagado', 'Debe']],
+                body: bodyAloj,
+                theme: 'grid',
+                headStyles: { fillColor: [40, 40, 40] },
+                styles: { fontSize: 8 },
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+        }
+
+        // --- CUADRO DE RESUMEN FINAL ---
+        if (currentY > 250) { doc.addPage(); currentY = 20; }
+
+        const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
+        const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0);
+        const pPago = pTotal - pDebe;
+
+        doc.setDrawColor(200);
+        doc.setFillColor(245, 245, 245);
+        doc.rect(120, currentY, 70, 25, 'FD');
+
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text("SUBTOTAL PROTOCOLO:", 125, currentY + 7);
+        doc.text("TOTAL PAGADO (+EX):", 125, currentY + 13);
+        doc.text("DEUDA PENDIENTE:", 125, currentY + 19);
+
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0);
+        doc.text(`$ ${pTotal.toFixed(2)}`, 185, currentY + 7, { align: "right" });
+        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
+        doc.text(`$ ${pPago.toFixed(2)}`, 185, currentY + 13, { align: "right" });
+        doc.setTextColor(200, 0, 0);
+        doc.text(`$ ${pDebe.toFixed(2)}`, 185, currentY + 19, { align: "right" });
+
+        doc.save(`Ficha_Financiera_Prot_${prot.nprotA}.pdf`);
+
+    } catch (e) {
+        console.error("Error generando PDF:", e);
+        Swal.fire('Error', 'No se pudo generar el documento PDF.', 'error');
+    } finally {
+        hideLoader();
     }
-
-    // --- RESUMEN FINANCIERO DEL PROTOCOLO ---
-    if (currentY > 250) { doc.addPage(); currentY = 20; }
-
-    const sumTotal = parseFloat(
-        (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + 
-        (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
-    ).toFixed(2);
-    
-    const sumDebe = parseFloat(prot.deudaAnimales + prot.deudaReactivos + prot.deudaAlojamiento).toFixed(2);
-    const sumPago = (parseFloat(sumTotal) - parseFloat(sumDebe)).toFixed(2);
-
-    doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(120, currentY, 70, 25, 'FD');
-
-    doc.setFontSize(8);
-    doc.setTextColor(100);
-    doc.text("SUBTOTAL ACUMULADO:", 125, currentY + 7);
-    doc.text("TOTAL ABONADO:", 125, currentY + 13);
-    doc.text("SALDO DEUDOR:", 125, currentY + 19);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text(`$ ${sumTotal}`, 185, currentY + 7, { align: "right" });
-    doc.setTextColor(verdeBioterio[0], verdeBioterio[1], verdeBioterio[2]);
-    doc.text(`$ ${sumPago}`, 185, currentY + 13, { align: "right" });
-    doc.setTextColor(200, 0, 0);
-    doc.text(`$ ${sumDebe}`, 185, currentY + 19, { align: "right" });
-
-    doc.save(`Ficha_Protocolo_${prot.nprotA}.pdf`);
-    hideLoader();
 };
-
 
 /**
  * Genera el reporte PDF de todos los Insumos Generales del departamento
  * Corrección: Blindaje de datos y estilo institucional.
  */
 window.downloadInsumosPDF = async () => {
+    
     // 1. Blindaje contra datos nulos
     if (!window.currentReportData || !window.currentReportData.insumosGenerales) {
         return Swal.fire('Aviso', 'No hay datos de insumos cargados para este periodo.', 'info');

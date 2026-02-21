@@ -21,17 +21,47 @@ window.cerrarSesionQR = () => {
 
 window.irALogin = () => {
     localStorage.setItem('redirectAfterLogin', window.location.href);
-    window.location.href = `../${localStorage.getItem('NombreInst') || 'urbe'}/`; 
+    const inst = localStorage.getItem('NombreInst') || '';
+    const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+    window.location.href = `${basePath}${inst}/`; 
 };
 
 window.abrirModalPersonalizar = () => { 
     new bootstrap.Modal(document.getElementById('modal-personalizar-qr')).show(); 
 };
 
-window.exportarHistoriaPDF = () => {
+window.exportarHistoriaPDF = async () => {
     const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
-    const params = new URLSearchParams({ alojamientos: true, trazabilidad: true, formato: 'pdf', historia: historiaId, instId: instId }).toString();
-    window.open(`${API.baseUrl}/alojamiento/export?${params}`, '_blank');
+    
+    // Mostramos un loading porque el PDF se genera en el backend
+    Swal.fire({ title: 'Generando PDF...', didOpen: () => Swal.showLoading() });
+    
+    try {
+        // Pedimos al backend que nos devuelva el archivo
+        const response = await fetch(API.urlBase + `/alojamiento/export?alojamientos=true&trazabilidad=true&formato=pdf&historia=${historiaId}&instId=${instId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (!response.ok) throw new Error("Fallo al generar PDF");
+
+        // Convertimos la respuesta binaria a un Blob y lo descargamos
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Historia_${historiaId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        Swal.close();
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'No se pudo generar el PDF', 'error');
+    }
 };
 
 window.confirmarDescargaPDF = () => {

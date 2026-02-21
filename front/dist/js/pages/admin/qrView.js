@@ -78,9 +78,11 @@ function renderAuthZone(name, roleId) {
  */
 window.irALogin = () => {
     localStorage.setItem('redirectAfterLogin', window.location.href);
-    const inst = localStorage.getItem('NombreInst') || 'urbe';
-    window.location.href = `../${inst}/`; 
+    const inst = localStorage.getItem('NombreInst') || '';
+    const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+    window.location.href = `${basePath}${inst}/`; 
 };
+
 
 window.cerrarSesionQR = () => {
     // Limpieza de seguridad

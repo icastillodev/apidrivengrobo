@@ -1,3 +1,5 @@
+import { API } from '../api.js';
+
 export const NotificationManager = {
     init() {
         this.check();
@@ -9,7 +11,7 @@ export const NotificationManager = {
         if (!instId) return;
 
         try {
-            const res = await fetch(`/URBE-API-DRIVEN/api/menu/notifications?inst=${instId}`).then(r => r.json());
+            const res = await API.request(`/menu/notifications?inst=${instId}`);
             
             if (res.status === "success" && res.data) {
                 // Actualizamos los 4 pilares
