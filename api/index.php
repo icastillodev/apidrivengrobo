@@ -27,9 +27,9 @@ try {
 }
 
 // El base path debe ser la carpeta de la API
-$base = (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false) 
+$base = (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false || strpos($_SERVER['HTTP_HOST'], '127.0.0.1') !== false) 
         ? '/URBE-API-DRIVEN/api' 
-        : '/api';
+        : '/core-backend-gem';
 
 $router = new \App\Utils\Router($base, $db);
 
