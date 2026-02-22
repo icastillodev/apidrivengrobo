@@ -28,12 +28,11 @@ $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
 
 
-// Rutas de Búsqueda Global (CORREGIDO: Sin el /api/ inicial)
+// Búsqueda tradicional (SQL Rápido)
 $router->get('/search/global', 'GlobalSearchController@search');
 
-
-$router->post('/ia/procesar', [new App\Controllers\Ai\AiController($db), 'processCommand']);
-
+// Procesamiento de lenguaje natural con Gemini
+$router->post('/ia/procesar', 'AiController@processCommand');
 
 
 

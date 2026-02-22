@@ -220,7 +220,11 @@ function getOmniBoxStyles() {
         .omni-item-icon { color: #bbb; display: flex; align-items: center; }
         .omni-item:hover .omni-item-icon { color: #1a5d3b; }
         .omni-meta { font-size: 10px; color: #999; margin-left: auto; background: #f5f5f5; padding: 3px 8px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px; }
-
+        .contenedor-resultados { /* Cambia esta clase por la que uses en tu HTML */
+            max-height: 350px; /* Suficiente para unos 5 resultados aprox */
+            overflow-y: auto;  /* Activa el scroll vertical solo si se pasa de la altura */
+            overflow-x: hidden; /* Evita que salga scroll horizontal feo */
+        }
         @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
     `;
 }

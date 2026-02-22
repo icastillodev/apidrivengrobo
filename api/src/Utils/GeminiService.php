@@ -1,90 +1,87 @@
 <?php
-namespace App\Services;
+namespace App\Utils;
 
 use Exception;
 
 class GeminiService {
     private $apiKey;
-    private $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    // Usamos el modelo ultra-estable y económico
+    // Usamos el modelo exacto que te dio Google AI Studio
+    private $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
 
-    public function __construct() {
-        // OJO: En producción, esto debería venir de un archivo .env o de tu config/database.php
-        // Por ahora pon tu clave aquí directamente para probar.
-        $this->apiKey = 'AIzaSyAeCFgSx6NGOu9wFtRHE6eo6D069rK5oeg'; 
+        public function __construct() {
+        // 1. Tomamos la llave que TU index.php y EnvLoader ya cargaron en memoria
+        $key = $_ENV['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY');
+
+        if (empty($key)) {
+            throw new Exception("Falta la configuración de la API Key (GEMINI_API_KEY) en el archivo .env");
+        }
+
+        // 2. Limpiamos las comillas por si en el .env pusiste GEMINI_API_KEY="AIza..."
+        $this->apiKey = trim($key, " \t\n\r\0\x0B\"'"); 
     }
 
-    /******************************************************************
-     * ENVÍA EL CONTEXTO Y EL COMANDO DE VOZ/TEXTO A LA IA
-     ******************************************************************/
     public function askGemini($systemInstruction, $userPrompt) {
         $url = $this->apiUrl . "?key=" . $this->apiKey;
 
-        // Estructura estricta que exige la API de Gemini
         $payload = [
             "system_instruction" => [
-                "parts" => [
-                    ["text" => $systemInstruction] // Aquí le damos el rol y las reglas
-                ]
+                "parts" => [["text" => $systemInstruction]]
             ],
             "contents" => [
                 [
                     "role" => "user",
-                    "parts" => [
-                        ["text" => $userPrompt] // Aquí va lo que dijo o escribió el usuario
-                    ]
+                    "parts" => [["text" => $userPrompt]]
                 ]
             ],
             "generationConfig" => [
-                "temperature" => 0.1, // Temperatura súper baja para que no "invente" cosas (alucinaciones)
-                "responseMimeType" => "application/json" // Obligamos a la IA a devolver un JSON parseable
+                "temperature" => 0.1, 
+                "maxOutputTokens" => 800, // Le damos más espacio para que termine de escribir el JSON
+                "responseMimeType" => "application/json" // Esto fuerza el formato
             ]
         ];
 
-        // Configuración del cURL
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json'
-        ]);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         
-        // En producción en VPSDime esto debe ser 'true'. En localhost a veces falla el SSL, ponlo en 'false' si tira error.
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); 
+        // Detección automática de SSL (Local vs Prod)
+        $isLocalhost = in_array($_SERVER['REMOTE_ADDR'], ['127.0.0.1', '::1']);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, !$isLocalhost); 
 
         $response = curl_exec($ch);
         $err = curl_error($ch);
         curl_close($ch);
 
-        if ($err) {
-            error_log("CURL Error Gemini: " . $err);
-            throw new Exception("Error de conexión con el motor de IA.");
-        }
+        if ($err) throw new Exception("Error de conexión: " . $err);
 
         $result = json_decode($response, true);
 
-        // Manejo de errores de la API de Google (ej. cuota excedida o key inválida)
         if (isset($result['error'])) {
-            error_log("API Error Gemini: " . $result['error']['message']);
-            throw new Exception("Error interno del asistente virtual.");
+            throw new Exception("Gemini dice: " . $result['error']['message']);
         }
 
-        // Extraer la respuesta de la IA
-        // Dentro de askGemini() en GeminiService.php
-        if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
+    if (isset($result['candidates'][0]['content']['parts'][0]['text'])) {
             $iaResponse = $result['candidates'][0]['content']['parts'][0]['text'];
             
-            // 🚀 PARCHE CRÍTICO: Limpiar el markdown oculto que manda Gemini
-            $iaResponse = str_replace(['```json', '```'], '', $iaResponse);
-            $iaResponse = trim($iaResponse);
+            // 1. Limpieza extrema: Aislamos estrictamente lo que esté entre { y }
+            $inicio = strpos($iaResponse, '{');
+            $fin = strrpos($iaResponse, '}');
             
-            // Verificamos que realmente sea un JSON válido
+            if ($inicio !== false && $fin !== false) {
+                $iaResponse = substr($iaResponse, $inicio, $fin - $inicio + 1);
+            }
+            
+            // 2. Intentamos decodificar
             $jsonCheck = json_decode($iaResponse, true);
+            
             if (json_last_error() === JSON_ERROR_NONE) {
-                return $jsonCheck;
+                return $jsonCheck; // ¡Éxito!
             } else {
-                error_log("Error JSON Gemini: " . $iaResponse);
-                throw new Exception("La IA no devolvió un formato JSON válido.");
+                // 3. SI FALLA, QUE NOS MUESTRE EL TEXTO EXACTO QUE MANDÓ LA IA
+                throw new Exception("Error de formato JSON. La IA respondió textualmente esto: " . $iaResponse);
             }
         }
 
