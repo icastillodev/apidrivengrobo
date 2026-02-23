@@ -24,8 +24,9 @@
 
 <script type="module">
         // 1. DEFINIR LA RUTA BASE DINÁMICA (Para evitar error MIME)
-        const isLocal = window.location.hostname === 'localhost';
-        const basePath = isLocal ? '/URBE-API-DRIVEN/front/' : '/front/';
+        // Si en producción tu app corre directo en midominio.com/, el basePath debe ser '/'
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const basePath = isLocal ? '/URBE-API-DRIVEN/front/' : '/';
         
         // 2. IMPORTAR AUTH DINÁMICAMENTE
         import(basePath + 'dist/js/auth.js')
