@@ -1,7 +1,6 @@
 import { API } from './api.js';
 
 // --- LISTA DE DATOS QUE DEBEN VIAJAR EN LA SESIÓN ---
-// Estos son los datos que guardaremos en Cookie si no hay "Recordarme"
 const SESSION_KEYS = [
     'token', 
     'userLevel', 
@@ -23,35 +22,24 @@ export const Auth = {
     tempRemember: false,
     resendTimer: null,
 
-    // --- HELPER BÁSICO ---
     getVal(key) {
         return sessionStorage.getItem(key) || localStorage.getItem(key);
     },
 
     getBasePath() {
-        return (window.location.hostname === 'localhost') 
+        return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? '/URBE-API-DRIVEN/front/' : '/';
     },
 
-    // =========================================================================
-    //  HIDRATACIÓN POTENTE (Recupera TODOS los datos de la Cookie)
-    // =========================================================================
     hydrateSession() {
-        // Solo hidratamos si falta información crítica en la sesión
         if (!sessionStorage.getItem('token') && !localStorage.getItem('token')) {
             const cookieToken = this.getCookie('token');
-            
             if (cookieToken) {
                 console.log("💧 Auth: Restaurando sesión completa desde Cookies...");
-                
-                // Recorremos la lista maestra y restauramos todo a sessionStorage
                 SESSION_KEYS.forEach(key => {
                     const val = this.getCookie(key);
                     if (val) {
                         sessionStorage.setItem(key, val);
-                        
-                        // Si es dato de contexto (Institución), aseguramos copia en LocalStorage
-                        // para que el redireccionamiento de 404 funcione.
                         if (key === 'instId' || key === 'NombreInst') {
                             localStorage.setItem(key, val);
                         }
@@ -61,18 +49,14 @@ export const Auth = {
         }
     },
 
-    // =========================================================================
-    //  INIT & CHECK ACCESS
-    // =========================================================================
-
     async init() {
         try {
-            // 1. HIDRATAR ANTES DE NADA
             this.hydrateSession();
 
             const path = window.location.pathname;
             if (path.includes('/paginas/')) return; 
 
+            // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
                 this.slug = 'superadmin';
                 localStorage.setItem('NombreInst', 'SISTEMA GLOBAL');
@@ -82,18 +66,38 @@ export const Auth = {
                 return; 
             }
 
+            // ------------------------------------------------------------------
+            // LÓGICA DE DETECCIÓN DE INSTITUCIÓN (SLUG) MEJORADA
+            // ------------------------------------------------------------------
             let slugContext = null;
-            const pathParts = window.location.pathname.split('/'); 
-            const frontIndex = pathParts.indexOf('front');
-            
-            if (frontIndex !== -1 && pathParts[frontIndex + 1]) slugContext = pathParts[frontIndex + 1];
+            const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+            if (isLocalhost) {
+                // En Localhost la URL es: /URBE-API-DRIVEN/front/urbe/
+                const pathParts = path.split('/'); 
+                const frontIndex = pathParts.indexOf('front');
+                if (frontIndex !== -1 && pathParts[frontIndex + 1] && pathParts[frontIndex + 1] !== 'index.html') {
+                    slugContext = pathParts[frontIndex + 1];
+                }
+            } else {
+                // En PRODUCCIÓN la URL es: app.groboapp.com/urbe/
+                const pathParts = path.split('/').filter(p => p); // Elimina vacíos
+                // Si la URL tiene un directorio, ese es el slug (ej. 'urbe')
+                if (pathParts.length > 0 && pathParts[0] !== 'index.html') {
+                    slugContext = pathParts[0];
+                }
+            }
+
+            // Fallbacks: Query Params o LocalStorage
             if (!slugContext) slugContext = new URLSearchParams(window.location.search).get('inst');
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
+            // Palabras prohibidas que no son instituciones
             if (!slugContext || ['dist', 'assets', 'resources', 'paginas', 'index.html'].includes(slugContext)) {
                 this.showErrorState();
                 return;
             }
+            // ------------------------------------------------------------------
 
             this.slug = slugContext.toLowerCase();
             
@@ -112,7 +116,6 @@ export const Auth = {
             if (res && res.status === 'success') {
                 const inst = res.data;
                 
-                // GUARDADO DE CONTEXTO
                 localStorage.setItem('instId', inst.id);
                 localStorage.setItem('NombreInst', this.slug);
                 if (!storedToken) {
@@ -278,17 +281,13 @@ export const Auth = {
         } catch (err) { console.error(err); }
     },
 
-    // --- 4. GESTIÓN DE SESIÓN COMPLETA ---
     completeLoginProcess(res, remember) {
         const role = parseInt(res.role);
         
-        // 1. Limpieza inicial
         localStorage.clear(); 
         sessionStorage.clear();
         this.clearAllCookies();
 
-        // 2. Preparar el objeto de datos unificado
-        // Mapeamos lo que viene de la API a nuestras Keys estándar
         const sessionData = {
             token: res.token,
             userLevel: role,
@@ -300,29 +299,19 @@ export const Auth = {
             NombreInst: this.slug || localStorage.getItem('NombreInst')
         };
 
-        // 3. Guardado según preferencia
         if (remember) {
-            // MODO RECORDARME: Todo a LocalStorage (Persistente)
-            console.log("✅ Login: Modo Persistente (LocalStorage)");
             SESSION_KEYS.forEach(key => {
                 if (sessionData[key] !== undefined) {
                     localStorage.setItem(key, sessionData[key]);
                 }
             });
         } else {
-            // MODO SESIÓN: Todo a Cookies (Compartido) + Session (Rápido)
-            console.log("✅ Login: Modo Sesión Temporal (Cookies)");
-            
             SESSION_KEYS.forEach(key => {
                 if (sessionData[key] !== undefined) {
-                    // Guardamos en Cookie (sin expiración = sesión)
                     this.setCookie(key, sessionData[key], null);
-                    // Guardamos en SessionStorage para acceso inmediato
                     sessionStorage.setItem(key, sessionData[key]);
                 }
             });
-
-            // Excepción: El Contexto siempre debe estar en LocalStorage para evitar 404
             localStorage.setItem('instId', sessionData.instId);
             localStorage.setItem('NombreInst', sessionData.NombreInst);
         }
@@ -365,7 +354,6 @@ export const Auth = {
     },
 
     checkAccess(allowed) {
-        // 1. HIDRATAR (Vital)
         this.hydrateSession();
 
         const token = this.getVal('token');
@@ -402,7 +390,7 @@ export const Auth = {
     },
 
     showErrorState() {
-        this.clearAllCookies(); // Limpieza por si acaso
+        this.clearAllCookies(); 
         localStorage.removeItem('NombreInst');
         
         const err = document.getElementById('error-state');
@@ -411,7 +399,6 @@ export const Auth = {
         if (cont) cont.classList.add('hidden');
     },
 
-    // --- COOKIES UTILS ---
     setCookie(name, value, days) {
         let expires = "";
         if (days) {
@@ -419,7 +406,6 @@ export const Auth = {
             date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
             expires = "; expires=" + date.toUTCString();
         }
-        // Encode para soportar espacios y caracteres especiales en nombres
         const valEncoded = encodeURIComponent(value || "");
         document.cookie = name + "=" + valEncoded + expires + "; path=/; SameSite=Lax";
     },
@@ -431,7 +417,6 @@ export const Auth = {
             let c = ca[i];
             while (c.charAt(0)==' ') c = c.substring(1,c.length);
             if (c.indexOf(nameEQ) == 0) {
-                // Decode para leer correctamente
                 return decodeURIComponent(c.substring(nameEQ.length,c.length));
             }
         }
