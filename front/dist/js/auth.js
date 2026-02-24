@@ -49,8 +49,9 @@ export const Auth = {
         }
     },
 
-    async init() {
+async init() {
         try {
+            // 1. HIDRATAR ANTES DE NADA
             this.hydrateSession();
 
             const path = window.location.pathname;
@@ -67,52 +68,57 @@ export const Auth = {
             }
 
             // ------------------------------------------------------------------
-            // LÓGICA DE DETECCIÓN DE INSTITUCIÓN (SLUG) MEJORADA
+            // LÓGICA DE DETECCIÓN DE INSTITUCIÓN A PRUEBA DE FALLOS
             // ------------------------------------------------------------------
-            let slugContext = null;
-            const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+            let slugContext = new URLSearchParams(window.location.search).get('inst');
 
-            if (isLocalhost) {
-                // En Localhost la URL es: /URBE-API-DRIVEN/front/urbe/
-                const pathParts = path.split('/'); 
-                const frontIndex = pathParts.indexOf('front');
-                if (frontIndex !== -1 && pathParts[frontIndex + 1] && pathParts[frontIndex + 1] !== 'index.html') {
-                    slugContext = pathParts[frontIndex + 1];
-                }
-            } else {
-                // En PRODUCCIÓN la URL es: app.groboapp.com/urbe/
-                const pathParts = path.split('/').filter(p => p); // Elimina vacíos
-                // Si la URL tiene un directorio, ese es el slug (ej. 'urbe')
-                if (pathParts.length > 0 && pathParts[0] !== 'index.html') {
-                    slugContext = pathParts[0];
+            if (!slugContext) {
+                const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                // Limpiamos la ruta de cosas inútiles
+                const pathParts = path.split('/').filter(p => p && p !== 'index.html' && p !== 'front');
+                
+                if (isLocalhost) {
+                    // Localhost ej: /URBE-API-DRIVEN/front/urbe -> pathParts: ['URBE-API-DRIVEN', 'urbe']
+                    if (pathParts.length > 1) slugContext = pathParts[1];
+                } else {
+                    // Producción ej: app.groboapp.com/urbe -> pathParts: ['urbe']
+                    if (pathParts.length > 0) slugContext = pathParts[0];
                 }
             }
 
-            // Fallbacks: Query Params o LocalStorage
-            if (!slugContext) slugContext = new URLSearchParams(window.location.search).get('inst');
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
             // Palabras prohibidas que no son instituciones
             if (!slugContext || ['dist', 'assets', 'resources', 'paginas', 'index.html'].includes(slugContext)) {
+                console.warn("⚠️ No hay slug válido. URL detectada:", slugContext);
                 this.showErrorState();
                 return;
             }
-            // ------------------------------------------------------------------
 
             this.slug = slugContext.toLowerCase();
             
+            // --- DIAGNÓSTICO EN CONSOLA ---
+            console.log("🔍 DIAGNÓSTICO DE RUTA:");
+            console.log("-> URL Actual:", path);
+            console.log("-> Sede Detectada (Slug):", this.slug);
+            // ------------------------------
+
             const storedToken = this.getVal('token');
             const storedInst = this.getVal('NombreInst');
             
             if (storedToken && storedInst === this.slug) {
-                console.log("Sesión activa detectada. Redirigiendo...");
+                console.log("✅ Sesión activa detectada. Redirigiendo...");
                 const role = parseInt(this.getVal('userLevel'));
                 this.autoRedirectIfLogged(role);
                 return; 
             }
 
+            // Llamada a la API
+            console.log(`🌐 Pidiendo validación a API: /validate-inst/${this.slug}`);
             const res = await API.request(`/validate-inst/${this.slug}`);
             
+            console.log("📥 Respuesta de la API:", res); // <- ESTO ES CLAVE
+
             if (res && res.status === 'success') {
                 const inst = res.data;
                 
@@ -148,10 +154,11 @@ export const Auth = {
 
                 this.renderLogin();
             } else {
+                console.error("❌ La API rechazó la institución o Nginx devolvió 404.");
                 this.showErrorState();
             }
         } catch (e) { 
-            console.error("Auth Init Error:", e);
+            console.error("❌ Auth Init Error Fatal:", e);
             this.showErrorState(); 
         }
     },
