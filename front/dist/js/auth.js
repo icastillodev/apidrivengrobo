@@ -35,7 +35,7 @@ export const Auth = {
         if (!sessionStorage.getItem('token') && !localStorage.getItem('token')) {
             const cookieToken = this.getCookie('token');
             if (cookieToken) {
-                console.log("💧 Auth: Restaurando sesión completa desde Cookies...");
+                console.log("💧 Auth: Restaurando sesión...");
                 SESSION_KEYS.forEach(key => {
                     const val = this.getCookie(key);
                     if (val) {
@@ -49,15 +49,13 @@ export const Auth = {
         }
     },
 
-async init() {
+    async init() {
         try {
-            // 1. HIDRATAR ANTES DE NADA
             this.hydrateSession();
 
             const path = window.location.pathname;
             if (path.includes('/paginas/')) return; 
 
-            // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
                 this.slug = 'superadmin';
                 localStorage.setItem('NombreInst', 'SISTEMA GLOBAL');
@@ -67,57 +65,51 @@ async init() {
                 return; 
             }
 
-            // ------------------------------------------------------------------
-            // LÓGICA DE DETECCIÓN DE INSTITUCIÓN A PRUEBA DE FALLOS
-            // ------------------------------------------------------------------
+            // ---------------------------------------------------------
+            // EXTRACCIÓN DEL SLUG A PRUEBA DE FALLOS (Producción / Dev)
+            // ---------------------------------------------------------
             let slugContext = new URLSearchParams(window.location.search).get('inst');
 
             if (!slugContext) {
+                const pathParts = path.split('/').filter(p => p && p !== 'index.html');
                 const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-                // Limpiamos la ruta de cosas inútiles
-                const pathParts = path.split('/').filter(p => p && p !== 'index.html' && p !== 'front');
                 
                 if (isLocalhost) {
-                    // Localhost ej: /URBE-API-DRIVEN/front/urbe -> pathParts: ['URBE-API-DRIVEN', 'urbe']
-                    if (pathParts.length > 1) slugContext = pathParts[1];
+                    const frontIndex = pathParts.indexOf('front');
+                    if (frontIndex !== -1 && pathParts[frontIndex + 1]) {
+                        slugContext = pathParts[frontIndex + 1];
+                    }
                 } else {
-                    // Producción ej: app.groboapp.com/urbe -> pathParts: ['urbe']
-                    if (pathParts.length > 0) slugContext = pathParts[0];
+                    // En producción (app.groboapp.com/urbe), el slug está en la primera posición [0]
+                    if (pathParts.length > 0) {
+                        slugContext = pathParts[0];
+                    }
                 }
             }
 
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
-            // Palabras prohibidas que no son instituciones
-            if (!slugContext || ['dist', 'assets', 'resources', 'paginas', 'index.html'].includes(slugContext)) {
-                console.warn("⚠️ No hay slug válido. URL detectada:", slugContext);
+            if (!slugContext || ['dist', 'assets', 'resources', 'paginas'].includes(slugContext)) {
+                console.warn("⚠️ Sede no detectada en la URL:", path);
                 this.showErrorState();
                 return;
             }
 
             this.slug = slugContext.toLowerCase();
             
-            // --- DIAGNÓSTICO EN CONSOLA ---
-            console.log("🔍 DIAGNÓSTICO DE RUTA:");
-            console.log("-> URL Actual:", path);
-            console.log("-> Sede Detectada (Slug):", this.slug);
-            // ------------------------------
+            console.log(`🌐 API Request: /validate-inst/${this.slug}`);
 
             const storedToken = this.getVal('token');
             const storedInst = this.getVal('NombreInst');
             
             if (storedToken && storedInst === this.slug) {
-                console.log("✅ Sesión activa detectada. Redirigiendo...");
                 const role = parseInt(this.getVal('userLevel'));
                 this.autoRedirectIfLogged(role);
                 return; 
             }
 
-            // Llamada a la API
-            console.log(`🌐 Pidiendo validación a API: /validate-inst/${this.slug}`);
             const res = await API.request(`/validate-inst/${this.slug}`);
-            
-            console.log("📥 Respuesta de la API:", res); // <- ESTO ES CLAVE
+            console.log("📥 Respuesta:", res); // Diagnóstico
 
             if (res && res.status === 'success') {
                 const inst = res.data;
@@ -154,11 +146,11 @@ async init() {
 
                 this.renderLogin();
             } else {
-                console.error("❌ La API rechazó la institución o Nginx devolvió 404.");
+                console.error("❌ Institución no válida o Nginx devolvió 404.");
                 this.showErrorState();
             }
         } catch (e) { 
-            console.error("❌ Auth Init Error Fatal:", e);
+            console.error("Error crítico Auth Init:", e);
             this.showErrorState(); 
         }
     },
