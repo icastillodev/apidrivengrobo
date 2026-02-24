@@ -28,6 +28,7 @@ export const es = {
         profile_group: "Perfil",
         prices: "Precios",
         billing: "Facturación",
+        historialpagos: "Historial pagos",
         config: "Configurar",
         logout: "Salir",
         help_group: "Ayuda"

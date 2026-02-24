@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Protocol\ProtocolModel;
+use App\Utils\Auditoria; // <-- Seguridad
 
 class ProtocolController {
     private $db;
@@ -12,60 +13,43 @@ class ProtocolController {
         $this->model = new ProtocolModel($db);
     }
 
-    /**
-     * Obtiene la lista principal de protocolos para la grilla
-     */
     public function getByInstitution() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        $instId = $_GET['inst'] ?? null;
-
-        if (!$instId) {
-            echo json_encode(['status' => 'error', 'message' => 'ID de institución no proporcionado']);
-            exit;
-        }
-
         try {
-            $data = $this->model->getByInstitution($instId);
+            $sesion = Auditoria::getDatosSesion(); // Extrae instId seguro
+            $data = $this->model->getByInstitution($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
-    /**
-     * Obtiene datos maestros para llenar los selects del formulario (Usuarios, Deptos, Tipos, Severidad)
-     */
     public function getFormData() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        $instId = $_GET['inst'] ?? null;
-        
         try {
-            $data = $this->model->getFormData($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getFormData($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
-    /**
-     * Cuenta las solicitudes pendientes (Aprobado = 3) para el badge de notificación
-     */
     public function getPendingCount() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $instId = $_GET['inst'] ?? null;
-        
         try {
-            $count = $this->model->getPendingRequestsCount($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $count = $this->model->getPendingRequestsCount($sesion['instId']);
             echo json_encode(['status' => 'success', 'count' => $count]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -73,17 +57,13 @@ class ProtocolController {
         exit;
     }
 
-    /**
-     * Obtiene las especies asignadas a un protocolo específico (para edición)
-     */
     public function getSpeciesByProtocol() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
-        $id = $_GET['id'] ?? null;
         
         try {
-            $data = $this->model->getProtocolSpecies($id);
+            Auditoria::getDatosSesion();
+            $data = $this->model->getProtocolSpecies($_GET['id'] ?? null);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -91,30 +71,25 @@ class ProtocolController {
         exit;
     }
 
-    /**
-     * Guarda o Actualiza un protocolo (Transacción completa)
-     */
     public function save() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
         $data = $_POST;
-        $id = $_GET['id'] ?? null; // Si viene ID es Update, sino Insert
-        $instId = $_GET['inst'] ?? $data['IdInstitucion'] ?? null;
+        $id = $_GET['id'] ?? null; 
 
         try {
+            $sesion = Auditoria::getDatosSesion(); // Seguridad
+            $instId = $sesion['instId'];
+            
             $this->db->beginTransaction();
 
-            // 1. Obtener nombre completo del Responsable (Usuario) para campo histórico
             $stmtUser = $this->db->prepare("SELECT NombreA, ApellidoA FROM personae WHERE IdUsrA = ?");
             $stmtUser->execute([$data['IdUsrA']]);
             $userRow = $stmtUser->fetch(\PDO::FETCH_ASSOC);
             $nombreEncargado = $userRow ? trim($userRow['NombreA'] . ' ' . $userRow['ApellidoA']) : '---';
 
-            // 2. Determinar si es Externo (Otros CEUAS)
             $isExterno = isset($data['protocoloexpe']) ? 1 : 0;
-            
-            // Si es externo, usamos el texto manual. Si es interno, usamos el ID del select (o string vacío si no eligió)
             $deptoValue = ($isExterno == 1) ? ($data['departamento_manual'] ?? '') : ($data['departamento'] ?? '');
 
             if ($id) {
@@ -133,6 +108,7 @@ class ProtocolController {
                     $data['IdUsrA'], $isExterno, $id
                 ]);
                 $currentId = $id;
+                Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId");
             } else {
                 // INSERT
                 $sql = "INSERT INTO protocoloexpe (
@@ -147,24 +123,20 @@ class ProtocolController {
                     $data['tipoprotocolo'], $data['severidad'], $data['IdUsrA'], $instId, $isExterno
                 ]);
                 $currentId = $this->db->lastInsertId();
+                Auditoria::logManual($this->db, $sesion['userId'], 'INSERT', 'protocoloexpe', "Creó protocolo: " . $data['nprotA']);
             }
 
-            // 3. Gestionar tabla PROTDEPTOR (Relación Depto Interno)
-            // Siempre borramos la relación anterior para evitar duplicados o inconsistencias
             $this->db->prepare("DELETE FROM protdeptor WHERE idprotA = ?")->execute([$currentId]);
             
-            // Solo insertamos si es Interno y se seleccionó un ID de departamento válido
             if ($isExterno == 0 && !empty($data['departamento']) && is_numeric($data['departamento'])) {
                 $stmtD = $this->db->prepare("INSERT INTO protdeptor (idprotA, iddeptoA) VALUES (?, ?)");
                 $stmtD->execute([$currentId, $data['departamento']]);
             }
 
-            // 4. Sincronizar Especies (Tabla protesper)
             $this->db->prepare("DELETE FROM protesper WHERE idprotA = ?")->execute([$currentId]);
             
             if (isset($data['especies']) && is_array($data['especies'])) {
                 $stmtE = $this->db->prepare("INSERT INTO protesper (idprotA, idespA) VALUES (?, ?)");
-                // Filtramos duplicados en PHP por seguridad, aunque el front lo hace
                 $uniqueSpecies = array_unique($data['especies']);
                 foreach ($uniqueSpecies as $espId) {
                     if (!empty($espId)) {
@@ -184,18 +156,15 @@ class ProtocolController {
         exit;
     }
 
-    /**
-     * Búsqueda general (Autocomplete o buscador)
-     */
     public function searchForAlojamiento() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $term = $_GET['term'] ?? '';
-        $instId = $_GET['inst'] ?? 1;
-
         try {
-            $data = $this->model->searchForAlojamiento($term, $instId);
+            $sesion = Auditoria::getDatosSesion();
+            $term = $_GET['term'] ?? '';
+            
+            $data = $this->model->searchForAlojamiento($term, $sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -203,23 +172,14 @@ class ProtocolController {
         }
         exit;
     }
-    /**
-     * Endpoint para listar protocolos (Usado por el Registro de Alojamientos)
-     */
-public function list() {
+
+    public function list() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        $instId = $_GET['inst'] ?? null;
-
-        if (!$instId) {
-            echo json_encode(['status' => 'error', 'message' => 'ID_INST_REQUIRED']);
-            exit;
-        }
-
         try {
-            // Inyección de dependencia hacia el Model
-            $data = $this->model->getByInstitution($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getByInstitution($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);

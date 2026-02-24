@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Utils\Auditoria;
+
 class NotificationController {
     private $db;
 
@@ -9,14 +11,13 @@ class NotificationController {
     }
 
     public function getMenuNotifications() {
-        // 1. Limpieza absoluta del búfer para evitar el SyntaxError en el Frontend
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
-        $instId = $_GET['inst'] ?? 0;
-
         try {
-            // --- 1. PROTOCOLOS (solicitudprotocolo + protocoloexpe) ---
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $sesion['instId'];
+
             $sqlProt = "SELECT COUNT(s.IdSolicitudProtocolo) as total 
                         FROM solicitudprotocolo s
                         INNER JOIN protocoloexpe p ON s.idprotA = p.idprotA
@@ -25,7 +26,6 @@ class NotificationController {
             $stmtProt->execute([$instId]);
             $countProt = $stmtProt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
 
-            // --- 2. ANIMALES (categoriaformulario = 'Animal vivo') ---
             $sqlAni = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
                        INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
@@ -35,7 +35,6 @@ class NotificationController {
             $stmtAni->execute([$instId]);
             $countAni = $stmtAni->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
 
-            // --- 3. REACTIVOS (categoriaformulario = 'Otros reactivos biologicos') ---
             $sqlRea = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
                        INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
@@ -45,7 +44,6 @@ class NotificationController {
             $stmtRea->execute([$instId]);
             $countRea = $stmtRea->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
 
-            // --- 4. INSUMOS (categoriaformulario = 'Insumos') ---
             $sqlIns = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
                        INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
@@ -55,7 +53,6 @@ class NotificationController {
             $stmtIns->execute([$instId]);
             $countIns = $stmtIns->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
 
-            // Enviar respuesta limpia
             echo json_encode([
                 'status' => 'success',
                 'data' => [
@@ -67,8 +64,9 @@ class NotificationController {
             ]);
 
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
-        exit; // Asegura que no se envíe nada más después del JSON
+        exit;
     }
 }

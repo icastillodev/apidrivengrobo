@@ -70,14 +70,12 @@ class PreciosModel {
     }
     // ----------------------------------------
 
-    public function updateTariff($items, $tituloprecios, $instId) {
+public function updateTariff($items, $tituloprecios, $instId) {
         $this->db->beginTransaction();
         try {
-            // 1. Actualizar Datos Institucionales (Solo Título)
             $this->db->prepare("UPDATE institucion SET tituloprecios = ? WHERE IdInstitucion = ?")
                      ->execute([$tituloprecios, $instId]);
 
-            // 2. Procesar Items Dinámicamente
             foreach ($items as $item) {
                 $precio = isset($item['precio']) ? (float)$item['precio'] : 0;
                 $id = $item['id'] ?? null;
@@ -105,6 +103,8 @@ class PreciosModel {
                         break;
                 }
             }
+            
+            \App\Utils\Auditoria::log($this->db, 'UPDATE', 'precios_multiples', "Modificó el Tarifario Financiero ($tituloprecios)");
             
             $this->db->commit();
             return true;

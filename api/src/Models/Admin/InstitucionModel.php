@@ -3,6 +3,7 @@ namespace App\Models\Admin;
 
 use PDO;
 use Exception;
+use App\Utils\Auditoria; // <-- Seguridad Inyectada
 
 class InstitucionModel {
     private $db;
@@ -86,9 +87,9 @@ class InstitucionModel {
             }
 
             $this->configurarSedesBase($idNew);
-
-            // 4. NUEVO: Aplicar lógica de desactivación según los servicios elegidos
             $this->sincronizarMenus($idNew, $servicios);
+
+            Auditoria::log($this->db, 'INSERT', 'institucion', "SuperAdmin registró la sede: " . $data['NombreInst']);
 
             $this->db->commit();
             return $idNew;
@@ -102,7 +103,6 @@ class InstitucionModel {
         try {
             $this->db->beginTransaction();
 
-            // 1. Update Institución
             $sql = "UPDATE institucion SET 
                         NombreInst = ?, NombreCompletoInst = ?, InstCorreo = ?, 
                         Pais = ?, Localidad = ?, Moneda = ?, Web = ?, 
@@ -133,7 +133,6 @@ class InstitucionModel {
                 $id
             ]);
 
-            // 2. Update Servicios
             $servicios = [
                 'Alojamiento' => (int)($data['Serv_Alojamiento'] ?? 1),
                 'Animales'    => (int)($data['Serv_Animales'] ?? 1),
@@ -162,8 +161,9 @@ class InstitucionModel {
                 ]);
             }
 
-            // 3. NUEVO: Recalcular Menús según los cambios
             $this->sincronizarMenus($id, $servicios);
+
+            Auditoria::log($this->db, 'UPDATE', 'institucion', "SuperAdmin editó configuración de la sede ID: " . $id);
 
             $this->db->commit();
             return true;
@@ -183,53 +183,34 @@ class InstitucionModel {
         foreach ($frms as $f) $sf->execute([$f[0], $f[1], $idInst, $f[2]]);
     }
 
-/**
-     * Lógica Centralizada de Activación/Desactivación de Menús
-     * 1: Habilitado | 2: Solo Admin | 3: Deshabilitado
-     * Activo (Menu): 1 = Visible, 2 = Oculto
-     */
     private function sincronizarMenus($idInst, $servicios) {
-        // Roles Administrativos (Admin Inst, Vet, Tec, Ceuas, etc.)
         $rolesAdmin = [2, 4, 5, 6]; 
         $roleInvestigador = 3;
 
-        // Función Helper para actualizar un menú específico para ciertos roles
         $updateMenu = function($menuId, $roles, $estado) use ($idInst) {
             $inQuery = implode(',', array_map('intval', is_array($roles) ? $roles : [$roles]));
             $sql = "UPDATE menudistr SET Activo = ? WHERE IdInstitucion = ? AND NombreMenu = ? AND IdTipoUsrA IN ($inQuery)";
             $this->db->prepare($sql)->execute([$estado, $idInst, $menuId]);
         };
 
-        // --- 1. ALOJAMIENTO ---
-        // Admin (7) / User (12)
         $sAloj = $servicios['Alojamiento'];
-        $updateMenu(7, $rolesAdmin, ($sAloj == 3) ? 2 : 1);       // Admin ve si no es OFF
-        $updateMenu(12, $roleInvestigador, ($sAloj == 1) ? 1 : 2); // User ve solo si es TODOS
+        $updateMenu(7, $rolesAdmin, ($sAloj == 3) ? 2 : 1);       
+        $updateMenu(12, $roleInvestigador, ($sAloj == 1) ? 1 : 2); 
 
-        // --- 2. ANIMALES ---
-        // Admin (3)
         $sAni = $servicios['Animales'];
         $updateMenu(3, $rolesAdmin, ($sAni == 3) ? 2 : 1);
 
-        // --- 3. REACTIVOS ---
-        // Admin (4)
         $sRea = $servicios['Reactivos'];
         $updateMenu(4, $rolesAdmin, ($sRea == 3) ? 2 : 1);
 
-        // --- 4. MIS FORMULARIOS (User) ---
-        // Menú 11: Se muestra si el usuario tiene acceso a Animales (1) O Reactivos (1)
         $verForms = ($sAni == 1 || $sRea == 1) ? 1 : 2;
         $updateMenu(11, $roleInvestigador, $verForms);
 
-        // --- 5. INSUMOS ---
-        // Admin (5)
         $sIns = $servicios['Insumos'];
         $updateMenu(5, $rolesAdmin, ($sIns == 3) ? 2 : 1);
 
-        // --- 6. RESERVAS (AGREGADO) ---
-        // Admin (6) / User (14)
         $sRes = $servicios['Reservas'];
-        $updateMenu(6, $rolesAdmin, ($sRes == 3) ? 2 : 1);        // Admin ve si no es OFF
-        $updateMenu(14, $roleInvestigador, ($sRes == 1) ? 1 : 2);  // User ve solo si es TODOS
+        $updateMenu(6, $rolesAdmin, ($sRes == 3) ? 2 : 1);        
+        $updateMenu(14, $roleInvestigador, ($sRes == 1) ? 1 : 2);  
     }
 }

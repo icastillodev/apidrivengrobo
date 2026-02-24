@@ -43,67 +43,46 @@ class InsumoFormularioModel {
     /**
      * Guarda el pedido completo en una transacción
      */
-    public function saveOrder($data) {
+public function saveOrder($data) {
         $this->db->beginTransaction();
         try {
-            // A. Insertar en formularioe
-            // CORRECCIÓN: Se agregaron fecRetiroA, aclaraA e IdInstitucion
             $sqlForm = "INSERT INTO formularioe (
-                            tipoA, 
-                            fechainicioA, 
-                            fecRetiroA, 
-                            aclaraA, 
-                            IdUsrA, 
-                            IdInstitucion, 
-                            depto, 
-                            estado, 
-                            visto
+                            tipoA, fechainicioA, fecRetiroA, aclaraA, IdUsrA, 
+                            IdInstitucion, depto, estado, visto
                         ) VALUES (?, NOW(), ?, ?, ?, ?, ?, 'Sin estado', 0)";
             
             $stmtForm = $this->db->prepare($sqlForm);
-            
-            // Mapeo de datos: Asegurarse que el Controller envíe estas llaves
             $stmtForm->execute([
                 $data['idTipoFormulario'],
-                $data['fecRetiroA'], // Fecha de retiro (string 'YYYY-MM-DD')
-                $data['aclaraA'],    // Aclaración del usuario
+                $data['fecRetiroA'], 
+                $data['aclaraA'],    
                 $data['userId'],
-                $data['instId'],     // ID de la Institución
-                $data['idDepto']     // ID del Departamento seleccionado
+                $data['instId'],     
+                $data['idDepto']     
             ]);
-            
             $idForm = $this->db->lastInsertId();
 
-            // B. Insertar en precioinsumosformulario (Cabecera contable)
-            // Se inicializa en 0. El cálculo final se suele hacer al aprobar o entregar.
             $this->db->prepare("INSERT INTO precioinsumosformulario (idformA, totalpago) VALUES (?, 0)")->execute([$idForm]);
             $idPrecioForm = $this->db->lastInsertId();
 
-            // C. Insertar ítems en forminsumo
             $sqlItem = "INSERT INTO forminsumo (idPrecioinsumosformulario, IdInsumo, cantidad, PrecioMomentoInsumo) VALUES (?, ?, ?, ?)";
             $stmtItem = $this->db->prepare($sqlItem);
 
             foreach ($data['items'] as $item) {
-                // 1. Buscamos el precio ACTUAL del insumo para congelarlo en el historial (snapshot)
                 $stmtPrice = $this->db->prepare("SELECT PrecioInsumo FROM insumo WHERE idInsumo = ?");
                 $stmtPrice->execute([$item['idInsumo']]);
                 $precioActual = $stmtPrice->fetchColumn() ?: 0;
 
-                // 2. Insertamos la línea del pedido
-                $stmtItem->execute([
-                    $idPrecioForm, 
-                    $item['idInsumo'], 
-                    $item['cantidad'], 
-                    $precioActual
-                ]);
+                $stmtItem->execute([$idPrecioForm, $item['idInsumo'], $item['cantidad'], $precioActual]);
             }
 
+            \App\Utils\Auditoria::log($this->db, 'INSERT', 'formularioe', "Nuevo Pedido de Insumos Generales #$idForm");
+            
             $this->db->commit();
-            return $idForm; // Retornamos el ID para confirmación o emails
-
+            return $idForm; 
         } catch (Exception $e) {
             $this->db->rollBack();
-            throw $e; // Re-lanzamos la excepción para que el Controller la maneje
+            throw $e; 
         }
     }
 }

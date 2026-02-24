@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\UserProtocols\UserProtocolsModel;
-use PDO;
+use App\Utils\Auditoria;
 
 class UserProtocolsController {
     private $model;
@@ -14,15 +14,15 @@ class UserProtocolsController {
     public function getAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
-        $userId = $_GET['user'] ?? 0;
-        $instId = $_GET['inst'] ?? 0; // Para saber la sede actual (botón crear)
 
         try {
-            $data = $this->model->getAllProtocols($userId, $instId);
+            // Seguridad
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getAllProtocols($sesion['userId'], $sesion['instId']);
+            
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -36,9 +36,12 @@ class UserProtocolsController {
         $id = end($uriParts);
 
         try {
+            Auditoria::getDatosSesion(); // Valida Token
             $data = $this->model->getDetail($id);
+            
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

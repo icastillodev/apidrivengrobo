@@ -39,11 +39,14 @@ class InsumoModel {
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         }
 
-    public function updateStatus($data) {
+public function updateStatus($data) {
         $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
-        return $this->db->prepare($sql)->execute([
+        $res = $this->db->prepare($sql)->execute([
             $data['estado'], $data['aclaracionadm'], $data['userName'], $data['idformA']
         ]);
+        
+        \App\Utils\Auditoria::log($this->db, 'UPDATE_STATUS', 'formularioe', "Cambió estado de Pedido de Insumos #{$data['idformA']} a: {$data['estado']}");
+        return $res;
     }
         public function getInsumosCatalog($instId) {
             $sql = "SELECT idInsumo, NombreInsumo, TipoInsumo 
@@ -64,59 +67,43 @@ public function getDepartments($instId) {
     return $stmt->fetchAll(\PDO::FETCH_ASSOC);
 }
 public function updateFullInsumo($data) {
-    $this->db->beginTransaction(); // Iniciamos transacción para seguridad
-    try {
-        // 1. Actualizar datos principales en formularioe (incluyendo depto)
-        $sqlF = "UPDATE formularioe SET 
-                    depto = ?, 
-                    fechainicioA = ?, 
-                    fecRetiroA = ? 
-                 WHERE idformA = ?";
-        $this->db->prepare($sqlF)->execute([
-            $data['depto'], 
-            $data['fechainicioA'], 
-            $data['fecRetiroA'], 
-            $data['idformA']
-        ]);
-
-        $idPrecio = $data['idPrecioinsumosformulario'];
-        $items = $data['items'] ?? [];
-        $nuevoTotal = 0;
-
-        // 2. Limpiar items anteriores para este pedido
-        $this->db->prepare("DELETE FROM forminsumo WHERE idPrecioinsumosformulario = ?")->execute([$idPrecio]);
-
-        // 3. Insertar los nuevos items y recalcular el total
-        foreach ($items as $item) {
-            // Buscamos el precio actual del catálogo para el 'PrecioMomentoInsumo'
-            $stmtP = $this->db->prepare("SELECT PrecioInsumo FROM insumo WHERE idInsumo = ?");
-            $stmtP->execute([$item['idInsumo']]);
-            $precioCatalogo = $stmtP->fetchColumn() ?: 0;
-
-            $subtotal = $precioCatalogo * $item['cantidad'];
-            $nuevoTotal += $subtotal;
-
-            $sqlI = "INSERT INTO forminsumo (idPrecioinsumosformulario, idInsumo, cantidad, PrecioMomentoInsumo) 
-                     VALUES (?, ?, ?, ?)";
-            $this->db->prepare($sqlI)->execute([
-                $idPrecio, 
-                $item['idInsumo'], 
-                $item['cantidad'], 
-                $precioCatalogo
+        $this->db->beginTransaction(); 
+        try {
+            $sqlF = "UPDATE formularioe SET depto = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
+            $this->db->prepare($sqlF)->execute([
+                $data['depto'], $data['fechainicioA'], $data['fecRetiroA'], $data['idformA']
             ]);
+
+            $idPrecio = $data['idPrecioinsumosformulario'];
+            $items = $data['items'] ?? [];
+            $nuevoTotal = 0;
+
+            $this->db->prepare("DELETE FROM forminsumo WHERE idPrecioinsumosformulario = ?")->execute([$idPrecio]);
+
+            foreach ($items as $item) {
+                $stmtP = $this->db->prepare("SELECT PrecioInsumo FROM insumo WHERE idInsumo = ?");
+                $stmtP->execute([$item['idInsumo']]);
+                $precioCatalogo = $stmtP->fetchColumn() ?: 0;
+
+                $subtotal = $precioCatalogo * $item['cantidad'];
+                $nuevoTotal += $subtotal;
+
+                $sqlI = "INSERT INTO forminsumo (idPrecioinsumosformulario, idInsumo, cantidad, PrecioMomentoInsumo) VALUES (?, ?, ?, ?)";
+                $this->db->prepare($sqlI)->execute([$idPrecio, $item['idInsumo'], $item['cantidad'], $precioCatalogo]);
+            }
+
+            $sqlP = "UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?";
+            $this->db->prepare($sqlP)->execute([$nuevoTotal, $idPrecio]);
+
+            \App\Utils\Auditoria::log($this->db, 'UPDATE_FULL', 'formularioe', "Modificación Administrativa de Pedido Insumos #{$data['idformA']}");
+            
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack(); 
+            throw $e;
         }
-
-        // 4. Actualizar el precio total en la tabla principal de costos
-        $sqlP = "UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?";
-        $this->db->prepare($sqlP)->execute([$nuevoTotal, $idPrecio]);
-
-        $this->db->commit();
-        return true;
-    } catch (\Exception $e) {
-        $this->db->rollBack(); // Si algo falla, deshacemos todo
-        throw $e;
     }
-}
 /**
  * Guarda la notificación en la entidad correcta
  */

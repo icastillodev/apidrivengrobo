@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\UserHousing\UserHousingModel;
-use PDO;
+use App\Utils\Auditoria;
 
 class UserHousingController {
     private $model;
@@ -14,15 +14,15 @@ class UserHousingController {
     public function getAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
-        $userId = $_GET['user'] ?? 0;
-        $instId = $_GET['inst'] ?? 0;
 
         try {
-            $data = $this->model->getAllHousings($userId, $instId);
+            // Seguridad
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getAllHousings($sesion['userId'], $sesion['instId']);
+            
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -33,12 +33,16 @@ class UserHousingController {
         header('Content-Type: application/json');
         
         $uriParts = explode('/', $_SERVER['REQUEST_URI']);
-        $id = end($uriParts); // ID Historia
+        $id = end($uriParts); 
 
         try {
+            // Validamos que exista un token válido
+            Auditoria::getDatosSesion();
+            
             $data = $this->model->getDetail($id);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

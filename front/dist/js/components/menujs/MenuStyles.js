@@ -67,6 +67,16 @@ function getBaseStyles() {
     border-bottom: 1px solid rgba(0,0,0,0.1);
     transform: rotate(45deg);
 }
+    /* Color del micrófono */
+#btn-voice-switch {
+    color: #000000; /* Negro por defecto */
+    transition: color 0.3s ease;
+}
+
+/* Cambio a verde según la clase dinámica */
+#btn-voice-switch.voice-status-true {
+    color: #1a5d3b !important; /* Verde */
+}
     `;
 }
 
@@ -226,6 +236,19 @@ function getOmniBoxStyles() {
             overflow-x: hidden; /* Evita que salga scroll horizontal feo */
         }
         @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
+
+        /* Reemplaza la regla de .gecko-omni-header svg por esta o añádela */
+        .gecko-search-logo {
+            width: 42px !important; 
+            height: 42px !important;
+            min-width: 42px;
+            object-fit: contain;
+        }
+
+        /* Opcional: Si quieres que el gecko tenga un efecto al abrir la caja */
+        .gecko-omni-box.open .gecko-search-logo {
+            transform: scale(1.1);
+        }
     `;
 }
 

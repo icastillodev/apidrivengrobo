@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigInsumoModel;
+use App\Utils\Auditoria;
 
 class AdminConfigInsumoController {
     private $model;
@@ -13,9 +14,9 @@ class AdminConfigInsumoController {
     public function getAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $instId = $_GET['inst'] ?? 0;
         try {
-            $data = $this->model->getAll($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getAll($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -24,13 +25,12 @@ class AdminConfigInsumoController {
         exit;
     }
 
-    // NUEVO ENDPOINT: Para llenar el select del modal
     public function get_types() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $instId = $_GET['inst'] ?? 0;
         try {
-            $data = $this->model->getInsumoTypes($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getInsumoTypes($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -46,6 +46,7 @@ class AdminConfigInsumoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            Auditoria::getDatosSesion();
             $res = $this->model->delete($_POST['id']);
             echo json_encode(['status' => 'success', 'mode' => $res]);
         } catch (\Exception $e) {
@@ -59,6 +60,9 @@ class AdminConfigInsumoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            $sesion = Auditoria::getDatosSesion();
+            $_POST['instId'] = $sesion['instId'];
+            
             $this->model->$method($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

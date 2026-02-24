@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigReservasModel;
+use App\Utils\Auditoria;
 
 class AdminConfigReservasController {
     private $model;
@@ -10,45 +11,55 @@ class AdminConfigReservasController {
         $this->model = new AdminConfigReservasModel($db);
     }
 
-    // --- SALAS ---
     public function getAllSalas() {
-        $this->jsonResponse($this->model->getAllSalas($_GET['inst']));
+        $sesion = Auditoria::getDatosSesion();
+        $this->jsonResponse($this->model->getAllSalas($sesion['instId']));
     }
 
     public function getSalaDetail() {
+        Auditoria::getDatosSesion(); // Valida Token
         $this->jsonResponse($this->model->getSalaDetail($_GET['id']));
     }
 
     public function saveSala() {
-        // Decodificar el JSON de horarios que viene dentro del FormData
+        $sesion = Auditoria::getDatosSesion();
+        $_POST['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId Real
+        
         $horarios = json_decode($_POST['horarios'], true);
         $this->model->saveSala($_POST, $horarios);
         $this->jsonResponse(['status' => 'success']);
     }
 
     public function toggleSala() {
+        Auditoria::getDatosSesion();
         $input = json_decode(file_get_contents('php://input'), true);
         $this->model->toggleSala($input['id'], $input['status']);
         $this->jsonResponse(['status' => 'success']);
     }
 
     public function updateGlobalTimeType() {
+        $sesion = Auditoria::getDatosSesion();
         $input = json_decode(file_get_contents('php://input'), true);
-        $this->model->updateGlobalTimeType($input['instId'], $input['type']);
+        
+        $this->model->updateGlobalTimeType($sesion['instId'], $input['type']);
         $this->jsonResponse(['status' => 'success']);
     }
 
-    // --- INSTRUMENTOS ---
     public function getAllInst() {
-        $this->jsonResponse($this->model->getAllInst($_GET['inst']));
+        $sesion = Auditoria::getDatosSesion();
+        $this->jsonResponse($this->model->getAllInst($sesion['instId']));
     }
 
     public function saveInst() {
+        $sesion = Auditoria::getDatosSesion();
+        $_POST['IdInstitucion'] = $sesion['instId'];
+        
         $this->model->saveInst($_POST);
         $this->jsonResponse(['status' => 'success']);
     }
 
     public function toggleInst() {
+        Auditoria::getDatosSesion();
         $input = json_decode(file_get_contents('php://input'), true);
         $this->model->toggleInst($input['id'], $input['status']);
         $this->jsonResponse(['status' => 'success']);

@@ -3,11 +3,10 @@ namespace App\Models\AdminConfig;
 
 use PDO;
 use Exception;
+use App\Utils\Auditoria;
 
 class AdminConfigInstitutionModel {
     private $db;
-    
-    // Ruta corregida a 'logos' (plural)
     private const LOGO_PATH = __DIR__ . '/../../../../../dist/multimedia/imagenes/logos/';
 
     public function __construct($db) {
@@ -26,12 +25,11 @@ class AdminConfigInstitutionModel {
         $stmt->execute([$id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$data) throw new Exception("Institución no encontrada (ID: $id)");
+        if (!$data) throw new Exception("Institución no encontrada");
         return $data;
     }
 
     public function getServices($instId) {
-        // Trae todos los servicios (ya no filtramos por Eliminado porque se borran físicamente)
         $sql = "SELECT * FROM serviciosinst WHERE IdInstitucion = ? ORDER BY IdServicioInst DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
@@ -39,8 +37,7 @@ class AdminConfigInstitutionModel {
     }
 
     public function updateInstitution($data, $files) {
-        $instId = $data['instId'] ?? 0;
-        if (!$instId) throw new Exception("ID inválido");
+        $instId = $data['instId'];
 
         $sqlLogo = "";
         $params = [
@@ -64,8 +61,9 @@ class AdminConfigInstitutionModel {
                     $sqlLogo
                 WHERE IdInstitucion = ?";
         
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute($params);
+        $res = $this->db->prepare($sql)->execute($params);
+        Auditoria::log($this->db, 'UPDATE', 'institucion', "Configuración General Actualizada");
+        return $res;
     }
 
     private function handleLogoUpload($file, $instId) {
@@ -80,7 +78,6 @@ class AdminConfigInstitutionModel {
 
         if (!is_dir(self::LOGO_PATH)) mkdir(self::LOGO_PATH, 0777, true);
 
-        // Nombre con prefijo para identificar
         $newName = 'urbelogo_' . $instId . '_' . time() . '.png';
         if (move_uploaded_file($file['tmp_name'], self::LOGO_PATH . $newName)) {
             return $newName;
@@ -89,31 +86,31 @@ class AdminConfigInstitutionModel {
     }
 
     public function addService($data) {
-        // CORREGIDO: Coinciden las 5 columnas con los 5 valores (4 placeholders + el 1 hardcoded)
         $sql = "INSERT INTO serviciosinst 
                 (NombreServicioInst, MedidaServicioInst, CantidadPorMedidaInst, IdInstitucion, Habilitado) 
                 VALUES (?, ?, ?, ?, 1)";
         
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
+        $res = $this->db->prepare($sql)->execute([
             $data['nombre'],
             $data['medida'] ?? 'Unidad',
             $data['cant'] ?? 1,
             $data['instId']
         ]);
+        Auditoria::log($this->db, 'INSERT', 'serviciosinst', "Agregó Servicio: " . $data['nombre']);
+        return $res;
     }
 
     public function deleteService($id) {
-        // CORREGIDO: Borrado físico real (DELETE)
         $sql = "DELETE FROM serviciosinst WHERE IdServicioInst = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$id]);
+        $res = $this->db->prepare($sql)->execute([$id]);
+        Auditoria::log($this->db, 'DELETE', 'serviciosinst', "Eliminó Servicio ID: $id");
+        return $res;
     }
 
     public function toggleService($id) {
-        // Invierte estado (Habilitado = NOT Habilitado)
         $sql = "UPDATE serviciosinst SET Habilitado = NOT Habilitado WHERE IdServicioInst = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$id]);
+        $res = $this->db->prepare($sql)->execute([$id]);
+        Auditoria::log($this->db, 'UPDATE', 'serviciosinst', "Cambió estado de Servicio ID: $id");
+        return $res;
     }
 }

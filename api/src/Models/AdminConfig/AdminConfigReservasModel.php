@@ -1,12 +1,13 @@
 <?php
 namespace App\Models\AdminConfig;
+
 use PDO;
+use App\Utils\Auditoria;
 
 class AdminConfigReservasModel {
     private $db;
     public function __construct($db) { $this->db = $db; }
 
-    // --- SALAS ---
     public function getAllSalas($instId) {
         $stmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? ORDER BY Nombre ASC");
         $stmt->execute([$instId]);
@@ -14,7 +15,6 @@ class AdminConfigReservasModel {
     }
 
     public function getSalaDetail($id) {
-        $sala = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdSalaReserva = ?")->execute([$id]);
         $sala = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdSalaReserva = ?");
         $sala->execute([$id]);
         $salaData = $sala->fetch(PDO::FETCH_ASSOC);
@@ -29,20 +29,20 @@ class AdminConfigReservasModel {
         try {
             $this->db->beginTransaction();
 
-            // 1. Guardar/Actualizar Sala
             if(empty($data['IdSalaReserva'])) {
                 $sql = "INSERT INTO reserva_sala (Nombre, Lugar, tipohorasalas, IdInstitucion, habilitado) VALUES (?, ?, ?, ?, 1)";
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute([$data['Nombre'], $data['Lugar'], $data['tipohorasalas'], $data['IdInstitucion']]);
                 $idSala = $this->db->lastInsertId();
+                Auditoria::log($this->db, 'INSERT', 'reserva_sala', "Creó Sala: " . $data['Nombre']);
             } else {
                 $idSala = $data['IdSalaReserva'];
                 $hab = $data['habilitado'] ?? 1;
                 $sql = "UPDATE reserva_sala SET Nombre=?, Lugar=?, tipohorasalas=?, habilitado=? WHERE IdSalaReserva=?";
                 $this->db->prepare($sql)->execute([$data['Nombre'], $data['Lugar'], $data['tipohorasalas'], $hab, $idSala]);
+                Auditoria::log($this->db, 'UPDATE', 'reserva_sala', "Modificó Sala ID: $idSala");
             }
 
-            // 2. Actualizar Horarios (Estrategia: Borrar todos y re-insertar los activos)
             $this->db->prepare("DELETE FROM reserva_horariospordiasala WHERE IdSalaReserva = ?")->execute([$idSala]);
 
             if(!empty($horarios)) {
@@ -62,13 +62,14 @@ class AdminConfigReservasModel {
 
     public function toggleSala($id, $status) {
         $this->db->prepare("UPDATE reserva_sala SET habilitado = ? WHERE IdSalaReserva = ?")->execute([$status, $id]);
+        Auditoria::log($this->db, 'UPDATE', 'reserva_sala', "Cambió estado a $status de Sala ID: $id");
     }
 
     public function updateGlobalTimeType($instId, $type) {
         $this->db->prepare("UPDATE reserva_sala SET tipohorasalas = ? WHERE IdInstitucion = ?")->execute([$type, $instId]);
+        Auditoria::log($this->db, 'UPDATE', 'reserva_sala', "Cambió el tipo de hora global de salas (Tipo: $type)");
     }
 
-    // --- INSTRUMENTOS ---
     public function getAllInst($instId) {
         $stmt = $this->db->prepare("SELECT * FROM reserva_instrumento WHERE IdInstitucion = ?");
         $stmt->execute([$instId]);
@@ -79,14 +80,17 @@ class AdminConfigReservasModel {
         if(empty($data['IdReservaInstrumento'])) {
             $sql = "INSERT INTO reserva_instrumento (NombreInstrumento, cantidad, detalleInstrumento, IdInstitucion, habilitado) VALUES (?, ?, ?, ?, 1)";
             $this->db->prepare($sql)->execute([$data['NombreInstrumento'], $data['cantidad'], $data['detalleInstrumento'], $data['IdInstitucion']]);
+            Auditoria::log($this->db, 'INSERT', 'reserva_instrumento', "Agregó instrumento: " . $data['NombreInstrumento']);
         } else {
             $hab = $data['habilitado'] ?? 1;
             $sql = "UPDATE reserva_instrumento SET NombreInstrumento=?, cantidad=?, detalleInstrumento=?, habilitado=? WHERE IdReservaInstrumento=?";
             $this->db->prepare($sql)->execute([$data['NombreInstrumento'], $data['cantidad'], $data['detalleInstrumento'], $hab, $data['IdReservaInstrumento']]);
+            Auditoria::log($this->db, 'UPDATE', 'reserva_instrumento', "Modificó instrumento ID: " . $data['IdReservaInstrumento']);
         }
     }
 
     public function toggleInst($id, $status) {
         $this->db->prepare("UPDATE reserva_instrumento SET habilitado = ? WHERE IdReservaInstrumento = ?")->execute([$status, $id]);
+        Auditoria::log($this->db, 'UPDATE', 'reserva_instrumento', "Cambió estado a $status de Instrumento ID: $id");
     }
 }

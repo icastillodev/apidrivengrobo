@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigRolesModel;
+use App\Utils\Auditoria;
 
 class AdminConfigRolesController {
     private $model;
@@ -13,9 +14,9 @@ class AdminConfigRolesController {
     public function init() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $instId = $_GET['inst'] ?? 0;
         try {
-            $data = $this->model->getInitialData($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getInitialData($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -28,6 +29,7 @@ class AdminConfigRolesController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            Auditoria::getDatosSesion(); // Valida Token
             $this->model->updateUserRole($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -40,6 +42,9 @@ class AdminConfigRolesController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            $sesion = Auditoria::getDatosSesion();
+            $_POST['instId'] = $sesion['instId']; // Inyecta ID de seguridad
+            
             $this->model->toggleMenu($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

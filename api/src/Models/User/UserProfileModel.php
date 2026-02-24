@@ -2,6 +2,7 @@
 namespace App\Models\User;
 
 use PDO;
+use App\Utils\Auditoria; // <-- Seguridad Inyectada
 
 class UserProfileModel {
     private $db;
@@ -39,13 +40,16 @@ class UserProfileModel {
                 WHERE IdUsrA = ?";
         
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([
+        $res = $stmt->execute([
             $data['nombre'], 
             $data['apellido'], 
             $data['email'], 
             $data['celular'], 
             $data['userId']
         ]);
+        
+        Auditoria::log($this->db, 'UPDATE', 'personae', "Actualizó datos personales propios (Desde panel de Perfil).");
+        return $res;
     }
 
     public function verifyCurrentPassword($userId, $inputPass) {
@@ -59,6 +63,9 @@ class UserProfileModel {
 
     public function updatePassword($userId, $newHash) {
         $stmt = $this->db->prepare("UPDATE usuarioe SET password_secure = ? WHERE IdUsrA = ?");
-        return $stmt->execute([$newHash, $userId]);
+        $res = $stmt->execute([$newHash, $userId]);
+        
+        Auditoria::log($this->db, 'UPDATE_PASS', 'usuarioe', "Actualizó su propia contraseña");
+        return $res;
     }
 }

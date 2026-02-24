@@ -60,23 +60,15 @@ public function getByInstitution($instId) {
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 
-    public function updateStatus($data) {
-        // 0. Validación y saneamiento de entradas para evitar Warnings
+public function updateStatus($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) return false;
 
         $nuevoEstado = $data['estado'] ?? 'Sin estado';
-        $aclaracion = $data['aclaracionadm'] ?? ''; // Soluciona el error: Undefined array key "aclaracionadm"
+        $aclaracion = $data['aclaracionadm'] ?? ''; 
         $quien = $data['quienvisto'] ?? 'Admin';
 
-        // 1. Obtener estado anterior, cantidad y protocolo en una sola consulta
-        $stmtOld = $this->db->prepare("
-            SELECT estado, 
-                (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as cant, 
-                (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as idprot 
-            FROM formularioe f 
-            WHERE f.idformA = ?
-        ");
+        $stmtOld = $this->db->prepare("SELECT estado, (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as cant, (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as idprot FROM formularioe f WHERE f.idformA = ?");
         $stmtOld->execute([$id]);
         $oldRow = $stmtOld->fetch(\PDO::FETCH_ASSOC);
 
@@ -88,30 +80,20 @@ public function getByInstitution($instId) {
 
         $this->db->beginTransaction();
         try {
-            // 2. Lógica de Stock: Comparamos normalizando a minúsculas
             $isNewSuspended = (strtolower(trim($nuevoEstado)) === 'suspendido');
             $isOldSuspended = (strtolower(trim($oldStatus)) === 'suspendido');
 
-            // Caso A: El pedido se suspende (Devolvemos animales al protocolo)
             if ($isNewSuspended && !$isOldSuspended && $idProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")
-                        ->execute([$cantidad, $idProt]);
-            } 
-            // Caso B: El pedido sale de suspensión (Restamos animales del protocolo nuevamente)
-            elseif (!$isNewSuspended && $isOldSuspended && $idProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                        ->execute([$cantidad, $idProt]);
+                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
+            } elseif (!$isNewSuspended && $isOldSuspended && $idProt) {
+                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
             }
 
-            // 3. Actualizar el registro del formulario
             $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
-            $this->db->prepare($sql)->execute([
-                $nuevoEstado, // Se guarda con el formato original (Ej: "Listo para entrega")
-                $aclaracion, 
-                $quien, 
-                $id
-            ]);
+            $this->db->prepare($sql)->execute([$nuevoEstado, $aclaracion, $quien, $id]);
 
+            Auditoria::log($this->db, 'UPDATE', 'formularioe', "Cambió estado de Pedido de Animales #$id a: $nuevoEstado");
+            
             $this->db->commit();
             return true;
         } catch (\Exception $e) {
@@ -170,86 +152,44 @@ public function getByInstitution($instId) {
  * Actualiza formularioe, sexoe, protformr y ajusta el stock en protocoloexpe.
  */
 public function updateFull($data) {
-    // 0. Protección contra llaves faltantes (Evita el Warning que rompe el JSON)
-    $id = $data['idformA'] ?? null;
-    if (!$id) return false;
+        $id = $data['idformA'] ?? null;
+        if (!$id) return false;
 
-    $newTotal = (int)($data['totalA'] ?? 0);
-    $newProt = $data['idprotA'] ?? null;
-    $idSubesp = $data['idsubespA'] ?? null;
+        $newTotal = (int)($data['totalA'] ?? 0);
+        $newProt = $data['idprotA'] ?? null;
+        $idSubesp = $data['idsubespA'] ?? null;
 
-    // 1. Obtener datos actuales antes de actualizar (para saber cuánto devolver al protocolo)
-    $stmtOld = $this->db->prepare("
-        SELECT 
-            (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal,
-            (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt
-        FROM formularioe f 
-        WHERE f.idformA = ?");
-    $stmtOld->execute([$id]);
-    $old = $stmtOld->fetch(\PDO::FETCH_ASSOC);
-    
-    $oldTotal = (int)($old['oldTotal'] ?? 0);
-    $oldProt = $old['oldProt'];
+        $stmtOld = $this->db->prepare("SELECT (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal, (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt FROM formularioe f WHERE f.idformA = ?");
+        $stmtOld->execute([$id]);
+        $old = $stmtOld->fetch(\PDO::FETCH_ASSOC);
+        
+        $oldTotal = (int)($old['oldTotal'] ?? 0);
+        $oldProt = $old['oldProt'];
 
-    $this->db->beginTransaction();
-    try {
-        // 2. Actualizar Formulario Principal (Uso de ?? para evitar errores de red o campos vacíos)
-        $sqlForm = "UPDATE formularioe SET 
-                        tipoA = ?, idsubespA = ?, edadA = ?, 
-                        pesoA = ?, fechainicioA = ?, fecRetiroA = ? 
-                    WHERE idformA = ?";
-        $this->db->prepare($sqlForm)->execute([
-            $data['tipoA'] ?? null, 
-            $idSubesp, 
-            $data['edadA'] ?? '', 
-            $data['pesoA'] ?? '', 
-            $data['fechainicioA'] ?? null, 
-            $data['fecRetiroA'] ?? null, 
-            $id
-        ]);
+        $this->db->beginTransaction();
+        try {
+            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
+            $this->db->prepare($sqlForm)->execute([$data['tipoA'] ?? null, $idSubesp, $data['edadA'] ?? '', $data['pesoA'] ?? '', $data['fechainicioA'] ?? null, $data['fecRetiroA'] ?? null, $id]);
 
-        // 3. Actualizar Cantidades por Sexo
-        $sqlSexo = "UPDATE sexoe SET 
-                        machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? 
-                    WHERE idformA = ?";
-        $this->db->prepare($sqlSexo)->execute([
-            $data['machoA'] ?? 0, 
-            $data['hembraA'] ?? 0, 
-            $data['indistintoA'] ?? 0, 
-            $newTotal, 
-            $id
-        ]);
+            $sqlSexo = "UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?";
+            $this->db->prepare($sqlSexo)->execute([$data['machoA'] ?? 0, $data['hembraA'] ?? 0, $data['indistintoA'] ?? 0, $newTotal, $id]);
 
-        // 4. Actualizar Relación de Protocolo
-        $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")
-                 ->execute([$newProt, $id]);
+            $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
 
-        // 5. SINCRONIZACIÓN DE STOCK: Comparamos lo viejo con lo nuevo
-        if ($oldProt == $newProt) {
-            // Mismo protocolo: ajustamos solo la diferencia
-            $diff = $newTotal - $oldTotal;
-            if ($diff != 0 && $newProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                         ->execute([$diff, $newProt]);
+            if ($oldProt == $newProt) {
+                $diff = $newTotal - $oldTotal;
+                if ($diff != 0 && $newProt) {
+                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$diff, $newProt]);
+                }
+            } else {
+                if ($oldProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$oldTotal, $oldProt]);
+                if ($newProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$newTotal, $newProt]);
             }
-        } else {
-            // El protocolo cambió: devolvemos al anterior y restamos del nuevo
-            if ($oldProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")
-                         ->execute([$oldTotal, $oldProt]);
-            }
-            if ($newProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                         ->execute([$newTotal, $newProt]);
-            }
-        }
 
-        $this->db->commit();
-        return true;
-    } catch (\Exception $e) {
-        $this->db->rollBack();
-        throw $e;
-    }
+            Auditoria::log($this->db, 'UPDATE_FULL', 'formularioe', "Modificación Administrativa de Pedido de Animales #$id");
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
     /**
@@ -472,30 +412,17 @@ public function getDetailsAndSpecies($protId) {
 // --- CAMBIO 2: Guardar el ID numérico del Depto ---
 public function saveOrder($data) {
         $this->db->beginTransaction();
-        
         try {
-            // A. VALIDACIÓN DE TIPO (Seguridad)
-            // Verificamos que el ID enviado realmente pertenezca a 'Animal vivo' y a la institución
-            $stmtCheck = $this->db->prepare("
-                SELECT IdTipoFormulario 
-                FROM tipoformularios 
-                WHERE IdTipoFormulario = ? 
-                AND categoriaformulario = 'Animal vivo' 
-                AND IdInstitucion = ?
-            ");
+            $stmtCheck = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE IdTipoFormulario = ? AND categoriaformulario = 'Animal vivo' AND IdInstitucion = ?");
             $stmtCheck->execute([$data['idTipoFormulario'], $data['instId']]);
             
-            if (!$stmtCheck->fetchColumn()) {
-                throw new \Exception("Error: El tipo de formulario seleccionado no es válido.");
-            }
+            if (!$stmtCheck->fetchColumn()) throw new \Exception("Error: El tipo de formulario seleccionado no es válido.");
 
-            // B. Recuperar ID Depto (Igual que antes)
             $finalDepto = 0;
             if (!empty($data['idprotA'])) {
                 $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
                 $stmtDepto->execute([$data['idprotA']]);
-                $protDepto = $stmtDepto->fetchColumn();
-                if ($protDepto) $finalDepto = $protDepto;
+                $finalDepto = $stmtDepto->fetchColumn() ?: 0;
             }
             if ($finalDepto == 0) {
                 $stmtUserLab = $this->db->prepare("SELECT LabA FROM personae WHERE IdUsrA = ?");
@@ -504,53 +431,22 @@ public function saveOrder($data) {
                 if (is_numeric($lab)) $finalDepto = $lab;
             }
 
-            // C. Insertar Formulario (Usando $data['idTipoFormulario'])
-            $sqlForm = "INSERT INTO formularioe (
-                tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, 
-                aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto
-            ) VALUES (
-                ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?, 0, ?
-            )";
-            
-            $stmt = $this->db->prepare($sqlForm);
-            $stmt->execute([
-                $data['idTipoFormulario'], // <--- AQUÍ VA EL ID SELECCIONADO
-                $data['idsubespA'],
-                $data['edad'],
-                $data['peso'],
-                $data['fecha_retiro'],
-                $data['aclaracion'],
-                $data['userId'],
-                $data['instId'],
-                $data['raza'],
-                $finalDepto
-            ]);
-            
+            $sqlForm = "INSERT INTO formularioe (tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?, 0, ?)";
+            $this->db->prepare($sqlForm)->execute([$data['idTipoFormulario'], $data['idsubespA'], $data['edad'], $data['peso'], $data['fecha_retiro'], $data['aclaracion'], $data['userId'], $data['instId'], $data['raza'], $finalDepto]);
             $idForm = $this->db->lastInsertId();
 
-            // D. Insertar Sexo (Igual que antes)
-            $sqlSex = "INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)";
-            $this->db->prepare($sqlSex)->execute([
-                $idForm,
-                $data['macho'], $data['hembra'], $data['indistinto'], $data['total']
-            ]);
+            $this->db->prepare("INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)")->execute([$idForm, $data['macho'], $data['hembra'], $data['indistinto'], $data['total']]);
 
-            // E. Vinculación y Stock (Igual que antes)
             $isExternal = isset($data['is_external']) && $data['is_external'] == 1;
             if (!$isExternal && !empty($data['idprotA'])) {
-                $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")
-                         ->execute([$idForm, $data['idprotA']]);
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                         ->execute([$data['total'], $data['idprotA']]);
+                $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")->execute([$idForm, $data['idprotA']]);
+                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$data['total'], $data['idprotA']]);
             }
 
+            Auditoria::log($this->db, 'INSERT', 'formularioe', "Nuevo Pedido de Animales #$idForm creado por usuario {$data['userId']}");
             $this->db->commit();
             return $idForm;
-
-        } catch (\Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
     // ************************************************************************
     // 4. HELPER PRIVADO

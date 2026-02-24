@@ -38,7 +38,7 @@ export function getMenuTemplates() {
             children: [
                 { label: window.txt.menu.prices, path: 'admin/precios.html' },
                 { label: window.txt.menu.billing, path: 'admin/facturacion/index.html' },
-                { label: 'Historial Pagos', path: 'construccion.html' }
+                { label: window.txt.menu.historialpagos, path: 'admin/historialcontable.html' }
             ]
         },
 

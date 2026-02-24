@@ -2,7 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\User\UserProfileModel;
-use PDO;
+use App\Utils\Auditoria;
 
 class UserProfileController {
     private $model;
@@ -14,19 +14,20 @@ class UserProfileController {
     public function getProfile() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
-        $userId = $_GET['user'] ?? 0;
 
         try {
-            $data = $this->model->getUserData($userId);
+            // Extrae el usuario de forma segura
+            $sesion = Auditoria::getDatosSesion();
+            
+            $data = $this->model->getUserData($sesion['userId']);
             if (!$data) throw new \Exception("Usuario no encontrado");
             
-            // No enviamos la contraseña real, obviamente
             unset($data['password_secure']);
             unset($data['PassA']);
             
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -39,6 +40,9 @@ class UserProfileController {
         $data = $_POST;
         
         try {
+            $sesion = Auditoria::getDatosSesion();
+            $data['userId'] = $sesion['userId']; // Fuerza a que solo pueda editarse a sí mismo
+            
             $this->model->updatePersonalData($data);
             echo json_encode(['status' => 'success', 'message' => 'Datos actualizados correctamente']);
         } catch (\Exception $e) {
@@ -53,18 +57,20 @@ class UserProfileController {
         header('Content-Type: application/json');
         
         $input = json_decode(file_get_contents('php://input'), true);
-        $userId = $input['userId'];
-        $currentPass = $input['currentPass'];
-        $newPass = $input['newPass'];
 
         try {
-            // 1. Verificar contraseña actual
+            // El ID sale del JWT para que no puedan cambiarle la contraseña a otro
+            $sesion = Auditoria::getDatosSesion();
+            $userId = $sesion['userId'];
+            
+            $currentPass = $input['currentPass'];
+            $newPass = $input['newPass'];
+
             if (!$this->model->verifyCurrentPassword($userId, $currentPass)) {
                 echo json_encode(['status' => 'error', 'message' => 'La contraseña actual es incorrecta']);
                 exit;
             }
 
-            // 2. Actualizar a nueva contraseña
             $newHash = password_hash($newPass, PASSWORD_BCRYPT);
             $this->model->updatePassword($userId, $newHash);
 

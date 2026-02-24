@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Animal\AnimalModel;
 use App\Models\Services\MailService;
+use App\Utils\Auditoria;
 
 class AnimalController {
     private $model;
@@ -13,63 +14,84 @@ class AnimalController {
 
     public function getAll() {
         if (ob_get_length()) ob_clean();
-        $instId = $_GET['inst'] ?? null;
-
-        if (!$instId) {
-            echo json_encode(['status' => 'error', 'message' => 'Falta ID Institución']);
-            exit;
+        try {
+            $sesion = Auditoria::getDatosSesion(); // Seguridad Total
+            $data = $this->model->getByInstitution($sesion['instId']);
+            
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+        exit;
+    }
 
-        $data = $this->model->getByInstitution($instId);
+    public function getLastNotification() {
+        if (ob_get_length()) ob_clean();
+        Auditoria::getDatosSesion(); // Valida Token
+        $id = $_GET['id'] ?? null;
+        $data = $this->model->getLastNotification($id);
         header('Content-Type: application/json');
         echo json_encode(['status' => 'success', 'data' => $data]);
         exit;
     }
-    public function getLastNotification() {
-    $id = $_GET['id'] ?? null;
-    $data = $this->model->getLastNotification($id);
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'success', 'data' => $data]);
-    exit;
-    }
 
     public function updateStatus() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         $data = $_POST;
-        // Capturamos el nombre de quien cambia el estado desde el localStorage enviado
-        $data['quienvisto'] = $data['userName'] ?? 'Admin'; 
-
+        
         try {
+            // El usuario que modifica viene de la sesión, no del POST inyectable
+            $sesion = Auditoria::getDatosSesion();
+            $data['quienvisto'] = "Admin (ID: " . $sesion['userId'] . ")"; 
+
             $this->model->updateStatus($data);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
-            header('Content-Type: application/json');
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
     public function getPendingCounts() {
-        $instId = $_GET['inst'] ?? null;
-        $count = $this->model->getPendingCount($instId); // Llamada al modelo
-        
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'success', 'data' => ['animales' => $count]]);
+        if (ob_get_length()) ob_clean();
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $count = $this->model->getPendingCount($sesion['instId']);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'success', 'data' => ['animales' => $count]]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error']);
+        }
         exit;
     }
+
     public function saveNotification() {
-    $data = $_POST;
-    $res = $this->model->saveNotification($data);
-    echo json_encode(['status' => 'success']);
-    exit;
+        if (ob_get_length()) ob_clean();
+        Auditoria::getDatosSesion();
+        $this->model->saveNotification($_POST);
+        echo json_encode(['status' => 'success']);
+        exit;
     }
+
     public function getFormData() {
-    $instId = $_GET['inst'] ?? null;
-    $data = $this->model->getFormData($instId);
-    echo json_encode(['status' => 'success', 'data' => $data]);
-    exit;
+        if (ob_get_length()) ob_clean();
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getFormData($sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error']);
+        }
+        exit;
     }
 
     public function getSexData() {
+        if (ob_get_length()) ob_clean();
+        Auditoria::getDatosSesion();
         $id = $_GET['id'] ?? null;
         $data = $this->model->getSexData($id);
         echo json_encode(['status' => 'success', 'data' => $data]);
@@ -77,61 +99,60 @@ class AnimalController {
     }
     
     public function updateFull() {
-        $data = $_POST; // Captura todos los campos del FormData
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         try {
-            $this->model->updateFull($data);
-            header('Content-Type: application/json');
+            Auditoria::getDatosSesion();
+            $this->model->updateFull($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
-            header('Content-Type: application/json');
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
+
     public function getSpeciesByProtocol() {
-    // Capturamos el id de la URL (?id=1346)
-    $protId = $_GET['id'] ?? null;
-    
-    if (!$protId) {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        echo json_encode(['status' => 'error', 'message' => 'Falta el ID del protocolo']);
+        Auditoria::getDatosSesion();
+        $protId = $_GET['id'] ?? null;
+        if (!$protId) {
+            echo json_encode(['status' => 'error', 'message' => 'Falta el ID']);
+            exit;
+        }
+        try {
+            $data = $this->model->getSpeciesByProtocol($protId);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         exit;
     }
 
-    try {
-        $data = $this->model->getSpeciesByProtocol($protId);
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'success', 'data' => $data]);
-    } catch (\Exception $e) {
-        header('HTTP/1.1 500 Internal Server Error');
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-    }
-    exit;
-    }
-
-public function sendNotification() {
+    public function sendNotification() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
         $data = json_decode(file_get_contents('php://input'), true);
         
         $idformA = $data['idformA'] ?? $data['id'] ?? null;
         $nota = $data['nota'] ?? null;
 
         if (!$idformA || $nota === null) {
-            echo json_encode(['status' => 'error', 'message' => 'Información insuficiente: ID no reconocido']);
+            echo json_encode(['status' => 'error', 'message' => 'Información insuficiente']);
             exit;
         }
 
         try {
-            // Aseguramos que el array que va al modelo tenga 'idformA'
+            $sesion = Auditoria::getDatosSesion();
+            $data['adminId'] = $sesion['userId']; // Validado
             $data['idformA'] = $idformA;
             
-            // Llamamos al modelo actualizado
             $info = $this->model->saveNotificationAndGetMailDetails($data);
             
             if (!$info) {
-                echo json_encode(['status' => 'error', 'message' => 'No se encontró el pedido #' . $idformA]);
+                echo json_encode(['status' => 'error', 'message' => 'No se encontró el pedido']);
                 exit;
             }
 
@@ -139,7 +160,6 @@ public function sendNotification() {
             $instName = strtoupper($info['institucion'] ?? 'URBE');
             $subject = "Solicitud Animales #{$idformA} - " . strtoupper($info['estado']) . " ({$instName})";
             
-            // Construimos el bloque HTML interno (Igual que en Reactivos pero con datos de animales)
             $message = "
                 Hola <b>{$info['investigador']}</b>,<br><br>
                 Tu solicitud de <b>Animales Vivos</b> ha sido actualizada.<br><br>
@@ -156,15 +176,12 @@ public function sendNotification() {
                 </p>
             ";
 
-            // Envolvemos en el template oficial de GROBO
-            // El link lleva al login para que revisen el detalle
-            $linkSistema = "http://localhost/URBE-API-DRIVEN/front/paginas/login.html"; // Ajusta esto a tu dominio real en producción
+            // Envolvemos en el template oficial
+            $linkSistema = "http://app.groboapp.com/"; // URL genérica
             $body = $mailService->getTemplate("Actualización de Pedido", $message, $linkSistema, "VER EN SISTEMA");
             
-            // Envío al Investigador
             $success = $mailService->executeSend($info['email_inv'], $subject, $body);
 
-            // Opcional: Enviar copia al admin si tiene correo configurado
             if (!empty($info['email_admin'])) {
                 $mailService->executeSend($info['email_admin'], "[COPIA] $subject", $body);
             }
@@ -177,70 +194,57 @@ public function sendNotification() {
         exit;
     }
 
-
-    /* INVESTIGADOR */ 
+    // --- MÉTODOS DE INVESTIGADOR ---
     public function searchProtocols() {
-            if (ob_get_length()) ob_clean();
-            header('Content-Type: application/json');
-            
-            $instId = $_GET['inst'] ?? 0;
-            $userId = $_GET['user'] ?? 0;
-
-            try {
-                // Obtenemos protocolos activos y la config de la institución (Otros CEUAS y PDF)
-                $data = $this->model->getActiveProtocolsForUser($instId, $userId);
-                echo json_encode(['status' => 'success', 'data' => $data]);
-            } catch (\Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            }
-            exit;
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getActiveProtocolsForUser($sesion['instId'], $sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+        exit;
+    }
 
-        public function getProtocolDetails() {
-            if (ob_get_length()) ob_clean();
-            header('Content-Type: application/json');
-            
-            $protId = $_GET['id'] ?? null;
-            $isOtrosCeuas = $_GET['otros_ceuas'] ?? 0;
-            $instId = $_GET['inst'] ?? 0;
-
-            try {
-                if ($isOtrosCeuas == 1) {
-                    // Si es Otros CEUAS, traemos TODAS las especies de la institución
-                    $data = $this->model->getAllSpeciesForInst($instId);
-                } else {
-                    // Si es protocolo normal, traemos sus especies aprobadas y cupos
-                    $data = $this->model->getDetailsAndSpecies($protId);
-                }
-                echo json_encode(['status' => 'success', 'data' => $data]);
-            } catch (\Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-            }
-            exit;
-        }
-
-public function createOrder() {
+    public function getProtocolDetails() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
+        $protId = $_GET['id'] ?? null;
+        $isOtrosCeuas = $_GET['otros_ceuas'] ?? 0;
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if ($isOtrosCeuas == 1) {
+                $data = $this->model->getAllSpeciesForInst($sesion['instId']);
+            } else {
+                $data = $this->model->getDetailsAndSpecies($protId);
+            }
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function createOrder() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
 
         try {
-            // 1. Guardar el Pedido (Como ya lo tenías)
+            $sesion = Auditoria::getDatosSesion();
+            $data['instId'] = $sesion['instId']; // Inyectamos 
+            $data['userId'] = $sesion['userId'];
+
             $idForm = $this->model->saveOrder($data);
             
-            // 2. PREPARAR DATOS PARA EL EMAIL
-            // Necesitamos los nombres de texto, no los IDs. 
-            // Podemos hacer pequeñas consultas rápidas o modificar el saveOrder para que devuelva info.
-            // Opción Rápida: Consultar lo necesario para el mail.
-            
-            // Obtener datos usuario e institución
-            $userInfo = $this->getUserAndInstInfo($data['userId'], $data['instId']);
-            
-            // Obtener nombres de especie/subespecie
+            // Mail
+            $userInfo = $this->model->getUserAndInstInfo($data['userId'], $data['instId']);
             $names = $this->model->getNamesForMail($data['idsubespA'], $data['idprotA']);
 
-            // Armar el array de datos para el MailService
             $mailData = [
                 'id' => $idForm,
                 'protocolo' => $names['nprot'] . ' - ' . $names['titulo'],
@@ -255,47 +259,28 @@ public function createOrder() {
                 'aclaracion' => $data['aclaracion']
             ];
 
-            // 3. ENVIAR CORREO
             $mailService = new \App\Models\Services\MailService();
-            $mailService->sendAnimalOrderConfirmation(
-                $userInfo['EmailA'],     // Para
-                $userInfo['NombreA'],    // Nombre Usuario
-                $userInfo['NombreInst'], // Institución
-                $mailData                // Array de datos
-            );
+            $mailService->sendAnimalOrderConfirmation($userInfo['EmailA'], $userInfo['NombreA'], $userInfo['NombreInst'], $mailData);
             
             echo json_encode(['status' => 'success', 'id' => $idForm]);
 
         } catch (\Exception $e) {
-            // Si falla el mail, NO fallamos el pedido, solo logueamos
-            // Si falla el saveOrder, sí va al catch normal.
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
-    // --- Helpers privados para el Controller ---
-
-    private function getUserAndInstInfo($userId, $instId) {
-        // Asumiendo que tienes acceso a $this->db o $this->model->db
-        // Si no, agrégalo en el modelo y llámalo desde ahí.
-        // Aquí uso una lógica genérica:
-        return $this->model->getUserAndInstInfo($userId, $instId);
-    }
-
-        // Obtiene TODOS los datos necesarios para armar el PDF en el cliente
     public function getPDFData() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $instId = $_GET['inst'] ?? 0;
         try {
-            $data = $this->model->getDataForTarifario($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getDataForTarifario($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
-
 }

@@ -1,22 +1,27 @@
 Options -Indexes
 RewriteEngine On
 
-# 1. EXCEPCIÓN SOLO PARA ARCHIVOS FÍSICOS
-# El cambio está aquí: Quitamos la línea que decía "RewriteCond %{REQUEST_FILENAME} -d"
-# Ahora, si alguien intenta entrar a /paginas/, como es carpeta y no archivo,
-# Apache ignorará esta regla y seguirá bajando hasta llegar al 404.
+# ============================================================
+# 1. FIX DE RUTAS PARA ASSETS
+# Si pides algo de /dist/ pero vienes de un slug (ej: /sede1/dist/js/auth.js)
+# esta regla quita el "sede1" de la ruta para que Apache encuentre el archivo real.
+# ============================================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^.+/(dist|assets|paginas|resources)/(.*)$ $1/$2 [L]
+
+# 2. EXCEPCIÓN PARA ARCHIVOS FÍSICOS
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# 2. REGLA FORMULARIO DE REGISTRO
+# 3. REGLA FORMULARIO DE REGISTRO
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html?inst=$1 [L,QSA]
 
-# 3. REGLA LOGIN POR SEDE (Slug)
-# Excluye rutas reservadas del sistema para no confundir slugs con carpetas
+# 4. REGLA LOGIN POR SEDE (Slug)
+# Evita que las carpetas reales se confundan con nombres de instituciones
 RewriteCond %{REQUEST_URI} !/(dist|paginas|assets|resources|node_modules)
 RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
 
-# 4. ERROR 404 HÍBRIDO (El "Catch-All")
-# Como quitamos la excepción de carpetas arriba, cualquier intento de entrar
-# a /paginas, /dist, /assets directamente caerá aquí.
+# 5. CATCH-ALL PARA ERRORES (Solo si no es un asset)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI} !(\.js|\.css|\.png|\.jpg|\.jpeg|\.svg|\.gif|\.ico)$ [NC]
 RewriteRule ^.*$ paginas/error404.html [L]

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Admin\UsuarioModel;
+use App\Utils\Auditoria;
 
 class UsuarioController {
     private $model;
@@ -20,9 +21,10 @@ class UsuarioController {
 
     public function list() {
         try {
-            $this->jsonOut(['status' => 'success', 'data' => $this->model->getAllGlobal()]);
+            $sesion = Auditoria::getDatosSesion();
+            $this->jsonOut(['status' => 'success', 'data' => $this->model->getAllGlobal($sesion['instId'])]);
         } catch (\Exception $e) {
-            $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
+            $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 401);
         }
     }
 
@@ -30,7 +32,8 @@ class UsuarioController {
         $data = json_decode(file_get_contents("php://input"), true);
         
         try {
-            // 1. Verificación de seguridad "último minuto"
+            Auditoria::getDatosSesion(); // Valida Token
+
             if ($this->model->existsUsername($data['UsrA'])) {
                 return $this->jsonOut([
                     'status' => 'error', 
@@ -38,7 +41,6 @@ class UsuarioController {
                 ], 400);
             }
 
-            // 2. Proceder con la creación multitable
             $id = $this->model->createGlobal($data);
             $this->jsonOut(['status' => 'success', 'id' => $id]);
 
@@ -51,6 +53,7 @@ class UsuarioController {
         $data = json_decode(file_get_contents("php://input"), true);
         $id = $_GET['id'] ?? null;
         try {
+            Auditoria::getDatosSesion(); // Valida Token
             $this->model->updateGlobal($id, $data);
             $this->jsonOut(['status' => 'success']);
         } catch (\Exception $e) {
@@ -61,33 +64,30 @@ class UsuarioController {
     public function resetPass() {
         $id = $_GET['id'] ?? null;
         try {
+            Auditoria::getDatosSesion(); // Valida Token
             $this->model->resetPassword($id);
             $this->jsonOut(['status' => 'success']);
         } catch (\Exception $e) {
             $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
-    /**
-     * Verifica disponibilidad de nombre de usuario en tiempo real
-     */
+
     public function checkUsername() {
-        // Limpieza de buffer para asegurar JSON puro
         if (ob_get_length()) ob_clean(); 
         header('Content-Type: application/json');
 
         $username = $_GET['user'] ?? '';
-        $excludeId = $_GET['exclude'] ?? null; // ID para omitir en caso de edición
+        $excludeId = $_GET['exclude'] ?? null; 
 
         try {
-            // Le pedimos al modelo que verifique la existencia
+            // Este método NO tiene Auditoria::getDatosSesion() porque el frontend 
+            // lo usa durante el registro PÚBLICO donde el usuario aún no tiene token.
             $isTaken = $this->model->existsUsername($username, $excludeId);
-
-            // Devolvemos true si NO existe (está disponible)
             echo json_encode(['available' => !$isTaken]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
-        exit; // Cortamos ejecución para evitar basura en el JSON
+        exit; 
     }
 }

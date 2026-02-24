@@ -4,6 +4,7 @@ namespace App\Models\adminsolicitudes;
 use PDO;
 use Exception;
 use App\Models\Services\MailService; 
+use App\Utils\Auditoria; // <-- Seguridad Inyectada
 
 class AdminSolicitudesModel {
     private $db;
@@ -15,27 +16,19 @@ class AdminSolicitudesModel {
     }
 
     public function getPendingRequests($instId) {
-        // CAMPOS SELECCIONADOS
         $fields = "s.idSolicitudProtocolo, s.TipoPedido, 
                    p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, 
                    p.FechaIniProtA, p.FechaFinProtA, p.CantidadAniA,
-                   
                    t.NombreTipoprotocolo as TipoNombre,
-                   
-                   -- DEPARTAMENTO
                    CONCAT(d.NombreDeptoA, IF(o.NombreOrganismoSimple IS NOT NULL, CONCAT(' - [', o.NombreOrganismoSimple, ']'), '')) as DeptoFormat,
-
-                   -- ESPECIES
                    (SELECT GROUP_CONCAT(e.EspeNombreA SEPARATOR ', ') 
                     FROM protesper pe 
                     JOIN especiee e ON pe.idespA = e.idespA 
                     WHERE pe.idprotA = p.idprotA) as Especies,
-
                    i_orig.NombreInst as Origen,
                    COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA) as Solicitante,
                    pers.EmailA as Email";
 
-        // 1. INTERNAS
         $sqlInternal = "SELECT $fields, 'INTERNA' as TipoEtiqueta
                         FROM solicitudprotocolo s
                         JOIN protocoloexpe p ON s.idprotA = p.idprotA
@@ -49,7 +42,6 @@ class AdminSolicitudesModel {
                         AND s.TipoPedido = 1 
                         AND s.Aprobado = 3"; 
 
-        // 2. RED
         $sqlNetwork = "SELECT $fields, 'RED' as TipoEtiqueta
                        FROM solicitudprotocolo s
                        JOIN protocoloexpe p ON s.idprotA = p.idprotA
@@ -74,9 +66,6 @@ class AdminSolicitudesModel {
     public function processRequest($data) {
         $this->db->beginTransaction();
         try {
-            // CORRECCIÓN AQUÍ: 
-            // 1. Usamos FechaAprobado en lugar de FechaRevision
-            // 2. Quitamos IdUserRevisor porque no está en tu tabla
             $sql = "UPDATE solicitudprotocolo 
                     SET Aprobado = ?, DetalleAdm = ?, FechaAprobado = NOW()
                     WHERE idSolicitudProtocolo = ?";
@@ -88,11 +77,13 @@ class AdminSolicitudesModel {
                 $data['idSolicitud']
             ]);
 
-            // Obtener info para el mail
+            // Auditoría
+            $estadoTxt = ($data['decision'] == 1) ? 'APROBADA' : 'RECHAZADA/OBSERVADA';
+            Auditoria::log($this->db, 'UPDATE_SOLICITUD', 'solicitudprotocolo', "Decisión: $estadoTxt sobre Solicitud ID: " . $data['idSolicitud']);
+
             $info = $this->getRequestInfo($data['idSolicitud']);
             $instName = $this->getInstNameById($data['idSolicitud']);
 
-            // Enviar correo
             $this->mailer->sendProtocolDecision(
                 $info['Email'], 
                 $info['NombreUser'], 

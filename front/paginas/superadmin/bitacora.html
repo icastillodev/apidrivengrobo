@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitácora de Auditoría - GROBO Devs</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+        .badge-gecko { background-color: #1a5d3b !important; }
+        .page-link { color: #1a5d3b; border: none; margin: 0 2px; border-radius: 4px; }
+        .page-item.active .page-link { background-color: #1a5d3b !important; border: none; }
+    </style>
+
+    <script type="module">
+        import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+        import { initBitacora } from '../../dist/js/pages/superadmin/bitacora.js'; // Tu script
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initSuperMenu();
+            initBitacora();
+        });
+    </script>
+</head>
+<body>
+
+<div class="container-fluid px-md-5 my-5">
+    <div class="card shadow-sm border-0 p-4 p-md-5">
+        
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                <li class="breadcrumb-item text-muted">GECKO DEVS</li>
+                <li class="breadcrumb-item text-muted">SUPERADMIN</li>
+                <li class="breadcrumb-item active">
+                    <span class="badge badge-gecko px-2 py-1 text-white">Auditoría del Sistema (Bitácora)</span>
+                </li>
+            </ol>
+        </nav>
+
+        <div class="row align-items-end mb-4 pb-3 border-bottom">
+            <div class="col-lg-8">
+                <h1 class="h4 text-secondary text-uppercase mb-4">Registro Maestro de Movimientos</h1>
+                <div class="input-group shadow-sm" style="max-width: 800px;">
+                    <span class="input-group-text bg-light text-muted fw-bold small text-uppercase" style="font-size: 10px;">Acción:</span>
+                    <select id="filter-action" class="form-select form-select-sm fw-bold" style="max-width: 150px;">
+                        <option value="all">Todas</option>
+                        <option value="INSERT">Creaciones</option>
+                        <option value="UPDATE">Modificaciones</option>
+                        <option value="DELETE">Eliminaciones</option>
+                        <option value="LOGIN">Accesos</option>
+                    </select>
+
+                    <span class="input-group-text bg-light text-muted fw-bold small text-uppercase" style="font-size: 10px;">Búsqueda Global:</span>
+                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Usuario, tabla o detalle...">
+                    
+                    <button id="btn-search" class="btn btn-success fw-bold px-4 badge-gecko text-white">Filtrar</button>
+                </div>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase text-xs">Descargar Excel</button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <section class="mb-3 text-end"><span id="table-info" class="text-muted small fw-bold"></span></section>
+            <table class="table table-hover align-middle border" style="font-size: 12px;">
+                <thead class="table-light text-uppercase" style="font-size: 11px;">
+                    <tr>
+                        <th class="py-3 px-3">Log ID</th>
+                        <th class="py-3 px-3">Fecha y Hora</th>
+                        <th class="py-3 px-3">Usuario Ejecutor</th>
+                        <th class="py-3 px-3 text-center">Tipo de Acción</th>
+                        <th class="py-3 px-3">Tabla Afectada</th>
+                        <th class="py-3 px-3 w-50">Detalle Exacto del Movimiento</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    </tbody>
+            </table>
+        </div>
+
+        <nav class="mt-5">
+            <ul id="pagination" class="pagination pagination-sm justify-content-center fw-bold"></ul>
+        </nav>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

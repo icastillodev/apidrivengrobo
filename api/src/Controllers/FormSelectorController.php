@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\FormSelector\FormSelectorModel;
+use App\Utils\Auditoria;
 
 class FormSelectorController {
     private $model;
@@ -14,21 +15,15 @@ class FormSelectorController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        // Solo necesitamos saber en qué institución está logueado actualmente
-        $instId = $_GET['inst'] ?? 0;
-
-        if (!$instId) {
-            echo json_encode(['status' => 'error', 'message' => 'Falta contexto institucional']);
-            exit;
-        }
-
         try {
-            // Buscamos toda la red basada en la dependencia
-            $sedes = $this->model->getInstitutionalNetwork($instId);
+            // Seguridad: Inyección desde el Token
+            $sesion = Auditoria::getDatosSesion();
+            $instIdSeguro = $sesion['instId'];
+
+            $sedes = $this->model->getInstitutionalNetwork($instIdSeguro);
 
             $depName = '';
             if (count($sedes) > 0) {
-                // Tomamos el nombre de la dependencia de la primera coincidencia
                 $depName = $sedes[0]['DependenciaInstitucion'];
             }
 
@@ -42,6 +37,7 @@ class FormSelectorController {
             ]);
 
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

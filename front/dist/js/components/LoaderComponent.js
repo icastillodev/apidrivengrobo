@@ -15,8 +15,8 @@ export function showLoader() {
 
     loader.innerHTML = `
         <div class="text-center">
-            <div class="mb-4">
-                <img src="../../dist/img/logo_gecko.png" 
+            <div class="mb-4 ">
+                <img class="rounded mx-auto d-block" src="../../../dist/multimedia/imagenes/grobo/grobo.png" 
                      alt="Gecko Dev" 
                      class="img-fluid" 
                      style="width: 150px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.05));">
@@ -24,7 +24,7 @@ export function showLoader() {
             
             <div class="d-flex flex-column align-items-center">
                 <h1 class="h5 fw-bold text-uppercase mb-1" style="color: #1a5d3b; letter-spacing: 5px;">
-                    Gecko Dev
+                    GROBO -ERP BIOTERIOS <br>Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación
                 </h1>
                 <p class="small text-muted text-uppercase" style="letter-spacing: 3px; font-size: 10px;">
                     Cargando entorno seguro...

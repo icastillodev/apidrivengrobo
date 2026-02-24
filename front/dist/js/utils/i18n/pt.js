@@ -28,6 +28,7 @@ export const pt = {
         profile_group: "Perfil",
         prices: "Preços",
         billing: "Faturamento",
+        historialpagos: "Histórico de pagamentos",
         config: "Configurar",
         logout: "Sair",
         help_group: "Ajuda"

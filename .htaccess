@@ -9,5 +9,4 @@ RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 # C. Todo lo demás se manda a la carpeta "front"
-# Al no usar / al inicio, es relativo. Funciona en local y prod.
 RewriteRule ^(.*)$ front/$1 [L]

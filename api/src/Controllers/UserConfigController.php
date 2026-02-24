@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Utils\Auditoria;
+
 class UserConfigController {
     private $db;
 
@@ -10,20 +12,17 @@ class UserConfigController {
 
     public function updatePreferences() {
         header('Content-Type: application/json');
-        $userId = $_POST['userId'] ?? null;
         
-        // Captura de todos los parámetros posibles
-        $theme    = $_POST['theme'] ?? null;
-        $lang     = $_POST['lang'] ?? null;
-        $menu     = $_POST['menu'] ?? null;
-        $fontSize = $_POST['fontSize'] ?? null;
-
-        if (!$userId) { 
-            echo json_encode(['status' => 'error', 'message' => 'Sin ID de usuario']); 
-            exit; 
-        }
-
         try {
+            // Seguridad: El usuario solo puede actualizar sus PROPIAS preferencias
+            $sesion = Auditoria::getDatosSesion();
+            $userId = $sesion['userId']; 
+
+            $theme    = $_POST['theme'] ?? null;
+            $lang     = $_POST['lang'] ?? null;
+            $menu     = $_POST['menu'] ?? null;
+            $fontSize = $_POST['fontSize'] ?? null;
+
             $sql = "UPDATE personae SET ";
             $params = [];
             
@@ -32,7 +31,6 @@ class UserConfigController {
             if ($menu)     { $sql .= "menu_preferido = ?, ";    $params[] = $menu; }
             if ($fontSize) { $sql .= "letra_preferida = ?, ";   $params[] = $fontSize; }
 
-            // Si no hay datos, salimos
             if (empty($params)) {
                 echo json_encode(['status' => 'success', 'message' => 'Nada que cambiar']);
                 exit;
@@ -45,9 +43,11 @@ class UserConfigController {
             $stmt = $this->db->prepare($sql);
             $stmt->execute($params);
 
+            Auditoria::logManual($this->db, $userId, 'UPDATE', 'personae', 'Actualizó sus preferencias visuales de UI.');
+
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

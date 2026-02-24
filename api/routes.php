@@ -247,6 +247,8 @@ $router->post('/billing/ajustar-pago-insumo', 'BillingController@ajustarPagoInsu
 // Generación de PDF
 $router->get('/billing/generate-pdf-ficha', 'BillingController@generatePdfFicha');
 
+// Ruta para extraer el historial contable / financiero (Auditoría específica)
+$router->get('/billing/audit-history', 'BillingController@getAuditHistory');
 
 // ============================================================
 // SECCIÓN: Auxiliares y Selectores
@@ -407,3 +409,4 @@ $router->get('/superadmin/form-registros/detail/:id', 'FormRegistroController@ge
 // Eliminar o desactivar un link de registro
 $router->post('/superadmin/form-registros/delete', 'FormRegistroController@deleteConfig');
 
+$router->get('/superadmin/bitacora/list', 'BitacoraController@listAll');

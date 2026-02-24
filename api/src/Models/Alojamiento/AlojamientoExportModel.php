@@ -1,6 +1,9 @@
 <?php
 namespace App\Models\Alojamiento;
 
+use PDO;
+use App\Utils\Auditoria; // <-- IMPORTANTE: Inyectamos seguridad
+
 class AlojamientoExportModel {
     private $db;
 
@@ -31,7 +34,7 @@ class AlojamientoExportModel {
             ";
             $stmt = $this->db->prepare($sqlAloj);
             $stmt->execute([$instId]);
-            $data['alojamientos'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $data['alojamientos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         // 3. Traer datos biológicos (Trazabilidad)
@@ -50,8 +53,13 @@ class AlojamientoExportModel {
             ";
             $stmtTraz = $this->db->prepare($sqlTraz);
             $stmtTraz->execute([$instId]);
-            $data['trazabilidad'] = $stmtTraz->fetchAll(\PDO::FETCH_ASSOC);
+            $data['trazabilidad'] = $stmtTraz->fetchAll(PDO::FETCH_ASSOC);
         }
+
+        // --- NUEVO: GUARDAR AUDITORÍA DE EXPORTACIÓN ---
+        // Registramos en la bitácora que un usuario extrajo un reporte del sistema
+        $detalle = "Exportó reporte de Alojamientos (Historia: $historiaId | Info Base: $incluirAloj | Trazabilidad: $incluirTraz)";
+        Auditoria::log($this->db, 'EXPORT', 'alojamiento', $detalle);
 
         return $data;
     }

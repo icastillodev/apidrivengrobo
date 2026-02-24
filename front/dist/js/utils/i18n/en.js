@@ -28,6 +28,7 @@ export const en = {
         profile_group: "Profile",
         prices: "Prices",
         billing: "Billing",
+        historialpagos: "Payment History",
         config: "Settings",
         logout: "Logout",
         help_group: "Help"

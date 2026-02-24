@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial Contable - GROBO</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+        th[data-sortable="true"] { cursor: pointer; position: relative; }
+        th[data-sortable="true"]:hover { background-color: #f8f9fa; }
+    </style>
+
+    <script type="module">
+        import { Auth } from '../../dist/js/auth.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { getRoleName } from '../../dist/js/components/menujs/menuconfig.js'; 
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        
+        // Importamos el módulo específico de esta página
+        import { initHistorialContable } from '../../dist/js/pages/admin/historialcontable.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+            try {
+                await loadLanguage(); 
+                Auth.checkAccess([1, 2, 4, 5, 6]); // Accesible para Admins
+
+                if (window.txt) {
+                    translatePage();
+                    
+                    const levelId = Auth.getVal('userLevel'); 
+                    const rolTexto = getRoleName(levelId);
+                    
+                    const roleEl = document.getElementById('role-bread');
+                    if (roleEl) roleEl.innerText = rolTexto;
+
+                    initMenu();
+                    NotificationManager.init();
+                    initHistorialContable(); // Inicializa lógica de la grilla
+                    
+                    const instEl = document.getElementById('institucionbread');
+                    if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
+                }
+
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
+            } catch (error) {
+                console.error("❌ Error:", error);
+            } finally {
+                hideLoader();
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="container-fluid my-5 px-4 px-md-5">
+        <div class="card shadow-sm border-0 p-4">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread">CARGANDO...</li>
+                    <li class="breadcrumb-item text-muted" id="role-bread"></li> 
+                    <li class="breadcrumb-item active">
+                        <span class="badge bg-success">HISTORIAL CONTABLE</span>
+                    </li>
+                </ol>
+            </nav>
+
+            <h5 class="fw-bold mb-4">Auditoría Financiera y Pagos</h5>
+
+            <div class="row align-items-end mb-4 pb-3 border-bottom">
+                <div class="input-group shadow-sm" style="max-width: 950px;">
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Operación</span>
+                    <select id="filter-type" class="form-select form-select-sm fw-bold">
+                        <option value="all">Todas las operaciones</option>
+                        <option value="CARGA_SALDO">Carga de Saldo</option>
+                        <option value="LIQUIDACION">Liquidación / Pago Masivo</option>
+                        <option value="PAGO_INDIVIDUAL">Pago Individual Formulario</option>
+                        <option value="PAGO_INSUMO">Pago Individual Insumo</option>
+                        <option value="PAGO_ALOJ">Pago Alojamiento</option>
+                        <option value="DEVOLUCION">Devolución / Ajuste Negativo</option>
+                    </select>
+
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por</span>
+                    <select id="filter-column" class="form-select form-select-sm fw-bold" style="max-width: 160px;">
+                        <option value="all">Todos los campos</option>
+                        <option value="Investigador">Investigador</option>
+                        <option value="Admin">Administrador</option>
+                        <option value="Ref">Ref. Pedido</option>
+                    </select>
+                    
+                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Escribe para buscar...">
+                    
+                    <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;">Buscar</button>
+                </div>
+
+                <div class="ms-auto col-md-2 d-flex gap-2 justify-content-end">
+                    <button id="btn-excel" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                    </button>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border" style="font-size: 11px;">
+                    <section class="mb-3 text-end"><span id="table-info" class="text-muted small fw-bold"></span></section>
+                    <thead class="table-light text-uppercase">
+                        <tr>
+                            <th class="py-3 px-2">ID Mov.</th>
+                            <th class="py-3 px-2">Fecha</th>
+                            <th class="py-3 px-2">Administrador</th>
+                            <th class="py-3 px-2">Investigador (Afectado)</th>
+                            <th class="py-3 px-2">Tipo Operación</th>
+                            <th class="py-3 px-2 text-center">Ref. Pedido</th>
+                            <th class="py-3 px-2 text-end">Monto ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body-historial">
+                        </tbody>
+                </table>
+            </div>
+
+            <nav aria-label="Page navigation" class="mt-5">
+                <ul id="pagination-historial" class="pagination pagination-sm justify-content-center fw-bold"></ul>
+            </nav>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

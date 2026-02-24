@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\TodosProtocolos\UsuarioTodosProtocolosModel;
+use App\Utils\Auditoria; // <-- Seguridad Inyectada
 
 class ControllerusuarioTodosProtocolos {
     private $model;
@@ -10,43 +11,33 @@ class ControllerusuarioTodosProtocolos {
         $this->model = new UsuarioTodosProtocolosModel($db);
     }
 
-    // --- CONFIGURACIÓN INICIAL (Selects, Info Institución) ---
     public function getConfig() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $instId = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
-        
         try {
-            $data = $this->model->getConfig($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getConfig($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
-    // --- LISTAR PROTOCOLOS (Mis, Local, Red) ---
     public function getAllLists() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $instId = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
-        $userId = $_GET['uid'] ?? null; 
-
-        if (!$userId) {
-            echo json_encode(['status' => 'error', 'message' => 'Usuario no identificado (Falta UID)']);
-            exit;
-        }
-
         try {
-            // 1. Mis Protocolos (Todos los del usuario)
+            $sesion = Auditoria::getDatosSesion();
+            // Ignoramos el UID de la URL y usamos el seguro del JWT
+            $instId = $sesion['instId'];
+            $userId = $sesion['userId'];
+
             $my = $this->model->getMyProtocols($instId, $userId);
-            
-            // 2. Institución Actual (Manuales + Aprobados + Red Aprobada)
             $local = $this->model->getLocalProtocols($instId);
-            
-            // 3. Red Global (Solo aprobados de otras instituciones)
             $network = $this->model->getNetworkProtocols($instId);
             
             echo json_encode([
@@ -63,20 +54,15 @@ class ControllerusuarioTodosProtocolos {
         exit;
     }
 
-    // --- CREAR PROTOCOLO (Interno o Externo) ---
     public function createInternal() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $currentUserId = $_POST['currentUserId'] ?? null;
-
-        if (!$currentUserId) {
-            echo json_encode(['status' => 'error', 'message' => 'Error de sesión: Usuario no identificado']);
-            exit;
-        }
-        
         try {
-            $this->model->createInternal($_POST, $currentUserId);
+            $sesion = Auditoria::getDatosSesion();
+            $_POST['IdInstitucion'] = $sesion['instId']; // Inyectamos Inst Real
+            
+            $this->model->createInternal($_POST, $sesion['userId']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -84,12 +70,12 @@ class ControllerusuarioTodosProtocolos {
         exit;
     }
 
-    // --- ACTUALIZAR PROTOCOLO ---
     public function updateInternal() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
         try {
+            Auditoria::getDatosSesion(); // Valida Token
             $this->model->updateInternal($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { 
@@ -99,7 +85,6 @@ class ControllerusuarioTodosProtocolos {
         exit;
     }
 
-    // --- DETALLE DE ESPECIES ---
     public function getSpeciesDetail() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -107,6 +92,7 @@ class ControllerusuarioTodosProtocolos {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         
         try {
+            Auditoria::getDatosSesion();
             $data = $this->model->getProtocolSpecies($id);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -115,15 +101,13 @@ class ControllerusuarioTodosProtocolos {
         exit;
     }
 
-    // --- OBJETIVOS DE RED (Instituciones para compartir) ---
     public function getNetworkTargets() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $instId = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
-        
         try {
-            $data = $this->model->getNetworkTargets($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getNetworkTargets($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -131,7 +115,6 @@ class ControllerusuarioTodosProtocolos {
         exit;
     }
 
-    // --- CREAR SOLICITUD DE RED ---
     public function createNetworkRequest() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -139,6 +122,7 @@ class ControllerusuarioTodosProtocolos {
         $input = json_decode(file_get_contents('php://input'), true);
         
         try {
+            Auditoria::getDatosSesion();
             $this->model->createNetworkRequest($input);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

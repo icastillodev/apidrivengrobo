@@ -155,8 +155,71 @@ class UsuarioTodosProtocolosModel {
 
     // ESCRITURA
     public function getProtocolSpecies($id){$s=$this->db->prepare("SELECT e.idespA, e.EspeNombreA FROM protesper pe JOIN especiee e ON pe.idespA=e.idespA WHERE pe.idprotA=?");$s->execute([$id]);return $s->fetchAll(PDO::FETCH_ASSOC);}
-    public function createInternal($d,$u){$this->db->beginTransaction();try{$s=$this->db->prepare("INSERT INTO protocoloexpe (tituloA,nprotA,InvestigadorACargA,departamento,tipoprotocolo,CantidadAniA,severidad,FechaIniProtA,FechaFinProtA,IdInstitucion,IdUsrA,variasInst,protocoloexpe) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,0)");$s->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$d['IdInstitucion'],$u]);$p=$this->db->lastInsertId();if(isset($d['especies'])&&is_array($d['especies'])){$e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");foreach($d['especies'] as $esp)if($esp)$e->execute([$p,$esp]);}$this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,1)")->execute([$p]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
-    public function updateInternal($d){$this->db->beginTransaction();try{$id=$d['idprotA'];$this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$id]);$this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);if(isset($d['especies'])&&is_array($d['especies'])){$e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");foreach($d['especies'] as $esp)if($esp)$e->execute([$id,$esp]);}$this->db->prepare("UPDATE solicitudprotocolo SET Aprobado=3,DetalleAdm=NULL WHERE idprotA=? AND TipoPedido=1")->execute([$id]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
+    public function createInternal($d, $u) {
+        $this->db->beginTransaction();
+        try {
+            $s=$this->db->prepare("INSERT INTO protocoloexpe (tituloA,nprotA,InvestigadorACargA,departamento,tipoprotocolo,CantidadAniA,severidad,FechaIniProtA,FechaFinProtA,IdInstitucion,IdUsrA,variasInst,protocoloexpe) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,0)");
+            $s->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$d['IdInstitucion'],$u]);
+            $p=$this->db->lastInsertId();
+            
+            if(isset($d['especies'])&&is_array($d['especies'])){
+                $e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");
+                foreach($d['especies'] as $esp) if($esp) $e->execute([$p,$esp]);
+            }
+            
+            $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,1)")->execute([$p]);
+            
+            Auditoria::log($this->db, 'INSERT', 'protocoloexpe', "Usuario solicitó nuevo protocolo: " . $d['nprotA']);
+            $this->db->commit();
+        } catch(Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }   
+    
+    public function updateInternal($d) {
+        $this->db->beginTransaction();
+        try {
+            $id=$d['idprotA'];
+            $this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$id]);
+            $this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);
+            
+            if(isset($d['especies'])&&is_array($d['especies'])){
+                $e=$this->db->prepare("INSERT INTO protesper (idprotA,idespA) VALUES (?,?)");
+                foreach($d['especies'] as $esp) if($esp) $e->execute([$id,$esp]);
+            }
+            $this->db->prepare("UPDATE solicitudprotocolo SET Aprobado=3,DetalleAdm=NULL WHERE idprotA=? AND TipoPedido=1")->execute([$id]);
+            
+            Auditoria::log($this->db, 'UPDATE', 'protocoloexpe', "Usuario corrigió el protocolo ID: $id y se envió a revisión.");
+            $this->db->commit();
+        } catch(Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    } 
+    
     public function getNetworkTargets($instId){$s=$this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion=?");$s->execute([$instId]);$r=$s->fetchColumn();if(!$r)return[];$s=$this->db->prepare("SELECT IdInstitucion,NombreInst FROM institucion WHERE DependenciaInstitucion=? AND IdInstitucion!=? AND Activo=1 ORDER BY NombreInst ASC");$s->execute([$r,$instId]);return $s->fetchAll(PDO::FETCH_ASSOC);}
-    public function createNetworkRequest($d){$this->db->beginTransaction();try{$p=$d['idprotA'];$this->db->prepare("UPDATE protocoloexpe SET variasInst=2 WHERE idprotA=?")->execute([$p]);if(!empty($d['targets'])&&is_array($d['targets'])){$r=$this->db->prepare("INSERT INTO protinstr (idprotA,IdInstitucion) VALUES (?,?)");foreach($d['targets'] as $t){$c=$this->db->prepare("SELECT COUNT(*) FROM protinstr WHERE idprotA=? AND IdInstitucion=?");$c->execute([$p,$t]);if($c->fetchColumn()==0)$r->execute([$p,$t]);}}$this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,2)")->execute([$p]);$this->db->commit();}catch(Exception $e){$this->db->rollBack();throw $e;}}
-}
+     public function createNetworkRequest($d) {
+        $this->db->beginTransaction();
+        try {
+            $p=$d['idprotA'];
+            $this->db->prepare("UPDATE protocoloexpe SET variasInst=2 WHERE idprotA=?")->execute([$p]);
+            
+            if(!empty($d['targets'])&&is_array($d['targets'])){
+                $r=$this->db->prepare("INSERT INTO protinstr (idprotA,IdInstitucion) VALUES (?,?)");
+                foreach($d['targets'] as $t) {
+                    $c=$this->db->prepare("SELECT COUNT(*) FROM protinstr WHERE idprotA=? AND IdInstitucion=?");
+                    $c->execute([$p,$t]);
+                    if($c->fetchColumn()==0) $r->execute([$p,$t]);
+                }
+            }
+            $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,2)")->execute([$p]);
+            
+            Auditoria::log($this->db, 'NETWORK_REQ', 'protinstr', "Se solicitó compartir a la Red el protocolo ID: $p");
+            $this->db->commit();
+        } catch(Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    }

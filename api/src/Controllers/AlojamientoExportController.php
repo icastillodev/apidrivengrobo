@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Alojamiento\AlojamientoExportModel;
+use App\Utils\Auditoria;
 
 class AlojamientoExportController {
     private $model;
@@ -11,37 +12,40 @@ class AlojamientoExportController {
     }
 
     public function export() {
-        // Recoger parámetros del GET
-        $instId = $_GET['instId'] ?? 1;
-        $historiaId = $_GET['historia'] ?? 'GLOBAL';
-        $formato = $_GET['formato'] ?? 'pdf';
-        $incluirAloj = $_GET['alojamientos'] ?? 'true';
-        $incluirTraz = $_GET['trazabilidad'] ?? 'true';
+        if (ob_get_length()) ob_clean();
+        
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instIdSeguro = $sesion['instId'];
 
-        $data = $this->model->getExportData($instId, $historiaId, $incluirAloj, $incluirTraz);
+            $historiaId = $_GET['historia'] ?? 'GLOBAL';
+            $formato = $_GET['formato'] ?? 'pdf';
+            $incluirAloj = $_GET['alojamientos'] ?? 'true';
+            $incluirTraz = $_GET['trazabilidad'] ?? 'true';
 
-        if ($formato === 'excel') {
-            $this->generateCSV($data, $historiaId);
-        } else {
-            $this->generatePDFView($data, $historiaId);
+            $data = $this->model->getExportData($instIdSeguro, $historiaId, $incluirAloj, $incluirTraz);
+
+            if ($formato === 'excel') {
+                $this->generateCSV($data, $historiaId);
+            } else {
+                $this->generatePDFView($data, $historiaId);
+            }
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
     }
 
     private function generateCSV($data, $historiaId) {
         $filename = "Reporte_Alojamientos_" . $historiaId . "_" . date('Ymd') . ".csv";
-        
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=' . $filename);
-        
-        // Abrir la salida de PHP
         $output = fopen('php://output', 'w');
-        // Soporte para caracteres especiales en Excel (BOM)
         fputs($output, $bom = (chr(0xEF) . chr(0xBB) . chr(0xBF)));
 
         if (isset($data['alojamientos'])) {
             fputcsv($output, ['--- REGISTROS DE ALOJAMIENTO ---']);
             fputcsv($output, ['Historia', 'Protocolo', 'Investigador', 'Especie', 'Tipo Caja', 'Fecha Inicio', 'Fecha Fin', 'Cant. Cajas', 'Precio Unit.', 'Costo Total', 'Estado']);
-            
             foreach ($data['alojamientos'] as $row) {
                 $estado = ($row['finalizado'] == 1) ? 'FINALIZADO' : 'VIGENTE';
                 fputcsv($output, [
@@ -51,13 +55,12 @@ class AlojamientoExportController {
                     "$" . number_format($row['totalpago'], 2), $estado
                 ]);
             }
-            fputcsv($output, []); // Fila en blanco
+            fputcsv($output, []);
         }
 
         if (isset($data['trazabilidad'])) {
             fputcsv($output, ['--- TRAZABILIDAD CLÍNICA ---']);
             fputcsv($output, ['Historia', 'Caja', 'Sujeto', 'Fecha', 'Variable', 'Valor Registrado']);
-            
             foreach ($data['trazabilidad'] as $row) {
                 fputcsv($output, [
                     $row['historia'], $row['NombreCaja'], $row['Sujeto'], 
@@ -65,13 +68,11 @@ class AlojamientoExportController {
                 ]);
             }
         }
-
         fclose($output);
         exit;
     }
 
     private function generatePDFView($data, $historiaId) {
-        // Vista HTML pura que se auto-imprime. 
-        // No requiere dependencias y se ve perfecto al guardar como PDF en cualquier navegador.
+        // Implementación PDF
     }
-        ?>
+}

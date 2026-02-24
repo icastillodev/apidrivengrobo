@@ -1,7 +1,8 @@
 <?php
-namespace App\Models\AdminConfig; // Coincide con la carpeta en tu imagen
+namespace App\Models\AdminConfig;
 
 use PDO;
+use App\Utils\Auditoria; // <-- IMPORTANTE
 
 class AdminConfigDeptoModel {
     private $db;
@@ -11,12 +12,10 @@ class AdminConfigDeptoModel {
     }
 
     public function getAllData($instId) {
-        // 1. Obtener Organismos
         $stmtOrg = $this->db->prepare("SELECT * FROM organismoe ORDER BY NombreOrganismoSimple ASC");
         $stmtOrg->execute();
         $orgs = $stmtOrg->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2. Obtener Departamentos de la Institución
         $sqlDepto = "SELECT 
                         d.*, 
                         o.NombreOrganismoSimple as NombreOrg
@@ -35,34 +34,51 @@ class AdminConfigDeptoModel {
         ];
     }
 
-    // --- MÉTODOS DE GUARDADO Y ELIMINACIÓN ---
     public function saveOrganismo($data) {
         if (empty($data['IdOrganismo'])) {
             $sql = "INSERT INTO organismoe (NombreOrganismoSimple, NombreOrganismoCompleto, ContactoOrgnismo, CorreoOrganismo, DireccionOrganismo, PaisOrganismo) VALUES (?, ?, ?, ?, ?, ?)";
-            return $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais']]);
+            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais']]);
+            
+            Auditoria::log($this->db, 'INSERT', 'organismoe', "Creó organismo: " . $data['NombreSimple']);
+            return $res;
         } else {
             $sql = "UPDATE organismoe SET NombreOrganismoSimple=?, NombreOrganismoCompleto=?, ContactoOrgnismo=?, CorreoOrganismo=?, DireccionOrganismo=?, PaisOrganismo=? WHERE IdOrganismo=?";
-            return $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais'], $data['IdOrganismo']]);
+            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais'], $data['IdOrganismo']]);
+            
+            Auditoria::log($this->db, 'UPDATE', 'organismoe', "Modificó organismo ID: " . $data['IdOrganismo']);
+            return $res;
         }
     }
 
     public function deleteOrganismo($id) {
         $stmt = $this->db->prepare("DELETE FROM organismoe WHERE IdOrganismo = ?");
-        return $stmt->execute([$id]);
+        $res = $stmt->execute([$id]);
+        
+        Auditoria::log($this->db, 'DELETE', 'organismoe', "Eliminó organismo ID: $id");
+        return $res;
     }
 
     public function saveDepartamento($data) {
         if (empty($data['iddeptoA'])) {
             $sql = "INSERT INTO departamentoe (NombreDeptoA, DetalledeptoA, organismopertenece, IdInstitucion) VALUES (?, ?, ?, ?)";
-            return $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['instId']]);
+            $res = $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['instId']]);
+            
+            Auditoria::log($this->db, 'INSERT', 'departamentoe', "Creó departamento: " . $data['NombreDepto']);
+            return $res;
         } else {
             $sql = "UPDATE departamentoe SET NombreDeptoA=?, DetalledeptoA=?, organismopertenece=? WHERE iddeptoA=?";
-            return $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['iddeptoA']]);
+            $res = $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['iddeptoA']]);
+            
+            Auditoria::log($this->db, 'UPDATE', 'departamentoe', "Modificó departamento ID: " . $data['iddeptoA']);
+            return $res;
         }
     }
 
     public function deleteDepartamento($id) {
         $stmt = $this->db->prepare("DELETE FROM departamentoe WHERE iddeptoA = ?");
-        return $stmt->execute([$id]);
+        $res = $stmt->execute([$id]);
+        
+        Auditoria::log($this->db, 'DELETE', 'departamentoe', "Eliminó departamento ID: $id");
+        return $res;
     }
 }

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigProtocoloModel;
+use App\Utils\Auditoria;
 
 class AdminConfigProtocoloController {
     private $model;
@@ -13,9 +14,9 @@ class AdminConfigProtocoloController {
     public function init() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $instId = $_GET['inst'] ?? 0;
         try {
-            $data = $this->model->getAllData($instId);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getAllData($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -24,27 +25,18 @@ class AdminConfigProtocoloController {
         exit;
     }
 
-    /* --- TIPOS --- */
-    public function saveType() {
-        $this->handleSave('saveTipoProtocolo');
-    }
-    public function deleteType() {
-        $this->handleDelete('deleteTipoProtocolo', 'idTipo');
-    }
+    public function saveType() { $this->handleSave('saveTipoProtocolo'); }
+    public function deleteType() { $this->handleDelete('deleteTipoProtocolo', 'idTipo'); }
+    public function saveSeverity() { $this->handleSave('saveSeveridad'); }
+    public function deleteSeverity() { $this->handleDelete('deleteSeveridad', 'idSev'); }
 
-    /* --- SEVERIDADES --- */
-    public function saveSeverity() {
-        $this->handleSave('saveSeveridad');
-    }
-    public function deleteSeverity() {
-        $this->handleDelete('deleteSeveridad', 'idSev');
-    }
-
-    /* --- HELPERS --- */
     private function handleSave($method) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            $sesion = Auditoria::getDatosSesion();
+            $_POST['instId'] = $sesion['instId']; 
+            
             $this->model->$method($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -58,6 +50,8 @@ class AdminConfigProtocoloController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            Auditoria::getDatosSesion();
+            
             $this->model->$method($_POST[$key]);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

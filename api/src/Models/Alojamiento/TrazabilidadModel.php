@@ -1,26 +1,24 @@
 <?php
 namespace App\Models\Alojamiento;
+use PDO;
+use App\Utils\Auditoria;
 
 class TrazabilidadModel {
     private $db;
+    public function __construct($db) { $this->db = $db; }
 
-    public function __construct($db) { 
-        $this->db = $db; 
-    }
-
-public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
+    public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
         $stmtCajas = $this->db->prepare("
             SELECT ac.* FROM alojamiento_caja ac
             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
             WHERE ac.IdAlojamiento = ? AND a.IdInstitucion = ?
         ");
         $stmtCajas->execute([$idAlojamiento, $idInstitucion]);
-        // BLINDAJE 1: Si es false, forzamos array vacío
         $cajas = $stmtCajas->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
 
         $stmtCat = $this->db->prepare("SELECT * FROM categoriadatosunidadalojamiento WHERE IdEspA = ?");
         $stmtCat->execute([$idEspecie]);
-        $categorias = $stmtCat->fetchAll(\PDO::FETCH_ASSOC) ?: []; // BLINDAJE 2
+        $categorias = $stmtCat->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
 
         $stmtTipo = $this->db->prepare("
             SELECT t.NombreTipoAlojamiento, a.CantidadCaja 
@@ -37,7 +35,7 @@ public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
         foreach ($cajas as &$caja) {
             $stmtUnidades = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
             $stmtUnidades->execute([$caja['IdCajaAlojamiento']]);
-            $caja['unidades'] = $stmtUnidades->fetchAll(\PDO::FETCH_ASSOC) ?: []; // BLINDAJE 3
+            $caja['unidades'] = $stmtUnidades->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
 
             foreach ($caja['unidades'] as &$unidad) {
                 $stmtObs = $this->db->prepare("
@@ -49,9 +47,8 @@ public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
                     ORDER BY o.fechaObs DESC, o.id_fila_obs DESC
                 ");
                 $stmtObs->execute([$unidad['IdEspecieAlojUnidad']]);
-                $obsFlat = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: []; // BLINDAJE 4
+                $obsFlat = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
 
-                // PIVOT: Agrupamos por id_fila_obs
                 $obsGrouped = [];
                 foreach ($obsFlat as $o) {
                     $key = $o['id_fila_obs'] ?: $o['fechaObs'] . '_' . uniqid();
@@ -63,16 +60,10 @@ public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
                 $unidad['observaciones_pivot'] = array_values($obsGrouped);
             }
         }
-
-        return [
-            'cajas' => $cajas,
-            'categorias' => $categorias,
-            'tipoAlojamiento' => $tipoAlojamiento,
-            'limiteCajas' => $limiteCajas
-        ];
+        return ['cajas' => $cajas, 'categorias' => $categorias, 'tipoAlojamiento' => $tipoAlojamiento, 'limiteCajas' => $limiteCajas];
     }
 
-public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidades, $idInstitucion) {
+    public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidades, $idInstitucion) {
         $stmtCheck = $this->db->prepare("SELECT IdAlojamiento, fechavisado, historia FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ?");
         $stmtCheck->execute([$idAlojamiento, $idInstitucion]);
         $aloj = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
@@ -85,7 +76,6 @@ public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidade
             $stmtCount->execute([$idAlojamiento]);
             $numeroSiguiente = $stmtCount->fetchColumn() + 1;
             
-            // CONSTRUIMOS EL PREFIJO (Ej: A1)
             $prefijoCaja = "A" . $numeroSiguiente;
             $nombreFinalCaja = $prefijoCaja . " - " . ($nombreCaja ?: "Sin Etiqueta");
 
@@ -94,11 +84,9 @@ public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidade
             $idNuevaCaja = $this->db->lastInsertId();
 
             $stmtMaxAnimal = $this->db->prepare("
-                SELECT MAX(eu.IdUnidadAlojamiento) 
-                FROM especie_alojamiento_unidad eu
+                SELECT MAX(eu.IdUnidadAlojamiento) FROM especie_alojamiento_unidad eu
                 INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
-                INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
-                WHERE a.historia = ?
+                INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento WHERE a.historia = ?
             ");
             $stmtMaxAnimal->execute([$aloj['historia']]);
             $ultimoIdAnimal = (int)$stmtMaxAnimal->fetchColumn();
@@ -107,58 +95,57 @@ public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidade
             
             for ($i = 1; $i <= $cantidadUnidades; $i++) {
                 $ultimoIdAnimal++; 
-                // CONSTRUIMOS EL NOMBRE FINAL DEL SUJETO (Ej: A1 - S1 - Sujeto 1)
                 $nombreAnimal = "{$prefijoCaja} - S{$ultimoIdAnimal} - Sujeto {$i}"; 
                 $stmtUnidad->execute([$ultimoIdAnimal, $nombreAnimal, $idNuevaCaja]);
             }
 
+            Auditoria::log($this->db, 'INSERT', 'alojamiento_caja', "Creó Caja Físca: $nombreFinalCaja");
             $this->db->commit();
             return true;
-            
-        } catch (\Exception $e) {
-            $this->db->rollBack();
-            throw new \Exception("Error BD: " . $e->getMessage());
-        }
+        } catch (\Exception $e) { $this->db->rollBack(); throw new \Exception("Error BD: " . $e->getMessage()); }
     }
 
     public function renameSujeto($idUnidad, $nuevoNombre) {
         $stmt = $this->db->prepare("UPDATE especie_alojamiento_unidad SET NombreEspecieAloj = ? WHERE IdEspecieAlojUnidad = ?");
-        return $stmt->execute([$nuevoNombre, $idUnidad]);
+        $res = $stmt->execute([$nuevoNombre, $idUnidad]);
+        Auditoria::log($this->db, 'UPDATE', 'especie_alojamiento_unidad', "Renombró sujeto ID: $idUnidad");
+        return $res;
     }
-    public function renameCaja($id, $nombre) {
-        return $this->db->prepare("UPDATE alojamiento_caja SET NombreCaja = ? WHERE IdCajaAlojamiento = ?")->execute([$nombre, $id]);
-    }
-    public function deleteCaja($idCaja) {
-            $this->db->beginTransaction();
-            try {
-                // 1. Borrar observaciones de los animales que viven en esta caja
-                $this->db->prepare("DELETE o FROM observacion_alojamiento_unidad o INNER JOIN especie_alojamiento_unidad e ON o.IdEspecieAlojUnidad = e.IdEspecieAlojUnidad WHERE e.IdCajaAlojamiento = ?")->execute([$idCaja]);
-                // 2. Borrar los animales de la caja
-                $this->db->prepare("DELETE FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?")->execute([$idCaja]);
-                // 3. Borrar la caja
-                $this->db->prepare("DELETE FROM alojamiento_caja WHERE IdCajaAlojamiento = ?")->execute([$idCaja]);
-                
-                $this->db->commit();
-                return true;
-            } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
-        }
 
-        public function deleteSujeto($idUnidad) {
-            $this->db->beginTransaction();
-            try {
-                // 1. Borrar observaciones del animal
-                $this->db->prepare("DELETE FROM observacion_alojamiento_unidad WHERE IdEspecieAlojUnidad = ?")->execute([$idUnidad]);
-                // 2. Borrar animal
-                $this->db->prepare("DELETE FROM especie_alojamiento_unidad WHERE IdEspecieAlojUnidad = ?")->execute([$idUnidad]);
-                
-                $this->db->commit();
-                return true;
-            } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
-        }
+    public function renameCaja($id, $nombre) {
+        $res = $this->db->prepare("UPDATE alojamiento_caja SET NombreCaja = ? WHERE IdCajaAlojamiento = ?")->execute([$nombre, $id]);
+        Auditoria::log($this->db, 'UPDATE', 'alojamiento_caja', "Renombró caja ID: $id");
+        return $res;
+    }
+
+    public function deleteCaja($idCaja) {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE o FROM observacion_alojamiento_unidad o INNER JOIN especie_alojamiento_unidad e ON o.IdEspecieAlojUnidad = e.IdEspecieAlojUnidad WHERE e.IdCajaAlojamiento = ?")->execute([$idCaja]);
+            $this->db->prepare("DELETE FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?")->execute([$idCaja]);
+            $this->db->prepare("DELETE FROM alojamiento_caja WHERE IdCajaAlojamiento = ?")->execute([$idCaja]);
+            
+            Auditoria::log($this->db, 'DELETE', 'alojamiento_caja', "Eliminó caja ID: $idCaja");
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+    }
+
+    public function deleteSujeto($idUnidad) {
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("DELETE FROM observacion_alojamiento_unidad WHERE IdEspecieAlojUnidad = ?")->execute([$idUnidad]);
+            $this->db->prepare("DELETE FROM especie_alojamiento_unidad WHERE IdEspecieAlojUnidad = ?")->execute([$idUnidad]);
+            
+            Auditoria::log($this->db, 'DELETE', 'especie_alojamiento_unidad', "Eliminó sujeto ID: $idUnidad");
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+    }
+
     public function insertarObservaciones($idUnidad, $fechaObs, $valores, $idInstitucion) {
         $this->db->beginTransaction();
         try {
-            // Obtenemos un ID único para esta tanda de observaciones
             $stmtMax = $this->db->query("SELECT MAX(id_fila_obs) FROM observacion_alojamiento_unidad");
             $newFilaId = (int)$stmtMax->fetchColumn() + 1;
 
@@ -175,15 +162,17 @@ public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidade
                 if ($tipo == 'date') $columna = 'DatoObsFecha';
                 if ($tipo == 'var') $columna = 'DatoObsVar';
 
-                // INSERTAMOS CON EL id_fila_obs
                 $sql = "INSERT INTO observacion_alojamiento_unidad (fechaObs, IdEspecieAlojUnidad, IdDatosUnidadAloj, {$columna}, id_fila_obs) 
                         VALUES (?, ?, ?, ?, ?)";
                 $this->db->prepare($sql)->execute([$fechaObs, $idUnidad, $idCat, $valorRaw, $newFilaId]);
             }
+            
+            Auditoria::log($this->db, 'INSERT', 'observacion_alojamiento_unidad', "Cargó métricas al sujeto ID: $idUnidad");
             $this->db->commit();
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
+
     public function addSujeto($idCaja, $idAlojamiento, $nombreSujetoInput) {
         $stmtHist = $this->db->prepare("SELECT historia FROM alojamiento WHERE IdAlojamiento = ?");
         $stmtHist->execute([$idAlojamiento]);
@@ -203,17 +192,18 @@ public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidade
 
         $nombreFinal = "{$prefijoCaja} - S{$ultimoIdAnimal} - {$nombreSujetoInput}";
 
-        return $this->db->prepare("INSERT INTO especie_alojamiento_unidad (IdUnidadAlojamiento, NombreEspecieAloj, IdCajaAlojamiento) VALUES (?, ?, ?)")
+        $res = $this->db->prepare("INSERT INTO especie_alojamiento_unidad (IdUnidadAlojamiento, NombreEspecieAloj, IdCajaAlojamiento) VALUES (?, ?, ?)")
                         ->execute([$ultimoIdAnimal, $nombreFinal, $idCaja]);
+        
+        Auditoria::log($this->db, 'INSERT', 'especie_alojamiento_unidad', "Agregó Sujeto $nombreFinal a la caja ID: $idCaja");
+        return $res;
     }
 
-public function getCajasTramoAnterior($idAlojamientoActual) {
-        // 1. Saber de qué historia estamos hablando
+    public function getCajasTramoAnterior($idAlojamientoActual) {
         $stmtHist = $this->db->prepare("SELECT historia FROM alojamiento WHERE IdAlojamiento = ?");
         $stmtHist->execute([$idAlojamientoActual]);
         $historia = $stmtHist->fetchColumn();
 
-        // 2. Extraer TODAS las cajas de tramos anteriores de esta historia
         $stmtCajasHist = $this->db->prepare("
             SELECT ac.IdCajaAlojamiento, ac.NombreCaja, ac.Detalle 
             FROM alojamiento_caja ac
@@ -224,7 +214,6 @@ public function getCajasTramoAnterior($idAlojamientoActual) {
         $stmtCajasHist->execute([$historia, $idAlojamientoActual]);
         $allCajas = $stmtCajasHist->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 3. Extraer nombres de cajas que YA ESTÁN en el tramo actual (para bloquearlas en la UI)
         $stmtCajasAct = $this->db->prepare("SELECT NombreCaja FROM alojamiento_caja WHERE IdAlojamiento = ?");
         $stmtCajasAct->execute([$idAlojamientoActual]);
         $cajasActuales = $stmtCajasAct->fetchAll(\PDO::FETCH_COLUMN);
@@ -233,17 +222,14 @@ public function getCajasTramoAnterior($idAlojamientoActual) {
         $nombresVistos = [];
 
         foreach($allCajas as $caja) {
-            // Solo guardamos la versión más reciente de la caja en el historial pasado
             if (!in_array($caja['NombreCaja'], $nombresVistos)) {
                 $nombresVistos[] = $caja['NombreCaja'];
                 $caja['ya_existe'] = in_array($caja['NombreCaja'], $cajasActuales);
                 
-                // Traer animales que estaban en esta caja
                 $stmtU = $this->db->prepare("SELECT IdEspecieAlojUnidad, IdUnidadAlojamiento, NombreEspecieAloj FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
                 $stmtU->execute([$caja['IdCajaAlojamiento']]);
                 $unidades = $stmtU->fetchAll(\PDO::FETCH_ASSOC);
 
-                // Verificar si el ID local del animal ya está instanciado en el tramo actual
                 $stmtUAct = $this->db->prepare("
                     SELECT 1 FROM especie_alojamiento_unidad eu 
                     INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
@@ -291,6 +277,7 @@ public function getCajasTramoAnterior($idAlojamientoActual) {
                     }
                 }
             }
+            Auditoria::log($this->db, 'CLONADO', 'alojamiento_caja', "Clonó cajas previas al tramo ID: $idAlojamientoActual");
             $this->db->commit();
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }

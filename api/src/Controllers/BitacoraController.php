@@ -1,29 +1,31 @@
 <?php
 namespace App\Controllers;
 
-use App\Models\Estadisticas\StatisticsModel; 
+use App\Models\Admin\BitacoraModel;
 use App\Utils\Auditoria;
 
-class StatisticsController {
+class BitacoraController {
     private $model;
 
     public function __construct($db) {
-        $this->model = new StatisticsModel($db);
+        $this->model = new BitacoraModel($db);
     }
 
-    public function getStats() {
+    public function listAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
+
         try {
             $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
             
-            $from   = (!empty($_GET['from'])) ? $_GET['from'] : date('Y-m-01');
-            $to     = (!empty($_GET['to']))   ? $_GET['to']   : date('Y-m-d');
+            // Verificamos que sea SuperAdmin (Rol 1)
+            if ((int)$sesion['role'] !== 1) {
+                throw new \Exception("Acceso denegado. Privilegios insuficientes.");
+            }
 
-            $data = $this->model->getGeneralStats($instId, $from, $to);
+            $data = $this->model->getFullLogs();
             echo json_encode(['status' => 'success', 'data' => $data]);
+
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

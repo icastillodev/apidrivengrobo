@@ -1,9 +1,7 @@
 <?php
-// ***************************************************
-// CONTROLADOR: FormRegistroController
-// ***************************************************
-namespace App\Controllers; // Asegúrate de que el namespace sea idéntico
+namespace App\Controllers; 
 use App\Models\FormRegistro\FormRegistroModel;
+use App\Utils\Auditoria; // <-- Seguridad Inyectada
 
 class FormRegistroController {
     private $model;
@@ -12,20 +10,21 @@ class FormRegistroController {
         $this->model = new FormRegistroModel($db);
     }
 
-    // ESTE ES EL MÉTODO QUE TE FALTABA PARA LA GRILLA DEL SUPERADMIN
-    // ***************************************************
     public function listAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
         try {
+            // Seguridad: Solo el rol 1 (Superadmin) debería ver todas las configuraciones
+            Auditoria::getDatosSesion(); 
+            
             $data = $this->model->getAllConfigs();
             echo json_encode([
                 'status' => 'success', 
                 'data' => $data ? $data : [] 
             ]);
         } catch (\Exception $e) {
-            http_response_code(500);
+            http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -35,6 +34,7 @@ class FormRegistroController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
+        // El slug es público (para el formulario de registro), no validamos token aquí.
         $config = $this->model->getConfigBySlug($slug);
         if (!$config) {
             http_response_code(404);
@@ -45,12 +45,12 @@ class FormRegistroController {
         exit;
     }
 
-    // Nuevo método necesario para el visor de detalles del Superadmin
     public function getFullDetail($id) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
 
         try {
+            Auditoria::getDatosSesion(); // Validación de seguridad
             $data = $this->model->getFullResponsesGrouped($id);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -66,6 +66,8 @@ class FormRegistroController {
         $data = json_decode(file_get_contents('php://input'), true);
         
         try {
+            // El submit del formulario onboarding suele ser público, 
+            // NO forzamos Auditoria::getDatosSesion() aquí.
             $this->model->saveResponses($data['id_form'], $data['respuestas']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -74,34 +76,32 @@ class FormRegistroController {
         }
         exit;
     }
-    // api/src/Controllers/FormRegistroController.php
 
-public function createConfig() {
-    if (ob_get_length()) ob_clean();
-    header('Content-Type: application/json');
+    public function createConfig() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
 
-    // IMPORTANTE: Leer el cuerpo de la petición JSON
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw, true);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true);
 
-    // Validación mínima
-    if (!$data || !isset($data['slug_url'])) {
-        echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
+        if (!$data || !isset($data['slug_url'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
+            exit;
+        }
+
+        try {
+            Auditoria::getDatosSesion(); // Solo admins pueden crear accesos
+
+            $id = $this->model->saveConfig($data);
+            echo json_encode([
+                'status' => 'success', 
+                'message' => 'Link creado con éxito',
+                'id' => $id
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Error de BD: ' . $e->getMessage()]);
+        }
         exit;
     }
-
-    try {
-        $id = $this->model->saveConfig($data);
-        echo json_encode([
-            'status' => 'success', 
-            'message' => 'Link creado con éxito',
-            'id' => $id
-        ]);
-    } catch (\Exception $e) {
-        http_response_code(500);
-        // Esto te dirá si el error es por un SLUG duplicado en la BD
-        echo json_encode(['status' => 'error', 'message' => 'Error de BD: ' . $e->getMessage()]);
-    }
-    exit;
-}
 }

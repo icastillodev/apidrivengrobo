@@ -2,6 +2,7 @@
 namespace App\Models\AdminConfig;
 
 use PDO;
+use App\Utils\Auditoria;
 
 class AdminConfigFormTypesModel {
     private $db;
@@ -29,29 +30,32 @@ class AdminConfigFormTypesModel {
         if (empty($id)) {
             $sql = "INSERT INTO tipoformularios (nombreTipo, categoriaformulario, exento, descuento, IdInstitucion) 
                     VALUES (?, ?, ?, ?, ?)";
-            $stmt = $this->db->prepare($sql);
-            return $stmt->execute([$nombre, $categoria, $exento, $descuento, $instId]);
+            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $instId]);
+            
+            Auditoria::log($this->db, 'INSERT', 'tipoformularios', "Creó Formulario: $nombre ($categoria)");
+            return $res;
         } else {
             $sql = "UPDATE tipoformularios SET nombreTipo=?, categoriaformulario=?, exento=?, descuento=? 
                     WHERE IdTipoFormulario=?";
-            $stmt = $this->db->prepare($sql);
-            return $stmt->execute([$nombre, $categoria, $exento, $descuento, $id]);
+            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $id]);
+            
+            Auditoria::log($this->db, 'UPDATE', 'tipoformularios', "Modificó Formulario ID: $id");
+            return $res;
         }
     }
 
     public function delete($id) {
-        // 1. VALIDACIÓN DE INTEGRIDAD
-        // Verificamos si existe al menos un formulario usando este tipo (tipoA)
         $check = $this->db->prepare("SELECT COUNT(*) FROM formularioe WHERE tipoA = ?");
         $check->execute([$id]);
         
         if ($check->fetchColumn() > 0) {
-            // Retornamos 'in_use' para que el controlador sepa qué pasó
             return 'in_use';
         }
 
-        // 2. Si no está en uso, procedemos a borrar
         $stmt = $this->db->prepare("DELETE FROM tipoformularios WHERE IdTipoFormulario = ?");
-        return $stmt->execute([$id]);
+        $res = $stmt->execute([$id]);
+        
+        Auditoria::log($this->db, 'DELETE', 'tipoformularios', "Eliminó Formulario ID: $id");
+        return $res;
     }
 }

@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Alojamiento\TrazabilidadModel;
+use App\Utils\Auditoria;
 
 class TrazabilidadController {
     
@@ -11,23 +12,22 @@ class TrazabilidadController {
         $this->model = new TrazabilidadModel($db);
     }
 
-    // GET: Carga el acordeón
     public function getArbol() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
         $idAlojamiento = $_GET['idAlojamiento'] ?? null;
         $idEspecie = $_GET['idEspecie'] ?? null;
-        // Capturamos la institución directo del GET (como haces en alojamientos)
-        $idInstitucion = $_GET['instId'] ?? null; 
 
         if (!$idAlojamiento || !$idEspecie) {
             http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Faltan parámetros críticos']);
+            echo json_encode(['status' => 'error', 'message' => 'Faltan parámetros']);
             exit;
         }
 
         try {
-            $data = $this->model->getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion);
+            $sesion = Auditoria::getDatosSesion(); // Seguridad
+            $data = $this->model->getArbolBiologico($idAlojamiento, $idEspecie, $sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -36,12 +36,10 @@ class TrazabilidadController {
         exit;
     }
 
-    // POST: Guarda la métrica del animal
     public function saveObservation() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
-        $json = file_get_contents('php://input');
-        $data = json_decode($json, true);
+        $data = json_decode(file_get_contents('php://input'), true);
 
         if (empty($data['IdEspecieAlojUnidad']) || empty($data['valores'])) {
             http_response_code(400);
@@ -50,33 +48,24 @@ class TrazabilidadController {
         }
 
         try {
-            // Pasamos el IdInstitucion que vendrá en el JSON
-            $idInstitucion = $data['IdInstitucion'] ?? 1; 
-            
-            $this->model->insertarObservaciones($data['IdEspecieAlojUnidad'], $data['fechaObs'], $data['valores'], $idInstitucion);
-            
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->insertarObservaciones($data['IdEspecieAlojUnidad'], $data['fechaObs'], $data['valores'], $sesion['instId']);
             echo json_encode(['status' => 'success', 'message' => 'Observaciones registradas']);
         } catch (\Exception $e) {
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Error al guardar: ' . $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
-    // POST /api/trazabilidad/add-caja
-public function addCaja() {
+
+    public function addCaja() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
-        
-        // Blindaje: Si instId no viene, forzamos el 1 o lo sacamos de la sesión si usas JWT en backend
-        $instId = isset($data['instId']) ? $data['instId'] : 1; 
 
         try {
-            $this->model->crearCajaYUnidades(
-                $data['idAlojamiento'], 
-                $data['nombreCaja'], 
-                $data['cantidadUnidades'], 
-                $instId
-            );
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->crearCajaYUnidades($data['idAlojamiento'], $data['nombreCaja'], $data['cantidadUnidades'], $sesion['instId']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -85,24 +74,26 @@ public function addCaja() {
         exit;
     }
 
-
     public function renameSubject() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
-        
         try {
+            Auditoria::getDatosSesion();
             $this->model->renameSujeto($data['idUnidad'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
-            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
+
     public function renameBox() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
+            Auditoria::getDatosSesion();
             $this->model->renameCaja($data['idCaja'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -110,9 +101,11 @@ public function addCaja() {
     }
 
     public function deleteBox() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
+            Auditoria::getDatosSesion();
             $this->model->deleteCaja($data['idCaja']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -120,18 +113,23 @@ public function addCaja() {
     }
 
     public function deleteSubject() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
+            Auditoria::getDatosSesion();
             $this->model->deleteSujeto($data['idUnidad']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
         exit;
     }
+
     public function addSubject() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
+            Auditoria::getDatosSesion();
             $this->model->addSujeto($data['idCaja'], $data['idAlojamiento'], $data['nombreSujeto']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -139,8 +137,10 @@ public function addCaja() {
     }
 
     public function getPastBoxes() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
+            Auditoria::getDatosSesion();
             $data = $this->model->getCajasTramoAnterior($_GET['idAlojamiento']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -148,9 +148,11 @@ public function addCaja() {
     }
 
     public function clonePastBoxes() {
+        if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
+            Auditoria::getDatosSesion();
             $this->model->clonarCajasBajoDemanda($data['idAlojamientoActual'], $data['cajas'], $data['unidades']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
