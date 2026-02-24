@@ -11,7 +11,7 @@ export function showLoader() {
     loader.className = "position-fixed top-0 start-0 vw-100 vh-100 d-flex flex-column align-items-center justify-content-center";
     loader.style.backgroundColor = "#f4f7f6";
     loader.style.zIndex = "10000";
-    loader.style.transition = "opacity 0.6s ease";
+    loader.style.transition = "opacity 0.8s ease";
 
     loader.innerHTML = `
         <div class="text-center">
@@ -24,7 +24,7 @@ export function showLoader() {
             
             <div class="d-flex flex-column align-items-center">
                 <h1 class="h5 fw-bold text-uppercase mb-1" style="color: #1a5d3b; letter-spacing: 5px;">
-                    GROBO -ERP BIOTERIOS <br>Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación
+                    GROBO - ERP BIOTERIOS <br>Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación
                 </h1>
                 <p class="small text-muted text-uppercase" style="letter-spacing: 3px; font-size: 10px;">
                     Cargando entorno seguro...
@@ -40,8 +40,8 @@ export function showLoader() {
         loader.style.opacity = '0';
         setTimeout(() => {
             if (loader.parentNode) loader.remove();
-        }, 350);
-    }, 500);
+        }, 550);
+    }, 1000);
 }
 export function hideLoader() {
     const loader = document.getElementById('main-loader');

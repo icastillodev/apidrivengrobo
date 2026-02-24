@@ -1,7 +1,7 @@
 <?php
 namespace App\Controllers; 
 use App\Models\FormRegistro\FormRegistroModel;
-use App\Utils\Auditoria; // <-- Seguridad Inyectada
+use App\Utils\Auditoria; 
 
 class FormRegistroController {
     private $model;
@@ -13,16 +13,10 @@ class FormRegistroController {
     public function listAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
         try {
-            // Seguridad: Solo el rol 1 (Superadmin) debería ver todas las configuraciones
-            Auditoria::getDatosSesion(); 
-            
+            Auditoria::getDatosSesion(); // Solo admins ven la lista
             $data = $this->model->getAllConfigs();
-            echo json_encode([
-                'status' => 'success', 
-                'data' => $data ? $data : [] 
-            ]);
+            echo json_encode(['status' => 'success', 'data' => $data ?: [] ]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -30,27 +24,11 @@ class FormRegistroController {
         exit;
     }
 
-    public function getBySlug($slug) {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-        
-        // El slug es público (para el formulario de registro), no validamos token aquí.
-        $config = $this->model->getConfigBySlug($slug);
-        if (!$config) {
-            http_response_code(404);
-            echo json_encode(['status' => 'error', 'message' => 'Formulario no encontrado']);
-            exit;
-        }
-        echo json_encode(['status' => 'success', 'data' => $config]);
-        exit;
-    }
-
     public function getFullDetail($id) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
         try {
-            Auditoria::getDatosSesion(); // Validación de seguridad
+            Auditoria::getDatosSesion(); // Solo admins leen el JSON resultante
             $data = $this->model->getFullResponsesGrouped($id);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -66,8 +44,7 @@ class FormRegistroController {
         $data = json_decode(file_get_contents('php://input'), true);
         
         try {
-            // El submit del formulario onboarding suele ser público, 
-            // NO forzamos Auditoria::getDatosSesion() aquí.
+            // MÉTODO PÚBLICO: El cliente llena esto desde su link sin tener login.
             $this->model->saveResponses($data['id_form'], $data['respuestas']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -80,24 +57,12 @@ class FormRegistroController {
     public function createConfig() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
-        $raw = file_get_contents('php://input');
-        $data = json_decode($raw, true);
-
-        if (!$data || !isset($data['slug_url'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
-            exit;
-        }
+        $data = json_decode(file_get_contents('php://input'), true);
 
         try {
-            Auditoria::getDatosSesion(); // Solo admins pueden crear accesos
-
-            $id = $this->model->saveConfig($data);
-            echo json_encode([
-                'status' => 'success', 
-                'message' => 'Link creado con éxito',
-                'id' => $id
-            ]);
+            $sesion = Auditoria::getDatosSesion(); 
+            $id = $this->model->saveConfig($data, $sesion['userId']);
+            echo json_encode(['status' => 'success', 'message' => 'Link creado con éxito', 'id' => $id]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => 'Error de BD: ' . $e->getMessage()]);

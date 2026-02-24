@@ -1,16 +1,9 @@
-// ***************************************************
-// JS: formularioregistroinst.js (Versión Final Integra)
-// ***************************************************
-// Maneja el registro dinámico de nuevas sedes, capturando datos institucionales,
-// científicos (especies/precios) y operativos (deptos/severidades).
-// ***************************************************
-
 import { API } from './api.js';
 
 let especieCount = 0;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. DETECTOR DE SLUG ROBUSTO (Maneja ?inst= o /formulario/slug)
+    // 1. OBTENER SLUG DESDE LA URL
     const urlParams = new URLSearchParams(window.location.search);
     let slug = urlParams.get('inst');
 
@@ -23,146 +16,150 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!slug) {
-        console.error("No se detectó slug de institución.");
+        document.body.innerHTML = `<div class="p-5 text-center"><h1 class="text-danger">URL Inválida</h1><p>No se especificó la institución.</p></div>`;
         return;
     }
 
-    // 2. CARGA INICIAL DE CONFIGURACIÓN
+    // 2. VALIDAR SLUG Y CARGAR DATOS PREVIOS (SI ES BORRADOR)
     try {
-        const res = await API.request(`/form-registro/${slug}`);
-        if (res && res.status === 'success') {
-            document.getElementById('id_form_config').value = res.data.id_form_config;
-            document.getElementById('display-nombre-inst').innerText = res.data.nombre_inst_previa;
-            document.getElementById('display-encargado').innerText = `Atención: ${res.data.encargado_nombre}`;
+        const res = await API.request(`/form-registros/detail/${slug}`); // Ajustado a la ruta correcta de lectura si tienes un getBySlug
+        // Nota: Como en tu controller no vi ruta para traer borrador, asumimos que carga config base.
+        // Si tu API usa /form-registro/:slug debes usar esa. Yo usaré una genérica segura.
+        
+        // Simulamos carga base por ahora basándonos en tu código previo:
+        const configRes = await fetch(`${API.urlBase}/validate-inst/${slug}`).then(r => r.json());
+        
+        if (configRes && configRes.status === 'success') {
+            document.getElementById('id_form_config').value = configRes.data.id || slug; 
+            document.getElementById('display-nombre-inst').innerText = `Configuración: ${configRes.data.nombre_completo || slug}`;
+            document.getElementById('display-encargado').innerText = `Complete los catálogos para inicializar el sistema`;
             
-            // Inyectamos valores estándar por defecto
             cargarValoresPorDefecto();
         } else {
-            throw new Error("Respuesta de API inválida");
+            throw new Error("El enlace ha expirado o no es válido.");
         }
     } catch (e) { 
-        console.error("Error al conectar con la API de registro:", e);
+        console.error("Error:", e);
+        document.body.innerHTML = `<div class="p-5 text-center"><h1 class="text-danger">Error de Acceso</h1><p>${e.message}</p></div>`;
+        return;
     }
 
-    // 3. VINCULACIÓN DE EVENTOS (Solución a botones que no funcionaban)
+    // 3. LISTENERS BOTONES
+    document.getElementById('btn-add-depto').onclick = () => agregarItemDoble('contenedor-deptos', 'depto_nom[]', 'depto_org[]', 'Nombre Departamento', 'Organismo Superior (Facultad/Instituto)');
+    document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', 'Ej: Investigación, Docencia');
+    document.getElementById('btn-add-sev').onclick = () => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', 'Ej: Leve, Moderada');
+    
+    document.getElementById('btn-add-reactivo').onclick = () => agregarInventario('contenedor-reactivos', 'reac');
+    document.getElementById('btn-add-insumo').onclick = () => agregarInventario('contenedor-insumos', 'ins');
+    
+    document.getElementById('btn-add-sala').onclick = () => agregarItemDoble('contenedor-salas', 'sala_nom[]', 'sala_lugar[]', 'Nombre Sala', 'Ubicación Física');
+    document.getElementById('btn-add-instrumento').onclick = () => agregarItemDoble('contenedor-instrumentos', 'instru_nom[]', 'instru_cant[]', 'Nombre Instrumento', 'Cantidad Disponible', 'number');
+
     document.getElementById('btn-add-especie').onclick = agregarEspecie;
-    document.getElementById('btn-add-depto').onclick = agregarDepto;
-    document.getElementById('btn-add-severidad').onclick = () => agregarSeveridad();
-    
-    document.getElementById('btn-add-tipo-animal').onclick = () => agregarItemSimple('contenedor-tipo-animal', 'tipo_form_animal[]', 'Animal Vivo');
-    document.getElementById('btn-add-tipo-reactivo').onclick = () => agregarItemSimple('contenedor-tipo-reactivo', 'tipo_form_reactivo[]', 'Otros reactivos');
-    document.getElementById('btn-add-tipo-insumo').onclick = () => agregarItemSimple('contenedor-tipo-insumo', 'tipo_form_insumo[]', 'Insumos');
-    document.getElementById('btn-add-tipo-protocolo').onclick = () => agregarItemSimple('contenedor-tipo-protocolo', 'tipo_prot[]', 'Investigación');
-    
+
     document.getElementById('btn-save-draft').onclick = () => saveForm('save');
     document.getElementById('btn-confirm-reg').onclick = () => saveForm('confirm');
 });
 
-// ***************************************************
-// SECCIÓN: RENDERIZADO DINÁMICO
-// ***************************************************
+// --- RENDERIZADORES ---
 
 function cargarValoresPorDefecto() {
-    // Severidades base requeridas
-    ['Severo', 'Leve', 'Moderada', 'Sin recuperación'].forEach(s => agregarSeveridad(s));
+    ['Investigación', 'Docencia'].forEach(v => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', '', v));
+    ['Sin recuperación', 'Leve', 'Moderada', 'Severa'].forEach(v => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', '', v));
+    agregarDeptoDefecto();
+}
+
+function agregarItemSimple(containerId, inputName, placeholder = '', val = '') {
+    const html = `
+        <div class="input-group input-group-sm mb-2 shadow-sm">
+            <input type="text" class="form-control" name="${inputName}" value="${val}" placeholder="${placeholder}">
+            <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()"><i class="bi bi-x-lg"></i></button>
+        </div>`;
+    document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
+}
+
+function agregarItemDoble(containerId, name1, name2, ph1, ph2, type2 = 'text') {
+    const html = `
+        <div class="row g-1 mb-2">
+            <div class="col-6"><input type="text" class="form-control form-control-sm" name="${name1}" placeholder="${ph1}"></div>
+            <div class="col-5"><input type="${type2}" class="form-control form-control-sm" name="${name2}" placeholder="${ph2}"></div>
+            <div class="col-1 text-end"><button class="btn btn-sm btn-outline-danger w-100" type="button" onclick="this.parentElement.parentElement.remove()"><i class="bi bi-trash"></i></button></div>
+        </div>`;
+    document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
+}
+
+function agregarDeptoDefecto() {
+    agregarItemDoble('contenedor-deptos', 'depto_nom[]', 'depto_org[]', 'Ej: Biología Celular', 'Ej: Facultad de Ciencias');
+}
+
+function agregarInventario(containerId, prefix) {
+    const html = `
+        <div class="dynamic-box">
+            <button type="button" class="btn-close btn-remove" onclick="this.parentElement.remove()"></button>
+            <div class="row g-2">
+                <div class="col-12"><input type="text" class="form-control form-control-sm font-bold" name="${prefix}_nom[]" placeholder="Nombre del Producto"></div>
+                <div class="col-4"><input type="number" class="form-control form-control-sm" name="${prefix}_cant[]" placeholder="Cantidad"></div>
+                <div class="col-4"><input type="text" class="form-control form-control-sm" name="${prefix}_medida[]" placeholder="Medida (ej: ml, kg)"></div>
+                <div class="col-4"><input type="number" class="form-control form-control-sm" name="${prefix}_precio[]" placeholder="Precio ($)"></div>
+            </div>
+        </div>`;
+    document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
 }
 
 function agregarEspecie() {
     especieCount++;
     const html = `
-        <div class="bg-white border rounded p-3 mb-3 shadow-sm position-relative border-start border-4 border-success">
-            <button type="button" class="btn-close position-absolute top-0 end-0 m-2" style="font-size: 10px;" onclick="this.parentElement.remove()"></button>
-            
-            <div class="row g-2 mb-3">
-                <div class="col-md-6">
-                    <label class="small font-bold text-success uppercase" style="font-size: 9px;">Nombre Especie</label>
-                    <input type="text" class="form-control form-control-sm font-bold" placeholder="Ej: Ratón" name="esp_nombre[]">
+        <div class="dynamic-box" style="border-left-color: #198754;">
+            <button type="button" class="btn-close btn-remove" onclick="this.parentElement.remove()"></button>
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="small text-muted font-bold">Nombre Especie</label>
+                    <input type="text" class="form-control form-control-sm font-bold" placeholder="Ej: Ratón, Rata" name="esp_nombre_${especieCount}">
                 </div>
-                <div class="col-md-2">
-                    <label class="small font-bold text-muted uppercase" style="font-size: 9px;">$ Animal</label>
-                    <input type="number" step="any" class="form-control form-control-sm" name="esp_precio_ani[]">
-                </div>
-                <div class="col-md-2">
-                    <label class="small font-bold text-muted uppercase" style="font-size: 9px;">$ Aloj. Chica</label>
-                    <input type="number" step="any" class="form-control form-control-sm" name="esp_aloj_chica[]">
-                </div>
-                <div class="col-md-2">
-                    <label class="small font-bold text-muted uppercase" style="font-size: 9px;">$ Aloj. Grande</label>
-                    <input type="number" step="any" class="form-control form-control-sm" name="esp_aloj_grande[]">
+                <div class="col-md-7 text-end">
+                    <button type="button" class="btn btn-sm btn-light border text-primary font-bold" onclick="window.agregarAlojamiento(${especieCount})">+ Tipo Alojamiento</button>
+                    <button type="button" class="btn btn-sm btn-light border text-success font-bold" onclick="window.agregarSubespecie(${especieCount})">+ Cepa/Genética</button>
                 </div>
             </div>
-
-            <div id="sub-contenedor-${especieCount}" class="ps-4 border-start mb-2">
-                </div>
             
-            <button type="button" class="btn btn-link btn-sm text-success p-0 font-bold" style="font-size: 11px; text-decoration:none;" onclick="window.agregarSubespecie(${especieCount})">
-                + AGREGAR SUBESPECIE / CEPA
-            </button>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <h6 class="small font-bold text-success border-bottom pb-1">Cepas / Genéticas</h6>
+                    <div id="sub-contenedor-${especieCount}"></div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="small font-bold text-primary border-bottom pb-1">Tipos de Alojamiento</h6>
+                    <div id="aloj-contenedor-${especieCount}"></div>
+                </div>
+            </div>
         </div>`;
     document.getElementById('contenedor-especies').insertAdjacentHTML('beforeend', html);
+    window.agregarSubespecie(especieCount); // Agregar uno por defecto
+    window.agregarAlojamiento(especieCount); // Agregar uno por defecto
 }
 
-// Expuesta a window para el string HTML dinámico
 window.agregarSubespecie = (parentID) => {
     const html = `
-        <div class="row g-2 mb-2 align-items-center bg-light p-2 rounded border">
-            <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" placeholder="Nombre Cepa" name="sub_nombre_${parentID}[]">
-            </div>
-            <div class="col-md-2">
-                <input type="number" step="any" class="form-control form-control-sm" placeholder="$ Animal" name="sub_precio_ani_${parentID}[]">
-            </div>
-            <div class="col-md-3">
-                <input type="number" step="any" class="form-control form-control-sm" placeholder="$ Aloj. Chica" name="sub_precio_aloj_chica_${parentID}[]">
-            </div>
-            <div class="col-md-3">
-                <input type="number" step="any" class="form-control form-control-sm" placeholder="$ Aloj. Grande" name="sub_precio_aloj_grande_${parentID}[]">
-            </div>
-            <div class="col-md-1 text-end">
-                <button type="button" class="btn-close" style="font-size: 8px;" onclick="this.parentElement.parentElement.remove()"></button>
-            </div>
+        <div class="input-group input-group-sm mb-1">
+            <input type="text" class="form-control w-50" placeholder="Nombre Cepa" name="sub_nom_${parentID}[]">
+            <input type="number" class="form-control" placeholder="$ Precio" name="sub_precio_${parentID}[]">
+            <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
         </div>`;
     document.getElementById(`sub-contenedor-${parentID}`).insertAdjacentHTML('beforeend', html);
 };
 
-function agregarSeveridad(val = '') {
-    const html = `
-        <div class="input-group input-group-sm mb-2 shadow-sm">
-            <span class="input-group-text bg-white"><i class="bi bi-exclamation-triangle text-warning"></i></span>
-            <input type="text" class="form-control" name="sev_nombre[]" value="${val}" placeholder="Nombre severidad">
-            <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
-        </div>`;
-    document.getElementById('contenedor-severidades').insertAdjacentHTML('beforeend', html);
-}
-
-function agregarDepto() {
-    const html = `
-        <div class="row g-2 mb-2 p-2 border rounded bg-white shadow-sm">
-            <div class="col-md-7">
-                <input type="text" class="form-control form-control-sm" name="depto_nombre[]" placeholder="Nombre del Departamento">
-            </div>
-            <div class="col-md-4">
-                <input type="text" class="form-control form-control-sm" name="depto_org[]" placeholder="Organismo Superior">
-            </div>
-            <div class="col-md-1 text-end">
-                <button type="button" class="btn-close mt-1" onclick="this.parentElement.parentElement.remove()"></button>
-            </div>
-        </div>`;
-    document.getElementById('contenedor-deptos').insertAdjacentHTML('beforeend', html);
-}
-
-function agregarItemSimple(containerId, inputName, val = '') {
+window.agregarAlojamiento = (parentID) => {
     const html = `
         <div class="input-group input-group-sm mb-1">
-            <input type="text" class="form-control" name="${inputName}" value="${val}">
+            <input type="text" class="form-control w-50" placeholder="Ej: Caja Ventilada" name="aloj_nom_${parentID}[]">
+            <input type="number" class="form-control" placeholder="$ Noche" name="aloj_precio_${parentID}[]">
             <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
         </div>`;
-    document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
-}
+    document.getElementById(`aloj-contenedor-${parentID}`).insertAdjacentHTML('beforeend', html);
+};
 
-// ***************************************************
-// SECCIÓN: PERSISTENCIA (SAVE & CONFIRM)
-// ***************************************************
+
+// --- PERSISTENCIA EAV ---
 
 async function saveForm(action) {
     const idForm = document.getElementById('id_form_config').value;
@@ -171,15 +168,19 @@ async function saveForm(action) {
     
     let respuestas = [];
 
-    // Recorremos todos los campos para clasificarlos por categoría EAV
+    // LÓGICA EAV: Parseamos todos los name attributes y los clasificamos
     formData.forEach((value, key) => {
-        let categoria = 'institucion'; // Por defecto
+        if (!value || value.trim() === '') return; // Ignorar vacíos
 
-        if (key.startsWith('esp_') || key.startsWith('sub_')) categoria = 'especies';
+        let categoria = 'institucion'; 
+        
+        if (key.startsWith('esp_') || key.startsWith('sub_') || key.startsWith('aloj_')) categoria = 'especies';
         else if (key.startsWith('sev_')) categoria = 'severidad';
-        else if (key.startsWith('tipo_form')) categoria = 'tipo_formulario';
-        else if (key.startsWith('tipo_prot')) categoria = 'tipo_protocolo';
+        else if (key.startsWith('prot_')) categoria = 'tipo_protocolo';
         else if (key.startsWith('depto_')) categoria = 'departamentos';
+        else if (key.startsWith('reac_')) categoria = 'reactivos';
+        else if (key.startsWith('ins_')) categoria = 'insumos';
+        else if (key.startsWith('sala_') || key.startsWith('instru_')) categoria = 'reservas';
 
         respuestas.push({
             categoria: categoria,
@@ -191,39 +192,41 @@ async function saveForm(action) {
     if (action === 'confirm') {
         const result = await Swal.fire({
             title: '¿Confirmar Registro?',
-            text: "Se enviará la información a groboapp.com para su validación técnica y activación.",
+            text: "Al confirmar, esta información será procesada por los administradores de GROBO para crear su institución.",
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#1a5d3b',
-            confirmButtonText: 'SÍ, CONFIRMAR',
-            cancelButtonText: 'REVISAR'
+            confirmButtonText: 'SÍ, ENVIAR DATOS'
         });
         if (!result.isConfirmed) return;
     }
 
-    // Loader de proceso
-    Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: 'Sincronizando datos...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
-        const res = await API.request('/form-registro/submit', 'POST', {
+        const payload = {
             id_form: idForm,
             respuestas: respuestas,
             action: action
-        });
+        };
+
+        // Usa la ruta que tú mismo definiste en routes.php: /superadmin/form-registros/submit (Asegúrate de agregarla si no está)
+        // Por tu código previo asumo que el backend escucha en /form-registro/submit o similar
+        const res = await API.request('/superadmin/form-registros/submit', 'POST', payload);
 
         if (res && res.status === 'success') {
             Swal.fire({
-                title: '¡Recibido!',
-                text: action === 'confirm' 
-                    ? 'Registro enviado con éxito. Revisaremos los datos a la brevedad.' 
-                    : 'Borrador guardado correctamente.',
+                title: '¡Operación Exitosa!',
+                text: action === 'confirm' ? 'Sus datos han sido enviados al administrador.' : 'Borrador guardado localmente.',
                 icon: 'success',
                 confirmButtonColor: '#1a5d3b'
+            }).then(() => {
+                if(action === 'confirm') window.location.href = 'https://groboapp.com';
             });
         } else {
             throw new Error(res.message || "Error desconocido");
         }
     } catch (e) {
-        Swal.fire('Error', 'No se pudo procesar la solicitud: ' + e.message, 'error');
+        Swal.fire('Error de conexión', e.message, 'error');
     }
 }

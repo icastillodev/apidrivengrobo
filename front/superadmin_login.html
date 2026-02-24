@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bioterio Central - Acceso</title>
+    <title>Bioterio Central - Acceso Maestro</title>
     
-<link rel="stylesheet" href="./dist/style/css/styles.css">
+    <link rel="stylesheet" href="./dist/style/css/styles.css">
     <link rel="stylesheet" href="./dist/style/css/tailwind.css">
     
-<script type="module">
-    import { SuperAuth } from './dist/js/superAuth.js';
-    document.addEventListener('DOMContentLoaded', () => {
-        SuperAuth.init();
-    });
-</script>
+    <script type="module">
+        import { SuperAuth } from './dist/js/superAuth.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            SuperAuth.init();
+        });
+    </script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen font-sans">
 
@@ -31,7 +31,7 @@
                 <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Usuario Maestro</label>
                 <input type="text" id="username" required 
                     class="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all"
-                    placeholder="">
+                    placeholder="Ej: master_admin">
             </div>
 
             <div> 
@@ -52,6 +52,5 @@
             </a>
         </div>
     </div>
-<script src="dist/js/config.js"></script>
 </body>
 </html>

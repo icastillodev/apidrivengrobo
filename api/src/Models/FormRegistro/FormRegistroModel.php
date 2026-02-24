@@ -1,7 +1,7 @@
 <?php
 namespace App\Models\FormRegistro;
 use PDO;
-use App\Utils\Auditoria; // <-- Seguridad Inyectada
+use App\Utils\Auditoria; 
 
 class FormRegistroModel {
     private $db;
@@ -10,13 +10,13 @@ class FormRegistroModel {
         $this->db = $db;
     }
 
-    public function saveConfig($data) {
+    public function saveConfig($data, $adminId) {
         $sql = "INSERT INTO form_registro_config (slug_url, nombre_inst_previa, encargado_nombre) VALUES (?, ?, ?)";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$data['slug_url'], $data['nombre_inst_previa'], $data['encargado_nombre']]);
         
         $id = $this->db->lastInsertId();
-        Auditoria::log($this->db, 'INSERT', 'form_registro_config', "Creó link de Onboarding: " . $data['slug_url']);
+        Auditoria::logManual($this->db, $adminId, 'INSERT', 'form_registro_config', "Creó link de Onboarding: " . $data['slug_url']);
         return $id;
     }
 
@@ -29,6 +29,7 @@ class FormRegistroModel {
     public function saveResponses($idConfig, $respuestas) {
         $this->db->beginTransaction();
         try {
+            // EAV: Borramos las anteriores y guardamos el estado actual
             $this->db->prepare("DELETE FROM form_registro_respuestas WHERE id_form_config = ?")->execute([$idConfig]);
 
             $sql = "INSERT INTO form_registro_respuestas (id_form_config, categoria, campo, valor, valor_extra, dependencia_id) VALUES (?, ?, ?, ?, ?, ?)";
@@ -45,8 +46,7 @@ class FormRegistroModel {
                 ]);
             }
             
-            // Aquí usamos logManual porque el usuario externo aún no tiene Token válido de sesión
-            Auditoria::logManual($this->db, 0, 'INSERT', 'form_registro_respuestas', "Respuestas guardadas para Config ID: $idConfig");
+            Auditoria::logManual($this->db, 0, 'INSERT', 'form_registro_respuestas', "Respuestas de Onboarding actualizadas para Config ID: $idConfig");
             
             $this->db->commit();
             return true;

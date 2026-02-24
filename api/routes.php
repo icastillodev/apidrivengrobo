@@ -410,3 +410,4 @@ $router->get('/superadmin/form-registros/detail/:id', 'FormRegistroController@ge
 $router->post('/superadmin/form-registros/delete', 'FormRegistroController@deleteConfig');
 
 $router->get('/superadmin/bitacora/list', 'BitacoraController@listAll');
+$router->post('/superadmin/form-registros/submit', 'FormRegistroController@submit');

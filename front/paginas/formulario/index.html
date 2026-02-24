@@ -2,74 +2,127 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Registro de Nueva Institución - GROBO</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onboarding Institucional - GROBO</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="module" src="../../dist/js/formularioregistroinst.js"></script>
+    <style>
+        .section-title { font-size: 12px; letter-spacing: 1px; color: #1a5d3b; border-bottom: 2px solid #1a5d3b; padding-bottom: 5px; margin-bottom: 20px; text-transform: uppercase; font-weight: 800; }
+        .dynamic-box { background: #fdfdfd; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #1a5d3b; position: relative; }
+        .btn-remove { position: absolute; top: 10px; right: 10px; font-size: 10px; }
+    </style>
 </head>
 <body class="bg-light">
-    <div class="container my-5" style="max-width: 900px;">
+    <div class="container my-5" style="max-width: 1000px;">
         <div class="card shadow-lg border-0">
-            <div class="card-header bg-dark text-white p-4">
-                <h2 id="display-nombre-inst" class="h4 mb-0 font-bold uppercase italic">Cargando Formulario...</h2>
-                <p id="display-encargado" class="small mb-0 opacity-75"></p>
+            <div class="card-header text-white p-4" style="background-color: #0f172a;">
+                <h2 id="display-nombre-inst" class="h3 mb-1 font-black uppercase tracking-tighter">Cargando Plataforma...</h2>
+                <p id="display-encargado" class="small mb-0 text-gray-400 font-bold tracking-widest uppercase"></p>
             </div>
             
-<div class="card-body p-4">
-    <form id="form-full-registro">
-        <input type="hidden" id="id_form_config">
+            <div class="card-body p-4 p-md-5">
+                <div class="alert alert-info border-0 bg-blue-50 text-blue-800 text-sm mb-5">
+                    <i class="bi bi-info-circle-fill me-2"></i> <strong>Bienvenido al asistente de configuración.</strong> Por favor, complete los catálogos y datos base de su institución. Podrá guardar un borrador y continuar más tarde.
+                </div>
 
-        <h6 class="text-success font-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">1. Datos de la Sede (Tabla Institución)</h6>
-        <div class="row g-3 mb-4">
-            <div class="col-md-6">
-                <label class="form-label small font-bold text-muted">NOMBRE DE LA SEDE (NombreInst)</label>
-                <input type="text" name="inst_NombreInst" class="form-control form-control-sm" required>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label small font-bold text-muted">NOMBRE COMPLETO (NombreCompletoInst)</label>
-                <input type="text" name="inst_NombreCompletoInst" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small font-bold text-muted">MONEDA</label>
-                <input type="text" name="inst_Moneda" class="form-control form-control-sm" placeholder="ARS, USD">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small font-bold text-muted">PAÍS</label>
-                <input type="text" name="inst_Pais" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small font-bold text-muted">LOCALIDAD</label>
-                <input type="text" name="inst_Localidad" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small font-bold text-muted">PRECIO JORNADA</label>
-                <input type="number" step="any" name="inst_PrecioJornadaTrabajoExp" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label small font-bold text-muted">DIRECCIÓN (InstDir)</label>
-                <input type="text" name="inst_InstDir" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label small font-bold text-muted">CONTACTO (InstContacto)</label>
-                <input type="text" name="inst_InstContacto" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label small font-bold text-muted">EMAIL (InstCorreo)</label>
-                <input type="email" name="inst_InstCorreo" class="form-control form-control-sm">
-            </div>
-        </div>
+                <form id="form-full-registro">
+                    <input type="hidden" id="id_form_config">
 
-        <h6 class="text-success font-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">2. Especies y Precios Base</h6>
-        <div id="contenedor-especies" class="mb-3"></div>
-        <button type="button" class="btn btn-outline-success btn-sm font-bold mb-4" id="btn-add-especie">+ AGREGAR ESPECIE</button>
+                    <h6 class="section-title">1. Datos de la Sede</h6>
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted">Nombre Comercial (Sede)</label>
+                            <input type="text" name="inst_NombreInst" class="form-control form-control-sm" required placeholder="Ej: URBE">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted">Razón Social / Nombre Completo</label>
+                            <input type="text" name="inst_NombreCompletoInst" class="form-control form-control-sm" placeholder="Ej: Facultad de Medicina - UDELAR">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">País</label>
+                            <input type="text" name="inst_Pais" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">Localidad / Ciudad</label>
+                            <input type="text" name="inst_Localidad" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">Moneda de Facturación</label>
+                            <input type="text" name="inst_Moneda" class="form-control form-control-sm" placeholder="Ej: UYU, USD">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">Email Oficial</label>
+                            <input type="email" name="inst_InstCorreo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">Teléfono Contacto</label>
+                            <input type="text" name="inst_InstContacto" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small font-bold text-muted">Sitio Web</label>
+                            <input type="text" name="inst_Web" class="form-control form-control-sm">
+                        </div>
+                    </div>
 
-        <div class="d-flex justify-content-end gap-3 border-top pt-4">
-            <button type="button" class="btn btn-secondary px-4 font-bold" id="btn-save-draft">GUARDAR BORRADOR</button>
-            <button type="button" class="btn btn-success px-5 font-bold shadow" id="btn-confirm-reg">CONFIRMAR Y ENVIAR</button>
-        </div>
-    </form>
-</div>
+                    <h6 class="section-title">2. Estructura Interna (Organismos y Departamentos)</h6>
+                    <div id="contenedor-deptos" class="mb-2"></div>
+                    <button type="button" class="btn btn-outline-dark btn-sm font-bold mb-5" id="btn-add-depto">+ Agregar Departamento</button>
+
+                    <h6 class="section-title">3. Tipos de Protocolo y Severidades</h6>
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted">Categorías de Protocolos</label>
+                            <div id="contenedor-tipos-prot"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm font-bold mt-2" id="btn-add-prot">+ Añadir Categoría</button>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted">Niveles de Severidad (Dolor)</label>
+                            <div id="contenedor-severidades"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm font-bold mt-2" id="btn-add-sev">+ Añadir Severidad</button>
+                        </div>
+                    </div>
+
+                    <h6 class="section-title">4. Catálogo Biológico (Especies y Cepas)</h6>
+                    <div id="contenedor-especies" class="mb-2"></div>
+                    <button type="button" class="btn btn-outline-success btn-sm font-bold mb-5" id="btn-add-especie">+ Agregar Especie</button>
+
+                    <h6 class="section-title">5. Almacén e Inventario</h6>
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted text-uppercase">Reactivos Experimentales</label>
+                            <div id="contenedor-reactivos"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm font-bold mt-2" id="btn-add-reactivo">+ Añadir Reactivo</button>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted text-uppercase">Insumos Generales</label>
+                            <div id="contenedor-insumos"></div>
+                            <button type="button" class="btn btn-outline-primary btn-sm font-bold mt-2" id="btn-add-insumo">+ Añadir Insumo</button>
+                        </div>
+                    </div>
+
+                    <h6 class="section-title">6. Reservas (Salas y Equipamiento)</h6>
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted text-uppercase">Salas Físicas</label>
+                            <div id="contenedor-salas"></div>
+                            <button type="button" class="btn btn-outline-warning text-dark btn-sm font-bold mt-2" id="btn-add-sala">+ Añadir Sala</button>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small font-bold text-muted text-uppercase">Instrumentos / Equipos</label>
+                            <div id="contenedor-instrumentos"></div>
+                            <button type="button" class="btn btn-outline-warning text-dark btn-sm font-bold mt-2" id="btn-add-instrumento">+ Añadir Equipo</button>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-3 border-top pt-4 mt-5">
+                        <button type="button" class="btn btn-light border px-4 font-bold text-muted" id="btn-save-draft">GUARDAR BORRADOR</button>
+                        <button type="button" class="btn btn-success px-5 font-bold shadow-lg" style="background-color: #1a5d3b;" id="btn-confirm-reg">CONFIRMAR Y ENVIAR AL ADMIN</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </body>
