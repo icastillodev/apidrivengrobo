@@ -1,6 +1,5 @@
 import { API } from './api.js';
 
-// --- LISTA DE DATOS QUE DEBEN VIAJAR EN LA SESIÓN ---
 const SESSION_KEYS = [
     'token', 
     'userLevel', 
@@ -35,7 +34,6 @@ export const Auth = {
         if (!sessionStorage.getItem('token') && !localStorage.getItem('token')) {
             const cookieToken = this.getCookie('token');
             if (cookieToken) {
-                console.log("💧 Auth: Restaurando sesión...");
                 SESSION_KEYS.forEach(key => {
                     const val = this.getCookie(key);
                     if (val) {
@@ -54,8 +52,11 @@ export const Auth = {
             this.hydrateSession();
 
             const path = window.location.pathname;
+            
+            // Si ya estamos dentro de una página, no hace falta validar el login
             if (path.includes('/paginas/')) return; 
 
+            // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
                 this.slug = 'superadmin';
                 localStorage.setItem('NombreInst', 'SISTEMA GLOBAL');
@@ -66,12 +67,14 @@ export const Auth = {
             }
 
             // ---------------------------------------------------------
-            // EXTRACCIÓN DEL SLUG A PRUEBA DE FALLOS (Producción / Dev)
+            // EXTRACCIÓN DEL SLUG A PRUEBA DE BALAS PARA NGINX
             // ---------------------------------------------------------
             let slugContext = new URLSearchParams(window.location.search).get('inst');
 
             if (!slugContext) {
+                // Separamos la URL y quitamos espacios vacíos o "index.html"
                 const pathParts = path.split('/').filter(p => p && p !== 'index.html');
+                
                 const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
                 
                 if (isLocalhost) {
@@ -80,16 +83,24 @@ export const Auth = {
                         slugContext = pathParts[frontIndex + 1];
                     }
                 } else {
-                    // En producción (app.groboapp.com/urbe), el slug está en la primera posición [0]
+                    // EN PRODUCCIÓN (NGINX)
+                    // Como el alias de Nginx es /urbe, pathParts[0] será 'urbe'
                     if (pathParts.length > 0) {
                         slugContext = pathParts[0];
+                    } 
+                    // Fallback: A veces Nginx sirve el index en la raíz si hay un subdominio específico
+                    else if (window.location.hostname.includes('urbe.')) {
+                        slugContext = 'urbe';
                     }
                 }
             }
 
+            // Fallback final: Si la persona recargó la página, sacarlo de la memoria
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
-            if (!slugContext || ['dist', 'assets', 'resources', 'paginas'].includes(slugContext)) {
+            // Palabras prohibidas que Nginx podría colar
+            const forbiddenPaths = ['dist', 'assets', 'resources', 'paginas', 'front', 'api', 'core-backend-gem'];
+            if (!slugContext || forbiddenPaths.includes(slugContext)) {
                 console.warn("⚠️ Sede no detectada en la URL:", path);
                 this.showErrorState();
                 return;
@@ -97,8 +108,6 @@ export const Auth = {
 
             this.slug = slugContext.toLowerCase();
             
-            console.log(`🌐 API Request: /validate-inst/${this.slug}`);
-
             const storedToken = this.getVal('token');
             const storedInst = this.getVal('NombreInst');
             
@@ -108,9 +117,9 @@ export const Auth = {
                 return; 
             }
 
+            // Llamada a la API de validación
             const res = await API.request(`/validate-inst/${this.slug}`);
-            console.log("📥 Respuesta:", res); // Diagnóstico
-
+            
             if (res && res.status === 'success') {
                 const inst = res.data;
                 
@@ -146,7 +155,7 @@ export const Auth = {
 
                 this.renderLogin();
             } else {
-                console.error("❌ Institución no válida o Nginx devolvió 404.");
+                console.error("❌ Institución no válida o no encontrada en BD.");
                 this.showErrorState();
             }
         } catch (e) { 
@@ -320,7 +329,16 @@ export const Auth = {
 
     autoRedirectIfLogged(role) {
         if (!this.getVal('token')) return;
-        const basePath = this.getBasePath();
+        
+        // CORRECCIÓN NGINX: Asegurar que el redirect respete la sede en la URL
+        let basePath = '/';
+        const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        
+        if (isLocalhost) {
+            basePath = `/URBE-API-DRIVEN/front/${this.slug}/`;
+        } else {
+            basePath = `/${this.slug}/`; 
+        }
 
         if (role === 1) {
             if (this.slug === 'superadmin' || this.slug === 'master' || this.getVal('NombreInst') === 'SISTEMA GLOBAL') {
