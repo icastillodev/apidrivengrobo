@@ -3,7 +3,7 @@ namespace App\Models\Admin;
 
 use PDO;
 use Exception;
-use App\Utils\Auditoria; // <-- Seguridad Inyectada
+use App\Utils\Auditoria; 
 
 class InstitucionModel {
     private $db;
@@ -12,20 +12,46 @@ class InstitucionModel {
         $this->db = $db;
     }
 
+    // Trae los módulos existentes en la app
+    public function getModulosMaestros() {
+        return $this->db->query("SELECT IdModulosApp, NombreModulo FROM modulosapp")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function getAllInstitutions() {
-        $sql = "SELECT i.*, 
-                       s.Alojamiento, s.Animales, s.Reactivos, s.Reservas, s.Insumos 
-                FROM institucion i
-                LEFT JOIN institucionservicios s ON i.IdInstitucion = s.IdInstitucion
-                ORDER BY i.IdInstitucion DESC";
-        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        $sql = "SELECT i.* FROM institucion i ORDER BY i.IdInstitucion DESC";
+        $instituciones = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        // Por cada institución, traemos sus módulos y los comprimimos al "estado lógico" (1, 2, 3)
+        $sqlMod = "SELECT ma.IdModulosApp, app.NombreModulo, ma.Habilitado, ma.ActivoInvestigador 
+                   FROM modulosactivosinst ma 
+                   JOIN modulosapp app ON ma.IdModulosApp = app.IdModulosApp
+                   WHERE ma.IdInstitucion = ?";
+        $stmtMod = $this->db->prepare($sqlMod);
+
+        foreach ($instituciones as &$inst) {
+            $stmtMod->execute([$inst['IdInstitucion']]);
+            $mods = $stmtMod->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Transformamos las dos variables binarias al estado lógico de tu dropdown
+            foreach ($mods as &$m) {
+                if ($m['Habilitado'] == 2) {
+                    $m['estado_logico'] = 1; // Desactivado total
+                } else if ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 2) {
+                    $m['estado_logico'] = 2; // Solo Admin
+                } else if ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 1) {
+                    $m['estado_logico'] = 3; // Full Admin y User
+                }
+            }
+            $inst['modulos'] = $mods;
+        }
+
+        return $instituciones;
     }
 
     public function crearInstitucionCompleta($data) {
         try {
             $this->db->beginTransaction();
 
-            // 1. Insertar Institución
             $sql = "INSERT INTO institucion (
                         NombreInst, NombreCompletoInst, InstCorreo, Pais, Localidad, 
                         Moneda, Web, Logo, DependenciaInstitucion, otrosceuas, 
@@ -48,7 +74,7 @@ class InstitucionModel {
                 (int)($data['TipoApp'] ?? 1), 
                 (int)($data['Activo'] ?? 1), 
                 $data['UltimoPago'] ?: null, 
-                $data['PrecioJornadaTrabajoExp'] ?? 0, 
+                0, 
                 (int)($data['TipoFacturacion'] ?? 1), 
                 $data['FechaContrato'] ?: null, 
                 $data['Detalle'] ?? ''
@@ -56,38 +82,11 @@ class InstitucionModel {
             
             $idNew = $this->db->lastInsertId();
 
-            // 2. Insertar Servicios (Por defecto llegan desde el JS)
-            $servicios = [
-                'Alojamiento' => (int)($data['Serv_Alojamiento'] ?? 1),
-                'Animales'    => (int)($data['Serv_Animales'] ?? 1),
-                'Reactivos'   => (int)($data['Serv_Reactivos'] ?? 1),
-                'Reservas'    => (int)($data['Serv_Reservas'] ?? 1),
-                'Insumos'     => (int)($data['Serv_Insumos'] ?? 1)
-            ];
-
-            $sqlServ = "INSERT INTO institucionservicios (IdInstitucion, Alojamiento, Animales, Reactivos, Reservas, Insumos) 
-                        VALUES (?, ?, ?, ?, ?, ?)";
-            $this->db->prepare($sqlServ)->execute([
-                $idNew, $servicios['Alojamiento'], $servicios['Animales'], 
-                $servicios['Reactivos'], $servicios['Reservas'], $servicios['Insumos']
-            ]);
-
-            // 3. Crear Menús Base (Todos en Activo=1 inicialmente)
-            $menusFull = [1, 2, 3, 4, 5, 6, 7, 8, 9, 55, 202];
-            $menusInvestigador = [11, 12, 14, 15];
-
-            $sqlMenu = "INSERT INTO menudistr (IdInstitucion, IdTipoUsrA, NombreMenu, Activo) VALUES (?, ?, ?, 1)";
-            $stmtMenu = $this->db->prepare($sqlMenu);
-
-            for ($role = 1; $role <= 6; $role++) {
-                $lista = ($role == 3) ? $menusInvestigador : $menusFull;
-                foreach ($lista as $numMenu) {
-                    $stmtMenu->execute([$idNew, $role, (int)$numMenu]); 
-                }
-            }
+            // Guardamos los módulos
+            $this->procesarModulos($idNew, $data['modulos']);
 
             $this->configurarSedesBase($idNew);
-            $this->sincronizarMenus($idNew, $servicios);
+            // $this->sincronizarMenus($idNew, $data['modulos']); // Lo dejo comentado porque la sincro de menús cambia con la nueva tabla, lo podemos hacer luego.
 
             Auditoria::log($this->db, 'INSERT', 'institucion', "SuperAdmin registró la sede: " . $data['NombreInst']);
 
@@ -108,8 +107,7 @@ class InstitucionModel {
                         Pais = ?, Localidad = ?, Moneda = ?, Web = ?, 
                         Logo = ?, DependenciaInstitucion = ?, otrosceuas = ?, 
                         TipoApp = ?, Activo = ?, UltimoPago = ?,
-                        TipoFacturacion = ?, FechaContrato = ?, Detalle = ?,
-                        PrecioJornadaTrabajoExp = ?
+                        TipoFacturacion = ?, FechaContrato = ?, Detalle = ?
                     WHERE IdInstitucion = ?";
 
             $this->db->prepare($sql)->execute([
@@ -129,47 +127,55 @@ class InstitucionModel {
                 (int)($data['TipoFacturacion'] ?? 1),
                 $data['FechaContrato'] ?: null,
                 $data['Detalle'] ?? '',
-                $data['PrecioJornadaTrabajoExp'] ?? 0,
                 $id
             ]);
 
-            $servicios = [
-                'Alojamiento' => (int)($data['Serv_Alojamiento'] ?? 1),
-                'Animales'    => (int)($data['Serv_Animales'] ?? 1),
-                'Reactivos'   => (int)($data['Serv_Reactivos'] ?? 1),
-                'Reservas'    => (int)($data['Serv_Reservas'] ?? 1),
-                'Insumos'     => (int)($data['Serv_Insumos'] ?? 1)
-            ];
+            // Upsert de los Módulos
+            $this->procesarModulos($id, $data['modulos']);
 
-            $check = $this->db->prepare("SELECT COUNT(*) FROM institucionservicios WHERE IdInstitucion = ?");
-            $check->execute([$id]);
-            
-            if ($check->fetchColumn() > 0) {
-                $sqlServ = "UPDATE institucionservicios SET 
-                            Alojamiento = ?, Animales = ?, Reactivos = ?, Reservas = ?, Insumos = ? 
-                            WHERE IdInstitucion = ?";
-                $this->db->prepare($sqlServ)->execute([
-                    $servicios['Alojamiento'], $servicios['Animales'], $servicios['Reactivos'], 
-                    $servicios['Reservas'], $servicios['Insumos'], $id
-                ]);
-            } else {
-                $sqlServ = "INSERT INTO institucionservicios (IdInstitucion, Alojamiento, Animales, Reactivos, Reservas, Insumos) 
-                            VALUES (?, ?, ?, ?, ?, ?)";
-                $this->db->prepare($sqlServ)->execute([
-                    $id, $servicios['Alojamiento'], $servicios['Animales'], $servicios['Reactivos'], 
-                    $servicios['Reservas'], $servicios['Insumos']
-                ]);
-            }
-
-            $this->sincronizarMenus($id, $servicios);
-
-            Auditoria::log($this->db, 'UPDATE', 'institucion', "SuperAdmin editó configuración de la sede ID: " . $id);
+            Auditoria::log($this->db, 'UPDATE', 'institucion', "SuperAdmin editó sede ID: " . $id);
 
             $this->db->commit();
             return true;
         } catch (Exception $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;
+        }
+    }
+
+    // --- NUEVO: Procesador de Módulos (Insert o Update) ---
+    private function procesarModulos($idInst, $modulosList) {
+        if (!$modulosList || !is_array($modulosList)) return;
+
+        // Validamos si ya existe el registro para saber si hacer UPDATE o INSERT
+        $checkStmt = $this->db->prepare("SELECT ModulosActivosInstId FROM modulosactivosinst WHERE IdInstitucion = ? AND IdModulosApp = ?");
+        $updateStmt = $this->db->prepare("UPDATE modulosactivosinst SET Habilitado = ?, ActivoInvestigador = ? WHERE IdInstitucion = ? AND IdModulosApp = ?");
+        $insertStmt = $this->db->prepare("INSERT INTO modulosactivosinst (IdInstitucion, IdModulosApp, Habilitado, ActivoInvestigador) VALUES (?, ?, ?, ?)");
+
+        foreach ($modulosList as $mod) {
+            $idModulo = $mod['IdModulosApp'];
+            $estadoLogico = $mod['estado_logico']; // 1, 2 o 3
+
+            // Traducción del estado lógico a las columnas físicas
+            $habilitado = 2; // Default (Desactivado)
+            $activoInv = 2;
+            
+            if ($estadoLogico == 2) {
+                $habilitado = 1; 
+                $activoInv = 2;
+            } else if ($estadoLogico == 3) {
+                $habilitado = 1;
+                $activoInv = 1;
+            }
+
+            $checkStmt->execute([$idInst, $idModulo]);
+            if ($checkStmt->fetchColumn() > 0) {
+                // Ya existe, hacemos UPDATE
+                $updateStmt->execute([$habilitado, $activoInv, $idInst, $idModulo]);
+            } else {
+                // No existe, hacemos INSERT
+                $insertStmt->execute([$idInst, $idModulo, $habilitado, $activoInv]);
+            }
         }
     }
 
@@ -181,36 +187,5 @@ class InstitucionModel {
         $frms = [['Animal vivo', 0, 'Animal vivo'], ['Otros reactivos', 0, 'Otros reactivos biologicos'], ['Insumos', 0, 'Insumos']];
         $sf = $this->db->prepare("INSERT INTO tipoformularios (nombreTipo, exento, IdInstitucion, categoriaformulario, descuento) VALUES (?, ?, ?, ?, 0)");
         foreach ($frms as $f) $sf->execute([$f[0], $f[1], $idInst, $f[2]]);
-    }
-
-    private function sincronizarMenus($idInst, $servicios) {
-        $rolesAdmin = [2, 4, 5, 6]; 
-        $roleInvestigador = 3;
-
-        $updateMenu = function($menuId, $roles, $estado) use ($idInst) {
-            $inQuery = implode(',', array_map('intval', is_array($roles) ? $roles : [$roles]));
-            $sql = "UPDATE menudistr SET Activo = ? WHERE IdInstitucion = ? AND NombreMenu = ? AND IdTipoUsrA IN ($inQuery)";
-            $this->db->prepare($sql)->execute([$estado, $idInst, $menuId]);
-        };
-
-        $sAloj = $servicios['Alojamiento'];
-        $updateMenu(7, $rolesAdmin, ($sAloj == 3) ? 2 : 1);       
-        $updateMenu(12, $roleInvestigador, ($sAloj == 1) ? 1 : 2); 
-
-        $sAni = $servicios['Animales'];
-        $updateMenu(3, $rolesAdmin, ($sAni == 3) ? 2 : 1);
-
-        $sRea = $servicios['Reactivos'];
-        $updateMenu(4, $rolesAdmin, ($sRea == 3) ? 2 : 1);
-
-        $verForms = ($sAni == 1 || $sRea == 1) ? 1 : 2;
-        $updateMenu(11, $roleInvestigador, $verForms);
-
-        $sIns = $servicios['Insumos'];
-        $updateMenu(5, $rolesAdmin, ($sIns == 3) ? 2 : 1);
-
-        $sRes = $servicios['Reservas'];
-        $updateMenu(6, $rolesAdmin, ($sRes == 3) ? 2 : 1);        
-        $updateMenu(14, $roleInvestigador, ($sRes == 1) ? 1 : 2);  
     }
 }

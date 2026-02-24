@@ -4,9 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Maestro - Bioterios Grobo</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../dist/style/css/styles.css">
+
+    <script type="module">
+        import { SuperAuth } from '../../dist/js/superAuth.js';
+        import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+        import { initSuperDashboard } from '../../dist/js/pages/superadmin/dashboard_superadmin.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Verificamos la sesión (Si falla, SuperAuth.checkMasterAccess redirige y detiene el flujo)
+            if (SuperAuth.checkMasterAccess([1])) {
+                // 2. Cargamos el Menú
+                initSuperMenu(); 
+                
+                // 3. Cargamos la lógica específica de esta página
+                initSuperDashboard();
+            }
+        });
+    </script>
+</head>
 <body class="bg-light">
 
     <main class="container py-5">
@@ -86,47 +104,12 @@
                 <div class="card border-0 shadow-sm h-100 p-4">
                     <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock-fill me-2 text-success"></i>Seguridad y Logs</h5>
                     <p class="text-muted">Revisa los últimos accesos al sistema y gestiona los permisos maestros de los administradores locales.</p>
-                    <a href="logs.html" class="btn btn-outline-success fw-bold mt-auto">
+                    <a href="bitacora.html" class="btn btn-outline-success fw-bold mt-auto">
                         VER AUDITORÍA
                     </a>
                 </div>
             </div>
         </div>
     </main>
-
-<script type="module">
-// Dentro de tu tag <script type="module"> existente en el HTML
-
-import { SuperAuth } from '../../dist/js/superAuth.js';
-import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
-import { API } from '../../dist/js/api.js'; // Importamos la API para los datos
-
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Validamos acceso (Pasamos [1] porque es solo para SuperAdmin)
-    if (SuperAuth.checkMasterAccess([1])) {
-        
-        // 2. Cargamos el Menú Maestro
-        initSuperMenu(); 
-        
-        // 3. Cargamos Estadísticas Globales
-        try {
-            // Este endpoint debe devolver el conteo total de la red Grobo
-            const res = await API.request('/superadmin/global-stats'); 
-            
-            if (res.status === 'success') {
-                document.getElementById('stat-sedes').innerText = res.data.totalSedes;
-                document.getElementById('stat-usuarios').innerText = res.data.totalUsuarios;
-                document.getElementById('stat-protocolos').innerText = res.data.totalProtocolos;
-            }
-        } catch (error) {
-            console.error("Error al cargar métricas globales:", error);
-            // Fallback elegante
-            ['stat-sedes', 'stat-usuarios', 'stat-protocolos'].forEach(id => {
-                document.getElementById(id).innerText = "Err";
-            });
-        }
-    }
-});
-</script>
 </body>
 </html>

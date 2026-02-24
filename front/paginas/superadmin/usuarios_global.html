@@ -9,7 +9,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
 
     <style>
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
@@ -60,20 +61,20 @@
             </div>
         </div>
 
-<div class="table-responsive">
-    <table class="table table-hover align-middle border" style="font-size: 12px;">
-        <thead class="table-light">
-            <tr class="text-uppercase" style="font-size: 11px;">
-                <th class="py-3 px-3">ID</th>
-                <th class="py-3 px-3">Institución</th>
-                <th class="py-3 px-3">Apellido y Nombre</th>
-                <th class="py-3 px-3">Correo / Usuario</th>
-                <th class="py-3 px-3 text-center">Rol</th>
-                </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-    </table>
-</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle border" style="font-size: 12px;">
+                <thead class="table-light">
+                    <tr class="text-uppercase" style="font-size: 11px;">
+                        <th class="py-3 px-3">ID</th>
+                        <th class="py-3 px-3">Institución</th>
+                        <th class="py-3 px-3">Apellido y Nombre</th>
+                        <th class="py-3 px-3">Correo / Usuario</th>
+                        <th class="py-3 px-3 text-center">Rol</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
 
         <nav class="mt-5">
             <ul id="pagination" class="pagination pagination-sm justify-content-center"></ul>
@@ -97,9 +98,6 @@
                             <div class="input-group has-validation">
                                 <span class="input-group-text"><i class="bi bi-person-badge-fill"></i></span>
                                 <input type="text" id="UsrA" class="form-control fw-bold" required placeholder="Ej: n_perez">
-                                <span id="user-status-icon" class="input-group-text bg-white d-none">
-                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                                </span>
                             </div>
                             <div id="user-feedback" class="form-text smaller fw-bold mt-1"></div>
                         </div>
@@ -142,7 +140,7 @@
                 <button type="button" onclick="resetPassword()" id="btn-reset" class="btn btn-warning btn-sm fw-bold">RESET CLAVE</button>
                 <div>
                     <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal">CERRAR</button>
-                    <button type="button" onclick="guardarUsuario()" class="btn btn-success btn-sm fw-bold px-4 badge-gecko text-white">GUARDAR</button>
+                    <button type="button" onclick="window.guardarUsuario()" class="btn btn-success btn-sm fw-bold px-4 badge-gecko text-white">GUARDAR</button>
                 </div>
             </div>
         </div>

@@ -44,12 +44,23 @@ export async function initMenu() {
     window.setAppLang = UserPreferences.setLanguage;
     window.Auth = Auth;
 
-    try {
-        const resMenu = await API.request(`/menu?role=${roleId}&inst=${instId}`);
+try {
+        let ids = [];
 
-        if (resMenu && resMenu.status === "success") {
-            let ids = (resMenu.data || []).map(id => Number(id));
-            
+        // Si es SUPERADMIN (Rol 1), le forzamos a ver todo, sin preguntar a la API
+        if (roleId === 1) {
+            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 203, 55, 202, 998, 999];
+        } 
+        // Si es usuario normal, le preguntamos a la base de datos qué puede ver
+        else {
+            const resMenu = await API.request(`/menu?role=${roleId}&inst=${instId}`);
+            if (resMenu && resMenu.status === "success") {
+                ids = (resMenu.data || []).map(id => Number(id));
+            }
+        }
+
+        // Si después de preguntar, tenemos IDs para mostrar, dibujamos el menú
+        if (ids.length > 0) {
             if (![1, 2].includes(roleId)) ids = ids.filter(id => id !== 9);
             [999, 998, 10].forEach(fixedId => { if(!ids.includes(fixedId)) ids.push(fixedId); });
 

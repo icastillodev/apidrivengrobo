@@ -6,7 +6,6 @@ export const SuperAuth = {
     async init() {
         console.log("Gecko Devs: Modo SuperAdmin Independiente Iniciado.");
         
-        // Limpiamos rastros de sedes anteriores para no confundir al sistema maestro
         localStorage.setItem('NombreInst', 'SISTEMA_GLOBAL');
         localStorage.setItem('instId', '0');
         
@@ -24,40 +23,111 @@ export const SuperAuth = {
         const payload = {
             user: document.getElementById('username').value,
             pass: document.getElementById('password').value,
-            instSlug: 'master' // Flag directo para el backend indicando que es un admin global
+            instSlug: 'master'
         };
 
         try {
-            const res = await API.request('/login', 'POST', payload);
+            const res = await API.request('/login-superadmin', 'POST', payload);
             
-            if (res?.status === 'success' && parseInt(res.role) === 1) {
-                // Guardamos la sesión maestra (Gecko)
-                localStorage.setItem('token', res.token || 'valid');
-                localStorage.setItem('userLevel', 1);
-                localStorage.setItem('userName', res.userName);
-                localStorage.setItem('userId', res.userId);
-
-                // Directo al dashboard de superadmin
-                window.location.href = getBasePath() + 'paginas/superadmin/dashboard.html';
-            } else {
+            // Si el backend dice "Todo bien, entra"
+            if (res?.status === 'success') {
+                this.completeLogin(res, box);
+            } 
+            // Si el backend dice "Espera, pon el código 2FA que te mandé al correo"
+            else if (res?.status === '2fa_required') {
+                this.prompt2FA(res.userId, box);
+            } 
+            // Si la clave está mal o el usuario no existe
+            else {
                 if (box) { 
-                    box.innerText = "ACCESO MAESTRO DENEGADO"; 
+                    box.innerText = (res?.message || "ACCESO MAESTRO DENEGADO").toUpperCase(); 
                     box.classList.remove('hidden'); 
                 }
             }
         } catch (err) {
             console.error("Error crítico en SuperAuth:", err);
+            if (box) { box.innerText = "ERROR DE CONEXIÓN CON EL SERVIDOR."; box.classList.remove('hidden'); }
+        }
+    },
+
+    // Pide el código 2FA con una alerta visual flotante
+    async prompt2FA(userId, box) {
+        const { value: code } = await Swal.fire({
+            title: 'Verificación en Dos Pasos',
+            text: 'Revisa tu correo e ingresa el código de 6 dígitos de seguridad.',
+            input: 'text',
+            inputPlaceholder: '000000',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Verificar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#16a34a', // Verde oscuro Tailwind
+            inputValidator: (value) => {
+                if (!value || value.length !== 6) {
+                    return 'Debes ingresar un código válido de 6 dígitos'
+                }
+            }
+        });
+
+        if (code) {
+            try {
+                // Verificamos el código usando la misma ruta de la API
+                const res = await API.request('/verify-2fa', 'POST', { userId: userId, code: code, instId: 0 });
+                
+                if (res?.status === 'success') {
+                    this.completeLogin(res, box);
+                } else {
+                    Swal.fire('Error', 'Código incorrecto o vencido', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    },
+
+// Finaliza el proceso y guarda la sesión
+    completeLogin(res, box) {
+        const role = parseInt(res.role || res.userLevel); 
+                
+        if (role === 1) {
+            const tokenReal = res.token || (res.data && res.data.token) || res.jwt;
+
+            if (!tokenReal) {
+                if (box) { box.innerText = "ERROR DE SISTEMA: TOKEN NO RECIBIDO"; box.classList.remove('hidden'); }
+                return;
+            }
+
+            // 1. Guardamos en LocalStorage
+            localStorage.setItem('token', tokenReal);
+            localStorage.setItem('userLevel', 1);
+            localStorage.setItem('userName', res.userName || 'Master');
+            localStorage.setItem('userId', res.userId || 0);
+            localStorage.setItem('NombreInst', 'SISTEMA_GLOBAL');
+            localStorage.setItem('instId', '0');
+
+            // 2. Guardamos en SessionStorage (Para api.js)
+            sessionStorage.setItem('token', tokenReal);
+            sessionStorage.setItem('userLevel', 1);
+            sessionStorage.setItem('userName', res.userName || 'Master');
+            sessionStorage.setItem('userId', res.userId || 0);
+            sessionStorage.setItem('NombreInst', 'SISTEMA_GLOBAL');
+            sessionStorage.setItem('instId', '0');
+
+            // 3. Forzamos en Cookies (Por si PHP lee $_COOKIE)
+            document.cookie = `token=${tokenReal}; path=/; SameSite=Lax`;
+            document.cookie = `userLevel=1; path=/; SameSite=Lax`;
+            document.cookie = `NombreInst=SISTEMA_GLOBAL; path=/; SameSite=Lax`;
+
+            // Redirigir al dashboard
+            window.location.href = getBasePath() + 'paginas/superadmin/dashboard.html';
+        } else {
             if (box) { 
-                box.innerText = "Error de conexión con el servidor."; 
+                box.innerText = "ACCESO DENEGADO: NO ERES GECKO MASTER"; 
                 box.classList.remove('hidden'); 
             }
         }
     },
 
-    /**
-     * Validador de Acceso - Versión GECKO MASTER
-     * @param {Array} allowedRoles - Niveles que pueden ver la página (ej: [1])
-     */
     checkMasterAccess(allowedRoles = [1]) {
         const token = localStorage.getItem('token');
         const userLevel = parseInt(localStorage.getItem('userLevel'));
@@ -66,7 +136,6 @@ export const SuperAuth = {
             window.location.href = getBasePath() + 'superadmin_login.html';
             return false;
         }
-
         if (userLevel === 1) return true; 
 
         if (!allowedRoles.includes(userLevel)) {
@@ -77,14 +146,11 @@ export const SuperAuth = {
     },
 
     logout() {
-        // Limpieza total de seguridad de NETWISE / GECKO
         localStorage.removeItem('token');
         localStorage.removeItem('userId');
         localStorage.removeItem('userLevel');
         localStorage.removeItem('userName');
         localStorage.setItem('isLoggedIn', 'false');
-
-        // Redirección al login de SuperAdmin
         window.location.href = getBasePath() + 'superadmin_login.html';
     }
 };

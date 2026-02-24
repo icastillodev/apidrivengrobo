@@ -10,11 +10,29 @@ class Auditoria {
      * Extrae y verifica matemáticamente que el Token no haya sido alterado por un hacker.
      */
     public static function getDatosSesion() {
-        $headers = apache_request_headers();
-        $token = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        $token = '';
+
+        // 1. INTENTO 1: Buscar en los headers estándar de Apache
+        if (function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            if (isset($headers['Authorization'])) {
+                $token = $headers['Authorization'];
+            } elseif (isset($headers['authorization'])) {
+                $token = $headers['authorization'];
+            }
+        }
+
+        // 2. INTENTO 2: Buscar en las variables genéricas de servidor (Nginx)
+        if (empty($token) && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $token = $_SERVER['HTTP_AUTHORIZATION'];
+        } elseif (empty($token) && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $token = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
         
         if (empty($token)) {
-            throw new Exception("Acceso denegado: No se proporcionó credencial de seguridad.");
+            // DEBUG: Descomentar esto si quieres ver qué headers están llegando
+            // error_log("Headers recibidos: " . print_r($_SERVER, true));
+            throw new Exception("Acceso denegado: No se proporcionó credencial de seguridad en los headers.");
         }
         
         $token = str_replace('Bearer ', '', $token);
@@ -38,10 +56,11 @@ class Auditoria {
                 throw new Exception("El token ha expirado. Inicie sesión nuevamente.");
             }
 
+            // 3. Devolvemos la sesión (El SuperAdmin pasará con instId = 0)
             return [
                 'userId' => $payload['userId'], 
-                'instId' => $payload['instId'],
-                'role'   => $payload['role']
+                'instId' => $payload['instId'] ?? 0,
+                'role'   => $payload['role'] ?? $payload['userLevel'] ?? 0
             ];
         }
         
@@ -54,6 +73,7 @@ class Auditoria {
     public static function log($db, $accion, $tabla, $detalle) {
         try {
             $sesion = self::getDatosSesion();
+            // Si es superadmin (role 1), la auditoría se guarda igual con su userId
             self::logManual($db, $sesion['userId'], $accion, $tabla, $detalle);
         } catch (Exception $e) {
             error_log("Error en Bitácora (Sesión): " . $e->getMessage());

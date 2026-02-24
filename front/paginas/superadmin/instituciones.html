@@ -4,10 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Sedes - Panel Maestro</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
     <link rel="stylesheet" href="../../dist/style/css/styles.css">
+<style>
+        /* Fuerza la manito y un color de fondo al pasar el mouse por las filas */
+        .table-hover tbody tr { transition: background-color 0.2s; }
+        .table-hover tbody tr:hover { 
+            background-color: #f1f5f9 !important; /* Un gris/azulado muy suave */
+            cursor: pointer !important; 
+        }
+    </style>
+<script type="module">
+        import { SuperAuth } from '../../dist/js/superAuth.js';
+        import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+        import { initSuperInstituciones } from '../../dist/js/pages/superadmin/instituciones.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Preguntamos si es SuperAdmin
+            if (SuperAuth.checkMasterAccess([1])) {
+                // 2. Cargamos su Menú
+                initSuperMenu(); 
+                
+                // 3. Cargamos los datos de las Instituciones
+                initSuperInstituciones();
+            }
+        });
+    </script>
 </head>
 <body class="bg-light">
 
@@ -15,7 +39,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h2 class="fw-bold text-dark">Gestión de Instituciones</h2>
-                <p class="text-muted">Administra las sedes activas en la red Bioterios Grobo.</p>
+                <p class="text-muted">Administra las sedes activas y sus módulos habilitados en la red.</p>
             </div>
             <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalCrear()">
                 <i class="bi bi-plus-circle me-2"></i>NUEVA INSTITUCIÓN
@@ -40,10 +64,9 @@
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase" style="min-width: 200px;">Institución / Sede</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Contacto</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ubicación</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th> 
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase">Facturación</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Servicios</th> 
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Últ. Pago</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center" style="min-width: 180px;">Módulos Activos</th> 
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">Últ. Pago</th>
                                 <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">CEUAS</th>
                                 <th class="text-center text-xs font-bold text-gray-500 uppercase">Estado</th>
                             </tr>
@@ -99,7 +122,6 @@
                                 <label class="form-label fw-bold">Web Oficial</label>
                                 <input type="url" id="Web" class="form-control" placeholder="https://...">
                             </div>
-                            <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Dependencia (Grupo)</label>
                                 <input type="text" id="DependenciaInstitucion" class="form-control" placeholder="Ej: UDELAR">
@@ -108,6 +130,7 @@
                                 <label class="form-label fw-bold">URL del Logo</label>
                                 <input type="text" id="Logo" class="form-control" placeholder="https://...">
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Permitir Otros CEUAS</label>
                                 <select id="otrosceuas" class="form-select">
@@ -128,103 +151,58 @@
                                     <option value="0">Inactiva (Bloqueada)</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Fecha Último Pago</label>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-primary">Ciclo Facturación</label>
+                                <select id="TipoFacturacion" class="form-select border-primary">
+                                    <option value="1">Mensual (1 mes)</option>
+                                    <option value="3">Trimestral (3 meses)</option>
+                                    <option value="6">Semestral (6 meses)</option>
+                                    <option value="12">Anual (12 meses)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-primary">Fecha Contrato</label>
+                                <input type="date" id="FechaContrato" class="form-control border-primary">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Último Pago</label>
                                 <input type="date" id="UltimoPago" class="form-control">
                             </div>
-                            <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ciclo / Contrato</th>
+                            
+                            <div class="col-12">
+                                <label class="form-label fw-bold">Detalles / Observaciones Internas</label>
+                                <textarea id="Detalle" class="form-control" rows="2" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
+                            </div>
 
-                            <div class="row g-3 mt-2 border-t pt-3">
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold text-primary">Ciclo Facturación</label>
-                                    <select id="TipoFacturacion" class="form-select border-primary">
-                                        <option value="1">Mensual (1 mes)</option>
-                                        <option value="3">Trimestral (3 meses)</option>
-                                        <option value="6">Semestral (6 meses)</option>
-                                        <option value="12">Anual (12 meses)</option>
-                                    </select>
+                            <div class="col-12 mt-4">
+                                <h6 class="fw-bold text-primary border-bottom pb-2 uppercase text-xs">Módulos de Sistema Habilitados</h6>
+                                <div id="contenedor-modulos" class="row g-2 mt-2">
+                                    <p class="text-muted small italic">Cargando módulos de la plataforma...</p>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold text-primary">Fecha Contrato</label>
-                                    <input type="date" id="FechaContrato" class="form-control border-primary">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold">Último Pago</label>
-                                    <input type="date" id="UltimoPago" class="form-control">
-                                </div>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Detalles / Notas</th>
-                                <div class="col-12 mt-3">
-                                    <h6 class="fw-bold text-primary border-bottom pb-2">Configuración de Servicios</h6>
-                                    <div class="row g-2">
-                                        <div class="col-md-2 col-4">
-                                            <label class="form-label small fw-bold">Alojamiento</label>
-                                            <select id="Serv_Alojamiento" class="form-select form-select-sm">
-                                                <option value="1">Todos (1)</option>
-                                                <option value="2">Solo Admin (2)</option>
-                                                <option value="3">OFF (3)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 col-4">
-                                            <label class="form-label small fw-bold">Animales</label>
-                                            <select id="Serv_Animales" class="form-select form-select-sm">
-                                                <option value="1">Todos (1)</option>
-                                                <option value="2">Solo Admin (2)</option>
-                                                <option value="3">OFF (3)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 col-4">
-                                            <label class="form-label small fw-bold">Reactivos</label>
-                                            <select id="Serv_Reactivos" class="form-select form-select-sm">
-                                                <option value="1">Todos (1)</option>
-                                                <option value="2">Solo Admin (2)</option>
-                                                <option value="3">OFF (3)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 col-4">
-                                            <label class="form-label small fw-bold">Reservas</label>
-                                            <select id="Serv_Reservas" class="form-select form-select-sm">
-                                                <option value="1">Todos (1)</option>
-                                                <option value="2">Solo Admin (2)</option>
-                                                <option value="3">OFF (3)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 col-4">
-                                            <label class="form-label small fw-bold">Insumos</label>
-                                            <select id="Serv_Insumos" class="form-select form-select-sm">
-                                                <option value="1">Todos (1)</option>
-                                                <option value="2">Solo Admin (2)</option>
-                                                <option value="3">OFF (3)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">Detalles / Observaciones Internas</label>
-                                    <textarea id="Detalle" class="form-control" rows="2" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
-                                </div>
-                          </div>
-                        </div>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">CANCELAR</button>
-                    <button type="button" class="btn btn-primary px-4 fw-bold" onclick="guardarCambios()">GUARDAR INSTITUCIÓN</button>
+                    <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="window.guardarCambios()">GUARDAR SEDE Y MÓDULOS</button>
                 </div>
             </div>
         </div>
     </div>
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="d-flex">
-            <div class="toast-body fw-bold">
-                <i class="bi bi-check-circle-fill me-2"></i> <span id="toast-msg">Datos actualizados correctamente</span>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold">
+                    <i class="bi bi-check-circle-fill me-2"></i> <span id="toast-msg">Datos actualizados correctamente</span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
-</div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="../../dist/js/pages/superadmin/instituciones.js"></script>
 </body>
 </html>

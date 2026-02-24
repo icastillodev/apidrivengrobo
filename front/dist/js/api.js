@@ -69,7 +69,7 @@ export const API = {
         }
     },
 
-    /**
+/**
      * Helper centralizado para expulsar al usuario, limpiar todo rastro y redirigir
      */
     forceLogout() {
@@ -77,28 +77,30 @@ export const API = {
         localStorage.clear();
         sessionStorage.clear();
         
-        // Limpiamos Cookies manualmente iterando
-        const cookies = document.cookie.split("; ");
-        for (let c = 0; c < cookies.length; c++) {
-            const d = window.location.hostname.split(".");
-            while (d.length > 0) {
-                const cookieBase = encodeURIComponent(cookies[c].split(";")[0].split("=")[0]) + '=; expires=Thu, 01-Jan-1970 00:00:01 GMT; domain=' + d.join('.') + ' ;path=';
-                const p = window.location.pathname.split('/');
-                document.cookie = cookieBase + '/';
-                while (p.length > 0) {
-                    document.cookie = cookieBase + p.join('/');
-                    p.pop();
-                }
-                d.shift();
+        // Limpiamos Cookies de forma segura (Evitando el error de nombre vacío)
+        try {
+            const cookies = document.cookie.split(";");
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (!cookie) continue; // Si la cookie está vacía, la saltamos
+                const eqPos = cookie.indexOf("=");
+                const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+                document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
             }
-        }
+        } catch(e) { console.warn("Error limpiando cookies", e); }
 
         // Redirección Híbrida
         const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
             ? '/URBE-API-DRIVEN/front/' 
             : '/'; 
 
-        // Como acabamos de borrar el localStorage, intentamos extraer el nombre de la URL si es posible
+        // Si estamos en la zona de superadmin, lo mandamos a su login
+        if (window.location.pathname.includes('superadmin')) {
+            window.location.href = basePath + 'superadmin_login.html';
+            return;
+        }
+
+        // Si es usuario normal
         let slugDestino = '';
         const pathParts = window.location.pathname.split('/'); 
         const frontIndex = pathParts.indexOf('front');
@@ -107,9 +109,9 @@ export const API = {
         }
 
         if (slugDestino && slugDestino !== 'superadmin' && slugDestino !== 'master') {
-            window.location.href = `${basePath}${slugDestino}/`; // Ej: app.groboapp.com/urbe/
+            window.location.href = `${basePath}${slugDestino}/`; 
         } else {
-            window.location.href = basePath; // app.groboapp.com/
+            window.location.href = basePath; 
         }
     }
 };

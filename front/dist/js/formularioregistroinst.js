@@ -20,19 +20,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 2. VALIDAR SLUG Y CARGAR DATOS PREVIOS (SI ES BORRADOR)
+// 2. VALIDAR SLUG Y CARGAR DATOS (RUTA PÚBLICA)
     try {
-        const res = await API.request(`/form-registros/detail/${slug}`); // Ajustado a la ruta correcta de lectura si tienes un getBySlug
-        // Nota: Como en tu controller no vi ruta para traer borrador, asumimos que carga config base.
-        // Si tu API usa /form-registro/:slug debes usar esa. Yo usaré una genérica segura.
+        // Le pegamos a la ruta pública que acabamos de crear en routes.php
+        const res = await API.request(`/form-registro/config/${slug}`);
         
-        // Simulamos carga base por ahora basándonos en tu código previo:
-        const configRes = await fetch(`${API.urlBase}/validate-inst/${slug}`).then(r => r.json());
-        
-        if (configRes && configRes.status === 'success') {
-            document.getElementById('id_form_config').value = configRes.data.id || slug; 
-            document.getElementById('display-nombre-inst').innerText = `Configuración: ${configRes.data.nombre_completo || slug}`;
-            document.getElementById('display-encargado').innerText = `Complete los catálogos para inicializar el sistema`;
+        if (res && res.status === 'success') {
+            // Llenamos los datos ocultos y visuales con lo que viene de la BD
+            document.getElementById('id_form_config').value = res.data.id_form_config; 
+            document.getElementById('display-nombre-inst').innerText = `Configuración: ${res.data.nombre_inst_previa}`;
+            document.getElementById('display-encargado').innerText = `A cargo de: ${res.data.encargado_nombre}`;
             
             cargarValoresPorDefecto();
         } else {
@@ -40,10 +37,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (e) { 
         console.error("Error:", e);
-        document.body.innerHTML = `<div class="p-5 text-center"><h1 class="text-danger">Error de Acceso</h1><p>${e.message}</p></div>`;
+        document.body.innerHTML = `
+            <div class="d-flex align-items-center justify-content-center vh-100 bg-light">
+                <div class="text-center p-5 bg-white shadow-lg rounded-4 border-top border-5 border-danger">
+                    <h1 class="text-danger fw-black mb-3">ACCESO DENEGADO</h1>
+                    <p class="text-muted fw-bold">El enlace proporcionado no es válido o ha expirado.</p>
+                </div>
+            </div>`;
         return;
     }
-
     // 3. LISTENERS BOTONES
     document.getElementById('btn-add-depto').onclick = () => agregarItemDoble('contenedor-deptos', 'depto_nom[]', 'depto_org[]', 'Nombre Departamento', 'Organismo Superior (Facultad/Instituto)');
     document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', 'Ej: Investigación, Docencia');
