@@ -20,7 +20,7 @@ class FormRegistroModel {
         return $id;
     }
 
-    public function getConfigBySlug($slug) {
+public function getConfigBySlug($slug) {
         $stmt = $this->db->prepare("SELECT * FROM form_registro_config WHERE slug_url = ? AND activo = 1 LIMIT 1");
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);

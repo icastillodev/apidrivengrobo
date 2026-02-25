@@ -69,4 +69,25 @@ class FormRegistroController {
         }
         exit;
     }
+    // AGREGAR ESTO AL CONTROLADOR:
+    public function getBySlug($slug) {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            // Buscamos en el modelo
+            $data = $this->model->getConfigBySlug($slug);
+            
+            if (!$data) {
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => 'El enlace ha expirado o no es válido.']);
+                exit;
+            }
+
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

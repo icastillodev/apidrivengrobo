@@ -22,11 +22,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 2. VALIDAR SLUG Y CARGAR DATOS (RUTA PÚBLICA)
     try {
-        // Le pegamos a la ruta pública que acabamos de crear en routes.php
+        // ESTA ES LA LÍNEA CLAVE QUE DEBEMOS CAMBIAR:
         const res = await API.request(`/form-registro/config/${slug}`);
         
         if (res && res.status === 'success') {
-            // Llenamos los datos ocultos y visuales con lo que viene de la BD
             document.getElementById('id_form_config').value = res.data.id_form_config; 
             document.getElementById('display-nombre-inst').innerText = `Configuración: ${res.data.nombre_inst_previa}`;
             document.getElementById('display-encargado').innerText = `A cargo de: ${res.data.encargado_nombre}`;
@@ -37,15 +36,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (e) { 
         console.error("Error:", e);
-        document.body.innerHTML = `
-            <div class="d-flex align-items-center justify-content-center vh-100 bg-light">
-                <div class="text-center p-5 bg-white shadow-lg rounded-4 border-top border-5 border-danger">
-                    <h1 class="text-danger fw-black mb-3">ACCESO DENEGADO</h1>
-                    <p class="text-muted fw-bold">El enlace proporcionado no es válido o ha expirado.</p>
-                </div>
-            </div>`;
-        return;
-    }
     // 3. LISTENERS BOTONES
     document.getElementById('btn-add-depto').onclick = () => agregarItemDoble('contenedor-deptos', 'depto_nom[]', 'depto_org[]', 'Nombre Departamento', 'Organismo Superior (Facultad/Instituto)');
     document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', 'Ej: Investigación, Docencia');
