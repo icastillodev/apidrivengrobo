@@ -9,6 +9,25 @@ export const HistorialUI = {
         window.confirmarFinalizarRango = this.confirmarFinalizarRango.bind(this);
         window.confirmarDesfinalizar = this.confirmarDesfinalizar.bind(this);
         window.abrirConfiguracion = this.abrirConfiguracion.bind(this);
+        window.cfgSelectProtocolo = this.cfgSelectProtocolo.bind(this);
+        window.cfgSelectUsuario = this.cfgSelectUsuario.bind(this);
+        window.cfgSelectEspecie = this.cfgSelectEspecie.bind(this);
+        window.cfgSelectTipo = this.cfgSelectTipo.bind(this);
+        window.guardarConfiguracionHistoria = this.guardarConfiguracionHistoria.bind(this);
+
+        // Listeners de búsqueda en vivo para Configuración
+        document.getElementById('cfg-search-prot')?.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('#cfg-grid-protocolos tr').forEach(tr => {
+                tr.style.display = tr.innerText.toLowerCase().includes(term) ? '' : 'none';
+            });
+        });
+        document.getElementById('cfg-search-user')?.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('#cfg-list-usuarios .list-group-item').forEach(li => {
+                li.style.display = li.innerText.toLowerCase().includes(term) ? '' : 'none';
+            });
+        });
     },
 
     async verHistorial(historiaId, event = null) {
@@ -69,7 +88,16 @@ renderSummary(historiaId) {
 
         summaryContainer.innerHTML = `
             <div class="col-md-2 border-end text-center"><label class="d-block small text-muted fw-bold">${(txt.th_history || 'Historia').toUpperCase()}</label><span class="badge bg-dark fs-6">#${historiaId}</span></div>
-            <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(gen.investigador || 'Investigador').toUpperCase()}</label><span class="text-dark small fw-bold text-uppercase">${first.Investigador}</span></div>
+            <div class="col-md-2 border-end">
+                <label class="d-block small text-muted fw-bold mb-0">${(gen.investigador || 'Investigador').toUpperCase()}</label>
+                <span class="text-dark small fw-bold text-uppercase d-block lh-1 mb-1" style="font-size: 11px;">${first.Investigador}</span>
+                <div class="text-muted text-truncate" style="font-size: 9px;" title="${first.EmailInvestigador}">
+                    <i class="bi bi-envelope-at-fill text-primary"></i> ${first.EmailInvestigador}
+                </div>
+                <div class="text-muted text-truncate" style="font-size: 9px;" title="${first.CelularInvestigador}">
+                    <i class="bi bi-telephone-fill text-success"></i> ${first.CelularInvestigador}
+                </div>
+            </div>
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">PROTOCOL N°</label><span class="text-dark small">${first.nprotA}</span></div>
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(gen.especie || 'Especie').toUpperCase()}</label><span class="text-dark small">${first.EspeNombreA}</span></div>
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(txt.box_name || 'Tipo').toUpperCase()}</label><span class="text-primary small fw-bold">${tipoCaja}</span></div> 
@@ -231,122 +259,246 @@ renderFooter(historiaId) {
         }
     },
 
+// =========================================================
+    // MODAL DE CONFIGURACIÓN DE HISTORIA (Edición Maestra)
+    // =========================================================
+    cfgSelections: { historia: null, idprotA: null, IdUsrA: null, idespA: null, IdTipoAlojamiento: null },
+    cfgData: { protocolos: [], usuarios: [] },
+
 async abrirConfiguracion() {
         const first = AlojamientoState.currentHistoryData[0];
-        const instId = AlojamientoState.instId;
+        if(!first) return;
 
-        // 1. OBTENER PROTOCOLOS
-        let protocols = [];
+        // Establecer las selecciones base de lo que YA tiene la historia
+        this.cfgSelections = {
+            historia: first.historia,
+            idprotA: parseInt(first.idprotA),
+            IdUsrA: parseInt(first.IdUsrA),
+            idespA: parseInt(first.TipoAnimal || first.idespA),
+            IdTipoAlojamiento: parseInt(first.IdTipoAlojamiento)
+        };
+
+        document.getElementById('modal-cfg-title').innerText = `CONFIGURACIÓN MAESTRA - HISTORIA #${first.historia}`;
+
+        showLoader();
+        await Promise.all([this.loadCfgProtocolos(), this.loadCfgUsuarios()]);
+        
+        // Cargar las especies del protocolo actual
+        await this.loadCfgEspecies(this.cfgSelections.idprotA);
+        hideLoader();
+
+        const modalEl = document.getElementById('modal-config-historia');
+        const modalObj = new bootstrap.Modal(modalEl);
+
+        // MAGIA VISUAL: Esperamos a que el modal esté 100% visible para scrollear y pintar
+        modalEl.addEventListener('shown.bs.modal', () => {
+            this.cfgSelectProtocolo(this.cfgSelections.idprotA, true); // true = esInit, no recargar hijos
+            this.cfgSelectUsuario(this.cfgSelections.IdUsrA, true);
+            if(this.cfgSelections.idespA) this.cfgSelectEspecie(this.cfgSelections.idespA, false);
+            if(this.cfgSelections.IdTipoAlojamiento) this.cfgSelectTipo(this.cfgSelections.IdTipoAlojamiento);
+        }, { once: true }); // Se ejecuta una sola vez al abrir
+
+        modalObj.show();
+    },
+
+    cfgSelectProtocolo(id, isInit = false) {
+        this.cfgSelections.idprotA = parseInt(id);
+        
+        document.querySelectorAll('#cfg-grid-protocolos tr').forEach(tr => tr.classList.remove('table-primary', 'border-primary'));
+        const row = document.getElementById(`cfg-row-prot-${id}`);
+        
+        if (row) {
+            row.classList.add('table-primary', 'border-primary');
+            // block: 'center' fuerza a la grilla a bajar hasta dejar la fila seleccionada en el medio
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+        }
+
+        // Solo recargamos especies si el usuario hizo clic manualmente
+        if (!isInit) {
+            this.cfgSelections.idespA = null;
+            this.cfgSelections.IdTipoAlojamiento = null;
+            this.loadCfgEspecies(id);
+        }
+    },
+
+    cfgSelectUsuario(id, isInit = false) {
+        this.cfgSelections.IdUsrA = parseInt(id);
+        document.querySelectorAll('#cfg-list-usuarios .list-group-item').forEach(li => {
+            li.classList.remove('active', 'bg-success', 'text-white', 'border-success');
+            li.querySelector('b')?.classList.replace('text-white', 'text-dark');
+        });
+        
+        const sel = document.getElementById(`cfg-item-usr-${id}`);
+        if (sel) {
+            sel.classList.add('active', 'bg-success', 'text-white', 'border-success');
+            sel.querySelector('b')?.classList.replace('text-dark', 'text-white');
+            sel.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+        }
+    },
+
+    async loadCfgProtocolos() {
         try {
-            const res = await API.request(`/protocoloexpe/list?inst=${instId}`);
-            if (res.status === 'success') protocols = res.data;
-        } catch(e) {}
-
-        const txt = window.txt.alojamientos;
-
-        // 2. HTML DEL MODAL (Muestra Valores Actuales por Defecto)
-        const html = `
-            <div class="text-start small p-2">
-                <div class="alert alert-danger py-2 px-3 mb-3 fw-bold" style="font-size:11px;">
-                    <i class="bi bi-exclamation-triangle-fill"></i> ${txt.cfg_warning || 'Se alterará toda la historia.'}
-                </div>
-
-                <label class="fw-bold text-muted text-uppercase mb-1">Buscar Protocolo Vigente</label>
-                <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-1" placeholder="Buscar...">
-                <select id="cfg-select-prot" class="form-select form-select-sm shadow-sm mb-3" size="3">
-                    ${protocols.map(p => `<option value="${p.idprotA}" ${p.idprotA == first.idprotA ? 'selected' : ''}>[${p.nprotA}] ${p.tituloA}</option>`).join('')}
-                </select>
-
-                <label class="fw-bold text-muted text-uppercase mb-1">Especie y Tipo (Afectará Precios)</label>
-                <select id="cfg-select-esp" class="form-select form-select-sm mb-1 disabled" disabled><option>Cargando...</option></select>
-                <select id="cfg-select-tipo" class="form-select form-select-sm border-primary disabled" disabled><option>Cargando...</option></select>
-            </div>
-        `;
-
-        const swalModal = await Swal.fire({
-            title: `${txt.btn_config} #${first.historia}`,
-            html: html,
-            showCancelButton: true,
-            confirmButtonText: 'SIGUIENTE <i class="bi bi-arrow-right"></i>',
-            confirmButtonColor: '#0d6efd',
-            target: document.getElementById('modal-historial'), // Para que no se bloquee
-            didOpen: async () => {
-                const selProt = document.getElementById('cfg-select-prot');
-                const selEsp = document.getElementById('cfg-select-esp');
-                const selTipo = document.getElementById('cfg-select-tipo');
-
-                const loadEspecies = async (idProt, preselectId = null) => {
-                    selEsp.innerHTML = '<option>Cargando...</option>';
-                    selTipo.innerHTML = '<option>Esperando...</option>';
-                    const res = await API.request(`/protocols/current-species?id=${idProt}`);
-                    selEsp.innerHTML = res.data.map(s => `<option value="${s.idespA}" ${s.idespA == preselectId ? 'selected' : ''}>${s.EspeNombreA}</option>`).join('');
-                    selEsp.disabled = false;
-                    await loadTipos(selEsp.value, first.IdTipoAlojamiento);
-                };
-
-                const loadTipos = async (idEsp, preselectId = null) => {
-                    const res = await API.request(`/precios/all-data`);
-                    const tipos = res.data.alojamientos.filter(t => t.idespA == idEsp && t.Habilitado == 1);
-                    selTipo.innerHTML = tipos.map(t => `<option value="${t.IdTipoAlojamiento}" ${t.IdTipoAlojamiento == preselectId ? 'selected' : ''}>${t.NombreTipoAlojamiento} ($${t.PrecioXunidad})</option>`).join('');
-                    selTipo.disabled = false;
-                };
-
-                selProt.addEventListener('change', (e) => loadEspecies(e.target.value));
-                selEsp.addEventListener('change', (e) => loadTipos(e.target.value));
-
-                document.getElementById('cfg-search-prot').addEventListener('input', (e) => {
-                    const term = e.target.value.toLowerCase();
-                    Array.from(selProt.options).forEach(opt => { opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none'; });
-                });
-
-                // Cargar datos actuales preseleccionados
-                await loadEspecies(selProt.value, first.TipoAnimal || first.idespA);
-            },
-            preConfirm: () => {
-                const selProt = document.getElementById('cfg-select-prot');
-                const selEsp = document.getElementById('cfg-select-esp');
-                const selTipo = document.getElementById('cfg-select-tipo');
-                return {
-                    historia: first.historia,
-                    idprotA: selProt.value,
-                    idespA: selEsp.value,
-                    IdTipoAlojamiento: selTipo.value,
-                    // Capturamos el texto para la pantalla de confirmación final
-                    txtProt: selProt.options[selProt.selectedIndex]?.text,
-                    txtEsp: selEsp.options[selEsp.selectedIndex]?.text,
-                    txtTipo: selTipo.options[selTipo.selectedIndex]?.text
-                };
+            const res = await API.request(`/protocoloexpe/list?inst=${AlojamientoState.instId}`);
+            if (res.status === 'success') {
+                this.cfgData.protocolos = res.data;
+                const tbody = document.getElementById('cfg-grid-protocolos');
+                
+                tbody.innerHTML = res.data.map(p => `
+                    <tr id="cfg-row-prot-${p.idprotA}" onclick="window.cfgSelectProtocolo(${p.idprotA})" class="transition-colors ${p.idprotA == this.cfgSelections.idprotA ? 'table-primary border-primary' : ''}">
+                        <td class="fw-bold text-muted">#${p.idprotA}</td>
+                        <td class="fw-bold text-primary">${p.nprotA}</td>
+                        <td class="text-truncate" style="max-width: 150px;">${p.tituloA || 'Sin Título'}</td>
+                        <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || 'Sin Asignar'}</td>
+                    </tr>
+                `).join('');
             }
+        } catch (e) { console.error(e); }
+    },
+
+
+    async loadCfgUsuarios() {
+        try {
+            const res = await API.request(`/users/institution`);
+            const list = document.getElementById('cfg-list-usuarios');
+            if (res.status === 'success') {
+                this.cfgData.usuarios = res.data;
+                list.innerHTML = res.data.map(u => `
+                    <div id="cfg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom ${u.IdUsrA == this.cfgSelections.IdUsrA ? 'active bg-success text-white border-success' : ''}" onclick="window.cfgSelectUsuario(${u.IdUsrA})">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><b class="${u.IdUsrA == this.cfgSelections.IdUsrA ? 'text-white' : 'text-dark'}">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
+                            <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) { console.error(e); }
+    },
+
+
+
+    async loadCfgEspecies(idProt) {
+        const container = document.getElementById('cfg-list-especies');
+        container.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div> Cargando...';
+        
+        // Limpiamos los tipos
+        document.getElementById('cfg-list-tipos').innerHTML = '<span class="small text-muted fst-italic">Seleccione una especie primero.</span>';
+
+        try {
+            const res = await API.request(`/protocols/current-species?id=${idProt}`);
+            if (res.status === 'success' && res.data.length > 0) {
+                container.innerHTML = res.data.map(s => `
+                    <button type="button" id="cfg-btn-esp-${s.idespA}" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.cfgSelectEspecie(${s.idespA})">
+                        <i class="bi bi-check-circle me-1 d-none" id="cfg-icon-esp-${s.idespA}"></i> ${s.EspeNombreA}
+                    </button>
+                `).join('');
+
+                // Autoseleccionar si hay una sola especie
+                if (res.data.length === 1) {
+                    this.cfgSelectEspecie(res.data[0].idespA);
+                }
+            } else {
+                container.innerHTML = '<div class="alert alert-danger small p-2 w-100">Este protocolo no tiene especies asignadas.</div>';
+            }
+        } catch (e) { console.error(e); }
+    },
+
+    cfgSelectEspecie(id, reloadTipos = true) {
+        this.cfgSelections.idespA = id;
+        document.querySelectorAll('#cfg-list-especies button').forEach(btn => {
+            btn.classList.remove('btn-warning', 'text-dark');
+            btn.classList.add('btn-outline-secondary');
+            btn.querySelector('i').classList.add('d-none');
+        });
+        
+        const btn = document.getElementById(`cfg-btn-esp-${id}`);
+        if(btn) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-warning', 'text-dark');
+            btn.querySelector('i').classList.remove('d-none');
+        }
+
+        if(reloadTipos) {
+            this.cfgSelections.IdTipoAlojamiento = null;
+            this.loadCfgTipos(id);
+        } else {
+            // Si venimos del init y ya teníamos IdTipoAlojamiento, igual cargamos los tipos
+            this.loadCfgTipos(id);
+        }
+    },
+
+async loadCfgTipos(idEsp) {
+        const container = document.getElementById('cfg-list-tipos');
+        container.innerHTML = '<div class="spinner-border spinner-border-sm text-danger"></div> Buscando estructuras...';
+
+        try {
+            const res = await API.request(`/alojamiento/tipos-por-especie?idEsp=${idEsp}`);
+            
+            if (res.status === 'success') {
+                const tipos = res.data;
+                
+                if (tipos.length > 0) {
+                    container.innerHTML = tipos.map(t => `
+                        <button type="button" id="cfg-btn-tipo-${t.IdTipoAlojamiento}" class="btn btn-outline-secondary btn-sm text-start" onclick="window.cfgSelectTipo(${t.IdTipoAlojamiento})">
+                            <i class="bi bi-check-circle me-1 d-none" id="cfg-icon-tipo-${t.IdTipoAlojamiento}"></i> 
+                            <b>${t.NombreTipoAlojamiento}</b> <span class="text-success ms-2">$${t.PrecioXunidad || 0}</span>
+                        </button>
+                    `).join('');
+
+                    if(this.cfgSelections.IdTipoAlojamiento) {
+                        this.cfgSelectTipo(this.cfgSelections.IdTipoAlojamiento);
+                    }
+                } else {
+                    container.innerHTML = '<div class="alert alert-danger small p-2 m-0"><i class="bi bi-exclamation-circle"></i> No hay estructuras tarifadas para esta especie.</div>';
+                }
+            }
+        } catch (e) { console.error("Error cargando tipos:", e); }
+    },
+
+    cfgSelectTipo(id) {
+        this.cfgSelections.IdTipoAlojamiento = id;
+        document.querySelectorAll('#cfg-list-tipos button').forEach(btn => {
+            btn.classList.remove('btn-danger', 'text-white');
+            btn.classList.add('btn-outline-secondary');
+            btn.querySelector('i').classList.add('d-none');
+        });
+        
+        const btn = document.getElementById(`cfg-btn-tipo-${id}`);
+        if(btn) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-danger', 'text-white');
+            btn.querySelector('i').classList.remove('d-none');
+        }
+    },
+
+    async guardarConfiguracionHistoria() {
+        const data = this.cfgSelections;
+        if (!data.idprotA || !data.IdUsrA || !data.idespA || !data.IdTipoAlojamiento) {
+            return Swal.fire('Faltan Datos', 'Asegúrese de tener seleccionado un Protocolo, Usuario, Especie y Estructura.', 'warning');
+        }
+
+        const confirm = await Swal.fire({
+            title: '¿Confirmar Modificación?',
+            text: `Se recalcularán los precios y se actualizará toda la historia #${data.historia}.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'SÍ, APLICAR',
+            confirmButtonColor: '#dc3545',
+            target: document.getElementById('modal-config-historia')
         });
 
-        // 3. PANTALLA DE CONFIRMACIÓN FINAL
-        if (swalModal.isConfirmed) {
-            const data = swalModal.value;
-            const confirm = await Swal.fire({
-                title: '¿Confirmar Modificación?',
-                html: `
-                    <div class="text-start bg-light p-3 rounded border">
-                        <p class="mb-1"><b>Protocolo:</b> <span class="text-primary">${data.txtProt}</span></p>
-                        <p class="mb-1"><b>Especie:</b> <span class="text-primary">${data.txtEsp}</span></p>
-                        <p class="mb-0"><b>Tipo/Costo:</b> <span class="text-primary">${data.txtTipo}</span></p>
-                    </div>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> APLICAR CAMBIOS',
-                confirmButtonColor: '#dc3545',
-                target: document.getElementById('modal-historial')
-            });
-
-            if (confirm.isConfirmed) {
-                showLoader();
-                try {
-                    await API.request('/alojamiento/update-config', 'POST', data);
-                    Swal.fire({title: 'Éxito', text: 'Se actualizó la historia completa.', icon: 'success', target: document.getElementById('modal-historial')});
-                    this.verHistorial(first.historia); // Refresca Modal Historial
-                    loadAlojamientos(); // Refresca Grilla
-                } catch(e) { console.error(e); } finally { hideLoader(); }
-            }
+        if (confirm.isConfirmed) {
+            showLoader();
+            try {
+                const res = await API.request('/alojamiento/update-config', 'POST', data);
+                if (res.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('modal-config-historia')).hide();
+                    Swal.fire({title: 'Éxito', text: 'Se reconfiguró toda la historia.', icon: 'success', timer: 1500});
+                    this.verHistorial(data.historia); // Refresca el modal de historial que está abajo
+                    loadAlojamientos(); // Refresca la grilla principal
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            } catch(e) { console.error(e); } finally { hideLoader(); }
         }
     }
-};
+}

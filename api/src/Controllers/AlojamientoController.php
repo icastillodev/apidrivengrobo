@@ -118,14 +118,18 @@ class AlojamientoController {
         exit;
     }
 
-    public function save() {
+public function save() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (!isset($data['historia'])) {
+        // 1. Detectamos si es una actualización de tramo o un REGISTRO NUEVO
+        $isUpdate = isset($data['is_update']) && ($data['is_update'] === true || $data['is_update'] === "true");
+
+        // 2. Si es actualización, SÍ O SÍ necesitamos la historia. Si es nuevo, la dejamos pasar.
+        if ($isUpdate && empty($data['historia'])) {
             http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Falta Historia']);
+            echo json_encode(['status' => 'error', 'message' => 'Falta el ID de Historia para actualizar.']);
             return;
         }
 
@@ -133,6 +137,7 @@ class AlojamientoController {
             $sesion = Auditoria::getDatosSesion();
             $data['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId real
             
+            // Mandamos a guardar al modelo (el modelo se encarga de crear la historia nueva si no existe)
             $res = $this->model->saveAlojamiento($data);
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -141,7 +146,28 @@ class AlojamientoController {
         }
         exit;
     }
+public function getTiposPorEspecie() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        $idEsp = $_GET['idEsp'] ?? null;
+        
+        if (!$idEsp) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Falta el ID de la especie']);
+            exit;
+        }
 
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getTiposAlojamientoHabilitados($idEsp, $sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
     public function updateConfig() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

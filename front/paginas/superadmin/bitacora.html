@@ -47,11 +47,11 @@
         </nav>
 
         <div class="row align-items-end mb-4 pb-3 border-bottom">
-            <div class="col-lg-8">
+            <div class="col-xl-9 col-lg-12">
                 <h1 class="h4 text-secondary text-uppercase mb-4">Registro Maestro de Movimientos</h1>
-                <div class="input-group shadow-sm" style="max-width: 800px;">
+                <div class="input-group shadow-sm">
                     <span class="input-group-text bg-light text-muted fw-bold small text-uppercase" style="font-size: 10px;">Acción:</span>
-                    <select id="filter-action" class="form-select form-select-sm fw-bold" style="max-width: 150px;">
+                    <select id="filter-action" class="form-select form-select-sm fw-bold" style="max-width: 140px;">
                         <option value="all">Todas</option>
                         <option value="INSERT">Creaciones</option>
                         <option value="UPDATE">Modificaciones</option>
@@ -59,14 +59,19 @@
                         <option value="LOGIN">Accesos</option>
                     </select>
 
-                    <span class="input-group-text bg-light text-muted fw-bold small text-uppercase" style="font-size: 10px;">Búsqueda Global:</span>
-                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Usuario, tabla o detalle...">
+                    <span class="input-group-text bg-light text-muted fw-bold small text-uppercase border-start-0" style="font-size: 10px;">Sede:</span>
+                    <select id="filter-inst" class="form-select form-select-sm fw-bold" style="max-width: 180px;">
+                        <option value="all">Todas las Sedes</option>
+                    </select>
+
+                    <span class="input-group-text bg-light text-muted fw-bold small text-uppercase border-start-0" style="font-size: 10px;">Búsqueda Global:</span>
+                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Usuario, tabla, detalle...">
                     
                     <button id="btn-search" class="btn btn-success fw-bold px-4 badge-gecko text-white">Filtrar</button>
                 </div>
             </div>
-            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-                <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase text-xs">Descargar Excel</button>
+            <div class="col-xl-3 col-lg-12 text-xl-end mt-3 mt-xl-0">
+                <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 text-uppercase" style="font-size: 12px;">Descargar Excel</button>
             </div>
         </div>
 
@@ -78,13 +83,14 @@
                         <th class="py-3 px-3">Log ID</th>
                         <th class="py-3 px-3">Fecha y Hora</th>
                         <th class="py-3 px-3">Usuario Ejecutor</th>
+                        <th class="py-3 px-3">Institución</th>
                         <th class="py-3 px-3 text-center">Tipo de Acción</th>
                         <th class="py-3 px-3">Tabla Afectada</th>
                         <th class="py-3 px-3 w-50">Detalle Exacto del Movimiento</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    </tbody>
+                </tbody>
             </table>
         </div>
 

@@ -119,4 +119,43 @@ public function verifyAndGetUser2FA($userId, $code) {
         $this->db->prepare("UPDATE institucion SET FechaDepuracion = NOW() WHERE IdInstitucion = ?")->execute([$instId]);
         return true;
     }
+    // =========================================================
+    // SEGURIDAD: CONTROL DE INTENTOS (RATE LIMITING)
+    // =========================================================
+
+    public function isIpBlocked($ip) {
+        $stmt = $this->db->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE ip_address = ?");
+        $stmt->execute([$ip]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($row) {
+            $lastAttempt = strtotime($row['last_attempt']);
+            $timePassed = time() - $lastAttempt;
+            
+            // Si tiene 5 o más intentos y pasaron menos de 5 minutos (300 segundos)
+            if ($row['attempts'] >= 5 && $timePassed < 300) {
+                return true; // 🚨 BLOQUEADO
+            }
+            
+            // Si ya pasaron los 5 minutos, le perdonamos la vida y reiniciamos
+            if ($row['attempts'] >= 5 && $timePassed >= 300) {
+                $this->resetLoginAttempts($ip);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public function recordFailedLogin($ip) {
+        // Inserta la IP con 1 intento. Si ya existe, le suma 1 y actualiza la hora.
+        $sql = "INSERT INTO login_attempts (ip_address, attempts, last_attempt) 
+                VALUES (?, 1, NOW()) 
+                ON DUPLICATE KEY UPDATE attempts = attempts + 1, last_attempt = NOW()";
+        $this->db->prepare($sql)->execute([$ip]);
+    }
+
+    public function resetLoginAttempts($ip) {
+        // Borramos el historial criminal de la IP cuando se loguea con éxito
+        $this->db->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
+    }
 }

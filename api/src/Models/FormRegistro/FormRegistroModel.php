@@ -20,6 +20,13 @@ class FormRegistroModel {
         return $id;
     }
 
+// Agrega esta función dentro de FormRegistroModel
+    public function getConfigById($id) {
+        $stmt = $this->db->prepare("SELECT * FROM form_registro_config WHERE id_form_config = ? LIMIT 1");
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
 public function getConfigBySlug($slug) {
         $stmt = $this->db->prepare("SELECT * FROM form_registro_config WHERE slug_url = ? AND activo = 1 LIMIT 1");
         $stmt->execute([$slug]);
@@ -79,5 +86,29 @@ public function getConfigBySlug($slug) {
             $grouped[$row['categoria']][] = $row;
         }
         return $grouped;
+    }
+    // --- NUEVAS FUNCIONES DE GESTIÓN ---
+
+    public function toggleStatus($idConfig, $status, $adminId) {
+        $sql = "UPDATE form_registro_config SET activo = ? WHERE id_form_config = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$status, $idConfig]);
+        
+        $estadoTexto = $status == 1 ? "Habilitado" : "Deshabilitado";
+        Auditoria::logManual($this->db, $adminId, 'UPDATE', 'form_registro_config', "Link de Onboarding ID: $idConfig cambiado a: $estadoTexto");
+        return true;
+    }
+
+    public function deleteConfig($idConfig, $adminId) {
+        // Como tienes llaves foráneas en respuestas (EAV), borramos primero las respuestas
+        $this->db->prepare("DELETE FROM form_registro_respuestas WHERE id_form_config = ?")->execute([$idConfig]);
+        
+        // Luego borramos la configuración base
+        $sql = "DELETE FROM form_registro_config WHERE id_form_config = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idConfig]);
+
+        Auditoria::logManual($this->db, $adminId, 'DELETE', 'form_registro_config', "Link de Onboarding ID: $idConfig eliminado permanentemente.");
+        return true;
     }
 }

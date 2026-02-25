@@ -282,70 +282,163 @@
     </div>
 </div>
 
-<div class="modal fade" id="modal-registro" aria-hidden="true">
-    <div class="modal-dialog modal-lg border-0">
+<div class="modal fade" id="modal-registro" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg border-0 modal-dialog-scrollable">
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-success text-white py-2">
                 <div>
                     <h6 id="modal-registro-title" class="modal-title fw-bold m-0" data-i18n="alojamientos.reg_title">NUEVO REGISTRO DE ALOJAMIENTO</h6>
-                    <small class="opacity-75" data-i18n="alojamientos.reg_subtitle">Control de estadía y bioseguridad</small>
+                    <small class="opacity-75">Asistente paso a paso</small>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-                <div class="modal-body">
+            <div class="modal-body bg-light p-4">
+                
+                <div id="step-1-protocolo" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-primary transition-all">
+                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-file-earmark-text me-2"></i>1. SELECCIONAR PROTOCOLO</h6>
+                    <input type="text" id="reg-search-prot" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, N° Protocolo, Título o Investigador...">
+                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table table-hover table-sm border align-middle text-start" style="font-size: 11px; cursor: pointer;">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>N° Prot</th>
+                                    <th>Título</th>
+                                    <th>Depto (Org)</th> <th>Especies</th>
+                                    <th>Responsable</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reg-grid-protocolos">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-12 mt-3 p-2 bg-light border rounded">
+                        <label class="small fw-bold text-info text-uppercase"><i class="bi bi-building"></i> Departamento Vinculado</label>
+                        <select id="reg-select-depto" class="form-select form-select-sm fw-bold border-info text-dark" disabled>
+                            <option value="">Esperando protocolo...</option>
+                        </select>
+                    </div>
+                <div id="step-2-usuario" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-success d-none transition-all">
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-person-badge me-2"></i>2. RESPONSABLE DEL ALOJAMIENTO</h6>
+                    <input type="text" id="reg-search-user" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, Usuario, Nombre o Apellido...">
+                    <div class="list-group" id="reg-list-usuarios" style="max-height: 180px; overflow-y: auto; font-size: 12px; cursor: pointer;">
+                        </div>
+                </div>
+
+                <div id="step-3-detalles" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-warning d-none transition-all">
+                    <h6 class="fw-bold text-warning mb-3 text-dark"><i class="bi bi-bug me-2"></i>3. CONFIGURACIÓN FÍSICA</h6>
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="small fw-bold">PROTOCOLO VIGENTE</label>
-                            <input type="text" id="reg-search-prot" class="form-control form-control-sm mb-1" placeholder="Buscar por título o protocolo...">
-                            <select id="reg-protocolo" class="form-select form-select-sm" size="4"></select>
-                        </div>
-                        
-                        <div class="col-12">
-                            <label class="small fw-bold">USUARIO RESPONSABLE</label>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" id="btn-user-select">
-                                    <span>Seleccione un usuario...</span>
-                                </button>
-                                <div class="dropdown-menu w-100 p-2 shadow-sm">
-                                    <input type="text" id="reg-user-search" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, usuario o nombre...">
-                                    <div id="reg-user-list" style="max-height: 150px; overflow-y: auto;"></div>
+                        <div class="col-md-5 border-end">
+                            <label class="small fw-bold text-muted mb-2">Especie a alojar</label>
+                            <div id="reg-list-especies" class="d-flex flex-column gap-2">
                                 </div>
-                            </div>
-                            <input type="hidden" id="reg-usuario-hidden">
                         </div>
-
-                        <div class="col-6">
-                            <label class="small fw-bold">ESPECIE</label>
-                            <select id="reg-especie" class="form-select form-select-sm border-primary disabled" disabled></select>
-                        </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">TIPO DE ALOJAMIENTO</label>
-                            <select id="reg-tipo" class="form-select form-select-sm border-success disabled" disabled></select>
-                        </div>
-
-                        <div class="col-6">
-                            <label class="small fw-bold">FECHA DE INGRESO</label>
-                            <input type="date" id="reg-fecha" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">CANT. INICIAL DE CAJAS</label>
-                            <input type="number" id="reg-cantidad" class="form-control form-control-sm" min="1" value="1">
-                        </div>
-                        <div class="col-12">
-                            <label class="small fw-bold">OBSERVACIONES</label>
-                            <textarea id="reg-obs" class="form-control form-control-sm" rows="2"></textarea>
+                        <div class="col-md-7">
+                            <label class="small fw-bold text-muted mb-2">Estructura / Tipo de Alojamiento</label>
+                            <div id="reg-list-tipos" class="d-flex flex-column gap-2">
+                                </div>
                         </div>
                     </div>
                 </div>
-            <div class="modal-footer bg-light border-top-0">
-                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal" data-i18n="alojamientos.btn_cancel">CANCELAR</button>
-                <button type="button" id="btn-save-reg" class="btn btn-sm btn-success fw-bold px-4 shadow-sm d-none" onclick="window.saveAlojamiento()">
-                    <i class="bi bi-save me-1"></i> <span data-i18n="alojamientos.btn_save_reg">GUARDAR REGISTRO</span>
+
+                <div id="step-4-final" class="bg-white p-3 rounded shadow-sm border-start border-4 border-danger d-none transition-all">
+                    <h6 class="fw-bold text-danger mb-3"><i class="bi bi-calendar-check me-2"></i>4. INGRESO AL BIOTERIO</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted text-uppercase">Fecha de Ingreso</label>
+                            <input type="date" id="reg-fecha" class="form-control form-control-sm fw-bold border-secondary">
+                        </div>
+                        <div class="col-md-8">
+                            <label id="lbl-cantidad-dinamico" class="small fw-bold text-danger text-uppercase">Cantidad Inicial de ...</label>
+                            <input type="number" id="reg-cantidad" class="form-control form-control-sm fw-bold border-danger" min="1" value="1">
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold text-muted text-uppercase">Observaciones Generales</label>
+                            <textarea id="reg-obs" class="form-control form-control-sm" rows="2" placeholder="Anotaciones administrativas opcionales..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer bg-light border-top-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal">CANCELAR</button>
+                <button type="button" id="btn-save-reg" class="btn btn-sm btn-success fw-bold px-4 shadow-sm d-none" onclick="window.guardarNuevoAlojamiento()">
+                    <i class="bi bi-save me-1"></i> GUARDAR ALOJAMIENTO
                 </button>
             </div>
         </div>
     </div>
 </div>
+<div class="modal fade" id="modal-config-historia" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl border-0 modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-dark text-white py-2">
+                <div>
+                    <h6 id="modal-cfg-title" class="modal-title fw-bold m-0 text-uppercase">Configuración Maestra de Historia</h6>
+                    <small class="text-warning">Atención: Los cambios aquí afectan toda la contabilidad histórica.</small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                
+                <div class="row g-4">
+                    <div class="col-lg-6 border-end">
+                        
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-primary mb-2" style="font-size: 11px;"><i class="bi bi-file-earmark-text me-1"></i> PROTOCOLO VINCULADO</h6>
+                            <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-2" placeholder="Filtrar protocolos...">
+                            <div class="table-responsive border bg-white shadow-sm" style="height: 180px; overflow-y: auto;">
+                                <table class="table table-hover table-sm align-middle text-start mb-0" style="font-size: 11px; cursor: pointer;">
+                                    <tbody id="cfg-grid-protocolos">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h6 class="fw-bold text-success mb-2" style="font-size: 11px;"><i class="bi bi-person-badge me-1"></i> USUARIO RESPONSABLE</h6>
+                            <input type="text" id="cfg-search-user" class="form-control form-control-sm mb-2" placeholder="Filtrar responsables...">
+                            <div class="list-group shadow-sm border" id="cfg-list-usuarios" style="height: 180px; overflow-y: auto; font-size: 11px; cursor: pointer;">
+                                </div>
+                        </div>
+
+                    </div>
+                    <div class="col-md-12 mt-3">
+                    <label class="fw-bold text-muted text-uppercase mb-1" style="font-size:10px;"><i class="bi bi-building"></i> DEPARTAMENTO / ORGANISMO</label>
+                    <select id="cfg-select-depto" class="form-select form-select-sm fw-bold border-info">
+                        <option>Cargando...</option>
+                    </select>
+                </div>
+                                    <div class="col-lg-6">
+                        
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-warning text-dark mb-2" style="font-size: 11px;"><i class="bi bi-bug me-1"></i> ESPECIE ANIMAL</h6>
+                            <div id="cfg-list-especies" class="d-flex flex-wrap gap-2 p-3 bg-white border rounded shadow-sm min-h-[100px]">
+                                </div>
+                        </div>
+
+                        <div>
+                            <h6 class="fw-bold text-danger mb-2" style="font-size: 11px;"><i class="bi bi-box me-1"></i> ESTRUCTURA DE ALOJAMIENTO (Afecta Precio)</h6>
+                            <div id="cfg-list-tipos" class="d-flex flex-column gap-2 p-3 bg-white border rounded shadow-sm min-h-[150px]">
+                                </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer bg-white border-top-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" data-bs-dismiss="modal">CANCELAR</button>
+                <button type="button" class="btn btn-sm btn-danger fw-bold px-4 shadow-sm" onclick="window.guardarConfiguracionHistoria()">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> APLICAR CAMBIOS CONTABLES
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <div class="modal fade" id="modal-alojamiento-help" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content border-0 shadow">

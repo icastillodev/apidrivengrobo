@@ -4,7 +4,7 @@ export const BitacoraState = {
     dataFull: [],
     dataFiltered: [],
     currentPage: 1,
-    itemsPerPage: 20, // 20 logs por página
+    itemsPerPage: 20, 
     maxVisiblePages: 6
 };
 
@@ -20,6 +20,8 @@ async function loadData() {
             BitacoraState.dataFull = res.data || [];
             BitacoraState.dataFiltered = [...BitacoraState.dataFull];
             BitacoraState.currentPage = 1;
+            
+            poblarFiltroInstituciones(); // Llenamos el dropdown
             renderTable();
         }
     } catch (e) {
@@ -27,12 +29,28 @@ async function loadData() {
     }
 }
 
+// Extrae las instituciones únicas y las inyecta en el <select>
+function poblarFiltroInstituciones() {
+    const selectInst = document.getElementById('filter-inst');
+    const institucionesUnicas = [...new Set(BitacoraState.dataFull.map(row => row.Institucion))].sort();
+    
+    // Dejamos la opción "Todas" y agregamos el resto
+    selectInst.innerHTML = '<option value="all">Todas las Sedes</option>';
+    institucionesUnicas.forEach(inst => {
+        if(inst) {
+            selectInst.innerHTML += `<option value="${inst}">${inst}</option>`;
+        }
+    });
+}
+
 function setupListeners() {
     document.getElementById('btn-search').addEventListener('click', filterData);
     document.getElementById('search-input').addEventListener('keyup', (e) => {
         if(e.key === 'Enter') filterData();
     });
+    
     document.getElementById('filter-action').addEventListener('change', filterData);
+    document.getElementById('filter-inst').addEventListener('change', filterData); // Escuchamos el nuevo select
 
     document.getElementById('btn-excel').addEventListener('click', exportToExcel);
 }
@@ -40,12 +58,16 @@ function setupListeners() {
 function filterData() {
     const text = document.getElementById('search-input').value.toLowerCase();
     const action = document.getElementById('filter-action').value;
+    const instFiltro = document.getElementById('filter-inst').value;
 
     BitacoraState.dataFiltered = BitacoraState.dataFull.filter(row => {
-        // 1. Filtro Select Action
+        // 1. Filtro Select Acción
         if (action !== 'all' && !row.accion.includes(action)) return false;
 
-        // 2. Filtro de Texto (Busca en todo el registro)
+        // 2. Filtro Select Institución
+        if (instFiltro !== 'all' && row.Institucion !== instFiltro) return false;
+
+        // 3. Filtro de Texto Global
         if (text) {
             const concatData = Object.values(row).join(' ').toLowerCase();
             if (!concatData.includes(text)) return false;
@@ -67,14 +89,13 @@ function renderTable() {
     const paginatedItems = BitacoraState.dataFiltered.slice(start, end);
 
     if (paginatedItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No se encontraron movimientos.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron movimientos.</td></tr>`;
         info.innerText = "0 registros";
         renderPagination(0);
         return;
     }
 
     paginatedItems.forEach(row => {
-        // Estilos según acción
         let badgeColor = 'bg-secondary';
         let act = row.accion.toUpperCase();
         if (act.includes('INSERT')) badgeColor = 'bg-success';
@@ -82,11 +103,17 @@ function renderTable() {
         if (act.includes('DELETE')) badgeColor = 'bg-danger';
         if (act.includes('LOGIN')) badgeColor = 'bg-info text-dark';
 
+        // Destacamos SISTEMA GLOBAL
+        const instLabel = row.Institucion === 'SISTEMA GLOBAL' 
+            ? `<span class="badge bg-dark">SISTEMA GLOBAL</span>` 
+            : `<span class="fw-bold text-success">${row.Institucion}</span>`;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="fw-bold text-muted">#${row.id_bitacora}</td>
             <td style="font-size:11px;">${row.fecha_hora}</td>
             <td class="fw-bold text-primary">${row.UsuarioName || 'SISTEMA'}</td>
+            <td>${instLabel}</td>
             <td class="text-center"><span class="badge ${badgeColor}">${row.accion}</span></td>
             <td><code class="text-secondary">${row.tabla_afectada}</code></td>
             <td class="text-muted">${row.detalle}</td>
@@ -98,7 +125,6 @@ function renderTable() {
     renderPagination(BitacoraState.dataFiltered.length);
 }
 
-// Lógica idéntica a Billing (Limitada a 6 botones)
 function renderPagination(totalItems) {
     const ul = document.getElementById('pagination');
     ul.innerHTML = '';

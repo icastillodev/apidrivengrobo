@@ -4,34 +4,42 @@ import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AlojamientoState, loadAlojamientos } from '../alojamientos.js';
 
 export const RegistroUI = {
-    init() {
-        // Enlace al entorno global para los onclick
-       window.openModalRegistro = this.abrirModalRegistro.bind(this);
-        window.guardarNuevoAlojamiento = this.guardarNuevoAlojamiento.bind(this);
-        window.selectUsuarioReg = this.selectUsuarioReg.bind(this);
+    // Variables de estado del formulario en cascada
+    currentData: {
+        protocolos: [],
+        usuarios: []
+    },
+    selections: {
+        idprotA: null,
+        IdUsrA: null,
+        idespA: null,
+        IdTipoAlojamiento: null
+    },
 
-        // 1. Buscador del Protocolo
+    init() {
+        // Enlaces principales
+        window.openModalRegistro = this.abrirModalRegistro.bind(this);
+        window.guardarNuevoAlojamiento = this.guardarNuevoAlojamiento.bind(this);
+
+        // Funciones expuestas para los onclick del HTML generado dinámicamente
+        window.regSelectProtocolo = this.selectProtocolo.bind(this);
+        window.regSelectUsuario = this.selectUsuario.bind(this);
+        window.regSelectEspecie = this.selectEspecie.bind(this);
+        window.regSelectTipo = this.selectTipo.bind(this);
+
+        // Buscador de Protocolos (En vivo)
         document.getElementById('reg-search-prot')?.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            Array.from(document.getElementById('reg-protocolo').options).forEach(opt => {
-                opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none';
+            const filas = document.querySelectorAll('#reg-grid-protocolos tr');
+            filas.forEach(fila => {
+                fila.style.display = fila.innerText.toLowerCase().includes(term) ? '' : 'none';
             });
         });
 
-        // 2. Cascada: Al cambiar Protocolo -> Buscar Especies
-        document.getElementById('reg-protocolo')?.addEventListener('change', (e) => {
-            this.loadEspecies(e.target.value);
-        });
-
-        // 3. Cascada: Al cambiar Especie -> Buscar Tipos de Cajas
-        document.getElementById('reg-especie')?.addEventListener('change', (e) => {
-            this.loadTipos(e.target.value);
-        });
-
-        // 4. Buscador del Dropdown de Usuarios
-        document.getElementById('reg-user-search')?.addEventListener('input', (e) => {
+        // Buscador de Usuarios (En vivo)
+        document.getElementById('reg-search-user')?.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const items = document.querySelectorAll('.user-dropdown-item');
+            const items = document.querySelectorAll('#reg-list-usuarios .list-group-item');
             items.forEach(item => {
                 item.style.display = item.innerText.toLowerCase().includes(term) ? '' : 'none';
             });
@@ -39,19 +47,23 @@ export const RegistroUI = {
     },
 
     async abrirModalRegistro() {
-        // Limpiar el formulario
+        // 1. Resetear selecciones internas
+        this.selections = { idprotA: null, IdUsrA: null, idespA: null, IdTipoAlojamiento: null };
+        
+        // 2. Resetear la Vista (Ocultar pasos)
+        document.getElementById('step-2-usuario').classList.add('d-none');
+        document.getElementById('step-3-detalles').classList.add('d-none');
+        document.getElementById('step-4-final').classList.add('d-none');
+        document.getElementById('btn-save-reg').classList.add('d-none');
+        
+        // 3. Limpiar inputs manuales
+        document.getElementById('reg-search-prot').value = '';
+        document.getElementById('reg-search-user').value = '';
         document.getElementById('reg-fecha').valueAsDate = new Date();
         document.getElementById('reg-cantidad').value = 1;
         document.getElementById('reg-obs').value = '';
-        document.getElementById('reg-especie').innerHTML = '<option>Esperando protocolo...</option>';
-        document.getElementById('reg-tipo').innerHTML = '<option>Esperando especie...</option>';
-        document.getElementById('reg-especie').disabled = true;
-        document.getElementById('reg-tipo').disabled = true;
 
-        // Limpiar Dropdown de Usuario
-        document.getElementById('reg-usuario-hidden').value = '';
-        document.querySelector('#btn-user-select span').innerText = 'Seleccione un usuario...';
-
+        // 4. Cargar los datos base
         showLoader();
         await Promise.all([this.loadProtocolos(), this.loadUsuarios()]);
         hideLoader();
@@ -59,102 +71,228 @@ export const RegistroUI = {
         new bootstrap.Modal(document.getElementById('modal-registro')).show();
     },
 
+// ==========================================
+    // PASO 1: PROTOCOLOS
+    // ==========================================
     async loadProtocolos() {
         try {
             const res = await API.request(`/protocoloexpe/list?inst=${AlojamientoState.instId}`);
             if (res.status === 'success') {
-                const sel = document.getElementById('reg-protocolo');
-                // FORMATO PROFESIONAL: Titulo | Inv | Dpto | ID
-                sel.innerHTML = res.data.map(p => 
-                    `<option value="${p.idprotA}">[${p.nprotA}] ${p.tituloA || 'Sin Título'} | Inv: ${p.Investigador} | Dpto: ${p.Departamento || '---'} | ID: ${p.idprotA}</option>`
-                ).join('');
+                this.currentData.protocolos = res.data;
+                const tbody = document.getElementById('reg-grid-protocolos');
+                
+                tbody.innerHTML = res.data.map(p => {
+                    // Usamos las variables EXACTAS de tu ProtocolModel
+                    const responsable = p.ResponsableFormat || `ID: ${p.IdUsrA}`;
+                    const especies = p.EspeciesList || 'A definir';
+
+                    return `
+                    <tr id="reg-row-prot-${p.idprotA}" onclick="window.regSelectProtocolo(${p.idprotA})" class="transition-colors">
+                        <td class="fw-bold text-muted">#${p.idprotA}</td>
+                        <td class="fw-bold text-primary">${p.nprotA}</td>
+                        <td class="text-truncate" style="max-width: 200px;">${p.tituloA || 'Sin Título'}</td>
+                        <td class="text-success fw-bold" style="font-size: 10px;">${especies}</td>
+                        <td class="text-muted" style="font-size: 10px;"><i class="bi bi-person-fill"></i> ${responsable}</td>
+                    </tr>
+                    `;
+                }).join('');
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Error al cargar protocolos:", e); }
     },
 
+    selectProtocolo(id) {
+        this.selections.idprotA = id;
+        
+        // Pintar fila seleccionada de azul
+        document.querySelectorAll('#reg-grid-protocolos tr').forEach(tr => {
+            tr.classList.remove('table-primary', 'border-primary');
+        });
+        const selectedRow = document.getElementById(`reg-row-prot-${id}`);
+        if(selectedRow) selectedRow.classList.add('table-primary', 'border-primary');
+
+        // Resetear visualmente los pasos que le siguen
+        this.selections.IdUsrA = null;
+        document.getElementById('step-3-detalles').classList.add('d-none');
+        document.getElementById('step-4-final').classList.add('d-none');
+        document.getElementById('btn-save-reg').classList.add('d-none');
+        document.querySelectorAll('#reg-list-usuarios .list-group-item').forEach(li => li.classList.remove('active', 'bg-success', 'text-white'));
+
+        // Mostrar paso 2
+        const step2 = document.getElementById('step-2-usuario');
+        step2.classList.remove('d-none');
+        step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    // ==========================================
+    // PASO 2: USUARIOS
+    // ==========================================
     async loadUsuarios() {
         try {
-            // Solicitamos a la base de usuarios de la institución
-            const res = await API.request(`/personae/list?inst=${AlojamientoState.instId}`);
+            const res = await API.request(`/users/institution`);
+            const list = document.getElementById('reg-list-usuarios');
+            list.innerHTML = '';
+            
             if (res.status === 'success') {
-                const list = document.getElementById('reg-user-list');
-                // FORMATO EXIGIDO: ID, usuario, nombre, apellido
-                list.innerHTML = res.data.map(u => `
-                    <a href="#" class="dropdown-item user-dropdown-item small border-bottom py-2" onclick="window.selectUsuarioReg(${u.IdUsrA}, '${u.usuarioA}', '${u.NombreA}', '${u.ApellidoA}', event)">
-                        <span class="fw-bold text-primary">ID: ${u.IdUsrA}</span> | 
-                        <span class="text-dark fw-bold">${u.usuarioA}</span> - 
-                        <span class="text-muted">${u.NombreA} ${u.ApellidoA}</span>
-                    </a>
-                `).join('');
-            }
-        } catch (e) { console.error(e); }
-    },
-
-    // Función que se ejecuta al elegir un usuario del Dropdown
-    selectUsuarioReg(id, user, nombre, apellido, e) {
-        e.preventDefault();
-        document.getElementById('reg-usuario-hidden').value = id;
-        document.querySelector('#btn-user-select span').innerHTML = `<span class="fw-bold text-primary">ID: ${id}</span> | ${user} - ${nombre} ${apellido}`;
-    },
-
-    async loadEspecies(idProt) {
-        const selEsp = document.getElementById('reg-especie');
-        const selTipo = document.getElementById('reg-tipo');
-        
-        selEsp.innerHTML = '<option>Cargando especies...</option>';
-        selTipo.innerHTML = '<option>Esperando especie...</option>';
-        selEsp.disabled = true;
-        selTipo.disabled = true;
-
-        try {
-            const res = await API.request(`/protocols/current-species?id=${idProt}`);
-            if (res.status === 'success' && res.data.length > 0) {
-                selEsp.innerHTML = res.data.map(s => `<option value="${s.idespA}">${s.EspeNombreA}</option>`).join('');
-                selEsp.disabled = false;
+                this.currentData.usuarios = res.data;
                 
-                // MÁGIA: Disparar la carga de tipos de cajas para la primera especie automáticamente
-                await this.loadTipos(res.data[0].idespA);
+                if (res.data.length === 0) {
+                    list.innerHTML = '<div class="alert alert-warning small p-2">No hay usuarios activos en la institución.</div>';
+                    return;
+                }
+
+                list.innerHTML = res.data.map(u => `
+                    <div id="reg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom" onclick="window.regSelectUsuario(${u.IdUsrA})">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><b class="text-dark">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
+                            <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
+                        </div>
+                    </div>
+                `).join('');
             } else {
-                selEsp.innerHTML = '<option>No hay especies asignadas</option>';
+                list.innerHTML = `<div class="text-danger small">Error: ${res.message}</div>`;
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error("Error cargando usuarios:", e); 
+        }
     },
 
-    async loadTipos(idEsp) {
-        const selTipo = document.getElementById('reg-tipo');
-        selTipo.innerHTML = '<option>Cargando tipos de caja...</option>';
-        selTipo.disabled = true;
+    selectUsuario(id) {
+        this.selections.IdUsrA = id;
+
+        // Pintar fila seleccionada de verde
+        document.querySelectorAll('#reg-list-usuarios .list-group-item').forEach(li => {
+            li.classList.remove('active', 'bg-success', 'text-white', 'border-success');
+        });
+        const selectedItem = document.getElementById(`reg-item-usr-${id}`);
+        if(selectedItem) selectedItem.classList.add('active', 'bg-success', 'text-white', 'border-success');
+
+        // Mostrar paso 3 y disparar carga de especies
+        const step3 = document.getElementById('step-3-detalles');
+        step3.classList.remove('d-none');
+        step3.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        this.loadEspecies();
+    },
+
+    // ==========================================
+    // PASO 3: ESPECIES Y TIPOS
+    // ==========================================
+    async loadEspecies() {
+        const container = document.getElementById('reg-list-especies');
+        container.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div> Cargando...';
+        
+        document.getElementById('reg-list-tipos').innerHTML = '';
+        document.getElementById('step-4-final').classList.add('d-none');
+        document.getElementById('btn-save-reg').classList.add('d-none');
 
         try {
-            const res = await API.request(`/precios/all-data`);
+            const res = await API.request(`/protocols/current-species?id=${this.selections.idprotA}`);
+            if (res.status === 'success' && res.data.length > 0) {
+                container.innerHTML = res.data.map(s => `
+                    <button type="button" id="reg-btn-esp-${s.idespA}" class="btn btn-outline-secondary btn-sm text-start fw-bold" onclick="window.regSelectEspecie(${s.idespA}, '${s.EspeNombreA}')">
+                        <i class="bi bi-check-circle me-1 d-none" id="icon-esp-${s.idespA}"></i> ${s.EspeNombreA}
+                    </button>
+                `).join('');
+
+                // Si el protocolo solo tiene 1 especie, se autoselecciona ahorrando tiempo
+                if (res.data.length === 1) {
+                    this.selectEspecie(res.data[0].idespA, res.data[0].EspeNombreA);
+                }
+            } else {
+                container.innerHTML = '<div class="alert alert-danger small p-2">Este protocolo no tiene especies asignadas.</div>';
+            }
+        } catch (e) { console.error("Error cargando especies:", e); }
+    },
+
+    selectEspecie(id, nombre) {
+        this.selections.idespA = id;
+
+        document.querySelectorAll('#reg-list-especies button').forEach(btn => {
+            btn.classList.remove('btn-warning', 'text-dark');
+            btn.classList.add('btn-outline-secondary');
+            btn.querySelector('i').classList.add('d-none');
+        });
+        const selectedBtn = document.getElementById(`reg-btn-esp-${id}`);
+        if(selectedBtn) {
+            selectedBtn.classList.remove('btn-outline-secondary');
+            selectedBtn.classList.add('btn-warning', 'text-dark');
+            selectedBtn.querySelector('i').classList.remove('d-none');
+        }
+
+        this.loadTipos(id);
+    },
+
+async loadTipos(idEsp) {
+        const container = document.getElementById('reg-list-tipos');
+        container.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Cargando estructuras...';
+        
+        document.getElementById('step-4-final').classList.add('d-none');
+        document.getElementById('btn-save-reg').classList.add('d-none');
+
+        try {
+            // Usamos la nueva ruta super limpia
+            const res = await API.request(`/alojamiento/tipos-por-especie?idEsp=${idEsp}`);
+            
             if (res.status === 'success') {
-                // Filtramos que la caja sea de la especie seleccionada y esté habilitada
-                const tipos = res.data.alojamientos.filter(t => t.idespA == idEsp && t.Habilitado == 1);
+                const tipos = res.data; // Ya viene filtrado de la BD
                 
                 if (tipos.length > 0) {
-                    selTipo.innerHTML = tipos.map(t => `<option value="${t.IdTipoAlojamiento}">${t.NombreTipoAlojamiento} ($${t.PrecioXunidad})</option>`).join('');
-                    selTipo.disabled = false;
+                    container.innerHTML = tipos.map(t => `
+                        <button type="button" id="reg-btn-tipo-${t.IdTipoAlojamiento}" class="btn btn-outline-secondary btn-sm text-start" onclick="window.regSelectTipo(${t.IdTipoAlojamiento}, '${t.NombreTipoAlojamiento}')">
+                            <i class="bi bi-check-circle me-1 d-none" id="icon-tipo-${t.IdTipoAlojamiento}"></i> 
+                            <b>${t.NombreTipoAlojamiento}</b> <span class="text-success ms-2">$${t.PrecioXunidad}</span>
+                        </button>
+                    `).join('');
                 } else {
-                    selTipo.innerHTML = '<option>No hay cajas/precios habilitados para esta especie.</option>';
+                    container.innerHTML = '<div class="alert alert-danger small p-2">No hay estructuras tarifadas para esta especie.</div>';
                 }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Error cargando tipos:", e); }
+    },
+    selectTipo(id, nombre) {
+        this.selections.IdTipoAlojamiento = id;
+
+        document.querySelectorAll('#reg-list-tipos button').forEach(btn => {
+            btn.classList.remove('btn-primary', 'text-white');
+            btn.classList.add('btn-outline-secondary');
+            btn.querySelector('i').classList.add('d-none');
+        });
+        const selectedBtn = document.getElementById(`reg-btn-tipo-${id}`);
+        if(selectedBtn) {
+            selectedBtn.classList.remove('btn-outline-secondary');
+            selectedBtn.classList.add('btn-primary', 'text-white');
+            selectedBtn.querySelector('i').classList.remove('d-none');
+        }
+
+        // --- ACTUALIZAMOS EL TEXTO FINAL ---
+        document.getElementById('lbl-cantidad-dinamico').innerText = `Cantidad Inicial de ${nombre.toUpperCase()}`;
+        document.getElementById('reg-cantidad').placeholder = `Ej: 5`;
+
+        // Mostramos el último paso y el botón de guardar
+        const step4 = document.getElementById('step-4-final');
+        step4.classList.remove('d-none');
+        step4.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        document.getElementById('btn-save-reg').classList.remove('d-none');
     },
 
+    // ==========================================
+    // PASO 4: GUARDAR EN BASE DE DATOS
+    // ==========================================
     async guardarNuevoAlojamiento() {
         const data = {
-            idprotA: document.getElementById('reg-protocolo').value,
-            IdUsrA: document.getElementById('reg-usuario-hidden').value,
-            TipoAnimal: document.getElementById('reg-especie').value,
-            IdTipoAlojamiento: document.getElementById('reg-tipo').value,
+            idprotA: this.selections.idprotA,
+            IdUsrA: this.selections.IdUsrA,
+            TipoAnimal: this.selections.idespA,
+            IdTipoAlojamiento: this.selections.IdTipoAlojamiento,
             fechavisado: document.getElementById('reg-fecha').value,
             CantidadCaja: document.getElementById('reg-cantidad').value,
             observaciones: document.getElementById('reg-obs').value,
             IdInstitucion: AlojamientoState.instId
         };
 
-        if (!data.idprotA || !data.IdUsrA || !data.IdTipoAlojamiento) {
-            return Swal.fire('Incompleto', 'Debe seleccionar un Protocolo, un Usuario Responsable y un Tipo de Alojamiento.', 'warning');
+        if (!data.idprotA || !data.IdUsrA || !data.TipoAnimal || !data.IdTipoAlojamiento || !data.fechavisado || !data.CantidadCaja) {
+            return Swal.fire('Incompleto', 'Debe completar todos los pasos del asistente y proporcionar fecha y cantidad.', 'warning');
         }
 
         showLoader();
@@ -162,11 +300,15 @@ export const RegistroUI = {
             const res = await API.request('/alojamiento/save', 'POST', data);
             if (res.status === 'success') {
                 bootstrap.Modal.getInstance(document.getElementById('modal-registro')).hide();
-                Swal.fire('Éxito', 'Alojamiento registrado correctamente.', 'success');
+                Swal.fire({ title: '¡Éxito!', text: 'Alojamiento registrado correctamente.', icon: 'success', timer: 1500, showConfirmButton: false});
                 await loadAlojamientos(); // Refresca la grilla principal
             } else {
                 Swal.fire('Error', res.message, 'error');
             }
-        } catch (e) { console.error(e); } finally { hideLoader(); }
+        } catch (e) { 
+            console.error("Error al guardar alojamiento:", e); 
+        } finally { 
+            hideLoader(); 
+        }
     }
 };

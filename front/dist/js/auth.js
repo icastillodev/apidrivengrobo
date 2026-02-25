@@ -351,17 +351,6 @@ export const Auth = {
             window.location.href = `${basePath}paginas/${folder}/dashboard.html`;
         }
     },
-
-    logout() {
-        const slug = this.getVal('NombreInst') || 'urbe';
-        
-        localStorage.clear();
-        sessionStorage.clear();
-        this.clearAllCookies();
-        
-        this.redirectToLogin(slug);
-    },
-
     renderLogin() {
         const form = document.getElementById('login-form');
         if (form) { 
@@ -375,14 +364,26 @@ export const Auth = {
 
         const token = this.getVal('token');
         const userLevel = parseInt(this.getVal('userLevel'));
-        const inst = this.getVal('NombreInst');
         
+        // Forzamos a String para evitar que un null real se evalúe raro
+        const inst = String(this.getVal('NombreInst')).trim().toLowerCase();
+        const instId = String(this.getVal('instId')).trim().toLowerCase();
+        const path = window.location.pathname.toLowerCase();
+        
+        // 1. BLOQUEO DE URL CORRUPTA (Si alguien escribe /null/ a mano en la barra)
+        if (path.includes('/null/') || path.includes('/undefined/') || path.includes('/0/')) {
+            console.error("Acceso bloqueado: URL corrupta detectada.");
+            this.logout(true); // Forzamos expulsión a la raíz
+            return false;
+        }
+
         if (!token || isNaN(userLevel)) {
             console.warn("Acceso denegado: No hay sesión activa.");
             this.redirectToLogin(inst);
             return false;
         }
 
+        // El SuperAdmin puede saltar la restricción de sede
         if (userLevel === 1) return true; 
 
         if (!allowed.includes(userLevel)) {
@@ -391,18 +392,38 @@ export const Auth = {
             return false;
         }
 
-        if (!inst || inst === 'superadmin' || inst === 'SISTEMA GLOBAL') {
-            console.error("Contexto inválido.");
-            this.logout();
+        // 2. BLOQUEO DE VARIABLES FANTASMA (Si LocalStorage guardó el texto "null")
+        const invalidValues = ['null', 'undefined', '0', '', 'superadmin', 'sistema global'];
+        
+        if (invalidValues.includes(inst) || invalidValues.includes(instId)) {
+            console.error("Contexto inválido: Sede no asignada o nula.");
+            this.logout(true); // Forzamos expulsión a la raíz
             return false;
         }
 
         return true; 
     },
 
+    // Le agregamos un parámetro para forzar ir a la raíz si todo se rompe
+    logout(forceRoot = false) {
+        const slug = forceRoot ? '' : (this.getVal('NombreInst') || 'urbe');
+        
+        localStorage.clear();
+        sessionStorage.clear();
+        this.clearAllCookies();
+        
+        this.redirectToLogin(slug);
+    },
+
     redirectToLogin(slug) {
         const basePath = this.getBasePath();
-        const cleanSlug = (slug && slug !== 'superadmin' && slug !== 'SISTEMA GLOBAL') ? slug : '';
+        const invalidSlugs = ['superadmin', 'sistema global', 'null', 'undefined', '0'];
+        
+        // Aseguramos que el slug sea seguro y no sea una palabra basura
+        const safeSlug = String(slug || '').toLowerCase().trim();
+        const cleanSlug = (!invalidSlugs.includes(safeSlug) && safeSlug !== '') ? safeSlug : '';
+        
+        // Si el slug es válido va a /sede/ , si es basura va a / (login raíz)
         window.location.href = cleanSlug ? `${basePath}${cleanSlug}/` : basePath;
     },
 

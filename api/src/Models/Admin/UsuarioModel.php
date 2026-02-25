@@ -8,24 +8,26 @@ class UsuarioModel {
 
     public function __construct($db) { $this->db = $db; }
 
-    public function getAllGlobal($instId) {
+public function getAllGlobal() {
+        // Quitamos el filtro "u.IdInstitucion = ?" para que traiga absolutamente a todos
+        // (Excepto a otros SuperAdmins -> IdTipousrA != 1)
+        // Usamos LEFT JOIN en institucion por si algún usuario quedó "huérfano" de sede.
         $sql = "SELECT u.IdUsrA, u.UsrA, u.IdInstitucion, p.NombreA, p.ApellidoA, p.EmailA, 
-                    i.NombreInst, 
+                    COALESCE(i.NombreInst, 'Sin Asignar') as NombreInst, 
                     t.IdTipousrA AS IdTipoUsrA,
                     a.ActivoA AS confirmado
                 FROM usuarioe u
                 LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
-                JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
+                LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
                 LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
-                WHERE t.IdTipousrA != 1 AND u.IdInstitucion = ?
+                WHERE t.IdTipousrA != 1 
                 ORDER BY i.NombreInst ASC, p.ApellidoA ASC";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
     public function updateGlobal($id, $data) {
         try {
             $this->db->beginTransaction();

@@ -20,8 +20,9 @@ $router->post('/verify-2fa', 'AuthController@verify2FA');
 $router->post('/forgot-password', 'UserController@forgotPassword');
 $router->post('/update-password-recovery', 'UserController@updatePasswordRecovery');
 
-// Ruta PÚBLICA para que el cliente cargue la cabecera de su formulario
+// Rutas PÚBLICAS para el Formulario de Onboarding
 $router->get('/form-registro/config/:slug', 'FormRegistroController@getBySlug');
+$router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- ESTA ES LA QUE FALTABA
 
 // ============================================================
 // SECCIÓN: Menú y Notificaciones , busqueda global
@@ -204,7 +205,7 @@ $router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
 $router->get('/trazabilidad/get-past-boxes', 'TrazabilidadController@getPastBoxes');
 $router->post('/trazabilidad/clone-past-boxes', 'TrazabilidadController@clonePastBoxes');
 $router->post('/alojamiento/update-price', 'AlojamientoController@updatePrice');
-
+$router->get('/alojamiento/tipos-por-especie', 'AlojamientoController@getTiposPorEspecie');
 $router->get('/alojamiento/export', 'AlojamientoExportController@export');
 
 // ============================================================
@@ -415,5 +416,5 @@ $router->post('/superadmin/form-registros/delete', 'FormRegistroController@delet
 
 $router->get('/superadmin/bitacora/list', 'BitacoraController@listAll');
 $router->post('/superadmin/form-registros/submit', 'FormRegistroController@submit');
-
-
+// 4. Habilitar o Deshabilitar un link (La que te daba 404)
+$router->post('/superadmin/form-registros/toggle-status', 'FormRegistroController@toggleStatus');

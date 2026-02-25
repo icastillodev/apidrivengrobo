@@ -15,7 +15,7 @@ export const SuperAuth = {
         }
     },
 
-    async handleLogin(e) {
+async handleLogin(e) {
         e.preventDefault();
         const box = document.getElementById('msg-alert');
         if (box) box.classList.add('hidden');
@@ -26,8 +26,23 @@ export const SuperAuth = {
             instSlug: 'master'
         };
 
+        // 1. ABRIMOS EL SWEETALERT DE CARGA
+        Swal.fire({
+            title: 'Verificando credenciales',
+            text: 'Conectando con el servidor seguro...',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
         try {
             const res = await API.request('/login-superadmin', 'POST', payload);
+            
+            // 2. CERRAMOS EL CARGANDO
+            Swal.close();
             
             // Si el backend dice "Todo bien, entra"
             if (res?.status === 'success') {
@@ -35,9 +50,10 @@ export const SuperAuth = {
             } 
             // Si el backend dice "Espera, pon el código 2FA que te mandé al correo"
             else if (res?.status === '2fa_required') {
-                this.prompt2FA(res.userId, box);
+                // Le damos un pequeño respiro de 300ms antes de abrir el otro modal
+                setTimeout(() => this.prompt2FA(res.userId, box), 300);
             } 
-            // Si la clave está mal o el usuario no existe
+            // Si la clave está mal o la IP fue bloqueada
             else {
                 if (box) { 
                     box.innerText = (res?.message || "ACCESO MAESTRO DENEGADO").toUpperCase(); 
@@ -45,6 +61,7 @@ export const SuperAuth = {
                 }
             }
         } catch (err) {
+            Swal.close();
             console.error("Error crítico en SuperAuth:", err);
             if (box) { box.innerText = "ERROR DE CONEXIÓN CON EL SERVIDOR."; box.classList.remove('hidden'); }
         }

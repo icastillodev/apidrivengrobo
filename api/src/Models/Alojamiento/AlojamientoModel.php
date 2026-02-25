@@ -21,7 +21,7 @@ class AlojamientoModel {
                     GROUP BY historia
                 ) last_a ON a.IdAlojamiento = last_a.max_id
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-                INNER JOIN especiee e ON p.especie = e.idespA
+                INNER JOIN especiee e ON a.TipoAnimal = e.idespA
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
                 LEFT JOIN personae pers ON a.IdUsrA = pers.IdUsrA
                 WHERE a.IdInstitucion = ?
@@ -31,10 +31,12 @@ class AlojamientoModel {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    public function getHistory($historiaId) {
+public function getHistory($historiaId) {
         $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo, 
                        e.EspeNombreA, t.NombreTipoAlojamiento,
-                       COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador
+                       COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador,
+                       COALESCE(u_resp.EmailA, u_tit.EmailA, 'No registrado') as EmailInvestigador,
+                       COALESCE(u_resp.CelularA, u_tit.CelularA, 'No registrado') as CelularInvestigador
                 FROM alojamiento a
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA 
@@ -47,14 +49,33 @@ class AlojamientoModel {
         $stmt->execute([$historiaId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
-
-    public function saveAlojamiento($data) {
+public function getTiposAlojamientoHabilitados($idEsp, $instId) {
+        // Trae los tipos de alojamiento de una especie que estén habilitados
+        $sql = "SELECT t.IdTipoAlojamiento, t.NombreTipoAlojamiento, t.PrecioXunidad
+                FROM tipoalojamiento t
+                INNER JOIN especiee e ON t.idespA = e.idespA
+                WHERE t.idespA = ? AND t.Habilitado = 1 AND e.IdInstitucion = ?";
+                
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idEsp, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+public function saveAlojamiento($data) {
         $this->db->beginTransaction();
         try {
             $isUpdate = isset($data['is_update']) && ($data['is_update'] === true || $data['is_update'] === "true");
+            
+            // Evitamos el warning verificando si la key existe
+            $historia = !empty($data['historia']) ? (int)$data['historia'] : null;
 
-            if ($isUpdate) {
-                $this->closePreviousRecord($data['historia'], $data['fechavisado']);
+            // MÁGIA: Si es un registro nuevo, calculamos la nueva Historia (incremental)
+            if (!$isUpdate || !$historia) {
+                $stmtMax = $this->db->query("SELECT MAX(historia) FROM alojamiento");
+                // Si la tabla está vacía, devuelve 0 y le suma 1 (inicia en 1)
+                $historia = (int)$stmtMax->fetchColumn() + 1;
+            } else {
+                // Si es un nuevo tramo (Actualización), cerramos el periodo anterior
+                $this->closePreviousRecord($historia, $data['fechavisado']);
             }
 
             $idTipoAlojamiento = (!empty($data['IdTipoAlojamiento']) && $data['IdTipoAlojamiento'] > 0) ? (int)$data['IdTipoAlojamiento'] : 1;
@@ -70,12 +91,20 @@ class AlojamientoModel {
             
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
-                $data['fechavisado'], (int)$data['IdUsrA'], $data['observaciones'] ?? '', 
-                (int)$data['TipoAnimal'], (int)$data['idprotA'], (int)$data['historia'], 
-                (int)$data['IdInstitucion'], $idTipoAlojamiento, (int)$data['CantidadCaja'], (float)$precioMomento
+                $data['fechavisado'], 
+                (int)$data['IdUsrA'], 
+                $data['observaciones'] ?? '', 
+                (int)$data['TipoAnimal'], 
+                (int)$data['idprotA'], 
+                $historia, // ¡CORREGIDO AQUÍ! (Antes decía $data['historia'] y explotaba)
+                (int)$data['IdInstitucion'], 
+                $idTipoAlojamiento, 
+                (int)$data['CantidadCaja'], 
+                (float)$precioMomento
             ]);
             $idNewTramo = $this->db->lastInsertId();
 
+            // Clonar cajas si es actualización de tramo (TramosUI)
             if ($isUpdate && isset($data['continuidad']) && !empty($data['continuidad']['cajas'])) {
                 $cajasViejasIds = $data['continuidad']['cajas']; 
                 $unidadesViejasIds = $data['continuidad']['unidades'] ?? []; 
@@ -104,9 +133,12 @@ class AlojamientoModel {
                 }
             }
 
-            $this->db->prepare("INSERT INTO registroalojamiento (IdUsrA, IdAlojamiento, TipoRegistro, FechaRegistro) VALUES (?, ?, 'ACTUALIZACION_TRAMO', NOW())")->execute([(int)$data['IdUsrA'], $idNewTramo]);
+            // Etiquetamos en bitácora si fue Nuevo Alojamiento o Tramo
+            $tipoReg = $isUpdate ? 'ACTUALIZACION_TRAMO' : 'NUEVO_ALOJAMIENTO';
+            $this->db->prepare("INSERT INTO registroalojamiento (IdUsrA, IdAlojamiento, TipoRegistro, FechaRegistro) VALUES (?, ?, ?, NOW())")->execute([(int)$data['IdUsrA'], $idNewTramo, $tipoReg]);
             
-            Auditoria::log($this->db, $isUpdate ? 'UPDATE' : 'INSERT', 'alojamiento', "Historia: " . $data['historia'] . " (Aloj. ID: $idNewTramo)");
+            // ¡CORREGIDO AQUÍ TAMBIÉN! (Auditoría limpia y segura)
+            Auditoria::log($this->db, $isUpdate ? 'UPDATE' : 'INSERT', 'alojamiento', "Historia: $historia (Aloj. ID: $idNewTramo)");
             $this->db->commit();
             return $idNewTramo;
             
@@ -221,36 +253,47 @@ class AlojamientoModel {
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
-    public function updateHistoryConfig($data) {
+public function updateHistoryConfig($data) {
         $this->db->beginTransaction();
         try {
             $historia = $data['historia'];
-            $nuevoTipo = $data['tipoCaja']; 
+            $idTipoAlojamiento = $data['IdTipoAlojamiento'];
 
-            if ($nuevoTipo === 'chica') {
-                $sqlMigracion = "totalcajachica = (totalcajachica + totalcajagrande), totalcajagrande = 0";
-            } else {
-                $sqlMigracion = "totalcajagrande = (totalcajachica + totalcajagrande), totalcajachica = 0";
-            }
+            // 1. Buscamos el nuevo precio asociado al nuevo tipo de caja
+            $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
+            $stmtPrecio->execute([$idTipoAlojamiento]);
+            $nuevoPrecio = $stmtPrecio->fetchColumn() ?: 0;
 
+            // 2. Actualizamos TODA la historia con el nuevo esquema
             $sql = "UPDATE alojamiento SET 
-                        idprotA = :idprotA, IdUsrA = :idUsrA, TipoAnimal = :idEsp, 
-                        preciocajachica = :pChica, preciocajagrande = :pGrande, $sqlMigracion
+                        idprotA = :idprotA, 
+                        IdUsrA = :idUsrA,
+                        TipoAnimal = :idEsp, 
+                        IdTipoAlojamiento = :idTipo, 
+                        PrecioCajaMomento = :precio
                     WHERE historia = :historia";
             
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
-                ':idprotA' => $data['idprotA'], ':idUsrA' => $data['IdUsrA'], 
-                ':idEsp' => $data['idespA'], ':pChica' => $data['precioChica'], 
-                ':pGrande' => $data['precioGrande'], ':historia' => $historia
+                ':idprotA' => $data['idprotA'], 
+                ':idUsrA'  => $data['IdUsrA'],
+                ':idEsp'   => $data['idespA'], 
+                ':idTipo'  => $idTipoAlojamiento, 
+                ':precio'  => $nuevoPrecio, 
+                ':historia'=> $historia
             ]);
 
+            // 3. Recalculamos toda la parte contable para aplicar el nuevo precio a cada tramo
             $this->recalculateHistory($historia);
+            
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Reconfiguró variables base de Historia ID: $historia");
             
             $this->db->commit();
             return true;
-        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+        } catch (\Exception $e) { 
+            $this->db->rollBack(); 
+            throw $e; 
+        }
     }
 
     public function updatePrice($idAlojamiento, $nuevoPrecio) {

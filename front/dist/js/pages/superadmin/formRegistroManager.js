@@ -1,55 +1,57 @@
 // ***************************************************
 // JS: formRegistroManager.js
 // ***************************************************
-// Gestión administrativa de links de registro institucional y visor de datos EAV.
-// Sistema: Bioterio Central (Gecko Devs 2026)
-// ***************************************************
 
 import { API } from '../../api.js';
 
-/**
- * INICIALIZACIÓN DEL MÓDULO
- */
 export async function initFormAdmin() {
     renderTable();
 }
 
-// ***************************************************
-// RENDERIZADO DE LA GRILLA PRINCIPAL
-// ***************************************************
-// Obtiene los links configurados y los muestra en la tabla con validación de datos.
 async function renderTable() {
     const res = await API.request('/superadmin/form-registros/all');
     const tbody = document.getElementById('table-body-forms');
     
-    // VALIDACIÓN DE SEGURIDAD: Evita fallos si la API no responde el formato esperado
     if (!res || res.status !== 'success' || !res.data) {
-        console.error("Error al obtener datos de la API:", res?.message || "Respuesta inválida");
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger font-bold py-4">No se pudieron cargar los formularios o no hay registros.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger font-bold py-4">No se pudieron cargar los formularios o no hay registros.</td></tr>';
         return;
     }
 
     tbody.innerHTML = '';
 
     res.data.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.className = "cursor-pointer hover:bg-slate-50 transition-colors";
+        const isActivo = parseInt(row.activo) === 1;
         
-        // Al hacer clic en la fila se abre el visor de detalles EAV
+        // Estilo visual de la fila si está deshabilitada
+        const rowClass = isActivo ? "hover:bg-slate-50 transition-colors cursor-pointer" : "bg-red-50 text-muted opacity-75 cursor-pointer";
+        const slugDisplay = isActivo ? `<code class="text-primary bg-slate-100 px-2 py-1 rounded">/formulario/${row.slug_url}</code>` : `<span class="text-danger small fw-bold">DESHABILITADO</span>`;
+        
+        const tr = document.createElement('tr');
+        tr.className = rowClass;
         tr.onclick = () => window.verDetalleCompleto(row.id_form_config);
 
+        // Botón de Toggle (Habilitar / Deshabilitar)
+        const toggleBtnClass = isActivo ? "btn-outline-warning" : "btn-success";
+        const toggleIcon = isActivo ? "bi-pause-circle" : "bi-play-circle";
+        const toggleText = isActivo ? "Pausar" : "Activar";
+        const toggleAction = isActivo ? 0 : 1;
+
         tr.innerHTML = `
-            <td class="font-bold text-muted text-center">${row.id_form_config}</td>
-            <td class="font-bold text-slate-700">${row.nombre_inst_previa}</td>
-            <td class="text-slate-600">${row.encargado_nombre}</td>
-            <td><code class="text-primary bg-slate-100 px-2 py-1 rounded">/formulario/${row.slug_url}</code></td>
+            <td class="font-bold text-center">${row.id_form_config}</td>
+            <td class="font-bold ${isActivo ? 'text-slate-700' : ''}">${row.nombre_inst_previa}</td>
+            <td>${row.encargado_nombre}</td>
+            <td>${slugDisplay}</td>
             <td class="text-center">
                 <span class="badge ${row.campos_completados > 0 ? 'bg-success' : 'bg-secondary'} px-2 py-1">
                     ${row.campos_completados} datos cargados
                 </span>
             </td>
-            <td class="text-muted" style="font-size: 11px;">${row.creado_el}</td>
+            <td style="font-size: 11px;">${row.creado_el}</td>
             <td class="text-center">
+                <button class="btn ${toggleBtnClass} btn-sm border-0 me-1" 
+                        onclick="event.stopPropagation(); window.toggleLinkStatus(${row.id_form_config}, ${toggleAction})">
+                    <i class="bi ${toggleIcon}"></i> ${toggleText}
+                </button>
                 <button class="btn btn-outline-danger btn-sm border-0" 
                         onclick="event.stopPropagation(); window.deleteLink(${row.id_form_config})">
                     <i class="bi bi-trash"></i> Eliminar
@@ -60,41 +62,97 @@ async function renderTable() {
     });
 }
 
-// ***************************************************
-// VISOR DE DETALLES (ESTRUCTURA EAV)
-// ***************************************************
-// Reconstruye dinámicamente las respuestas agrupadas por categoría en el modal.
+// TOGGLE STATUS
+window.toggleLinkStatus = async (id, newStatus) => {
+    const actionText = newStatus === 1 ? 'habilitar' : 'deshabilitar';
+    const confirm = await Swal.fire({
+        title: `¿${actionText.toUpperCase()} Link?`,
+        text: newStatus === 1 ? "La institución podrá volver a ingresar datos." : "La institución ya no podrá acceder a este formulario.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: newStatus === 1 ? '#198754' : '#ffc107',
+        confirmButtonText: `SÍ, ${actionText.toUpperCase()}`,
+        cancelButtonText: 'CANCELAR'
+    });
+
+    if (confirm.isConfirmed) {
+        Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
+        const res = await API.request('/superadmin/form-registros/toggle-status', 'POST', { id_form_config: id, status: newStatus });
+        
+        if (res && res.status === 'success') {
+            Swal.fire('Actualizado', 'El estado del enlace ha cambiado.', 'success');
+            renderTable();
+        } else {
+            Swal.fire('Error', res?.message || 'Error al actualizar.', 'error');
+        }
+    }
+};
+
+// ELIMINAR
+window.deleteLink = async (id) => {
+    const confirm = await Swal.fire({
+        title: '¿Eliminar este Link?',
+        text: "Esta acción borrará el acceso y todas las respuestas cargadas permanentemente.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonText: 'SÍ, ELIMINAR'
+    });
+
+    if (confirm.isConfirmed) {
+        Swal.fire({ title: 'Borrando...', didOpen: () => Swal.showLoading() });
+        const res = await API.request('/superadmin/form-registros/delete', 'POST', { id_form_config: id });
+        
+        if (res && res.status === 'success') {
+            Swal.fire('Eliminado', 'El registro ha sido borrado.', 'success');
+            renderTable();
+        } else {
+            Swal.fire('Error', res?.message || 'Error al intentar eliminar.', 'error');
+        }
+    }
+};
+
+// VISOR DE DETALLES
 window.verDetalleCompleto = async (id) => {
+    Swal.fire({ title: 'Cargando datos...', didOpen: () => Swal.showLoading() });
+    
     const res = await API.request(`/superadmin/form-registros/detail/${id}`);
     const container = document.getElementById('content-detalle-eav');
     
+    Swal.close();
+
     if (!res || res.status !== 'success' || !res.data) {
-        Swal.fire('Error', 'No se pudieron recuperar los detalles del formulario.', 'error');
+        Swal.fire('Error', 'No se pudieron recuperar los detalles.', 'error');
         return;
     }
 
     container.innerHTML = '';
 
-    // Si no hay respuestas aún
     if (Object.keys(res.data).length === 0) {
         container.innerHTML = `<div class="alert alert-info text-center font-bold uppercase">La institución aún no ha cargado datos en este formulario.</div>`;
     } else {
-        // El backend devuelve los datos agrupados por CATEGORIA
         for (const [categoria, campos] of Object.entries(res.data)) {
             let sectionHtml = `
                 <div class="mb-4 bg-white p-3 rounded shadow-sm border-l-4 border-success">
-                    <h6 class="font-black text-success uppercase text-xs mb-3 italic tracking-wider">
+                    <h6 class="font-black text-success uppercase text-xs mb-3 italic tracking-wider border-bottom pb-2">
                         <i class="bi bi-folder-fill me-1"></i> CATEGORÍA: ${categoria}
                     </h6>
-                    <div class="row g-2">
+                    <div class="row g-3">
             `;
 
             campos.forEach(c => {
+                let nombreCampo = c.campo.replace('inst_', '').replace(/_/g, ' ');
+                // Limpiamos los "[]" y los prefijos raros de los arrays (ej: "org_nom[]")
+                nombreCampo = nombreCampo.replace('[]', '').replace(/[0-9]+$/, ''); 
+
                 sectionHtml += `
-                    <div class="col-md-4 mb-2">
-                        <label class="d-block text-muted fw-bold uppercase" style="font-size: 9px;">${c.campo.replace('inst_', '').replace(/_/g, ' ')}</label>
-                        <div class="border-bottom pb-1 text-slate-800 font-medium" style="font-size: 12px;">
-                            ${c.valor || '<span class="text-slate-300 italic">No proporcionado</span>'}
+                    <div class="col-md-3">
+                        <div class="bg-slate-50 p-2 rounded border h-100">
+                            <label class="d-block text-muted fw-bold uppercase mb-1" style="font-size: 10px;">${nombreCampo}</label>
+                            <div class="text-slate-800 font-medium" style="font-size: 13px;">
+                                ${c.valor || '<span class="text-slate-300 italic">N/A</span>'}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -108,11 +166,8 @@ window.verDetalleCompleto = async (id) => {
     new bootstrap.Modal(document.getElementById('modal-detalle-form')).show();
 };
 
-// ***************************************************
-// CREACIÓN DE NUEVO LINK DE ACCESO
-// ***************************************************
-// Abre modal de SweetAlert2 y procesa el guardado del nuevo link.
 window.openCreateLinkModal = async () => {
+    // ... (Tu código de openCreateLinkModal se mantiene exactamente igual) ...
     const { value: formValues } = await Swal.fire({
         title: 'Generar Nuevo Link de Registro',
         html:
@@ -150,36 +205,10 @@ window.openCreateLinkModal = async () => {
         const res = await API.request('/superadmin/form-registros/create-link', 'POST', formValues);
         
         if(res && res.status === 'success') {
-            Swal.fire('¡Éxito!', 'El link de registro ha sido generado correctamente.', 'success');
+            Swal.fire('¡Éxito!', 'El link de registro ha sido generado.', 'success');
             renderTable();
         } else {
             Swal.fire('Error', res?.message || 'No se pudo crear el link.', 'error');
-        }
-    }
-};
-
-// ***************************************************
-// ELIMINACIÓN TÉCNICA
-// ***************************************************
-window.deleteLink = async (id) => {
-    const confirm = await Swal.fire({
-        title: '¿Eliminar este Link?',
-        text: "Esta acción borrará el acceso y todas las respuestas cargadas por la institución.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'SÍ, ELIMINAR',
-        cancelButtonText: 'CANCELAR'
-    });
-
-    if (confirm.isConfirmed) {
-        const res = await API.request('/superadmin/form-registros/delete', 'POST', { id_form_config: id });
-        if (res && res.status === 'success') {
-            Swal.fire('Eliminado', 'El registro ha sido borrado.', 'success');
-            renderTable();
-        } else {
-            Swal.fire('Error', res?.message || 'Error al intentar eliminar.', 'error');
         }
     }
 };

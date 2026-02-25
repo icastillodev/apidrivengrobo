@@ -2,26 +2,50 @@ Options -Indexes
 RewriteEngine On
 
 # ============================================================
+# 0. BLOQUEAR ACCESO DIRECTO AL ARCHIVO FÍSICO DEL SUPERADMIN
+# ============================================================
+RewriteCond %{THE_REQUEST} /superadmin_login\.html [NC]
+RewriteRule ^ paginas/error404.html [L]
+
+# ============================================================
 # 1. FIX DE RUTAS PARA ASSETS
-# Si pides algo de /dist/ pero vienes de un slug (ej: /sede1/dist/js/auth.js)
-# esta regla quita el "sede1" de la ruta para que Apache encuentre el archivo real.
 # ============================================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^.+/(dist|assets|paginas|resources)/(.*)$ $1/$2 [L]
 
-# 2. EXCEPCIÓN PARA ARCHIVOS FÍSICOS
+# ============================================================
+# 1.5 RUTA SECRETA MAESTRA (geckoadm/login)
+# ============================================================
+RewriteRule ^geckoadm/login/?$ superadmin_login.html [L,NC]
+
+# ============================================================
+# 2. URLs AMIGABLES: LEER ARCHIVOS SIN EL .HTML
+# Si el archivo con .html existe, lo sirve internamente.
+# ============================================================
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.html -f
+RewriteRule ^(.*)$ $1.html [L]
+
+# ============================================================
+# 3. EXCEPCIÓN PARA ARCHIVOS FÍSICOS (Evita bucles)
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# 3. REGLA FORMULARIO DE REGISTRO
+# ============================================================
+# 4. REGLA FORMULARIO DE REGISTRO
+# ============================================================
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html?inst=$1 [L,QSA]
 
-# 4. REGLA LOGIN POR SEDE (Slug)
-# Evita que las carpetas reales se confundan con nombres de instituciones
+# ============================================================
+# 5. REGLA LOGIN POR SEDE (Slug)
+# ============================================================
 RewriteCond %{REQUEST_URI} !/(dist|paginas|assets|resources|node_modules)
 RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
 
-# 5. CATCH-ALL PARA ERRORES (Solo si no es un asset)
+# ============================================================
+# 6. CATCH-ALL PARA ERRORES (Página 404 general)
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_URI} !(\.js|\.css|\.png|\.jpg|\.jpeg|\.svg|\.gif|\.ico)$ [NC]
 RewriteRule ^.*$ paginas/error404.html [L]

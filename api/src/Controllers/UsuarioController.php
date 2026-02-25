@@ -19,10 +19,18 @@ class UsuarioController {
         exit;
     }
 
-    public function list() {
+public function list() {
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->jsonOut(['status' => 'success', 'data' => $this->model->getAllGlobal($sesion['instId'])]);
+            
+            // Seguridad Extra: Solo el SuperAdmin puede ver toda la red
+            if ((int)$sesion['role'] !== 1) {
+                throw new \Exception("Acceso denegado. Privilegios insuficientes.");
+            }
+
+            // Llamamos a la función global sin filtros de sede
+            $this->jsonOut(['status' => 'success', 'data' => $this->model->getAllGlobal()]);
+            
         } catch (\Exception $e) {
             $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 401);
         }
