@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+vendor/
+
+# Entorno y Secretos (¡MUY IMPORTANTE!)
+.env
+.env.local
+.env.*.local
+
+# Bases de datos
+*.sql
+*.sqlite
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS (Windows/Mac)
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Builds / Salida
+build/
+.astro/
