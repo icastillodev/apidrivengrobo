@@ -524,7 +524,7 @@ async function submitOrder() {
                 confirmButtonColor: '#1a5d3b',
                 confirmButtonText: 'IR A MIS FORMULARIOS'
             });
-            window.location.href = `${basePath}pages/usuario/misformularios.html`;
+            window.location.href = `${basePath}paginas/usuario/misformularios.html`;
         } else {
             Swal.fire('Error', res.message, 'error');
         }

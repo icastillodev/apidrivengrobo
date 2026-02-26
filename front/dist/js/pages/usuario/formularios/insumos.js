@@ -263,7 +263,7 @@ async function handleSubmit(e) {
             const res = await API.request('/insumos-form/save', 'POST', payload);
             if (res.status === 'success') {
                 await Swal.fire('¡Enviado!', `El pedido #${res.id} ha sido registrado.`, 'success');
-                window.location.href = `${basePath}pages/usuario/misformularios.html`;
+                window.location.href = `${basePath}paginas/usuario/misformularios.html`;
             } else {
                  Swal.fire('Error', res.message || 'Error desconocido', 'error');
             }

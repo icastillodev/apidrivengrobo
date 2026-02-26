@@ -28,7 +28,6 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
         if (res.status === 'success') {
             input.value = ''; 
             
-            // --- REFRESCO INTELIGENTE ---
             if (typeof window.cargarFacturacionProtocolo === "function") {
                 await window.cargarFacturacionProtocolo();
             } else if (typeof window.cargarFacturacionInvestigador === "function") {
@@ -56,24 +55,25 @@ window.procesarPagoProtocolo = async (idProt) => {
     let totalAPagar = 0;
     const items = [];
 
-    // Recolectamos selección de checkboxes
+    // Recolectamos selección y EL MONTO EXACTO
     const seleccionados = document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj)`);
     seleccionados.forEach(chk => {
-        totalAPagar += parseFloat(chk.dataset.monto || 0);
+        const montoItem = parseFloat(chk.dataset.monto || 0);
+        totalAPagar += montoItem;
         items.push({ 
             tipo: chk.classList.contains('check-item-form') ? 'FORM' : 'ALOJ', 
-            id: chk.dataset.id 
+            id: chk.dataset.id,
+            monto_pago: montoItem // CRUCIAL: Se envía al backend
         });
     });
 
     if (totalAPagar <= 0) {
-        Swal.fire('Atención', 'Seleccione qué desea pagar.', 'info');
+        Swal.fire('Atención', 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
         return;
     }
 
     const saldoActual = parseFloat(prot.saldoInv || 0);
 
-    // VALIDACIÓN: ¿Tiene saldo suficiente?
     if (totalAPagar > saldoActual) {
         Swal.fire({
             title: 'Saldo Insuficiente',
@@ -88,7 +88,6 @@ window.procesarPagoProtocolo = async (idProt) => {
         return;
     }
 
-    // CONFIRMACIÓN: Detalle de saldo restante
     const confirm = await Swal.fire({
         title: 'Confirmar Liquidación',
         html: `
@@ -131,7 +130,6 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
             hideLoader();
             await Swal.fire('¡Pago Procesado!', 'El saldo ha sido actualizado.', 'success');
 
-            // --- REFRESCO INTELIGENTE ---
             if (typeof window.cargarFacturacionProtocolo === "function") {
                 await window.cargarFacturacionProtocolo();
             } else if (typeof window.cargarFacturacionInvestigador === "function") {
@@ -175,23 +173,19 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
 window.procesarPagoInsumosGenerales = async () => {
     const seleccionados = document.querySelectorAll('.check-item-insumo:checked');
     
-    if (seleccionados.length === 0) {
-        Swal.fire('Atención', 'Seleccione al menos un insumo para pagar.', 'info');
-        return;
-    }
+    if (seleccionados.length === 0) return Swal.fire('Atención', 'Seleccione al menos un insumo para pagar.', 'info');
 
     let totalAPagar = 0;
     const items = [];
     let htmlItems = '<ul class="list-group list-group-flush mb-3 small shadow-sm">';
 
-    // Recolectamos datos de la grilla
     seleccionados.forEach(chk => {
         const fila = chk.closest('tr');
-        const concepto = fila.cells[3].innerText; // Columna de concepto
+        const concepto = fila.cells[3].innerText; 
         const monto = parseFloat(chk.dataset.monto || 0);
         
         totalAPagar += monto;
-        items.push({ tipo: 'INSUMO_GRAL', id: chk.dataset.id });
+        items.push({ tipo: 'INSUMO_GRAL', id: chk.dataset.id, monto_pago: monto });
         htmlItems += `<li class="list-group-item d-flex justify-content-between">
                         <span class="text-truncate" style="max-width: 200px;">${concepto}</span>
                         <b>$ ${monto.toLocaleString('es-UY')}</b>
@@ -199,13 +193,10 @@ window.procesarPagoInsumosGenerales = async () => {
     });
     htmlItems += '</ul>';
 
-    // Obtenemos los datos del investigador (del primer insumo seleccionado)
-    // Asumimos que los insumos generales pertenecen a un investigador responsable
     const primerItem = window.currentReportData.insumosGenerales.find(i => i.id == items[0].id);
     const saldoActual = parseFloat(primerItem.saldoInv || 0);
     const nombreInvestigador = primerItem.solicitante;
 
-    // VALIDACIÓN CRÍTICA: Si no le alcanza el saldo, no se abre el pago
     if (totalAPagar > saldoActual) {
         Swal.fire({
             title: 'Saldo Insuficiente',
@@ -220,7 +211,6 @@ window.procesarPagoInsumosGenerales = async () => {
         return;
     }
 
-    // CARTEL DE CONFIRMACIÓN DETALLADO
     const confirm = await Swal.fire({
         title: 'Confirmar Liquidación de Insumos',
         width: '500px',
@@ -228,10 +218,7 @@ window.procesarPagoInsumosGenerales = async () => {
             <div class="text-start">
                 <div class="mb-2 small text-muted text-uppercase fw-bold">Investigador Responsable:</div>
                 <h6 class="fw-bold mb-3">${nombreInvestigador}</h6>
-                
-                <div class="mb-2 small text-muted text-uppercase fw-bold">Ítems a pagar:</div>
                 ${htmlItems}
-
                 <div class="p-3 bg-light rounded border">
                     <div class="d-flex justify-content-between mb-1">
                         <span>Saldo Actual:</span> <b>$ ${saldoActual.toLocaleString('es-UY')}</b>

@@ -48,15 +48,13 @@ export const HistorialUI = {
             }
         } catch (e) { console.error(e); } finally { hideLoader(); }
     },
-// dist/js/pages/admin/alojamientos/HistorialUI.js
-// Remplaza renderSummary y renderTable enteros por esto:
 
 renderSummary(historiaId) {
         const summaryContainer = document.getElementById('historial-summary');
         if (summaryContainer && !document.getElementById('leyenda-trazabilidad')) {
             summaryContainer.insertAdjacentHTML('afterend', `
                 <div id="leyenda-trazabilidad" class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
-                    <i class="bi bi-info-circle-fill me-1"></i> ${window.txt.alojamientos.legend_click_row || 'Haga clic en una fila para ver la trazabilidad.'}
+                    <i class="bi bi-info-circle-fill me-1"></i> ${window.txt.alojamientos?.legend_click_row || 'Haga clic en una fila para ver la trazabilidad.'}
                 </div>
             `);
         }
@@ -72,14 +70,24 @@ renderSummary(historiaId) {
             const esAbierto = !h.hastafecha;
             const pIni = h.fechavisado.split('-');
             const fIni = new Date(pIni[0], pIni[1]-1, pIni[2], 12,0,0);
-            let fFin = esAbierto ? hoy : new Date(h.hastafecha.split('-')[0], h.hastafecha.split('-')[1]-1, h.hastafecha.split('-')[2], 12,0,0);
-
-            let dias = Math.max(0, Math.floor((fFin - fIni)/(1000*60*60*24)));
-            const precio = parseFloat(h.PrecioCajaMomento || 0);
-            const cant = parseInt(h.CantidadCaja || 0);
             
-            totalCosto += esAbierto ? (dias * precio * cant) : parseFloat(h.totalpago || 0);
-            totalDias += dias;
+            let dias;
+
+            if (esAbierto) {
+                // TRAMO VIGENTE: Los días se calculan en vivo hasta HOY
+                dias = Math.max(0, Math.floor((hoy - fIni)/(1000*60*60*24)));
+            } else {
+                // TRAMO CERRADO: Días fijos cerrados
+                const pFin = h.hastafecha.split('-');
+                const fFin = new Date(pFin[0], pFin[1]-1, pFin[2], 12,0,0);
+                dias = Math.max(0, Math.floor((fFin - fIni)/(1000*60*60*24)));
+            }
+            
+            // LA CLAVE: El Costo Total Superior es LA SUMA ESTRICTA DE LA BD (cuentaapagar). 
+            // Si el tramo está abierto, sumará 0 porque aún no se cerró contablemente.
+            totalCosto += parseFloat(h.cuentaapagar || 0);
+            
+            totalDias += dias; // Los días sí se siguen sumando todos
         });
 
         const txt = window.txt.alojamientos || {};
@@ -100,7 +108,7 @@ renderSummary(historiaId) {
             </div>
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">PROTOCOL N°</label><span class="text-dark small">${first.nprotA}</span></div>
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(gen.especie || 'Especie').toUpperCase()}</label><span class="text-dark small">${first.EspeNombreA}</span></div>
-            <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(txt.box_name || 'Tipo').toUpperCase()}</label><span class="text-primary small fw-bold">${tipoCaja}</span></div> 
+            <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(txt.type_box || 'Tipo').toUpperCase()}</label><span class="text-primary small fw-bold">${tipoCaja}</span></div> 
             <div class="col-md-1 border-end text-center"><label class="d-block small text-muted fw-bold text-primary">${(txt.total_days || 'Días').toUpperCase()}</label><span class="fw-bold fs-5">${totalDias}</span></div>
             <div class="col-md-1 text-center"><label class="d-block small text-muted fw-bold text-success">${(txt.total_cost || 'Costo').toUpperCase()}</label><span class="fw-bold fs-6 text-success">$ ${totalCosto.toFixed(2)}</span></div>
             
@@ -111,34 +119,28 @@ renderSummary(historiaId) {
         `;
     },
 
-renderTable() {
+    renderTable() {
         const history = AlojamientoState.currentHistoryData;
         const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
-        const txt = window.txt.alojamientos;
-        const gen = window.txt.generales;
+        const txt = window.txt.alojamientos || {};
+        const gen = window.txt.generales || {};
 
         const tbody = document.getElementById('tbody-historial');
-        
-        // BARRERA DE SEGURIDAD
-        if (!tbody) {
-            console.error("❌ CRÍTICO: No se encuentra el <tbody id='tbody-historial'> en el HTML.");
-            return;
-        }
+        if (!tbody) return;
 
-        // Buscar el thead de forma segura (sin usar previousElementSibling)
         const thead = tbody.closest('table').querySelector('thead');
         if (thead) {
             thead.innerHTML = `
                 <tr>
-                    <th>${gen.id}</th> 
-                    <th>${gen.inicio}</th>
-                    <th>${gen.retiro}</th>
-                    <th>${txt.th_boxes}</th>
-                    <th>${txt.days_tramo}</th>
-                    <th>${txt.price}</th>
-                    <th>${txt.subtotal}</th>
-                    <th>${txt.th_obs}</th>
-                    <th>${txt.th_actions}</th>
+                    <th>${gen.id || 'ID'}</th> 
+                    <th>${gen.inicio || 'Inicio'}</th>
+                    <th>${gen.retiro || 'Retiro'}</th>
+                    <th>${txt.th_boxes || 'Cant. (Tipo)'}</th>
+                    <th>${txt.days_tramo || 'Días'}</th>
+                    <th>${txt.price || 'Precio U.'}</th>
+                    <th>${txt.subtotal || 'Subtotal'}</th>
+                    <th>${txt.th_obs || 'Obs.'}</th>
+                    <th>${txt.th_actions || 'Acciones'}</th>
                 </tr>
             `;
         }
@@ -147,30 +149,40 @@ renderTable() {
             const esAbierto = !h.hastafecha;
             const pIni = h.fechavisado.split('-');
             const fIni = new Date(pIni[0], pIni[1] - 1, pIni[2], 12, 0, 0);
-            let fFin = esAbierto ? hoy : new Date(h.hastafecha.split('-')[0], h.hastafecha.split('-')[1]-1, h.hastafecha.split('-')[2], 12, 0, 0);
-
-            let diasTramo = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
             
-            // CÁLCULO EAV DINÁMICO
             const precioUnit = parseFloat(h.PrecioCajaMomento || 0);
             const cant = parseInt(h.CantidadCaja || 0);
-            const subtotal = esAbierto ? (diasTramo * precioUnit * cant) : parseFloat(h.totalpago || 0);
+            let diasTramo, subtotal, txtFin;
+
+            if (esAbierto) {
+                // TRAMO VIGENTE
+                txtFin = txt.status_active || 'Vigente';
+                diasTramo = Math.max(0, Math.floor((hoy - fIni) / (1000 * 60 * 60 * 24)));
+                subtotal = (diasTramo * precioUnit * cant);
+            } else {
+                // TRAMO CERRADO
+                const pFin = h.hastafecha.split('-');
+                const fFin = new Date(pFin[0], pFin[1]-1, pFin[2], 12,0,0);
+                txtFin = fFin.toLocaleDateString();
+                diasTramo = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
+                subtotal = parseFloat(h.cuentaapagar) > 0 ? parseFloat(h.cuentaapagar) : (diasTramo * precioUnit * cant);
+            }
 
             const trMaster = `
             <tr class="pointer table-light" onclick="window.toggleTrazabilidad(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})">
                 <td><span class="badge bg-secondary">#${h.IdAlojamiento}</span></td>
                 <td>${fIni.toLocaleDateString()}</td> 
-                <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${esAbierto ? txt.status_active : fFin.toLocaleDateString()}</td>
+                <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
                 <td>${cant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small></td>
                 <td class="fw-bold">${diasTramo}</td>
                 <td>$ ${precioUnit.toFixed(2)}</td>
-                <td class="fw-bold">$ ${subtotal.toFixed(2)}</td>
+                <td class="fw-bold text-dark">$ ${subtotal.toFixed(2)}</td>
                 <td class="small italic text-muted">${h.observaciones || ''}</td>
-            <td onclick="event.stopPropagation()">
+                <td onclick="event.stopPropagation()">
                     <div class="btn-group">
                         <button class="btn btn-xs btn-outline-success" title="${txt.btn_edit_price || 'Editar Precio'}" onclick="window.modificarPrecioTramo(${h.IdAlojamiento}, ${h.PrecioCajaMomento})"><i class="bi bi-currency-dollar"></i></button>
-                        <button class="btn btn-xs btn-outline-primary" title="${txt.btn_edit}" onclick="window.modificarTramo(${h.IdAlojamiento})"><i class="bi bi-pencil"></i></button>
-                        <button class="btn btn-xs btn-outline-danger" title="${txt.btn_delete}" onclick="window.eliminarTramo(${h.IdAlojamiento}, ${h.historia})"><i class="bi bi-trash"></i></button>
+                        <button class="btn btn-xs btn-outline-primary" title="${txt.btn_edit || 'Editar'}" onclick="window.modificarTramo(${h.IdAlojamiento})"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-xs btn-outline-danger" title="${txt.btn_delete || 'Borrar'}" onclick="window.eliminarTramo(${h.IdAlojamiento}, ${h.historia})"><i class="bi bi-trash"></i></button>
                     </div>
                 </td>
             </tr>`;
@@ -179,7 +191,7 @@ renderTable() {
             <tr id="trazabilidad-row-${h.IdAlojamiento}" class="d-none bg-white">
                 <td colspan="9" class="p-0 border-0">
                     <div id="trazabilidad-content-${h.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner bg-light">
-                        <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${txt.traceability_loading}</div>
+                        <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${txt.traceability_loading || 'Cargando trazabilidad...'}</div>
                     </div>
                 </td>
             </tr>`;
@@ -187,14 +199,12 @@ renderTable() {
             return trMaster + trDetail;
         }).join('');
     },
-
-renderFooter(historiaId) {
+    renderFooter(historiaId) {
         const history = AlojamientoState.currentHistoryData;
         const isFinalizado = history.some(h => String(h.finalizado) === "1");
         const footer = document.getElementById('historial-footer');
         const txt = window.txt.alojamientos;
         
-        // Traducimos el título del modal dinámicamente aquí para aprovechar el flujo
         document.getElementById('historial-title').innerText = txt.history_record;
 
         if (isFinalizado) {
@@ -259,21 +269,21 @@ renderFooter(historiaId) {
         }
     },
 
-// =========================================================
+    // =========================================================
     // MODAL DE CONFIGURACIÓN DE HISTORIA (Edición Maestra)
     // =========================================================
-    cfgSelections: { historia: null, idprotA: null, IdUsrA: null, idespA: null, IdTipoAlojamiento: null },
-    cfgData: { protocolos: [], usuarios: [] },
+    cfgSelections: { historia: null, idprotA: null, IdUsrA: null, idespA: null, IdTipoAlojamiento: null, departamento: null },
+    cfgData: { protocolos: [], usuarios: [], deptos: [] },
 
-async abrirConfiguracion() {
+    async abrirConfiguracion() {
         const first = AlojamientoState.currentHistoryData[0];
         if(!first) return;
 
-        // Establecer las selecciones base de lo que YA tiene la historia
         this.cfgSelections = {
             historia: first.historia,
             idprotA: parseInt(first.idprotA),
             IdUsrA: parseInt(first.IdUsrA),
+            departamento: parseInt(first.departamento), // AGREGADO
             idespA: parseInt(first.TipoAnimal || first.idespA),
             IdTipoAlojamiento: parseInt(first.IdTipoAlojamiento)
         };
@@ -281,22 +291,44 @@ async abrirConfiguracion() {
         document.getElementById('modal-cfg-title').innerText = `CONFIGURACIÓN MAESTRA - HISTORIA #${first.historia}`;
 
         showLoader();
-        await Promise.all([this.loadCfgProtocolos(), this.loadCfgUsuarios()]);
+        try {
+            const [resProt, resUsr, resDepto] = await Promise.all([
+                API.request(`/protocoloexpe/list?inst=${AlojamientoState.instId}`),
+                API.request(`/users/institution`),
+                API.request(`/deptos/list`) // AGREGADO
+            ]);
+            
+            if (resProt.status === 'success') this.cfgData.protocolos = resProt.data;
+            if (resUsr.status === 'success') this.cfgData.usuarios = resUsr.data;
+            if (resDepto.status === 'success') this.cfgData.deptos = resDepto.data; // AGREGADO
+            
+        } catch(e) { console.error(e); }
+
+        this.renderCfgProtocolos();
+        this.renderCfgUsuarios();
+
+        // AGREGADO: Renderizar y llenar select departamento
+        const selDepto = document.getElementById('cfg-select-depto');
+        if (selDepto) {
+            selDepto.innerHTML = this.cfgData.deptos.map(d => 
+                `<option value="${d.iddeptoA}">${d.NombreDeptoA} ${d.NombreOrganismoSimple ? `(${d.NombreOrganismoSimple})` : ''}</option>`
+            ).join('');
+            selDepto.value = this.cfgSelections.departamento || '';
+            selDepto.onchange = (e) => { this.cfgSelections.departamento = parseInt(e.target.value); };
+        }
         
-        // Cargar las especies del protocolo actual
         await this.loadCfgEspecies(this.cfgSelections.idprotA);
         hideLoader();
 
         const modalEl = document.getElementById('modal-config-historia');
         const modalObj = new bootstrap.Modal(modalEl);
 
-        // MAGIA VISUAL: Esperamos a que el modal esté 100% visible para scrollear y pintar
         modalEl.addEventListener('shown.bs.modal', () => {
-            this.cfgSelectProtocolo(this.cfgSelections.idprotA, true); // true = esInit, no recargar hijos
+            this.cfgSelectProtocolo(this.cfgSelections.idprotA, true); 
             this.cfgSelectUsuario(this.cfgSelections.IdUsrA, true);
             if(this.cfgSelections.idespA) this.cfgSelectEspecie(this.cfgSelections.idespA, false);
             if(this.cfgSelections.IdTipoAlojamiento) this.cfgSelectTipo(this.cfgSelections.IdTipoAlojamiento);
-        }, { once: true }); // Se ejecuta una sola vez al abrir
+        }, { once: true }); 
 
         modalObj.show();
     },
@@ -309,11 +341,17 @@ async abrirConfiguracion() {
         
         if (row) {
             row.classList.add('table-primary', 'border-primary');
-            // block: 'center' fuerza a la grilla a bajar hasta dejar la fila seleccionada en el medio
             row.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
         }
 
-        // Solo recargamos especies si el usuario hizo clic manualmente
+        // AGREGADO: Autoseleccionar departamento basado en el protocolo
+        const prot = this.cfgData.protocolos.find(p => p.idprotA == id);
+        if (prot && prot.departamento) {
+            this.cfgSelections.departamento = parseInt(prot.departamento);
+            const selDepto = document.getElementById('cfg-select-depto');
+            if (selDepto) selDepto.value = prot.departamento;
+        }
+
         if (!isInit) {
             this.cfgSelections.idespA = null;
             this.cfgSelections.IdTipoAlojamiento = null;
@@ -341,46 +379,54 @@ async abrirConfiguracion() {
             const res = await API.request(`/protocoloexpe/list?inst=${AlojamientoState.instId}`);
             if (res.status === 'success') {
                 this.cfgData.protocolos = res.data;
-                const tbody = document.getElementById('cfg-grid-protocolos');
-                
-                tbody.innerHTML = res.data.map(p => `
-                    <tr id="cfg-row-prot-${p.idprotA}" onclick="window.cfgSelectProtocolo(${p.idprotA})" class="transition-colors ${p.idprotA == this.cfgSelections.idprotA ? 'table-primary border-primary' : ''}">
-                        <td class="fw-bold text-muted">#${p.idprotA}</td>
-                        <td class="fw-bold text-primary">${p.nprotA}</td>
-                        <td class="text-truncate" style="max-width: 150px;">${p.tituloA || 'Sin Título'}</td>
-                        <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || 'Sin Asignar'}</td>
-                    </tr>
-                `).join('');
+                this.renderCfgProtocolos(); // Reutiliza la funcion de render
             }
         } catch (e) { console.error(e); }
     },
 
+    // Nueva funcion separada para renderizar
+    renderCfgProtocolos() {
+        const tbody = document.getElementById('cfg-grid-protocolos');
+        if (!tbody) return;
+        tbody.innerHTML = this.cfgData.protocolos.map(p => `
+            <tr id="cfg-row-prot-${p.idprotA}" onclick="window.cfgSelectProtocolo(${p.idprotA})" class="transition-colors ${p.idprotA == this.cfgSelections.idprotA ? 'table-primary border-primary' : ''}">
+                <td class="fw-bold text-muted">#${p.idprotA}</td>
+                <td class="fw-bold text-primary">${p.nprotA}</td>
+                <td class="text-truncate" style="max-width: 150px;">${p.tituloA || 'Sin Título'}</td>
+                <td class="text-info fw-bold" style="font-size: 10px;">${p.DeptoProtocoloFormat || '---'}</td>
+                <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || 'Sin Asignar'}</td>
+            </tr>
+        `).join('');
+    },
 
     async loadCfgUsuarios() {
         try {
             const res = await API.request(`/users/institution`);
-            const list = document.getElementById('cfg-list-usuarios');
             if (res.status === 'success') {
                 this.cfgData.usuarios = res.data;
-                list.innerHTML = res.data.map(u => `
-                    <div id="cfg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom ${u.IdUsrA == this.cfgSelections.IdUsrA ? 'active bg-success text-white border-success' : ''}" onclick="window.cfgSelectUsuario(${u.IdUsrA})">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><b class="${u.IdUsrA == this.cfgSelections.IdUsrA ? 'text-white' : 'text-dark'}">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
-                            <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
-                        </div>
-                    </div>
-                `).join('');
+                this.renderCfgUsuarios(); // Reutiliza la funcion
             }
         } catch (e) { console.error(e); }
     },
 
-
+    // Nueva funcion separada para renderizar
+    renderCfgUsuarios() {
+        const list = document.getElementById('cfg-list-usuarios');
+        if (!list) return;
+        list.innerHTML = this.cfgData.usuarios.map(u => `
+            <div id="cfg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom ${u.IdUsrA == this.cfgSelections.IdUsrA ? 'active bg-success text-white border-success' : ''}" onclick="window.cfgSelectUsuario(${u.IdUsrA})">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><b class="${u.IdUsrA == this.cfgSelections.IdUsrA ? 'text-white' : 'text-dark'}">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
+                    <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
+                </div>
+            </div>
+        `).join('');
+    },
 
     async loadCfgEspecies(idProt) {
         const container = document.getElementById('cfg-list-especies');
         container.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div> Cargando...';
         
-        // Limpiamos los tipos
         document.getElementById('cfg-list-tipos').innerHTML = '<span class="small text-muted fst-italic">Seleccione una especie primero.</span>';
 
         try {
@@ -392,7 +438,6 @@ async abrirConfiguracion() {
                     </button>
                 `).join('');
 
-                // Autoseleccionar si hay una sola especie
                 if (res.data.length === 1) {
                     this.cfgSelectEspecie(res.data[0].idespA);
                 }
@@ -421,12 +466,11 @@ async abrirConfiguracion() {
             this.cfgSelections.IdTipoAlojamiento = null;
             this.loadCfgTipos(id);
         } else {
-            // Si venimos del init y ya teníamos IdTipoAlojamiento, igual cargamos los tipos
             this.loadCfgTipos(id);
         }
     },
 
-async loadCfgTipos(idEsp) {
+    async loadCfgTipos(idEsp) {
         const container = document.getElementById('cfg-list-tipos');
         container.innerHTML = '<div class="spinner-border spinner-border-sm text-danger"></div> Buscando estructuras...';
 
@@ -471,9 +515,13 @@ async loadCfgTipos(idEsp) {
     },
 
     async guardarConfiguracionHistoria() {
+        // AGREGADO: Asegurar captura final del departamento
+        const selDepto = document.getElementById('cfg-select-depto');
+        if (selDepto) this.cfgSelections.departamento = parseInt(selDepto.value);
+
         const data = this.cfgSelections;
-        if (!data.idprotA || !data.IdUsrA || !data.idespA || !data.IdTipoAlojamiento) {
-            return Swal.fire('Faltan Datos', 'Asegúrese de tener seleccionado un Protocolo, Usuario, Especie y Estructura.', 'warning');
+        if (!data.idprotA || !data.IdUsrA || !data.idespA || !data.IdTipoAlojamiento || !data.departamento) {
+            return Swal.fire('Faltan Datos', 'Asegúrese de tener seleccionado un Protocolo, Usuario, Departamento, Especie y Estructura.', 'warning');
         }
 
         const confirm = await Swal.fire({
@@ -493,8 +541,8 @@ async loadCfgTipos(idEsp) {
                 if (res.status === 'success') {
                     bootstrap.Modal.getInstance(document.getElementById('modal-config-historia')).hide();
                     Swal.fire({title: 'Éxito', text: 'Se reconfiguró toda la historia.', icon: 'success', timer: 1500});
-                    this.verHistorial(data.historia); // Refresca el modal de historial que está abajo
-                    loadAlojamientos(); // Refresca la grilla principal
+                    this.verHistorial(data.historia); 
+                    loadAlojamientos(); 
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }

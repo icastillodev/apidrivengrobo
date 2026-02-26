@@ -347,7 +347,7 @@ alojamientos: {
         exp_opt_traz: "Traceability / Observations",
         exp_opt_precio: "Financial Information (Cost)",
         exp_title: "Export Data",
-    }onboarding: {
+    },onboarding: {
         err_invalid_url: "Invalid URL",
         err_no_inst: "Institution not specified.",
         err_expired: "The link has expired or is invalid.",
@@ -467,6 +467,60 @@ alojamientos: {
         inst_phone_label: "Phone",
         inst_email_label: "Email",
         inst_lang_label: "Preferred Language",
+    },
+    facturacion: {
+        titulo: "Billing",
+        por_depto: "By Department",
+        por_investigador: "By Investigator",
+        por_protocolo: "By Protocol",
+        titulo_liquidacion: "Department Settlement",
+        
+        // Filters
+        filtro_animales: "ANIMALS/REA",
+        filtro_alojamiento: "HOUSING",
+        filtro_insumos: "SUPPLIES",
+        
+        // Dashboard
+        resumen_fin: "Financial Summary",
+        deuda_total: "TOTAL DEBT",
+        total_pagado_lbl: "TOTAL PAID",
+        debe_animales: "OWES ANIMALS",
+        debe_reactivos: "OWES REAGENTS",
+        debe_alojamiento: "OWES HOUSING",
+        debe_insumos: "OWES SUPPLIES",
+        
+        saldos_inv: "Balances by Investigator",
+        total_deuda: "Total Debt",
+        total_pagado: "Total Paid",
+        saldo_disp: "Available Balance",
+        agregar_quitar: "Add / Remove Balance",
+        
+        // Tables
+        titular_paga: "Account Holder (Payer)",
+        esp_tipo_aloj: "Species / Housing Type",
+        periodo: "Period",
+        dias: "Days",
+        total: "Total",
+        pago: "Paid",
+        falta: "Due",
+        
+        // Text
+        btn_pagar_sel: "Pay Selection",
+        volver_seleccion: "BACK TO SELECTION",
+        selecc_pagar: "Selected for payment:",
+        saldo_actual: "Current Balance:",
+        
+        // Alerts
+        aviso_filtro: "You must have at least one active filter (Animals, Housing, or Supplies).",
+        aviso_depto: "Please select a department.",
+        sin_movimientos: "No transactions match the selected filters.",
+        saldo_act: "Balance Updated",
+        saldo_insuficiente: "Insufficient Balance",
+        confirm_pago: "Confirm Settlement",
+        pago_procesado: "Payment Processed!",
+        
+        // Modals
+        monto_ajustar: "Amount to adjust..."
     }
 
 

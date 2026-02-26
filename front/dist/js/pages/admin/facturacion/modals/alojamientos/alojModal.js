@@ -5,15 +5,10 @@
 import { API } from '../../../../../api.js';
 import { hideLoader, showLoader } from '../../../../../components/LoaderComponent.js';
 
-/**
- * MODAL: Gestión Financiera de Alojamiento (Versión Blindada)
- * Ubicación: js/pages/admin/facturacion/Modals/alojamientos/alojModal.js
- */
 export const openAlojModal = async (historiaId) => {
     try {
         showLoader();
 
-        // 1. Obtener historial técnico
         const resAloj = await API.request(`/alojamiento/history?historia=${historiaId}`);
         
         if (resAloj.status !== 'success' || !resAloj.data.length) {
@@ -24,52 +19,54 @@ export const openAlojModal = async (historiaId) => {
         const history = resAloj.data;
         const first = history[0];
 
-        // --- CLAVE: Pedimos el saldo del Titular del Protocolo ---
-        // Usamos IdTitularProtocolo que acabamos de agregar al SQL
-        const idPagador = first.IdTitularProtocolo; 
+        // 1. Identificamos al Pagador (Titular del Protocolo)
+        const idPagador = first.IdTitularProtocolo || first.idprotA;
+        const titularNombre = first.TitularNombre || `Titular (ID: ${idPagador})`;
+        const respEstadia = first.Investigador || 'Sin asignar';
 
+        // 2. Traemos Saldo Billetera
         const resSaldo = await API.request(`/billing/get-investigator-balance/${idPagador}`);
         hideLoader();
 
-        // 3. PROCESAMIENTO FINANCIERO
         const saldoReal = (resSaldo.status === 'success' && resSaldo.data) 
             ? parseFloat(resSaldo.data.SaldoDinero || 0) 
             : 0;
 
+        // 3. Variables de Alojamiento Modernas (Adiós Caja Chica/Grande)
+        const tipoAlojamiento = first.NombreTipoAlojamiento || 'Estructura Estándar';
+        const precioActual = parseFloat(first.PrecioCajaMomento || 0);
+
+        // 4. Procesamiento Matemático
         const { tramos, diasTotales, costoHistoricoTotal } = procesarTramosFinancieros(history);
 
-        // --- SUMA MANUAL DE PAGOS PARA ACTUALIZACIÓN REAL ---
         let totalPagadoHistorico = 0;
         history.forEach(h => {
             totalPagadoHistorico += parseFloat(h.totalpago || 0);
         });
 
-        const esChica = parseFloat(first.totalcajachica) > 0;
-        const precioActual = esChica ? first.preciocajachica : first.preciocajagrande;
-
-        // 4. CONSTRUCCIÓN DEL MODAL
+        // 5. Construcción Visual
         const html = `
         <div class="modal fade" id="modalAlojamiento" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                     
-                    ${renderHeader(historiaId, saldoReal)}
+                    ${renderHeader(historiaId, saldoReal, titularNombre)}
 
                     <div class="modal-body p-4 bg-light">
                         <div class="row">
                             <div class="col-lg-7 border-end pe-4">
                                 <h6 class="text-info fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">Responsabilidades</h6>
-                                <div class="row mb-4">
-                                    <div class="col-6">
-                                        <label class="small text-muted d-block">TITULAR (Paga):</label>
-                                        <strong class="text-primary">${first.TitularProtocolo}</strong>
+                                <div class="row mb-4 bg-white p-2 rounded shadow-sm border">
+                                    <div class="col-6 border-end">
+                                        <label class="small text-muted d-block uppercase fw-bold" style="font-size: 10px;">Titular (Paga):</label>
+                                        <strong class="text-primary fs-6">${titularNombre}</strong>
                                     </div>
                                     <div class="col-6">
-                                        <label class="small text-muted d-block">RESP. ESTADÍA:</label>
-                                        <span class="small">${first.ResponsableTecnico}</span>
+                                        <label class="small text-muted d-block uppercase fw-bold" style="font-size: 10px;">Resp. Estadía:</label>
+                                        <span class="fs-6 fw-semibold text-secondary">${respEstadia}</span>
                                     </div>
                                 </div>
-                                ${renderResumenTecnico(first, esChica, precioActual, tramos)}
+                                ${renderResumenTecnico(first, tipoAlojamiento, precioActual, tramos)}
                             </div>
                             <div class="col-lg-5 ps-lg-4">
                                 ${renderGestionCobros(historiaId, diasTotales, costoHistoricoTotal, totalPagadoHistorico)}
@@ -94,15 +91,14 @@ export const openAlojModal = async (historiaId) => {
         hideLoader(); 
     }
 };
-// --- SUB-COMPONENTES DE RENDERIZADO ---
 
-function renderHeader(id, saldo) {
+function renderHeader(id, saldo, titularNombre) {
     return `
     <div class="modal-header bg-dark text-white py-3">
         <div class="d-flex align-items-center w-100 justify-content-between pe-4">
             <h5 class="modal-title fw-bold"><i class="bi bi-house-door me-2 text-info"></i>ALOJAMIENTO #${id}</h5>
             <div class="text-end">
-                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">Dinero del Investigador:</small>
+                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">Dinero de ${titularNombre}:</small>
                 <span class="badge bg-success fs-5" id="mdl-aloj-saldo-txt">$ ${saldo.toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
                 <input type="hidden" id="mdl-aloj-saldo-val" value="${saldo}">
             </div>
@@ -111,31 +107,31 @@ function renderHeader(id, saldo) {
     </div>`;
 }
 
-function renderResumenTecnico(first, esChica, precio, tramos) {
+function renderResumenTecnico(first, tipoAlojamiento, precio, tramos) {
     return `
     <h6 class="text-info fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">Resumen Técnico</h6>
     <div class="row g-3 mb-4">
         <div class="col-md-6">
-            <label class="small fw-bold text-muted uppercase">Investigador</label>
-            <div id="pdf-aloj-inv" class="form-control-plaintext border-bottom fw-bold text-primary">${first.Investigador}</div>
+            <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">Investigador Resp. Estadía</label>
+            <div id="pdf-aloj-inv" class="form-control-plaintext border-bottom fw-bold text-dark">${first.Investigador || '---'}</div>
         </div>
         <div class="col-md-3 text-center">
-            <label class="small fw-bold text-muted uppercase">Tipo Caja</label>
-            <div id="pdf-aloj-tipo" class="form-control-plaintext border-bottom fw-bold">${esChica ? 'CHICA' : 'GRANDE'}</div>
+            <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">Tipo Alojamiento</label>
+            <div id="pdf-aloj-tipo" class="form-control-plaintext border-bottom fw-bold text-secondary text-truncate">${tipoAlojamiento}</div>
         </div>
         <div class="col-md-3 text-center">
-            <label class="small fw-bold text-muted text-primary uppercase">Precio Momento</label>
+            <label class="small fw-bold text-muted text-primary uppercase" style="font-size: 10px;">Precio Momento</label>
             <div class="form-control-plaintext border-bottom fw-bold text-primary">$ ${parseFloat(precio).toFixed(2)}</div>
         </div>
-        <div class="col-12">
-            <label class="small fw-bold text-muted uppercase">Protocolo</label>
+        <div class="col-12 mt-1">
+            <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">Protocolo</label>
             <div id="pdf-aloj-prot" class="form-control-plaintext border-bottom small">${first.nprotA}</div>
         </div>
     </div>
     <div class="table-responsive bg-white rounded border shadow-sm">
         <table id="table-aloj-tramos" class="table table-sm table-hover align-middle mb-0 text-center">
             <thead class="bg-light text-muted small uppercase">
-                <tr><th>ID</th><th>Desde</th><th>Hasta</th><th>Cajas</th><th>Días</th><th class="text-end pe-2">Subtotal</th></tr>
+                <tr><th>ID</th><th>Desde</th><th>Hasta</th><th>Cant.</th><th>Días</th><th class="text-end pe-2">Subtotal</th></tr>
             </thead>
             <tbody class="small">
                 ${tramos.map(t => `
@@ -143,9 +139,9 @@ function renderResumenTecnico(first, esChica, precio, tramos) {
                         <td class="ps-2 text-start text-muted">#${t.id}</td>
                         <td>${t.desde}</td>
                         <td class="${t.esVigente ? 'text-success fw-bold' : ''}">${t.hasta}</td>
-                        <td>${t.cajas}</td>
+                        <td class="fw-bold">${t.cajas}</td>
                         <td class="fw-bold text-info">${t.dias}</td>
-                        <td class="text-end pe-2 fw-bold">$ ${t.subtotal.toFixed(2)}</td>
+                        <td class="text-end pe-2 fw-bold text-dark">$ ${t.subtotal.toFixed(2)}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -161,7 +157,7 @@ function renderGestionCobros(historiaId, dias, total, pagado) {
         <span id="pdf-aloj-dias" class="display-6 fw-bold text-info">${dias}</span>
     </div>
     <div class="p-3 bg-white border rounded mb-3 shadow-sm">
-        <label class="form-label fw-bold text-primary small uppercase">Costo Total Acumulado</label>
+        <label class="form-label fw-bold text-primary small uppercase">Costo Total a Pagar</label>
         <div class="input-group input-group-lg">
             <span class="input-group-text">$</span>
             <input type="number" id="mdl-aloj-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" readonly>
@@ -194,10 +190,13 @@ function procesarTramosFinancieros(history) {
         let fFin = !h.hastafecha ? hoy : new Date(h.hastafecha.split('-')[0], h.hastafecha.split('-')[1]-1, h.hastafecha.split('-')[2], 12, 0, 0);
         
         const dias = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
-        const esChica = parseFloat(h.totalcajachica) > 0;
-        const cant = esChica ? parseInt(h.totalcajachica) : parseInt(h.totalcajagrande);
-        const precio = esChica ? parseFloat(h.preciocajachica) : parseFloat(h.preciocajagrande);
-        const subtotal = (dias * precio * cant);
+        
+        // Uso de variables MODERNAS
+        const cant = parseInt(h.CantidadCaja || 0);
+        const precio = parseFloat(h.PrecioCajaMomento || 0);
+        
+        // El costo: Si tiene 'cuentaapagar' guardado (estadía finalizada), lo usa. Si no, lo calcula en vivo.
+        const subtotal = parseFloat(h.cuentaapagar) > 0 ? parseFloat(h.cuentaapagar) : (dias * precio * cant);
 
         diasTotales += dias;
         costoHistoricoTotal += subtotal;
@@ -214,64 +213,3 @@ function procesarTramosFinancieros(history) {
     });
     return { tramos, diasTotales, costoHistoricoTotal };
 }
-/**
- * GENERACIÓN DE PDF - ALOJAMIENTO (jsPDF + autoTable)
- */
-window.descargarFichaAlojPDF = async (historiaId) => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-
-    const getTxt = (id) => document.getElementById(id)?.innerText || '---';
-    const getVal = (id) => document.getElementById(id)?.value || '0.00';
-
-    const investigador = getTxt('pdf-aloj-inv');
-    const tipoCaja = getTxt('pdf-aloj-tipo');
-    const protocolo = getTxt('pdf-aloj-prot');
-    const totalDias = getTxt('pdf-aloj-dias');
-    const costoTotal = getVal('mdl-aloj-total');
-    const pagadoTxt = getTxt('mdl-aloj-pagado-txt');
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, 20, { align: "center" });
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(`HISTORIAL DE ALOJAMIENTO #${historiaId}`, 105, 28, { align: "center" });
-    doc.line(20, 32, 190, 32);
-
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Investigador: ${investigador}`, 20, 42);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Tipo de Caja: ${tipoCaja}`, 20, 48);
-    doc.text(`Protocolo: ${protocolo}`, 20, 54);
-    doc.text(`Días Totales Acumulados: ${totalDias}`, 20, 60);
-
-    const rows = [];
-    document.querySelectorAll('#table-aloj-tramos tbody tr').forEach(tr => {
-        const tds = tr.querySelectorAll('td');
-        rows.push([tds[0].innerText, tds[1].innerText, tds[2].innerText, tds[3].innerText, tds[4].innerText, tds[5].innerText]);
-    });
-
-    doc.autoTable({
-        startY: 68,
-        head: [['ID', 'Desde', 'Hasta', 'Cajas', 'Días', 'Subtotal']],
-        body: rows,
-        headStyles: { fillColor: [26, 93, 59], halign: 'center' },
-        columnStyles: { 0: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'right' } },
-        theme: 'grid'
-    });
-
-    const finalY = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(245, 245, 245);
-    doc.rect(20, finalY, 170, 22, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.text(`COSTO TOTAL DE LA HISTORIA: $ ${costoTotal}`, 25, finalY + 8);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`TOTAL ABONADO A LA FECHA: ${pagadoTxt}`, 25, finalY + 16);
-
-    doc.save(`Ficha_Alojamiento_${historiaId}.pdf`);
-};

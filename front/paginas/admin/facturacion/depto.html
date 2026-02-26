@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facturación por Departamento - Gecko Dev</title>
+    <title>Facturación por Departamento - Bioterio</title>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -25,45 +25,29 @@
     </style>
 
     <script type="module">
-        import { Auth } from '../../../dist/js/auth.js';
-        import { API } from '../../../dist/js/api.js';
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
-        // Lógica específica de facturación departamental (Liquidaciones y presupuestos)
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         import { initBillingDepto } from '../../../dist/js/pages/admin/facturacion/billingDepto.js';
-
+        showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
-            showLoader();
-
+           
             try {
-                // 1. CARGA CRÍTICA: Idioma
-                // Bloqueamos la ejecución hasta que window.txt esté listo
                 await loadLanguage(); 
+                translatePage();
 
-                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles con potestad financiera)
-                Auth.checkAccess([1, 2, 4,5,6]); 
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
-                // 3. INICIALIZACIÓN DE COMPONENTES
                 if (window.txt) {
                     initMenu();
                     NotificationManager.init();
-                    
-                    // Inicialización de la lógica de facturación por departamento
                     initBillingDepto();
-                    
-                    console.log("✅ Módulo de Facturación por Departamento inicializado correctamente.");
-                } else {
-                    throw new Error("El objeto de idioma window.txt no se generó.");
                 }
 
-                // 4. ROUTER (Delay para permitir que los reportes financieros se procesen)
-                setTimeout(() => {
-                    checkUrlParamsAndOpen();
-                }, 300);
-
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
             } catch (error) {
                 console.error("❌ Fallo en inicialización de BillingDepto:", error);
             } finally {
@@ -79,16 +63,22 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
-                    <li class="breadcrumb-item text-muted">Facturación</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="generales.admin">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.titulo">Facturación</li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Por Departamento</span>
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="facturacion.por_depto">Por Departamento</span>
                     </li>
                 </ol>
             </nav>
 
+            <div class="mb-3">
+                <a href="index.html" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3" style="font-size: 11px;">
+                    <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A SELECCIÓN
+                </a>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="fw-bold m-0"><i class="bi bi-building-fill-check text-success me-2"></i>Liquidación de Departamentos</h5>
+                <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i><span data-i18n="facturacion.titulo_liquidacion">Liquidación de Departamentos</span></h5>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm" onclick="window.downloadGlobalPDF()">
                             <i class="bi bi-file-earmark-pdf me-1"></i> PDF GLOBAL
@@ -99,7 +89,7 @@
                         </button>
 
                         <button class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" onclick="window.abrirAyudaBilling()">
-                            <i class="bi bi-question-circle me-1"></i> AYUDA
+                            <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda">AYUDA</span>
                         </button>
                     </div>
             </div>
@@ -107,19 +97,19 @@
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
                 <div class="col-md-3">
                     <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Departamento:</span>
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.departamento">Departamento:</span>
                         <select id="sel-depto" class="form-select form-select-sm fw-bold border-success shadow-none"></select>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Desde:</span>
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.desde">Desde:</span>
                         <input type="date" id="f-desde" class="form-control form-control-sm shadow-none">
                     </div>
                 </div>
                 <div class="col-md-2">
                     <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Hasta:</span>
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.hasta">Hasta:</span>
                         <input type="date" id="f-hasta" class="form-control form-control-sm shadow-none">
                     </div>
                 </div>
@@ -127,15 +117,15 @@
                     <div class="d-flex gap-3 bg-white p-1 rounded border shadow-sm px-3" style="height: 31px; align-items: center;">
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input" type="checkbox" id="chk-animales" checked>
-                            <label class="form-check-label small fw-bold" style="font-size: 9px;">ANIMALES/REA</label>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_animales">ANIMALES/REA</label>
                         </div>
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input" type="checkbox" id="chk-alojamiento" checked>
-                            <label class="form-check-label small fw-bold" style="font-size: 9px;">ALOJAMIENTO</label>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_alojamiento">ALOJAMIENTO</label>
                         </div>
                         <div class="form-check form-switch m-0 border-start ps-4">
                             <input class="form-check-input" type="checkbox" id="chk-insumos" checked>
-                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;">INSUMOS</label>
+                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;" data-i18n="facturacion.filtro_insumos">INSUMOS</label>
                         </div>
                     </div>
                 </div>
@@ -145,36 +135,38 @@
                     </button>
                 </div>
             </div>
-                <div id="dashboard-area" class="mb-5 d-none">
-                    <div class="text-center mb-4">
-                        <h6 class="text-muted fw-bold uppercase" style="font-size: 11px; letter-spacing: 2px;">
-                            Resumen Financiero - <span id="txt-periodo"></span>
-                        </h6>
-                    </div>
-
-                    <div id="stats-container" class="row g-3 mb-4 justify-content-center"></div>
-
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white py-3 border-bottom text-center">
-                            <h6 class="fw-bold m-0 uppercase" style="font-size: 12px; letter-spacing: 1px;">Saldos por Investigador</h6>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
-                                <thead class="table-light text-center">
-                                    <tr>
-                                        <th class="text-start ps-4">Investigador</th>
-                                        <th>Total Deuda</th>
-                                        <th>Total Pagado</th>
-                                        <th>Saldo Disponible</th>
-                                        <th style="width: 250px;">Agregar / Quitar Saldo</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-investigadores"></tbody>
-                            </table>
-                        </div>
-                    </div>
+                
+        <div id="dashboard-area" class="mb-5 d-none">
+                <div class="text-center mb-4">
+                    <h5 id="titulo-departamento-dinamico" class="fw-bold text-success m-0 mb-1 text-uppercase" style="letter-spacing: 1px;"></h5>
+                    
+                    <h6 class="text-muted fw-bold uppercase" style="font-size: 11px; letter-spacing: 2px;">
+                        <span data-i18n="facturacion.resumen_fin">Resumen Financiero</span> - <span id="txt-periodo"></span>
+                    </h6>
                 </div>
 
+                <div id="stats-container" class="row g-3 mb-4 justify-content-center"></div>
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3 border-bottom text-center">
+                        <h6 class="fw-bold m-0 uppercase" style="font-size: 12px; letter-spacing: 1px;" data-i18n="facturacion.saldos_inv">Saldos por Investigador</h6>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                            <thead class="table-light text-center">
+                                <tr>
+                                    <th class="text-start ps-4" data-i18n="generales.investigador">Investigador</th>
+                                    <th data-i18n="facturacion.total_deuda">Total Deuda</th>
+                                    <th data-i18n="facturacion.total_pagado">Total Pagado</th>
+                                    <th data-i18n="facturacion.saldo_disp">Saldo Disponible</th>
+                                    <th style="width: 250px;" data-i18n="facturacion.agregar_quitar">Agregar / Quitar Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-investigadores"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             <div id="billing-results" class="mt-2"></div>
         </div>
@@ -193,6 +185,7 @@
             </div>
         </div>
     </div>
+    
     <div id="modal-container"></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

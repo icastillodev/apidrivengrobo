@@ -24,7 +24,13 @@ async function renderTable() {
         
         // Estilo visual de la fila si está deshabilitada
         const rowClass = isActivo ? "hover:bg-slate-50 transition-colors cursor-pointer" : "bg-red-50 text-muted opacity-75 cursor-pointer";
-        const slugDisplay = isActivo ? `<code class="text-primary bg-slate-100 px-2 py-1 rounded">/formulario/${row.slug_url}</code>` : `<span class="text-danger small fw-bold">DESHABILITADO</span>`;
+        const slugDisplay = isActivo ? `
+        <a href="${window.location.origin}${window.location.pathname.includes('URBE-API-DRIVEN') ? '/URBE-API-DRIVEN/front' : ''}/formulario/${row.slug_url}" 
+       target="_blank" 
+       class="btn btn-sm btn-outline-primary fw-bold px-2 py-1 shadow-sm"
+       title="Abrir formulario público">
+        <i class="bi bi-box-arrow-up-right me-1"></i> /formulario/${row.slug_url}
+    </a>` : `<span class="text-danger small fw-bold">DESHABILITADO</span>`;
         
         const tr = document.createElement('tr');
         tr.className = rowClass;
@@ -141,10 +147,13 @@ window.verDetalleCompleto = async (id) => {
                     <div class="row g-3">
             `;
 
-            campos.forEach(c => {
-                let nombreCampo = c.campo.replace('inst_', '').replace(/_/g, ' ');
-                // Limpiamos los "[]" y los prefijos raros de los arrays (ej: "org_nom[]")
-                nombreCampo = nombreCampo.replace('[]', '').replace(/[0-9]+$/, ''); 
+     campos.forEach(c => {
+                let nombreCampo = c.campo.replace('inst_', '')
+                                         .replace('menuRol4_', '')
+                                         .replace('menuRol5_', '')
+                                         .replace('menuRol6_', '')
+                                         .replace(/_/g, ' ');
+                nombreCampo = nombreCampo.replace('[]', '').replace(/[0-9]+$/, '');
 
                 sectionHtml += `
                     <div class="col-md-3">

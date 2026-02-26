@@ -31,20 +31,21 @@
     </style>
 
     <script type="module">
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { Auth } from '../../dist/js/auth.js';
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { getRoleName } from '../../dist/js/components/menujs/MenuConfig.js';
-        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         
         // Importamos el maestro orquestador de alojamientos
         import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js';
-
+        
+        showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
-            showLoader();
+            
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 await loadLanguage(); 
@@ -304,7 +305,8 @@
                                     <th>ID</th>
                                     <th>N° Prot</th>
                                     <th>Título</th>
-                                    <th>Depto (Org)</th> <th>Especies</th>
+                                    <th>Depto (Org)</th>
+                                    <th>Especies</th>
                                     <th>Responsable</th>
                                 </tr>
                             </thead>
@@ -313,12 +315,12 @@
                         </table>
                     </div>
                 </div>
-                <div class="col-12 mt-3 p-2 bg-light border rounded">
-                        <label class="small fw-bold text-info text-uppercase"><i class="bi bi-building"></i> Departamento Vinculado</label>
-                        <select id="reg-select-depto" class="form-select form-select-sm fw-bold border-info text-dark" disabled>
-                            <option value="">Esperando protocolo...</option>
-                        </select>
-                    </div>
+                <div class="mt-2 p-2 bg-light border rounded">
+                    <label class="small fw-bold text-info text-uppercase"><i class="bi bi-building"></i> Depto Vinculado</label>
+                    <select id="reg-select-depto" class="form-select form-select-sm fw-bold border-info text-dark" disabled>
+                        <option value="">Esperando protocolo...</option>
+                    </select>
+                </div>
                 <div id="step-2-usuario" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-success d-none transition-all">
                     <h6 class="fw-bold text-success mb-3"><i class="bi bi-person-badge me-2"></i>2. RESPONSABLE DEL ALOJAMIENTO</h6>
                     <input type="text" id="reg-search-user" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, Usuario, Nombre o Apellido...">
@@ -383,9 +385,9 @@
             <div class="modal-body bg-light p-4">
                 
                 <div class="row g-4">
-                    <div class="col-lg-6 border-end">
-                        
-                        <div class="mb-4">
+                    
+                    <div class="col-lg-7 border-end">
+                        <div class="mb-3">
                             <h6 class="fw-bold text-primary mb-2" style="font-size: 11px;"><i class="bi bi-file-earmark-text me-1"></i> PROTOCOLO VINCULADO</h6>
                             <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-2" placeholder="Filtrar protocolos...">
                             <div class="table-responsive border bg-white shadow-sm" style="height: 180px; overflow-y: auto;">
@@ -396,35 +398,35 @@
                             </div>
                         </div>
 
-                        <div>
-                            <h6 class="fw-bold text-success mb-2" style="font-size: 11px;"><i class="bi bi-person-badge me-1"></i> USUARIO RESPONSABLE</h6>
-                            <input type="text" id="cfg-search-user" class="form-control form-control-sm mb-2" placeholder="Filtrar responsables...">
-                            <div class="list-group shadow-sm border" id="cfg-list-usuarios" style="height: 180px; overflow-y: auto; font-size: 11px; cursor: pointer;">
-                                </div>
+                        <div class="p-2 bg-white border rounded shadow-sm">
+                            <label class="small fw-bold text-info text-uppercase"><i class="bi bi-building"></i> Depto Vinculado al Protocolo</label>
+                            <select id="cfg-select-depto" class="form-select form-select-sm fw-bold border-info text-dark" disabled>
+                                <option value="">Esperando protocolo...</option>
+                            </select>
                         </div>
-
                     </div>
-                    <div class="col-md-12 mt-3">
-                    <label class="fw-bold text-muted text-uppercase mb-1" style="font-size:10px;"><i class="bi bi-building"></i> DEPARTAMENTO / ORGANISMO</label>
-                    <select id="cfg-select-depto" class="form-select form-select-sm fw-bold border-info">
-                        <option>Cargando...</option>
-                    </select>
-                </div>
-                                    <div class="col-lg-6">
-                        
+
+                    <div class="col-lg-5">
                         <div class="mb-4">
-                            <h6 class="fw-bold text-warning text-dark mb-2" style="font-size: 11px;"><i class="bi bi-bug me-1"></i> ESPECIE ANIMAL</h6>
-                            <div id="cfg-list-especies" class="d-flex flex-wrap gap-2 p-3 bg-white border rounded shadow-sm min-h-[100px]">
+                            <h6 class="fw-bold text-success mb-2" style="font-size: 11px;"><i class="bi bi-person-badge me-1"></i> USUARIO RESPONSABLE</h6>
+                            <div class="list-group shadow-sm border" id="cfg-list-usuarios" style="height: 100px; overflow-y: auto; font-size: 11px; cursor: pointer;">
                                 </div>
                         </div>
 
-                        <div>
-                            <h6 class="fw-bold text-danger mb-2" style="font-size: 11px;"><i class="bi bi-box me-1"></i> ESTRUCTURA DE ALOJAMIENTO (Afecta Precio)</h6>
-                            <div id="cfg-list-tipos" class="d-flex flex-column gap-2 p-3 bg-white border rounded shadow-sm min-h-[150px]">
-                                </div>
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <h6 class="fw-bold text-warning text-dark mb-2" style="font-size: 11px;"><i class="bi bi-bug me-1"></i> ESPECIE ANIMAL</h6>
+                                <div id="cfg-list-especies" class="d-flex flex-column gap-2 p-2 bg-white border rounded shadow-sm min-h-[100px]">
+                                    </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <h6 class="fw-bold text-danger mb-2" style="font-size: 11px;"><i class="bi bi-box me-1"></i> ESTRUCTURA FÍSICA</h6>
+                                <div id="cfg-list-tipos" class="d-flex flex-column gap-2 p-2 bg-white border rounded shadow-sm min-h-[100px]">
+                                    </div>
+                            </div>
                         </div>
-
                     </div>
+
                 </div>
 
             </div>

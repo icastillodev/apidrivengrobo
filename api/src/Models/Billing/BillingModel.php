@@ -12,15 +12,14 @@ class BillingModel {
     }
 
     // ... [TODO EL BLOQUE DE GETTERS SE MANTIENE EXACTAMENTE IGUAL HASTA "updateBalance"] ...
-    public function getProtocolosByDepto($deptoId) {
+public function getProtocolosByDepto($deptoId) {
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
                        CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
                 FROM protocoloexpe p JOIN personae u ON p.IdUsrA = u.IdUsrA
                 WHERE p.departamento = ? AND p.idprotA > 0"; 
         $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
-    public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
+public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
                 se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
@@ -70,40 +69,61 @@ class BillingModel {
         return $rows;
     }
 
+// 1. ALOJAMIENTOS: Ajustado el alias y preparado para el nombre de la estructura
     public function getAlojamientosProtocolo($idProt, $desde = null, $hasta = null) {
         $sql = "SELECT MAX(a.IdAlojamiento) as last_id, a.historia, MAX(e.EspeNombreA) as especie, 
-                MAX(IF(a.totalcajachica > 0, 'Chica', 'Grande')) as caja, MAX(IF(a.totalcajachica > 0, e.PalojamientoChica, e.PalojamientoGrande)) as p_caja,
+                MAX(COALESCE(ta.NombreTipoAlojamiento, 'Estructura')) as caja, 
+                MAX(a.PrecioCajaMomento) as p_caja,
+                MAX(a.CantidadCaja) as cant_caja,
                 MIN(a.fechavisado) as fecha_inicio, MAX(IFNULL(a.hastafecha, CURDATE())) as fecha_fin,
-                SUM(DATEDIFF(IFNULL(a.hastafecha, CURDATE()), a.fechavisado)) as dias, SUM(a.cuentaapagar) as total,
-                SUM(a.totalpago) as pagado, MAX(p.IdUsrA) as IdUsrA 
-                FROM alojamiento a LEFT JOIN especiee e ON a.TipoAnimal = e.idespA
-                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA WHERE a.idprotA = ? AND a.historia != ''";
+                SUM(DATEDIFF(IFNULL(a.hastafecha, CURDATE()), a.fechavisado)) as dias, 
+                SUM(a.cuentaapagar) as total_guardado,
+                SUM(a.totalpago) as pagado, MAX(p.IdUsrA) as IdUsrA,
+                MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as TitularProtocolo
+                FROM alojamiento a 
+                LEFT JOIN especiee e ON a.TipoAnimal = e.idespA
+                LEFT JOIN tipoalojamiento ta ON a.IdTipoAlojamiento = ta.IdTipoAlojamiento
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA 
+                LEFT JOIN personae u ON p.IdUsrA = u.IdUsrA
+                WHERE a.idprotA = ? AND a.historia IS NOT NULL";
         
         $params = [$idProt];
         if ($desde && $hasta) { $sql .= " AND a.fechavisado BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $sql .= " GROUP BY a.historia";
-        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         foreach ($rows as &$r) {
-            $r['debe'] = (float)$r['total'] - (float)$r['pagado'];
+            $dias = (int)$r['dias'];
+            $precio = (float)$r['p_caja'];
+            $cant = (int)$r['cant_caja'];
+            $totalCalc = $dias * $precio * $cant;
+            
+            $r['total'] = (float)$r['total_guardado'] > 0 ? (float)$r['total_guardado'] : $totalCalc;
+            $r['pagado'] = (float)$r['pagado'];
+            $r['debe'] = max(0, $r['total'] - $r['pagado']);
             $r['periodo'] = date("d/m", strtotime($r['fecha_inicio'])) . " - " . date("d/m", strtotime($r['fecha_fin']));
         }
         return $rows;
     }
 
+// 2. INSUMOS POR DEPARTAMENTO: Matemática detallada en el texto
     public function getInsumosGenerales($deptoId, $desde, $hasta) {
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
-                MAX(d.SaldoDinero) as saldoInv, GROUP_CONCAT(CONCAT(i.NombreInsumo, ' (', fi.cantidad, ' ', i.TipoInsumo, ')') SEPARATOR ' | ') as detalle_completo,
+                MAX(d.SaldoDinero) as saldoInv, 
+                GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado 
                 FROM formularioe f JOIN personae u ON f.IdUsrA = u.IdUsrA
                 LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion
-                JOIN precioinsumosformulario pif ON f.idformA = pif.idformA JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
-                JOIN insumo i ON fi.IdInsumo = i.idInsumo WHERE f.depto = ? AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? GROUP BY f.idformA";
+                JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
+                JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
+                JOIN insumo i ON fi.IdInsumo = i.idInsumo 
+                WHERE f.depto = ? AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? GROUP BY f.idformA";
         
-        $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
-            $r['debe'] = $r['total_item'] - $r['pagado'];
+            $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
         }
         return $rows;
     }
@@ -112,7 +132,7 @@ class BillingModel {
     // LOGICA TRANSACCIONAL: ACTUALIZACIÓN DE SALDOS Y PAGOS
     // ========================================================
 
-    public function updateBalance($idUsr, $inst, $monto, $adminId) {
+public function updateBalance($idUsr, $inst, $monto, $adminId) {
         $check = $this->db->prepare("SELECT IdDinero FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ?");
         $check->execute([$idUsr, $inst]);
         $exists = $check->fetch();
@@ -127,15 +147,14 @@ class BillingModel {
 
         Auditoria::log($this->db, 'FINANCIERO', 'dinero', "Ajuste de Saldo: $$monto al usuario ID: $idUsr");
         
-        // HistorialPago Auditoría Financiera Específica
-        $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
+        // CORREGIDO: IdFormA en lugar de IdFromA
+        $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
                             VALUES (?, ?, ?, 0, CURDATE(), 'CARGA_SALDO', ?)")
                  ->execute([$adminId, $monto, $idUsr, $inst]);
 
         return $res;
     }
-
-    public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
+public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
         try {
             $this->db->beginTransaction();
             $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
@@ -143,23 +162,26 @@ class BillingModel {
 
             foreach ($items as $item) {
                 $id = $item['id'];
+                $monto_item = (float)$item['monto_pago'];
+
                 if ($item['tipo'] === 'INSUMO_GRAL' || $item['tipo'] === 'FORM') {
-                    $this->db->prepare("UPDATE precioinsumosformulario SET totalpago = totalpago + (preciototal - totalpago) WHERE idformA = ?")->execute([$id]);
+                    $this->db->prepare("UPDATE precioinsumosformulario SET totalpago = totalpago + ? WHERE idformA = ?")->execute([$monto_item, $id]);
                     if ($item['tipo'] === 'FORM') {
-                        $this->db->prepare("UPDATE precioformulario SET totalpago = totalpago + (precioformulario - totalpago) WHERE idformA = ?")->execute([$id]);
+                        $this->db->prepare("UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?")->execute([$monto_item, $id]);
                     }
                     
-                    // Historial Pago
-                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
+                    // CORREGIDO: IdFormA en lugar de IdFromA
+                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
                                         VALUES (?, ?, ?, ?, CURDATE(), 'LIQUIDACION', ?)")
-                             ->execute([$adminId, $monto, $idUsr, $id, $inst]);
+                             ->execute([$adminId, $monto_item, $idUsr, $id, $inst]);
 
                 } else if ($item['tipo'] === 'ALOJ') {
-                    $this->db->prepare("UPDATE alojamiento SET totalpago = totalpago + (cuentaapagar - totalpago) WHERE historia = ?")->execute([$id]);
-                    // En alojamiento usamos el historia (id) en IdFromA para trazabilidad
-                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
+                    $this->db->prepare("UPDATE alojamiento SET totalpago = totalpago + ? WHERE historia = ?")->execute([$monto_item, $id]);
+                    
+                    // CORREGIDO: IdFormA en lugar de IdFromA
+                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
                                         VALUES (?, ?, ?, ?, CURDATE(), 'LIQUIDACION_ALOJ', ?)")
-                             ->execute([$adminId, $monto, $idUsr, $id, $inst]);
+                             ->execute([$adminId, $monto_item, $idUsr, $id, $inst]);
                 }
             }
 
@@ -168,8 +190,7 @@ class BillingModel {
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
-
-    public function procesarAjustePago($id, $monto, $accion, $adminId) {
+public function procesarAjustePago($id, $monto, $accion, $adminId) {
         try {
             $this->db->beginTransaction();
             $sql = "SELECT f.IdUsrA, f.IdInstitucion FROM formularioe f WHERE f.idformA = ?";
@@ -192,7 +213,8 @@ class BillingModel {
 
             Auditoria::log($this->db, $tipoHist, 'precioformulario', "Ajuste $accion de $$monto en Formulario #$id");
             
-            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
+            // CORREGIDO: IdFormA (antes decía IdFromA)
+            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
                                 VALUES (?, ?, ?, ?, CURDATE(), ?, ?)")
                      ->execute([$adminId, $monto, $data['IdUsrA'], $id, $tipoHist, $data['IdInstitucion']]);
 
@@ -201,48 +223,22 @@ class BillingModel {
         } catch (\Exception $e) { $this->db->rollBack(); return false; }
     }
 
-    public function procesarAjustePagoInsumo($id, $monto, $accion, $adminId) {
+
+public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         try {
             $this->db->beginTransaction();
-            $sqlInfo = "SELECT f.IdUsrA, f.IdInstitucion FROM formularioe f WHERE f.idformA = ? LIMIT 1";
-            $stmtInfo = $this->db->prepare($sqlInfo); $stmtInfo->execute([$id]);
-            $data = $stmtInfo->fetch(\PDO::FETCH_ASSOC);
-
-            if (!$data) throw new \Exception("Formulario no encontrado");
-            $idPagador = $data['IdUsrA']; $inst = $data['IdInstitucion']; 
-
-            if ($accion === 'PAGAR') {
-                $sqlForm = "UPDATE precioinsumosformulario SET totalpago = totalpago + ? WHERE idformA = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "PAGO_INSUMO";
-            } else {
-                $sqlForm = "UPDATE precioinsumosformulario SET totalpago = totalpago - ? WHERE idformA = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "DEVOLUCION_INSUMO";
-            }
-
-            $this->db->prepare($sqlForm)->execute([$monto, $id]);
-            $this->db->prepare($sqlSaldo)->execute([$monto, $idPagador, $inst]);
-
-            Auditoria::log($this->db, $tipoHist, 'precioinsumosformulario', "Ajuste $accion de $$monto en Formulario Insumo #$id");
-
-            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
-                                VALUES (?, ?, ?, ?, CURDATE(), ?, ?)")
-                     ->execute([$adminId, $monto, $idPagador, $id, $tipoHist, $inst]);
-
-            $this->db->commit();
-            return true;
-        } catch (\Exception $e) { $this->db->rollBack(); return false; }
-    }
-
-    public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
-        try {
-            $this->db->beginTransaction();
-            $sqlInfo = "SELECT IdUsrA, IdInstitucion FROM alojamiento WHERE historia = ? LIMIT 1";
+            
+            // CORRECCIÓN CRÍTICA: Traemos el IdTitular del protocolo, no el IdUsrA del alojamiento (que es el técnico)
+            $sqlInfo = "SELECT a.IdInstitucion, p.IdUsrA as IdTitular 
+                        FROM alojamiento a 
+                        INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA 
+                        WHERE a.historia = ? LIMIT 1";
             $stmtInfo = $this->db->prepare($sqlInfo); $stmtInfo->execute([$historiaId]);
             $data = $stmtInfo->fetch(\PDO::FETCH_ASSOC);
 
             if (!$data) throw new \Exception("Historia no encontrada");
+            
+            $idPagador = $data['IdTitular'];
 
             if ($accion === 'PAGAR') {
                 $sqlAloj = "UPDATE alojamiento SET totalpago = totalpago + ? WHERE historia = ?";
@@ -255,13 +251,13 @@ class BillingModel {
             }
 
             $this->db->prepare($sqlAloj)->execute([$monto, $historiaId]);
-            $this->db->prepare($sqlSaldo)->execute([$monto, $data['IdUsrA'], $data['IdInstitucion']]);
+            $this->db->prepare($sqlSaldo)->execute([$monto, $idPagador, $data['IdInstitucion']]);
 
             Auditoria::log($this->db, $tipoHist, 'alojamiento', "Ajuste $accion de $$monto en Historia #$historiaId");
 
-            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFromA, fecha, TipoHistorial, IdInstitucion) 
+            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
                                 VALUES (?, ?, ?, ?, CURDATE(), ?, ?)")
-                     ->execute([$adminId, $monto, $data['IdUsrA'], $historiaId, $tipoHist, $data['IdInstitucion']]);
+                     ->execute([$adminId, $monto, $idPagador, $historiaId, $tipoHist, $data['IdInstitucion']]);
 
             $this->db->commit();
             return true;
@@ -287,12 +283,25 @@ class BillingModel {
         $stmt->execute([$id]);
         return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
+// 4. DETALLE DE INSUMO (MODAL): Matemática detallada en el texto
     public function getInsumoDetailById($id) {
-        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, GROUP_CONCAT(CONCAT(i.NombreInsumo, ' (', fi.cantidad, ' ', i.TipoInsumo, ')') SEPARATOR ' | ') as detalle_completo, MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado FROM formularioe f JOIN personae u ON f.IdUsrA = u.IdUsrA LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion JOIN precioinsumosformulario pif ON f.idformA = pif.idformA JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario JOIN insumo i ON fi.IdInsumo = i.idInsumo WHERE f.idformA = ? GROUP BY f.idformA";
+        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, 
+                GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo, 
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado 
+                FROM formularioe f 
+                JOIN personae u ON f.IdUsrA = u.IdUsrA 
+                LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion 
+                JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
+                JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario 
+                JOIN insumo i ON fi.IdInsumo = i.idInsumo 
+                WHERE f.idformA = ? GROUP BY f.idformA";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$id]);
         $r = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if ($r) { $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; $r['debe'] = $r['total_item'] - $r['pagado']; }
+        if ($r) { 
+            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
+            $r['debe'] = max(0, $r['total_item'] - $r['pagado']); 
+        }
         return $r;
     }
     public function getBasicUserInfo($idUsr, $idInst) {
@@ -303,13 +312,27 @@ class BillingModel {
         $sql = "SELECT idprotA, nprotA, tituloA, CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador FROM protocoloexpe p JOIN personae u ON p.IdUsrA = u.IdUsrA WHERE p.IdUsrA = ? AND p.IdInstitucion = ?";
         $stmt = $this->db->prepare($sql); $stmt->execute([$idUsr, $idInst]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+// 3. INSUMOS POR INVESTIGADOR: Matemática detallada en el texto
     public function getInsumosByUser($idUsr, $idInst, $desde = null, $hasta = null) {
-        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, GROUP_CONCAT(CONCAT(i.NombreInsumo, ' (', fi.cantidad, ' ', i.TipoInsumo, ')') SEPARATOR ' | ') as detalle_completo, MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as is_exento FROM formularioe f JOIN personae u ON f.IdUsrA = u.IdUsrA LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion JOIN precioinsumosformulario pif ON f.idformA = pif.idformA JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario JOIN insumo i ON fi.IdInsumo = i.idInsumo JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario WHERE f.IdUsrA = ? AND f.IdInstitucion = ? AND f.estado = 'Entregado' AND (f.depto = 0 OR f.depto IS NULL)";
+        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, 
+                GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo, 
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as is_exento 
+                FROM formularioe f 
+                JOIN personae u ON f.IdUsrA = u.IdUsrA 
+                LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion 
+                JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
+                JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario 
+                JOIN insumo i ON fi.IdInsumo = i.idInsumo 
+                JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario 
+                WHERE f.IdUsrA = ? AND f.IdInstitucion = ? AND f.estado = 'Entregado' AND (f.depto = 0 OR f.depto IS NULL)";
         $params = [$idUsr, $idInst];
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $sql .= " GROUP BY f.idformA";
-        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($rows as &$r) { $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; $r['debe'] = ($r['is_exento'] == 1) ? 0 : ($r['total_item'] - $r['pagado']); }
+        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) { 
+            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
+            $r['debe'] = ($r['is_exento'] == 1) ? 0 : max(0, $r['total_item'] - $r['pagado']); 
+        }
         return $rows;
     }
     public function getActiveInvestigators($idInst) {

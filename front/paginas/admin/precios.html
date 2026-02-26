@@ -24,18 +24,21 @@
     </style>
 
     <script type="module">
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { Auth } from '../../dist/js/auth.js';
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         import { getRoleName } from '../../dist/js/components/menujs/MenuConfig.js';
         import { initPreciosPage } from '../../dist/js/pages/admin/precios.js';
 
+
+        showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
-            showLoader();
+            
             try {
                 await loadLanguage(); 
                 Auth.checkAccess([1, 2, 4, 5, 6]); 

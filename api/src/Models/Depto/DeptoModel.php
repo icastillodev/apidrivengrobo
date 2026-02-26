@@ -12,13 +12,13 @@ class DeptoModel {
     }
 
     public function getAllByInstitution($instId) {
-        $sql = "SELECT iddeptoA, NombreDeptoA 
-                FROM departamentoe 
-                WHERE IdInstitucion = ? 
-                ORDER BY NombreDeptoA ASC";
-        
+        $sql = "SELECT d.iddeptoA, d.NombreDeptoA, o.NombreOrganismoSimple 
+                FROM departamentoe d 
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo 
+                WHERE d.IdInstitucion = ? 
+                ORDER BY d.NombreDeptoA ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 }

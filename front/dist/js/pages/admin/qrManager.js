@@ -255,6 +255,37 @@ async function cargarDatosQR() {
             document.getElementById('txt-investigador').innerText = first.Investigador;
             document.getElementById('txt-obs').innerText = last.observaciones || '---';
 
+            // --- NUEVO: INYECTAR CONTACTO DEL INVESTIGADOR CLICKEABLE ---
+            const containerContacto = document.getElementById('container-contacto');
+            if (containerContacto) {
+                let htmlContacto = '';
+                
+                // Botón Email (abre gestor de correos)
+                if (first.EmailInvestigador && first.EmailInvestigador !== 'No registrado') {
+                    htmlContacto += `
+                        <a href="mailto:${first.EmailInvestigador}?subject=Consulta sobre Historia #${first.historia}" class="text-decoration-none text-primary small fw-bold">
+                            <i class="bi bi-envelope-at-fill me-1"></i> ${first.EmailInvestigador}
+                        </a>
+                    `;
+                }
+                
+                // Botón Teléfono (abre marcador en celulares)
+                if (first.CelularInvestigador && first.CelularInvestigador !== 'No registrado') {
+                    htmlContacto += `
+                        <a href="tel:${first.CelularInvestigador.replace(/\D/g,'')}" class="text-decoration-none text-success small fw-bold">
+                            <i class="bi bi-telephone-fill me-1"></i> ${first.CelularInvestigador}
+                        </a>
+                    `;
+                }
+
+                if (htmlContacto === '') {
+                    htmlContacto = '<span class="text-muted small italic">Sin datos de contacto</span>';
+                }
+
+                containerContacto.innerHTML = htmlContacto;
+            }
+            // -------------------------------------------------------------
+
             const thCajas = document.getElementById('th-cajas');
             if (thCajas) thCajas.innerText = txt.th_boxes || 'CAJAS';
 
@@ -271,8 +302,11 @@ async function cargarDatosQR() {
                 const cant = parseInt(h.CantidadCaja || 0);
                 totalDias += dias;
 
+                // CUIDADO AQUÍ CON EL ID DE ESPECIE AL ABRIR TRAZABILIDAD
+                const espId = h.TipoAnimal || h.idespA || first.TipoAnimal || first.idespA || 0;
+
                 return `
-                <tr class="pointer table-light" onclick="window.TrazabilidadUI.toggleRow(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})">
+                <tr class="pointer table-light" onclick="window.TrazabilidadUI.toggleRow(${h.IdAlojamiento}, ${espId})">
                     <td><span class="text-muted small">#${h.IdAlojamiento}</span></td>
                     <td>${fIni.toLocaleDateString()}</td>
                     <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${esAbierto ? (txt.status_active || 'Vigente') : fFin.toLocaleDateString()}</td>

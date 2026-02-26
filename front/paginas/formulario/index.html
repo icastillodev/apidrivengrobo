@@ -230,7 +230,63 @@
                     <div id="contenedor-servicios" class="row g-3"></div>
                 </div>
             </div>
+<h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5">7. Permisos por Rol de Usuario</h5>
+            <div class="card shadow-sm mb-4 border-0 bg-light">
+                <div class="card-body">
+                    <p class="text-muted small border-bottom border-secondary pb-2 mb-3">Defina qué módulos estarán visibles para cada rol de usuario en su institución.</p>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-4 border-end border-secondary">
+                            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person-gear me-2"></i>Rol 4 - Sec Admin</h6>
+                            
+                            <div class="d-flex flex-column gap-2 px-1">
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Protocolos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Protocolos (CEUA)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Formularios" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Formularios Dinámicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Animales" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Pedidos de Animales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Reactivos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Reactivos Biológicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Insumos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Insumos Generales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Alojamientos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Alojamientos y Clínica</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Reservas" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Reservas (Salas/Equipos)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Facturacion" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Facturación y Cobranzas</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol4_Estadisticas" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Estadísticas y Reportes</label></div>
+                            </div>
+                        </div>
 
+                        <div class="col-md-4 border-end border-secondary">
+                            <h6 class="fw-bold text-info mb-3"><i class="bi bi-person-workspace me-2"></i>Rol 5 - Asistente</h6>
+                            
+                            <div class="d-flex flex-column gap-2 px-1">
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Protocolos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Protocolos (CEUA)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Formularios" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Formularios Dinámicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Animales" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Pedidos de Animales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Reactivos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Reactivos Biológicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Insumos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Insumos Generales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Alojamientos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Alojamientos y Clínica</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Reservas" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Reservas (Salas/Equipos)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Facturacion" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Facturación y Cobranzas</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="menuRol5_Estadisticas" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Estadísticas y Reportes</label></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <h6 class="fw-bold text-success mb-3"><i class="bi bi-droplet-half me-2"></i>Rol 6 - Laboratorio</h6>
+                            
+                            <div class="d-flex flex-column gap-2 px-1">
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Protocolos" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Protocolos (CEUA)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Formularios" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Formularios Dinámicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Animales" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Pedidos de Animales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Reactivos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Reactivos Biológicos</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Insumos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Insumos Generales</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Alojamientos" value="Habilitado" checked><label class="form-check-label fw-bold small text-secondary">Alojamientos y Clínica</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Reservas" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Reservas (Salas/Equipos)</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Facturacion" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Facturación y Cobranzas</label></div>
+                                <div class="form-check form-switch"><input class="form-check-input border-success" type="checkbox" name="menuRol6_Estadisticas" value="Habilitado"><label class="form-check-label fw-bold small text-secondary">Estadísticas y Reportes</label></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
         </form>
     </main>
 

@@ -1,6 +1,5 @@
 /**
- * GESTIÓN DE FACTURACIÓN POR INVESTIGADOR - GECKO DEVS 2026
- * Módulo independiente para manejo de deudas por Titular de Protocolo.
+ * GESTIÓN DE FACTURACIÓN POR INVESTIGADOR - GECKO DEVS
  */
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
@@ -10,17 +9,14 @@ import '../billingPayments.js';
 import '../Modals/manager.js';  
 
 window.currentReportData = null;
+window.investigadoresCache = [];
 
-/**
- * 1. INICIALIZACIÓN DE LA PÁGINA
- */
 export async function initBillingInvestigador() {
     try {
         aplicarEstilosTablas();
         showLoader();
         await refreshMenuNotifications();
         
-        // Fechas por defecto: mes actual
         const hoy = new Date();
         const fDesde = document.getElementById('f-desde');
         const fHasta = document.getElementById('f-hasta');
@@ -32,69 +28,42 @@ export async function initBillingInvestigador() {
         await cargarListaInvestigadores();
     } catch (error) { 
         console.error("Error en init:", error); 
-    } finally { 
-        hideLoader(); 
-    }
+    } finally { hideLoader(); }
 }
-
-/**
- * 2. CARGA DE SELECTOR DE INVESTIGADORES
- */
-// Variable global para guardar los investigadores
-window.investigadoresCache = [];
 
 async function cargarListaInvestigadores() {
     const instId = localStorage.getItem('instId') || 1;
     try {
         const res = await API.request(`/users/list-investigators?inst=${instId}`);
         if (res.status === 'success' && res.data) {
-            window.investigadoresCache = res.data; // Guardamos copia
+            window.investigadoresCache = res.data;
             renderizarOpcionesInvestigador(res.data);
-            vincularFiltroRealTime(); // Activamos el buscador
+            vincularFiltroRealTime(); 
         }
     } catch (e) { console.error("Error cargando investigadores:", e); }
 }
 
-/**
- * Función que dibuja las opciones (con el formato solicitado)
- */
 function renderizarOpcionesInvestigador(lista) {
     const select = document.getElementById('sel-investigador');
     if (!select) return;
-
     let html = '<option value="">-- SELECCIONAR INVESTIGADOR --</option>';
-    html += lista.map(u => {
-        // Formato: Apellido Nombre (ID: [id])
-        return `<option value="${u.IdUsrA}">${u.ApellidoA} ${u.NombreA} (ID: ${u.IdUsrA})</option>`;
-    }).join('');
-
+    html += lista.map(u => `<option value="${u.IdUsrA}">${u.ApellidoA} ${u.NombreA} (ID: ${u.IdUsrA})</option>`).join('');
     select.innerHTML = html;
 }
 
-/**
- * Lógica del buscador en tiempo real
- */
 function vincularFiltroRealTime() {
     const inputBusqueda = document.getElementById('busqueda-investigador');
     if (!inputBusqueda) return;
-
     inputBusqueda.addEventListener('input', (e) => {
         const termino = e.target.value.toLowerCase();
-        
-        // Filtramos en el cache por Nombre, Apellido o ID
         const filtrados = window.investigadoresCache.filter(u => {
             const nombreCompleto = `${u.ApellidoA} ${u.NombreA}`.toLowerCase();
-            const id = u.IdUsrA.toString();
-            return nombreCompleto.includes(termino) || id.includes(termino);
+            return nombreCompleto.includes(termino) || u.IdUsrA.toString().includes(termino);
         });
-
         renderizarOpcionesInvestigador(filtrados);
     });
 }
 
-/**
- * 3. BUSCADOR PRINCIPAL
- */
 window.cargarFacturacionInvestigador = async () => {
     const idUsr = document.getElementById('sel-investigador').value;
     const desde = document.getElementById('f-desde').value;
@@ -106,38 +75,23 @@ window.cargarFacturacionInvestigador = async () => {
 
     try {
         showLoader();
-        const res = await API.request('/billing/investigador-report', 'POST', { 
-            idUsr, desde, hasta, chkAni, chkIns 
-        });
-
+        const res = await API.request('/billing/investigador-report', 'POST', { idUsr, desde, hasta, chkAni, chkIns });
         if (res.status === 'success') {
             window.currentReportData = res.data; 
             renderizarResultados(res.data);
-        } else { 
-            Swal.fire('Error', res.message, 'error'); 
-        }
-    } catch (error) { 
-        console.error("Error en búsqueda:", error); 
-    } finally { 
-        hideLoader(); 
-    }
+        } else { Swal.fire('Error', res.message, 'error'); }
+    } catch (error) { console.error("Error en búsqueda:", error); } finally { hideLoader(); }
 };
 
-/**
- * REEMPLAZAR EN billingInvestigador.js
- * Actualiza la interfaz con el Nombre (ID) y el Dashboard
- */
 function renderizarResultados(data) {
     const container = document.getElementById('billing-results');
     const dashboardArea = document.getElementById('dashboard-area');
     const saldoContainer = document.getElementById('contenedor-saldo-maestro');
-    const tituloInvestigador = document.getElementById('dashboard-investigador-titulo'); // <--- Nuevo selector
+    const tituloInvestigador = document.getElementById('dashboard-investigador-titulo'); 
     
     dashboardArea.classList.remove('d-none');
 
-    // 1. Inyectar Identidad en el Dashboard
     if (tituloInvestigador && data.perfil) {
-        // Formato solicitado: Investigador: nombre apellido (id)
         tituloInvestigador.innerHTML = `
             <i class="bi bi-person-check-fill text-primary me-2"></i>
             Investigador: <span class="text-primary">${data.perfil.NombreCompleto}</span> 
@@ -145,7 +99,6 @@ function renderizarResultados(data) {
         `;
     }
 
-    // 2. Renderizar Saldo Maestro (sin duplicados)
     const saldo = parseFloat(data.perfil?.SaldoDinero || 0);
     const idUsr = data.perfil?.IdUsrA;
 
@@ -158,17 +111,15 @@ function renderizarResultados(data) {
                 </div>
                 <div class="input-group input-group-sm shadow-sm" style="width: 210px;">
                     <input type="number" id="inp-saldo-${idUsr}" class="form-control border-primary" placeholder="Monto...">
-                    <button class="btn btn-success" onclick="window.updateBalance(${idUsr}, 'add', false)"><i class="bi bi-plus-lg"></i></button>
-                    <button class="btn btn-danger" onclick="window.updateBalance(${idUsr}, 'sub', false)"><i class="bi bi-dash-lg"></i></button>
+                    <button type="button" class="btn btn-success" onclick="window.updateBalance(${idUsr}, 'add', false)"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-danger" onclick="window.updateBalance(${idUsr}, 'sub', false)"><i class="bi bi-dash-lg"></i></button>
                 </div>
             </div>
         `;
     }
 
-    // 3. Renderizar las tarjetas de totales
     renderDashboard(data);
 
-    // 4. Generar el HTML de las tablas (Protocolos e Insumos)
     let html = '';
     const showIns = document.getElementById('chk-insumos').checked;
     const showAni = document.getElementById('chk-animales').checked;
@@ -197,13 +148,9 @@ function renderizarResultados(data) {
     });
 
     container.innerHTML = html || '<div class="alert alert-light text-center py-5 shadow-sm">No se encontraron movimientos.</div>';
-    
-    // Vinculamos los eventos de checkbox y buscador real-time
     vincularEventosSeleccion();
 }
-/**
- * 5. TABLA DE FORMULARIOS (ANIMALES Y REACTIVOS)
- */
+
 function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
     return `
@@ -233,12 +180,13 @@ function getFormsTableHTML(formularios, idProt) {
                         const isRea = f.categoria?.toLowerCase().includes('reactivo');
                         const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `:${f.nombre_subespecie}` : '');
                         
+                        // LÓGICA ANTI-CLIC EN CHECKBOX Y CURSOR POINTER
                         return `
-                            <tr class="text-center align-middle pointer" onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('${isRea ? 'REACTIVO' : 'ANIMAL'}', ${f.id})">
+                            <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('${isRea ? 'REACTIVO' : 'ANIMAL'}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
                                 <td class="fw-bold">#${f.id} ${isExento ? '<br><span class="badge bg-info text-dark" style="font-size:7px">EXENTO</span>' : ''}</td>
                                 <td class="small">${f.fecha || '---'}</td>
-                                <td class="small text-danger fw-bold">${f.fecRetiroA || '---'}</td>
+                                <td class="text-danger fw-bold">${f.fecRetiroA || '---'}</td>
                                 <td class="small text-secondary">${espDisplay}</td>
                                 <td class="text-start small">${f.detalle_display.replace(/<[^>]*>/g, "")}</td>
                                 <td class="small">${isRea ? f.NombreInsumo : f.cant_animal + ' un.'}</td>
@@ -251,25 +199,25 @@ function getFormsTableHTML(formularios, idProt) {
             </table>
         </div>`;
 }
-/**
- * 6. TABLA DE ALOJAMIENTOS
- */
+
 function getAlojTableHTML(alojamientos, idProt) {
     return `
         <div class="mt-2 border-top pt-3">
-            <h6 class="fw-bold text-muted mb-3 uppercase" style="font-size: 10px;">Detalle de Alojamientos</h6>
+            <h6 class="fw-bold text-muted mb-2 small uppercase">Alojamientos</h6>
             <table class="table table-bordered table-billing mb-0">
                 <thead class="table-dark text-center">
                     <tr>
                         <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                        <th>HISTORIA</th><th>ESPECIE</th><th>PERIODO</th><th>DÍAS</th><th>TOTAL</th><th>PAGADO</th><th>DEBE</th>
+                        <th>HISTORIA</th><th>ESPECIE / TIPO</th><th>PERIODO</th><th>DÍAS</th><th>TOTAL</th><th>PAGADO</th><th>DEBE</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${alojamientos.map(a => `
-                        <tr onclick="window.abrirEdicionFina('ALOJ', ${a.historia})" class="text-center align-middle pointer">
+                        <tr onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})" class="text-center align-middle pointer">
                             <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
-                            <td>#${a.historia}</td><td>${a.especie}</td><td class="small">${a.periodo}</td>
+                            <td>#${a.historia}</td>
+                            <td>${a.especie} <br><small class="text-muted">${a.caja || 'Alojamiento'}</small></td>
+                            <td class="small">${a.periodo}</td>
                             <td class="fw-bold">${a.dias}</td>
                             <td class="text-end">$ ${parseFloat(a.total).toFixed(2)}</td>
                             <td class="text-end text-success fw-bold">$ ${parseFloat(a.pagado || 0).toFixed(2)}</td>
@@ -280,9 +228,6 @@ function getAlojTableHTML(alojamientos, idProt) {
         </div>`;
 }
 
-/**
- * 7. TABLA DE INSUMOS GENERALES
- */
 function getInsumosGeneralesTableHTML(insumos) {
     return `
         <div class="card shadow-sm border-0 mb-5" style="border-left: 5px solid #0d6efd !important;">
@@ -303,7 +248,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                     </thead>
                     <tbody>
                         ${insumos.map(i => `
-                            <tr class="text-center align-middle pointer" onclick="if(event.target.type !== 'checkbox') window.abrirEdicionFina('INSUMO', ${i.id})">
+                            <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('INSUMO', ${i.id})">
                                 <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${i.debe}" ${i.debe <= 0 ? 'disabled' : ''}></td>
                                 <td class="small text-muted">#${i.id}</td>
                                 <td class="text-start ps-3 small">${i.detalle_completo.split('|').join('<br>• ')}</td>
@@ -316,24 +261,14 @@ function getInsumosGeneralesTableHTML(insumos) {
             </div>
             <div class="card-footer bg-light py-3 text-end">
                 <span class="fs-5 fw-bold text-primary me-3" id="total-insumos-seleccionados">$ 0.00</span>
-                <button class="btn btn-primary fw-bold px-4" onclick="window.procesarPagoInsumosGenerales()">Pagar Selección</button>
+                <button type="button" class="btn btn-primary fw-bold px-4" onclick="window.procesarPagoInsumosGenerales()">Pagar Selección</button>
             </div>
         </div>`;
 }
 
-/**
- * 8. FOOTER DE PROTOCOLO (PAGOS MASIVOS)
- */
 function getFooterHTML(prot) {
-    // 1. Cálculos de Subtotales
-    const totAni = (prot.formularios || [])
-        .filter(f => !f.categoria?.toLowerCase().includes('reactivo'))
-        .reduce((s, f) => s + parseFloat(f.total || 0), 0);
-    
-    const totRea = (prot.formularios || [])
-        .filter(f => f.categoria?.toLowerCase().includes('reactivo'))
-        .reduce((s, f) => s + parseFloat(f.total || 0), 0);
-        
+    const totAni = (prot.formularios || []).filter(f => !f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
+    const totRea = (prot.formularios || []).filter(f => f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
     const totAlo = (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
     
     const sumTotal = (totAni + totRea + totAlo).toFixed(2);
@@ -344,7 +279,7 @@ function getFooterHTML(prot) {
         <div class="card-footer bg-white border-top py-3 shadow-sm">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-4">
-                    <button class="btn btn-outline-danger btn-sm fw-bold" onclick="window.downloadProtocoloPDF(${prot.idProt})">
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" onclick="window.downloadProtocoloPDF(${prot.idProt})">
                         <i class="bi bi-file-earmark-pdf me-1"></i>ESTADO DE CUENTA
                     </button>
                     
@@ -360,10 +295,10 @@ function getFooterHTML(prot) {
 
                 <div class="d-flex align-items-center gap-3">
                     <div class="text-end me-2">
-                        <small class="text-muted d-block uppercase fw-bold" style="font-size: 9px;">Seleccionado para pagar:</small>
+                        <small class="text-muted d-block uppercase fw-bold" style="font-size: 9px;">Seleccionado para liquidar:</small>
                         <span class="fs-5 fw-bold text-primary" id="pago-seleccionado-${prot.idProt}">$ 0.00</span>
                     </div>
-                    <button class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
+                    <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
                         <i class="bi bi-wallet2 me-2"></i> Pagar Selección
                     </button>
                 </div>
@@ -371,11 +306,7 @@ function getFooterHTML(prot) {
         </div>`;
 }
 
-/**
- * 9. GESTIÓN DE SELECCIÓN
- */
 function vincularEventosSeleccion() {
-    // Checkboxes de Protocolos
     document.querySelectorAll('.check-all-form, .check-all-aloj').forEach(master => {
         master.addEventListener('change', (e) => {
             const idProt = e.target.dataset.prot;
@@ -391,7 +322,6 @@ function vincularEventosSeleccion() {
         }
     });
 
-    // Checkboxes de Insumos
     const masterIns = document.getElementById('check-all-insumos-gen');
     if (masterIns) {
         masterIns.addEventListener('change', (e) => {
@@ -423,8 +353,17 @@ function aplicarEstilosTablas() {
     const style = document.createElement('style');
     style.id = 'estilos-gecko-inv';
     style.innerHTML = `
-        .pointer { cursor: pointer; } 
-        .table-billing tr:hover td { background-color: #f0f7ff !important; transition: 0.2s; }
+        /* Cursor y Hover estilo Departamento */
+        .table-billing tbody tr { transition: all 0.2s; }
+        .table-billing tbody tr:hover td { background-color: #f0f7ff !important; color: #000 !important; }
+        
+        .pointer { cursor: pointer !important; }
+        .pointer:hover { background-color: #f0f7ff !important; }
+        
+        /* MAGIA: Anular manito en checkbox */
+        .pointer td:first-child { cursor: default !important; }
+        .pointer td:first-child input[type="checkbox"] { cursor: pointer !important; }
+        
         .table-billing thead th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle; }
         .tabla-finanzas tbody td { font-size: 11px; }
     `;
@@ -433,11 +372,9 @@ function aplicarEstilosTablas() {
 
 window.abrirAyudaBilling = () => { new bootstrap.Modal(document.getElementById('modal-billing-help')).show(); };
 
-
-/**
- * 10. GENERACIÓN DE PDF GLOBAL DEL INVESTIGADOR (Reporte Individual Completo)
- * Corregido: Encabezado con Nombre del Investigador y Columna Pagado
- */
+// =====================================
+// EXPORTADOR DE PDF GLOBAL
+// =====================================
 window.downloadGlobalPDF = async () => {
     if (!window.currentReportData) return Swal.fire('Aviso', 'No hay datos cargados.', 'info');
     
@@ -484,13 +421,11 @@ window.downloadGlobalPDF = async () => {
         doc.setFont("helvetica", "bold");
         doc.text(`PROT: ${prot.nprotA} - ${prot.tituloA}`, 18, currentY + 6);
         
-        // Mapeo de items con lógica de EXENTO
         const bodyItems = [
             ...(prot.formularios || []).map(f => {
                 const isEx = (f.is_exento == 1 || f.exento == 1);
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
-                // Si es exento, mostramos el total como pagado
                 const pagadoMostrar = isEx ? total : pagadoReal;
                 const debeMostrar = isEx ? 0 : (total - pagadoReal);
 
@@ -505,7 +440,7 @@ window.downloadGlobalPDF = async () => {
                 ];
             }),
             ...(prot.alojamientos || []).map(a => [
-                a.historia, a.periodo, a.especie, 'Alojamiento', 
+                a.historia, a.periodo, a.especie, `Alojamiento (${a.caja || 'Estructura'})`, 
                 `$ ${parseFloat(a.total).toFixed(2)}`, 
                 `$ ${parseFloat(a.pagado || 0).toFixed(2)}`, 
                 `$ ${parseFloat(a.debe).toFixed(2)}`
@@ -522,14 +457,12 @@ window.downloadGlobalPDF = async () => {
             columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
         });
 
-        // Totales del protocolo (El exento suma en pPago)
         const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
         const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0);
         const pPago = pTotal - pDebe;
 
         currentY = doc.lastAutoTable.finalY;
-        doc.setFontSize(8);
-        doc.setTextColor(0);
+        doc.setFontSize(8); doc.setTextColor(0);
         doc.text(`SUBTOTAL PROTOCOLO:`, 215, currentY + 5, { align: "right" });
         doc.text(`$ ${pTotal.toFixed(2)}`, 238, currentY + 5, { align: "right" });
         doc.text(`$ ${pPago.toFixed(2)}`, 260, currentY + 5, { align: "right" });
@@ -542,10 +475,7 @@ window.downloadGlobalPDF = async () => {
     doc.save(`Reporte_Integral_${invNombre.replace(/ /g, '_')}.pdf`);
     hideLoader();
 };
-/**
- * 11. FICHA PDF INDIVIDUAL POR PROTOCOLO (Botón en cada tarjeta)
- * Corregido: Inclusión de columna PAGADO y alineación
- */
+
 window.downloadProtocoloPDF = async (idProt) => {
     if (!window.currentReportData) return;
     const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
@@ -581,17 +511,13 @@ window.downloadProtocoloPDF = async (idProt) => {
                 `$ ${isEx ? '0.00' : parseFloat(f.debe).toFixed(2)}`
             ];
         }),
-        ...(prot.alojamientos || []).map(a => [`H-${a.historia}`, a.especie, 'Alojamiento', `$ ${parseFloat(a.total).toFixed(2)}`, `$ ${parseFloat(a.pagado || 0).toFixed(2)}`, `$ ${parseFloat(a.debe).toFixed(2)}`]),
+        ...(prot.alojamientos || []).map(a => [`H-${a.historia}`, a.especie, `Aloj. (${a.caja || 'Estructura'})`, `$ ${parseFloat(a.total).toFixed(2)}`, `$ ${parseFloat(a.pagado || 0).toFixed(2)}`, `$ ${parseFloat(a.debe).toFixed(2)}`]),
     ];
 
     doc.autoTable({
-        startY: 55,
-        head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
-        body: bodyAll,
-        theme: 'grid',
-        headStyles: { fillColor: [26, 93, 59] },
-        styles: { fontSize: 8 },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+        startY: 55, head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
+        body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
+        styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
     });
 
     const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
@@ -601,21 +527,13 @@ window.downloadProtocoloPDF = async (idProt) => {
     let currentY = doc.lastAutoTable.finalY + 10;
     if (currentY > 250) { doc.addPage(); currentY = 20; }
 
-    doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(120, currentY, 70, 25, 'FD');
-
+    doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
     doc.setFontSize(9); doc.setTextColor(100);
-    doc.text("SUBTOTAL PROTOCOLO:", 125, currentY + 7);
-    doc.text("TOTAL PAGADO (+EX):", 125, currentY + 13);
-    doc.text("DEUDA PENDIENTE:", 125, currentY + 19);
+    doc.text("SUBTOTAL PROTOCOLO:", 125, currentY + 7); doc.text("TOTAL PAGADO (+EX):", 125, currentY + 13); doc.text("DEUDA PENDIENTE:", 125, currentY + 19);
 
-    doc.setFont("helvetica", "bold"); doc.setTextColor(0);
-    doc.text(`$ ${pTotal.toFixed(2)}`, 185, currentY + 7, { align: "right" });
-    doc.setTextColor(26, 93, 59);
-    doc.text(`$ ${pPago.toFixed(2)}`, 185, currentY + 13, { align: "right" });
-    doc.setTextColor(200, 0, 0);
-    doc.text(`$ ${pDebe.toFixed(2)}`, 185, currentY + 19, { align: "right" });
+    doc.setFont("helvetica", "bold"); doc.setTextColor(0); doc.text(`$ ${pTotal.toFixed(2)}`, 185, currentY + 7, { align: "right" });
+    doc.setTextColor(26, 93, 59); doc.text(`$ ${pPago.toFixed(2)}`, 185, currentY + 13, { align: "right" });
+    doc.setTextColor(200, 0, 0); doc.text(`$ ${pDebe.toFixed(2)}`, 185, currentY + 19, { align: "right" });
 
     doc.save(`Ficha_Protocolo_${prot.nprotA}.pdf`);
     hideLoader();

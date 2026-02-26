@@ -2,6 +2,7 @@
 namespace App\Models\Animal;
 
 use PDO;
+use App\Utils\Auditoria;
 
 class AnimalModel {
     private $db;

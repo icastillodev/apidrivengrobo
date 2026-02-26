@@ -468,5 +468,59 @@ alojamientos: {
         inst_phone_label: "Telefone",
         inst_email_label: "E-mail",
         inst_lang_label: "Idioma Preferencial",
+    },
+    facturacion: {
+        titulo: "Faturamento",
+        por_depto: "Por Departamento",
+        por_investigador: "Por Pesquisador",
+        por_protocolo: "Por Protocolo",
+        titulo_liquidacion: "Liquidação de Departamentos",
+        
+        // Filtros
+        filtro_animales: "ANIMAIS/REA",
+        filtro_alojamiento: "ALOJAMENTO",
+        filtro_insumos: "INSUMOS",
+        
+        // Dashboard
+        resumen_fin: "Resumo Financeiro",
+        deuda_total: "DÍVIDA TOTAL",
+        total_pagado_lbl: "TOTAL PAGO",
+        debe_animales: "DEVE ANIMAIS",
+        debe_reactivos: "DEVE REAGENTES",
+        debe_alojamiento: "DEVE ALOJAMENTO",
+        debe_insumos: "DEVE INSUMOS",
+        
+        saldos_inv: "Saldos por Pesquisador",
+        total_deuda: "Dívida Total",
+        total_pagado: "Total Pago",
+        saldo_disp: "Saldo Disponível",
+        agregar_quitar: "Adicionar / Remover Saldo",
+        
+        // Tabelas
+        titular_paga: "Titular da Conta (Pagador)",
+        esp_tipo_aloj: "Espécie / Tipo Aloj.",
+        periodo: "Período",
+        dias: "Dias",
+        total: "Total",
+        pago: "Pago",
+        falta: "Pendente",
+        
+        // Textos
+        btn_pagar_sel: "Pagar Seleção",
+        volver_seleccion: "VOLTAR À SELEÇÃO",
+        selecc_pagar: "Selecionado para pagar:",
+        saldo_actual: "Saldo Atual:",
+        
+        // Alertas
+        aviso_filtro: "Você deve ter pelo menos um filtro ativo (Animais, Alojamento ou Insumos).",
+        aviso_depto: "Por favor, selecione um departamento.",
+        sin_movimientos: "Nenhuma transação corresponde aos filtros selecionados.",
+        saldo_act: "Saldo Atualizado",
+        saldo_insuficiente: "Saldo Insuficiente",
+        confirm_pago: "Confirmar Liquidação",
+        pago_procesado: "Pagamento Processado!",
+        
+        // Modals
+        monto_ajustar: "Valor a ajustar..."
     }
 }

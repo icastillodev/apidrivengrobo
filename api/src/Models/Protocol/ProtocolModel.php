@@ -10,7 +10,7 @@ class ProtocolModel {
         $this->db = $db;
     }
 
-    public function getByInstitution($instId) {
+public function getByInstitution($instId) {
         $sql = "SELECT 
                     pe.*, 
                     pe.idprotA, pe.nprotA, pe.tituloA, pe.CantidadAniA as AniAprob, 
@@ -27,6 +27,12 @@ class ProtocolModel {
                      LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                      WHERE pd.idprotA = pe.idprotA LIMIT 1) as DeptoFormat,
 
+                    -- LÍNEA AGREGADA: Trae el formato bonito del departamento original del protocolo
+                    (SELECT CONCAT(d2.NombreDeptoA, IF(o2.NombreOrganismoSimple IS NOT NULL, CONCAT(' (', o2.NombreOrganismoSimple, ')'), ''))
+                     FROM departamentoe d2 
+                     LEFT JOIN organismoe o2 ON d2.organismopertenece = o2.IdOrganismo
+                     WHERE d2.iddeptoA = pe.departamento LIMIT 1) as DeptoProtocoloFormat,
+
                     tp.NombreTipoprotocolo as TipoNombre, 
                     ts.NombreSeveridad as SeveridadNombre,
 
@@ -40,7 +46,6 @@ class ProtocolModel {
 
                     i_orig.NombreInst as InstitucionOrigen,
 
-                    -- TipoAprobacion: Determina si es PROPIO o RED
                     CASE 
                         WHEN sp.TipoPedido = 2 AND sp.Aprobado = 1 THEN 'RED'
                         ELSE 'PROPIO'
@@ -62,7 +67,7 @@ class ProtocolModel {
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId, $instId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     public function getFormData($instId) {

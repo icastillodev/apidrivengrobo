@@ -31,10 +31,11 @@ class AlojamientoModel {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-public function getHistory($historiaId) {
+    public function getHistory($historiaId) {
         $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo, 
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador,
+                       CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA) as TitularNombre,
                        COALESCE(u_resp.EmailA, u_tit.EmailA, 'No registrado') as EmailInvestigador,
                        COALESCE(u_resp.CelularA, u_tit.CelularA, 'No registrado') as CelularInvestigador
                 FROM alojamiento a
@@ -49,8 +50,8 @@ public function getHistory($historiaId) {
         $stmt->execute([$historiaId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
-public function getTiposAlojamientoHabilitados($idEsp, $instId) {
-        // Trae los tipos de alojamiento de una especie que estén habilitados
+
+    public function getTiposAlojamientoHabilitados($idEsp, $instId) {
         $sql = "SELECT t.IdTipoAlojamiento, t.NombreTipoAlojamiento, t.PrecioXunidad
                 FROM tipoalojamiento t
                 INNER JOIN especiee e ON t.idespA = e.idespA
@@ -60,26 +61,22 @@ public function getTiposAlojamientoHabilitados($idEsp, $instId) {
         $stmt->execute([$idEsp, $instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-public function saveAlojamiento($data) {
+
+    public function saveAlojamiento($data) {
         $this->db->beginTransaction();
         try {
             $isUpdate = isset($data['is_update']) && ($data['is_update'] === true || $data['is_update'] === "true");
-            
-            // Evitamos el warning verificando si la key existe
             $historia = !empty($data['historia']) ? (int)$data['historia'] : null;
 
-            // MÁGIA: Si es un registro nuevo, calculamos la nueva Historia (incremental)
             if (!$isUpdate || !$historia) {
                 $stmtMax = $this->db->query("SELECT MAX(historia) FROM alojamiento");
-                // Si la tabla está vacía, devuelve 0 y le suma 1 (inicia en 1)
                 $historia = (int)$stmtMax->fetchColumn() + 1;
             } else {
-                // Si es un nuevo tramo (Actualización), cerramos el periodo anterior
+                // AQUÍ ES DONDE SE CERRABA EL TRAMO VIEJO ANTES DE CREAR EL NUEVO
                 $this->closePreviousRecord($historia, $data['fechavisado']);
             }
 
             $idTipoAlojamiento = (!empty($data['IdTipoAlojamiento']) && $data['IdTipoAlojamiento'] > 0) ? (int)$data['IdTipoAlojamiento'] : 1;
-
             $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
             $stmtPrecio->execute([$idTipoAlojamiento]);
             $precioMomento = $stmtPrecio->fetchColumn() ?: 0;
@@ -96,7 +93,7 @@ public function saveAlojamiento($data) {
                 $data['observaciones'] ?? '', 
                 (int)$data['TipoAnimal'], 
                 (int)$data['idprotA'], 
-                $historia, // ¡CORREGIDO AQUÍ! (Antes decía $data['historia'] y explotaba)
+                $historia, 
                 (int)$data['IdInstitucion'], 
                 $idTipoAlojamiento, 
                 (int)$data['CantidadCaja'], 
@@ -104,11 +101,9 @@ public function saveAlojamiento($data) {
             ]);
             $idNewTramo = $this->db->lastInsertId();
 
-            // Clonar cajas si es actualización de tramo (TramosUI)
             if ($isUpdate && isset($data['continuidad']) && !empty($data['continuidad']['cajas'])) {
                 $cajasViejasIds = $data['continuidad']['cajas']; 
                 $unidadesViejasIds = $data['continuidad']['unidades'] ?? []; 
-
                 foreach ($cajasViejasIds as $oldIdCaja) {
                     $stmtGetCaja = $this->db->prepare("SELECT * FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
                     $stmtGetCaja->execute([$oldIdCaja]);
@@ -133,21 +128,22 @@ public function saveAlojamiento($data) {
                 }
             }
 
-            // Etiquetamos en bitácora si fue Nuevo Alojamiento o Tramo
             $tipoReg = $isUpdate ? 'ACTUALIZACION_TRAMO' : 'NUEVO_ALOJAMIENTO';
             $this->db->prepare("INSERT INTO registroalojamiento (IdUsrA, IdAlojamiento, TipoRegistro, FechaRegistro) VALUES (?, ?, ?, NOW())")->execute([(int)$data['IdUsrA'], $idNewTramo, $tipoReg]);
-            
-            // ¡CORREGIDO AQUÍ TAMBIÉN! (Auditoría limpia y segura)
             Auditoria::log($this->db, $isUpdate ? 'UPDATE' : 'INSERT', 'alojamiento', "Historia: $historia (Aloj. ID: $idNewTramo)");
+            
+            // FORZAR RECALCULO DE TODA LA HISTORIA PARA ASEGURAR COHERENCIA
+            $this->recalculateHistory($historia);
+
             $this->db->commit();
             return $idNewTramo;
-            
         } catch (\Exception $e) {
             $this->db->rollBack();
             throw new \Exception("Error SQL en Model: " . $e->getMessage());
         }
     }
 
+    // CORRECCIÓN CRÍTICA: Se usan las variables MODERNAS (CantidadCaja y PrecioCajaMomento)
     private function closePreviousRecord($historia, $newDate) {
         $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY IdAlojamiento DESC LIMIT 1";
         $stmt = $this->db->prepare($sql);
@@ -158,13 +154,16 @@ public function saveAlojamiento($data) {
             $diff = strtotime($newDate) - strtotime($prev['fechavisado']);
             $diasDefinidos = max(0, floor($diff / 86400));
             
-            $esChica = (float)$prev['totalcajachica'] > 0;
-            $precio = $esChica ? (float)$prev['preciocajachica'] : (float)$prev['preciocajagrande'];
-            $cantidad = $esChica ? (int)$prev['totalcajachica'] : (int)$prev['totalcajagrande'];
-            $totalPago = $diasDefinidos * $precio * $cantidad;
+            // USANDO LAS NUEVAS VARIABLES DE PRECIO Y CANTIDAD
+            $precio = (float)$prev['PrecioCajaMomento'];
+            $cantidad = (int)$prev['CantidadCaja'];
+            
+            // 'cuentaapagar' es la variable moderna que la base de datos usa para guardar la deuda
+            $totalDeudaTramo = $diasDefinidos * $precio * $cantidad;
 
-            $update = "UPDATE alojamiento SET hastafecha = ?, totaldiasdefinidos = ?, totalpago = ? WHERE IdAlojamiento = ?";
-            $this->db->prepare($update)->execute([$newDate, $diasDefinidos, $totalPago, $prev['IdAlojamiento']]);
+            // Actualizamos marcando el fin, días definidos y su cuenta a pagar
+            $update = "UPDATE alojamiento SET hastafecha = ?, totaldiasdefinidos = ?, cuentaapagar = ? WHERE IdAlojamiento = ?";
+            $this->db->prepare($update)->execute([$newDate, $diasDefinidos, $totalDeudaTramo, $prev['IdAlojamiento']]);
         }
     }
 
@@ -194,7 +193,8 @@ public function saveAlojamiento($data) {
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
-    public function recalculateHistory($historiaId) {
+    // CORRECCIÓN: El recálculo ahora actualiza la 'cuentaapagar' en lugar del 'totalpago' (el cual es para lo que el usuario YA pagó de su bolsillo)
+public function recalculateHistory($historiaId) {
         $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY fechavisado ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$historiaId]);
@@ -202,18 +202,39 @@ public function saveAlojamiento($data) {
 
         foreach ($rows as $i => $row) {
             $next = $rows[$i + 1] ?? null;
-            $hasta = $next ? $next['fechavisado'] : (($row['finalizado'] == 1) ? $row['hastafecha'] : null);
-            
-            $fechaFinCalculo = $hasta ?: date('Y-m-d');
-            $diff = strtotime($fechaFinCalculo) - strtotime($row['fechavisado']);
-            $dias = max(0, floor($diff / 86400));
             
             $precio = (float)$row['PrecioCajaMomento'];
             $cajas = (int)$row['CantidadCaja'];
-            $totalPago = $dias * $cajas * $precio;
 
-            $updateSql = "UPDATE alojamiento SET hastafecha = ?, totaldiasdefinidos = ?, totalpago = ? WHERE IdAlojamiento = ?";
-            $this->db->prepare($updateSql)->execute([$hasta, $dias, $totalPago, $row['IdAlojamiento']]);
+            if ($next) {
+                // Hay un tramo siguiente -> Este tramo está CERRADO.
+                $hasta = $next['fechavisado'];
+                $diff = strtotime($hasta) - strtotime($row['fechavisado']);
+                $dias = max(0, floor($diff / 86400));
+                
+                // Calculamos y GUARDAMOS el costo porque es un tramo histórico.
+                $deudaTramo = $dias * $cajas * $precio;
+
+                $updateSql = "UPDATE alojamiento SET hastafecha = ?, totaldiasdefinidos = ?, cuentaapagar = ? WHERE IdAlojamiento = ?";
+                $this->db->prepare($updateSql)->execute([$hasta, $dias, $deudaTramo, $row['IdAlojamiento']]);
+                
+            } else {
+                // ES EL ÚLTIMO TRAMO (Puede estar finalizado o abierto)
+                if ($row['finalizado'] == 1) {
+                    // Si está finalizado, ya tiene su 'hastafecha' real. Calculamos y cerramos.
+                    $hasta = $row['hastafecha'];
+                    $diff = strtotime($hasta) - strtotime($row['fechavisado']);
+                    $dias = max(0, floor($diff / 86400));
+                    $deudaTramo = $dias * $cajas * $precio;
+
+                    $updateSql = "UPDATE alojamiento SET totaldiasdefinidos = ?, cuentaapagar = ? WHERE IdAlojamiento = ?";
+                    $this->db->prepare($updateSql)->execute([$dias, $deudaTramo, $row['IdAlojamiento']]);
+                } else {
+                    // ESTÁ VIGENTE/ABIERTO -> Limpiamos variables para que Javascript lo calcule AL DÍA DE HOY.
+                    $updateSql = "UPDATE alojamiento SET hastafecha = NULL, totaldiasdefinidos = 0, cuentaapagar = 0 WHERE IdAlojamiento = ?";
+                    $this->db->prepare($updateSql)->execute([$row['IdAlojamiento']]);
+                }
+            }
         }
     }
 
@@ -242,29 +263,30 @@ public function saveAlojamiento($data) {
     public function desfinalizarHistoria($historiaId) {
         $this->db->beginTransaction();
         try {
-            $sql = "UPDATE alojamiento SET finalizado = 0, hastafecha = NULL, totaldiasdefinidos = 0, totalpago = 0 
+            $sql = "UPDATE alojamiento SET finalizado = 0, hastafecha = NULL, totaldiasdefinidos = 0, cuentaapagar = 0 
                     WHERE IdAlojamiento = (SELECT id FROM (SELECT MAX(IdAlojamiento) as id FROM alojamiento WHERE historia = ?) as t)";
             $this->db->prepare($sql)->execute([$historiaId]);
+            
             $this->db->prepare("UPDATE alojamiento SET finalizado = 0 WHERE historia = ?")->execute([$historiaId]);
             
+            $this->recalculateHistory($historiaId);
+
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Desfinalizó Historia ID: $historiaId");
             $this->db->commit();
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
-public function updateHistoryConfig($data) {
+    public function updateHistoryConfig($data) {
         $this->db->beginTransaction();
         try {
             $historia = $data['historia'];
             $idTipoAlojamiento = $data['IdTipoAlojamiento'];
 
-            // 1. Buscamos el nuevo precio asociado al nuevo tipo de caja
             $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
             $stmtPrecio->execute([$idTipoAlojamiento]);
             $nuevoPrecio = $stmtPrecio->fetchColumn() ?: 0;
 
-            // 2. Actualizamos TODA la historia con el nuevo esquema
             $sql = "UPDATE alojamiento SET 
                         idprotA = :idprotA, 
                         IdUsrA = :idUsrA,
@@ -275,17 +297,15 @@ public function updateHistoryConfig($data) {
             
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
-                ':idprotA' => $data['idprotA'], 
-                ':idUsrA'  => $data['IdUsrA'],
-                ':idEsp'   => $data['idespA'], 
-                ':idTipo'  => $idTipoAlojamiento, 
-                ':precio'  => $nuevoPrecio, 
-                ':historia'=> $historia
+                ':idprotA'      => $data['idprotA'], 
+                ':idUsrA'       => $data['IdUsrA'],
+                ':idEsp'        => $data['idespA'], 
+                ':idTipo'       => $idTipoAlojamiento, 
+                ':precio'       => $nuevoPrecio, 
+                ':historia'     => $historia
             ]);
 
-            // 3. Recalculamos toda la parte contable para aplicar el nuevo precio a cada tramo
             $this->recalculateHistory($historia);
-            
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Reconfiguró variables base de Historia ID: $historia");
             
             $this->db->commit();

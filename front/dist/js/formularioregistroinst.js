@@ -324,6 +324,9 @@ async function saveForm(action) {
         else if (key.startsWith('reac_')) categoria = 'reactivos';
         else if (key.startsWith('ins_')) categoria = 'insumos';
         else if (key.startsWith('sala_') || key.startsWith('instru_')) categoria = 'reservas';
+        else if (key.startsWith('menuRol4_')) categoria = 'permisos_rol_4_sec_admin'; 
+        else if (key.startsWith('menuRol5_')) categoria = 'permisos_rol_5_asistente';  
+        else if (key.startsWith('menuRol6_')) categoria = 'permisos_rol_6_laboratorio';  // <-- NUEVO
 
         respuestas.push({ categoria, campo: key, valor: value });
     });

@@ -468,5 +468,60 @@ precios: {
         inst_email_label: "Correo Electrónico",
         inst_lang_label: "Idioma Preferencial",
         
+    },
+    facturacion: {
+        titulo: "Facturación",
+        por_depto: "Por Departamento",
+        por_investigador: "Por Investigador",
+        por_protocolo: "Por Protocolo",
+        titulo_liquidacion: "Liquidación de Departamentos",
+        
+        // Filtros
+        filtro_animales: "ANIMALES/REA",
+        filtro_alojamiento: "ALOJAMIENTO",
+        filtro_insumos: "INSUMOS",
+        
+        // Dashboard
+        resumen_fin: "Resumen Financiero",
+        deuda_total: "DEUDA TOTAL",
+        total_pagado_lbl: "TOTAL PAGADO",
+        debe_animales: "DEBE ANIMALES",
+        debe_reactivos: "DEBE REACTIVOS",
+        debe_alojamiento: "DEBE ALOJAMIENTO",
+        debe_insumos: "DEBE INSUMOS",
+        
+        saldos_inv: "Saldos por Investigador",
+        total_deuda: "Total Deuda",
+        total_pagado: "Total Pagado",
+        saldo_disp: "Saldo Disponible",
+        agregar_quitar: "Agregar / Quitar Saldo",
+        
+        // Tablas
+        titular_paga: "Titular (Responsable Financiero)",
+        esp_tipo_aloj: "Especie / Tipo Aloj.",
+        periodo: "Periodo",
+        dias: "Días",
+        total: "Total",
+        pago: "Pago",
+        falta: "Falta",
+        
+        // Textos varios
+        btn_pagar_sel: "Pagar Selección",
+        volver_seleccion: "VOLVER A SELECCIÓN",
+        selecc_pagar: "Seleccionado para pagar:",
+        saldo_actual: "Saldo Actual:",
+        
+        // Alertas
+        aviso_filtro: "Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).",
+        aviso_depto: "Seleccione un departamento.",
+        sin_movimientos: "No hay movimientos que coincidan con los filtros seleccionados.",
+        saldo_act: "Saldo Actualizado",
+        saldo_insuficiente: "Saldo Insuficiente",
+        confirm_pago: "Confirmar Liquidación",
+        pago_procesado: "¡Pago Procesado!",
+        
+        // Modales
+        monto_ajustar: "Monto a ajustar..."
     }
+
 }

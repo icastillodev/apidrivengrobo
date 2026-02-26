@@ -18,19 +18,18 @@
     </style>
 
     <script type="module">
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { Auth } from '../../../dist/js/auth.js';
         import { API } from '../../../dist/js/api.js';
         import { initMenu } from '../../../dist/js/components/MenuComponent.js';
-        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
         import { loadLanguage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica del formulario de reactivos
         import { initReactivosForm } from '../../../dist/js/pages/usuario/formularios/reactivos.js';
+        showLoader();
 
         document.addEventListener('DOMContentLoaded', async () => {
-            showLoader();
-
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos hasta que window.txt esté listo para las etiquetas del formulario
@@ -78,7 +77,11 @@
                 <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
             </button>
         </div>
-
+        <div class="mb-4">
+            <a href="../formularios.html" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3">
+                <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A FORMULARIOS
+            </a>
+        </div>
         <div id="step-1" class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
                 <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Protocolo</label>

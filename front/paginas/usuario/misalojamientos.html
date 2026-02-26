@@ -7,14 +7,16 @@
 
 
     <script type="module">
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { Auth } from '../../dist/js/auth.js';
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
-        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage } from '../../dist/js/utils/i18n.js';
         import { initMisAlojamientos } from '../../dist/js/pages/usuario/misAlojamientos.js';
+
+
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
            
@@ -136,15 +138,16 @@
         </div>
     </div>
 
-    <div class="modal fade" id="modal-visor" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-centered">
+<div class="modal fade" id="modal-visor" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-dark text-white py-2">
-                    <h5 class="modal-title fw-bold fs-6">FICHA DE ALOJAMIENTO</h5>
+                    <h5 class="modal-title fw-bold fs-6"><i class="bi bi-journal-text me-2"></i>FICHA DE ALOJAMIENTO</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-4" id="modal-visor-body"></div>
-                <div class="modal-footer bg-light py-2 justify-content-between">
+                <div class="modal-body p-4 bg-light" id="modal-visor-body">
+                    </div>
+                <div class="modal-footer bg-white border-top-0 py-3 justify-content-between">
                     <div id="modal-actions"></div>
                     <button type="button" class="btn btn-secondary btn-sm fw-bold px-4" data-bs-dismiss="modal">CERRAR</button>
                 </div>

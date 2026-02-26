@@ -4,6 +4,9 @@
  * Versión: Final (PDF Rápido + Excel Multi-hoja + UX Mejorada)
  */
 
+// ¡AQUÍ ESTABA EL ERROR! Faltaba importar la API para que pudiera hacer la petición.
+import { API } from '../../api.js';
+
 let charts = {};
 let rawData = null;
 let deptColors = {}; // Caché de colores para consistencia visual
@@ -65,7 +68,7 @@ async function loadStats() {
     }
 
     try {
-        // ✅ USANDO EL MOTOR SEGURO API.request
+        // ✅ AHORA SÍ FUNCIONARÁ EL MOTOR API.request
         const res = await API.request(`/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`);
 
         if (res.status === 'success') {
