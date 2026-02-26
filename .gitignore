@@ -6,6 +6,11 @@ vendor/
 .env
 .env.local
 .env.*.local
+api/.env
+*/.env
+*/.env.local
+*/.env.*.local
+
 
 # Bases de datos
 *.sql
