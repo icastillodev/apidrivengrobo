@@ -1,4 +1,4 @@
-import { API } from './api.js';
+import { API } from './api.js?v1';
 
 const SESSION_KEYS = [
     'token', 
