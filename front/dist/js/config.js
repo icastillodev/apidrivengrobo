@@ -13,5 +13,5 @@ export const ENV = {
     // El Backend (API)
     API_URL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? "/URBE-API-DRIVEN/api" 
-        : "/core-backend-gem"
+        : "/api" // <-- ¡CORREGIDO!
 };

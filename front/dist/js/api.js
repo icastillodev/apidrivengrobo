@@ -2,7 +2,7 @@ export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO
     urlBase: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? '/URBE-API-DRIVEN/api' 
-        : '/core-backend-gem', // <-- La ruta secreta configurada en Nginx
+        : '/api', // <-- ¡CORREGIDO! Nginx ya sabe que /api significa /core-backend-gem
 
     async request(endpoint, method = 'GET', data = null) {
         const url = `${this.urlBase}${endpoint}`;
