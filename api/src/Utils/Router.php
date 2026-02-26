@@ -17,44 +17,73 @@ class Router {
     public function delete($path, $handler) { $this->addRoute('DELETE', $path, $handler); }
 
     private function addRoute($method, $path, $handler) {
-        $pattern = preg_replace('/:[a-zA-Z0-9]+/', '([a-zA-Z0-9-]+)', $path);
+        // Convertimos los parámetros como :slug en expresiones regulares ([a-zA-Z0-9-]+)
+        $pattern = preg_replace('/:[a-zA-Z0-9]+/', '([a-zA-Z0-9_-]+)', $path);
+        
+        // Hacemos que la barra final sea opcional en la regex agregando /?
+        // Esto permite que /api/users y /api/users/ funcionen igual
         $this->routes[] = [
             'method' => $method,
-            'pattern' => "#^" . $this->basePath . $pattern . "$#",
+            'pattern' => "#^" . $this->basePath . $pattern . "/?$#",
             'handler' => $handler
         ];
     }
 
     public function run() {
+        // Capturamos la URI pura (sin ?variables=get)
         $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $method = $_SERVER['REQUEST_METHOD'];
 
+        // ============================================================
+        // BLINDAJE NGINX: Limpieza de artefactos en la URI
+        // ============================================================
+        // NGINX suele inyectar /index.php en el REQUEST_URI tras un try_files.
+        // Si no lo limpiamos, la regex falla.
+        $uri = str_replace('/index.php', '', $uri);
+
+        // Si después de limpiar quedó vacío (raro, pero posible en la raíz de la api), forzamos barra
+        if (empty($uri)) {
+            $uri = '/';
+        }
+
+        // Iteramos las rutas buscando coincidencias
         foreach ($this->routes as $route) {
             if ($route['method'] === $method && preg_match($route['pattern'], $uri, $matches)) {
-                array_shift($matches); // Eliminar el match completo
+                array_shift($matches); // Eliminar el match completo (dejando solo los parámetros capturados)
                 return $this->resolve($route['handler'], $matches);
             }
         }
 
+        // Si el bucle termina sin hacer return, es un 404 real.
         http_response_code(404);
-        echo json_encode(["status" => "error", "message" => "Ruta no encontrada"]);
+        echo json_encode([
+            "status" => "error", 
+            "message" => "Ruta no encontrada en la API",
+            "debug_uri" => $uri,        // Útil para ver qué está leyendo exactamente PHP
+            "debug_base" => $this->basePath
+        ]);
     }
 
     private function resolve($handler, $params) {
+        // Separamos el Nombre del Controlador y el Método
         list($controllerName, $method) = explode('@', $handler);
         $controllerClass = "App\\Controllers\\" . $controllerName;
 
         if (class_exists($controllerClass)) {
-            // CUALQUIER controlador se instancia igual, pasándole la DB
+            // Instanciamos inyectando PDO para cumplir con el estándar
             $controller = new $controllerClass($this->db);
 
             if (method_exists($controller, $method)) {
-                // Ejecuta el método pasándole los parámetros de la URL (como el :slug)
+                // Ejecutamos pasándole los parámetros extraídos de la URL
                 return call_user_func_array([$controller, $method], $params);
             }
         }
 
+        // Error interno de código (500)
         http_response_code(500);
-        echo json_encode(["status" => "error", "message" => "Error interno: Controlador o método no válido"]);
+        echo json_encode([
+            "status" => "error", 
+            "message" => "Error interno: Controlador ($controllerName) o método ($method) no válido"
+        ]);
     }
 }
