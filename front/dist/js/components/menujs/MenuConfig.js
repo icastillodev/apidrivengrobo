@@ -287,8 +287,13 @@ export async function updateBreadcrumbInstitution() {
 
 export async function applyGlobalHeadConfigs() {
     const head = document.head;
-    const basePath = (window.location.hostname === 'localhost') ? '/URBE-API-DRIVEN/front/' : '/front/';
 
+    // 1. AJUSTE DE RUTA: En producción debe ser '/' para URLs enmascaradas
+    const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+        ? '/URBE-API-DRIVEN/front/' 
+        : '/';
+
+    // Configuración de Robots
     if (!document.querySelector('meta[name="robots"]')) {
         const robots = document.createElement('meta');
         robots.name = "robots";
@@ -296,6 +301,7 @@ export async function applyGlobalHeadConfigs() {
         head.appendChild(robots);
     }
 
+    // Configuración de Meta Description
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
         metaDesc = document.createElement('meta');
@@ -304,12 +310,16 @@ export async function applyGlobalHeadConfigs() {
     }
     metaDesc.content = "GROBO - Gestor de Reactivos Biológicos Online. ERP web para la gestión de protocolos, gastos y reactivos biológicos.";
 
-    let favicon = document.querySelector('link[rel="icon"]');
+    // 2. CONFIGURACIÓN DINÁMICA DEL FAVICON
+    let favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
+    
     if (!favicon) {
         favicon = document.createElement('link');
         favicon.rel = "icon";
         favicon.type = "image/x-icon";
         head.appendChild(favicon);
     }
+    
+    // Usamos la ruta absoluta construida con el basePath
     favicon.href = `${basePath}dist/multimedia/imagenes/grobo/favicon.ico`; 
 }

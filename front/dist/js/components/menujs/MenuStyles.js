@@ -83,34 +83,82 @@ function getBaseStyles() {
 function getSidebarStyles() {
     return `
         .gecko-sidebar { 
-            position: fixed !important; top: 0; left: 0; 
-            height: 100vh; width: 260px; z-index: 1050; 
+            position: fixed !important; 
+            top: 0; 
+            left: 0; 
+            height: 100vh; /* Alto total de la pantalla */
+            width: 260px; 
+            z-index: 1050; 
             transition: transform 0.3s ease; 
             background-color: var(--bs-body-bg);
-            display: flex; flex-direction: column;
-            padding-bottom: 10px !important;
-            /* IMPORTANTE: Permitir que los hijos se vean fuera */
+            display: flex; 
+            flex-direction: column;
+            padding-bottom: 15px !important;
             overflow: visible !important; 
         }
         
         #side-menu-ul {
-            flex-grow: 1;
-            /* Cambiamos auto por visible para que el flyout no se corte */
-            /* Si tienes MUCHOS ítems y necesitas scroll, hay que usar una técnica de portal JS, 
-               pero para una cantidad normal, visible funciona */
-            overflow-y: visible; 
+            flex-grow: 1; /* Ocupa todo el espacio sobrante */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly; /* Reparte los ítems equitativamente */
+            overflow-y: visible; /* Nunca scroll */
             min-height: 0;
             padding: 0;
+            margin-bottom: 0 !important;
         }
 
-        /* Si el mouse está sobre el ítem o el submenú, lo mantenemos visible (si usas hover) */
-        .group-gecko-item:hover .dropdown-menu-gecko.hidden {
-            /* Esto es opcional si manejas el toggle por JS, déjalo si quieres soporte hover */
+        /* Ajuste automático para que quepa todo */
+        .gecko-sidebar .nav-item {
+            margin-bottom: 0 !important; 
         }
 
-        .gecko-sidebar .nav-link { padding-top: 8px !important; padding-bottom: 8px !important; }
-        
+        .gecko-sidebar .nav-link { 
+            padding-top: 6px !important; 
+            padding-bottom: 6px !important; 
+            /* Si hay muchos ítems, el texto se achica un poco automáticamente */
+            font-size: clamp(10px, 1.2vh, var(--gecko-font-size)) !important;
+        }
+
+        .gecko-sidebar .menu-icon svg {
+            /* Achica un poco el icono si la pantalla es bajita */
+            width: clamp(18px, 2.5vh, 24px); 
+            height: clamp(18px, 2.5vh, 24px);
+        }
+
         @media (min-width: 769px) { body.with-sidebar { padding-left: 260px !important; } }
+        /* --- BLOQUEO DE DESBORDAMIENTO (ANTI-SCROLL EXTREMO) --- */
+        #side-menu-ul {
+            /* Forzamos a que el UL nunca pase del 100% del espacio disponible */
+            max-height: calc(100vh - 160px); 
+        }
+
+        .gecko-sidebar .nav-item {
+            /* Cada ítem tiene permitido encogerse si no hay espacio */
+            flex: 1 1 auto; 
+            min-height: 25px; /* Altura mínima de colapso */
+            display: flex;
+            align-items: center;
+        }
+
+        .gecko-sidebar .nav-link {
+            /* El enlace ocupa el 100% del ítem encogido */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            /* Padding elástico: menos espacio vertical, menos padding */
+            padding-top: clamp(2px, 1vh, 8px) !important;
+            padding-bottom: clamp(2px, 1vh, 8px) !important;
+            /* La letra se ahoga antes que salir de la pantalla */
+            font-size: clamp(9px, 2vh, var(--gecko-font-size)) !important;
+        }
+
+        /* Espacio para la barra de búsqueda Omnibox cuando el menú es lateral */
+        body.with-sidebar .container,
+        body.with-sidebar .container-fluid {
+            padding-top: 60px !important; /* Da aire arriba para que el buscador flotante no tape el contenido */
+        }
     `;
 }
 
@@ -264,18 +312,209 @@ function getHotkeyStyles() {
 
 function getDarkModeStyles() {
     return `
-        [data-bs-theme="dark"] .gecko-search-trigger { background: rgba(30, 30, 30, 0.8); border-color: #444; color: #ccc; }
-        [data-bs-theme="dark"] .gecko-search-trigger:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-        [data-bs-theme="dark"] .gecko-search-trigger .kbd-shortcut { background: rgba(255,255,255,0.1); border-color: #555; color: #aaa; }
-        [data-bs-theme="dark"] .gecko-omni-box { background: #1e1e1e; border: 1px solid #444; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-        [data-bs-theme="dark"] .gecko-omni-header { border-bottom-color: #333; background: #1e1e1e; }
+        /* Variables Globales Modo Oscuro */
+        [data-bs-theme="dark"] {
+            --bs-body-bg: #121212 !important;
+            --bs-body-color: #E0E0E0 !important;
+            --gecko-dark-card: #1E1E1E;
+            --gecko-dark-border: #2A2A2A;
+            --gecko-dark-hover: #1e3a29; 
+            --gecko-accent: #4ade80 !important; 
+            --gecko-input-bg: #2B2B2B;
+        }
+
+        /* --- SELECCIÓN DE TEXTO --- */
+        [data-bs-theme="dark"] ::selection {
+            background: rgba(74, 222, 128, 0.3);
+            color: #ffffff;
+        }
+
+        /* --- FONDOS Y TARJETAS GLOBALES --- */
+        /* Forzamos el fondo del body y sobreescribimos estilos en línea */
+        [data-bs-theme="dark"] body { background-color: var(--bs-body-bg) !important; }
+        
+        [data-bs-theme="dark"] .card, 
+        [data-bs-theme="dark"] .bg-white,
+        [data-bs-theme="dark"] .bg-body-tertiary,
+        [data-bs-theme="dark"] .bg-light { 
+            background-color: var(--gecko-dark-card) !important; 
+            border-color: var(--gecko-dark-border) !important; 
+        }
+        
+        /* Cajas especiales (ej. "step-2" verde clarito en claro) */
+        [data-bs-theme="dark"] [style*="background: #f8fff9"] {
+            background-color: #16241a !important; /* Verde ultra oscuro */
+            border-left-color: var(--gecko-accent) !important;
+        }
+
+        /* --- CLASES ESPECÍFICAS DE TAILWIND --- */
+        [data-bs-theme="dark"] .bg-gray-50 { background-color: #1A1A1A !important; }
+        [data-bs-theme="dark"] .border-gray-200 { border-color: var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] .text-gray-900 { color: #FFFFFF !important; }
+        [data-bs-theme="dark"] .text-gray-400 { color: #888888 !important; }
+        [data-bs-theme="dark"] .text-green-600 { color: var(--gecko-accent) !important; }
+        [data-bs-theme="dark"] .text-amber-600 { color: #F59E0B !important; }
+
+        /* --- TEXTOS --- */
+        [data-bs-theme="dark"] .text-dark { color: #FFFFFF !important; }
+        [data-bs-theme="dark"] .text-muted { color: #A0A0A0 !important; }
+        [data-bs-theme="dark"] .text-secondary { color: #B0B0B0 !important; }
+        [data-bs-theme="dark"] .text-success { color: var(--gecko-accent) !important; } 
+        [data-bs-theme="dark"] .text-primary { color: #60A5FA !important; } 
+
+        /* --- INPUTS Y FORMULARIOS --- */
+        [data-bs-theme="dark"] .form-control,
+        [data-bs-theme="dark"] .form-select,
+        [data-bs-theme="dark"] .input-group-text {
+            background-color: var(--gecko-input-bg) !important;
+            border-color: var(--gecko-dark-border) !important;
+            color: #FFFFFF !important;
+        }
+        [data-bs-theme="dark"] .form-control:focus,
+        [data-bs-theme="dark"] .form-select:focus {
+            border-color: var(--gecko-accent) !important;
+            box-shadow: 0 0 0 0.25rem rgba(74, 222, 128, 0.25) !important;
+        }
+        [data-bs-theme="dark"] .form-control::placeholder { color: #777 !important; }
+        
+        /* Input totales bg-success */
+        [data-bs-theme="dark"] input.bg-success {
+            background-color: var(--gecko-dark-hover) !important;
+            color: var(--gecko-accent) !important;
+            border-color: var(--gecko-accent) !important;
+        }
+
+        /* --- LISTAS DESPLEGABLES (Buscador de Protocolos) --- */
+        [data-bs-theme="dark"] .list-group-item {
+            background-color: var(--gecko-dark-card) !important;
+            border-color: var(--gecko-dark-border) !important;
+            color: #E0E0E0 !important;
+        }
+        [data-bs-theme="dark"] .list-group-item:hover,
+        [data-bs-theme="dark"] .list-group-item-action:focus {
+            background-color: var(--gecko-dark-hover) !important;
+        }
+        
+        /* --- TABLA Y TRAZABILIDAD --- */
+        [data-bs-theme="dark"] .table { border-color: var(--gecko-dark-border) !important; color: #E0E0E0; }
+        [data-bs-theme="dark"] .table thead th,
+        [data-bs-theme="dark"] .table thead.bg-secondary { 
+            background-color: #252525 !important; 
+            color: #AAA !important; 
+            border-color: var(--gecko-dark-border) !important;
+        }
+        [data-bs-theme="dark"] .table-light,
+        [data-bs-theme="dark"] .table tbody tr { background-color: var(--gecko-dark-card) !important; border-color: var(--gecko-dark-border) !important; color: #E0E0E0; }
+        [data-bs-theme="dark"] .table tbody tr td { border-color: var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] .table tbody tr.pointer:hover { background-color: #252525 !important; }
+        [data-bs-theme="dark"] [id^="trazabilidad-row"] td { background-color: #121212 !important; }
+        [data-bs-theme="dark"] [id^="trazabilidad-content"] { 
+            background-color: #1A1A1A !important; 
+            border-left-color: var(--gecko-accent) !important;
+        }
+
+        /* --- MODAL --- */
+        [data-bs-theme="dark"] .modal-content { background-color: var(--bs-body-bg); border: 1px solid var(--gecko-dark-border); }
+        [data-bs-theme="dark"] .modal-header.bg-dark { background-color: #1E1E1E !important; border-bottom: 1px solid var(--gecko-dark-border); }
+        [data-bs-theme="dark"] .modal-footer,
+        [data-bs-theme="dark"] .modal-footer.bg-light { background-color: #1E1E1E !important; border-top: 1px solid var(--gecko-dark-border); }
+        [data-bs-theme="dark"] #historial-summary.bg-light { background-color: #1E1E1E !important; border-color: var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] #historial-summary .border-end { border-right-color: var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] #historial-summary .border-top { border-top-color: var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] .alert-info { background-color: rgba(13, 202, 240, 0.1) !important; border-color: transparent !important; border-left-color: #0dcaf0 !important; color: #E0E0E0; }
+
+        /* --- BOTONES Y BADGES --- */
+        [data-bs-theme="dark"] .btn-outline-dark { border-color: #555; color: #CCC; }
+        [data-bs-theme="dark"] .btn-outline-dark:hover { background-color: #333; color: #FFF; border-color: #777; }
+        
+        [data-bs-theme="dark"] .btn-outline-success { border-color: var(--gecko-accent); color: var(--gecko-accent); }
+        [data-bs-theme="dark"] .btn-outline-success:hover { background-color: var(--gecko-dark-hover); color: #FFF; }
+        
+        [data-bs-theme="dark"] .btn-light { background-color: #252525 !important; border-color: #444 !important; color: #CCC !important; }
+        [data-bs-theme="dark"] .btn-light:hover { background-color: #333 !important; color: #FFF !important; }
+
+        [data-bs-theme="dark"] .badge.bg-dark,
+        [data-bs-theme="dark"] .badge.bg-secondary { background-color: #333 !important; color: #DDD !important; border: 1px solid #555; }
+        [data-bs-theme="dark"] .badge.bg-success { background-color: var(--gecko-dark-hover) !important; color: var(--gecko-accent) !important; border: 1px solid var(--gecko-accent); }
+        [data-bs-theme="dark"] .badge.bg-light { background-color: #252525 !important; color: #AAA !important; border-color: #444 !important; }
+
+        /* ========================================================= */
+        /* --- MENÚ SUPERIOR / LATERAL (SUBRAYADOS VERDE CLARITO) --- */
+        /* ========================================================= */
+        [data-bs-theme="dark"] .gecko-sidebar { border-right: 1px solid var(--gecko-dark-border) !important; }
+        [data-bs-theme="dark"] .custom-menu-pill,
+        [data-bs-theme="dark"] .border-success { border-color: var(--gecko-accent) !important; }
+        
+        [data-bs-theme="dark"] .gecko-nav-link, 
+        [data-bs-theme="dark"] .gecko-sidebar .nav-link { color: #CCCCCC !important; border: 2px solid transparent; }
+        
+        [data-bs-theme="dark"] .gecko-nav-link:hover, 
+        [data-bs-theme="dark"] .gecko-sidebar .nav-link:hover { background-color: var(--gecko-dark-hover) !important; color: var(--gecko-accent) !important; }
+
+        [data-bs-theme="dark"] .gecko-nav-link:hover { border-bottom: 2px solid var(--gecko-accent) !important; }
+        [data-bs-theme="dark"] .gecko-sidebar .nav-link:hover { border-bottom: 2px solid transparent !important; border-left: 3px solid var(--gecko-accent) !important; }
+
+        [data-bs-theme="dark"] .dropdown-menu-gecko { background-color: var(--gecko-dark-card) !important; border: 1px solid var(--gecko-accent) !important; box-shadow: 0 10px 30px rgba(0,0,0,0.6) !important; }
+        [data-bs-theme="dark"] .dropdown-menu-gecko::before { background: var(--gecko-dark-card); border-color: var(--gecko-accent); }
+        [data-bs-theme="dark"] .dropdown-item-gecko { color: #CCCCCC; }
+        [data-bs-theme="dark"] .dropdown-item-gecko:hover { background-color: var(--gecko-dark-hover); color: var(--gecko-accent) !important; }
+
+        /* --- OMNIBOX BUSCADOR --- */
+        [data-bs-theme="dark"] .gecko-search-trigger { background: var(--gecko-dark-card); border-color: var(--gecko-dark-border); color: #ccc; }
+        [data-bs-theme="dark"] .gecko-search-trigger:hover { background: #252525; border-color: var(--gecko-accent); color: #fff; }
+        [data-bs-theme="dark"] .gecko-search-trigger .kbd-shortcut { background: #2A2A2A; border-color: #444; color: #aaa; }
+        [data-bs-theme="dark"] .gecko-omni-box { background: var(--gecko-dark-card); border: 1px solid var(--gecko-accent); box-shadow: 0 20px 60px rgba(0,0,0,0.8) !important; }
+        [data-bs-theme="dark"] .gecko-omni-header { border-bottom-color: var(--gecko-dark-border); background: var(--gecko-dark-card); }
         [data-bs-theme="dark"] #gecko-omni-input { color: #fff; }
-        [data-bs-theme="dark"] .gecko-omni-results { background: #1e1e1e; }
-        [data-bs-theme="dark"] .omni-item { border-color: #2a2a2a; color: #ddd; }
-        [data-bs-theme="dark"] .omni-item:hover { background: #2a2a2a; }
+        [data-bs-theme="dark"] .gecko-omni-results { background: var(--gecko-dark-card); }
+        [data-bs-theme="dark"] .omni-item { border-color: var(--gecko-dark-border); color: #ddd; }
+        [data-bs-theme="dark"] .omni-item:hover, [data-bs-theme="dark"] .omni-item.active { background: var(--gecko-dark-hover); border-left-color: var(--gecko-accent); }
+        [data-bs-theme="dark"] .omni-item:hover .omni-item-icon { color: var(--gecko-accent); }
         [data-bs-theme="dark"] .omni-meta { background: #333; color: #aaa; }
-        [data-bs-theme="dark"] .hotkey-item { background: #252525; border-color: #333; }
-        [data-bs-theme="dark"] .hotkey-desc { color: #ccc; }
-        [data-bs-theme="dark"] .hotkey-keys kbd { background: #555; }
+        [data-bs-theme="dark"] .btn-control-gecko { border-color: var(--gecko-dark-border) !important; color: #CCCCCC !important; background: transparent !important; }
+        [data-bs-theme="dark"] .btn-control-gecko:hover { background-color: var(--gecko-dark-hover) !important; color: var(--gecko-accent) !important; border-color: var(--gecko-accent) !important; }
+        /* ========================================================================== */
+        /* TELÓN DE FONDO DINÁMICO (LIGHT / DARK)                                     */
+        /* ========================================================================== */
+
+        /* Bloqueo de scroll inicial */
+        body:not(.gecko-loaded) {
+            overflow: hidden !important;
+        }
+
+        /* 1. El telón que tapa el HTML crudo (Modo Claro por defecto) */
+        body:not(.gecko-loaded)::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #f4f7f6; 
+            z-index: 999999;
+        }
+
+        /* 2. El telón en Modo Oscuro (Se activa si el HTML tiene data-bs-theme="dark") */
+        [data-bs-theme="dark"] body:not(.gecko-loaded)::before {
+            background-color: #121212 !important; 
+        }
+
+        /* Spinner minimalista de respaldo */
+        body:not(.gecko-loaded)::after {
+            content: "";
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 40px; height: 40px;
+            margin: -20px 0 0 -20px;
+            border: 3px solid rgba(26, 93, 59, 0.1);
+            border-top-color: #1a5d3b;
+            border-radius: 50%;
+            animation: gecko-global-spin 0.6s linear infinite;
+            z-index: 1000000;
+        }
+
+        [data-bs-theme="dark"] body:not(.gecko-loaded)::after {
+            border-color: rgba(74, 222, 128, 0.1);
+            border-top-color: #4ade80; 
+        }
+
+        @keyframes gecko-global-spin { to { transform: rotate(360deg); } }
     `;
 }

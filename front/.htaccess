@@ -25,6 +25,7 @@ RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
 # Forzamos el .html para que Apache no confunda con carpetas
 # ============================================================
 RewriteRule ^panel/(.*)$ paginas/usuario/$1.html [L]
+RewriteRule ^admin/facturacion/(.*)$ paginas/admin/facturacion/$1.html [L]
 RewriteRule ^admin/(.*)$ paginas/admin/$1.html [L]
 RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1.html [L]
 
