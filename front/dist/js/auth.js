@@ -47,14 +47,14 @@ export const Auth = {
         }
     },
 
-    async init() {
+async init() {
         try {
             this.hydrateSession();
 
             const path = window.location.pathname;
             
-            // Si ya estamos dentro de una página, no hace falta validar el login
-            if (path.includes('/paginas/')) return; 
+            // Si ya estamos dentro de una página enmascarada, no pinta el login
+            if (path.includes('/paginas/') || path.includes('/panel/') || path.includes('/admin/') || path.includes('/superadmin/')) return; 
 
             // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
@@ -66,15 +66,11 @@ export const Auth = {
                 return; 
             }
 
-            // ---------------------------------------------------------
-            // EXTRACCIÓN DEL SLUG A PRUEBA DE BALAS PARA NGINX
-            // ---------------------------------------------------------
+            // EXTRACCIÓN DEL SLUG
             let slugContext = new URLSearchParams(window.location.search).get('inst');
 
             if (!slugContext) {
-                // Separamos la URL y quitamos espacios vacíos o "index.html"
                 const pathParts = path.split('/').filter(p => p && p !== 'index.html');
-                
                 const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
                 
                 if (isLocalhost) {
@@ -83,23 +79,18 @@ export const Auth = {
                         slugContext = pathParts[frontIndex + 1];
                     }
                 } else {
-                    // EN PRODUCCIÓN (NGINX)
-                    // Como el alias de Nginx es /urbe, pathParts[0] será 'urbe'
                     if (pathParts.length > 0) {
                         slugContext = pathParts[0];
                     } 
-                    // Fallback: A veces Nginx sirve el index en la raíz si hay un subdominio específico
                     else if (window.location.hostname.includes('urbe.')) {
                         slugContext = 'urbe';
                     }
                 }
             }
 
-            // Fallback final: Si la persona recargó la página, sacarlo de la memoria
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
-            // Palabras prohibidas que Nginx podría colar
-            const forbiddenPaths = ['dist', 'assets', 'resources', 'paginas', 'front', 'api', 'core-backend-gem'];
+            const forbiddenPaths = ['dist', 'assets', 'resources', 'paginas', 'front', 'api', 'core-backend-gem', 'panel', 'admin', 'superadmin'];
             if (!slugContext || forbiddenPaths.includes(slugContext)) {
                 console.warn("⚠️ Sede no detectada en la URL:", path);
                 this.showErrorState();
@@ -111,13 +102,13 @@ export const Auth = {
             const storedToken = this.getVal('token');
             const storedInst = this.getVal('NombreInst');
             
+            // REDIRECCIÓN SI YA ESTÁ LOGUEADO (Evita que vuelva a ver el login)
             if (storedToken && storedInst === this.slug) {
                 const role = parseInt(this.getVal('userLevel'));
                 this.autoRedirectIfLogged(role);
                 return; 
             }
 
-            // Llamada a la API de validación
             const res = await API.request(`/validate-inst/${this.slug}`);
             
             if (res && res.status === 'success') {
@@ -163,7 +154,6 @@ export const Auth = {
             this.showErrorState(); 
         }
     },
-
     updateElements(map) {
         for (const [id, val] of Object.entries(map)) {
             if (id === 'logo-url') {
@@ -327,28 +317,26 @@ export const Auth = {
         this.autoRedirectIfLogged(role);
     },
 
-    autoRedirectIfLogged(role) {
+autoRedirectIfLogged(role) {
         if (!this.getVal('token')) return;
         
-        // CORRECCIÓN NGINX: Asegurar que el redirect respete la sede en la URL
         let basePath = '/';
         const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         
         if (isLocalhost) {
-            basePath = `/URBE-API-DRIVEN/front/${this.slug}/`;
-        } else {
-            basePath = `/${this.slug}/`; 
+            basePath = `/URBE-API-DRIVEN/front/`;
         }
 
         if (role === 1) {
             if (this.slug === 'superadmin' || this.slug === 'master' || this.getVal('NombreInst') === 'SISTEMA GLOBAL') {
-                window.location.href = `${basePath}paginas/superadmin/dashboard.html`;
+                window.location.href = `${basePath}superadmin/dashboard`;
             } else {
-                window.location.href = `${basePath}paginas/admin/dashboard.html`;
+                window.location.href = `${basePath}admin/dashboard`;
             }
         } else {
-            const folder = (role === 3) ? 'usuario' : 'admin';
-            window.location.href = `${basePath}paginas/${folder}/dashboard.html`;
+            // Role 3 ahora va a /panel/ en vez de /usuario/
+            const folder = (role === 3) ? 'panel' : 'admin';
+            window.location.href = `${basePath}${folder}/dashboard`;
         }
     },
     renderLogin() {
@@ -415,16 +403,25 @@ export const Auth = {
         this.redirectToLogin(slug);
     },
 
-    redirectToLogin(slug) {
+redirectToLogin(slug) {
         const basePath = this.getBasePath();
-        const invalidSlugs = ['superadmin', 'sistema global', 'null', 'undefined', '0'];
-        
-        // Aseguramos que el slug sea seguro y no sea una palabra basura
         const safeSlug = String(slug || '').toLowerCase().trim();
-        const cleanSlug = (!invalidSlugs.includes(safeSlug) && safeSlug !== '') ? safeSlug : '';
-        
-        // Si el slug es válido va a /sede/ , si es basura va a / (login raíz)
-        window.location.href = cleanSlug ? `${basePath}${cleanSlug}/` : basePath;
+
+        // 1. CASO SUPERADMIN: Lo devolvemos a la ruta secreta de Nginx
+        if (safeSlug === 'superadmin' || safeSlug === 'sistema global') {
+            window.location.href = `${basePath}geckoadm/login`;
+            return;
+        }
+
+        // 2. CASO BASURA/NULO: Lo mandamos a la raíz genérica
+        const invalidSlugs = ['null', 'undefined', '0', ''];
+        if (invalidSlugs.includes(safeSlug)) {
+            window.location.href = basePath;
+            return;
+        }
+
+        // 3. CASO INSTITUCIÓN: Lo mandamos al slug limpio (ej: /urbe)
+        window.location.href = `${basePath}${safeSlug}`;
     },
 
     showErrorState() {

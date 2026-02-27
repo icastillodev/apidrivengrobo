@@ -11,23 +11,23 @@ export function getMenuTemplates() {
         7: { label: window.txt.menu.accommodations, svg: `<svg viewBox="0 0 576 512"><path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1v16.2c0 22.1-17.9 40-40 40h-16c-1.1 0-2.2 0-3.3-.1c-1.4.1-2.8.1-4.2.1L416 512h-24c-22.1 0-40-17.9-40-40v-88c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v88c0 22.1-17.9 40-40 40h-55.9c-1.5 0-3-.1-4.5-.2c-1.2.1-2.4.2-3.6.2h-16c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9.1-2.8v-69.7h-32c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7l255.4 224.5c8 7 12 15 11 24"/></svg>`, path: 'admin/alojamientos' },
         8: { label: window.txt.menu.stats, svg: `<svg viewBox="0 0 24 24"><path d="M20 13.75a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75v6.75H14V4.25c0-.728-.002-1.2-.048-1.546c-.044-.325-.115-.427-.172-.484c-.057-.057-.159-.128-.484-.172C12.949 2.002 12.478 2 11.75 2c-.728 0-1.2.002-1.546.048c-.325.044-.427.115-.484.172c-.057.057-.128.159-.172.484c-.046.347-.048.818-.048 1.546V20.5H8V8.75A.75.75 0 0 0 7.25 8h-3a.75.75 0 0 0-.75.75V20.5H1.75a.75.75 0 0 0 0 1.5h20a.75.75 0 0 0 0-1.5H20v-6.75Z"/></svg>`, path: 'admin/estadisticas' },
         9: { label: window.txt.menu.admin_config, svg: `<svg viewBox="0 0 24 24"><path d="M12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5m7 2c0-1.1.9-2 2-2V9.5c-1.1 0-2-.9-2-2s.9-2 2-2V4c0-1.1-.9-2-2-2h-3c0 1.1-.9 2-2 2s-2-.9-2-2H4c-1.1 0-2 .9-2 2v1.5c1.1 0 2 .9 2 2s-.9 2-2 2V15c1.1 0 2 .9 2 2s-.9 2-2 2V20c0 1.1.9 2 2 2h3c0-1.1-.9-2 2-2s2 .9 2 2h3c1.1 0 2-.9 2-2v-2.5z"/></svg>`, path: 'admin/configuracion/config' },
-        10: { label: window.txt.menu.forms, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'usuario/formularios.html' },
-        11: { label: window.txt.menu.my_forms, svg: `<svg viewBox="0 0 24 24"><path d="M13 1.07l1 1 .03.02L18.41 7.5c.39.39.39 1.02 0 1.41L13 14.34l-1-1L17 8.5 13 4.5V2H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 4h3v1h-3V4z"/></svg>`, path: 'usuario/misformularios' },
-        12: { label: window.txt.menu.my_accommodations, svg: `<svg viewBox="0 0 576 512"><path d="M280.37 148.26L96 300.11V464a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V344a16 16 0 0 1 16-16h88a16 16 0 0 1 16 16v120a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V300.11zM571 225.47L488 153.47V48a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v51.33L313.43 14.3a16 16 0 0 0-20.48 0L4.38 225.47a16 16 0 0 0 2.06 22.44l15.11 12.65a16 16 0 0 0 22.59-2.22L288 64.82l243.86 203.52a16 16 0 0 0 22.59 2.22l15.11-12.65a16 16 0 0 0 1.44-22.44z"/></svg>`, path: 'usuario/misalojamientos' },
+        10: { label: window.txt.menu.forms, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'panel/formularios' },
+        11: { label: window.txt.menu.my_forms, svg: `<svg viewBox="0 0 24 24"><path d="M13 1.07l1 1 .03.02L18.41 7.5c.39.39.39 1.02 0 1.41L13 14.34l-1-1L17 8.5 13 4.5V2H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM8 4h3v1h-3V4z"/></svg>`, path: 'panel/misformularios' },
+        12: { label: window.txt.menu.my_accommodations, svg: `<svg viewBox="0 0 576 512"><path d="M280.37 148.26L96 300.11V464a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V344a16 16 0 0 1 16-16h88a16 16 0 0 1 16 16v120a16 16 0 0 0 16 16l40 .06a16 16 0 0 0 16-16V300.11zM571 225.47L488 153.47V48a16 16 0 0 0-16-16h-48a16 16 0 0 0-16 16v51.33L313.43 14.3a16 16 0 0 0-20.48 0L4.38 225.47a16 16 0 0 0 2.06 22.44l15.11 12.65a16 16 0 0 0 22.59-2.22L288 64.82l243.86 203.52a16 16 0 0 0 22.59 2.22l15.11-12.65a16 16 0 0 0 1.44-22.44z"/></svg>`, path: 'panel/misalojamientos' },
         13: { label: window.txt.menu.my_history, svg: `<svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>`, path: 'construccion' },
-        14: { label: window.txt.menu.my_reservations, svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'usuario/construccion' },
+        14: { label: window.txt.menu.my_reservations, svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'panel/construccion' },
         15: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'admin/protocolos' },
-        203: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,path: 'usuario/misprotocolos' },
+        203: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,path: 'panel/misprotocolos' },
         
         55: { 
             label: window.txt.menu.investigator_group, 
             svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,
             isDropdown: true,
             children: [
-                { label: window.txt.menu.my_forms, path: 'usuario/misformularios' },
-                { label: window.txt.menu.my_accommodations, path: 'usuario/misalojamientos' },
+                { label: window.txt.menu.my_forms, path: 'panel/misformularios' },
+                { label: window.txt.menu.my_accommodations, path: 'panel/misalojamientos' },
                 { label: window.txt.menu.my_reservations, path: 'construccion' },
-                { label: window.txt.menu.my_protocols, path: 'usuario/misprotocolos' }
+                { label: window.txt.menu.my_protocols, path: 'panel/misprotocolos' }
             ]
         },
 
@@ -58,7 +58,7 @@ export function getMenuTemplates() {
             svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z"/></svg>`,
             isDropdown: true,
             children: [
-                { label: window.txt.menu.config, path: 'usuario/perfil' },
+                { label: window.txt.menu.config, path: 'panel/perfil' },
                 { label: window.txt.menu.logout, path: 'logout' }
             ]
         }
