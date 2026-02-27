@@ -2,6 +2,8 @@ import { getUserDisplayText, getCorrectPath } from './MenuConfig.js';
 
 function renderOmniComponents(mode) {
     const existing = document.getElementById('gecko-search-trigger');
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const assetPath = isLocal ? '/URBE-API-DRIVEN/front/' : '/';
     if(existing) existing.remove();
 
     const trigger = document.createElement('div');
@@ -27,7 +29,7 @@ function renderOmniComponents(mode) {
         modal.innerHTML = `
             <div class="gecko-omni-box">
                 <div class="gecko-omni-header">
-                    <img src="../../../dist/multimedia/imagenes/grobo/grobo.png" class="gecko-search-logo" alt="Gecko">
+                    <img src="${assetPath}dist/multimedia/imagenes/grobo/gecko.png" class="gecko-search-logo" alt="Gecko">
                     
                     <input type="text" id="gecko-omni-input" placeholder="Escribe un comando o di &quot;Gecko&quot; para activar la IA..." autocomplete="off">
                     

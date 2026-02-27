@@ -54,7 +54,7 @@ async init() {
             const path = window.location.pathname;
             
             // ¡ESTO ES CLAVE! Ignorar validación de login en páginas enmascaradas y formularios
-            if (path.includes('/paginas/') || path.includes('/panel/') || path.includes('/admin/') || path.includes('/superadmin/') || path.includes('/formulario/') || path.includes('adm/login') || path.includes('/qr/')) return;
+            if (path.includes('/paginas/') || path.includes('/panel/') || path.includes('/admin/') || path.includes('/superadmin/') || path.includes('/formulario/') || path.includes('/construccion') ||path.includes('adm/login')  || path.includes('/qr/')) return;
 
             // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {

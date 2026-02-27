@@ -77,6 +77,17 @@ function getBaseStyles() {
 #btn-voice-switch.voice-status-true {
     color: #1a5d3b !important; /* Verde */
 }
+    body:not(.gecko-loaded)::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background-color: #f4f7f6; /* Color claro */
+        z-index: 2147483646;
+    }
+
+    [data-bs-theme="dark"] body:not(.gecko-loaded)::before {
+        background-color: #121212 !important; /* Color oscuro */
+    }
     `;
 }
 
@@ -516,5 +527,20 @@ function getDarkModeStyles() {
         }
 
         @keyframes gecko-global-spin { to { transform: rotate(360deg); } }
+        /* Hover sutil para las filas de la tabla en modo oscuro */
+[data-bs-theme="dark"] .table tbody tr {
+  background-color: var(--gecko-dark-card) !important;
+  border-color: var(--gecko-dark-border) !important;
+  color: #E0E0E0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .table tbody tr:hover {
+  /* Un verde esmeralda muy suave (8% de opacidad) */
+  background-color: rgba(74, 222, 128, 0.08) !important; 
+  /* Iluminamos el texto un poquito hacia el verde de la marca */
+  color: #4ade80 !important; 
+  cursor: pointer;
+}
     `;
 }

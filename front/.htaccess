@@ -19,6 +19,7 @@ RewriteRule ^.+/(dist|assets|paginas|resources)/(.*)$ $1/$2 [L]
 RewriteRule ^gecko(s)?adm/login/?$ superadmin_login.html [L,NC]
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html [L]
 RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
+RewriteRule ^construccion$ paginas/construccion.html [L]
 
 # ============================================================
 # 3. ENMASCARAMIENTO DE RUTAS LÓGICAS (Ocultar /paginas/)
@@ -26,7 +27,7 @@ RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
 # ============================================================
 RewriteRule ^panel/(.*)$ paginas/usuario/$1.html [L]
 RewriteRule ^admin/facturacion/(.*)$ paginas/admin/facturacion/$1.html [L]
-RewriteRule ^admin/(.*)$ paginas/admin/$1.html [L]
+RewriteRule ^admin/([a-zA-Z0-9_-]+)$ paginas/admin/$1.html [L]
 RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1.html [L]
 
 # ============================================================
