@@ -9,13 +9,11 @@
     <link rel="stylesheet" href="./dist/style/css/styles.css">
     <link rel="stylesheet" href="./dist/style/css/tailwind.css"> <script src="https://cdn.tailwindcss.com"></script>
 <script type="module">
-    import { showLoader, hideLoader } from './dist/js/components/LoaderComponent.js';
     import { Auth } from './dist/js/auth.js?v1'; 
-    showLoader();
     document.addEventListener('DOMContentLoaded', () => Auth.init());
 </script>
 </head>
-<body class="bg-[#f2f2f2] font-sans">
+<body class="bg-[#f2f2f2] font-sans gecko-loaded" >
     <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
         <section class="w-full max-w-5xl bg-black p-[6px] gap-x-3 rounded-xl flex-col md:flex-row flex shadow-2xl overflow-hidden">
             

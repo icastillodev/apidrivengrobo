@@ -1130,26 +1130,3 @@ body:not(.gecko-loaded)::before {
     background-color: #121212; 
 }
 
-/* 3. El circulo del Spinner girando en el medio */
-body:not(.gecko-loaded)::after {
-    content: "";
-    position: fixed;
-    top: 50%; left: 50%;
-    width: 50px; height: 50px;
-    margin: -25px 0 0 -25px; /* Para centrarlo perfecto */
-    border: 4px solid rgba(26, 93, 59, 0.2); /* Verde oscuro transparente */
-    border-top-color: #1a5d3b; /* Verde oscuro sólido */
-    border-radius: 50%;
-    animation: gecko-global-spin 0.8s linear infinite;
-    z-index: 1000000;
-}
-/* Spinner verde neón en dark mode */
-[data-bs-theme="dark"] body:not(.gecko-loaded)::after {
-    border-color: rgba(74, 222, 128, 0.2);
-    border-top-color: #4ade80; 
-}
-
-@keyframes gecko-global-spin {
-    to { transform: rotate(360deg); }
-}
-

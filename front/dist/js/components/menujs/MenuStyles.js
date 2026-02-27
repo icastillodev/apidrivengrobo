@@ -88,6 +88,17 @@ function getBaseStyles() {
     [data-bs-theme="dark"] body:not(.gecko-loaded)::before {
         background-color: #121212 !important; /* Color oscuro */
     }
+        /* Agrega esto a tus estilos CSS */
+@keyframes gecko-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Aplica la animación al logo del loader */
+#global-loader img {
+    animation: gecko-pulse 2s ease-in-out infinite;
+}
     `;
 }
 
@@ -541,6 +552,15 @@ function getDarkModeStyles() {
   /* Iluminamos el texto un poquito hacia el verde de la marca */
   color: #4ade80 !important; 
   cursor: pointer;
+}
+  /* Hover sutil verde para las filas */
+[data-bs-theme="dark"] .table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .table tbody tr:hover {
+    background-color: rgba(74, 222, 128, 0.1) !important; /* Verde marca al 10% */
+    cursor: pointer;
 }
     `;
 }
