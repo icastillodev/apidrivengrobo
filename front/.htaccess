@@ -1,36 +1,55 @@
-Options -Indexes
+Options -Indexes -MultiViews
 RewriteEngine On
 
-# 0. BLOQUEAR ACCESO DIRECTO
+# ============================================================
+# 0. BLOQUEAR ACCESO DIRECTO AL SUPERADMIN FÍSICO
+# ============================================================
 RewriteCond %{THE_REQUEST} /superadmin_login\.html [NC]
 RewriteRule ^ paginas/error404.html [L]
 
+# ============================================================
 # 1. FIX DE RUTAS PARA ASSETS
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^.+/(dist|assets|paginas|resources)/(.*)$ $1/$2 [L]
 
-# 2. RUTA SECRETA MAESTRA
-RewriteRule ^geckoadm/login/?$ superadmin_login.html [L,NC]
+# ============================================================
+# 2. RUTAS ESPECIALES (Superadmin, Formularios y QR)
+# ============================================================
+RewriteRule ^gecko(s)?adm/login/?$ superadmin_login.html [L,NC]
+RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html [L]
+RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
 
-# 3. ENMASCARAMIENTO DE RUTAS LÓGICAS
-RewriteRule ^panel/(.*)$ paginas/usuario/$1 [L]
-RewriteRule ^admin/(.*)$ paginas/admin/$1 [L]
-RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1 [L]
+# ============================================================
+# 3. ENMASCARAMIENTO DE RUTAS LÓGICAS (Ocultar /paginas/)
+# Forzamos el .html para que Apache no confunda con carpetas
+# ============================================================
+RewriteRule ^panel/(.*)$ paginas/usuario/$1.html [L]
+RewriteRule ^admin/(.*)$ paginas/admin/$1.html [L]
+RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1.html [L]
 
-# 4. LEER ARCHIVOS SIN EL .HTML
+# ============================================================
+# 4. LEER ARCHIVOS SIN EL .HTML GENERAL
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.html -f
 RewriteRule ^(.*)$ $1.html [L]
 
-# 5. EXCEPCIÓN ARCHIVOS FÍSICOS
+# ============================================================
+# 5. EXCEPCIÓN ARCHIVOS FÍSICOS (Evita bucles)
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
-# 6. SLUG LOGIN
+# ============================================================
+# 6. ENRUTADOR SPA (Slugs Institucionales)
+# ============================================================
 RewriteCond %{REQUEST_URI} !/(dist|paginas|assets|resources|node_modules)
-RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html?inst=$1 [L,QSA]
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html [L]
 
-# 7. ERRORES 404
+# ============================================================
+# 7. CATCH-ALL PARA ERRORES 404
+# ============================================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_URI} !(\.js|\.css|\.png|\.jpg|\.jpeg|\.svg|\.gif|\.ico)$ [NC]
 RewriteRule ^.*$ paginas/error404.html [L]

@@ -6,11 +6,20 @@ export const getSession = (key) => sessionStorage.getItem(key) || localStorage.g
 
 const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
+// ABRÍ TU ARCHIVO: menujs/MenuConfig.js
+// Y REEMPLAZÁ LA FUNCIÓN getCorrectPath POR ESTO:
+
 export function getCorrectPath(rawPath) {
-    if (!rawPath || rawPath === '#') return 'javascript:void(0);';
     if (rawPath === 'logout') return 'javascript:Auth.logout();';
-    return `${getBasePath()}paginas/${rawPath}`;
+
+    // MAGIA PURA: La base de la URL ya no incluye la carpeta "paginas"
+    const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const basePath = isLocalhost ? '/URBE-API-DRIVEN/front/' : '/';
+
+    // Une la base limpia con la ruta que viene de MenuTemplates (ej: admin/usuarios)
+    return basePath + rawPath;
 }
+
 
 export function getRoleName(level) {
     // Accedemos al objeto global cargado por tu i18n.js

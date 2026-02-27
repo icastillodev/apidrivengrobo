@@ -66,7 +66,7 @@ window.verPaginaQR = (historiaId = null) => {
     const id = historiaId || (AlojamientoState.currentHistoryData[0]?.historia);
     if (!id) return console.error("Sin ID de historia para QR.");
     
-    // Usamos el basePath absoluto en lugar del relativo ../../ para evitar errores de rutas
-    const url = `${basePath}paginas/qr-alojamiento.html?historia=${id}`;
+    // USAMOS LA URL LIMPIA: /qr/alojamiento en lugar de /paginas/qr-alojamiento.html
+    const url = `${basePath}qr/alojamiento?historia=${id}`;
     window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
 };

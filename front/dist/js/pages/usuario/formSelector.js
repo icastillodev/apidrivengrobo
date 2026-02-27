@@ -5,6 +5,11 @@ let currentInstId = null;
 // Obtenemos el nivel del usuario (1=Super, 2=Admin, 3=Investigador)
 const userRole = parseInt(localStorage.getItem('userLevel') || '3');
 
+// NUEVO: Calculamos la base de la URL dinámicamente para evitar problemas de carpetas relativas
+const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+    ? '/URBE-API-DRIVEN/front/' 
+    : '/';
+
 export async function initFormSelector() {
     currentInstId = localStorage.getItem('instId');
     const container = document.getElementById('forms-grid');
@@ -110,7 +115,7 @@ function renderActionButtons(sede) {
     let buttonsHtml = '';
     const target = sede.IdInstitucion;
 
-    // APLICAMOS LA NUEVA LÓGICA DE FILTRADO 'checkPermission'
+    // --- ENLACES ACTUALIZADOS: Usan la ruta absoluta y sin .html ---
 
     // 1. Animales
     if (checkPermission(sede.flag_animales)) {
@@ -118,7 +123,7 @@ function renderActionButtons(sede) {
             'Solicitud Animales', 
             'bi bi-mouse', 
             'bg-success text-white', 
-            `formularios/animales.html?targetInst=${target}`
+            `${basePath}panel/formularios/animales?targetInst=${target}`
         );
     }
 
@@ -128,7 +133,7 @@ function renderActionButtons(sede) {
             'Reactivos Biológicos', 
             'bi bi-eyedropper', 
             'bg-warning text-dark', 
-            `formularios/reactivos.html?targetInst=${target}`
+            `${basePath}panel/formularios/reactivos?targetInst=${target}`
         );
     }
 
@@ -138,7 +143,7 @@ function renderActionButtons(sede) {
             'Pedido de Insumos', 
             'bi bi-box-seam', 
             'bg-primary text-white', 
-            `formularios/insumos.html?targetInst=${target}`
+            `${basePath}panel/formularios/insumos?targetInst=${target}`
         );
     }
     
@@ -148,7 +153,7 @@ function renderActionButtons(sede) {
             'Reserva de Salas', 
             'bi bi-calendar-check', 
             'bg-info text-dark', 
-            `formularios/reservas.html?targetInst=${target}`
+            `${basePath}panel/formularios/reservas?targetInst=${target}`
         );
     }
 

@@ -1,93 +1,63 @@
 export function initConfigDashboard() {
-    // 1. Nombre Institución
     const instName = localStorage.getItem('NombreInst') || 'la Institución';
     const lbl = document.getElementById('lbl-inst-name');
     if(lbl) lbl.innerText = instName;
 
-    // 2. Definición de Módulos
+    // Calculamos el path base dinámicamente
+    const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+        ? '/URBE-API-DRIVEN/front/admin/configuracion/' 
+        : '/admin/configuracion/';
+
     const modules = [
         {
-            title: "Institución",
-            desc: "Datos generales, Logos, Correos, Servicios/Procesos y configuración de reportes PDF.",
-            icon: "bi-building",
-            theme: "theme-primary", // Azul
-            border: "border-primary",
-            link: "institucion.html"
+            title: "Institución", desc: "Datos generales, Logos, Correos, Servicios/Procesos y configuración de reportes PDF.",
+            icon: "bi-building", theme: "theme-primary", border: "border-primary",
+            link: `${basePath}institucion` // <-- Ruta limpia
         },
         {
-            title: "Usuarios y Roles",
-            desc: "Gestión de permisos, alta de investigadores y roles de sistema.",
-            icon: "bi-people-fill",
-            theme: "theme-dark", // Negro
-            border: "border-dark",
-            link: "roles.html"
+            title: "Usuarios y Roles", desc: "Gestión de permisos, alta de investigadores y roles de sistema.",
+            icon: "bi-people-fill", theme: "theme-dark", border: "border-dark",
+            link: `${basePath}roles`
         },
         {
-            title: "Departamentos",
-            desc: "Administración de áreas, laboratorios y centros de costos.",
-            icon: "bi-diagram-3",
-            theme: "theme-info", // Cyan
-            border: "border-info",
-            link: "departamentos.html"
+            title: "Departamentos", desc: "Administración de áreas, laboratorios y centros de costos.",
+            icon: "bi-diagram-3", theme: "theme-info", border: "border-info",
+            link: `${basePath}departamentos`
         },
         {
-            // MÓDULO 4: SOLO BIOLOGÍA
-            title: "Especies y Cepas",
-            desc: "Catálogo de especies, subespecies (cepas) y sus precios base.",
-            icon: "bi-tencent-qq", // Icono más biológico
-            theme: "theme-success", // Verde
-            border: "border-success",
-            link: "especies.html"
+            title: "Especies y Cepas", desc: "Catálogo de especies, subespecies (cepas) y sus precios base.",
+            icon: "bi-tencent-qq", theme: "theme-success", border: "border-success",
+            link: `${basePath}especies`
         },
         {
-            // MÓDULO 5: NUEVO - ALOJAMIENTOS Y CLÍNICA
-            title: "Alojamientos y Clínica",
-            desc: "Tipos de cajas/jaulas por especie y variables de Historia Clínica (HC).",
-            icon: "bi-hospital", // Icono clínico/hospitalario
-            theme: "theme-orange", // Naranja (Diferente a especies)
-            border: "border-warning",
-            link: "alojamientos.html" 
+            title: "Alojamientos y Clínica", desc: "Tipos de cajas/jaulas por especie y variables de Historia Clínica (HC).",
+            icon: "bi-hospital", theme: "theme-orange", border: "border-warning",
+            link: `${basePath}alojamientos`
         },
         {
-            // MÓDULO 6: NUEVO - RESERVAS
-            title: "Reservas y Espacios",
-            desc: "Gestión de Salones, Instrumentos y horarios disponibles (L-V).",
-            icon: "bi-calendar-range", // Calendario
-            theme: "theme-pink", // Rosa/Magenta
-            border: "border-danger",
-            link: "reservas.html"
+            title: "Reservas y Espacios", desc: "Gestión de Salones, Instrumentos y horarios disponibles (L-V).",
+            icon: "bi-calendar-range", theme: "theme-pink", border: "border-danger",
+            link: `${basePath}reservas`
         },
         {
-            title: "Protocolos Config",
-            desc: "Reglas de severidad, tipos de protocolos y validaciones.",
-            icon: "bi-file-medical",
-            theme: "theme-danger", // Rojo
-            border: "border-danger",
-            link: "protocolos-config.html"
+            title: "Protocolos Config", desc: "Reglas de severidad, tipos de protocolos y validaciones.",
+            icon: "bi-file-medical", theme: "theme-danger", border: "border-danger",
+            link: `${basePath}protocolos-config`
         },
         {
-            title: "Tipos Formularios",
-            desc: "Configuración de solicitudes, descuentos y exenciones.",
-            icon: "bi-ui-checks",
-            theme: "theme-warning", // Amarillo
-            border: "border-warning",
-            link: "tipos-form.html"
+            title: "Tipos Formularios", desc: "Configuración de solicitudes, descuentos y exenciones.",
+            icon: "bi-ui-checks", theme: "theme-warning", border: "border-warning",
+            link: `${basePath}tipos-form`
         },
         {
-            title: "Insumos Grales.",
-            desc: "Catálogo de insumos básicos (Cajas, viruta, alimento).",
-            icon: "bi-box-seam",
-            theme: "theme-teal", // Verde azulado
-            border: "border-secondary",
-            link: "insumos.html"
+            title: "Insumos Grales.", desc: "Catálogo de insumos básicos (Cajas, viruta, alimento).",
+            icon: "bi-box-seam", theme: "theme-teal", border: "border-secondary",
+            link: `${basePath}insumos`
         },
         {
-            title: "Insumos Exp.",
-            desc: "Reactivos biológicos y materiales experimentales.",
-            icon: "bi-eyedropper",
-            theme: "theme-purple", // Morado
-            border: "border-primary",
-            link: "insumos-exp.html"
+            title: "Insumos Exp.", desc: "Reactivos biológicos y materiales experimentales.",
+            icon: "bi-eyedropper", theme: "theme-purple", border: "border-primary",
+            link: `${basePath}insumos-exp`
         }
     ];
 
