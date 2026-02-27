@@ -9,7 +9,9 @@
     <link rel="stylesheet" href="./dist/style/css/styles.css">
     <link rel="stylesheet" href="./dist/style/css/tailwind.css"> <script src="https://cdn.tailwindcss.com"></script>
 <script type="module">
+    import { showLoader, hideLoader } from './dist/js/components/LoaderComponent.js';
     import { Auth } from './dist/js/auth.js?v1'; 
+    showLoader();
     document.addEventListener('DOMContentLoaded', () => Auth.init());
 </script>
 </head>
