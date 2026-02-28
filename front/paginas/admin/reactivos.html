@@ -1,5 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,74 +16,58 @@
         th[data-sortable="true"]:hover { background-color: #f8f9fa; }
     </style>
 
-<script>
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const projectPath = isLocal ? '/URBE-API-DRIVEN/front/' : '/';
-    
-    // Inyectamos la base
-    const base = document.createElement('base');
-    base.href = projectPath;
-    document.head.appendChild(base);
+    <script type="module">
+        // Usamos el mismo estándar de Animales (../../)
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { Auth } from '../../dist/js/auth.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        
+        // ⚠️ ATENCIÓN AQUÍ: Verifica en tu servidor si la carpeta es MenuJs, menujs, MenuJS y corrige esta línea:
+        import { getRoleName } from '../../dist/js/components/MenuJs/menuconfig.js'; 
+        
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        import { initReactivosPage } from '../../dist/js/pages/admin/reactivos.js';
 
-    // Corregimos el Favicon para que no de 404
-    let favicon = document.querySelector('link[rel="icon"]');
-    if (!favicon) {
-        favicon = document.createElement('link');
-        favicon.rel = 'icon';
-        document.head.appendChild(favicon);
-    }
-    favicon.href = projectPath + 'dist/multimedia/imagenes/grobo/favicon.ico';
-</script>
+        showLoader();
 
-<script type="module">
-    // Agregamos "./" al inicio de cada ruta para evitar el error de "especificador básico"
-    import { showLoader, hideLoader } from './dist/js/components/LoaderComponent.js';
-    import { Auth } from './dist/js/auth.js';
-    import { API } from './dist/js/api.js';
-    import { initMenu } from './dist/js/components/MenuComponent.js';
-    import { getRoleName } from './dist/js/components/menujs/menuconfig.js';
-    import { NotificationManager } from './dist/js/NotificationManager.js';
-    import { checkUrlParamsAndOpen } from './dist/js/components/UrlRouter.js';
-    import { loadLanguage, translatePage } from './dist/js/utils/i18n.js';
-    import { initReactivosPage } from './dist/js/pages/admin/reactivos.js';
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadLanguage(); 
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
-    showLoader();
+                if (window.txt) {
+                    translatePage();
+                    
+                    const levelId = Auth.getVal('userLevel'); 
+                    const rolTexto = getRoleName(levelId);
+                    
+                    const roleEl = document.getElementById('role-bread');
+                    if (roleEl) roleEl.innerText = rolTexto;
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            await loadLanguage(); 
-            Auth.checkAccess([1, 2, 4, 5, 6]); 
+                    window.currentRoleName = rolTexto; 
 
-            if (window.txt) {
-                translatePage();
-                
-                const levelId = Auth.getVal('userLevel'); 
-                const rolTexto = getRoleName(levelId);
-                
-                const roleEl = document.getElementById('role-bread');
-                if (roleEl) roleEl.innerText = rolTexto;
+                    initMenu();
+                    NotificationManager.init();
+                    initReactivosPage();
+                    
+                    const instEl = document.getElementById('institucionbread');
+                    if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
 
-                window.currentRoleName = rolTexto; 
+                } else {
+                    throw new Error("window.txt no disponible");
+                }
 
-                initMenu();
-                NotificationManager.init();
-                initReactivosPage();
-                
-                const instEl = document.getElementById('institucionbread');
-                if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
-
-            } else {
-                throw new Error("window.txt no disponible");
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
+            } catch (error) {
+                console.error("❌ Error en el arranque:", error);
+            } finally {
+                hideLoader();
             }
-
-            setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
-        } catch (error) {
-            console.error("❌ Error en el arranque:", error);
-        } finally {
-            hideLoader();
-        }
-    });
-</script>
+        });
+    </script>
 </head>
 <body>
     <div class="container-fluid my-5 px-4 px-md-5">

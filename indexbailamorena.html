@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urbe | En Mantenimiento</title>
+    <style>
+        /* Reseteo básico */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            /* Usa fuentes nativas del sistema para estilo 'App' */
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Tarjeta principal con efecto cristal */
+        .card {
+            max-width: 550px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 3rem 2rem;
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Estilo del "Logo" en texto */
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e2e8f0;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+        }
+
+        /* Animación de carga CSS pura */
+        .loader-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(56, 189, 248, 0.2);
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        /* Ajustes para móviles */
+        @media (max-width: 480px) {
+            .card {
+                padding: 2rem 1.5rem;
+            }
+            .logo {
+                font-size: 2rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            p {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="logo">URBE</div>
+        
+        <h1>Sitio en Mantenimiento</h1>
+        <p>Estamos preparando una nueva y mejorada experiencia para nuestra aplicación. Volveremos a estar en línea muy pronto.</p>
+        
+        <div class="loader-container">
+            <div class="loader"></div>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Urbe. Todos los derechos reservados.
+        </div>
+    </div>
+
+</body>
+</html>
