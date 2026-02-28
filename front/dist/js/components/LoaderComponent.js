@@ -169,7 +169,7 @@ export function showLoader() {
                     GROBO
                 </h1>
                 <p style="color: #888; font-size: 11px; letter-spacing: 1.5px; font-weight: 700; margin: 0; text-transform: uppercase; font-family: sans-serif;">
-                    SISTEMA ERP DE BIOTERIOS
+                    SISTEMA ERP DE BIOTERIOS 
                 </p>
             </div>
             <div style="margin-top: 30px; display: flex; align-items: center; justify-content: center; gap: 12px;">
