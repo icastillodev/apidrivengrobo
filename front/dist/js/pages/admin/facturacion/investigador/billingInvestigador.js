@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { renderDashboard } from '../billingDashboard.js'; 
 import '../billingPayments.js'; 
-import '../Modals/manager.js';  
+import '../modals/manager.js';  
 
 window.currentReportData = null;
 window.investigadoresCache = [];
