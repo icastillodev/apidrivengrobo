@@ -1,3 +1,53 @@
+/* ========================================================================== */
+/* LOADER GLOBAL INSTANTÁNEO GECKOLAB (Latencia Cero)                         */
+/* ========================================================================== */
+
+/* 1. Bloqueamos el scroll mientras carga */
+body:not(.gecko-loaded) {
+    overflow: hidden !important;
+}
+
+/* 2. Pantalla de fondo que tapa todo el HTML crudo */
+body:not(.gecko-loaded)::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-color: #f4f7f6;
+    z-index: 999998;
+}
+
+/* 3. Spinner CSS Puro en el centro (Verde GROBO) */
+body:not(.gecko-loaded)::after {
+    content: "";
+    position: fixed;
+    top: calc(50% - 25px);
+    left: calc(50% - 25px);
+    width: 50px;
+    height: 50px;
+    border: 4px solid #dee2e6; /* Borde gris claro */
+    border-top: 4px solid #1a5d3b; /* Borde verde principal */
+    border-radius: 50%;
+    z-index: 999999;
+    animation: gecko-spin 1s linear infinite;
+}
+
+/* 4. Animación del giro */
+@keyframes gecko-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 5. Fondo oscuro si está activado el dark mode */
+[data-bs-theme="dark"] body:not(.gecko-loaded)::before {
+    background-color: #121212; 
+}
+[data-bs-theme="dark"] body:not(.gecko-loaded)::after {
+    border: 4px solid #333;
+    border-top: 4px solid #28a745;
+}
+
+
+
 *, ::before, ::after {
   --tw-border-spacing-x: 0;
   --tw-border-spacing-y: 0;
@@ -1106,27 +1156,4 @@ body.with-sidebar {
     100% { transform: scale(1); }
 }
 
-
-
-/* ========================================================================== */
-/* LOADER GLOBAL INSTANTÁNEO (Se dibuja antes de que cargue el HTML)          */
-/* ========================================================================== */
-
-/* 1. Bloqueamos el scroll mientras carga */
-body:not(.gecko-loaded) {
-    overflow: hidden !important;
-}
-
-/* 2. Pantalla de fondo que tapa todo el HTML crudo */
-body:not(.gecko-loaded)::before {
-    content: "";
-    position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    background-color: #f4f7f6; /* Color de fondo claro */
-    z-index: 999999;
-}
-/* Fondo oscuro si está activado el dark mode */
-[data-bs-theme="dark"] body:not(.gecko-loaded)::before {
-    background-color: #121212; 
-}
 
