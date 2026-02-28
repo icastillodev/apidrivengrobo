@@ -1,6 +1,7 @@
 // front/dist/js/pages/registro.js
 import { Auth } from '../auth.js';
 import { API } from '../api.js';
+
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 let isUserValid = false;
@@ -11,6 +12,32 @@ export async function initRegistro() {
     // 1. Inicializar branding y validación de sede
     await Auth.init();
     
+    // --- NUEVO: RECUPERAR DATOS DE INSTITUCIÓN Y ACTUALIZAR UI ---
+    const instId = localStorage.getItem('instId');
+    const instSlug = localStorage.getItem('NombreInst'); // El slug que guardas en storage
+    const instFullName = localStorage.getItem('instFullName') || ''; // Opcional, si tienes el nombre largo
+
+    // Si por algún motivo no hay institución válida, mostramos el error y ocultamos el form
+    if (!instId || !instSlug) {
+        document.getElementById('auth-content').classList.add('hidden');
+        document.getElementById('error-state').classList.remove('hidden');
+        return; // Detenemos la ejecución aquí
+    }
+
+    // Actualizamos los textos en el HTML (quitamos el "Validando...")
+    document.getElementById('reg-inst-name').innerText = instSlug.toUpperCase();
+    document.getElementById('reg-inst-description-name').innerText = instSlug.toUpperCase();
+    if (document.getElementById('reg-inst-full-name')) {
+        document.getElementById('reg-inst-full-name').innerText = instFullName;
+    }
+
+    // Actualizamos el enlace del botón "Volver al Login"
+    const btnVolver = document.getElementById('btn-volver-login');
+    if (btnVolver) {
+        btnVolver.href = `${basePath}${instSlug}/`;
+    }
+    // -------------------------------------------------------------
+
     // 2. Cargar países con detección de IP (blindado contra errores 429/CORS)
     await loadCountriesAndDetect();
 
@@ -88,7 +115,7 @@ export async function initRegistro() {
         btnSubmit.disabled = true;
         Swal.fire({
             title: 'Procesando Registro...',
-            html: 'Estamos creando su cuenta en la <b>Institución</b>, por favor espere.',
+            html: `Estamos creando su cuenta en <b>${instSlug.toUpperCase()}</b>, por favor espere.`,
             allowOutsideClick: false,
             didOpen: () => { Swal.showLoading(); }
         });
@@ -97,8 +124,7 @@ export async function initRegistro() {
         const data = Object.fromEntries(formData.entries());
         
         // Contexto institucional desde el storage
-        data.IdInstitucion = localStorage.getItem('instId');
-        const instSlug = localStorage.getItem('NombreInst');
+        data.IdInstitucion = instId; // Ya lo capturamos arriba
 
         try {
             // Enviamos el registro a la API inyectando el slug en la URL
