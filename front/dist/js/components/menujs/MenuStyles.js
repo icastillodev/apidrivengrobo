@@ -177,9 +177,9 @@ function getSidebarStyles() {
         }
 
         /* Espacio para la barra de búsqueda Omnibox cuando el menú es lateral */
-        body.with-sidebar .container,
-        body.with-sidebar .container-fluid {
-            padding-top: 60px !important; /* Da aire arriba para que el buscador flotante no tape el contenido */
+        .with-sidebar ,
+        .with-sidebar  {
+            padding-top: 30px !important; /* Da aire arriba para que el buscador flotante no tape el contenido */
         }
     `;
 }
@@ -548,7 +548,7 @@ function getDarkModeStyles() {
 
 [data-bs-theme="dark"] .table tbody tr:hover {
   /* Un verde esmeralda muy suave (8% de opacidad) */
-  background-color: rgba(74, 222, 128, 0.08) !important; 
+  background-color: white !important; 
   /* Iluminamos el texto un poquito hacia el verde de la marca */
   color: #4ade80 !important; 
   cursor: pointer;
@@ -558,9 +558,91 @@ function getDarkModeStyles() {
     transition: background-color 0.15s ease;
 }
 
-[data-bs-theme="dark"] .table tbody tr:hover {
-    background-color: rgba(74, 222, 128, 0.1) !important; /* Verde marca al 10% */
+
+
+/* ========================================================================== */
+/* OVERRIDE ABSOLUTO DE TABLAS BOOTSTRAP 5 EN MODO OSCURO                     */
+/* ========================================================================== */
+
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    /* 1. Sobreescribimos la variable interna de Bootstrap */
+    --bs-table-bg-state: rgba(26, 93, 59, 0.4) !important; 
+    
+    /* 2. Forzamos el fondo por si la variable falla */
+    background-color: rgba(26, 93, 59, 0.4)!important; 
+    
+    /* 3. ¡LA CLAVE! Destruimos la sombra oscura que pone Bootstrap encima */
+    box-shadow: none !important; 
+    
+    /* 4. Como el fondo ahora es blanco, la letra DEBE ser oscura para leerse */
+    color: #212529 !important; 
+    
     cursor: pointer;
+}
+/* ========================================================================== */
+/* TABLAS EN MODO OSCURO: FONDO BASE GRIS-VERDOSO Y REPARACIÓN DE CELDAS      */
+/* ========================================================================== */
+
+/* 1. Redefinimos las variables internas de la tabla para Modo Oscuro */
+[data-bs-theme="dark"] .table {
+    /* El gris-verdoso oscuro que pedías (Base de todas las filas) */
+    --bs-table-bg: #0b0f0d !important; 
+    
+    /* El color de las líneas que separan las filas (Un verde un poco más claro) */
+    --bs-table-border-color: #2a3b32 !important; 
+    
+    /* Color principal del texto para que contraste perfecto */
+    --bs-table-color: #e4e9e6 !important; 
+}
+
+/* 2. Reparamos el TD descolocado (text-muted) para que no se pierda en el fondo */
+[data-bs-theme="dark"] .table .text-muted {
+    /* Un gris-verdoso clarito para textos secundarios */
+    color: #8faba0 !important; 
+}
+
+/* 3. Aseguramos que la cabecera (thead) se despegue visualmente del cuerpo */
+[data-bs-theme="dark"] .table > thead {
+    --bs-table-bg: #151e19 !important; /* Un tono apenas más oscuro para el encabezado */
+}
+
+/* ========================================================================== */
+/* REPARACIÓN PROFUNDA DE TABLAS EN MODO OSCURO                               */
+/* ========================================================================== */
+
+/* 1. HOVER BLANCO ABSOLUTO (Ahora funciona en TODAS las tablas) */
+[data-bs-theme="dark"] .table tbody tr:hover > * {
+    --bs-table-bg-state: white !important; 
+    background-color: white !important; 
+    box-shadow: none !important; 
+    color: #212529 !important; 
+    cursor: pointer;
+}
+
+/* 2. REPARACIÓN DE .table-light y .bg-light EN MODO OSCURO */
+/* Las convertimos en un gris-verdoso "cabecera" para mantener el contraste */
+[data-bs-theme="dark"] .table .table-light > *,
+[data-bs-theme="dark"] .table .bg-light,
+[data-bs-theme="dark"] .table-light {
+    --bs-table-bg: #23332a !important; /* Un tono más claro que el fondo de la tabla */
+    background-color: #23332a !important;
+    color: #e4e9e6 !important;
+    box-shadow: none !important;
+}
+
+/* 3. INPUTS DE PRECIO ADAPTADOS AL MODO OSCURO */
+[data-bs-theme="dark"] .table .precio-input {
+    background-color: #121a15 !important; /* Fondo súper oscuro para el input */
+    color: #ffffff !important;
+    border: 1px solid #3a5043 !important;
+}
+
+/* 4. ASEGURAR QUE LOS ÍCONOS Y TEXTOS SE VEAN BIEN AL HACER HOVER BLANCO */
+[data-bs-theme="dark"] .table tbody tr:hover .text-muted,
+[data-bs-theme="dark"] .table tbody tr:hover .text-success,
+[data-bs-theme="dark"] .table tbody tr:hover .text-primary,
+[data-bs-theme="dark"] .table tbody tr:hover .text-warning {
+    color: #47627c !important; /* Forzamos a que todo sea oscuro si el fondo se vuelve blanco */
 }
     `;
 }

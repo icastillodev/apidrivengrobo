@@ -2,56 +2,56 @@ Options -Indexes -MultiViews
 RewriteEngine On
 
 # ============================================================
+# ⚠️ LA MAGIA PARA XAMPP: Le dice a Apache cuál es la raíz real
+# ============================================================
+RewriteBase /URBE-API-DRIVEN/front/
+
+# ============================================================
 # 0. BLOQUEAR ACCESO DIRECTO AL SUPERADMIN FÍSICO
 # ============================================================
 RewriteCond %{THE_REQUEST} /superadmin_login\.html [NC]
 RewriteRule ^ paginas/error404.html [L]
 
 # ============================================================
-# 1. FIX DE RUTAS PARA ASSETS
+# 1. FIX DE RUTAS PARA ASSETS (Limpieza Anti-Bucles)
 # ============================================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^.+/(dist|assets|paginas|resources)/(.*)$ $1/$2 [L]
+# El "^(.+)/" asegura que solo limpie si hay carpetas falsas antes (ej. admin/config/dist -> dist)
+RewriteRule ^(.+)/(dist|assets|paginas|resources|node_modules)/(.*)$ $2/$3 [L]
 
 # ============================================================
-# 2. RUTAS ESPECIALES (Superadmin, Formularios y QR)
+# 2. FRENO DE EMERGENCIA PARA ARCHIVOS FÍSICOS
+# ============================================================
+# Si Apache ya encontró el archivo real (ej. un .js, .css o el html final), detiene el motor.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ============================================================
+# 3. RUTAS ESPECIALES
 # ============================================================
 RewriteRule ^gecko(s)?adm/login/?$ superadmin_login.html [L,NC]
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html [L]
 RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
-RewriteRule ^construccion$ paginas/construccion.html [L]
+RewriteRule ^construccion/?$ paginas/construccion.html [L]
 
 # ============================================================
-# 3. ENMASCARAMIENTO DE RUTAS LÓGICAS (Ocultar /paginas/)
-# Forzamos el .html para que Apache no confunda con carpetas
+# 4. ENMASCARAMIENTO DE RUTAS LÓGICAS (Profundidad Infinita)
 # ============================================================
+# Atrapa cualquier ruta por más larga que sea y la mapea a su HTML
 RewriteRule ^panel/(.*)$ paginas/usuario/$1.html [L]
-RewriteRule ^admin/facturacion/(.*)$ paginas/admin/facturacion/$1.html [L]
-RewriteRule ^admin/([a-zA-Z0-9_-]+)$ paginas/admin/$1.html [L]
+RewriteRule ^admin/(.*)$ paginas/admin/$1.html [L]
 RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1.html [L]
 
 # ============================================================
-# 4. LEER ARCHIVOS SIN EL .HTML GENERAL
-# ============================================================
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME}\.html -f
-RewriteRule ^(.*)$ $1.html [L]
-
-# ============================================================
-# 5. EXCEPCIÓN ARCHIVOS FÍSICOS (Evita bucles)
-# ============================================================
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^ - [L]
-
-# ============================================================
-# 6. ENRUTADOR SPA (Slugs Institucionales)
+# 5. ENRUTADOR SPA PRINCIPAL (Slugs Institucionales)
 # ============================================================
 RewriteCond %{REQUEST_URI} !/(dist|paginas|assets|resources|node_modules)
-RewriteRule ^([a-zA-Z0-9_-]+)/?$ index.html [L]
+RewriteRule ^([a-zA-Z0-9_-]+)(/.*)?$ index.html?inst=$1 [L,QSA]
 
 # ============================================================
-# 7. CATCH-ALL PARA ERRORES 404
+# 6. CATCH-ALL PARA ERRORES 404
 # ============================================================
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_URI} !(\.js|\.css|\.png|\.jpg|\.jpeg|\.svg|\.gif|\.ico)$ [NC]
 RewriteRule ^.*$ paginas/error404.html [L]

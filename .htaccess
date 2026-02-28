@@ -3,10 +3,13 @@ RewriteEngine On
 # A. Si la URL apunta a la carpeta "api", dejamos que entre ahí.
 RewriteRule ^api($|/) - [L]
 
-# B. Si la URL apunta a un archivo real (ej: robots.txt), lo mostramos.
+# B. 🛡️ ESCUDO ANTI-BUCLE: Si la URL YA tiene "front/", déjala pasar y no le agregues nada.
+RewriteRule ^front($|/) - [L]
+
+# C. Si la URL apunta a un archivo real (ej: robots.txt), lo mostramos.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# C. Todo lo demás se manda a la carpeta "front"
+# D. Todo lo demás se manda a la carpeta "front"
 RewriteRule ^(.*)$ front/$1 [L]

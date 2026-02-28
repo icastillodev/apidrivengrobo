@@ -31,6 +31,14 @@ body:not(.gecko-loaded)::after {
     animation: gecko-spin 1s linear infinite;
 }
 
+[data-bs-theme="dark"] .clickable-row:hover{
+    background-color:white !important;
+}
+
+[data-bs-theme="dark"] .clickable-row:hover .table > :not(caption) > * > *{
+    background-color:white !important;
+}
+
 /* 4. Animación del giro */
 @keyframes gecko-spin {
     0% { transform: rotate(0deg); }
