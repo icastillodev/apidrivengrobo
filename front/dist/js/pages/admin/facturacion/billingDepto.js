@@ -3,6 +3,7 @@ import { hideLoader, showLoader } from '../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../components/MenuComponent.js';
 import { renderDashboard } from './billingDashboard.js'; 
 import './billingPayments.js';
+
 import './modals/manager.js' ;
 
 let currentReportData = null;
