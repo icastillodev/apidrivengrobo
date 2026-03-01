@@ -216,9 +216,18 @@ const ROLE_MAP = { 1: 'SUPERADMIN', 2: 'ADMINISTRADOR', 3: 'INVESTIGADOR', 4: 'T
 export const initQRPage = async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const historiaParam = urlParams.get('historia');
-    tokenQR = urlParams.get('token');
+    tokenQR = urlParams.get('token'); // Por si viene a la antigua
+
+    // 🚀 EL FIX MAESTRO: Leer la URL limpia (/qr/m4j9x2) directamente del navegador
+    if (!tokenQR) {
+        // Busca exactamente 6 letras/números después de "/qr/" en la ruta
+        const match = window.location.pathname.match(/\/qr\/([a-zA-Z0-9]{6})\/?$/);
+        if (match) {
+            tokenQR = match[1]; // ¡Atrapado!
+        }
+    }
     
-    // 🚀 BLINDAJE: Si no entra por panel interno (?historia) ni por QR escaneado (?token)
+    // 🚀 BLINDAJE: Si definitivamente no hay ni historia ni token, bloqueamos
     if (!historiaParam && !tokenQR) {
         mostrarErrorCritico("Enlace inválido o incompleto."); return;
     }
