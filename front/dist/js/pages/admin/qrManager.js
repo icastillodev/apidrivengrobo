@@ -223,7 +223,7 @@ export const initQRPage = async () => {
         // Busca exactamente 6 letras/números después de "/qr/" en la ruta
         const match = window.location.pathname.match(/\/qr\/([a-zA-Z0-9]{6})\/?$/);
         if (match) {
-            tokenQR = match[1]; // ¡Atrapado!
+            tokenQR = match[1]; // ¡Atrapado! 
         }
     }
     
