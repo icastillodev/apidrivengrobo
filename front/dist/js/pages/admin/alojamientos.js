@@ -62,11 +62,28 @@ window.toggleTrazabilidad = (idAlojamiento, idEspecie) => {
 };
 
 // Función auxiliar global para el QR
-window.verPaginaQR = (historiaId = null) => {
+window.verPaginaQR = async (historiaId = null) => {
     const id = historiaId || (AlojamientoState.currentHistoryData[0]?.historia);
     if (!id) return console.error("Sin ID de historia para QR.");
     
-    // USAMOS LA URL LIMPIA: /qr/alojamiento en lugar de /paginas/qr-alojamiento.html
-    const url = `${basePath}qr/alojamiento?historia=${id}`;
-    window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
+    try {
+        // 1. Mostramos un pequeño loading porque vamos a hablar con el Backend
+        Swal.fire({ title: 'Generando enlace seguro...', didOpen: () => Swal.showLoading() });
+
+        // 2. Pedimos (o creamos) el token único de 6 letras para esta historia
+        const res = await API.request('/alojamiento/generar-qr', 'POST', { historia: id });
+
+        if (res.status === 'success' && res.codigo) {
+            Swal.close();
+            
+            // 3. Abrimos la URL limpia, corta y pública (Ej: /qr/a8x2m9)
+            const url = `${basePath}qr/${res.codigo}`;
+            window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
+        } else {
+            throw new Error(res.message || "Error al generar el token de seguridad.");
+        }
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo generar el enlace del QR.', 'error');
+    }
 };
