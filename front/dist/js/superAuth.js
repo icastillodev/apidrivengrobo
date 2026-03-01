@@ -136,7 +136,7 @@ async handleLogin(e) {
             document.cookie = `NombreInst=SISTEMA_GLOBAL; path=/; SameSite=Lax`;
 
             // Redirigir al dashboard
-            window.location.href = getBasePath() + 'paginas/superadmin/dashboard.html';
+            window.location.href = getBasePath() + 'superadmin/dashboard';
         } else {
             if (box) { 
                 box.innerText = "ACCESO DENEGADO: NO ERES GECKO MASTER"; 

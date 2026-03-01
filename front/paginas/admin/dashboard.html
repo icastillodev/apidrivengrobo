@@ -15,124 +15,83 @@
 
 <body class="bg-gray-50 font-sans">
 
-    <header class="bg-white border-b px-6 py-2 d-flex justify-content-between align-items-center shadow-sm sticky-top">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-green-100 text-green-700 rounded-full w-10 h-10 flex items-center justify-center shadow-sm">
-                <i class="bi bi-person-badge-fill fs-5"></i>
-            </div>
-            
-            <div>
-                <p class="text-[10px] text-gray-400 uppercase font-black mb-0 tracking-widest leading-none">Usuario Autenticado</p>
-                <div class="flex items-center gap-2 mt-1">
-                    <h6 class="mb-0 fw-bold text-dark" id="display-user-name">Cargando...</h6>
-                    <span id="display-user-role" class="text-[9px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-bold uppercase tracking-tighter border border-amber-200">
-                        ---
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <div class="text-end border-s ps-4">
-            <p class="text-[10px] text-gray-400 uppercase font-black mb-0 tracking-widest">ID de Sesión</p>
-            <span class="badge bg-light text-dark border font-mono mt-1" id="display-user-id">---</span>
-        </div>
-    </header>
-
-    <main class="container mx-auto mt-10 p-6">
-        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-            <div class="max-w-2xl">
-                <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">Bienvenido al Bioterio</h1>
-                <p class="text-gray-500 font-medium leading-relaxed">
-                    Panel de gestión institucional **GROBO**. Utilice el menú de navegación para gestionar protocolos y administrar la plataforma.
+    <main class="container mx-auto mt-6 p-6">
+        
+        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6">
+            <div class="max-w-3xl">
+                <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
+                    Hola <span id="welcome-name" class="text-primary">Colega</span>, Bienvenido a GROBO
+                </h1>
+                <p class="text-gray-500 font-medium leading-relaxed mb-0">
+                    Panel de gestión institucional <strong>GROBO</strong>. Utilice el menú de navegación para gestionar protocolos, revisar solicitudes y administrar la plataforma de manera integral.
                 </p>
-                
-                <div class="mt-8 flex gap-3">
-                    <div class="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex-1 text-center">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase">Estado del Sistema</span>
-                        <p class="text-green-600 font-bold text-sm mt-1 mb-0">● OPERATIVO</p>
-                    </div>
-                    <div class="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200 flex-1 text-center">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase">Rango de Acceso</span>
-                        <p class="text-amber-600 font-bold text-sm mt-1 mb-0">Nivel <span id="display-role-number">?</span></p>
-                    </div>
-                </div>
             </div>
         </section>
+
+        <div class="row g-4" id="dashboard-grid">
+            <div class="col-12 text-center text-muted py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-3 fw-bold tracking-widest text-uppercase text-[10px]">Cargando métricas...</p>
+            </div>
+        </div>
+
     </main>
 
-<script type="module">
+    <script type="module">
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
-import { Auth } from '../../dist/js/auth.js';
-    import { API } from '../../dist/js/api.js';
-    import { initMenu } from '../../dist/js/components/MenuComponent.js';
-
-    import { NotificationManager } from '../../dist/js/NotificationManager.js';
-    import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-    import { loadLanguage } from '../../dist/js/utils/i18n.js';
-    showLoader();
-    const getRoleBadgeText = (level) => {
-        const roles = {
-            1: 'Super Administrador',
-            2: 'Administrador Institución',
-            3: 'Usuario de la Plataforma',
-            4: 'Sub Administrador',
-            5: 'Asistente',
-            6: 'Laboratorio'
-        };
-        return `${roles[level] || 'Usuario Externo'} (${level})`;
-    };
-
-    document.addEventListener('DOMContentLoaded', async () => {
+        import { Auth } from '../../dist/js/auth.js';
+        import { API } from '../../dist/js/api.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { loadLanguage } from '../../dist/js/utils/i18n.js';
         
+        showLoader();
 
-        try {
-            // 1. CARGA CRÍTICA: Idioma (Debe ser lo primero)
-            // Asegúrate que loadLanguage() devuelva el fetch
-            await loadLanguage(); 
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // 1. CARGA CRÍTICA: Idioma
+                await loadLanguage(); 
 
-            // 2. VALIDACIÓN DE SESIÓN
-            // Se hace después del idioma por si el checkAccess lanza un alert/error traducido
-            Auth.checkAccess([1, 2, 4, 5, 6]); 
+                // 2. VALIDACIÓN DE SESIÓN
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
-            const userId = localStorage.getItem('userId');
-            const userFull = localStorage.getItem('userFull');
-            const instId = localStorage.getItem('instId');
-            const userLevel = localStorage.getItem('userLevel');
+                const userName = localStorage.getItem('userName');
+                const instId = localStorage.getItem('instId');
 
-            // 3. ACTUALIZACIÓN DE UI
-            document.getElementById('display-user-name').innerText = userFull || 'Usuario Desconocido';
-            document.getElementById('display-user-id').innerText = `USR-${userId || '000'}`;
-            
-            const levelInt = parseInt(userLevel);
-            const roleBadge = document.getElementById('display-user-role');
-            const roleSmall = document.getElementById('display-role-number');
-            
-            if (roleBadge) roleBadge.innerText = getRoleBadgeText(levelInt);
-            if (roleSmall) roleSmall.innerText = levelInt;
+                // 3. SALUDO PERSONALIZADO (A prueba de errores)
+                const welcomeSpan = document.getElementById('welcome-name');
+                if (welcomeSpan) {
+                    const primerNombre = userName ? userName.split(' ')[0] : 'Admin';
+                    welcomeSpan.innerText = primerNombre;
+                }
 
-            // 4. MANTENIMIENTO (Segundo plano, no bloqueante)
-            API.request(`/maintenance?instId=${instId}`, 'GET')
-                .then(res => { if(res.executed) console.log(`NETWISE: Depuración completada.`); })
-                .catch(() => {});
+                // 4. MANTENIMIENTO SILENCIOSO
+                if (instId) {
+                    API.request(`/maintenance?instId=${instId}`, 'GET')
+                        .catch(() => {}); // Ignoramos errores de fondo
+                }
 
-            // 5. INICIALIZACIÓN DE COMPONENTES
-            // Verificamos si window.txt existe antes de llamar al menú para evitar el crash
-            if (window.txt) {
-                initMenu();
-                NotificationManager.init();
-            } else {
-                throw new Error("El objeto de idioma window.txt no se generó.");
+                // 5. INICIALIZACIÓN DE COMPONENTES Y DASHBOARD
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    
+                    // 🚀 CARGAMOS EL DASHBOARD
+                    import('../../dist/js/pages/admin/dashboard.js')
+                        .then(module => module.DashboardUI.init())
+                        .catch(e => console.error("Error al arrancar el motor del Dashboard:", e));
+
+                } else {
+                    console.warn("El sistema de idioma no se inicializó correctamente.");
+                }
+
+            } catch (error) {
+                console.error("❌ Fallo en la inicialización de la página:", error);
+            } finally {
+                hideLoader();
             }
-
-        } catch (error) {
-            console.error("❌ Fallo en inicialización:", error);
-            // Si el error es de Auth, checkAccess ya suele redirigir, 
-            // pero si es de idioma, aquí podrías manejar un fallback.
-        } finally {
-            hideLoader();
-        }
-    });
-</script>
+        });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
