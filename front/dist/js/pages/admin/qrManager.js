@@ -216,20 +216,24 @@ const ROLE_MAP = { 1: 'SUPERADMIN', 2: 'ADMINISTRADOR', 3: 'INVESTIGADOR', 4: 'T
 export const initQRPage = async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const historiaParam = urlParams.get('historia');
-    tokenQR = urlParams.get('token'); // Por si viene a la antigua
+    tokenQR = urlParams.get('token'); 
 
-    // 🚀 EL FIX MAESTRO: Leer la URL limpia (/qr/m4j9x2) directamente del navegador
+    // 🚀 EL FIX MAESTRO: Atrapa 6 letras/números que estén justo después de "/qr/"
     if (!tokenQR) {
-        // Busca exactamente 6 letras/números después de "/qr/" en la ruta
-        const match = window.location.pathname.match(/\/qr\/([a-zA-Z0-9]{6})\/?$/);
+        const match = window.location.href.match(/\/qr\/([a-zA-Z0-9]{6})/);
         if (match) {
-            tokenQR = match[1]; // ¡Atrapado! 
+            tokenQR = match[1]; // ¡Atrapado! (ej: wr98ug)
         }
     }
     
-    // 🚀 BLINDAJE: Si definitivamente no hay ni historia ni token, bloqueamos
+    // 📡 RADAR PARA LA CONSOLA (F12) - Te dirá si el JS nuevo está corriendo
+    console.log("📍 URL que lee JS:", window.location.href);
+    console.log("🔑 Token atrapado por JS:", tokenQR);
+
+    // 🚀 BLINDAJE CON MENSAJE DETALLADO
     if (!historiaParam && !tokenQR) {
-        mostrarErrorCritico("Enlace inválido o incompleto."); return;
+        mostrarErrorCritico("Enlace inválido o incompleto. Revisa la consola."); 
+        return;
     }
 
     const lbl = document.getElementById('current-lang-lbl');
