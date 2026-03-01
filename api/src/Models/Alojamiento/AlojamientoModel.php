@@ -336,27 +336,26 @@ public function recalculateHistory($historiaId) {
     // MÓDULO DE CÓDIGOS QR (TOKENS PÚBLICOS)
     // ==========================================================
 
-    public function generarCodigoQR($historiaId, $idUsuario) {
+public function generarCodigoQR($historiaId, $idUsuario, $instId) {
         $this->db->beginTransaction();
         try {
-            // 1. Verificamos si esta historia YA tiene un código (para no crear basura)
-            $stmtCheck = $this->db->prepare("SELECT codigo FROM qralojamiento WHERE historia = ?");
-            $stmtCheck->execute([$historiaId]);
+            // 1. Verificamos si ya existe y ES de esta institución
+            $stmtCheck = $this->db->prepare("SELECT codigo FROM qralojamiento WHERE historia = ? AND IdInstitucion = ?");
+            $stmtCheck->execute([$historiaId, $instId]);
             $codigoExistente = $stmtCheck->fetchColumn();
 
             if ($codigoExistente) {
                 $this->db->rollBack();
-                return $codigoExistente; // Ya tenía uno, se lo devolvemos
+                return $codigoExistente; 
             }
 
-            // 2. Generamos un código único de 6 caracteres alfanuméricos en minúscula
+            // 2. Generamos el código único
             $caracteres = '0123456789abcdefghijklmnopqrstuvwxyz';
             $codigo = '';
             $esUnico = false;
 
             while (!$esUnico) {
                 $codigo = substr(str_shuffle($caracteres), 0, 6);
-                // Comprobamos que este código random no le haya tocado a otro
                 $stmtVal = $this->db->prepare("SELECT COUNT(*) FROM qralojamiento WHERE codigo = ?");
                 $stmtVal->execute([$codigo]);
                 if ($stmtVal->fetchColumn() == 0) {
@@ -364,12 +363,11 @@ public function recalculateHistory($historiaId) {
                 }
             }
 
-            // 3. Guardamos el token en la base de datos
-            $sql = "INSERT INTO qralojamiento (codigo, historia, IdUsrA) VALUES (?, ?, ?)";
-            $this->db->prepare($sql)->execute([$codigo, $historiaId, $idUsuario]);
+            // 3. 🚀 INYECTAMOS LA INSTITUCIÓN EN LA TABLA
+            $sql = "INSERT INTO qralojamiento (codigo, historia, IdInstitucion, IdUsrA) VALUES (?, ?, ?, ?)";
+            $this->db->prepare($sql)->execute([$codigo, $historiaId, $instId, $idUsuario]);
 
-            // 4. Auditoría
-            Auditoria::log($this->db, 'INSERT', 'qralojamiento', "Generó QR [$codigo] para Historia $historiaId");
+            Auditoria::log($this->db, 'INSERT', 'qralojamiento', "Generó QR [$codigo] para Historia $historiaId (Inst: $instId)");
             
             $this->db->commit();
             return $codigo;
@@ -380,12 +378,12 @@ public function recalculateHistory($historiaId) {
     }
 
     public function getHistoryByToken($codigoToken) {
-        // Buscamos la historia basándonos ÚNICAMENTE en el código random de 6 letras
+        // 🚀 EL INNER JOIN CON qralojamiento AHORA TAMBIÉN VALIDA LA INSTITUCIÓN
         $sql = "SELECT a.*, p.nprotA, p.tituloA, 
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador
                 FROM qralojamiento qr
-                INNER JOIN alojamiento a ON qr.historia = a.historia
+                INNER JOIN alojamiento a ON qr.historia = a.historia AND qr.IdInstitucion = a.IdInstitucion
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento

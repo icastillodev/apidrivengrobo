@@ -238,19 +238,19 @@ public function getTiposPorEspecie() {
         exit;
     }
 
-    public function generarAlojamientoQR() {
+public function generarAlojamientoQR() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         
         try {
-            $sesion = Auditoria::getDatosSesion(); // 🛡️ Solo los logueados generan QRs
+            $sesion = Auditoria::getDatosSesion(); // 🛡️ Validamos token y extraemos datos
             
-            // 🚀 EL FIX: Buscamos el ID del usuario probando las claves más comunes de tu sistema
             $idUsuario = $sesion['userId'] ?? $sesion['IdUsrA'] ?? $sesion['id'] ?? 1;
+            $instId = $sesion['instId'] ?? 1; // 🚀 Extraemos la institución
             
-            // El modelo nos devuelve el código alfanumérico generado
-            $codigo = $this->model->generarCodigoQR($data['historia'], $idUsuario);
+            // Pasamos los 3 parámetros al modelo
+            $codigo = $this->model->generarCodigoQR($data['historia'], $idUsuario, $instId);
             
             echo json_encode(['status' => 'success', 'codigo' => $codigo]);
         } catch (\Exception $e) {
