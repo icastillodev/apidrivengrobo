@@ -13,6 +13,11 @@ $router->post('/confirm-account', 'UserController@confirmAccount');
 $router->get('/check-username', 'UserController@checkUsername');
 $router->get('/maintenance', 'UserController@maintenance');
 
+// ============================================================
+// SECCIÓN: Preferencias y Configuración del Usuario (Menú/Tema)
+// ============================================================
+$router->get('/user/config/get', 'UserConfigMenuController@getConfig');
+$router->post('/user/config/update', 'UserConfigMenuController@updateConfig');
 // api/routes.php
 $router->post('/verify-2fa', 'AuthController@verify2FA');
 

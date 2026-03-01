@@ -104,19 +104,19 @@ function getBaseStyles() {
 
 function getSidebarStyles() {
     return `
-        .gecko-sidebar { 
+.gecko-sidebar { 
             position: fixed !important; 
-            top: 0; 
-            left: 0; 
-            height: 100vh; /* Alto total de la pantalla */
-            width: 260px; 
+            top: 0; left: 0; height: 100vh; width: 260px; 
             z-index: 1050; 
-            transition: transform 0.3s ease; 
             background-color: var(--bs-body-bg);
-            display: flex; 
-            flex-direction: column;
+            display: flex; flex-direction: column;
             padding-bottom: 15px !important;
             overflow: visible !important; 
+            
+            /* 🚀 EL BORDE VERDE Y EL ESCONDITE MÓVIL */
+            border-right: 4px solid #1a5d3b !important; 
+            transform: translateX(-100%);
+            transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
         
         #side-menu-ul {
@@ -147,7 +147,15 @@ function getSidebarStyles() {
             width: clamp(18px, 2.5vh, 24px); 
             height: clamp(18px, 2.5vh, 24px);
         }
+    .gecko-sidebar.open {
+            transform: translateX(0) !important;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+        }
 
+        @media (min-width: 769px) { 
+            body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; }
+            body.with-sidebar { padding-left: 260px !important; } 
+        }
         @media (min-width: 769px) { body.with-sidebar { padding-left: 260px !important; } }
         /* --- BLOQUEO DE DESBORDAMIENTO (ANTI-SCROLL EXTREMO) --- */
         #side-menu-ul {

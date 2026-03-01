@@ -112,7 +112,6 @@ export function renderSideMenuStructure(container, menuIds, templates) {
 }
 
 export function renderTopMenuStructure(container, menuIds, templates) {
-    // Igual que tu versión anterior (no cambia lógica, solo estilos importados)
     document.body.classList.remove('with-sidebar');
     const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
     const userText = getUserDisplayText();
@@ -121,7 +120,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     header.className = "w-full gecko-header gecko-header-top bg-transparent mb-2"; 
     header.innerHTML = `
         <div class="container-fluid pt-2 pb-1">
-            <div class="d-flex justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
+            <div class="d-none d-md-flex justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
                 <div class="d-flex align-items-center gap-3">
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
                     <div class="d-flex flex-column lh-1 border-start ps-3">
@@ -134,26 +133,40 @@ export function renderTopMenuStructure(container, menuIds, templates) {
 
             <nav class="w-full d-flex flex-column align-items-center position-relative">
                 <div id="gecko-nav-container-desktop" class="d-flex flex-column align-items-center gap-2 position-relative w-100">
-                    <button id="gecko-mobile-toggle-top" class="btn btn-link text-success d-md-none position-absolute start-0 ms-n4" style="top:0;">
+                    <button id="gecko-mobile-toggle-top" class="btn btn-link text-success d-md-none position-absolute start-0 ms-1" style="top:0;">
                         <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
                     </button>
                     <ul id="main-menu-ul" class="nav border-success bg-body p-1 shadow-sm align-items-center d-none d-md-flex gap-1 custom-menu-pill"></ul>
                 </div>
             </nav>
         </div>
+
         <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
-            <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-start p-3 border-bottom">
                 <div class="d-flex flex-column">
                     <span class="fw-bold text-success small text-uppercase">${instName}</span>
                     <span class="text-muted" style="font-size: 9px;">${userText}</span>
+                    <hr class="my-2 opacity-25 w-100">
+                    <a href="https://groboapp.com" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px;">GROBO - ERP BIOTERIOS</a>
+                    <span class="text-muted d-block fw-bold" style="font-size: 9px;">Gekos.uy & UDELAR</span>
                 </div>
-                <button class="btn-close" id="gecko-close-sidebar"></button>
+                <button class="btn-close mt-1" id="gecko-close-sidebar"></button>
             </div>
-            <ul class="nav flex-column p-3" id="mobile-menu-ul"></ul>
+            <ul class="nav flex-column p-2 mb-auto" id="mobile-menu-ul"></ul>
         </aside>
     `;
     
     document.body.prepend(header);
+
+    // Activamos el botón para abrir el menú en la versión TOP
+    const toggleTop = document.getElementById('gecko-mobile-toggle-top');
+    if (toggleTop) {
+        toggleTop.onclick = (e) => {
+            e.stopPropagation();
+            document.getElementById('gecko-sidebar-element').classList.add('open');
+        };
+    }
+
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
     

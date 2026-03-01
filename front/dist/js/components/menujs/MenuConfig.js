@@ -75,15 +75,33 @@ export const UserPreferences = {
         gecko_ok: localStorage.getItem('gecko_ok') || 2
     },
 
-    init: async () => {
+init: async () => {
+        // 1. INTENTAMOS LEER DE LA BD PRIMERO
+        try {
+            // El backend devuelve { status: "success", data: { tema_preferido: "dark", ... } }
+            const res = await API.request('/user/config/get', 'GET');
+            
+            if (res && res.status === 'success' && res.data) {
+                const dbConfig = res.data;
+                
+                // Mapeamos los campos de la BD a LocalStorage SOLO si tienen valor
+                if (dbConfig.tema_preferido) localStorage.setItem('theme', dbConfig.tema_preferido);
+                if (dbConfig.idioma_preferido) localStorage.setItem('lang', dbConfig.idioma_preferido);
+                if (dbConfig.letra_preferida) localStorage.setItem('fontSize', dbConfig.letra_preferida);
+                if (dbConfig.menu_preferido) localStorage.setItem('menuLayout', dbConfig.menu_preferido);
+                if (dbConfig.gecko_ok !== null && dbConfig.gecko_ok !== "") localStorage.setItem('gecko_ok', dbConfig.gecko_ok);
+            }
+        } catch (e) {
+            console.warn("No se pudo cargar la config de BD, usando local.", e);
+        }
+
+        // 2. APLICAMOS LA CONFIGURACIÓN (que ahora tiene lo de la BD o el Default)
         UserPreferences.config.theme = localStorage.getItem('theme') || DEFAULTS.THEME;
         UserPreferences.config.lang = localStorage.getItem('lang') || DEFAULTS.LANG;
         UserPreferences.config.menu = localStorage.getItem('menuLayout') || DEFAULTS.MENU_LAYOUT;
         
-        // Carga inicial del tamaño de fuente
         const savedFont = localStorage.getItem('fontSize');
         UserPreferences.config.fontSize = ['chica', 'mediana', 'grande'].includes(savedFont) ? savedFont : 'chica';
-        
         UserPreferences.config.gecko_ok = localStorage.getItem('gecko_ok') || 2;
 
         UserPreferences.applyTheme(UserPreferences.config.theme);
@@ -92,6 +110,28 @@ export const UserPreferences = {
         UserPreferences.applyVoiceVisuals(UserPreferences.config.gecko_ok);
         
         return UserPreferences.config.menu;
+    },
+
+    saveBackend: async (data) => {
+        // Obtenemos el ID del token o de localStorage
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        // Armamos el objeto con exactamente lo que queremos actualizar
+        const payload = {};
+        if (data.theme) payload.theme = data.theme;
+        if (data.lang) payload.lang = data.lang;
+        if (data.menu) payload.menu = data.menu;
+        if (data.fontSize) payload.fontSize = data.fontSize;
+        if (data.gecko_ok) payload.gecko_ok = data.gecko_ok;
+
+        try {
+            // Enviamos como JSON, que suele ser más robusto para estas actualizaciones
+            await API.request('/user/config/update', 'POST', payload);
+            console.log("Preferencia guardada en BD:", payload);
+        } catch (e) { 
+            console.error("Error guardando preferencia en BD:", e); 
+        }
     },
 
     // --- CORREGIDO: CICLO DE TAMAÑO DE FUENTE ---

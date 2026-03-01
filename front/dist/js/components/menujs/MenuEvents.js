@@ -15,11 +15,16 @@ export function setupEventListeners() {
     const closeBtn = document.getElementById('gecko-close-sidebar');
     if(closeBtn) closeBtn.onclick = () => document.getElementById('gecko-sidebar-element').classList.remove('open');
 
-    document.addEventListener('click', (e) => {
+document.addEventListener('click', (e) => {
         const sidebar = document.getElementById('gecko-sidebar-element');
         if (sidebar && sidebar.classList.contains('open')) {
             const bSide = document.getElementById('gecko-mobile-toggle');
-            if (!sidebar.contains(e.target) && (!bSide || !bSide.contains(e.target))) {
+            const bTop = document.getElementById('gecko-mobile-toggle-top');
+            
+            // Cierra el menú si tocamos fuera de la barra y fuera de los botones
+            if (!sidebar.contains(e.target) && 
+               (!bSide || !bSide.contains(e.target)) && 
+               (!bTop || !bTop.contains(e.target))) {
                 sidebar.classList.remove('open');
             }
         }
