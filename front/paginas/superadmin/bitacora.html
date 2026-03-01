@@ -24,10 +24,12 @@
     <script type="module">
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
         import { initBitacora } from '../../dist/js/pages/superadmin/bitacora.js';
-
+        import { SuperAuth } from '../../dist/js/superAuth.js';
         document.addEventListener('DOMContentLoaded', () => {
+            if (SuperAuth.checkMasterAccess([1])) {
             initSuperMenu();
             initBitacora();
+            }
         });
     </script>
 </head>

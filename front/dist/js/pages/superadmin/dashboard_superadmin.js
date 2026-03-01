@@ -1,29 +1,60 @@
-// Archivo: dist/js/pages/superadmin/dashboard_superadmin.js
-import { API } from '../../api.js';
+export const DashboardSuperUI = {
+    init() {
+        this.renderGrid();
+    },
 
-export async function initSuperDashboard() {
-    try {
-        console.log("Solicitando estadísticas a la API...");
-        const res = await API.request('/superadmin/global-stats'); 
-        
-        if (res && res.status === 'success') {
-            console.log("✅ Estadísticas cargadas correctamente.");
-            document.getElementById('stat-sedes').innerText = res.data.totalSedes || 0;
-            document.getElementById('stat-usuarios').innerText = res.data.totalUsuarios || 0;
-            document.getElementById('stat-protocolos').innerText = res.data.totalProtocolos || 0;
-        } else {
-            console.error("❌ El backend respondió, pero con error:", res);
-            mostrarErrorStats();
-        }
-    } catch (error) {
-        console.error("❌ Fallo crítico al llamar a la API de estadísticas:", error);
-        mostrarErrorStats();
+    renderGrid() {
+        const grid = document.getElementById('superadmin-grid');
+        if(!grid) return;
+
+        grid.innerHTML = `
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden transition-hover" style="cursor:pointer;" onclick="window.location.href='./instituciones'">
+                    <div class="card-body p-4 text-center">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-buildings-fill fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark text-uppercase">Instituciones</h6>
+                        <span class="small text-muted">Gestión de Bioterios</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden transition-hover" style="cursor:pointer;" onclick="window.location.href='./usuario-global'">
+                    <div class="card-body p-4 text-center">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-globe fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark text-uppercase">Usuarios Globales</h6>
+                        <span class="small text-muted">Directorio Maestro</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden transition-hover" style="cursor:pointer;" onclick="window.location.href='./formularioinstitucion'">
+                    <div class="card-body p-4 text-center">
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-ui-checks-grid fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark text-uppercase">Formularios</h6>
+                        <span class="small text-muted">Plantillas y Secciones</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden transition-hover" style="cursor:pointer;" onclick="window.location.href='./bitacora'">
+                    <div class="card-body p-4 text-center">
+                        <div class="bg-dark bg-opacity-10 text-dark rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-shield-lock-fill fs-2"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark text-uppercase">Bitácora</h6>
+                        <span class="small text-muted">Auditoría y Logs</span>
+                    </div>
+                </div>
+            </div>
+        `;
     }
-}
-
-function mostrarErrorStats() {
-    ['stat-sedes', 'stat-usuarios', 'stat-protocolos'].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.innerText = "Err";
-    });
-}
+};

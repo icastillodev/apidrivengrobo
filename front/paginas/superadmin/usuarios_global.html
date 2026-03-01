@@ -25,9 +25,12 @@
         import { initSuperUsuarios } from '../../dist/js/pages/superadmin/usuarios.js';
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
 
+        import { SuperAuth } from '../../dist/js/superAuth.js';
         document.addEventListener('DOMContentLoaded', () => {
+            if (SuperAuth.checkMasterAccess([1])) {
                 initSuperMenu();
                 initSuperUsuarios();
+            }
         });
     </script>
 </head>

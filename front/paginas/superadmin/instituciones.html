@@ -16,22 +16,24 @@
             cursor: pointer !important; 
         }
     </style>
-<script type="module">
-        import { SuperAuth } from '../../dist/js/superAuth.js';
+
+    <script type="module">
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
         import { initSuperInstituciones } from '../../dist/js/pages/superadmin/instituciones.js';
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Preguntamos si es SuperAdmin
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        showLoader();
+        import { SuperAuth } from '../../dist/js/superAuth.js';
+        document.addEventListener('DOMContentLoaded', () => {
             if (SuperAuth.checkMasterAccess([1])) {
-                // 2. Cargamos su Menú
-                initSuperMenu(); 
-                
-                // 3. Cargamos los datos de las Instituciones
-                initSuperInstituciones();
+            initSuperMenu();
+            initSuperInstituciones();
+            hideLoader();
             }
         });
     </script>
+
+
+
 </head>
 <body class="bg-light">
 

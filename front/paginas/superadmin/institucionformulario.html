@@ -9,8 +9,14 @@
     <script type="module">
         import { initFormAdmin } from '../../dist/js/pages/superadmin/formRegistroManager.js';
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
+
+                import { SuperAuth } from '../../dist/js/superAuth.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            if (SuperAuth.checkMasterAccess([1])) {
         initSuperMenu();
-        document.addEventListener('DOMContentLoaded', initFormAdmin);
+        initFormAdmin
+            }
+        });
     </script>
 </head>
 <body class="bg-slate-50">
