@@ -211,4 +211,52 @@ public function getTiposPorEspecie() {
         }
         exit;
     }
+    public function publicHistory() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        // Ahora el frontend nos manda el código token, no el ID de historia
+        $token = $_GET['token'] ?? ''; 
+
+        try {
+            if (empty($token) || strlen($token) !== 6) {
+                throw new \Exception("Código de etiqueta inválido o corrupto.");
+            }
+
+            // Llamamos a la historia por su token (Sin Auditoria::getDatosSesion)
+            $data = $this->model->getHistoryByToken($token);
+            
+            if (empty($data)) {
+                throw new \Exception("Esta ficha no existe o el QR ha sido revocado.");
+            }
+            
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function generarAlojamientoQR() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true);
+        
+        try {
+            $sesion = Auditoria::getDatosSesion(); // 🛡️ Solo los logueados generan QRs
+            
+            // 🚀 EL FIX: Buscamos el ID del usuario probando las claves más comunes de tu sistema
+            $idUsuario = $sesion['userId'] ?? $sesion['IdUsrA'] ?? $sesion['id'] ?? 1;
+            
+            // El modelo nos devuelve el código alfanumérico generado
+            $codigo = $this->model->generarCodigoQR($data['historia'], $idUsuario);
+            
+            echo json_encode(['status' => 'success', 'codigo' => $codigo]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

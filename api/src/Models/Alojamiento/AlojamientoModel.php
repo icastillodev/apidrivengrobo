@@ -332,4 +332,69 @@ public function recalculateHistory($historiaId) {
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
+    // ==========================================================
+    // MÓDULO DE CÓDIGOS QR (TOKENS PÚBLICOS)
+    // ==========================================================
+
+    public function generarCodigoQR($historiaId, $idUsuario) {
+        $this->db->beginTransaction();
+        try {
+            // 1. Verificamos si esta historia YA tiene un código (para no crear basura)
+            $stmtCheck = $this->db->prepare("SELECT codigo FROM qralojamiento WHERE historia = ?");
+            $stmtCheck->execute([$historiaId]);
+            $codigoExistente = $stmtCheck->fetchColumn();
+
+            if ($codigoExistente) {
+                $this->db->rollBack();
+                return $codigoExistente; // Ya tenía uno, se lo devolvemos
+            }
+
+            // 2. Generamos un código único de 6 caracteres alfanuméricos en minúscula
+            $caracteres = '0123456789abcdefghijklmnopqrstuvwxyz';
+            $codigo = '';
+            $esUnico = false;
+
+            while (!$esUnico) {
+                $codigo = substr(str_shuffle($caracteres), 0, 6);
+                // Comprobamos que este código random no le haya tocado a otro
+                $stmtVal = $this->db->prepare("SELECT COUNT(*) FROM qralojamiento WHERE codigo = ?");
+                $stmtVal->execute([$codigo]);
+                if ($stmtVal->fetchColumn() == 0) {
+                    $esUnico = true; 
+                }
+            }
+
+            // 3. Guardamos el token en la base de datos
+            $sql = "INSERT INTO qralojamiento (codigo, historia, IdUsrA) VALUES (?, ?, ?)";
+            $this->db->prepare($sql)->execute([$codigo, $historiaId, $idUsuario]);
+
+            // 4. Auditoría
+            Auditoria::log($this->db, 'INSERT', 'qralojamiento', "Generó QR [$codigo] para Historia $historiaId");
+            
+            $this->db->commit();
+            return $codigo;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getHistoryByToken($codigoToken) {
+        // Buscamos la historia basándonos ÚNICAMENTE en el código random de 6 letras
+        $sql = "SELECT a.*, p.nprotA, p.tituloA, 
+                       e.EspeNombreA, t.NombreTipoAlojamiento,
+                       COALESCE(CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador
+                FROM qralojamiento qr
+                INNER JOIN alojamiento a ON qr.historia = a.historia
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                INNER JOIN especiee e ON a.TipoAnimal = e.idespA
+                LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
+                LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA
+                WHERE qr.codigo = ? 
+                ORDER BY a.fechavisado ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$codigoToken]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
 }

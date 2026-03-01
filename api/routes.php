@@ -172,6 +172,12 @@ $router->post('/precios/update-all', 'PreciosController@updateAll');
 // ============================================================
 $router->get('/alojamiento/list', 'AlojamientoController@list');
 $router->get('/alojamiento/history', 'AlojamientoController@history');
+
+// CÓDIGOS QR BLINDADOS
+$router->get('/alojamiento/public-history', 'AlojamientoController@publicHistory');
+$router->post('/alojamiento/generar-qr', 'AlojamientoController@generarAlojamientoQR');
+
+// Rutas originales de edición/guardado
 $router->post('/alojamiento/save', 'AlojamientoController@save');
 $router->post('/alojamiento/finalizar', 'AlojamientoController@finalizar');
 $router->post('/alojamiento/delete-row', 'AlojamientoController@deleteRow');

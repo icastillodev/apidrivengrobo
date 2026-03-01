@@ -1,8 +1,10 @@
 import { API } from '../../api.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js'; 
+
 let isAdmin = false;
 let currentHistoryData = [];
 let historiaId = null;
+let tokenQR = null;
 
 // =========================================================================
 // 1. FUNCIONES GLOBALES EXPUESTAS (Para que funcionen los OnClick del HTML)
@@ -16,6 +18,7 @@ window.cambiarIdiomaQR = (lang) => {
 window.cerrarSesionQR = () => {
     localStorage.removeItem('token'); 
     localStorage.removeItem('userLevel'); 
+    localStorage.removeItem('userName'); 
     window.location.reload();
 };
 
@@ -33,11 +36,9 @@ window.abrirModalPersonalizar = () => {
 window.exportarHistoriaPDF = async () => {
     const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
     
-    // Mostramos un loading porque el PDF se genera en el backend
     Swal.fire({ title: 'Generando PDF...', didOpen: () => Swal.showLoading() });
     
     try {
-        // Pedimos al backend que nos devuelva el archivo
         const response = await fetch(API.urlBase + `/alojamiento/export?alojamientos=true&trazabilidad=true&formato=pdf&historia=${historiaId}&instId=${instId}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -46,7 +47,6 @@ window.exportarHistoriaPDF = async () => {
 
         if (!response.ok) throw new Error("Fallo al generar PDF");
 
-        // Convertimos la respuesta binaria a un Blob y lo descargamos
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -64,7 +64,8 @@ window.exportarHistoriaPDF = async () => {
     }
 };
 
-window.confirmarDescargaPDF = () => {
+// 🚀 NUEVA GENERACIÓN DE PDF BLINDADA (CON TOKENS)
+window.confirmarDescargaPDF = async () => {
     const { jsPDF } = window.jspdf;
     const sizeType = document.getElementById('qr-custom-size').value;
     const config = {
@@ -84,12 +85,39 @@ window.confirmarDescargaPDF = () => {
     const txt = document.getElementById('qr-custom-text').value;
     if (txt) doc.text(txt, midX, 15, { align: 'center' });
 
-    const qrImg = document.getElementById("qrcode-buffer").querySelector("img") || document.getElementById("qrcode-buffer").querySelector("canvas");
-    if (qrImg) {
-        const qrBase64 = qrImg.src || qrImg.toDataURL("image/png");
-        doc.addImage(qrBase64, 'PNG', midX - (cfg.qrSize / 2), cfg.qrY, cfg.qrSize, cfg.qrSize);
-        doc.save(`QR_Etiqueta_H${historiaId}.pdf`);
-        bootstrap.Modal.getInstance(document.getElementById('modal-personalizar-qr')).hide();
+    try {
+        Swal.fire({ title: 'Generando Etiqueta Segura...', didOpen: () => Swal.showLoading() });
+
+        // 1. Pedimos al Backend que genere (o recupere) el Token random de 6 letras
+        const resToken = await API.request('/alojamiento/generar-qr', 'POST', { historia: historiaId });
+        
+        if (resToken.status !== 'success') throw new Error("No se pudo generar el código seguro.");
+
+        // 2. Armamos la URL corta y pública
+        const basePath = window.location.origin + ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/');
+        const publicUrl = `${basePath}qr/${resToken.codigo}`;
+
+        // 3. Dibujamos el QR en un div temporal e invisible
+        const tempDiv = document.createElement('div');
+        new QRCode(tempDiv, { text: publicUrl, width: 400, height: 400 });
+
+        // 4. Esperamos 100ms para que la librería termine de renderizar la imagen
+        setTimeout(() => {
+            const qrImg = tempDiv.querySelector("img") || tempDiv.querySelector("canvas");
+            if (qrImg) {
+                const qrBase64 = qrImg.src || qrImg.toDataURL("image/png");
+                doc.addImage(qrBase64, 'PNG', midX - (cfg.qrSize / 2), cfg.qrY, cfg.qrSize, cfg.qrSize);
+                doc.save(`QR_Etiqueta_H${historiaId}.pdf`);
+                bootstrap.Modal.getInstance(document.getElementById('modal-personalizar-qr')).hide();
+                Swal.close();
+            } else {
+                Swal.fire('Error', 'No se pudo renderizar la imagen QR.', 'error');
+            }
+        }, 150);
+
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'Hubo un problema al generar la etiqueta.', 'error');
     }
 };
 
@@ -135,7 +163,7 @@ window.guardarNuevoTramo = async () => {
     const res = await API.request('/alojamiento/save', 'POST', data);
     if (res.status === 'success') {
         bootstrap.Modal.getInstance(document.getElementById('modal-actualizar-qr')).hide();
-        await cargarDatosQR();
+        await cargarDatosQR(historiaId, tokenQR); // Recargamos usando las variables activas
     }
 };
 
@@ -162,7 +190,7 @@ window.guardarEdicionTramo = async () => {
     const res = await API.request('/alojamiento/update-row', 'POST', data);
     if (res.status === 'success') {
         bootstrap.Modal.getInstance(document.getElementById('modal-editar-tramo')).hide();
-        await cargarDatosQR();
+        await cargarDatosQR(historiaId, tokenQR);
     }
 };
 
@@ -175,7 +203,7 @@ window.eliminarTramoQR = async (idAlojamiento) => {
     });
     if (isConfirmed) {
         const res = await API.request('/alojamiento/delete-row', 'POST', { IdAlojamiento: idAlojamiento, historia: historiaId });
-        if (res.status === 'success') await cargarDatosQR();
+        if (res.status === 'success') await cargarDatosQR(historiaId, tokenQR);
     }
 };
 
@@ -187,10 +215,12 @@ const ROLE_MAP = { 1: 'SUPERADMIN', 2: 'ADMINISTRADOR', 3: 'INVESTIGADOR', 4: 'T
 
 export const initQRPage = async () => {
     const urlParams = new URLSearchParams(window.location.search);
-    historiaId = urlParams.get('historia');
+    const historiaParam = urlParams.get('historia');
+    tokenQR = urlParams.get('token');
     
-    if (!historiaId) {
-        mostrarErrorCritico("Falta el ID de historia en la URL."); return;
+    // 🚀 BLINDAJE: Si no entra por panel interno (?historia) ni por QR escaneado (?token)
+    if (!historiaParam && !tokenQR) {
+        mostrarErrorCritico("Enlace inválido o incompleto."); return;
     }
 
     const lbl = document.getElementById('current-lang-lbl');
@@ -203,14 +233,10 @@ export const initQRPage = async () => {
 
     renderAuthZone(userName, role);
 
-    try {
-        new QRCode(document.getElementById("qrcode-buffer"), { text: window.location.href, width: 400, height: 400 });
-    } catch(e) {}
-
     window.TrazabilidadUI = TrazabilidadUI;
     window.TrazabilidadUI.isReadOnly = !isAdmin;
 
-    await cargarDatosQR();
+    await cargarDatosQR(historiaParam, tokenQR);
 };
 
 function renderAuthZone(name, roleId) {
@@ -234,16 +260,29 @@ function renderAuthZone(name, roleId) {
     }
 }
 
-async function cargarDatosQR() {
+async function cargarDatosQR(hParam, tParam) {
     try {
-        const res = await API.request(`/alojamiento/history?historia=${historiaId}`);
+        let res;
         
-        if (res.status === 'success' && res.data && res.data.length > 0) {
+        // 🚀 DOBLE ENTRADA INTELIGENTE:
+        if (hParam) {
+            // Modo Admin (Interno): Usa la API que pide Token
+            res = await API.request(`/alojamiento/history?historia=${hParam}`);
+            historiaId = hParam;
+        } else if (tParam) {
+            // Modo Público (Escaneo QR): Usa la nueva API blindada basada en Token
+            res = await API.request(`/alojamiento/public-history?token=${tParam}`);
+        }
+        
+        if (res && res.status === 'success' && res.data && res.data.length > 0) {
             currentHistoryData = res.data;
             const first = currentHistoryData[0];
             const last = currentHistoryData[currentHistoryData.length - 1]; 
             const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
             const txt = window.txt.alojamientos || {};
+
+            // Si entró por QR público, descubrimos qué historia es realmente
+            if (tParam) historiaId = first.historia;
 
             localStorage.setItem('instId_temp_qr', first.IdInstitucion || 1);
 
@@ -255,12 +294,10 @@ async function cargarDatosQR() {
             document.getElementById('txt-investigador').innerText = first.Investigador;
             document.getElementById('txt-obs').innerText = last.observaciones || '---';
 
-            // --- NUEVO: INYECTAR CONTACTO DEL INVESTIGADOR CLICKEABLE ---
             const containerContacto = document.getElementById('container-contacto');
             if (containerContacto) {
                 let htmlContacto = '';
                 
-                // Botón Email (abre gestor de correos)
                 if (first.EmailInvestigador && first.EmailInvestigador !== 'No registrado') {
                     htmlContacto += `
                         <a href="mailto:${first.EmailInvestigador}?subject=Consulta sobre Historia #${first.historia}" class="text-decoration-none text-primary small fw-bold">
@@ -269,7 +306,6 @@ async function cargarDatosQR() {
                     `;
                 }
                 
-                // Botón Teléfono (abre marcador en celulares)
                 if (first.CelularInvestigador && first.CelularInvestigador !== 'No registrado') {
                     htmlContacto += `
                         <a href="tel:${first.CelularInvestigador.replace(/\D/g,'')}" class="text-decoration-none text-success small fw-bold">
@@ -284,7 +320,6 @@ async function cargarDatosQR() {
 
                 containerContacto.innerHTML = htmlContacto;
             }
-            // -------------------------------------------------------------
 
             const thCajas = document.getElementById('th-cajas');
             if (thCajas) thCajas.innerText = txt.th_boxes || 'CAJAS';
@@ -302,7 +337,6 @@ async function cargarDatosQR() {
                 const cant = parseInt(h.CantidadCaja || 0);
                 totalDias += dias;
 
-                // CUIDADO AQUÍ CON EL ID DE ESPECIE AL ABRIR TRAZABILIDAD
                 const espId = h.TipoAnimal || h.idespA || first.TipoAnimal || first.idespA || 0;
 
                 return `
@@ -343,10 +377,10 @@ async function cargarDatosQR() {
             document.getElementById('qr-loader').classList.add('d-none');
             document.getElementById('qr-content').classList.remove('d-none');
         } else {
-            mostrarErrorCritico("No se encontraron datos para esta historia.");
+            mostrarErrorCritico("No se encontraron datos para esta historia o enlace revocado.");
         }
     } catch (e) { 
-        console.error(e); mostrarErrorCritico(`Error de conexión con el servidor.`);
+        console.error(e); mostrarErrorCritico(`Acceso Denegado o Error de conexión.`);
     }
 }
 

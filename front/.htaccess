@@ -31,8 +31,16 @@ RewriteRule ^ - [L]
 # ============================================================
 RewriteRule ^gecko(s)?adm/login/?$ superadmin_login.html [L,NC]
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html [L]
+
+
+RewriteRule ^qr/([a-zA-Z0-9]{6})/?$ paginas/qr-alojamiento.html?token=$1 [L,QSA]
+
+# REGLA ORIGINAL: Modo Admin (Interno)
 RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
+
 RewriteRule ^construccion/?$ paginas/construccion.html [L]
+
+
 
 # ============================================================
 # 4. ENMASCARAMIENTO DE RUTAS LÓGICAS (Profundidad Infinita)
