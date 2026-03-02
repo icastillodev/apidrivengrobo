@@ -71,20 +71,29 @@ public function getConfigBySlug($slug) {
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getFullResponsesGrouped($idConfig) {
-        $sql = "SELECT categoria, campo, valor, valor_extra 
-                FROM form_registro_respuestas 
-                WHERE id_form_config = ? 
-                ORDER BY categoria, id_respuesta ASC";
+public function getFullResponsesGrouped($idConfig) {
+        // Hacemos un SELECT * puro para asegurarnos de traer todas las columnas
+        // Quitamos el ORDER BY id_respuesta por si tu llave primaria se llama distinto
+        $sql = "SELECT * FROM form_registro_respuestas 
+                WHERE id_form_config = ?";
+                
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idConfig]);
+        
+        // Nos aseguramos de forzar el tipo de dato a ENTERO para que MySQL no lo malinterprete
+        $stmt->bindValue(1, $idConfig, PDO::PARAM_INT);
+        $stmt->execute();
         
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $grouped = [];
-        foreach ($results as $row) {
-            $grouped[$row['categoria']][] = $row;
+        if ($results) {
+            foreach ($results as $row) {
+                // Agrupamos dinámicamente asegurando que la categoría exista
+                $cat = $row['categoria'] ?? 'sin_categoria';
+                $grouped[$cat][] = $row;
+            }
         }
+        
         return $grouped;
     }
     // --- NUEVAS FUNCIONES DE GESTIÓN ---
