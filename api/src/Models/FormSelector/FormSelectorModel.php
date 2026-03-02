@@ -84,3 +84,4 @@ public function getInstitutionalNetwork($currentInstId) {
         $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC); 
     }
+}
