@@ -34,7 +34,11 @@ $router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- 
 // ============================================================
 $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
-
+// ============================================================
+// SECCIÓN: Preferencias y Configuración del Usuario
+// ============================================================
+$router->get('/user/config/get', 'UserConfigController@getConfig');
+$router->post('/user/config/update', 'UserConfigController@updateConfig');
 
 // Búsqueda tradicional (SQL Rápido)
 $router->get('/search/global', 'GlobalSearchController@search');
@@ -54,8 +58,6 @@ $router->get('/users/forms', 'UserController@getForms');
 $router->post('/users/update', 'UserController@update');      
 $router->post('/users/reset-pass', 'UserController@resetPassword'); 
 $router->get('/users/list-investigators', 'UserController@listInvestigators'); // Selector de investigadores
-
-$router->post('/user/config/update', 'UserConfigController@updatePreferences');
 
 // ============================================================
 // SECCIÓN: Mis Formularios (Visor Unificado Investigador)

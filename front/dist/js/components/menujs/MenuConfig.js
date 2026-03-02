@@ -262,17 +262,25 @@ init: async () => {
     },
 
     saveBackend: async (data) => {
-        if (!UserPreferences.userId) return;
-        const fd = new FormData();
-        fd.append('userId', UserPreferences.userId);
-        if (data.theme) fd.append('theme', data.theme);
-        if (data.lang) fd.append('lang', data.lang);
-        if (data.menu) fd.append('menu', data.menu);
-        if (data.fontSize) fd.append('fontSize', data.fontSize);
-        if (data.gecko_ok) fd.append('gecko_ok', data.gecko_ok);
+        // LO HACEMOS DINÁMICO PARA EVITAR NULLS AL CARGAR
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        // Limpiamos y armamos un payload estricto
+        const payload = {};
+        if (data.theme) payload.theme = data.theme;
+        if (data.lang) payload.lang = data.lang;
+        if (data.menu) payload.menu = data.menu;
+        if (data.fontSize) payload.fontSize = data.fontSize;
+        if (data.gecko_ok !== undefined) payload.gecko_ok = data.gecko_ok;
+
         try {
-            await API.request('/user/config/update', 'POST', fd);
-        } catch (e) { console.error("Error persistencia:", e); }
+            // USAMOS JSON PARA ASEGURARNOS QUE PHP LO LEA BIEN
+            await API.request('/user/config/update', 'POST', payload);
+            console.log("✅ Preferencia guardada en BD:", payload);
+        } catch (e) { 
+            console.error("❌ Error persistencia:", e); 
+        }
     }
 };
 
