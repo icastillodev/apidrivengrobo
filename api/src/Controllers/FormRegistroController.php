@@ -42,7 +42,7 @@ class FormRegistroController {
         exit;
     }
 
-    public function getBySlug($slug) {
+public function getBySlug($slug) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
@@ -54,7 +54,11 @@ class FormRegistroController {
                 exit;
             }
 
-            echo json_encode(['status' => 'success', 'data' => $data]);
+            // NUEVO: Rescatamos las respuestas guardadas previamente usando EAV
+            $respuestas = $this->model->getFullResponsesGrouped($data['id_form_config']);
+
+            // Enviamos el objeto 'respuestas' junto con 'data'
+            echo json_encode(['status' => 'success', 'data' => $data, 'respuestas' => $respuestas]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
