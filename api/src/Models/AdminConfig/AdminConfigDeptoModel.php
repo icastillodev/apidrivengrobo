@@ -36,8 +36,8 @@ class AdminConfigDeptoModel {
 
     public function saveOrganismo($data) {
         if (empty($data['IdOrganismo'])) {
-            $sql = "INSERT INTO organismoe (NombreOrganismoSimple, NombreOrganismoCompleto, ContactoOrgnismo, CorreoOrganismo, DireccionOrganismo, PaisOrganismo) VALUES (?, ?, ?, ?, ?, ?)";
-            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais']]);
+            $sql = "INSERT INTO organismoe (NombreOrganismoSimple, NombreOrganismoCompleto, ContactoOrgnismo, CorreoOrganismo, DireccionOrganismo, PaisOrganismo,IdInstitucion) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais'], $data['instId']]);
             
             Auditoria::log($this->db, 'INSERT', 'organismoe', "Creó organismo: " . $data['NombreSimple']);
             return $res;
