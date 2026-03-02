@@ -3,13 +3,16 @@ import { API } from '../../../api.js';
 let allUsers = [];
 let menuConfig = [];
 let currentPage = 1;
-const rowsPerPage = 12; // Paginación de 6 filas
+const rowsPerPage = 12; 
 
+// --- 1. AGREGADO ROL 2 (ADMIN) Y CORRECCIÓN DE LABORATORIO A 6 ---
 const ROLE_NAMES = {
+    2: { label: 'Administrador', class: 'bg-dark text-white border-dark' }, // Admin
     3: { label: 'Investigador', class: 'bg-info-subtle text-info border-info' },
     4: { label: 'Sub Admin', class: 'bg-primary-subtle text-primary border-primary' },
     5: { label: 'Asistente', class: 'bg-warning-subtle text-warning border-warning' },
-    7: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }
+    6: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }, // Corregido a 6
+    7: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }  // Se mantiene por si hay registros legacy
 };
 
 const MENU_DEFINITION = [
@@ -24,27 +27,26 @@ const MENU_DEFINITION = [
     { id: 202, name: "Módulo Contable" }
 ];
 
-/**
- * INICIALIZACIÓN
- */
 export async function initConfigRoles() {
     await loadData();
     
-    // Evento de búsqueda en tiempo real
+    // Eventos de filtrado combinados
     document.getElementById('user-search').onkeyup = () => { 
         currentPage = 1; 
         renderUsers(); 
     };
+    
+    // --- 2. NUEVO EVENTO PARA EL SELECT DE ROLES ---
+    document.getElementById('role-filter').onchange = () => {
+        currentPage = 1; 
+        renderUsers(); 
+    };
 
-    // Evento al cambiar el rol en el panel derecho (Menús)
     document.getElementById('select-role-menu').onchange = () => {
         renderMenuPermissions();
     };
 }
 
-/**
- * CARGA DE DATOS
- */
 async function loadData() {
     const instId = localStorage.getItem('instId');
     try {
@@ -60,26 +62,32 @@ async function loadData() {
     }
 }
 
-/**
- * RENDERIZADO DE USUARIOS (TABLA IZQUIERDA)
- */
 function renderUsers() {
     const term = document.getElementById('user-search').value.toLowerCase().trim();
+    const roleFilter = document.getElementById('role-filter').value; // <-- Capturamos el select
     
-    // Filtrado seguro (protección contra nulls)
+    // --- 3. LÓGICA DE FILTRADO COMBINADO ---
     const filtered = allUsers.filter(u => {
+        // Preparación de datos seguros
         const nombre = (u.NombreA || "").toLowerCase();
         const apellido = (u.ApellidoA || "").toLowerCase();
         const username = (u.UsrA || "").toLowerCase();
         const idString = String(u.IdUsrA);
+        const roleIdString = String(u.CurrentRoleId);
         
-        return nombre.includes(term) || 
-               apellido.includes(term) || 
-               username.includes(term) ||
-               idString.includes(term); // También permite buscar por ID
+        // Match de Texto (Busca en Nombre, Apellido, Usuario o ID)
+        const matchText = nombre.includes(term) || 
+                          apellido.includes(term) || 
+                          username.includes(term) ||
+                          idString.includes(term);
+
+        // Match de Rol (Si es 'all' pasa de largo, si no, debe coincidir)
+        const matchRole = roleFilter === 'all' || roleFilter === roleIdString;
+        
+        // Retorna True solo si cumple AMBAS condiciones
+        return matchText && matchRole; 
     });
 
-    // Cálculos de paginación
     const totalPages = Math.ceil(filtered.length / rowsPerPage);
     if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
 
@@ -89,16 +97,17 @@ function renderUsers() {
     tbody.innerHTML = '';
 
     if (pageData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No se encontraron usuarios</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No se encontraron usuarios con esos filtros</td></tr>`;
         renderPagination(0);
         return;
     }
 
     pageData.forEach(u => {
+        // Ya detectará el rol 2 y el 6 correctamente gracias al const ROLE_NAMES actualizado
         const role = ROLE_NAMES[u.CurrentRoleId] || { label: 'Sin Rol', class: 'bg-light text-dark' };
         
         const tr = document.createElement('tr');
-        tr.className = "clickable-row"; // Clase opcional para cursor pointer en CSS
+        tr.className = "clickable-row"; 
         tr.innerHTML = `
             <td class="ps-3 text-dark">
                 <span class="text-secondary small fw-normal me-1" style="font-size: 0.85em;">#${u.IdUsrA}</span>
@@ -118,9 +127,6 @@ function renderUsers() {
     renderPagination(filtered.length);
 }
 
-/**
- * CONTROLES DE PAGINACIÓN
- */
 function renderPagination(totalItems) {
     const totalPages = Math.ceil(totalItems / rowsPerPage);
     const container = document.getElementById('pagination-container');
@@ -132,7 +138,6 @@ function renderPagination(totalItems) {
     const ul = document.createElement('ul');
     ul.className = "pagination pagination-sm mb-0 shadow-sm";
 
-    // Botón Anterior
     ul.innerHTML += `
         <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="window.changePage(event, ${currentPage - 1})">
@@ -141,7 +146,6 @@ function renderPagination(totalItems) {
         </li>
     `;
 
-    // Lógica de visualización de páginas (1 ... 4 5 6 ... 10)
     for (let i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
             ul.innerHTML += `
@@ -154,7 +158,6 @@ function renderPagination(totalItems) {
         }
     }
 
-    // Botón Siguiente
     ul.innerHTML += `
         <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="window.changePage(event, ${currentPage + 1})">
@@ -174,16 +177,12 @@ window.changePage = (event, page) => {
     renderUsers();
 };
 
-/**
- * RENDERIZADO DE MENÚS (PANEL DERECHO)
- */
 function renderMenuPermissions() {
     const roleId = parseInt(document.getElementById('select-role-menu').value);
     const container = document.getElementById('menu-list-container');
     container.innerHTML = '';
 
     MENU_DEFINITION.forEach(m => {
-        // Buscamos si existe configuración para este rol y menú
         const config = menuConfig.find(c => c.IdTipoUsrA == roleId && c.NombreMenu == m.id);
         const isActive = config ? config.Activo == 1 : false;
 
@@ -203,9 +202,6 @@ function renderMenuPermissions() {
     });
 }
 
-/**
- * MODAL DE CAMBIO DE ROL
- */
 window.openRoleModal = (userId, currentRole) => {
     document.getElementById('target-user-id').value = userId;
     document.getElementById('new-role-select').value = currentRole;
@@ -227,7 +223,7 @@ window.processRoleChange = async () => {
         if(res.status === 'success') {
             Swal.fire({ title: 'Rol Actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
             bootstrap.Modal.getInstance(document.getElementById('modal-role')).hide();
-            loadData(); // Recargamos para ver el cambio en la tabla
+            loadData(); 
         } else {
             Swal.fire('Error', res.message || 'Error al actualizar', 'error');
         }
@@ -236,20 +232,16 @@ window.processRoleChange = async () => {
     }
 };
 
-/**
- * TOGGLE DE PERMISOS DE MENÚ
- */
 window.toggleMenuPermission = async (roleId, menuId, isChecked) => {
     const fd = new FormData();
     fd.append('instId', localStorage.getItem('instId'));
     fd.append('roleId', roleId);
     fd.append('menuId', menuId);
-    fd.append('status', isChecked ? 1 : 2); // 1 Activo, 2 Inactivo
+    fd.append('status', isChecked ? 1 : 2); 
 
     try {
         const res = await API.request('/admin/config/roles/toggle-menu', 'POST', fd);
         if(res.status === 'success') {
-            // Actualización optimista de la caché local
             const index = menuConfig.findIndex(c => c.IdTipoUsrA == roleId && c.NombreMenu == menuId);
             if(index > -1) {
                 menuConfig[index].Activo = isChecked ? 1 : 2;
@@ -263,6 +255,5 @@ window.toggleMenuPermission = async (roleId, menuId, isChecked) => {
         }
     } catch (err) {
         console.error("Error al cambiar permiso:", err);
-        // Si falla, podrías revertir el switch visualmente aquí si quisieras ser muy estricto
     }
 };

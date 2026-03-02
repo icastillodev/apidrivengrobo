@@ -104,11 +104,19 @@
                         <h6 class="fw-bold text-dark m-0"><i class="bi bi-people me-2"></i>ASIGNACIÓN DE ROLES</h6>
                     </div>
                     
-                    <div class="p-3 border-bottom bg-light">
-                        <div class="input-group input-group-sm">
+                    <div class="p-3 border-bottom bg-light d-flex flex-column flex-md-row gap-2">
+                        <div class="input-group input-group-sm flex-grow-1">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
                             <input type="text" id="user-search" class="form-control border-start-0 shadow-none" placeholder="Buscar por nombre, apellido o email...">
                         </div>
+                        <select id="role-filter" class="form-select form-select-sm shadow-none fw-bold text-secondary" style="min-width: 160px; width: auto;">
+                            <option value="all">Todos los roles</option>
+                            <option value="2">Administrador</option>
+                            <option value="3">Investigador</option>
+                            <option value="4">Sub Admin</option>
+                            <option value="5">Asistente</option>
+                            <option value="6">Laboratorio</option>
+                        </select>
                     </div>
 
                     <div class="table-responsive" style="max-height: 600px;">
@@ -162,10 +170,11 @@
                     <input type="hidden" id="target-user-id">
                     <label class="form-label small fw-bold">Nuevo Perfil:</label>
                     <select id="new-role-select" class="form-select fw-bold mb-3">
+                        <option value="2">Administrador</option>
                         <option value="3">Usuario / Investigador</option>
                         <option value="4">Sub Administrador</option>
                         <option value="5">Asistente</option>
-                        <option value="7">Laboratorio</option>
+                        <option value="6">Laboratorio</option> </select>
                     </select>
                     <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="window.processRoleChange()">ACTUALIZAR</button>
                 </div>
