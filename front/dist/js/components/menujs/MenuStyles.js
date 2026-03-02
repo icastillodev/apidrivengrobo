@@ -175,53 +175,61 @@ function getSidebarStyles() {
         .gecko-sidebar { 
             position: fixed !important; 
             top: 0; left: 0; 
-            height: 100dvh; /* dvh evita cortes con las barras de navegación en móviles iOS/Android */
+            height: 100dvh; /* dvh maneja perfecto las barras de iOS/Android */
             width: 260px; 
             z-index: 1050; 
             background-color: var(--bs-body-bg);
             display: flex; flex-direction: column;
-            padding-bottom: 0 !important; 
-            overflow: hidden !important; /* El padre NUNCA hace scroll */
+            padding: 0 !important;
+            overflow: hidden !important; /* EL PADRE NUNCA HACE SCROLL */
             border-right: 4px solid #1a5d3b !important; 
             transform: translateX(-100%);
             transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
         
-        /* 🚀 EL SECRETO DEL SCROLL PERFECTO (ESCRITORIO Y MÓVIL) */
-        #side-menu-ul, #mobile-menu-ul {
-            flex: 1 1 auto; /* Toma todo el espacio disponible en el medio */
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start; /* Agrupa arriba, no los dispersa */
-            overflow-y: auto !important; /* ¡AQUÍ ESTÁ EL SCROLL! */
+        /* 🚀 EL ÁREA DE SCROLL PERFECTA */
+        .gecko-sidebar-scroll-area {
+            flex: 1 1 auto;
+            overflow-y: auto !important; 
             overflow-x: hidden;
-            min-height: 0; /* Previene bugs de colapso en Flexbox */
-            padding: 10px 0;
-            margin-bottom: 0 !important;
-            gap: 2px;
+            height: 0; /* Obliga a Flexbox a respetar el scroll interior */
         }
+        
+        .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 5px; }
+        .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
+        [data-bs-theme="dark"] .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
 
-        /* Scrollbar elegante y minimalista */
-        #side-menu-ul::-webkit-scrollbar, #mobile-menu-ul::-webkit-scrollbar { width: 5px; }
-        #side-menu-ul::-webkit-scrollbar-thumb, #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
-        [data-bs-theme="dark"] #side-menu-ul::-webkit-scrollbar-thumb,
-        [data-bs-theme="dark"] #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
-
-        .gecko-sidebar .nav-item {
-            flex-shrink: 0; /* Impide que los ítems se aplasten para intentar caber */
-            margin-bottom: 0 !important; 
-        }
+        .gecko-sidebar .nav-item { flex-shrink: 0; margin-bottom: 0 !important; }
 
         .gecko-sidebar .nav-link { 
             padding-top: 8px !important; 
             padding-bottom: 8px !important; 
-            font-size: clamp(11px, 1.5vh, var(--gecko-font-size)) !important;
+            font-size: clamp(12px, 1.5vh, var(--gecko-font-size)) !important;
         }
 
-        .gecko-sidebar .menu-icon svg {
-            width: clamp(18px, 2.5vh, 24px); 
-            height: clamp(18px, 2.5vh, 24px);
+        /* 🚀 ACORDEÓN MÁGICO PARA ESCRITORIO Y MÓVIL */
+        .gecko-sidebar .dropdown-menu-gecko {
+            position: static !important; /* Empuja el contenido hacia abajo */
+            float: none !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-left: 3px solid rgba(26, 93, 59, 0.2) !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            padding: 5px 0 5px 35px !important; /* Sangría visual elegante */
+            margin: 0 !important;
+            transform: none !important;
         }
+
+        .gecko-sidebar .dropdown-menu-gecko::before { display: none !important; } /* Quita la flechita del popup */
+
+        .gecko-sidebar .dropdown-item-gecko { padding: 8px 10px !important; opacity: 0.8; transition: 0.2s; }
+        .gecko-sidebar .dropdown-item-gecko:hover { opacity: 1; background-color: rgba(26, 93, 59, 0.1); border-radius: 6px; }
+
+        /* Rotación dinámica de la flecha */
+        .gecko-sidebar .arrow-icon-gecko { transform: rotate(0deg); }
+        .gecko-sidebar .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
 
         .gecko-sidebar.open {
             transform: translateX(0) !important;
@@ -233,12 +241,15 @@ function getSidebarStyles() {
             body.with-sidebar { padding-left: 260px !important; } 
         }
 
-        .with-sidebar {
-            padding-top: 30px !important; 
+        .with-sidebar { padding-top: 30px !important; }
+        
+        /* Dropdown TOP Escritorio (Se mantiene flotante) */
+        #main-menu-ul .dropdown-menu-gecko {
+            position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
+            background-color: var(--bs-body-bg); border: 1px solid rgba(0,0,0,0.1); padding: 8px; border-radius: 8px; shadow-lg;
         }
     `;
 }
-
 function getTriggerStyles() {
     return `
         .gecko-search-trigger {
@@ -256,10 +267,9 @@ function getTriggerStyles() {
         }
         .gecko-search-trigger.floating { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); }
         .gecko-search-trigger.static { position: relative; margin: 5px auto 10px auto; }
-        
         .gecko-search-trigger:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: #1a5d3b; border-color: #1a5d3b; }
         
-        /* 🚀 ESCUDO DE TAMAÑO DE FUENTE: Mantiene el botón intacto usando !important para ganarle al global */
+        /* 🚀 ESCUDO DE FUENTE PARA EL BUSCADOR (Ignora "Letra Grande") */
         .gecko-search-trigger .placeholder-text { font-size: 13px !important; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
         .gecko-search-trigger .kbd-shortcut { font-size: 10px !important; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
         .gecko-search-trigger svg { width: 16px !important; height: 16px !important; }
