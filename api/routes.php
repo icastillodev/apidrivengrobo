@@ -35,10 +35,10 @@ $router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- 
 $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
 // ============================================================
-// SECCIÓN: Preferencias y Configuración del Usuario
+// SECCIÓN: Preferencias y Configuración del Usuario (Menú/Tema)
 // ============================================================
-$router->get('/user/config/get', 'UserConfigController@getConfig');
-$router->post('/user/config/update', 'UserConfigController@updateConfig');
+$router->get('/user/config/get', 'UserConfigMenuController@getConfig');
+$router->post('/user/config/update', 'UserConfigMenuController@updateConfig');
 
 // Búsqueda tradicional (SQL Rápido)
 $router->get('/search/global', 'GlobalSearchController@search');
