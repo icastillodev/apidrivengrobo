@@ -93,21 +93,25 @@ function renderSedesList(sedes, isMulti) {
 }
 
 /**
- * LÓGICA DE PERMISOS (1=Todos, 2=Admins, 3=Nadie)
+ * LÓGICA DE PERMISOS CRUZADA (Backend SQL devuelve 0, 1, o 2)
+ * 0 = Módulo apagado para toda la institución (Nadie lo ve).
+ * 1 = Habilitado, pero cerrado a investigadores (Solo lo ven Admins/Roles 1 y 2).
+ * 2 = Habilitado y abierto a investigadores (Lo ven todos).
  */
 function checkPermission(flagValue) {
     const val = parseInt(flagValue);
     
-    // 1: Habilitado para TODOS
-    if (val === 1) return true;
+    // Si la institución no tiene el módulo, NADIE lo ve.
+    if (val === 0) return false;
     
-    // 2: Habilitado solo para ADMINS (Roles 1 y 2)
-    // El rol 3 (Investigador) recibe false
-    if (val === 2) {
+    // Si el módulo está abierto para investigadores (2), TODO EL MUNDO lo ve.
+    if (val === 2) return true;
+    
+    // Si el módulo es de uso exclusivo interno (1), SOLO roles administrativos (1 y 2) lo ven.
+    if (val === 1) {
         return [1, 2].includes(userRole);
     }
 
-    // 3 o cualquier otro valor: Deshabilitado
     return false;
 }
 
