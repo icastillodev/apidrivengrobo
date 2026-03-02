@@ -142,7 +142,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
         </div>
 
         <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
-            <div class="d-flex justify-content-between align-items-start p-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-start p-3 border-bottom flex-shrink-0">
                 <div class="d-flex flex-column">
                     <span class="fw-bold text-success small text-uppercase">${instName}</span>
                     <span class="text-muted" style="font-size: 9px;">${userText}</span>
@@ -152,13 +152,17 @@ export function renderTopMenuStructure(container, menuIds, templates) {
                 </div>
                 <button class="btn-close mt-1" id="gecko-close-sidebar"></button>
             </div>
-            <ul class="nav flex-column p-2 mb-auto" id="mobile-menu-ul"></ul>
+            
+            <ul class="nav flex-column p-2" id="mobile-menu-ul"></ul>
+            
+            <div class="mt-auto border-top pt-2 pb-3 text-center flex-shrink-0" id="mobile-controls-container">
+                <ul class="nav nav-pills flex-column" id="mobile-controls-ul"></ul>
+            </div>
         </aside>
     `;
     
     document.body.prepend(header);
 
-    // Activamos el botón para abrir el menú en la versión TOP
     const toggleTop = document.getElementById('gecko-mobile-toggle-top');
     if (toggleTop) {
         toggleTop.onclick = (e) => {
@@ -169,13 +173,16 @@ export function renderTopMenuStructure(container, menuIds, templates) {
 
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
+    const mobileControls = document.getElementById('mobile-controls-ul');
     
     menuIds.forEach(id => {
         ulDesktop.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'top', templates));
         ulMobile.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates));
     });
+    
     ulDesktop.insertAdjacentHTML('beforeend', buildControlsHTML('top'));
-    ulMobile.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
+    // En móvil, inyectamos los controles en su contenedor fijo inferior
+    mobileControls.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
 
     renderOmniComponents('top');
 }

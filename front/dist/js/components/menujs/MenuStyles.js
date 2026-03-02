@@ -172,50 +172,58 @@ function getBaseStyles() {
 
 function getSidebarStyles() {
     return `
-.gecko-sidebar { 
+        .gecko-sidebar { 
             position: fixed !important; 
-            top: 0; left: 0; height: 100vh; width: 260px; 
+            top: 0; left: 0; 
+            height: 100dvh; /* dvh evita cortes con las barras de navegación en móviles iOS/Android */
+            width: 260px; 
             z-index: 1050; 
             background-color: var(--bs-body-bg);
             display: flex; flex-direction: column;
-            padding-bottom: 15px !important;
-            overflow: visible !important; 
-            
-            /* 🚀 EL BORDE VERDE Y EL ESCONDITE MÓVIL */
+            padding-bottom: 0 !important; 
+            overflow: hidden !important; /* El padre NUNCA hace scroll */
             border-right: 4px solid #1a5d3b !important; 
             transform: translateX(-100%);
             transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
         
-        #side-menu-ul {
-            flex-grow: 1; /* Ocupa todo el espacio sobrante */
+        /* 🚀 EL SECRETO DEL SCROLL PERFECTO (ESCRITORIO Y MÓVIL) */
+        #side-menu-ul, #mobile-menu-ul {
+            flex: 1 1 auto; /* Toma todo el espacio disponible en el medio */
             display: flex;
             flex-direction: column;
-            justify-content: space-evenly; /* Reparte los ítems equitativamente */
-            overflow-y: visible; /* Nunca scroll */
-            min-height: 0;
-            padding: 0;
+            justify-content: flex-start; /* Agrupa arriba, no los dispersa */
+            overflow-y: auto !important; /* ¡AQUÍ ESTÁ EL SCROLL! */
+            overflow-x: hidden;
+            min-height: 0; /* Previene bugs de colapso en Flexbox */
+            padding: 10px 0;
             margin-bottom: 0 !important;
+            gap: 2px;
         }
 
-        /* Ajuste automático para que quepa todo */
+        /* Scrollbar elegante y minimalista */
+        #side-menu-ul::-webkit-scrollbar, #mobile-menu-ul::-webkit-scrollbar { width: 5px; }
+        #side-menu-ul::-webkit-scrollbar-thumb, #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
+        [data-bs-theme="dark"] #side-menu-ul::-webkit-scrollbar-thumb,
+        [data-bs-theme="dark"] #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
+
         .gecko-sidebar .nav-item {
+            flex-shrink: 0; /* Impide que los ítems se aplasten para intentar caber */
             margin-bottom: 0 !important; 
         }
 
         .gecko-sidebar .nav-link { 
-            padding-top: 6px !important; 
-            padding-bottom: 6px !important; 
-            /* Si hay muchos ítems, el texto se achica un poco automáticamente */
-            font-size: clamp(10px, 1.2vh, var(--gecko-font-size)) !important;
+            padding-top: 8px !important; 
+            padding-bottom: 8px !important; 
+            font-size: clamp(11px, 1.5vh, var(--gecko-font-size)) !important;
         }
 
         .gecko-sidebar .menu-icon svg {
-            /* Achica un poco el icono si la pantalla es bajita */
             width: clamp(18px, 2.5vh, 24px); 
             height: clamp(18px, 2.5vh, 24px);
         }
-    .gecko-sidebar.open {
+
+        .gecko-sidebar.open {
             transform: translateX(0) !important;
             box-shadow: 10px 0 30px rgba(0,0,0,0.3);
         }
@@ -224,38 +232,9 @@ function getSidebarStyles() {
             body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; }
             body.with-sidebar { padding-left: 260px !important; } 
         }
-        @media (min-width: 769px) { body.with-sidebar { padding-left: 260px !important; } }
-        /* --- BLOQUEO DE DESBORDAMIENTO (ANTI-SCROLL EXTREMO) --- */
-        #side-menu-ul {
-            /* Forzamos a que el UL nunca pase del 100% del espacio disponible */
-            max-height: calc(100vh - 160px); 
-        }
 
-        .gecko-sidebar .nav-item {
-            /* Cada ítem tiene permitido encogerse si no hay espacio */
-            flex: 1 1 auto; 
-            min-height: 25px; /* Altura mínima de colapso */
-            display: flex;
-            align-items: center;
-        }
-
-        .gecko-sidebar .nav-link {
-            /* El enlace ocupa el 100% del ítem encogido */
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            /* Padding elástico: menos espacio vertical, menos padding */
-            padding-top: clamp(2px, 1vh, 8px) !important;
-            padding-bottom: clamp(2px, 1vh, 8px) !important;
-            /* La letra se ahoga antes que salir de la pantalla */
-            font-size: clamp(9px, 2vh, var(--gecko-font-size)) !important;
-        }
-
-        /* Espacio para la barra de búsqueda Omnibox cuando el menú es lateral */
-        .with-sidebar ,
-        .with-sidebar  {
-            padding-top: 30px !important; /* Da aire arriba para que el buscador flotante no tape el contenido */
+        .with-sidebar {
+            padding-top: 30px !important; 
         }
     `;
 }
@@ -267,9 +246,9 @@ function getTriggerStyles() {
             background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 50px;
-            padding: 6px 16px; /* Más compacto */
+            padding: 6px 16px;
             display: flex; align-items: center; gap: 10px;
-            transition: opacity 0.2s; /* Solo opacidad, el movimiento lo hace la caja */
+            transition: opacity 0.2s;
             cursor: pointer;
             width: 280px; 
             color: #666;
@@ -279,8 +258,11 @@ function getTriggerStyles() {
         .gecko-search-trigger.static { position: relative; margin: 5px auto 10px auto; }
         
         .gecko-search-trigger:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: #1a5d3b; border-color: #1a5d3b; }
-        .gecko-search-trigger .placeholder-text { font-size: 13px; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
-        .gecko-search-trigger .kbd-shortcut { font-size: 10px; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
+        
+        /* 🚀 ESCUDO DE TAMAÑO DE FUENTE: Mantiene el botón intacto usando !important para ganarle al global */
+        .gecko-search-trigger .placeholder-text { font-size: 13px !important; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
+        .gecko-search-trigger .kbd-shortcut { font-size: 10px !important; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
+        .gecko-search-trigger svg { width: 16px !important; height: 16px !important; }
     `;
 }
 
