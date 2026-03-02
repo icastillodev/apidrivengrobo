@@ -83,6 +83,11 @@ async function saveDepto(e, instId) {
     const fd = new FormData(e.target);
     fd.append('instId', instId);
 
+    // [NUEVO] - Limpieza del ID de Organismo antes de enviar
+    if (!fd.get('idOrg') || fd.get('idOrg').trim() === '') {
+        fd.set('idOrg', ''); // Lo forzamos a vacío absoluto para que PHP lo detecte fácil
+    }
+
     const modalEl = document.getElementById('modal-depto');
     const modal = bootstrap.Modal.getInstance(modalEl);
     modal.hide();
@@ -97,7 +102,9 @@ async function saveDepto(e, instId) {
         } else {
             Swal.fire('Error', res.message, 'error');
         }
-    } catch (err) { Swal.fire('Error', 'Fallo de red', 'error'); }
+    } catch (err) { 
+        Swal.fire('Error', 'Fallo de red', 'error'); 
+    }
 }
 
 window.deleteDepto = async (id) => {
