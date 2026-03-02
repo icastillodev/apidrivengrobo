@@ -67,14 +67,22 @@ document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
 
             const isHidden = currentMenu.classList.contains('hidden');
             
-            // 1. Cerramos TODOS los demás submenús abiertos
+            // Cierra todos los submenús y resetea las flechas
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
             document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
 
-            // 2. Si el que tocamos estaba oculto, lo abrimos (Acordeón)
             if(isHidden) {
                 currentMenu.classList.remove('hidden');
-                btn.classList.add('open'); 
+                btn.classList.add('open'); // Rota la flecha
+
+                // LA MAGIA: Si estamos en el Escritorio Lateral, calculamos coordenadas
+                // Esto evita que el menú se corte por culpa del "overflow-y: auto" (Scroll)
+                if (btn.closest('#side-menu-ul')) {
+                    const rect = btn.getBoundingClientRect();
+                    currentMenu.style.position = 'fixed'; // Flota sobre todo el DOM
+                    currentMenu.style.top = rect.top + 'px'; // A la altura del botón
+                    currentMenu.style.left = (rect.right + 12) + 'px'; // Pegado a la derecha + 12px
+                }
             }
         };
     });

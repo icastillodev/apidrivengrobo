@@ -99,178 +99,100 @@ function getBaseStyles() {
 #global-loader img {
     animation: gecko-pulse 2s ease-in-out infinite;
 }
-    // Agrega esto dentro de los templates de estilos en MenuStyles.js (reemplaza las reglas anteriores de dropdown-menu-gecko)
-
-/* ==============================================
-   1. MENU ESCRITORIO LATERAL (SCROLL NATIVO)
-   ============================================== */
-#side-menu-ul {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start; /* Evita que queden espacios gigantes */
-    overflow-y: auto;  /* ¡LA CLAVE! Habilita el scroll vertical */
-    overflow-x: hidden;
-    padding: 0;
-    margin-bottom: 0 !important;
-    gap: 4px;
-}
-
-/* Scrollbar personalizado para el menú lateral */
-#side-menu-ul::-webkit-scrollbar { width: 5px; }
-#side-menu-ul::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
-[data-bs-theme="dark"] #side-menu-ul::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
-
-/* Submenú en Escritorio Lateral (Posición Fixed asignada por JS) */
-#side-menu-ul .dropdown-menu-gecko {
-    min-width: 200px;
-    z-index: 9999;
-}
-#side-menu-ul .dropdown-menu-gecko::before {
-    content: ""; position: absolute; top: 15px; left: -6px; width: 12px; height: 12px;
-    background: var(--bs-body-bg); border-left: 1px solid rgba(0,0,0,0.1); border-bottom: 1px solid rgba(0,0,0,0.1);
-    transform: rotate(45deg);
-}
-
-/* ==============================================
-   2. MENU MÓVIL LATERAL (MODO ACORDEÓN)
-   ============================================== */
-#mobile-menu-ul .dropdown-menu-gecko {
-    position: static !important; /* Anula el absoluto, empuja el contenido */
-    box-shadow: none !important;
-    border: none !important;
-    border-left: 2px solid rgba(26, 93, 59, 0.2) !important; /* Línea guía */
-    background: transparent !important;
-    padding-left: 2.5rem !important;
-    margin-top: 4px;
-    margin-bottom: 8px;
-    transform: none !important;
-    width: 100%;
-}
-#mobile-menu-ul .dropdown-menu-gecko::before { display: none !important; }
-
-/* ==============================================
-   3. MENU TOP ESCRITORIO
-   ============================================== */
-#main-menu-ul .dropdown-menu-gecko {
-    position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
-}
-
-/* ==============================================
-   4. ROTACIÓN DE FLECHAS DINÁMICAS
-   ============================================== */
-/* Escritorio: Apunta a la derecha, al abrir baja */
-#side-menu-ul .arrow-icon-gecko { transform: rotate(-90deg); }
-#side-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(0deg); }
-
-/* Móvil/Top: Apunta abajo, al abrir sube */
-#mobile-menu-ul .arrow-icon-gecko, #main-menu-ul .arrow-icon-gecko { transform: rotate(0deg); }
-#mobile-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko, 
-#main-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
+    
     `;
 }
 
 function getSidebarStyles() {
     return `
-        /* ========================================================= */
-        /* 1. ESTRUCTURA MAESTRA DEL SIDEBAR (ESCRITORIO Y MÓVIL)    */
-        /* ========================================================= */
-        .gecko-sidebar { 
+.gecko-sidebar { 
             position: fixed !important; 
-            top: 0; left: 0; 
-            height: 100vh; /* Fallback */
-            height: 100dvh; /* Soporte perfecto para barras de navegación en iOS/Android */
-            width: 260px; 
+            top: 0; left: 0; height: 100vh; width: 260px; 
             z-index: 1050; 
             background-color: var(--bs-body-bg);
-            display: flex; 
-            flex-direction: column;
-            padding: 0 !important;
-            overflow: hidden !important; /* El padre NUNCA hace scroll */
+            display: flex; flex-direction: column;
+            padding-bottom: 15px !important;
+            overflow: visible !important; 
+            
+            /* 🚀 EL BORDE VERDE Y EL ESCONDITE MÓVIL */
             border-right: 4px solid #1a5d3b !important; 
             transform: translateX(-100%);
             transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
-
-        /* ========================================================= */
-        /* 2. ÁREA CENTRAL (LA MAGIA DEL SCROLL)                     */
-        /* ========================================================= */
-        .gecko-sidebar-scroll-area {
-            flex: 1 1 auto; /* Toma el espacio sobrante */
-            overflow-y: auto !important; /* ACTIVA EL SCROLL */
-            overflow-x: hidden;
-            min-height: 0; /* ¡REGLA DE ORO! Obliga a Flexbox a respetar los límites y no desbordar */
-            width: 100%;
-            padding: 10px 0;
+        
+        #side-menu-ul {
+            flex-grow: 1; /* Ocupa todo el espacio sobrante */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly; /* Reparte los ítems equitativamente */
+            overflow-y: visible; /* Nunca scroll */
+            min-height: 0;
+            padding: 0;
+            margin-bottom: 0 !important;
         }
 
-        /* Estilo del Scrollbar (Fino y Elegante) */
-        .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 4px; }
-        .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.3); border-radius: 10px; }
-        [data-bs-theme="dark"] .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
+        /* Ajuste automático para que quepa todo */
+        .gecko-sidebar .nav-item {
+            margin-bottom: 0 !important; 
+        }
 
-        .gecko-sidebar .nav-item { flex-shrink: 0; margin-bottom: 0 !important; }
         .gecko-sidebar .nav-link { 
-            padding-top: 10px !important; 
-            padding-bottom: 10px !important; 
-            font-size: clamp(12px, 1.5vh, var(--gecko-font-size)) !important;
+            padding-top: 6px !important; 
+            padding-bottom: 6px !important; 
+            /* Si hay muchos ítems, el texto se achica un poco automáticamente */
+            font-size: clamp(10px, 1.2vh, var(--gecko-font-size)) !important;
         }
 
-        /* ========================================================= */
-        /* 3. ACORDEÓN PERFECTO (NADA DE FLOTANTES AL COSTADO)       */
-        /* ========================================================= */
-        .dropdown-menu-gecko.hidden { display: none !important; }
-
-        .gecko-sidebar .dropdown-menu-gecko {
-            position: static !important; /* Empuja el contenido hacia abajo, no flota */
-            display: block; /* El JS controla el toggle mediante la clase .hidden */
-            width: 100% !important;
-            box-shadow: none !important;
-            border: none !important;
-            border-left: 3px solid rgba(26, 93, 59, 0.2) !important;
-            border-radius: 0 !important;
-            background: transparent !important;
-            padding: 5px 0 5px 35px !important; /* Sangría hacia adentro */
-            margin: 0 !important;
-            transform: none !important;
+        .gecko-sidebar .menu-icon svg {
+            /* Achica un poco el icono si la pantalla es bajita */
+            width: clamp(18px, 2.5vh, 24px); 
+            height: clamp(18px, 2.5vh, 24px);
         }
-
-        .gecko-sidebar .dropdown-menu-gecko::before { display: none !important; } /* Quita la flechita inútil del popup */
-        .gecko-sidebar .dropdown-item-gecko { padding: 8px 10px !important; opacity: 0.8; transition: 0.2s; }
-        .gecko-sidebar .dropdown-item-gecko:hover { opacity: 1; background-color: rgba(26, 93, 59, 0.1); border-radius: 6px; color: #1a5d3b !important; }
-
-        /* Animación de la flecha del Acordeón */
-        .gecko-sidebar .arrow-icon-gecko { transform: rotate(0deg); transition: transform 0.3s ease; }
-        .gecko-sidebar .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
-
-        /* ========================================================= */
-        /* 4. COMPORTAMIENTO RESPONSIVE (MÓVIL VS ESCRITORIO)        */
-        /* ========================================================= */
-        .gecko-sidebar.open {
+    .gecko-sidebar.open {
             transform: translateX(0) !important;
             box-shadow: 10px 0 30px rgba(0,0,0,0.3);
         }
 
-        /* ESCRITORIO: El menú empuja el cuerpo de la página */
         @media (min-width: 769px) { 
             body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; }
             body.with-sidebar { padding-left: 260px !important; } 
         }
-
-        /* MÓVIL: El menú flota por encima (Drawer) y NO empuja el padding */
-        @media (max-width: 768px) {
-            body.with-sidebar { padding-left: 0 !important; }
+        @media (min-width: 769px) { body.with-sidebar { padding-left: 260px !important; } }
+        /* --- BLOQUEO DE DESBORDAMIENTO (ANTI-SCROLL EXTREMO) --- */
+        #side-menu-ul {
+            /* Forzamos a que el UL nunca pase del 100% del espacio disponible */
+            max-height: calc(100vh - 160px); 
         }
 
-        .with-sidebar { padding-top: 30px !important; }
-        
-        /* Dropdown TOP Escritorio (Ese SÍ debe flotar) */
-        #main-menu-ul .dropdown-menu-gecko {
-            position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
-            background-color: var(--bs-body-bg); border: 1px solid rgba(0,0,0,0.1); padding: 8px; border-radius: 8px;
+        .gecko-sidebar .nav-item {
+            /* Cada ítem tiene permitido encogerse si no hay espacio */
+            flex: 1 1 auto; 
+            min-height: 25px; /* Altura mínima de colapso */
+            display: flex;
+            align-items: center;
+        }
+
+        .gecko-sidebar .nav-link {
+            /* El enlace ocupa el 100% del ítem encogido */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            /* Padding elástico: menos espacio vertical, menos padding */
+            padding-top: clamp(2px, 1vh, 8px) !important;
+            padding-bottom: clamp(2px, 1vh, 8px) !important;
+            /* La letra se ahoga antes que salir de la pantalla */
+            font-size: clamp(9px, 2vh, var(--gecko-font-size)) !important;
+        }
+
+        /* Espacio para la barra de búsqueda Omnibox cuando el menú es lateral */
+        .with-sidebar ,
+        .with-sidebar  {
+            padding-top: 30px !important; /* Da aire arriba para que el buscador flotante no tape el contenido */
         }
     `;
 }
+
 function getTriggerStyles() {
     return `
         .gecko-search-trigger {
@@ -278,9 +200,9 @@ function getTriggerStyles() {
             background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 50px;
-            padding: 6px 16px;
+            padding: 6px 16px; /* Más compacto */
             display: flex; align-items: center; gap: 10px;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s; /* Solo opacidad, el movimiento lo hace la caja */
             cursor: pointer;
             width: 280px; 
             color: #666;
@@ -288,12 +210,10 @@ function getTriggerStyles() {
         }
         .gecko-search-trigger.floating { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); }
         .gecko-search-trigger.static { position: relative; margin: 5px auto 10px auto; }
-        .gecko-search-trigger:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: #1a5d3b; border-color: #1a5d3b; }
         
-        /* 🚀 ESCUDO DE FUENTE PARA EL BUSCADOR (Ignora "Letra Grande") */
-        .gecko-search-trigger .placeholder-text { font-size: 13px !important; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
-        .gecko-search-trigger .kbd-shortcut { font-size: 10px !important; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
-        .gecko-search-trigger svg { width: 16px !important; height: 16px !important; }
+        .gecko-search-trigger:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: #1a5d3b; border-color: #1a5d3b; }
+        .gecko-search-trigger .placeholder-text { font-size: 13px; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
+        .gecko-search-trigger .kbd-shortcut { font-size: 10px; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
     `;
 }
 

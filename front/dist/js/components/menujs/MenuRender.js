@@ -59,10 +59,11 @@ export function renderSideMenuStructure(container, menuIds, templates) {
 
     const sidebar = document.createElement('aside');
     sidebar.id = "gecko-sidebar-element";
-    sidebar.className = "gecko-sidebar shadow-sm";
+    sidebar.className = "gecko-sidebar d-flex flex-column flex-shrink-0 p-3 border-end shadow-sm";
     
+    // ESTRUCTURA FLEX PARA QUE EL MENÚ OCUPE LO QUE SOBRA
     sidebar.innerHTML = `
-        <div class="d-flex flex-column pb-1 flex-shrink-0 p-3">
+        <div class="d-flex flex-column pb-1 flex-shrink-0">
             <div class="d-flex justify-content-between align-items-center w-100">
                 <div class="d-flex flex-column" style="overflow: hidden; line-height: 1.1;">
                     <span class="fs-6 fw-black text-success text-uppercase lh-1 text-truncate" title="${instName}">${instName}</span>
@@ -73,14 +74,14 @@ export function renderSideMenuStructure(container, menuIds, templates) {
             <hr class="my-2 opacity-25">
         </div>
         
-        <div class="gecko-sidebar-scroll-area">
-            <ul class="nav nav-pills flex-column mb-auto gap-1 px-2" id="side-menu-ul"></ul>
-        </div>
+        <ul class="nav nav-pills flex-column mb-auto gap-1" id="side-menu-ul"></ul>
         
-        <div class="mt-auto border-top pt-2 text-center flex-shrink-0 p-3">
+        <div class="mt-auto border-top pt-2 text-center flex-shrink-0">
             <div class="mb-2 px-2">
                 <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 9px; opacity: 0.8;">GROBO - ERP BIOTERIOS</a>
-                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px;">Gekos.uy & UDELAR</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px;">
+                    Gekos.uy & UDELAR
+                </a>
             </div>
             <ul class="nav nav-pills flex-column" id="side-controls-ul"></ul>
         </div>
@@ -88,15 +89,21 @@ export function renderSideMenuStructure(container, menuIds, templates) {
 
     document.body.prepend(sidebar);
     
+    // ... resto del renderSideMenu igual (mobile toggle, loops) ...
     const mobileToggle = document.createElement('button');
     mobileToggle.id = "gecko-mobile-toggle";
     mobileToggle.className = "btn btn-success position-fixed top-0 start-0 m-2 d-md-none z-3 shadow";
     mobileToggle.innerHTML = '<svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>';
-    mobileToggle.onclick = (e) => { e.stopPropagation(); sidebar.classList.add('open'); };
+    mobileToggle.onclick = (e) => {
+        e.stopPropagation();
+        sidebar.classList.add('open');
+    };
     document.body.prepend(mobileToggle);
 
     const ul = document.getElementById('side-menu-ul');
-    menuIds.forEach(id => { ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates)); });
+    menuIds.forEach(id => {
+        ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates));
+    });
     
     const controlsUl = document.getElementById('side-controls-ul');
     controlsUl.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
@@ -121,7 +128,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
                         <span class="text-muted fw-bold mt-1" style="font-size: 10px;">${userText}</span>
                     </div>
                 </div>
-                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link text-end">Gekos.uy & UDELAR</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link text-end">Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
             </div>
 
             <nav class="w-full d-flex flex-column align-items-center position-relative">
@@ -134,21 +141,21 @@ export function renderTopMenuStructure(container, menuIds, templates) {
             </nav>
         </div>
 
-        <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary shadow-sm">
+        <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
             <div class="d-flex justify-content-between align-items-start p-3 border-bottom flex-shrink-0">
                 <div class="d-flex flex-column">
                     <span class="fw-bold text-success small text-uppercase">${instName}</span>
                     <span class="text-muted" style="font-size: 9px;">${userText}</span>
                     <hr class="my-2 opacity-25 w-100">
+                    <a href="https://groboapp.com" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px;">GROBO - ERP BIOTERIOS</a>
+                    <span class="text-muted d-block fw-bold" style="font-size: 9px;">Gekos.uy & UDELAR</span>
                 </div>
                 <button class="btn-close mt-1" id="gecko-close-sidebar"></button>
             </div>
             
-            <div class="gecko-sidebar-scroll-area">
-                <ul class="nav flex-column p-2" id="mobile-menu-ul"></ul>
-            </div>
+            <ul class="nav flex-column p-2" id="mobile-menu-ul"></ul>
             
-            <div class="mt-auto border-top pt-2 pb-3 text-center flex-shrink-0">
+            <div class="mt-auto border-top pt-2 pb-3 text-center flex-shrink-0" id="mobile-controls-container">
                 <ul class="nav nav-pills flex-column" id="mobile-controls-ul"></ul>
             </div>
         </aside>
@@ -157,7 +164,12 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     document.body.prepend(header);
 
     const toggleTop = document.getElementById('gecko-mobile-toggle-top');
-    if (toggleTop) { toggleTop.onclick = (e) => { e.stopPropagation(); document.getElementById('gecko-sidebar-element').classList.add('open'); }; }
+    if (toggleTop) {
+        toggleTop.onclick = (e) => {
+            e.stopPropagation();
+            document.getElementById('gecko-sidebar-element').classList.add('open');
+        };
+    }
 
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
@@ -169,11 +181,12 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     });
     
     ulDesktop.insertAdjacentHTML('beforeend', buildControlsHTML('top'));
+    // En móvil, inyectamos los controles en su contenedor fijo inferior
     mobileControls.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
 
     renderOmniComponents('top');
 }
-// Limpiamos la función constructora para que CSS haga la magia
+
 function buildMenuItemHTML(id, layout, templates) {
     const item = templates[id]; 
     if (!item) return '';
@@ -181,21 +194,31 @@ function buildMenuItemHTML(id, layout, templates) {
     const isSide = layout === 'side';
     
     const liClass = isSide ? 'nav-item mb-1 w-100 position-relative group-gecko-item' : 'nav-item position-relative';
-    const linkClass = isSide ? 'nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2' : 'gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body';
     
-    const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">${item.svg}<div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div></div>`;
+    const linkClass = isSide 
+        ? 'nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2' 
+        : 'gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body';
+    
+    const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">
+                        ${item.svg}
+                        <div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div>
+                      </div>`;
     const labelHTML = `<span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span>`;
 
     if (item.isDropdown && item.children) {
+        // Flecha dinámica (sin rotación forzada en línea, lo hará el CSS)
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
-        const childrenHTML = item.children.map(child => `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;">${child.label}</a></li>`).join('');
+        
+        const childrenHTML = item.children.map(child => `
+            <li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;">${child.label}</a></li>
+        `).join('');
 
         return `
         <li class="${liClass}">
             <a href="javascript:void(0);" class="${linkClass} dropdown-toggle-gecko d-flex ${isSide ? 'align-items-center justify-content-between' : 'flex-column align-items-center'}">
                 ${isSide ? `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}` : `<div>${iconHTML}</div> <div class="d-flex align-items-center">${labelHTML} ${arrowIcon}</div>`}
             </a>
-            <ul class="dropdown-menu-gecko hidden list-unstyled">
+            <ul class="dropdown-menu-gecko hidden list-unstyled border shadow-lg rounded-3">
                 ${childrenHTML}
             </ul>
         </li>`;
