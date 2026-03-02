@@ -41,6 +41,12 @@ class AdminConfigDeptoController {
             $sesion = Auditoria::getDatosSesion();
             $_POST['instId'] = $sesion['instId'];
             
+            // --- FIX 1366: Intercepción de llaves foráneas vacías ---
+            // Convertimos el string vacío a un NULL puro de PHP antes de enviarlo al Model
+            if (isset($_POST['idOrg']) && trim($_POST['idOrg']) === '') {
+                $_POST['idOrg'] = null;
+            }
+            
             $this->model->$method($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

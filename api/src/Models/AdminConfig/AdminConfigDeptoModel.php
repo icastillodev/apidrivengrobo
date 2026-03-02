@@ -59,15 +59,33 @@ class AdminConfigDeptoModel {
     }
 
     public function saveDepartamento($data) {
+        // --- FIX 1366: Validación final en el Model ---
+        // Nos aseguramos 100% que si viene vacío, pase un 'null' real a PDO para la llave foránea
+        $idOrg = (isset($data['idOrg']) && trim($data['idOrg']) !== '') ? $data['idOrg'] : null;
+
         if (empty($data['iddeptoA'])) {
             $sql = "INSERT INTO departamentoe (NombreDeptoA, DetalledeptoA, organismopertenece, IdInstitucion) VALUES (?, ?, ?, ?)";
-            $res = $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['instId']]);
+            
+            // Pasamos $idOrg validado, en lugar de $data['idOrg']
+            $res = $this->db->prepare($sql)->execute([
+                $data['NombreDepto'], 
+                $data['Detalle'], 
+                $idOrg, 
+                $data['instId']
+            ]);
             
             Auditoria::log($this->db, 'INSERT', 'departamentoe', "Creó departamento: " . $data['NombreDepto']);
             return $res;
         } else {
             $sql = "UPDATE departamentoe SET NombreDeptoA=?, DetalledeptoA=?, organismopertenece=? WHERE iddeptoA=?";
-            $res = $this->db->prepare($sql)->execute([$data['NombreDepto'], $data['Detalle'], $data['idOrg'], $data['iddeptoA']]);
+            
+            // Pasamos $idOrg validado también aquí
+            $res = $this->db->prepare($sql)->execute([
+                $data['NombreDepto'], 
+                $data['Detalle'], 
+                $idOrg, 
+                $data['iddeptoA']
+            ]);
             
             Auditoria::log($this->db, 'UPDATE', 'departamentoe', "Modificó departamento ID: " . $data['iddeptoA']);
             return $res;
