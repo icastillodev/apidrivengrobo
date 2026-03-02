@@ -4,7 +4,7 @@ namespace App\Controllers;
 use App\Models\UserConfig\UserConfigModel;
 use App\Utils\Auditoria;
 
-class UserConfigController {
+class UserConfigMenuController {
     private $model;
 
     public function __construct($db) {
@@ -16,25 +16,11 @@ class UserConfigController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            
-            // Validación por si la sesión no trae el ID
-            if (!isset($sesion['userId'])) {
-                throw new \Exception("No se encontró userId en el token de sesión.");
-            }
-
             $data = $this->model->getConfig($sesion['userId']);
-            
-            // Si la base de datos no devuelve nada (false), enviamos un array vacío
             echo json_encode(['status' => 'success', 'data' => $data ?: []]);
-            
-        } catch (\Throwable $e) { // <-- \Throwable atrapa TODO (Errores Fatales y Excepciones)
+        } catch (\Throwable $e) {
             http_response_code(500);
-            echo json_encode([
-                'status' => 'error', 
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
@@ -45,19 +31,11 @@ class UserConfigController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $data = json_decode(file_get_contents('php://input'), true);
-            
-            if (!$data) throw new \Exception("No se recibieron datos JSON válidos.");
-
             $this->model->updateConfig($sesion['userId'], $data);
-            
-            echo json_encode(['status' => 'success', 'message' => 'Preferencias actualizadas']);
+            echo json_encode(['status' => 'success', 'message' => 'Actualizado']);
         } catch (\Throwable $e) {
             http_response_code(500);
-            echo json_encode([
-                'status' => 'error', 
-                'message' => $e->getMessage(),
-                'line' => $e->getLine()
-            ]);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
