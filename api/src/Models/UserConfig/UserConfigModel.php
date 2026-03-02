@@ -18,40 +18,26 @@ class UserConfigModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    public function updateConfig($userId, $data) {
+public function updateConfig($userId, $data) {
         $fields = [];
         $values = [];
 
-        // Mapeo dinámico de JSON -> Columnas SQL
-        if (isset($data['theme'])) { 
-            $fields[] = "tema_preferido = ?"; 
-            $values[] = $data['theme']; 
-        }
-        if (isset($data['lang'])) { 
-            $fields[] = "idioma_preferido = ?"; 
-            $values[] = $data['lang']; 
-        }
-        if (isset($data['fontSize'])) { 
-            $fields[] = "letra_preferida = ?"; 
-            $values[] = $data['fontSize']; 
-        }
-        if (isset($data['menu'])) { 
-            $fields[] = "menu_preferido = ?"; 
-            $values[] = $data['menu']; 
-        }
-        if (isset($data['gecko_ok'])) { 
-            $fields[] = "gecko_ok = ?"; 
-            $values[] = (int)$data['gecko_ok']; 
-        }
+        if (isset($data['theme'])) { $fields[] = "tema_preferido = ?"; $values[] = $data['theme']; }
+        if (isset($data['lang'])) { $fields[] = "idioma_preferido = ?"; $values[] = $data['lang']; }
+        if (isset($data['fontSize'])) { $fields[] = "letra_preferida = ?"; $values[] = $data['fontSize']; }
+        if (isset($data['menu'])) { $fields[] = "menu_preferido = ?"; $values[] = $data['menu']; }
+        if (isset($data['gecko_ok'])) { $fields[] = "gecko_ok = ?"; $values[] = (int)$data['gecko_ok']; }
 
-        // Si no hay nada que actualizar, salimos silenciosamente
-        if (empty($fields)) return true;
+        if (empty($fields)) return 0; // No había nada que actualizar
 
-        // Añadimos el userId al final para el WHERE
-        $values[] = $userId;
+        $values[] = $userId; // El ID para el WHERE
 
         $sql = "UPDATE personae SET " . implode(', ', $fields) . " WHERE IdUsrA = ?";
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute($values);
+        
+        $stmt->execute($values);
+        
+        // Magia: Nos devuelve cuántas filas alteró realmente
+        return $stmt->rowCount(); 
     }
 }
