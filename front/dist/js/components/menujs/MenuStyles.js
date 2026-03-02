@@ -99,6 +99,74 @@ function getBaseStyles() {
 #global-loader img {
     animation: gecko-pulse 2s ease-in-out infinite;
 }
+    // Agrega esto dentro de los templates de estilos en MenuStyles.js (reemplaza las reglas anteriores de dropdown-menu-gecko)
+
+/* ==============================================
+   1. MENU ESCRITORIO LATERAL (SCROLL NATIVO)
+   ============================================== */
+#side-menu-ul {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Evita que queden espacios gigantes */
+    overflow-y: auto;  /* ¡LA CLAVE! Habilita el scroll vertical */
+    overflow-x: hidden;
+    padding: 0;
+    margin-bottom: 0 !important;
+    gap: 4px;
+}
+
+/* Scrollbar personalizado para el menú lateral */
+#side-menu-ul::-webkit-scrollbar { width: 5px; }
+#side-menu-ul::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
+[data-bs-theme="dark"] #side-menu-ul::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
+
+/* Submenú en Escritorio Lateral (Posición Fixed asignada por JS) */
+#side-menu-ul .dropdown-menu-gecko {
+    min-width: 200px;
+    z-index: 9999;
+}
+#side-menu-ul .dropdown-menu-gecko::before {
+    content: ""; position: absolute; top: 15px; left: -6px; width: 12px; height: 12px;
+    background: var(--bs-body-bg); border-left: 1px solid rgba(0,0,0,0.1); border-bottom: 1px solid rgba(0,0,0,0.1);
+    transform: rotate(45deg);
+}
+
+/* ==============================================
+   2. MENU MÓVIL LATERAL (MODO ACORDEÓN)
+   ============================================== */
+#mobile-menu-ul .dropdown-menu-gecko {
+    position: static !important; /* Anula el absoluto, empuja el contenido */
+    box-shadow: none !important;
+    border: none !important;
+    border-left: 2px solid rgba(26, 93, 59, 0.2) !important; /* Línea guía */
+    background: transparent !important;
+    padding-left: 2.5rem !important;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    transform: none !important;
+    width: 100%;
+}
+#mobile-menu-ul .dropdown-menu-gecko::before { display: none !important; }
+
+/* ==============================================
+   3. MENU TOP ESCRITORIO
+   ============================================== */
+#main-menu-ul .dropdown-menu-gecko {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
+}
+
+/* ==============================================
+   4. ROTACIÓN DE FLECHAS DINÁMICAS
+   ============================================== */
+/* Escritorio: Apunta a la derecha, al abrir baja */
+#side-menu-ul .arrow-icon-gecko { transform: rotate(-90deg); }
+#side-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(0deg); }
+
+/* Móvil/Top: Apunta abajo, al abrir sube */
+#mobile-menu-ul .arrow-icon-gecko, #main-menu-ul .arrow-icon-gecko { transform: rotate(0deg); }
+#mobile-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko, 
+#main-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
     `;
 }
 

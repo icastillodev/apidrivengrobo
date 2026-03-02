@@ -16,11 +16,25 @@ class UserConfigController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            // Traemos las configuraciones del usuario
+            
+            // Validación por si la sesión no trae el ID
+            if (!isset($sesion['userId'])) {
+                throw new \Exception("No se encontró userId en el token de sesión.");
+            }
+
             $data = $this->model->getConfig($sesion['userId']);
-            echo json_encode(['status' => 'success', 'data' => $data]);
-        } catch (\Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            
+            // Si la base de datos no devuelve nada (false), enviamos un array vacío
+            echo json_encode(['status' => 'success', 'data' => $data ?: []]);
+            
+        } catch (\Throwable $e) { // <-- \Throwable atrapa TODO (Errores Fatales y Excepciones)
+            http_response_code(500);
+            echo json_encode([
+                'status' => 'error', 
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
         }
         exit;
     }
@@ -30,20 +44,20 @@ class UserConfigController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            
-            // Leemos el payload JSON que viene desde la API.js
             $data = json_decode(file_get_contents('php://input'), true);
             
-            if (!$data) {
-                throw new \Exception("No se recibieron datos válidos.");
-            }
+            if (!$data) throw new \Exception("No se recibieron datos JSON válidos.");
 
-            // Ejecutamos la actualización
             $this->model->updateConfig($sesion['userId'], $data);
             
             echo json_encode(['status' => 'success', 'message' => 'Preferencias actualizadas']);
-        } catch (\Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'status' => 'error', 
+                'message' => $e->getMessage(),
+                'line' => $e->getLine()
+            ]);
         }
         exit;
     }

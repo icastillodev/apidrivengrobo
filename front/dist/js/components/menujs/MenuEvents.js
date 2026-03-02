@@ -58,18 +58,43 @@ document.addEventListener('click', (e) => {
         }
     });
 
-    document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
+document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
         btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
             const currentMenu = btn.nextElementSibling;
             if(!currentMenu) return;
+
             const isHidden = currentMenu.classList.contains('hidden');
+            
+            // Cierra todos los submenús y resetea las flechas
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
-            if(isHidden) currentMenu.classList.remove('hidden');
+            document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
+
+            if(isHidden) {
+                currentMenu.classList.remove('hidden');
+                btn.classList.add('open'); // Rota la flecha
+
+                // LA MAGIA: Si estamos en el Escritorio Lateral, calculamos coordenadas
+                // Esto evita que el menú se corte por culpa del "overflow-y: auto" (Scroll)
+                if (btn.closest('#side-menu-ul')) {
+                    const rect = btn.getBoundingClientRect();
+                    currentMenu.style.position = 'fixed'; // Flota sobre todo el DOM
+                    currentMenu.style.top = rect.top + 'px'; // A la altura del botón
+                    currentMenu.style.left = (rect.right + 12) + 'px'; // Pegado a la derecha + 12px
+                }
+            }
         };
     });
-
+// EXTRA: Si el usuario hace scroll en el menú lateral de escritorio,
+    // cerramos los submenús fijos para que no se queden flotando "huérfanos".
+    const sideMenuUl = document.getElementById('side-menu-ul');
+    if (sideMenuUl) {
+        sideMenuUl.addEventListener('scroll', () => {
+            document.querySelectorAll('#side-menu-ul .dropdown-menu-gecko:not(.hidden)').forEach(m => m.classList.add('hidden'));
+            document.querySelectorAll('#side-menu-ul .dropdown-toggle-gecko.open').forEach(b => b.classList.remove('open'));
+        });
+    }
     setTimeout(() => {
         if (localStorage.getItem('gecko_ok') == 1) {
             if (!navigator.userAgent.toLowerCase().includes('firefox')) {
