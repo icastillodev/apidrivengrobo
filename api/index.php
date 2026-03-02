@@ -1,6 +1,11 @@
 <?php
 // api/index.php
 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// ... el resto de tu código (require autoload, router, etc.)
 // 1. Iniciamos buffer para atrapar cualquier error de texto plano o warnings de PHP
 ob_start(); 
 
