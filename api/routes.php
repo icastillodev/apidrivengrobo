@@ -18,6 +18,8 @@ $router->get('/maintenance', 'UserController@maintenance');
 // ============================================================
 $router->get('/user/config/get', 'UserConfigMenuController@getConfig');
 $router->post('/user/config/update', 'UserConfigMenuController@updateConfig');
+
+
 // api/routes.php
 $router->post('/verify-2fa', 'AuthController@verify2FA');
 
@@ -34,11 +36,7 @@ $router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- 
 // ============================================================
 $router->get('/menu', 'MenuController@getMenu');
 $router->get('/menu/notifications', 'NotificationController@getMenuNotifications');
-// ============================================================
-// SECCIÓN: Preferencias y Configuración del Usuario (Menú/Tema)
-// ============================================================
-$router->get('/user/config/get', 'UserConfigMenuController@getConfig');
-$router->post('/user/config/update', 'UserConfigMenuController@updateConfig');
+
 
 // Búsqueda tradicional (SQL Rápido)
 $router->get('/search/global', 'GlobalSearchController@search');

@@ -56,7 +56,7 @@ const DEFAULTS = {
 };
 
 export const UserPreferences = {
-    userId: localStorage.getItem('userId'),
+    // YA NO LO DEFINIMOS ACÁ ARRIBA. Lo calcularemos dinámicamente cuando se necesite.
     
     icons: {
         moon: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z"/></svg>`,
@@ -75,16 +75,12 @@ export const UserPreferences = {
         gecko_ok: localStorage.getItem('gecko_ok') || 2
     },
 
-init: async () => {
-        // 1. INTENTAMOS LEER DE LA BD PRIMERO
+    init: async () => {
         try {
-            // El backend devuelve { status: "success", data: { tema_preferido: "dark", ... } }
             const res = await API.request('/user/config/get', 'GET');
             
             if (res && res.status === 'success' && res.data) {
                 const dbConfig = res.data;
-                
-                // Mapeamos los campos de la BD a LocalStorage SOLO si tienen valor
                 if (dbConfig.tema_preferido) localStorage.setItem('theme', dbConfig.tema_preferido);
                 if (dbConfig.idioma_preferido) localStorage.setItem('lang', dbConfig.idioma_preferido);
                 if (dbConfig.letra_preferida) localStorage.setItem('fontSize', dbConfig.letra_preferida);
@@ -95,7 +91,6 @@ init: async () => {
             console.warn("No se pudo cargar la config de BD, usando local.", e);
         }
 
-        // 2. APLICAMOS LA CONFIGURACIÓN (que ahora tiene lo de la BD o el Default)
         UserPreferences.config.theme = localStorage.getItem('theme') || DEFAULTS.THEME;
         UserPreferences.config.lang = localStorage.getItem('lang') || DEFAULTS.LANG;
         UserPreferences.config.menu = localStorage.getItem('menuLayout') || DEFAULTS.MENU_LAYOUT;
@@ -112,59 +107,23 @@ init: async () => {
         return UserPreferences.config.menu;
     },
 
-    saveBackend: async (data) => {
-        // Obtenemos el ID del token o de localStorage
-        const userId = localStorage.getItem('userId');
-        if (!userId) return;
-
-        // Armamos el objeto con exactamente lo que queremos actualizar
-        const payload = {};
-        if (data.theme) payload.theme = data.theme;
-        if (data.lang) payload.lang = data.lang;
-        if (data.menu) payload.menu = data.menu;
-        if (data.fontSize) payload.fontSize = data.fontSize;
-        if (data.gecko_ok) payload.gecko_ok = data.gecko_ok;
-
-        try {
-            // Enviamos como JSON, que suele ser más robusto para estas actualizaciones
-            await API.request('/user/config/update', 'POST', payload);
-            console.log("Preferencia guardada en BD:", payload);
-        } catch (e) { 
-            console.error("Error guardando preferencia en BD:", e); 
-        }
-    },
-
-    // --- CORREGIDO: CICLO DE TAMAÑO DE FUENTE ---
     cycleFontSize: async () => {
         const sizes = ['chica', 'mediana', 'grande'];
-        
-        // 1. Obtener estado actual (forzar 'chica' si es null)
         let current = UserPreferences.config.fontSize || 'chica';
-        
-        // 2. Calcular índice
         let currentIndex = sizes.indexOf(current);
         if (currentIndex === -1) currentIndex = 0;
 
-        // 3. Siguiente tamaño
         let nextIndex = (currentIndex + 1) % sizes.length;
         const newSize = sizes[nextIndex];
 
-        // 4. ACTUALIZAR ESTADO INTERNO (Importante para el próximo clic)
         UserPreferences.config.fontSize = newSize;
-
-        // 5. Aplicar visualmente
         UserPreferences.applyFontSize(newSize);
-        
-        // 6. Guardar en backend
         await UserPreferences.saveBackend({ fontSize: newSize });
     },
 
     applyFontSize: (size) => {
-        // Aplicamos al HTML para que el CSS (root) lo tome
         document.documentElement.setAttribute('data-font-size', size);
         localStorage.setItem('fontSize', size);
-        
-        // Actualizar el icono del botón
         const btn = document.getElementById('btn-font-switch');
         if (btn) {
             btn.innerHTML = UserPreferences.icons[`font_${size}`] || UserPreferences.icons.font_chica;
@@ -262,11 +221,15 @@ init: async () => {
     },
 
     saveBackend: async (data) => {
-        // LO HACEMOS DINÁMICO PARA EVITAR NULLS AL CARGAR
-        const userId = localStorage.getItem('userId');
-        if (!userId) return;
+        // --- LA CORRECCIÓN CLAVE ---
+        // Utilizamos el Helper de Auth para buscar la variable híbrida de Sesión
+        const userId = Auth.getVal('userId');
+        
+        if (!userId) {
+            console.error("❌ Guardado cancelado: No se detectó un usuario activo.");
+            return;
+        }
 
-        // Limpiamos y armamos un payload estricto
         const payload = {};
         if (data.theme) payload.theme = data.theme;
         if (data.lang) payload.lang = data.lang;
@@ -275,9 +238,8 @@ init: async () => {
         if (data.gecko_ok !== undefined) payload.gecko_ok = data.gecko_ok;
 
         try {
-            // USAMOS JSON PARA ASEGURARNOS QUE PHP LO LEA BIEN
-            await API.request('/user/config/update', 'POST', payload);
-            console.log("✅ Preferencia guardada en BD:", payload);
+            const res = await API.request('/user/config/update', 'POST', payload);
+            console.log("🛠️ Debug de guardado en BD:", res);
         } catch (e) { 
             console.error("❌ Error persistencia:", e); 
         }
