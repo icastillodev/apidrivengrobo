@@ -172,81 +172,102 @@ function getBaseStyles() {
 
 function getSidebarStyles() {
     return `
+        /* ========================================================= */
+        /* 1. ESTRUCTURA MAESTRA DEL SIDEBAR (ESCRITORIO Y MÓVIL)    */
+        /* ========================================================= */
         .gecko-sidebar { 
             position: fixed !important; 
             top: 0; left: 0; 
-            height: 100dvh; /* dvh maneja perfecto las barras de iOS/Android */
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Soporte perfecto para barras de navegación en iOS/Android */
             width: 260px; 
             z-index: 1050; 
             background-color: var(--bs-body-bg);
-            display: flex; flex-direction: column;
+            display: flex; 
+            flex-direction: column;
             padding: 0 !important;
-            overflow: hidden !important; /* EL PADRE NUNCA HACE SCROLL */
+            overflow: hidden !important; /* El padre NUNCA hace scroll */
             border-right: 4px solid #1a5d3b !important; 
             transform: translateX(-100%);
             transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
-        
-        /* 🚀 EL ÁREA DE SCROLL PERFECTA */
+
+        /* ========================================================= */
+        /* 2. ÁREA CENTRAL (LA MAGIA DEL SCROLL)                     */
+        /* ========================================================= */
         .gecko-sidebar-scroll-area {
-            flex: 1 1 auto;
-            overflow-y: auto !important; 
+            flex: 1 1 auto; /* Toma el espacio sobrante */
+            overflow-y: auto !important; /* ACTIVA EL SCROLL */
             overflow-x: hidden;
-            height: 0; /* Obliga a Flexbox a respetar el scroll interior */
+            min-height: 0; /* ¡REGLA DE ORO! Obliga a Flexbox a respetar los límites y no desbordar */
+            width: 100%;
+            padding: 10px 0;
         }
-        
-        .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 5px; }
-        .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
+
+        /* Estilo del Scrollbar (Fino y Elegante) */
+        .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 4px; }
+        .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.3); border-radius: 10px; }
         [data-bs-theme="dark"] .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
 
         .gecko-sidebar .nav-item { flex-shrink: 0; margin-bottom: 0 !important; }
-
         .gecko-sidebar .nav-link { 
-            padding-top: 8px !important; 
-            padding-bottom: 8px !important; 
+            padding-top: 10px !important; 
+            padding-bottom: 10px !important; 
             font-size: clamp(12px, 1.5vh, var(--gecko-font-size)) !important;
         }
 
-        /* 🚀 ACORDEÓN MÁGICO PARA ESCRITORIO Y MÓVIL */
+        /* ========================================================= */
+        /* 3. ACORDEÓN PERFECTO (NADA DE FLOTANTES AL COSTADO)       */
+        /* ========================================================= */
+        .dropdown-menu-gecko.hidden { display: none !important; }
+
         .gecko-sidebar .dropdown-menu-gecko {
-            position: static !important; /* Empuja el contenido hacia abajo */
-            float: none !important;
+            position: static !important; /* Empuja el contenido hacia abajo, no flota */
+            display: block; /* El JS controla el toggle mediante la clase .hidden */
             width: 100% !important;
             box-shadow: none !important;
             border: none !important;
             border-left: 3px solid rgba(26, 93, 59, 0.2) !important;
             border-radius: 0 !important;
             background: transparent !important;
-            padding: 5px 0 5px 35px !important; /* Sangría visual elegante */
+            padding: 5px 0 5px 35px !important; /* Sangría hacia adentro */
             margin: 0 !important;
             transform: none !important;
         }
 
-        .gecko-sidebar .dropdown-menu-gecko::before { display: none !important; } /* Quita la flechita del popup */
-
+        .gecko-sidebar .dropdown-menu-gecko::before { display: none !important; } /* Quita la flechita inútil del popup */
         .gecko-sidebar .dropdown-item-gecko { padding: 8px 10px !important; opacity: 0.8; transition: 0.2s; }
-        .gecko-sidebar .dropdown-item-gecko:hover { opacity: 1; background-color: rgba(26, 93, 59, 0.1); border-radius: 6px; }
+        .gecko-sidebar .dropdown-item-gecko:hover { opacity: 1; background-color: rgba(26, 93, 59, 0.1); border-radius: 6px; color: #1a5d3b !important; }
 
-        /* Rotación dinámica de la flecha */
-        .gecko-sidebar .arrow-icon-gecko { transform: rotate(0deg); }
+        /* Animación de la flecha del Acordeón */
+        .gecko-sidebar .arrow-icon-gecko { transform: rotate(0deg); transition: transform 0.3s ease; }
         .gecko-sidebar .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
 
+        /* ========================================================= */
+        /* 4. COMPORTAMIENTO RESPONSIVE (MÓVIL VS ESCRITORIO)        */
+        /* ========================================================= */
         .gecko-sidebar.open {
             transform: translateX(0) !important;
             box-shadow: 10px 0 30px rgba(0,0,0,0.3);
         }
 
+        /* ESCRITORIO: El menú empuja el cuerpo de la página */
         @media (min-width: 769px) { 
             body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; }
             body.with-sidebar { padding-left: 260px !important; } 
         }
 
+        /* MÓVIL: El menú flota por encima (Drawer) y NO empuja el padding */
+        @media (max-width: 768px) {
+            body.with-sidebar { padding-left: 0 !important; }
+        }
+
         .with-sidebar { padding-top: 30px !important; }
         
-        /* Dropdown TOP Escritorio (Se mantiene flotante) */
+        /* Dropdown TOP Escritorio (Ese SÍ debe flotar) */
         #main-menu-ul .dropdown-menu-gecko {
             position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
-            background-color: var(--bs-body-bg); border: 1px solid rgba(0,0,0,0.1); padding: 8px; border-radius: 8px; shadow-lg;
+            background-color: var(--bs-body-bg); border: 1px solid rgba(0,0,0,0.1); padding: 8px; border-radius: 8px;
         }
     `;
 }

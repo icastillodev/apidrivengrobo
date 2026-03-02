@@ -67,15 +67,14 @@ document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
 
             const isHidden = currentMenu.classList.contains('hidden');
             
-            // Cerramos TODOS los demás submenús abiertos
+            // 1. Cerramos TODOS los demás submenús abiertos
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
             document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
 
-            // Si el que tocamos estaba oculto, lo abrimos y rotamos flecha
+            // 2. Si el que tocamos estaba oculto, lo abrimos (Acordeón)
             if(isHidden) {
                 currentMenu.classList.remove('hidden');
                 btn.classList.add('open'); 
-                // Cero cálculos JS. El CSS "position: static" hará el resto.
             }
         };
     });
