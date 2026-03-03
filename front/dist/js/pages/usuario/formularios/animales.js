@@ -5,12 +5,14 @@ let speciesData = [];
 let dataFull = null;
 let currentUserEmail = "No disponible"; 
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
-/* --- HELPER: Obtener Institución del Contexto --- */
+/* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
 function getContextInstId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('targetInst') || localStorage.getItem('instId');
+    let instId = sessionStorage.getItem('target_inst_secreto');
+    if (!instId) {
+        instId = localStorage.getItem('instId');
+    }
+    return instId;
 }
-
 export async function initAnimalForm() {
     // 1. Usamos el ID correcto (URL o Storage)
     const instId = getContextInstId();

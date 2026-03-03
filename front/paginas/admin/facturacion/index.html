@@ -42,6 +42,13 @@
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
 
+        // 🚀 FIX: Exponemos la función al objeto global window para que el HTML pueda usarla
+        window.irFacturacion = function(modulo) {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const base = isLocal ? '/URBE-API-DRIVEN/front/admin/facturacion/' : '/admin/facturacion/';
+            window.location.href = base + modulo;
+        };
+        
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await loadLanguage(); 
@@ -61,6 +68,7 @@
                 hideLoader();
             }
         });
+
     </script>
 </head>
 <body>
@@ -85,7 +93,7 @@
             <div class="row g-4 justify-content-center mb-4">
                 
                 <div class="col-md-4">
-                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-success" onclick="location.href='/admin/facturacion/depto'">
+                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-success" onclick="irFacturacion('depto')">
                         <div class="icon-circle ic-depto shadow-sm">
                             <i class="bi bi-building-gear"></i>
                         </div>
@@ -97,7 +105,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-primary" onclick="location.href='/admin/facturacion/investigador'">
+                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-primary" onclick="irFacturacion('investigador')">
                         <div class="icon-circle ic-persona shadow-sm">
                             <i class="bi bi-person-vcard"></i>
                         </div>
@@ -109,7 +117,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-dark" onclick="location.href='/admin/facturacion/protocolo'">
+                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-dark" onclick="irFacturacion('protocolo')">
                         <div class="icon-circle ic-proto shadow-sm">
                             <i class="bi bi-file-earmark-medical"></i>
                         </div>

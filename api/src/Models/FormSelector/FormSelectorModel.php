@@ -9,7 +9,10 @@ class FormSelectorModel {
         $this->db = $db;
     }
 
-public function getInstitutionalNetwork($currentInstId) {
+    public function getInstitutionalNetwork($currentInstId) {
+        // Escudo de seguridad anti-nulos
+        if (empty($currentInstId)) return [];
+
         $stmtDep = $this->db->prepare("SELECT DependenciaInstitucion FROM institucion WHERE IdInstitucion = ?");
         $stmtDep->execute([$currentInstId]);
         $dependencia = $stmtDep->fetchColumn();

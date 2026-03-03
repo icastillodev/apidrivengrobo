@@ -149,10 +149,10 @@ public function updateStatus($data) {
     // api/src/Models/Animal/AnimalModel.php
 
 /**
- * Guarda la modificación completa de un formulario de animales.
- * Actualiza formularioe, sexoe, protformr y ajusta el stock en protocoloexpe.
- */
-public function updateFull($data) {
+     * Guarda la modificación completa de un formulario de animales.
+     * Actualiza formularioe, sexoe, protformr, ajusta el stock y RECALCULA EL PRECIO.
+     */
+    public function updateFull($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) return false;
 
@@ -169,20 +169,32 @@ public function updateFull($data) {
 
         $this->db->beginTransaction();
         try {
-        // 🚀 AGREGAMOS raza = ? Y PASAMOS EL DATO
             $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
             $this->db->prepare($sqlForm)->execute([
                 $data['tipoA'] ?? null, 
                 $idSubesp, 
-                $data['razaA'] ?? '', // Nombre que le daremos en el form HTML
+                $data['razaA'] ?? '', 
                 $data['edadA'] ?? '', 
                 $data['pesoA'] ?? '', 
                 $data['fechainicioA'] ?? null, 
                 $data['fecRetiroA'] ?? null, 
                 $id
             ]);
+            
             $sqlSexo = "UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?";
             $this->db->prepare($sqlSexo)->execute([$data['machoA'] ?? 0, $data['hembraA'] ?? 0, $data['indistintoA'] ?? 0, $newTotal, $id]);
+
+            // 🚀 NUEVO: RECALCULAR FACTURACIÓN
+            // 1. Buscamos el precio de la subespecie (por si la cambiaron)
+            $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+            $stmtPrecio->execute([$idSubesp]);
+            $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+
+            // 2. Calculamos nuevo total y actualizamos precioformulario
+            $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+            $sqlPrecio = "UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?";
+            $this->db->prepare($sqlPrecio)->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+            // ------------------------------------------
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
 
@@ -201,7 +213,6 @@ public function updateFull($data) {
             return true;
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
-
     /**
      * Obtiene las especies y subespecies aprobadas para un protocolo
      */
@@ -419,7 +430,6 @@ public function getDetailsAndSpecies($protId) {
     // 3. LÓGICA DE GUARDADO TRANSACCIONAL
     // ************************************************************************
 
-// --- CAMBIO 2: Guardar el ID numérico del Depto ---
 public function saveOrder($data) {
         $this->db->beginTransaction();
         try {
@@ -446,6 +456,17 @@ public function saveOrder($data) {
             $idForm = $this->db->lastInsertId();
 
             $this->db->prepare("INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)")->execute([$idForm, $data['macho'], $data['hembra'], $data['indistinto'], $data['total']]);
+
+            // 🚀 NUEVO: CONGELAMOS EL PRECIO Y AGREGAMOS fechaIniForm
+            $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+            $stmtPrecio->execute([$data['idsubespA']]);
+            $precioMomento = (float)$stmtPrecio->fetchColumn();
+            
+            $totalAnimales = (int)$data['total'];
+            $costoTotal = $precioMomento * $totalAnimales;
+
+            $sqlPrecio = "INSERT INTO precioformulario (idformA, precioanimalmomento, precioformulario, totalpago, fechaIniForm) VALUES (?, ?, ?, 0, CURDATE())";
+            $this->db->prepare($sqlPrecio)->execute([$idForm, $precioMomento, $costoTotal]);
 
             $isExternal = isset($data['is_external']) && $data['is_external'] == 1;
             if (!$isExternal && !empty($data['idprotA'])) {

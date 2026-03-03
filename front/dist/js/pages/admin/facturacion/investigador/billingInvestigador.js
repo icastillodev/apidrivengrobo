@@ -152,7 +152,7 @@ function renderizarResultados(data) {
 }
 
 function getFormsTableHTML(formularios, idProt) {
-    if (!formularios || formularios.length === 0) return '';
+    if (!formularios || formularios.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos de Protocolo (Formularios)</h6>
         <div class="table-responsive">
@@ -160,12 +160,12 @@ function getFormsTableHTML(formularios, idProt) {
                 <thead class="table-light text-center">
                     <tr>
                         <th style="width:2%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
-                        <th style="width:7%">ID</th>
-                        <th style="width:10%">INICIO</th>
-                        <th style="width:10%">RETIRO</th>
-                        <th style="width:12%">ESPECIE</th>
-                        <th>CONCEPTO</th>
-                        <th style="width:15%">CANTIDAD</th>
+                        <th style="width:5%">ID</th>
+                        <th style="width:8%">ESTADO</th>
+                        <th style="width:12%">FECHAS</th>
+                        <th style="width:15%">ESPECIE / TIPO</th>
+                        <th style="width:15%">CONCEPTO</th>
+                        <th style="width:18%">CANTIDAD / PRESENTACIÓN</th>
                         <th style="width:8%">TOTAL</th>
                         <th style="width:8%">PAGADO</th>
                         <th style="width:8%">DEBE</th>
@@ -177,20 +177,46 @@ function getFormsTableHTML(formularios, idProt) {
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
+
                         const isRea = f.categoria?.toLowerCase().includes('reactivo');
-                        const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `:${f.nombre_subespecie}` : '');
+                        const tipoModal = isRea ? 'REACTIVO' : 'ANIMAL';
+
+                        // 🚀 MAGIA VISUAL PARA CANTIDADES Y REACTIVOS
+                        let cantidadDisplay = '';
+                        if (isRea) {
+                            cantidadDisplay = `
+                                <div class="text-start lh-sm">
+                                    <span class="text-info fw-bold">${f.NombreInsumo || 'Reactivo'}</span><br>
+                                    <small class="text-muted" style="font-size: 10px;">Pres: <b>${f.CantidadInsumo || '-'} ${f.TipoInsumo || ''}</b></small><br>
+                                    <span class="badge bg-light text-dark border mt-1 shadow-sm">Solicitadas: <b class="text-primary">${f.cant_organo || 0} un.</b></span>
+                                </div>`;
+                        } else {
+                            cantidadDisplay = `<b class="fs-5 text-dark">${f.cant_animal || 0}</b> <small class="text-muted">un.</small>`;
+                        }
+
+                        // --- VISUAL: ESPECIE Y FECHAS ---
+                        const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `<br><small class="text-muted">${f.nombre_subespecie}</small>` : '');
+                        const fechasDisplay = `<div class="small"><b>In:</b> ${f.fecha || '-'}</div><div class="small text-danger"><b>Out:</b> ${f.fecRetiroA || '-'}</div>`;
+                        const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
                         
-                        // LÓGICA ANTI-CLIC EN CHECKBOX Y CURSOR POINTER
+                        let estadoBadge = isExento ? '<span class="badge bg-info text-dark shadow-sm">EXENTO</span>' : 
+                                         (debe <= 0 ? '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>' : 
+                                         (pagado > 0 ? '<span class="badge bg-warning text-dark shadow-sm">PAGO PARCIAL</span>' : 
+                                         '<span class="badge bg-danger shadow-sm">SIN PAGAR</span>'));
+
+                        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+
                         return `
-                            <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('${isRea ? 'REACTIVO' : 'ANIMAL'}', ${f.id})">
+                            <tr class="text-center align-middle pointer" style="${rowStyle}" 
+                                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="fw-bold">#${f.id} ${isExento ? '<br><span class="badge bg-info text-dark" style="font-size:7px">EXENTO</span>' : ''}</td>
-                                <td class="small">${f.fecha || '---'}</td>
-                                <td class="text-danger fw-bold">${f.fecRetiroA || '---'}</td>
-                                <td class="small text-secondary">${espDisplay}</td>
-                                <td class="text-start small">${f.detalle_display.replace(/<[^>]*>/g, "")}</td>
-                                <td class="small">${isRea ? f.NombreInsumo : f.cant_animal + ' un.'}</td>
-                                <td class="text-end">$ ${total.toFixed(2)}</td>
+                                <td class="small text-muted fw-bold">#${f.id}</td>
+                                <td>${estadoBadge}</td>
+                                <td>${fechasDisplay}</td>
+                                <td class="small text-secondary">${isRea ? '<span class="badge bg-light text-info border">REACTIVO BIOLÓGICO</span>' : espDisplay}</td>
+                                <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
+                                <td>${cantidadDisplay}</td>
+                                <td class="text-end fw-bold text-dark">$ ${total.toFixed(2)}</td>
                                 <td class="text-end text-success fw-bold">$ ${pagado.toFixed(2)}</td>
                                 <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
                             </tr>`;

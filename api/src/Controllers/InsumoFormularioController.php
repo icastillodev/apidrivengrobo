@@ -20,7 +20,10 @@ class InsumoFormularioController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            echo json_encode(['status' => 'success', 'data' => $this->model->getInitialData($sesion['instId'])]);
+            // 🚀 FIX: Usamos la institución que manda el Frontend (la elegida en el selector)
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+
+            echo json_encode(['status' => 'success', 'data' => $this->model->getInitialData($targetInst)]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -40,7 +43,9 @@ class InsumoFormularioController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $input['userId'] = $sesion['userId']; // Seguridad
-            $input['instId'] = $sesion['instId']; 
+            
+            // 🚀 FIX: Si viene instId en el POST lo usamos, sino el de sesión
+            $input['instId'] = !empty($input['instId']) ? $input['instId'] : $sesion['instId']; 
             
             $idForm = $this->model->saveOrder($input);
 

@@ -218,16 +218,25 @@ function renderNotificationSection(lastNotify, idformA) {
     </div>`;
 }
 /**
- * RENDERIZADO TÉCNICO - CORRECCIÓN DE SELECTORES Y CANTIDADES
- */
-/**
- * RENDERIZADO TÉCNICO - VERSIÓN FINAL PRECISIÓN TÉCNICA
+ * RENDERIZADO TÉCNICO - VERSIÓN FINAL CON MEDIDAS EN TIEMPO REAL
  */
 function renderOrderModificationSection(r, usage, cache) {
     const t = window.txt.reactivos.modal;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
     const isExterno = r.EsOtrosCeuas == 1;
+
+    // Medida inicial al cargar el modal
+    const unidadMedida = r.Medida ? r.Medida : 'unidades';
+    
+    const optionsReactivos = reactivos.map(i => {
+        const iterId = i.idInsumo || i.IdInsumoexp; 
+        const isSelected = (iterId == r.idinsumoA) ? 'selected' : '';
+        const pres = i.CantidadInsumo ? ` [${i.CantidadInsumo} ${i.TipoInsumo}]` : '';
+        
+        // 🚀 FIX: Guardamos el TipoInsumo (ml, gr, caja) en data-medida
+        return `<option value="${iterId}" data-medida="${i.TipoInsumo || 'un.'}" ${isSelected}>${i.NombreInsumo}${pres}</option>`;
+    }).join('');
 
     return `
     <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 11px;">${t.tech_mod}</h6>
@@ -247,22 +256,35 @@ function renderOrderModificationSection(r, usage, cache) {
                     }).join('')}
                 </select>
             </div>
+            
             <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">${t.reagent_bio}</label>
-                <select name="idinsumoA" class="form-select form-select-sm">
-                    ${reactivos.map(i => `<option value="${i.IdInsumoexp}" ${r.Reactivo === i.NombreInsumo ? 'selected' : ''}>${i.NombreInsumo} [${i.TipoInsumo}]</option>`).join('')}
+                <label class="form-label small fw-bold text-primary uppercase">INSUMO EXPERIMENTAL</label>
+                <select name="reactivo" class="form-select form-select-sm" onchange="window.cambiarMedidaReactivo(this)">
+                    <option value="" data-medida="un.">Seleccione Insumo</option>
+                    ${optionsReactivos}
                 </select>
             </div>
+            
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase">${t.qty_req} (${r.Medida || ''})</label>
+                <label id="lbl-medida-dinamica" class="form-label small fw-bold uppercase">${t.qty_req} (${unidadMedida})</label>
                 <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${usage.organo || 0}">
             </div>
+            
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase">${t.animals_used}</label>
                 <input type="number" name="totalA" class="form-control form-control-sm fw-bold text-danger" value="${usage.totalA || 0}">
             </div>
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">${t.start_date}</label><input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}"></div>
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">${t.end_date}</label><input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}"></div>
+            
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase">${t.start_date}</label>
+                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}">
+            </div>
+            
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase">${t.end_date}</label>
+                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}">
+            </div>
+            
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
                 <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadReactivoPDF(${r.idformA})">PDF</button>
                 <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">${t.save_btn}</button>
@@ -270,31 +292,49 @@ function renderOrderModificationSection(r, usage, cache) {
         </div>
     </form>`;
 }
-/* --- EVENTOS DINÁMICOS --- */
 
+// 🚀 NUEVA FUNCIÓN: Cambia el texto de la medida al instante
+window.cambiarMedidaReactivo = (selectElement) => {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const medida = selectedOption.getAttribute('data-medida') || 'unidades';
+    const label = document.getElementById('lbl-medida-dinamica');
+    if (label) {
+        label.innerText = `CANT. SOLICITADA (${medida})`;
+    }
+};
+// 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque
 window.updateReactivoStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
     const statusSelect = document.getElementById('modal-status');
     const badgeContainer = document.getElementById('modal-status-badge-container');
     const aclara = document.getElementById('modal-aclaracionadm').value;
-    const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+    
+    // Obtenemos el nombre. Si no existe, usamos "Admin"
+    let userName = localStorage.getItem('userFull');
+    if (!userName || userName === 'null' || userName === 'undefined') userName = "Admin";
+    
+    const identity = `${userName} (ID: ${localStorage.getItem('userId')})`;
+    const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
+    const quienVistoTarget = isSinEstado ? 'Falta revisar' : identity;
 
     const fd = new FormData();
     fd.append('idformA', id);
     fd.append('estado', statusSelect.value);
     fd.append('aclaracionadm', aclara);
-    fd.append('userName', identity); 
+    // Mandamos el nombre de quien lo vio al backend para que lo guarde
+    fd.append('quienvisto', quienVistoTarget); 
 
     try {
         const res = await API.request(`/reactivos/update-status`, 'POST', fd);
         if (res.status === 'success') {
-            // Cambio de color instantáneo en el modal
-            if (badgeContainer) {
-                badgeContainer.innerHTML = getStatusBadge(statusSelect.value);
-            }
-            document.getElementById('modal-quienvisto').value = identity;
+            // Actualiza la etiqueta visual de color
+            if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(statusSelect.value);
             
-            // Sincronizamos la tabla principal de fondo sin cerrar el modal
+            // 🚀 ACTUALIZACIÓN EN TIEMPO REAL DEL INPUT DEL MODAL
+            const inputQuienVisto = document.getElementById('modal-quienvisto');
+            if (inputQuienVisto) inputQuienVisto.value = quienVistoTarget;
+            
+            // Sincroniza la tabla de fondo
             syncAllData(); 
         }
     } catch (e) { 

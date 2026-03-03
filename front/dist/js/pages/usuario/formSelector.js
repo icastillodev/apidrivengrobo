@@ -11,6 +11,9 @@ const basePath = (window.location.hostname === 'localhost' || window.location.ho
     : '/';
 
 export async function initFormSelector() {
+    // 🚀 NUEVO: Limpiamos cualquier selección anterior por seguridad al entrar aquí
+    sessionStorage.removeItem('target_inst_secreto');
+    
     currentInstId = localStorage.getItem('instId');
     const container = document.getElementById('forms-grid');
     const depTitle = document.getElementById('dependency-title');
@@ -119,15 +122,14 @@ function renderActionButtons(sede) {
     let buttonsHtml = '';
     const target = sede.IdInstitucion;
 
-    // --- ENLACES ACTUALIZADOS: Usan la ruta absoluta y sin .html ---
-
     // 1. Animales
     if (checkPermission(sede.flag_animales)) {
         buttonsHtml += createCard(
             'Solicitud Animales', 
             'bi bi-mouse', 
             'bg-success text-white', 
-            `${basePath}panel/formularios/animales?targetInst=${target}`
+            'panel/formularios/animales', 
+            target
         );
     }
 
@@ -137,7 +139,8 @@ function renderActionButtons(sede) {
             'Reactivos Biológicos', 
             'bi bi-eyedropper', 
             'bg-warning text-dark', 
-            `${basePath}panel/formularios/reactivos?targetInst=${target}`
+            'panel/formularios/reactivos', 
+            target
         );
     }
 
@@ -147,7 +150,8 @@ function renderActionButtons(sede) {
             'Pedido de Insumos', 
             'bi bi-box-seam', 
             'bg-primary text-white', 
-            `${basePath}panel/formularios/insumos?targetInst=${target}`
+            'panel/formularios/insumos', 
+            target
         );
     }
     
@@ -157,7 +161,8 @@ function renderActionButtons(sede) {
             'Reserva de Salas', 
             'bi bi-calendar-check', 
             'bg-info text-dark', 
-            `${basePath}panel/formularios/reservas?targetInst=${target}`
+            'panel/formularios/reservas', 
+            target
         );
     }
 
@@ -168,23 +173,28 @@ function renderActionButtons(sede) {
     return `<div class="row g-3 justify-content-start w-100 mb-3 px-3">${buttonsHtml}</div>`;
 }
 
-function createCard(title, iconClass, bgClass, link) {
+function createCard(title, iconClass, bgClass, modulePath, targetId) {
+    // Usamos onclick para disparar la función secreta en lugar de un href tradicional
     return `
     <div class="col-md-6 col-lg-4 col-xl-3">
-        <a href="${link}" class="text-decoration-none">
-            <div class="card border-0 shadow-sm h-100 hover-scale" style="background: #fff; border-left: 4px solid #1a5d3b !important;">
-                <div class="card-body p-3 d-flex align-items-center">
-                    <div class="rounded-3 p-3 me-3 ${bgClass} shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
-                        <i class="${iconClass} fs-5"></i>
-                    </div>
-                    <div>
-                        <h6 class="fw-bold mb-1 text-dark text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">${title}</h6>
-                        <span class="text-success fw-bold" style="font-size: 0.65rem;">
-                            Iniciar <i class="bi bi-arrow-right-short"></i>
-                        </span>
-                    </div>
+        <div class="card border-0 shadow-sm h-100 hover-scale" style="background: #fff; border-left: 4px solid #1a5d3b !important;" onclick="window.irAFormulario('${modulePath}', ${targetId})">
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="rounded-3 p-3 me-3 ${bgClass} shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                    <i class="${iconClass} fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold mb-1 text-dark text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">${title}</h6>
+                    <span class="text-success fw-bold" style="font-size: 0.65rem;">
+                        Iniciar <i class="bi bi-arrow-right-short"></i>
+                    </span>
                 </div>
             </div>
-        </a>
+        </div>
     </div>`;
 }
+
+// NUEVO: Función global que guarda el ID y hace la redirección limpia
+window.irAFormulario = (modulePath, targetId) => {
+    sessionStorage.setItem('target_inst_secreto', targetId);
+    window.location.href = basePath + modulePath;
+};

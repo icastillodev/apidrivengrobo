@@ -1,9 +1,9 @@
 <?php
 namespace App\Controllers;
 
-use App\Models\Reactivo\ReactivoModel; // <-- Sin 's'
+use App\Models\Reactivo\ReactivoModel;
 use App\Models\Services\MailService; 
-use App\Utils\Auditoria; // <-- Seguridad Inyectada
+use App\Utils\Auditoria;
 
 class ReactivoController {
     private $model;
@@ -14,15 +14,15 @@ class ReactivoController {
         $this->model = new ReactivoModel($db);
     }
 
+    // ============================================================
+    // FUNCIONES DE ADMINISTRADOR (BANDEJA DE ENTRADA)
+    // ============================================================
     public function getAll() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
         try {
             $sesion = Auditoria::getDatosSesion();
-            $categoria = "Otros reactivos biologicos"; 
-
-            $data = $this->model->getAllByInstitution($sesion['instId'], $categoria);
+            $data = $this->model->getAllByInstitution($sesion['instId'], "Otros reactivos biologicos");
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -34,7 +34,6 @@ class ReactivoController {
     public function getFormData() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
         try {
             $sesion = Auditoria::getDatosSesion();
             $data = [
@@ -53,55 +52,9 @@ class ReactivoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $id = $_GET['id'] ?? 0;
-        
         try {
-            Auditoria::getDatosSesion(); // Valida Token
-            $data = $this->model->getLastNotification($id);
-            echo json_encode(['status' => 'success', 'data' => $data]);
-        } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-        }
-        exit;
-    }
-
-    // Funciones prestadas de AnimalController que estaban en tu archivo
-    public function getPendingCounts() {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-        
-        try {
-            $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
-
-            // 1. Conteo de Animales Vivos
-            $sqlAni = "SELECT COUNT(f.idformA) as total 
-                       FROM formularioe f 
-                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                       WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.categoriaformulario = 'Animal vivo'";
-            $stmtAni = $this->db->prepare($sqlAni);
-            $stmtAni->execute([$instId]);
-            $countAni = $stmtAni->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-
-            // 2. Conteo de Reactivos Biológicos
-            $sqlRea = "SELECT COUNT(f.idformA) as total 
-                       FROM formularioe f 
-                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                       WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.nombreTipo = 'Otros reactivos biologicos'";
-            $stmtRea = $this->db->prepare($sqlRea);
-            $stmtRea->execute([$instId]);
-            $countRea = $stmtRea->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
-
-            echo json_encode([
-                'status' => 'success',
-                'data' => [
-                    'animales' => (int)$countAni,
-                    'reactivos' => (int)$countRea
-                ]
-            ]);
-            exit;
+            Auditoria::getDatosSesion();
+            echo json_encode(['status' => 'success', 'data' => $this->model->getLastNotification($id)]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -113,12 +66,28 @@ class ReactivoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $data = $_POST;
+        $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data['quienvisto'] = "Admin (ID: " . $sesion['userId'] . ")"; 
+            $estado = $data['estado'] ?? 'Sin estado';
+            
+            // 🚀 FIX: Si el Frontend mandó quién lo vio, lo usamos. 
+            // Si no, lo armamos nosotros verificando variables de sesión (ideal para SuperAdmins)
+            if (strtolower(trim($estado)) === 'sin estado') {
+                $quienvisto = "Falta revisar";
+            } else {
+                if (!empty($data['quienvisto'])) {
+                    $quienvisto = $data['quienvisto'];
+                } else {
+                    // Si el Frontend falló, lo respaldamos desde el token del Backend
+                    $nombreAdmin = !empty($sesion['userFull']) ? $sesion['userFull'] : (!empty($sesion['NombreA']) ? $sesion['NombreA'] : "Admin ID " . $sesion['userId']);
+                    $quienvisto = $nombreAdmin . " (ID: " . $sesion['userId'] . ")";
+                }
+            }
 
-            $this->model->updateQuickStatus($data['idformA'], $data['estado'], $data['aclaracionadm'], $data['quienvisto']);
+            $this->model->updateQuickStatus($data['idformA'], $estado, $data['aclaracionadm'] ?? '', $quienvisto);
+            
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -126,13 +95,16 @@ class ReactivoController {
         }
         exit;
     }
-
     public function updateFull() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        
+        // 🚀 FIX: Leemos el JSON correctamente. Si usábamos $_POST quedaba vacío.
+        $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+        
         try {
             Auditoria::getDatosSesion();
-            $this->model->updateFull($_POST);
+            $this->model->updateFull($data);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -145,11 +117,9 @@ class ReactivoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $id = $_GET['id'] ?? 0;
-
         try {
             Auditoria::getDatosSesion();
-            $data = $this->model->getUsageData($id);
-            echo json_encode(['status' => 'success', 'data' => $data]);
+            echo json_encode(['status' => 'success', 'data' => $this->model->getUsageData($id)]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -160,28 +130,23 @@ class ReactivoController {
     public function sendNotification() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-
         $data = json_decode(file_get_contents('php://input'), true);
         
         $idformA = $data['idformA'] ?? $data['id'] ?? null;
         $nota = $data['nota'] ?? null;
 
         if (!$idformA || $nota === null) {
-            echo json_encode(['status' => 'error', 'message' => 'Información insuficiente: ID no reconocido']);
+            echo json_encode(['status' => 'error', 'message' => 'Información insuficiente']);
             exit;
         }
 
         try {
             $sesion = Auditoria::getDatosSesion();
             $data['idformA'] = $idformA;
-            $data['adminId'] = $sesion['userId']; // Seguridad
+            $data['adminId'] = $sesion['userId'];
             
             $info = $this->model->saveNotificationAndGetMailDetails($data);
-            
-            if (!$info) {
-                echo json_encode(['status' => 'error', 'message' => 'No se encontró el pedido #' . $idformA]);
-                exit;
-            }
+            if (!$info) throw new \Exception('No se encontró el pedido #' . $idformA);
 
             $mailService = new MailService();
             $instName = strtoupper($info['institucion'] ?? 'URBE');
@@ -199,26 +164,31 @@ class ReactivoController {
                 <p style='font-size: 12px; color: #666;'>Protocolo: {$info['nprotA']} | Reactivo: {$info['reactivo']}</p>
             ";
 
-            // Se asume URL dinámica frontal en producción.
             $body = $mailService->getTemplate("Actualización de Pedido", $message, "http://app.groboapp.com/", "VER SOLICITUD");
             $success = $mailService->executeSend($info['email_inv'], $subject, $body);
 
             echo json_encode(['status' => $success ? 'success' : 'error']);
-
         } catch (\Exception $e) {
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }
 
+
+    // ============================================================
+    // FUNCIONES DE INVESTIGADOR (FORMULARIO DE PEDIDO)
+    // ============================================================
+    
     public function getInitData() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
         try {
             $sesion = Auditoria::getDatosSesion();
-            echo json_encode(['status' => 'success', 'data' => $this->model->getInitialData($sesion['instId'], $sesion['userId'])]);
+            // 🚀 FIX DE LA RED: Leemos el ID que manda el Frontend
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            
+            echo json_encode(['status' => 'success', 'data' => $this->model->getInitialData($targetInst, $sesion['userId'])]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -243,17 +213,17 @@ class ReactivoController {
     public function createOrder() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
         $data = json_decode(file_get_contents('php://input'), true);
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data['userId'] = $sesion['userId']; // Seguridad
-            $data['instId'] = $sesion['instId'];
+            $data['userId'] = $sesion['userId'];
+
+            // 🚀 FIX DE LA RED: Usamos la institución enviada en el POST
+            $data['instId'] = !empty($data['instId']) ? $data['instId'] : $sesion['instId'];
 
             $res = $this->model->saveOrder($data);
             $idForm = $res['id'];
-            $insumoName = $res['insumoName'];
             
             $userInfo = $this->model->getUserAndInstInfo($data['userId'], $data['instId']);
             $protInfo = $this->model->getProtocolDetails($data['idprotA']);
@@ -261,19 +231,14 @@ class ReactivoController {
             $mailData = [
                 'id' => $idForm,
                 'protocolo' => ($protInfo['nprotA'] ?? 'S/D') . ' - ' . ($protInfo['tituloA'] ?? ''),
-                'insumo' => $insumoName,
+                'insumo' => $res['insumoName'],
                 'cantidad' => $data['cantidad'],
                 'fecha_retiro' => $data['fecha_retiro'],
                 'aclaracion' => $data['aclaracion']
             ];
 
             $mailService = new MailService();
-            $mailService->sendReactivoOrderConfirmation(
-                $userInfo['EmailA'],
-                $userInfo['NombreA'],
-                $userInfo['NombreInst'],
-                $mailData
-            );
+            $mailService->sendReactivoOrderConfirmation($userInfo['EmailA'], $userInfo['NombreA'], $userInfo['NombreInst'], $mailData);
 
             echo json_encode(['status' => 'success', 'id' => $idForm]);
 
@@ -287,10 +252,12 @@ class ReactivoController {
     public function getPDFData() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data = $this->model->getDataForTarifario($sesion['instId']);
+            // 🚀 FIX DE LA RED: PDF de la institución correcta
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            
+            $data = $this->model->getDataForTarifario($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);

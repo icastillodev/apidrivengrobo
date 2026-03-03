@@ -40,12 +40,22 @@ class AnimalController {
     public function updateStatus() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $data = $_POST;
+        
+        $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
         
         try {
-            // El usuario que modifica viene de la sesión, no del POST inyectable
             $sesion = Auditoria::getDatosSesion();
-            $data['quienvisto'] = "Admin (ID: " . $sesion['userId'] . ")"; 
+            $estado = $data['estado'] ?? 'Sin estado';
+
+            // 🚀 FIX LÓGICA "QUIEN VISTO"
+            if (strtolower(trim($estado)) === 'sin estado') {
+                $quienvisto = "Falta revisar";
+            } else {
+                $nombreAdmin = !empty($sesion['userFull']) ? $sesion['userFull'] : "Admin ID " . $sesion['userId'];
+                $quienvisto = $nombreAdmin;
+            }
+
+            $data['quienvisto'] = $quienvisto; 
 
             $this->model->updateStatus($data);
             echo json_encode(['status' => 'success']);
@@ -195,12 +205,15 @@ class AnimalController {
     }
 
     // --- MÉTODOS DE INVESTIGADOR ---
-    public function searchProtocols() {
+public function searchProtocols() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data = $this->model->getActiveProtocolsForUser($sesion['instId'], $sesion['userId']);
+            // 🚀 FIX: Respetar la institución que pide el Frontend
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            
+            $data = $this->model->getActiveProtocolsForUser($targetInst, $sesion['userId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -208,7 +221,7 @@ class AnimalController {
         exit;
     }
 
-    public function getProtocolDetails() {
+public function getProtocolDetails() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
@@ -217,8 +230,11 @@ class AnimalController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            // 🚀 FIX: Respetar la institución que pide el Frontend
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+
             if ($isOtrosCeuas == 1) {
-                $data = $this->model->getAllSpeciesForInst($sesion['instId']);
+                $data = $this->model->getAllSpeciesForInst($targetInst);
             } else {
                 $data = $this->model->getDetailsAndSpecies($protId);
             }
@@ -236,7 +252,8 @@ class AnimalController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data['instId'] = $sesion['instId']; // Inyectamos 
+            // 🚀 FIX: Si el frontend manda un instId en el POST, lo usamos. Si no, usamos el Token.
+            $data['instId'] = !empty($data['instId']) ? $data['instId'] : $sesion['instId']; 
             $data['userId'] = $sesion['userId'];
 
             $idForm = $this->model->saveOrder($data);
@@ -276,7 +293,10 @@ class AnimalController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data = $this->model->getDataForTarifario($sesion['instId']);
+            // 🚀 FIX: Respetar la institución que pide el Frontend
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            
+            $data = $this->model->getDataForTarifario($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

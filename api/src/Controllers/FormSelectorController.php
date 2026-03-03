@@ -16,11 +16,24 @@ class FormSelectorController {
         header('Content-Type: application/json');
         
         try {
-            // Seguridad: Inyección desde el Token
+            // 1. Validamos la sesión
             $sesion = Auditoria::getDatosSesion();
-            $instIdSeguro = $sesion['instId'];
+            $rol = (int)$sesion['role'];
+            $instIdToken = $sesion['instId'];
 
-            $sedes = $this->model->getInstitutionalNetwork($instIdSeguro);
+            // 2. Leemos la sede solicitada por el Frontend (GET)
+            $instIdRequest = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
+
+            // 3. SEGURIDAD: Determinamos qué sede buscar
+            // Si es SuperAdmin (Rol 1), puede ver la que pida. Si no, forzamos la de su Token.
+            $instIdFinal = ($rol === 1 && $instIdRequest > 0) ? $instIdRequest : $instIdToken;
+
+            if (empty($instIdFinal) || $instIdFinal === 0) {
+                throw new \Exception("No hay una institución válida para mostrar los formularios.");
+            }
+
+            // 4. Buscamos la red institucional
+            $sedes = $this->model->getInstitutionalNetwork($instIdFinal);
 
             $depName = '';
             if (count($sedes) > 0) {
@@ -37,7 +50,7 @@ class FormSelectorController {
             ]);
 
         } catch (\Exception $e) {
-            http_response_code(401);
+            http_response_code(400); // 400 Bad Request (No 401 para que no desloguee)
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

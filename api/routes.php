@@ -134,6 +134,8 @@ $router->post('/animals/create-order', 'AnimalController@createOrder');
 // ============================================================
 // SECCIÓN: Reactivos (Otros reactivos biológicos) 
 // ============================================================
+
+// 1. Acciones de Administrador (Bandeja de Entrada)
 $router->get('/reactivos/all', 'ReactivoController@getAll'); 
 $router->get('/reactivos/form-data', 'ReactivoController@getFormData'); 
 $router->post('/reactivos/update-status', 'ReactivoController@updateStatus'); 
@@ -142,10 +144,11 @@ $router->get('/reactivos/last-notification', 'ReactivoController@getLastNotifica
 $router->post('/reactivos/send-notification', 'ReactivoController@sendNotification');
 $router->get('/reactivos/usage', 'ReactivoController@getUsageData');
 
-$router->get('/reactivos/init', 'ReactivosController@getInitData');
-$router->get('/reactivos/protocol-info', 'ReactivosController@getProtocolInfo');
-$router->post('/reactivos/create', 'ReactivosController@createOrder');
-$router->get('/reactivos/pdf-data', 'ReactivosController@getPDFData');
+// 2. Acciones de Investigador (Formulario de Pedido)
+$router->get('/reactivos/init', 'ReactivoController@getInitData');
+$router->get('/reactivos/protocol-info', 'ReactivoController@getProtocolInfo');
+$router->post('/reactivos/create', 'ReactivoController@createOrder');
+$router->get('/reactivos/pdf-data', 'ReactivoController@getPDFData');
 
 
 // ============================================================

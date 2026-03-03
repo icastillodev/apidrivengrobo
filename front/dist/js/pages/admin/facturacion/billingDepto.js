@@ -173,53 +173,62 @@ function getFormsTableHTML(formularios, idProt) {
                     <tr>
                         <th style="width:2%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
                         <th style="width:5%">ID</th>
-                        <th style="width:8%">Estado</th> 
-                        <th style="width:12%">Solicitante</th>
-                        <th style="width:15%">Especie</th>
-                        <th style="width:15%">Detalle / Concepto</th>
-                        <th style="width:18%">Cantidad</th>
-                        <th style="width:8%">Total</th>
-                        <th style="width:8%">Pagado</th>
-                        <th style="width:8%">Debe</th>
+                        <th style="width:8%">ESTADO</th> 
+                        <th style="width:12%">SOLICITANTE</th>
+                        <th style="width:15%">ESPECIE / CEPA</th>
+                        <th style="width:15%">DETALLE / CONCEPTO</th>
+                        <th style="width:18%">CANTIDAD / PRESENTACIÓN</th>
+                        <th style="width:8%">TOTAL</th>
+                        <th style="width:8%">PAGADO</th>
+                        <th style="width:8%">DEBE</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${formularios.map(f => {
+                        const isExento = (f.is_exento == 1 || f.exento == 1);
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
-                        const isExento = (f.is_exento == 1 || f.exento == 1);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
 
-                        const isReactivo = (f.categoria && f.categoria.toLowerCase().includes('reactivo'));
-                        const tipoModal = isReactivo ? 'REACTIVO' : 'ANIMAL';
+                        const isRea = f.categoria?.toLowerCase().includes('reactivo');
+                        const tipoModal = isRea ? 'REACTIVO' : 'ANIMAL';
 
-                        const especieDisplay = (f.nombre_especie || '---') + ((f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '');
+                        // 🚀 MAGIA VISUAL PARA CANTIDADES Y REACTIVOS
+                        let cantidadDisplay = '';
+                        if (isRea) {
+                            cantidadDisplay = `
+                                <div class="text-start lh-sm">
+                                    <span class="text-info fw-bold">${f.NombreInsumo || 'Reactivo'}</span><br>
+                                    <small class="text-muted" style="font-size: 10px;">Pres: <b>${f.CantidadInsumo || '-'} ${f.TipoInsumo || ''}</b></small><br>
+                                    <span class="badge bg-light text-dark border mt-1 shadow-sm">Solicitadas: <b class="text-primary">${f.cant_organo || 0} un.</b></span>
+                                </div>`;
+                        } else {
+                            cantidadDisplay = `<b class="fs-5 text-dark">${f.cant_animal || 0}</b> <small class="text-muted">un.</small>`;
+                        }
 
-                        let cantidadDisplay = isReactivo 
-                            ? `<span class="text-info fw-bold">${f.NombreInsumo || 'Insumo'}</span> <b>${f.CantidadInsumo || 0}</b><small class="text-muted">(${f.TipoInsumo || ''})</small> - ${f.cant_organo || 0} un.` 
-                            : `<b class="fs-6">${f.cant_animal || 0}</b> <small class="text-muted">un.</small>`;
-
-                        const dctoHTML = (f.descuento > 0) ? `<span class="badge-discount">-${f.descuento}%</span>` : '';
-
-                        let estadoBadge = isExento ? '<span class="badge bg-info text-dark">EXENTO</span>' : 
+                        // --- VISUAL: ESPECIE Y ESTADO ---
+                        const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `<br><small class="text-muted">${f.nombre_subespecie}</small>` : '');
+                        const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
+                        
+                        let estadoBadge = isExento ? '<span class="badge bg-info text-dark shadow-sm">EXENTO</span>' : 
                                          (debe <= 0 ? '<span class="badge bg-success shadow-sm">PAGO COMPLETO</span>' : 
-                                         (pagado > 0 ? '<span class="badge bg-warning text-dark">PAGO PARCIAL</span>' : 
-                                         '<span class="badge bg-danger">SIN PAGAR</span>'));
+                                         (pagado > 0 ? '<span class="badge bg-warning text-dark shadow-sm">PAGO PARCIAL</span>' : 
+                                         '<span class="badge bg-danger shadow-sm">SIN PAGAR</span>'));
 
                         const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
 
                         return `
-                                <tr class="text-center align-middle pointer" style="${rowStyle}" 
+                            <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">${f.id}</td>
+                                <td class="small text-muted fw-bold">#${f.id}</td>
                                 <td>${estadoBadge}</td>
-                                <td class="small">${f.solicitante}</td>
-                                <td class="small text-secondary">${especieDisplay}</td>
-                                <td class="text-start ps-3 small">${f.detalle_display || '---'}</td>
-                                <td class="small text-dark">${cantidadDisplay}</td>
-                                <td class="text-end fw-bold">$ ${total.toFixed(2)} ${dctoHTML}</td>
-                                <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+                                <td class="small fw-bold">${f.solicitante}</td>
+                                <td class="small text-secondary">${isRea ? '<span class="badge bg-light text-info border">REACTIVO BIOLÓGICO</span>' : espDisplay}</td>
+                                <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
+                                <td>${cantidadDisplay}</td>
+                                <td class="text-end fw-bold text-dark">$ ${total.toFixed(2)}</td>
+                                <td class="text-end text-success fw-bold">$ ${pagado.toFixed(2)}</td>
                                 <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
                             </tr>`;
                     }).join('')}

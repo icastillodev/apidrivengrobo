@@ -15,13 +15,12 @@ RewriteRule ^ paginas/error404.html [L]
 # ============================================================
 # 1. FIX DE RUTAS PARA ASSETS (Limpieza Anti-Bucles)
 # ============================================================
-# El "^(.+)/" asegura que solo limpie si hay carpetas falsas antes (ej. admin/config/dist -> dist)
-RewriteRule ^(.+)/(dist|assets|paginas|resources|node_modules)/(.*)$ $2/$3 [L]
+RewriteCond %{REQUEST_URI} !^/URBE-API-DRIVEN/front/(dist|assets|paginas|resources|node_modules)/
+RewriteRule ^.*?(dist|assets|paginas|resources|node_modules)/(.*)$ $1/$2 [L]
 
 # ============================================================
 # 2. FRENO DE EMERGENCIA PARA ARCHIVOS FÍSICOS
 # ============================================================
-# Si Apache ya encontró el archivo real (ej. un .js, .css o el html final), detiene el motor.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
@@ -31,24 +30,17 @@ RewriteRule ^ - [L]
 # ============================================================
 RewriteRule ^gecko(s)?adm/login/?$ superadmin_login.html [L,NC]
 RewriteRule ^formulario/([a-zA-Z0-9_-]+)/?$ paginas/formulario/index.html [L]
-
-
 RewriteRule ^qr/([a-zA-Z0-9]{6})/?$ paginas/qr-alojamiento.html?token=$1 [L,QSA]
-
-# REGLA ORIGINAL: Modo Admin (Interno)
 RewriteRule ^qr/alojamiento/?$ paginas/qr-alojamiento.html [L,QSA]
-
 RewriteRule ^construccion/?$ paginas/construccion.html [L]
 
-
-
 # ============================================================
-# 4. ENMASCARAMIENTO DE RUTAS LÓGICAS (Profundidad Infinita)
+# 4. ENMASCARAMIENTO DE RUTAS LÓGICAS (BLINDADO)
 # ============================================================
-# Atrapa cualquier ruta por más larga que sea y la mapea a su HTML
-RewriteRule ^panel/(.*)$ paginas/usuario/$1.html [L]
-RewriteRule ^admin/(.*)$ paginas/admin/$1.html [L]
-RewriteRule ^superadmin/(.*)$ paginas/superadmin/$1.html [L]
+# Esta Regex atrapa "facturacion/depto" perfecto, ignorando si el usuario pone "/" al final
+RewriteRule ^panel/([a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)/?$ paginas/usuario/$1.html [L]
+RewriteRule ^admin/([a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)/?$ paginas/admin/$1.html [L]
+RewriteRule ^superadmin/([a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*)/?$ paginas/superadmin/$1.html [L]
 
 # ============================================================
 # 5. ENRUTADOR SPA PRINCIPAL (Slugs Institucionales)

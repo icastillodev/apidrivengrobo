@@ -5,10 +5,17 @@ let catalogInsumos = [];
 let selectedItems = []; 
 let dataFull = null; // Almacén para el PDF de precios e info institucional
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
-/* --- HELPER: Obtener Institución del Contexto --- */
+/* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
 function getContextInstId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('targetInst') || localStorage.getItem('instId');
+    // 1. Buscamos el ID secreto en la memoria (NO lo borramos aquí porque se usa al enviar)
+    let instId = sessionStorage.getItem('target_inst_secreto');
+    
+    // 2. Si no existe, usamos su sede por defecto.
+    if (!instId) {
+        instId = localStorage.getItem('instId');
+    }
+    
+    return instId;
 }
 
 export async function initInsumosForm() {
