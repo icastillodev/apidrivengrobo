@@ -181,26 +181,30 @@ export function renderTopMenuStructure(container, menuIds, templates) {
 
     renderOmniComponents('top');
 }
-// AQUÍ CORREGIMOS EL DROPDOWN PARA QUE INICIE CERRADO
+// AQUÍ ESTÁ LA LÓGICA DEL "ACTIVO", LA LÍNEA VERDE Y LA ESTRUCTURA DEL DROPDOWN
 function buildMenuItemHTML(id, layout, templates) {
     const item = templates[id]; 
     if (!item) return '';
     const path = item.path ? getCorrectPath(item.path) : '#';
     const isSide = layout === 'side';
     
+    // Detectamos si la URL actual coincide con el enlace para pintarlo de verde
     const currentPath = window.location.pathname;
     const isActive = (item.path !== '#' && currentPath.includes(item.path));
     
     const liClass = isSide ? 'nav-item mb-1 w-100 position-relative group-gecko-item' : 'nav-item position-relative';
+    
+    // Clases base para enlaces normales
     const linkClass = isSide 
         ? `nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 ${isActive ? 'active-gecko-link' : ''}` 
         : `gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body ${isActive ? 'active-gecko-link' : ''}`;
     
     const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">${item.svg}<div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div></div>`;
+    // Div extra al label para anclar la barrita verde en el medio
     const labelHTML = `<div class="position-relative d-inline-block"><span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span></div>`;
 
     if (item.isDropdown && item.children) {
-        // 🚀 Quitamos el "open" de aquí. Solo marcamos verde el padre.
+        // Auto-abrir o marcar si uno de sus hijos es la página actual
         const isChildActive = item.children.some(c => currentPath.includes(c.path));
         const activeDropClass = isChildActive ? 'active-gecko-link' : ''; 
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
@@ -210,16 +214,31 @@ function buildMenuItemHTML(id, layout, templates) {
             return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${child.label}</a></li>`;
         }).join('');
 
+        // 🚀 LA MAGIA ESTÁ AQUÍ: Construimos distinto si es Lateral o Superior
+        let dropLinkClass, dropInner;
+        
+        if (isSide) {
+            // Diseño Menú Lateral: Horizontal, Icono -> Texto -> Flecha separada al final
+            dropLinkClass = `nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 dropdown-toggle-gecko justify-content-between ${activeDropClass}`;
+            dropInner = `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}`;
+        } else {
+            // 🚀 Diseño Menú Superior: Vertical (flex-column), usa gecko-nav-link para el hover
+            dropLinkClass = `gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body dropdown-toggle-gecko ${activeDropClass}`;
+            // Icono Arriba, Texto y Flecha juntos abajo
+            dropInner = `${iconHTML} <div class="d-flex align-items-center gap-1">${labelHTML} ${arrowIcon}</div>`;
+        }
+
         return `
         <li class="${liClass}">
-            <a href="javascript:void(0);" class="nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 dropdown-toggle-gecko d-flex justify-content-between ${activeDropClass}">
-                <div class="d-flex align-items-center gap-2 flex-column flex-md-row">${iconHTML} ${labelHTML}</div> ${arrowIcon}
+            <a href="javascript:void(0);" class="${dropLinkClass}">
+                ${dropInner}
             </a>
             <ul class="dropdown-menu-gecko list-unstyled hidden">
                 ${childrenHTML}
             </ul>
         </li>`;
     }
+    
     return `<li class="${liClass}"><a href="${path}" class="${linkClass}">${iconHTML} ${labelHTML}</a></li>`;
 }
 function buildControlsHTML(layout) {

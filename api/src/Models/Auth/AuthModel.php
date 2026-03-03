@@ -158,4 +158,37 @@ public function verifyAndGetUser2FA($userId, $code) {
         // Borramos el historial criminal de la IP cuando se loguea con éxito
         $this->db->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
     }
+
+    // =========================================================
+    // 🚀 NUEVO: ESCUDO DE SEGURIDAD (CONTRASEÑA Y CORREO)
+    // =========================================================
+    
+    public function getSecurityStatus($userId) {
+        $sql = "SELECT u.password_secure, p.EmailA 
+                FROM usuarioe u 
+                LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA 
+                WHERE u.IdUsrA = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function updateSecurity($userId, $data) {
+        $this->db->beginTransaction();
+        try {
+            if (!empty($data['pass'])) {
+                $hash = password_hash($data['pass'], PASSWORD_BCRYPT);
+                $this->db->prepare("UPDATE usuarioe SET password_secure = ? WHERE IdUsrA = ?")->execute([$hash, $userId]);
+            }
+            if (!empty($data['email'])) {
+                // Actualiza el email si está vacío o mal formado
+                $this->db->prepare("UPDATE personae SET EmailA = ? WHERE IdUsrA = ?")->execute([$data['email'], $userId]);
+            }
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }

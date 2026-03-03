@@ -48,9 +48,10 @@ try {
         let ids = [];
 
         // Si es SUPERADMIN (Rol 1), le forzamos a ver todo, sin preguntar a la API
-        if (roleId === 1) {
-            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 203, 55, 202, 998, 999];
+        if (roleId === 1 || roleId === 2) {
+            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 998, 999];
         } 
+
         // Si es usuario normal, le preguntamos a la base de datos qué puede ver
         else {
             const resMenu = await API.request(`/menu?role=${roleId}&inst=${instId}`);

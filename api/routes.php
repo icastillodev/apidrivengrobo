@@ -31,6 +31,10 @@ $router->post('/update-password-recovery', 'UserController@updatePasswordRecover
 $router->get('/form-registro/config/:slug', 'FormRegistroController@getBySlug');
 $router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- ESTA ES LA QUE FALTABA
 
+// 🚀 NUEVAS RUTAS: ESCUDO DE SEGURIDAD OBLIGATORIO
+$router->get('/auth/security-check', 'AuthController@securityCheck');
+$router->post('/auth/update-security', 'AuthController@updateSecurity');
+
 // ============================================================
 // SECCIÓN: Menú y Notificaciones , busqueda global
 // ============================================================
@@ -43,6 +47,7 @@ $router->get('/search/global', 'GlobalSearchController@search');
 
 // Procesamiento de lenguaje natural con Gemini
 $router->post('/ia/procesar', 'AiController@processCommand');
+
 
 
 

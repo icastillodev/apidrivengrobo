@@ -204,4 +204,51 @@ class AuthController {
         }
         exit;
     }
+    // =========================================================
+    // 🚀 NUEVO: ENDPOINTS DEL ESCUDO DE SEGURIDAD
+    // =========================================================
+
+    public function securityCheck() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        try {
+            $sesion = Auditoria::getDatosSesion(); // Valida que esté logueado
+            $data = $this->model->getSecurityStatus($sesion['userId']);
+            
+            // Verificamos si tiene el Hash exacto de "12345678"
+            $needsPass = ($data['password_secure'] === '$2y$10$MFY0vftBQjV9Yv8TMQ42sOKkTPrJMmZCagOdV44ZAKgH3KNeilSMO');
+            
+            // Verificamos si no tiene email o si no tiene un '@'
+            $needsEmail = empty($data['EmailA']) || strpos($data['EmailA'], '@') === false;
+
+            echo json_encode([
+                'status' => 'success', 
+                'needsPass' => $needsPass, 
+                'needsEmail' => $needsEmail
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function updateSecurity() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = json_decode(file_get_contents('php://input'), true);
+            
+            $this->model->updateSecurity($sesion['userId'], $data);
+            
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Error de base de datos']);
+        }
+        exit;
+    }
 }
