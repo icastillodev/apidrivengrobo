@@ -159,10 +159,9 @@ public function verifyAndGetUser2FA($userId, $code) {
         $this->db->prepare("DELETE FROM login_attempts WHERE ip_address = ?")->execute([$ip]);
     }
 
+// =========================================================
+    // 🚀 ESCUDO DE SEGURIDAD (CONTRASEÑA Y CORREO)
     // =========================================================
-    // 🚀 NUEVO: ESCUDO DE SEGURIDAD (CONTRASEÑA Y CORREO)
-    // =========================================================
-    
     public function getSecurityStatus($userId) {
         $sql = "SELECT u.password_secure, p.EmailA 
                 FROM usuarioe u 
@@ -170,18 +169,19 @@ public function verifyAndGetUser2FA($userId, $code) {
                 WHERE u.IdUsrA = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
 
     public function updateSecurity($userId, $data) {
         $this->db->beginTransaction();
         try {
+            // Si el frontend manda una contraseña nueva, la hasheamos y guardamos
             if (!empty($data['pass'])) {
                 $hash = password_hash($data['pass'], PASSWORD_BCRYPT);
                 $this->db->prepare("UPDATE usuarioe SET password_secure = ? WHERE IdUsrA = ?")->execute([$hash, $userId]);
             }
+            // Si el frontend manda un email nuevo, lo guardamos
             if (!empty($data['email'])) {
-                // Actualiza el email si está vacío o mal formado
                 $this->db->prepare("UPDATE personae SET EmailA = ? WHERE IdUsrA = ?")->execute([$data['email'], $userId]);
             }
             $this->db->commit();

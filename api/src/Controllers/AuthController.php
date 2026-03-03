@@ -204,8 +204,8 @@ class AuthController {
         }
         exit;
     }
-    // =========================================================
-    // 🚀 NUEVO: ENDPOINTS DEL ESCUDO DE SEGURIDAD
+// =========================================================
+    // 🚀 ENDPOINTS DEL ESCUDO DE SEGURIDAD
     // =========================================================
 
     public function securityCheck() {
@@ -216,11 +216,19 @@ class AuthController {
             $sesion = Auditoria::getDatosSesion(); // Valida que esté logueado
             $data = $this->model->getSecurityStatus($sesion['userId']);
             
-            // Verificamos si tiene el Hash exacto de "12345678"
-            $needsPass = ($data['password_secure'] === '$2y$10$MFY0vftBQjV9Yv8TMQ42sOKkTPrJMmZCagOdV44ZAKgH3KNeilSMO');
+            // 🚀 FIX CRIPTOGRÁFICO: Comparamos dinámicamente usando password_verify
+            // Esto asegura que detecte "12345678" sin importar qué "salt" aleatorio tenga el hash
+            $needsPass = false;
+            if (!empty($data['password_secure'])) {
+                $needsPass = password_verify('12345678', $data['password_secure']);
+            } else {
+                // Si por alguna razón el campo está totalmente vacío, también requiere cambio
+                $needsPass = true;
+            }
             
-            // Verificamos si no tiene email o si no tiene un '@'
-            $needsEmail = empty($data['EmailA']) || strpos($data['EmailA'], '@') === false;
+            // Verificamos si no tiene email o si el email es inválido (no tiene @)
+            $correoReal = trim($data['EmailA'] ?? '');
+            $needsEmail = empty($correoReal) || strpos($correoReal, '@') === false;
 
             echo json_encode([
                 'status' => 'success', 
