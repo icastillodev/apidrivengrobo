@@ -12,28 +12,90 @@ export function setupEventListeners() {
 
     HotkeyManager.init();
 
+    // 1. REPARACIÓN DE BOTONES HAMBURGUESA Y CRUZ
     const closeBtn = document.getElementById('gecko-close-sidebar');
-    if(closeBtn) closeBtn.onclick = () => document.getElementById('gecko-sidebar-element').classList.remove('open');
+    const toggleTop = document.getElementById('gecko-mobile-toggle-top');
+    const toggleSide = document.getElementById('gecko-mobile-toggle');
+    const sidebar = document.getElementById('gecko-sidebar-element');
 
-document.addEventListener('click', (e) => {
-        const sidebar = document.getElementById('gecko-sidebar-element');
+    if(closeBtn && sidebar) {
+        closeBtn.addEventListener('click', (e) => { e.preventDefault(); sidebar.classList.remove('open'); });
+    }
+    if (toggleTop) {
+        toggleTop.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if(sidebar) sidebar.classList.add('open'); });
+    }
+    if (toggleSide) {
+        toggleSide.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if(sidebar) sidebar.classList.add('open'); });
+    }
+
+    // 2. GESTOS TÁCTILES (SWIPE INTELIGENTE)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    document.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, {passive: true});
+
+    document.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, {passive: true});
+
+function handleSwipe() {
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY; // Positivo significa que deslizó hacia abajo
+        const absX = Math.abs(diffX);
+        const absY = Math.abs(diffY);
+        
+        // SWIPE HORIZONTAL (Para abrir/cerrar menú)
+        if (absX > absY) {
+            if (diffX > 40 && touchStartX < 40) {
+                if (sidebar && window.innerWidth <= 1250) sidebar.classList.add('open');
+            }
+            if (diffX < -50) {
+                if (sidebar && sidebar.classList.contains('open')) sidebar.classList.remove('open');
+            }
+        } 
+        // 🚀 SWIPE VERTICAL (Para abrir el buscador GeckoSearch)
+        else if (absY > absX) {
+            // Solo lo activamos si el dedo empezó bien arriba en la pantalla y deslizó hacia abajo
+            if (diffY > 60 && touchStartY < 120) {
+                window.GeckoSearch.open();
+            }
+        }
+    }
+
+    // 3. CERRAR SI SE TOCA FUERA DEL MENÚ (Escritorio)
+    document.addEventListener('click', (e) => {
+        // 🚀 ESCUDO CONTRA EL ERROR DE CONSOLA (Si tocas el scroll o un nodo de texto)
+        if (!e.target || typeof e.target.closest !== 'function') return;
+
         if (sidebar && sidebar.classList.contains('open')) {
-            const bSide = document.getElementById('gecko-mobile-toggle');
-            const bTop = document.getElementById('gecko-mobile-toggle-top');
-            
-            // Cierra el menú si tocamos fuera de la barra y fuera de los botones
             if (!sidebar.contains(e.target) && 
-               (!bSide || !bSide.contains(e.target)) && 
-               (!bTop || !bTop.contains(e.target))) {
+               (!toggleSide || !toggleSide.contains(e.target)) && 
+               (!toggleTop || !toggleTop.contains(e.target))) {
                 sidebar.classList.remove('open');
             }
         }
+        
+        // Cierra los menús desplegables (Acordeones de módulos)
         if (!e.target.closest('.dropdown-menu-gecko') && !e.target.closest('.dropdown-toggle-gecko')) {
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
+            document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
+            document.querySelectorAll('.nav-item.expanded-grid').forEach(li => li.classList.remove('expanded-grid'));
+        }
+
+        // Cierra el menú desplegable de idiomas (Banderas) si se hace click afuera
+        if (!e.target.closest('.dropdown-container-lang')) {
+            document.querySelectorAll('.dropdown-menu-lang').forEach(m => m.classList.add('hidden'));
         }
     });
 
-    // ATAJO GLOBAL ALT G
+    // 4. ATAJO GLOBAL ALT G
     document.addEventListener('keydown', (e) => {
         if (e.altKey && e.key.toLowerCase() === 'g') {
             e.preventDefault();
@@ -43,22 +105,33 @@ document.addEventListener('click', (e) => {
         }
     });
 
+    // 5. BOTONES DE CONFIGURACIÓN
     const actions = {
-        'btn-voice-switch': () => UserPreferences.toggleVoice(),
-        'btn-font-switch': () => UserPreferences.cycleFontSize(),
-        'btn-theme-switch': () => UserPreferences.toggleTheme(),
-        'btn-layout-switch': () => UserPreferences.toggleMenuLayout(),
-        'btn-hotkeys-help': () => showHotkeysModal()
+        '.btn-voice-switch': () => UserPreferences.toggleVoice(),
+        '.btn-font-switch': () => UserPreferences.cycleFontSize(),
+        '.btn-theme-switch': () => UserPreferences.toggleTheme(),
+        '.btn-layout-switch': () => UserPreferences.toggleMenuLayout(),
+        '.btn-hotkeys-help': () => showHotkeysModal()
     };
 
-    Object.entries(actions).forEach(([id, fn]) => {
-        const btn = document.getElementById(id);
-        if(btn) {
-            btn.onclick = (e) => { e.preventDefault(); fn(); };
-        }
+    Object.entries(actions).forEach(([selector, fn]) => {
+        document.querySelectorAll(selector).forEach(btn => {
+            btn.addEventListener('click', (e) => { e.preventDefault(); fn(); });
+        });
     });
 
-document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
+    // EVENTO DEL MENÚ DE IDIOMAS (Para que se abra el popup de banderas)
+    document.querySelectorAll('.dropdown-toggle-lang').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const menu = btn.nextElementSibling;
+            if (menu) menu.classList.toggle('hidden');
+        });
+    });
+
+    // 6. ACORDEÓN CLICK (ABRIR / CERRAR Y EXPANSIÓN GRID)
+    document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
         btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -66,35 +139,24 @@ document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
             if(!currentMenu) return;
 
             const isHidden = currentMenu.classList.contains('hidden');
+            const liParent = btn.closest('.nav-item'); // Capturamos la caja padre para el Grid Móvil
             
-            // Cierra todos los submenús y resetea las flechas
+            // Cierra todos
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
             document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
+            document.querySelectorAll('.nav-item.expanded-grid').forEach(li => li.classList.remove('expanded-grid'));
 
+            // Abre el tocado
             if(isHidden) {
                 currentMenu.classList.remove('hidden');
-                btn.classList.add('open'); // Rota la flecha
-
-                // LA MAGIA: Si estamos en el Escritorio Lateral, calculamos coordenadas
-                // Esto evita que el menú se corte por culpa del "overflow-y: auto" (Scroll)
-                if (btn.closest('#side-menu-ul')) {
-                    const rect = btn.getBoundingClientRect();
-                    currentMenu.style.position = 'fixed'; // Flota sobre todo el DOM
-                    currentMenu.style.top = rect.top + 'px'; // A la altura del botón
-                    currentMenu.style.left = (rect.right + 12) + 'px'; // Pegado a la derecha + 12px
+                btn.classList.add('open'); 
+                if (liParent && window.innerWidth <= 768) {
+                    liParent.classList.add('expanded-grid'); // Expande a 2 columnas en móvil
                 }
             }
         };
     });
-// EXTRA: Si el usuario hace scroll en el menú lateral de escritorio,
-    // cerramos los submenús fijos para que no se queden flotando "huérfanos".
-    const sideMenuUl = document.getElementById('side-menu-ul');
-    if (sideMenuUl) {
-        sideMenuUl.addEventListener('scroll', () => {
-            document.querySelectorAll('#side-menu-ul .dropdown-menu-gecko:not(.hidden)').forEach(m => m.classList.add('hidden'));
-            document.querySelectorAll('#side-menu-ul .dropdown-toggle-gecko.open').forEach(b => b.classList.remove('open'));
-        });
-    }
+
     setTimeout(() => {
         if (localStorage.getItem('gecko_ok') == 1) {
             if (!navigator.userAgent.toLowerCase().includes('firefox')) {
@@ -109,11 +171,9 @@ document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
 function showHotkeysModal() {
     const hotkeys = HotkeyManager.getVisibleHotkeys();
     
-    // Eliminamos modal viejo si existe
     const oldModal = document.getElementById('modalHotkeys');
     if (oldModal) oldModal.remove();
 
-    // Generamos las tarjetas (Cards)
     const cards = hotkeys.map(h => `
         <div class="hotkey-item">
             <span class="hotkey-desc">${h.desc}</span>

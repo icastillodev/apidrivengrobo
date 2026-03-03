@@ -14,40 +14,40 @@ class AnimalModel {
 // api/src/Models/Animal/AnimalModel.php
 
 public function getByInstitution($instId) {
-    $sql = "SELECT 
-                f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
-                f.aclaraA as Aclaracion, f.estado, f.quienvisto as QuienVio, 
-                f.edadA as Edad, f.pesoA as Peso, f.aclaracionadm as AclaracionAdm,
-                f.IdUsrA as IdInvestigador, f.idsubespA,
-                CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
-                pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
-                tf.nombreTipo as TipoNombre,
-                px.nprotA as NProtocolo, px.idprotA,
-                -- Atributo protocoloexpe = 1 identifica Otros CEUAs
-                px.protocoloexpe as IsExterno, 
-                COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
-                CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie, 
-                COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
-                COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
-                se.Psubanimal as PrecioUnit 
-            FROM formularioe f
-            INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
-            INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
-            LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
-            LEFT JOIN especiee e ON se.idespA = e.idespA
-            LEFT JOIN protformr pf ON f.idformA = pf.idformA
-            LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
-            LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-            LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
-            LEFT JOIN sexoe s ON f.idformA = s.idformA
-            WHERE f.IdInstitucion = ? 
-              AND tf.categoriaformulario = 'Animal vivo'
-            ORDER BY f.idformA DESC";
-    
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute([$instId]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+        $sql = "SELECT 
+                    f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
+                    f.aclaraA as Aclaracion, f.estado, f.quienvisto as QuienVio, 
+                    f.edadA as Edad, f.pesoA as Peso, f.aclaracionadm as AclaracionAdm,
+                    f.raza, -- 🚀 AQUI AGREGAMOS LA RAZA
+                    f.IdUsrA as IdInvestigador, f.idsubespA,
+                    CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
+                    pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
+                    tf.nombreTipo as TipoNombre,
+                    px.nprotA as NProtocolo, px.idprotA,
+                    px.protocoloexpe as IsExterno, 
+                    COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
+                    CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie, 
+                    COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
+                    COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
+                    se.Psubanimal as PrecioUnit 
+                FROM formularioe f
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
+                LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
+                LEFT JOIN especiee e ON se.idespA = e.idespA
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+                LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+                LEFT JOIN sexoe s ON f.idformA = s.idformA
+                WHERE f.IdInstitucion = ? 
+                  AND tf.categoriaformulario = 'Animal vivo'
+                ORDER BY f.idformA DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     // api/src/Models/Animal/AnimalModel.php
 
     // Obtener la última notificación del registro
@@ -169,9 +169,18 @@ public function updateFull($data) {
 
         $this->db->beginTransaction();
         try {
-            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
-            $this->db->prepare($sqlForm)->execute([$data['tipoA'] ?? null, $idSubesp, $data['edadA'] ?? '', $data['pesoA'] ?? '', $data['fechainicioA'] ?? null, $data['fecRetiroA'] ?? null, $id]);
-
+        // 🚀 AGREGAMOS raza = ? Y PASAMOS EL DATO
+            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
+            $this->db->prepare($sqlForm)->execute([
+                $data['tipoA'] ?? null, 
+                $idSubesp, 
+                $data['razaA'] ?? '', // Nombre que le daremos en el form HTML
+                $data['edadA'] ?? '', 
+                $data['pesoA'] ?? '', 
+                $data['fechainicioA'] ?? null, 
+                $data['fecRetiroA'] ?? null, 
+                $id
+            ]);
             $sqlSexo = "UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?";
             $this->db->prepare($sqlSexo)->execute([$data['machoA'] ?? 0, $data['hembraA'] ?? 0, $data['indistintoA'] ?? 0, $newTotal, $id]);
 

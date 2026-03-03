@@ -131,13 +131,13 @@ function renderTable() {
             </td>
             <td class="py-2 px-2 small">${a.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${a.NProtocolo || '---'}</td>
-            <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
             <td class="py-2 px-2 small">${a.CatEspecie}</td>
+            <td class="py-2 px-2 small text-muted">${a.raza || '---'}</td>
+            <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
+            <td class="py-2 px-2 small text-muted">${a.Peso || '---'}</td>
             <td class="py-2 px-2 text-center fw-bold">${a.CantAnimal}</td>
             <td class="py-2 px-2 small text-muted">${a.Inicio || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Retiro || '---'}</td>
-            <td class="py-2 px-2 small text-truncate" style="max-width: 150px;">${a.Aclaracion || '---'}</td>
-            <td class="py-2 px-2 small">${a.QuienVio || '---'}</td>
             <td class="py-2 px-2 text-center">${getStatusBadge(a.estado)}</td>
         `;
         tbody.appendChild(tr);
@@ -286,61 +286,114 @@ function renderNotificationSection(lastNotify, idformA) {
 
 function renderOrderModificationSection(a, sex, cache) {
     return `
-    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 11px;">MODIFICACIÓN DEL FORMULARIO (DATOS DEL PEDIDO)</h6>
+    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">MODIFICACIÓN DEL FORMULARIO (DATOS DEL PEDIDO)</h6>
     <div id="alert-otros-ceuas" class="alert alert-danger py-1 px-2 mb-3 fw-bold" style="font-size: 10px; display: ${a.IsExterno == 1 ? 'block' : 'none'};">
         ⚠️ PROTOCOLO PERTENECE A OTROS CEUAS (EXTERNO)
     </div>
-    <form id="form-animal-full">
+    
+    <form id="form-animal-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${a.idformA}">
         <div class="row g-3">
+            
             <div class="col-md-12">
-                <label class="form-label small fw-bold uppercase">Tipo de Pedido</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Tipo de Pedido</label>
                 <select name="tipoA" id="select-type-modal" class="form-select form-select-sm" onchange="window.calculateAnimalTotals()">
                     ${cache.types.map(t => `<option value="${t.IdTipoFormulario}" data-exento="${t.exento}" data-desc="${t.descuento}" ${a.TipoNombre === t.nombreTipo ? 'selected' : ''}>${t.nombreTipo}</option>`).join('')}
                 </select>
             </div>
             <div class="col-md-12">
-                <label class="form-label small fw-bold uppercase">N° Protocolo (Buscar)</label>
-                <input type="text" class="form-control form-control-sm mb-1" placeholder="Filtrar..." onkeyup="window.filterProtocolList(this)">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">N° Protocolo (Buscar)</label>
+                <input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="Filtrar protocolo..." onkeyup="window.filterProtocolList(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" onchange="window.handleProtocolChange(this)">
                     ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${p.nprotA} - ${p.tituloA}</option>`).join('')}
                 </select>
             </div>
-            <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">Categoría Especie</label>
+
+            <div class="col-12 mt-4">
+                <h6 class="fw-bold text-success border-bottom border-success border-opacity-25 pb-2 mb-1" style="font-size: 11px;">1. CARACTERÍSTICAS DEL ANIMAL</h6>
+            </div>
+            
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Especie</label>
                 <select id="select-species-modal" name="idsubespA" class="form-select form-select-sm" onchange="window.updateSpeciesPrice(this)"></select>
             </div>
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Edad</label><input type="text" name="edadA" class="form-control form-control-sm" value="${a.Edad || ''}"></div>
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Peso</label><input type="text" name="pesoA" class="form-control form-control-sm" value="${a.Peso || ''}"></div>
-
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Machos</label><input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()"></div>
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Hembras</label><input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()"></div>
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Indistintos</label><input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()"></div>
-            <div class="col-md-3"><label class="form-label small fw-bold uppercase">Total</label><input type="number" id="total-animals-modal" name="totalA" class="form-control form-control-sm bg-light fw-bold" value="${sex.totalA}" readonly></div>
-
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">Precio Unit. (BD)</label><input type="text" id="price-unit-modal" class="form-control form-control-sm bg-light" value="${a.PrecioUnit || 0}" readonly></div>
-            <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">Precio Final ($)</label>
-                <div id="discount-alert" class="small text-danger fw-bold mb-1" style="display:none;"></div>
-                <input type="text" id="price-total-modal" class="form-control form-control-sm bg-light fw-bold text-success" value="0.00" readonly>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Raza</label>
+                <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Edad</label>
+                <input type="text" name="edadA" class="form-control form-control-sm" value="${a.Edad || ''}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Peso</label>
+                <input type="text" name="pesoA" class="form-control form-control-sm" value="${a.Peso || ''}">
             </div>
 
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">Fecha Inicio</label><input type="date" name="fechainicioA" class="form-control form-control-sm" value="${a.Inicio || ''}"></div>
-            <div class="col-md-6"><label class="form-label small fw-bold uppercase">Fecha Retiro</label><input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${a.Retiro || ''}"></div>
+            <div class="col-12 mt-4">
+                <h6 class="fw-bold text-success border-bottom border-success border-opacity-25 pb-2 mb-1" style="font-size: 11px;">2. CANTIDADES Y COSTOS</h6>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Machos</label>
+                <input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Hembras</label>
+                <input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Indistintos</label>
+                <input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Total</label>
+                <input type="number" id="total-animals-modal" name="totalA" class="form-control form-control-sm bg-light fw-bold text-center" value="${sex.totalA}" readonly>
+            </div>
+
+            <div class="col-md-6 mt-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Precio Unitario (BD)</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-light fw-bold">$</span>
+                    <input type="text" id="price-unit-modal" class="form-control bg-light text-end" value="${a.PrecioUnit || 0}" readonly>
+                </div>
+            </div>
+            <div class="col-md-6 mt-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Precio Final</label>
+                <div id="discount-alert" class="small text-danger fw-bold mb-1" style="display:none;"></div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text alert-success border-success fw-bold">$</span>
+                    <input type="text" id="price-total-modal" class="form-control alert-success border-success fw-bold text-end" value="0.00" readonly>
+                </div>
+            </div>
+
+            <div class="col-12 mt-4">
+                <h6 class="fw-bold text-success border-bottom border-success border-opacity-25 pb-2 mb-1" style="font-size: 11px;">3. FECHAS Y OBSERVACIONES</h6>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Fecha de Inicio</label>
+                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${a.Inicio || ''}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Fecha de Retiro</label>
+                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${a.Retiro || ''}">
+            </div>
 
             <div class="col-12">
-                <label class="form-label small fw-bold uppercase">Aclaración Usuario (Lectura)</label>
-                <div class="p-2 border rounded bg-light small">${a.Aclaracion || 'Sin aclaración.'}</div>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Aclaración Usuario (Lectura)</label>
+                <div class="p-2 border rounded bg-light small" style="min-height: 40px;">${a.Aclaracion || '<span class="text-muted fst-italic">Sin aclaración adicional enviada por el usuario.</span>'}</div>
             </div>
 
-            <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
-                <button type="button" class="btn btn-danger btn-sm px-4 fw-bold" onclick="window.downloadAnimalPDF(${a.idformA})">PDF</button>
-                <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">GUARDAR CAMBIOS</button>
+            <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
+                <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadAnimalPDF(${a.idformA})">
+                    <i class="bi bi-file-pdf"></i> DESCARGAR PDF
+                </button>
+                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;">GUARDAR CAMBIOS</button>
             </div>
         </div>
     </form>`;
 }
-
 // --- ACTUALIZACIÓN DINÁMICA ---
 window.updateAnimalStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
@@ -595,6 +648,8 @@ window.downloadAnimalPDF = async (id) => {
     // Corrección Edad y Peso
     const edad = getValByName('edadA');
     const peso = getValByName('pesoA');
+    const raza = getValByName('razaA');
+
     
     const machos = getValByName('machoA') || '0';
     const hembras = getValByName('hembraA') || '0';
@@ -634,10 +689,10 @@ window.downloadAnimalPDF = async (id) => {
                     <td style="padding: 10px; border: 1px solid #ddd; width: 50%;"><strong>Tipo de Pedido:</strong><br>${tipoPedido}</td>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>N° Protocolo:</strong><br>${nProtocolo}</td>
                 </tr>
-                <tr>
+            <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría Especie:</strong><br>${especie}</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">
-                        <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
+                        <strong>Raza:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
                     </td>
                 </tr>
             </table>
@@ -724,7 +779,7 @@ window.processExcelExport = () => {
     }
 
     // Encabezados con punto y coma
-    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Total", "Inicio", "Retiro", "Estado"];
+    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Raza", "Edad", "Peso", "Total", "Inicio", "Retiro", "Estado"];
     const csvRows = [headers.join(";")];
 
     data.forEach(a => {
@@ -734,8 +789,10 @@ window.processExcelExport = () => {
             a.Investigador,
             a.NProtocolo || '---',
             a.CatEspecie || '---',
+            a.raza || '---',  // NUEVO
+            a.Edad || '---',  // NUEVO
+            a.Peso || '---',  // NUEVO
             a.CantAnimal,
-            // TRUCO EXCEL: Force texto para que no salgan los #######
             `="${a.Inicio || '---'}"`, 
             `="${a.Retiro || '---'}"`,
             a.estado

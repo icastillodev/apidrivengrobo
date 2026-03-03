@@ -60,8 +60,7 @@ export const UserPreferences = {
     
     icons: {
         moon: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z"/></svg>`,
-        sun: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10zm0-5a1 1 0 0 0 1 1v3a1 1 0 0 0-2 0V3a1 1 0 0 0 1-1zm0 19a1 1 0 0 0-1 1v3a1 1 0 0 0 2 0v-3a1 1 0 0 0-1-1zm10-10a1 1 0 0 0-1-1h-3a1 1 0 0 0 0 2h3a1 1 0 0 0 1-1zM5 12a1 1 0 0 0-1-1H1a1 1 0 0 0 0 2h3a1 1 0 0 0 1-1zm13.364 7.778a1 1 0 0 0-1.414 0l-2.121 2.121a1 1 0 0 0 1.414 1.414l2.121-2.21a1 1 0 0 0 0-1.414zM6.157 4.737l-2.121 2.121a1 1 0 0 0 1.414 1.414l2.121-2.121a1 1 0 0 0-1.414-1.414zm11.314 0a1 1 0 0 0 0 1.414l2.121 2.121a1 1 0 0 0 1.414-1.414l-2.121-2.121a1 1 0 0 0-1.414 0zM6.157 19.07l2.121-2.121a1 1 0 0 0-1.414-1.414l-2.121 2.121a1 1 0 0 0 1.414 1.414z"/></svg>`,
-        gecko: `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-5.5 3a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm11 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM3.5 11.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm17 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM12 11c3 1.5 4 4.5 4 8s-1.5 5-4 5-4-1.5-4-5 1-6.5 4-8z"/></svg>`,
+        sun: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.8 5.2a.75.75 0 011.06 0l1.59 1.59a.75.75 0 11-1.06 1.06l-1.59-1.59a.75.75 0 010-1.06zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.74 17.74a.75.75 0 010 1.06l-1.59 1.59a.75.75 0 11-1.06-1.06l1.59-1.59a.75.75 0 011.06 0zM12 18.75a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25a.75.75 0 01.75-.75zM6.26 17.74a.75.75 0 01-1.06 0l-1.59 1.59a.75.75 0 111.06 1.06l1.59-1.59a.75.75 0 010-1.06zM4.5 12a.75.75 0 01-.75.75H1.5a.75.75 0 010-1.5h2.25a.75.75 0 01.75.75zM5.2 5.2a.75.75 0 010 1.06l-1.59 1.59a.75.75 0 01-1.06-1.06l1.59-1.59a.75.75 0 011.06 0z"/></svg>`,        gecko: `<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zm-5.5 3a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm11 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM3.5 11.5a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zm17 0a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4zM12 11c3 1.5 4 4.5 4 8s-1.5 5-4 5-4-1.5-4-5 1-6.5 4-8z"/></svg>`,
         font_chica: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4L5 20h2l2-5h7l2 5h2L12 4zm-3.5 9L12 6.5 15.5 13h-7z"/></svg>`,
         font_mediana: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M11 4L4 20h2l2-5h7l2 5h2L11 4zm-3.5 9L11 6.5 14.5 13h-7z"/><path d="M19 12l-4-4v3h-3v2h3v3z"/></svg>`,
         font_grande: `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4L3 20h2l2-5h7l2 5h2L10 4zm-3.5 9L10 6.5 13.5 13h-7z"/><path d="M18 8l-4-4v3h-3v2h3v3zM22 12l-4-4v3h-3v2h3v3z"/></svg>`
@@ -124,11 +123,10 @@ export const UserPreferences = {
     applyFontSize: (size) => {
         document.documentElement.setAttribute('data-font-size', size);
         localStorage.setItem('fontSize', size);
-        const btn = document.getElementById('btn-font-switch');
-        if (btn) {
+        document.querySelectorAll('.btn-font-switch').forEach(btn => {
             btn.innerHTML = UserPreferences.icons[`font_${size}`] || UserPreferences.icons.font_chica;
             btn.title = `Tamaño: ${size.toUpperCase()}`;
-        }
+        });
     },
 
     toggleTheme: async () => {
@@ -141,8 +139,9 @@ export const UserPreferences = {
     applyTheme: (theme) => {
         document.documentElement.setAttribute('data-bs-theme', theme);
         localStorage.setItem('theme', theme);
-        const iconContainer = document.getElementById('pref-icon-theme');
-        if (iconContainer) iconContainer.innerHTML = theme === 'dark' ? UserPreferences.icons.moon : UserPreferences.icons.sun;
+        document.querySelectorAll('.pref-icon-theme').forEach(icon => {
+            icon.innerHTML = theme === 'dark' ? UserPreferences.icons.moon : UserPreferences.icons.sun;
+        });
     },
 
     toggleVoice: async () => {
@@ -181,19 +180,19 @@ export const UserPreferences = {
     },
 
     applyVoiceVisuals: (state) => {
-        const btn = document.getElementById('btn-voice-switch');
-        if (!btn) return;
-        btn.classList.remove('voice-status-1', 'voice-status-2', 'voice-status-null', 'voice-status-error');
-        if (state == 'error') {
-            btn.classList.add('voice-status-error');
-            btn.style.color = "#000000"; 
-        } else if (state == 1) {
-            btn.classList.add('voice-status-1');
-            btn.style.color = "#1a5d3b"; 
-        } else {
-            btn.classList.add('voice-status-2');
-            btn.style.color = "#888888"; 
-        }
+        document.querySelectorAll('.btn-voice-switch').forEach(btn => {
+            btn.classList.remove('voice-status-1', 'voice-status-2', 'voice-status-null', 'voice-status-error');
+            if (state == 'error') {
+                btn.classList.add('voice-status-error');
+                btn.style.color = "#000000"; 
+            } else if (state == 1) {
+                btn.classList.add('voice-status-1');
+                btn.style.color = "#1a5d3b"; 
+            } else {
+                btn.classList.add('voice-status-2');
+                btn.style.color = "#888888"; 
+            }
+        });
     },
 
     setLanguage: async (lang) => {
@@ -205,11 +204,10 @@ export const UserPreferences = {
     },
 
     applyLanguageVisuals: (lang) => {
-        const img = document.getElementById('pref-current-flag');
-        if (img) {
+        document.querySelectorAll('.pref-current-flag').forEach(img => {
             const flags = { 'es': 'es.png', 'en': 'us.png', 'pt': 'br.png' };
             img.src = `https://flagcdn.com/w40/${flags[lang] || 'es.png'}`;
-        }
+        });
     },
 
     toggleMenuLayout: async () => {

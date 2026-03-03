@@ -5,7 +5,8 @@ export function injectMenuStyles() {
     style.id = 'gecko-menu-styles';
     style.innerHTML = [
         getBaseStyles(),
-        getSidebarStyles(),
+        getDesktopSidebarStyles(), // 🚀 1. Estilos exclusivos de PC
+        getMobileMenuStyles(),     // 🚀 2. Estilos exclusivos de Celular
         getTriggerStyles(),
         getOmniBoxStyles(),
         getHotkeyStyles(),
@@ -167,74 +168,187 @@ function getBaseStyles() {
 #mobile-menu-ul .arrow-icon-gecko, #main-menu-ul .arrow-icon-gecko { transform: rotate(0deg); }
 #mobile-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko, 
 #main-menu-ul .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
+
+/* ESTILOS DEL POPUP DE IDIOMAS */
+.dropdown-menu-lang {
+    background-color: var(--bs-body-bg) !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+    border-radius: 8px;
+}
+.dropdown-menu-lang.hidden { display: none !important; }
+
+[data-bs-theme="dark"] .dropdown-menu-lang {
+    background-color: #1e1e1e !important;
+    border-color: #333 !important;
+}
+
+/* Adaptación del texto requerido en Dark Mode */
+[data-bs-theme="dark"] .text-dark { color: #fff !important; }
+
+
+/* ========================================================= */
+        /* BURBUJAS DE NOTIFICACIÓN (Estilo App Nativa)              */
+        /* ========================================================= */
+        .notif-dot {
+            top: -6px !important;
+            right: -10px !important;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            font-size: 10px !important;
+            font-weight: 800 !important;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            border: 2px solid var(--bs-body-bg); /* Borde dinámico que recorta el icono */
+            z-index: 10;
+        }
+        [data-bs-theme="dark"] .notif-dot {
+            border-color: #1a1a1a; /* Borde oscuro para el modo noche */
+        }
     `;
 }
 
-function getSidebarStyles() {
+function getDesktopSidebarStyles() {
     return `
+        body { overscroll-behavior-x: none; }
+
+        /* Oculta la cruz en escritorio */
+        .gecko-btn-close { display: none !important; }
+
         .gecko-sidebar { 
-            position: fixed !important; 
-            top: 0; left: 0; 
-            height: 100dvh; /* dvh evita cortes con las barras de navegación en móviles iOS/Android */
-            width: 260px; 
-            z-index: 1050; 
-            background-color: var(--bs-body-bg);
-            display: flex; flex-direction: column;
-            padding-bottom: 0 !important; 
-            overflow: hidden !important; /* El padre NUNCA hace scroll */
-            border-right: 4px solid #1a5d3b !important; 
-            transform: translateX(-100%);
-            transition: transform 0.3s ease, box-shadow 0.3s ease; 
-        }
-        
-        /* 🚀 EL SECRETO DEL SCROLL PERFECTO (ESCRITORIO Y MÓVIL) */
-        #side-menu-ul, #mobile-menu-ul {
-            flex: 1 1 auto; /* Toma todo el espacio disponible en el medio */
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start; /* Agrupa arriba, no los dispersa */
-            overflow-y: auto !important; /* ¡AQUÍ ESTÁ EL SCROLL! */
-            overflow-x: hidden;
-            min-height: 0; /* Previene bugs de colapso en Flexbox */
-            padding: 10px 0;
-            margin-bottom: 0 !important;
-            gap: 2px;
+            position: fixed !important; top: 0; left: 0; height: 100vh; height: 100dvh; width: 260px; z-index: 1050; 
+            background-color: var(--bs-body-bg); display: flex; flex-direction: column; padding: 0 !important;
+            border-right: 4px solid #1a5d3b !important; transform: translateX(-100%); transition: transform 0.3s ease, box-shadow 0.3s ease; 
         }
 
-        /* Scrollbar elegante y minimalista */
-        #side-menu-ul::-webkit-scrollbar, #mobile-menu-ul::-webkit-scrollbar { width: 5px; }
-        #side-menu-ul::-webkit-scrollbar-thumb, #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
-        [data-bs-theme="dark"] #side-menu-ul::-webkit-scrollbar-thumb,
-        [data-bs-theme="dark"] #mobile-menu-ul::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
+        .gecko-sidebar-top-section { flex: 0 0 auto; padding: 30px 20px 0 20px; }
+        .gecko-sidebar-bottom-section { flex: 0 0 auto; padding: 15px 20px; border-top: 1px solid rgba(0,0,0,0.05); }
 
-        .gecko-sidebar .nav-item {
-            flex-shrink: 0; /* Impide que los ítems se aplasten para intentar caber */
-            margin-bottom: 0 !important; 
+        .gecko-sidebar-scroll-area {
+            flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden;
+            padding: 10px 0; width: 100%; -webkit-overflow-scrolling: touch; 
         }
 
+        .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 6px; background: transparent; }
+        .gecko-sidebar-scroll-area::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); border-radius: 10px; }
+        .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.4); border-radius: 10px; }
+        [data-bs-theme="dark"] .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.3); }
+
+        .gecko-sidebar .nav-item { flex: 0 0 auto; margin-bottom: 0 !important; }
         .gecko-sidebar .nav-link { 
-            padding-top: 8px !important; 
-            padding-bottom: 8px !important; 
-            font-size: clamp(11px, 1.5vh, var(--gecko-font-size)) !important;
+            padding-top: 12px !important; padding-bottom: 12px !important; 
+            font-size: clamp(13px, 1.5vh, var(--gecko-font-size)) !important;
+            white-space: normal !important; line-height: 1.2 !important; 
         }
 
-        .gecko-sidebar .menu-icon svg {
-            width: clamp(18px, 2.5vh, 24px); 
-            height: clamp(18px, 2.5vh, 24px);
+        .active-gecko-link { background-color: rgba(26, 93, 59, 0.08) !important; color: #1a5d3b !important; }
+        .active-gecko-link .menu-icon svg { fill: #1a5d3b !important; }
+        [data-bs-theme="dark"] .active-gecko-link { color: #4ade80 !important; }
+        [data-bs-theme="dark"] .active-gecko-link .menu-icon svg { fill: #4ade80 !important; }
+        .active-gecko-link .d-inline-block::after {
+            content: ""; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+            width: 60%; height: 3px; background-color: #1a5d3b; border-radius: 4px;
         }
+        [data-bs-theme="dark"] .active-gecko-link .d-inline-block::after { background-color: #4ade80; }
 
-        .gecko-sidebar.open {
-            transform: translateX(0) !important;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+        .dropdown-menu-gecko.hidden { display: none !important; }
+        .gecko-sidebar .dropdown-menu-gecko {
+            position: static !important; display: block; width: 100% !important; box-shadow: none !important;
+            border: none !important; border-left: 3px solid rgba(26, 93, 59, 0.2) !important; border-radius: 0 !important;
+            background: transparent !important; padding: 5px 0 5px 35px !important; margin: 0 !important; transform: none !important;
         }
+        .gecko-sidebar .dropdown-menu-gecko::before { display: none !important; }
+        
+        .gecko-sidebar .dropdown-item-gecko { 
+            padding: 10px 10px !important; opacity: 0.8; transition: all 0.2s; font-size: 12px; white-space: normal !important; line-height: 1.2; cursor: pointer;
+        }
+        .gecko-sidebar .dropdown-item-gecko:hover { 
+            opacity: 1; background-color: rgba(26, 93, 59, 0.15) !important; border-radius: 6px; color: #1a5d3b !important; font-weight: bold !important;
+        }
+        [data-bs-theme="dark"] .gecko-sidebar .dropdown-item-gecko:hover { background-color: rgba(74, 222, 128, 0.15) !important; color: #4ade80 !important; }
 
-        @media (min-width: 769px) { 
-            body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; }
+        .gecko-sidebar .arrow-icon-gecko { transform: rotate(0deg); transition: transform 0.3s ease; min-width: 10px; }
+        .gecko-sidebar .dropdown-toggle-gecko.open .arrow-icon-gecko { transform: rotate(180deg); }
+        .gecko-sidebar.open { transform: translateX(0) !important; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        
+        @media (min-width: 1001px) { 
+            #gecko-mobile-toggle-top, #gecko-mobile-toggle { display: none !important; }
+            #main-menu-ul { display: flex !important; }
+            .gecko-top-bar-info { display: flex !important; } /* 🚀 LA MOSTRAMOS EN PC */
+            
+            body.with-sidebar .gecko-sidebar { transform: translateX(0) !important; width: 260px; }
             body.with-sidebar { padding-left: 260px !important; } 
         }
+        .with-sidebar { padding-top: 30px !important; }
+        #main-menu-ul .dropdown-menu-gecko {
+            position: absolute; top: 100%; left: 50%; transform: translateX(-50%); min-width: 180px; z-index: 3000;
+            background-color: var(--bs-body-bg); border: 1px solid rgba(0,0,0,0.1); padding: 8px; border-radius: 8px;
+        }
+    `;
+}
 
-        .with-sidebar {
-            padding-top: 30px !important; 
+function getMobileMenuStyles() {
+    return `
+    @media (max-width: 1000px) {
+            #main-menu-ul { display: none !important; }
+            .gecko-top-bar-info { display: none !important; }
+            
+            /* 🚀 MUESTRA LA CRUZ SOLO EN MÓVIL */
+            .gecko-btn-close { display: block !important; }
+
+            #gecko-mobile-toggle-top, #gecko-mobile-toggle { 
+                display: flex !important; width: 48px !important; height: 48px !important; min-width: 48px !important;
+                border-radius: 50% !important; background: rgba(26, 93, 59, 0.08) !important;
+                border: 1px solid rgba(26, 93, 59, 0.2) !important; align-items: center; justify-content: center;
+                padding: 0 !important; color: #1a5d3b !important; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: all 0.3s ease; z-index: 1050;
+            }
+            #gecko-mobile-toggle-top svg, #gecko-mobile-toggle svg { width: 24px !important; height: 24px !important; }
+            [data-bs-theme="dark"] #gecko-mobile-toggle-top, [data-bs-theme="dark"] #gecko-mobile-toggle { background: rgba(74, 222, 128, 0.1) !important; border-color: rgba(74, 222, 128, 0.2) !important; color: #4ade80 !important; }
+
+            .gecko-sidebar { width: 100vw !important; border-right: none !important; }
+            body.with-sidebar { padding-left: 0 !important; }
+            #gecko-close-sidebar { width: 24px; height: 24px; opacity: 1; }
+
+            .gecko-sidebar-scroll-area {
+                flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden;
+                display: block; padding: 20px 15px 30px 15px !important; -webkit-overflow-scrolling: touch;
+            }
+            .gecko-sidebar-scroll-area::-webkit-scrollbar { width: 4px; }
+            .gecko-sidebar-scroll-area::-webkit-scrollbar-thumb { background: rgba(26, 93, 59, 0.3); border-radius: 10px; }
+
+            #side-menu-ul, #mobile-menu-ul { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; padding-bottom: 20px; }
+
+            .gecko-sidebar .nav-item {
+                background: rgba(26, 93, 59, 0.05); border: 1px solid rgba(26, 93, 59, 0.1); border-radius: 16px; 
+                box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: flex-start; align-items: center; 
+                transition: all 0.3s ease; overflow: hidden;
+            }
+            [data-bs-theme="dark"] .gecko-sidebar .nav-item { background: rgba(74, 222, 128, 0.05); border-color: rgba(74, 222, 128, 0.15); box-shadow: none; }
+
+            .gecko-sidebar .nav-link {
+                flex-direction: column !important; align-items: center !important; justify-content: center !important;
+                text-align: center; padding: 15px 5px !important; gap: 8px !important; width: 100%; height: 100%;
+            }
+
+            .gecko-sidebar .menu-icon svg { width: 32px !important; height: 32px !important; }
+            .gecko-sidebar .menu-label { font-size: 11px !important; line-height: 1.1 !important; margin-top: 0 !important; padding: 0 8px; }
+            .gecko-sidebar .arrow-icon-gecko { display: block !important; margin: 4px auto 0 auto; opacity: 0.6; }
+            
+            .active-gecko-link .d-inline-block::after { display: none !important; }
+            .active-gecko-link { background-color: rgba(26, 93, 59, 0.15) !important; border: 2px solid #1a5d3b !important; color: #1a5d3b !important; }
+            [data-bs-theme="dark"] .active-gecko-link { background-color: rgba(74, 222, 128, 0.15) !important; border-color: #4ade80 !important; color: #4ade80 !important; }
+
+            .gecko-sidebar .nav-item.expanded-grid { grid-column: span 2; border-radius: 16px; background: rgba(26, 93, 59, 0.05); border-color: #1a5d3b; padding: 0; }
+            .gecko-sidebar .nav-item.expanded-grid .nav-link { height: auto; padding-bottom: 8px !important; }
+
+            .gecko-sidebar .dropdown-menu-gecko { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px !important; border-left: none !important; }
+            .gecko-sidebar .dropdown-item-gecko { background: rgba(255,255,255,0.8); border: 1px solid rgba(0,0,0,0.05); border-radius: 8px; text-align: center; justify-content: center; padding: 10px 5px !important; font-size: 10px !important; cursor: pointer; }
+            [data-bs-theme="dark"] .gecko-sidebar .dropdown-item-gecko { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.1); }
+            
+            .gecko-sidebar-bottom-section { flex: 0 0 auto; padding: 15px 20px; padding-bottom: env(safe-area-inset-bottom, 20px); background-color: var(--bs-body-bg); border-top: 1px solid rgba(0,0,0,0.05); }
         }
     `;
 }
@@ -242,44 +356,84 @@ function getSidebarStyles() {
 function getTriggerStyles() {
     return `
         .gecko-search-trigger {
-            z-index: 1055;
-            background: #fff;
-            border: 1px solid #e0e0e0;
-            border-radius: 50px;
-            padding: 6px 16px;
-            display: flex; align-items: center; gap: 10px;
-            transition: opacity 0.2s;
-            cursor: pointer;
-            width: 280px; 
-            color: #666;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 1040; background: #fff; border: 1px solid #e0e0e0; border-radius: 50px;
+            padding: 6px 16px; display: flex; align-items: center; gap: 10px; transition: opacity 0.2s;
+            cursor: pointer; width: 280px; color: #666; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
-        .gecko-search-trigger.floating { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); }
-        .gecko-search-trigger.static { position: relative; margin: 5px auto 10px auto; }
-        
         .gecko-search-trigger:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); color: #1a5d3b; border-color: #1a5d3b; }
         
-        /* 🚀 ESCUDO DE TAMAÑO DE FUENTE: Mantiene el botón intacto usando !important para ganarle al global */
-        .gecko-search-trigger .placeholder-text { font-size: 13px !important; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; }
+        .gecko-search-trigger .placeholder-text { font-size: 13px !important; font-weight: 500; opacity: 0.8; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
         .gecko-search-trigger .kbd-shortcut { font-size: 10px !important; background: #f8f9fa; padding: 2px 6px; border-radius: 6px; font-family: monospace; border: 1px solid #dee2e6; margin-left: auto; color: #777; font-weight: 700; min-width: 50px; text-align: center; }
-        .gecko-search-trigger svg { width: 16px !important; height: 16px !important; }
+        .gecko-search-trigger svg { width: 16px !important; height: 16px !important; min-width: 16px;}
+
+        @media (min-width: 1001px) {
+            .gecko-search-trigger.floating { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); }
+            .gecko-search-trigger.static { position: relative; margin: 5px auto 10px auto; }
+        }
+
+        /* 🚀 MÓVIL Y TABLET */
+        @media (max-width: 1000px) {
+            
+            /* Si usas diseño de Menú Arriba (Top) */
+            #gecko-nav-container-desktop {
+                display: flex !important; flex-direction: row !important; align-items: center !important;
+                justify-content: flex-start !important; width: 100% !important; gap: 15px !important; padding: 10px 15px !important;
+            }
+            #gecko-mobile-toggle-top { position: relative !important; margin: 0 !important; top: auto !important; left: auto !important; transform: none !important; }
+            
+            .gecko-search-trigger.static {
+                position: relative !important; flex-grow: 1 !important; width: auto !important; max-width: none !important;
+                margin: 0 !important; height: 48px !important; top: auto !important; left: auto !important; transform: none !important;
+            }
+
+            /* 🚀 Si usas diseño de Menú Lateral (Side) */
+            #gecko-mobile-toggle { top: 15px !important; left: 15px !important; margin: 0 !important; }
+            .gecko-search-trigger.floating {
+                position: fixed !important;
+                top: 15px !important;
+                left: 75px !important; /* Separado de la hamburguesa */
+                width: calc(100vw - 90px) !important;
+                margin: 0 !important; height: 48px !important; transform: none !important;
+            }
+            .gecko-header-top .container-fluid { padding: 0 !important; }
+        }
+
+        /* 🚀 OCULTAMIENTO INTELIGENTE (FANTASMA) CUANDO HAY MODALES O MENÚ ABIERTO */
+        body:has(.gecko-sidebar.open) .gecko-search-trigger,
+        body:has(.modal.show) .gecko-search-trigger,
+        body:has(.swal2-container) .gecko-search-trigger {
+            opacity: 0 !important;
+            pointer-events: none !important; /* Lo hace intocable cuando está invisible */
+        }
     `;
 }
-
-// 4. ESTILOS DEL OMNI-BOX (Animación mejorada y Z-Index corregido)
+// 4. ESTILOS DEL OMNI-BOX (Z-Index nivel Dios y Fondo Blur)
 function getOmniBoxStyles() {
     return `
         /* --- OMNI-OVERLAY --- */
         #gecko-omni-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: transparent; 
-            /* Z-Index 1045: Encima del menú (1030) pero DEBAJO del Modal Backdrop (1050) */
-            z-index: 1045; 
+            
+            /* 🚀 Fondo Premium: Desenfoque del fondo cuando se abre el buscador */
+            background: rgba(255, 255, 255, 0.4); 
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            
+            /* 🚀 Z-INDEX SUPREMO: Cubre el menú (1050) y el botón trigger (1055) */
+            z-index: 9999 !important; 
+            
             display: none;
             justify-content: center;
             align-items: flex-start;
         }
-        #gecko-omni-overlay.show { display: block; }
+        
+        /* Fondo oscuro para Dark Mode */
+        [data-bs-theme="dark"] #gecko-omni-overlay {
+            background: rgba(0, 0, 0, 0.6);
+        }
+        
+        /* 🚀 Flex en lugar de Block para centrar el contenido */
+        #gecko-omni-overlay.show { display: flex !important; }
 
         /* --- CAJA PRINCIPAL --- */
         .gecko-omni-box {
@@ -287,13 +441,13 @@ function getOmniBoxStyles() {
             /* width/top/left iniciales definidos por JS al abrir */
             border-radius: 50px; /* Empieza redonda como el trigger */
             border: 1px solid rgba(0,0,0,0.15);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1); /* Sombra inicial sutil */
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
             overflow: hidden;
             display: flex; flex-direction: column;
             position: fixed;
             opacity: 0;
             
-            /* LA MAGIA MEJORADA: Curvas Bezier para suavidad extrema */
+            /* Curvas Bezier para suavidad extrema */
             transition: 
                 top 0.4s cubic-bezier(0.25, 1, 0.5, 1),
                 left 0.4s cubic-bezier(0.25, 1, 0.5, 1),
@@ -306,19 +460,18 @@ function getOmniBoxStyles() {
         
         /* ESTADO ABIERTO */
         .gecko-omni-box.open {
-            /* Los valores finales los pone el JS, pero aquí forzamos la sombra grande */
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2) !important;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25) !important;
             opacity: 1 !important;
             border-radius: 16px !important;
         }
 
         .gecko-omni-header {
             display: flex; align-items: center; border-bottom: 1px solid transparent; 
-            padding: 8px 20px; /* Padding reducido para coincidir con el trigger */
+            padding: 8px 20px; 
             gap: 12px;
             background: #fff;
-            height: 52px; /* Altura controlada */
-            transition: border-color 0.3s ease 0.2s; /* El borde aparece después */
+            height: 52px; 
+            transition: border-color 0.3s ease 0.2s; 
         }
         .gecko-omni-box.open .gecko-omni-header { border-bottom-color: #f0f0f0; }
 
@@ -348,7 +501,7 @@ function getOmniBoxStyles() {
             opacity: 1; 
             transform: translateY(0);
             pointer-events: all;
-            transition-delay: 0.2s; /* Espera a que la caja crezca */
+            transition-delay: 0.2s; 
         }
 
         .gecko-omni-empty { padding: 40px; text-align: center; color: #999; font-size: 14px; }
@@ -358,14 +511,14 @@ function getOmniBoxStyles() {
         .omni-item-icon { color: #bbb; display: flex; align-items: center; }
         .omni-item:hover .omni-item-icon { color: #1a5d3b; }
         .omni-meta { font-size: 10px; color: #999; margin-left: auto; background: #f5f5f5; padding: 3px 8px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px; }
-        .contenedor-resultados { /* Cambia esta clase por la que uses en tu HTML */
-            max-height: 350px; /* Suficiente para unos 5 resultados aprox */
-            overflow-y: auto;  /* Activa el scroll vertical solo si se pasa de la altura */
-            overflow-x: hidden; /* Evita que salga scroll horizontal feo */
+        
+        .contenedor-resultados { 
+            max-height: 350px; 
+            overflow-y: auto;  
+            overflow-x: hidden; 
         }
         @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
 
-        /* Reemplaza la regla de .gecko-omni-header svg por esta o añádela */
         .gecko-search-logo {
             width: 42px !important; 
             height: 42px !important;
@@ -373,7 +526,6 @@ function getOmniBoxStyles() {
             object-fit: contain;
         }
 
-        /* Opcional: Si quieres que el gecko tenga un efecto al abrir la caja */
         .gecko-omni-box.open .gecko-search-logo {
             transform: scale(1.1);
         }

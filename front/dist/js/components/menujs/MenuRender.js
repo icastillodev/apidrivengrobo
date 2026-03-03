@@ -8,12 +8,18 @@ function renderOmniComponents(mode) {
 
     const trigger = document.createElement('div');
     trigger.id = 'gecko-search-trigger';
-    trigger.className = `gecko-search-trigger d-none d-md-flex ${mode === 'top' ? 'static' : 'floating'}`; 
+    // 🚀 Quitamos el d-none para que se vea siempre (Móvil y PC)
+    trigger.className = `gecko-search-trigger d-flex ${mode === 'top' ? 'static' : 'floating'}`; 
     trigger.onclick = () => window.GeckoSearch.open();
+    
+    // 🚀 Cambiamos el texto ALT G por una flechita de deslizar hacia abajo en pantallas menores a 1250px
     trigger.innerHTML = `
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <span class="placeholder-text">Buscar o Diga "Gecko"...</span>
-        <span class="kbd-shortcut">ALT G</span>
+        <span class="kbd-shortcut d-none d-xl-block">ALT G</span>
+        <span class="kbd-shortcut d-xl-none bg-transparent border-0 text-success px-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+        </span>
     `;
     
     if (mode === 'top') {
@@ -30,9 +36,7 @@ function renderOmniComponents(mode) {
             <div class="gecko-omni-box">
                 <div class="gecko-omni-header">
                     <img src="${assetPath}dist/multimedia/imagenes/grobo/gecko.png" class="gecko-search-logo" alt="Gecko">
-                    
                     <input type="text" id="gecko-omni-input" placeholder="Escribe un comando o di &quot;Gecko&quot; para activar la IA..." autocomplete="off">
-                    
                     <button id="gecko-omni-voice-btn" title="Activar Voz">
                         <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0V3z"/>
@@ -59,51 +63,45 @@ export function renderSideMenuStructure(container, menuIds, templates) {
 
     const sidebar = document.createElement('aside');
     sidebar.id = "gecko-sidebar-element";
-    sidebar.className = "gecko-sidebar d-flex flex-column flex-shrink-0 p-3 border-end shadow-sm";
+    sidebar.className = "gecko-sidebar shadow-sm";
     
-    // ESTRUCTURA FLEX PARA QUE EL MENÚ OCUPE LO QUE SOBRA
     sidebar.innerHTML = `
-        <div class="d-flex flex-column pb-1 flex-shrink-0">
-            <div class="d-flex justify-content-between align-items-center w-100">
-                <div class="d-flex flex-column" style="overflow: hidden; line-height: 1.1;">
-                    <span class="fs-6 fw-black text-success text-uppercase lh-1 text-truncate" title="${instName}">${instName}</span>
-                    <span class="text-muted mt-1 text-truncate" style="font-size: 10px; font-weight: 600;" title="${userText}">${userText}</span>
+        <div class="gecko-sidebar-top-section">
+            <div class="d-flex justify-content-between align-items-start w-100">
+                <div class="d-flex flex-column pe-2" style="line-height: 1.2; word-break: break-word;">
+                    <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
+                    <span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>
                 </div>
-                <button class="btn-close d-md-none ms-2" id="gecko-close-sidebar"></button>
+                <button class="btn-close mt-1 gecko-btn-close" id="gecko-close-sidebar"></button>
             </div>
-            <hr class="my-2 opacity-25">
+            <hr class="my-3 opacity-25 w-100">
         </div>
         
-        <ul class="nav nav-pills flex-column mb-auto gap-1" id="side-menu-ul"></ul>
+        <div class="gecko-sidebar-scroll-area">
+            <ul class="nav nav-pills flex-column gap-1 px-2 mb-3" id="side-menu-ul"></ul>
+        </div>
         
-        <div class="mt-auto border-top pt-2 text-center flex-shrink-0">
-            <div class="mb-2 px-2">
-                <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 9px; opacity: 0.8;">GROBO - ERP BIOTERIOS</a>
-                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px;">
-                    Gekos.uy & UDELAR
-                </a>
+        <div class="gecko-sidebar-bottom-section text-center d-flex flex-column pt-4 pb-4">
+            <div class="px-2 order-2 order-md-1 mt-4 mt-md-0 mb-md-3">
+                <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px; opacity: 0.9;">GROBO - ERP BIOTERIOS</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">Desarrollado por Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
             </div>
-            <ul class="nav nav-pills flex-column" id="side-controls-ul"></ul>
+            <ul class="nav nav-pills d-flex flex-row justify-content-center align-items-center w-100 m-0 p-0 order-1 order-md-2" id="side-controls-ul"></ul>
         </div>
     `;
 
     document.body.prepend(sidebar);
     
-    // ... resto del renderSideMenu igual (mobile toggle, loops) ...
     const mobileToggle = document.createElement('button');
     mobileToggle.id = "gecko-mobile-toggle";
-    mobileToggle.className = "btn btn-success position-fixed top-0 start-0 m-2 d-md-none z-3 shadow";
+    // 🚀 QUITAMOS d-md-none para que no desaparezca en 768px
+    mobileToggle.className = "btn btn-success position-fixed z-3 shadow";
     mobileToggle.innerHTML = '<svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>';
-    mobileToggle.onclick = (e) => {
-        e.stopPropagation();
-        sidebar.classList.add('open');
-    };
+    mobileToggle.onclick = (e) => { e.stopPropagation(); sidebar.classList.add('open'); };
     document.body.prepend(mobileToggle);
 
     const ul = document.getElementById('side-menu-ul');
-    menuIds.forEach(id => {
-        ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates));
-    });
+    menuIds.forEach(id => { ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates)); });
     
     const controlsUl = document.getElementById('side-controls-ul');
     controlsUl.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
@@ -120,7 +118,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     header.className = "w-full gecko-header gecko-header-top bg-transparent mb-2"; 
     header.innerHTML = `
         <div class="container-fluid pt-2 pb-1">
-            <div class="d-none d-md-flex justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
+            <div class="gecko-top-bar-info justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
                 <div class="d-flex align-items-center gap-3">
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
                     <div class="d-flex flex-column lh-1 border-start ps-3">
@@ -133,43 +131,41 @@ export function renderTopMenuStructure(container, menuIds, templates) {
 
             <nav class="w-full d-flex flex-column align-items-center position-relative">
                 <div id="gecko-nav-container-desktop" class="d-flex flex-column align-items-center gap-2 position-relative w-100">
-                    <button id="gecko-mobile-toggle-top" class="btn btn-link text-success d-md-none position-absolute start-0 ms-1" style="top:0;">
+                    <button id="gecko-mobile-toggle-top" class="btn btn-link text-success position-absolute start-0 ms-1" style="top:0;">
                         <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
                     </button>
-                    <ul id="main-menu-ul" class="nav border-success bg-body p-1 shadow-sm align-items-center d-none d-md-flex gap-1 custom-menu-pill"></ul>
+                    <ul id="main-menu-ul" class="nav border-success bg-body p-1 shadow-sm align-items-center gap-1 custom-menu-pill"></ul>
                 </div>
             </nav>
         </div>
 
-        <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none bg-body-tertiary">
-            <div class="d-flex justify-content-between align-items-start p-3 border-bottom flex-shrink-0">
-                <div class="d-flex flex-column">
-                    <span class="fw-bold text-success small text-uppercase">${instName}</span>
-                    <span class="text-muted" style="font-size: 9px;">${userText}</span>
-                    <hr class="my-2 opacity-25 w-100">
-                    <a href="https://groboapp.com" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px;">GROBO - ERP BIOTERIOS</a>
-                    <span class="text-muted d-block fw-bold" style="font-size: 9px;">Gekos.uy & UDELAR</span>
+        <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none shadow-sm">
+            <div class="gecko-sidebar-top-section">
+                <div class="d-flex justify-content-between align-items-start w-100">
+                    <div class="d-flex flex-column pe-2" style="line-height: 1.2; word-break: break-word;">
+                        <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
+                        <span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>
+                    </div>
+                    <button class="btn-close mt-1 gecko-btn-close" id="gecko-close-sidebar"></button>
                 </div>
-                <button class="btn-close mt-1" id="gecko-close-sidebar"></button>
+                <hr class="my-3 opacity-25 w-100">
             </div>
             
-            <ul class="nav flex-column p-2" id="mobile-menu-ul"></ul>
+            <div class="gecko-sidebar-scroll-area">
+                <ul class="nav flex-column px-2 mb-3" id="mobile-menu-ul"></ul>
+            </div>
             
-            <div class="mt-auto border-top pt-2 pb-3 text-center flex-shrink-0" id="mobile-controls-container">
-                <ul class="nav nav-pills flex-column" id="mobile-controls-ul"></ul>
+            <div class="gecko-sidebar-bottom-section text-center d-flex flex-column pt-4 pb-4">
+                <ul class="nav nav-pills d-flex flex-row justify-content-center align-items-center w-100 mb-4 p-0" id="mobile-controls-ul"></ul>
+                <div class="px-2 mt-2">
+                    <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px; opacity: 0.9;">GROBO - ERP BIOTERIOS</a>
+                    <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">Desarrollado por Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
+                </div>
             </div>
         </aside>
     `;
     
     document.body.prepend(header);
-
-    const toggleTop = document.getElementById('gecko-mobile-toggle-top');
-    if (toggleTop) {
-        toggleTop.onclick = (e) => {
-            e.stopPropagation();
-            document.getElementById('gecko-sidebar-element').classList.add('open');
-        };
-    }
 
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
@@ -181,51 +177,51 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     });
     
     ulDesktop.insertAdjacentHTML('beforeend', buildControlsHTML('top'));
-    // En móvil, inyectamos los controles en su contenedor fijo inferior
     mobileControls.insertAdjacentHTML('beforeend', buildControlsHTML('side'));
 
     renderOmniComponents('top');
 }
-
+// AQUÍ CORREGIMOS EL DROPDOWN PARA QUE INICIE CERRADO
 function buildMenuItemHTML(id, layout, templates) {
     const item = templates[id]; 
     if (!item) return '';
     const path = item.path ? getCorrectPath(item.path) : '#';
     const isSide = layout === 'side';
     
+    const currentPath = window.location.pathname;
+    const isActive = (item.path !== '#' && currentPath.includes(item.path));
+    
     const liClass = isSide ? 'nav-item mb-1 w-100 position-relative group-gecko-item' : 'nav-item position-relative';
-    
     const linkClass = isSide 
-        ? 'nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2' 
-        : 'gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body';
+        ? `nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 ${isActive ? 'active-gecko-link' : ''}` 
+        : `gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body ${isActive ? 'active-gecko-link' : ''}`;
     
-    const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">
-                        ${item.svg}
-                        <div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div>
-                      </div>`;
-    const labelHTML = `<span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span>`;
+    const iconHTML = `<div class="menu-icon position-relative d-flex justify-content-center" data-menu-id="${id}" style="width: 24px;">${item.svg}<div class="notif-dot bg-danger text-white position-absolute" id="badge-${id}" style="display:none;"></div></div>`;
+    const labelHTML = `<div class="position-relative d-inline-block"><span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span></div>`;
 
     if (item.isDropdown && item.children) {
-        // Flecha dinámica (sin rotación forzada en línea, lo hará el CSS)
+        // 🚀 Quitamos el "open" de aquí. Solo marcamos verde el padre.
+        const isChildActive = item.children.some(c => currentPath.includes(c.path));
+        const activeDropClass = isChildActive ? 'active-gecko-link' : ''; 
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
         
-        const childrenHTML = item.children.map(child => `
-            <li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;">${child.label}</a></li>
-        `).join('');
+        const childrenHTML = item.children.map(child => {
+            const isSubActive = currentPath.includes(child.path);
+            return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${child.label}</a></li>`;
+        }).join('');
 
         return `
         <li class="${liClass}">
-            <a href="javascript:void(0);" class="${linkClass} dropdown-toggle-gecko d-flex ${isSide ? 'align-items-center justify-content-between' : 'flex-column align-items-center'}">
-                ${isSide ? `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}` : `<div>${iconHTML}</div> <div class="d-flex align-items-center">${labelHTML} ${arrowIcon}</div>`}
+            <a href="javascript:void(0);" class="nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 dropdown-toggle-gecko d-flex justify-content-between ${activeDropClass}">
+                <div class="d-flex align-items-center gap-2 flex-column flex-md-row">${iconHTML} ${labelHTML}</div> ${arrowIcon}
             </a>
-            <ul class="dropdown-menu-gecko hidden list-unstyled border shadow-lg rounded-3">
+            <ul class="dropdown-menu-gecko list-unstyled hidden">
                 ${childrenHTML}
             </ul>
         </li>`;
     }
     return `<li class="${liClass}"><a href="${path}" class="${linkClass}">${iconHTML} ${labelHTML}</a></li>`;
 }
-
 function buildControlsHTML(layout) {
     const isSide = layout === 'side';
     const btnClass = isSide 
@@ -234,10 +230,9 @@ function buildControlsHTML(layout) {
     const btnStyle = isSide ? 'width: 38px; height: 38px; padding: 0; border-radius: 50%;' : 'width: 32px; height: 32px; padding: 0;';
     const geckoOk = localStorage.getItem('gecko_ok') || '2';
     
-    // Todos los botones juntos
-    return `<li class="${isSide ? 'd-flex justify-content-center gap-2 w-100 mt-3 pb-3 flex-wrap flex-shrink-0' : 'nav-item d-flex align-items-center ms-2 ps-2 border-start border-secondary-subtle'}">
+    return `<li class="${isSide ? 'd-flex justify-content-center align-items-center gap-2 w-100 flex-row flex-wrap m-0 p-0' : 'nav-item d-flex align-items-center ms-2 ps-2 border-start border-secondary-subtle'}">
         
-        <button id="btn-voice-switch" class="${btnClass} voice-status-${geckoOk}" style="${btnStyle}" title="Gecko Voice">
+        <button class="btn-voice-switch ${btnClass} voice-status-${geckoOk}" style="${btnStyle}" title="Gecko Voice">
             <span class="d-flex align-items-center justify-content-center">
                 <svg viewBox="0 0 16 16" width="22" height="22" fill="currentColor">
                     <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0V3z"/>
@@ -246,26 +241,26 @@ function buildControlsHTML(layout) {
             </span>
         </button>
         
-        <button id="btn-font-switch" class="${btnClass}" style="${btnStyle}" title="Tamaño de letra"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4L5 20h2l2-5h7l2 5h2L12 4zm-3.5 9L12 6.5 15.5 13h-7z"/></svg></button>
+        <button class="btn-font-switch ${btnClass}" style="${btnStyle}" title="Tamaño de letra"></button>
         
-        <button id="btn-theme-switch" class="${btnClass}" style="${btnStyle}" title="Tema"><span id="pref-icon-theme"></span></button>
+        <button class="btn-theme-switch ${btnClass}" style="${btnStyle}" title="Tema"><span class="pref-icon-theme"></span></button>
         
-        <div class="position-relative dropdown-container-gecko ${!isSide ? 'mx-1' : ''}">
-            <button class="dropdown-toggle-gecko btn btn-light rounded-circle border shadow-sm p-0 d-flex align-items-center justify-content-center overflow-hidden" style="${isSide ? 'width:38px; height:38px;' : 'width:28px; height:28px;'}">
-                <img id="pref-current-flag" src="" style="width: 100%; height: 100%; object-fit: cover;">
+        <div class="position-relative dropdown-container-lang ${!isSide ? 'mx-1' : ''}">
+            <button class="dropdown-toggle-lang btn btn-light rounded-circle border shadow-sm p-0 d-flex align-items-center justify-content-center overflow-hidden" style="${isSide ? 'width:38px; height:38px;' : 'width:28px; height:28px;'}">
+                <img class="pref-current-flag" src="" style="width: 100%; height: 100%; object-fit: cover;">
             </button>
-            <ul class="dropdown-menu-gecko hidden shadow p-2 border list-unstyled" style="position: absolute; min-width: 140px; z-index: 1050; ${isSide ? 'bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px;' : 'top: 120%; right: 0;'}">
+            <ul class="dropdown-menu-lang hidden shadow p-2 border list-unstyled" style="position: absolute; min-width: 140px; z-index: 9999; ${isSide ? 'bottom: 110%; left: 50%; transform: translateX(-50%); margin-bottom: 10px;' : 'top: 120%; right: 0;'}">
                 <li><a href="#" onclick="window.setAppLang('es')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded mb-1"><img src="https://flagcdn.com/w40/es.png" width="20" class="me-2 shadow-sm"> Español</a></li>
                 <li><a href="#" onclick="window.setAppLang('en')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded mb-1"><img src="https://flagcdn.com/w40/us.png" width="20" class="me-2 shadow-sm"> English</a></li>
                 <li><a href="#" onclick="window.setAppLang('pt')" class="d-flex align-items-center px-2 py-2 text-decoration-none text-body small hover-bg-light rounded"><img src="https://flagcdn.com/w40/br.png" width="20" class="me-2 shadow-sm"> Português</a></li>
             </ul>
         </div>
         
-        <button id="btn-hotkeys-help" class="${btnClass}" style="${btnStyle}" title="Atajos de Teclado">
+        <button class="btn-hotkeys-help ${btnClass} d-none d-md-flex" style="${btnStyle}" title="Atajos de Teclado">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
         </button>
 
-        <button id="btn-layout-switch" class="${btnClass}" style="${btnStyle}" title="Cambiar Diseño">
+        <button class="btn-layout-switch ${btnClass} d-none d-md-flex" style="${btnStyle}" title="Cambiar Diseño">
             <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v1h14V2a1 1 0 0 0-1-1H2z"/></svg>
         </button>
     </li>`;

@@ -33,7 +33,7 @@ export function getMenuTemplates() {
 
         202: { 
             label: window.txt.menu.accounting_group, 
-            svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,
+            svg: `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`,
             isDropdown: true,
             children: [
                 { label: window.txt.menu.prices, path: 'admin/precios' },

@@ -45,56 +45,56 @@
 
                     <form id="registro-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
-                        <div class="col-span-2">
+                        <div class="col-span-1 md:col-span-2">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre de Usuario (Login) *</label>
                             <input type="text" id="reg-user" name="usuario" required 
-                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-all text-sm">
                             <p id="user-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Este usuario ya se encuentra registrado</p>
                             <p id="user-success" class="text-[9px] text-green-600 mt-1 font-bold uppercase hidden">Nombre de usuario disponible</p>
                         </div>
 
-                        <div>
+                        <div class="col-span-1">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre *</label>
-                            <input type="text" name="NombreA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <input type="text" name="NombreA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
-                        <div>
+                        <div class="col-span-1">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Apellido *</label>
-                            <input type="text" name="ApellidoA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <input type="text" name="ApellidoA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
 
-                        <div class="col-span-2">
+                        <div class="col-span-1 md:col-span-2">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Correo Electrónico *</label>
-                            <input type="email" name="EmailA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <input type="email" name="EmailA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                             <p class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-tighter">
                                 * Se enviará un correo de confirmación. Por favor ingrese su correo real para activar la cuenta.
                             </p>
                         </div>
 
-                        <div class="col-span-2">
+                        <div class="col-span-1 md:col-span-2">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">País de Residencia *</label>
-                            <select id="reg-pais" name="PaisA" required class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none"></select>
+                            <select id="reg-pais" name="PaisA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm appearance-none cursor-pointer"></select>
                         </div>
 
-                        <div>
+                        <div class="col-span-1">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Contraseña *</label>
                             <input type="password" id="reg-pass" name="contrasena" required 
-                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                             <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Debe tener entre 5 y 20 caracteres</p>
                         </div>
-                        <div>
+                        <div class="col-span-1">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Confirmar Contraseña *</label>
                             <input type="password" id="reg-pass-confirm" required 
-                                class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                             <p id="pass-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Las contraseñas no coinciden</p>
                         </div>
 
-                        <div class="col-span-2">
+                        <div class="col-span-1 md:col-span-2">
                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Celular / Teléfono (Opcional)</label>
-                            <input type="text" name="CelularA" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none">
+                            <input type="text" name="CelularA" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
 
-                        <div class="col-span-2 mt-4">
-                            <button type="submit" id="btn-finalizar" class="w-full bg-black text-white py-3 rounded-lg font-bold uppercase text-xs tracking-widest shadow-lg opacity-50 cursor-not-allowed" disabled>
+                        <div class="col-span-1 md:col-span-2 mt-4">
+                            <button type="submit" id="btn-finalizar" class="w-full bg-black text-white py-4 rounded-lg font-bold uppercase text-xs tracking-widest shadow-lg opacity-50 cursor-not-allowed" disabled>
                                 Finalizar Registro
                             </button>
                         </div>
