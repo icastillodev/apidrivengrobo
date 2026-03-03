@@ -112,7 +112,7 @@ export const TramosUI = {
         }
     },
 
-    async guardarNuevoTramo() {
+async guardarNuevoTramo() {
         const modalEl = document.getElementById('modal-actualizar-qr');
         const historiaId = modalEl.dataset.historia;
         const idTramoViejo = modalEl.dataset.idTramoActual;
@@ -121,16 +121,29 @@ export const TramosUI = {
         if (!f) return Swal.fire('Error', 'No se pudo recuperar información base.', 'error');
 
         const nuevaFecha = document.getElementById('reg-fecha-qr').value;
-        const nuevaCantidad = parseInt(document.getElementById('reg-cantidad-qr').value) || 0;
+        const rawCantidad = document.getElementById('reg-cantidad-qr').value;
+        const nuevaCantidad = rawCantidad !== "" ? parseInt(rawCantidad) : null;
         
-        if (!nuevaFecha || nuevaCantidad <= 0) return Swal.fire('Atención', 'Fecha y Cantidad son obligatorias.', 'warning');
+        if (!nuevaFecha || nuevaCantidad === null || nuevaCantidad < 0) {
+            return Swal.fire('Atención', 'Fecha y Cantidad (puede ser 0) son obligatorias.', 'warning');
+        }
 
-        // Capturar los IDs de lo que está checkeado
-        const cajasClonar = Array.from(document.querySelectorAll('.check-caja-continuidad:checked')).map(cb => parseInt(cb.value));
-        const unidadesClonar = Array.from(document.querySelectorAll('.check-unidad-continuidad:checked:not(:disabled)')).map(cb => parseInt(cb.value));
+        // Capturamos lo que está checkeado (usamos LET porque podríamos vaciarlos)
+        let cajasClonar = Array.from(document.querySelectorAll('.check-caja-continuidad:checked')).map(cb => parseInt(cb.value));
+        let unidadesClonar = Array.from(document.querySelectorAll('.check-unidad-continuidad:checked:not(:disabled)')).map(cb => parseInt(cb.value));
 
-        if (nuevaCantidad < cajasClonar.length) {
-            return Swal.fire('Atención', `Has marcado ${cajasClonar.length} cajas para continuar, pero indicaste un total físico de ${nuevaCantidad} cajas.`, 'warning');
+        // 🔥 MAGIA DE STAND BY AUTOMÁTICA 🔥
+        if (nuevaCantidad === 0) {
+            // Si declaran 0 cajas, vaciamos la clonación automáticamente sin molestar al usuario.
+            cajasClonar = [];
+            unidadesClonar = [];
+        } else if (nuevaCantidad < cajasClonar.length) {
+            // Solo validamos si es mayor a 0 pero intentan traer más cajas físicas de las que declararon.
+            return Swal.fire(
+                'Incoherencia Física', 
+                `Has marcado ${cajasClonar.length} caja(s) para continuar, pero indicaste un límite total de ${nuevaCantidad} cajas. Desmarca las que no continúan.`, 
+                'warning'
+            );
         }
 
         const tipoAlojamiento = parseInt(f.IdTipoAlojamiento) > 0 ? parseInt(f.IdTipoAlojamiento) : 1; 
@@ -146,7 +159,6 @@ export const TramosUI = {
             TipoAnimal: f.TipoAnimal || f.idespA,
             IdInstitucion: AlojamientoState.instId, 
             is_update: true,
-            // Mandamos el motor de clonación
             continuidad: {
                 idTramoOrigen: idTramoViejo,
                 cajas: cajasClonar,
@@ -159,10 +171,18 @@ export const TramosUI = {
             const res = await API.request('/alojamiento/save', 'POST', payload);
             if (res.status === 'success') {
                 bootstrap.Modal.getInstance(modalEl)?.hide();
-                Swal.fire({ title: '¡Tramo Generado!', text: 'Se ha abierto el nuevo periodo contable.', icon: 'success', timer: 1500, showConfirmButton: false });
+                Swal.fire({ 
+                    title: '¡Tramo Generado!', 
+                    text: nuevaCantidad === 0 ? 'Tramo en Stand By iniciado.' : 'Nuevo periodo contable abierto.', 
+                    icon: 'success', 
+                    timer: 1500, 
+                    showConfirmButton: false 
+                });
                 await loadAlojamientos();
                 setTimeout(() => window.verHistorial(historiaId), 500);
-            } else Swal.fire('Error', res.message, 'error');
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
         } catch (e) { console.error(e); } finally { hideLoader(); }
     },
 
@@ -190,31 +210,34 @@ export const TramosUI = {
         new bootstrap.Modal(document.getElementById('modal-modificar-tramo')).show();
     },
 
-    async updateTramoData(event) {
-        if (event) event.preventDefault();
-        const hId = document.getElementById('edit-historia').value;
-        const data = {
-            IdAlojamiento: parseInt(document.getElementById('edit-id-alojamiento').value),
-            historia: parseInt(hId), 
-            fechavisado: document.getElementById('edit-fecha-inicio').value,
-            CantidadCaja: parseInt(document.getElementById('edit-caja-cant').value) || 0,
-            observaciones: document.getElementById('edit-obs').value || "",
-            IdInstitucion: AlojamientoState.instId
-        };
+async updateTramoData(event) {
+    if (event) event.preventDefault();
+    const hId = document.getElementById('edit-historia').value;
+    const rawCant = document.getElementById('edit-caja-cant').value;
+    
+    const data = {
+        IdAlojamiento: parseInt(document.getElementById('edit-id-alojamiento').value),
+        historia: parseInt(hId), 
+        fechavisado: document.getElementById('edit-fecha-inicio').value,
+        // Parseo seguro del 0
+        CantidadCaja: rawCant !== "" ? parseInt(rawCant) : 0, 
+        observaciones: document.getElementById('edit-obs').value || "",
+        IdInstitucion: AlojamientoState.instId
+    };
 
-        if (!data.fechavisado) return Swal.fire('Atención', 'Fecha requerida.', 'warning');
+    if (!data.fechavisado) return Swal.fire('Atención', 'Fecha requerida.', 'warning');
 
-        showLoader();
-        try {
-            const res = await API.request('/alojamiento/update-row', 'POST', data);
-            if (res.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('modal-modificar-tramo'))?.hide();
-                Swal.fire({ title: 'Éxito', text: 'Tramo actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
-                await loadAlojamientos();
-                setTimeout(() => window.verHistorial(hId), 600);
-            } else Swal.fire('Error', res.message, 'error');
-        } catch (e) { console.error(e); } finally { hideLoader(); }
-    },
+    showLoader();
+    try {
+        const res = await API.request('/alojamiento/update-row', 'POST', data);
+        if (res.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('modal-modificar-tramo'))?.hide();
+            Swal.fire({ title: 'Éxito', text: 'Tramo actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
+            await loadAlojamientos();
+            setTimeout(() => window.verHistorial(hId), 600);
+        } else Swal.fire('Error', res.message, 'error');
+    } catch (e) { console.error(e); } finally { hideLoader(); }
+},
 
     async eliminarTramo(idAlojamiento, historiaId) {
         const { isConfirmed } = await Swal.fire({

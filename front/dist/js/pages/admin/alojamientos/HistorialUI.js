@@ -119,7 +119,7 @@ renderSummary(historiaId) {
         `;
     },
 
-    renderTable() {
+renderTable() {
         const history = AlojamientoState.currentHistoryData;
         const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
         const txt = window.txt.alojamientos || {};
@@ -168,12 +168,17 @@ renderSummary(historiaId) {
                 subtotal = parseFloat(h.cuentaapagar) > 0 ? parseFloat(h.cuentaapagar) : (diasTramo * precioUnit * cant);
             }
 
+            // --- MAGIA VISUAL: LÓGICA DE STAND BY AQUÍ ---
+            const renderCant = cant === 0 
+                ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> STAND BY (0)</span>` 
+                : cant;
+
             const trMaster = `
             <tr class="pointer table-light" onclick="window.toggleTrazabilidad(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})">
                 <td><span class="badge bg-secondary">#${h.IdAlojamiento}</span></td>
                 <td>${fIni.toLocaleDateString()}</td> 
                 <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
-                <td>${cant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small></td>
+                <td>${renderCant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small></td>
                 <td class="fw-bold">${diasTramo}</td>
                 <td>$ ${precioUnit.toFixed(2)}</td>
                 <td class="fw-bold text-dark">$ ${subtotal.toFixed(2)}</td>
