@@ -47,10 +47,15 @@ export async function initMenu() {
 try {
         let ids = [];
 
-        // Si es SUPERADMIN (Rol 1), le forzamos a ver todo, sin preguntar a la API
-        if (roleId === 1 || roleId === 2) {
+        // Si es SUPERADMIN / ADMIN (Roles 1, 2, 4), le forzamos a ver todo, sin preguntar a la API
+        if (roleId === 1 || roleId === 2 || roleId === 4) {
             ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 998, 999];
         } 
+
+    /*    if (roleId === 4 || roleId === 5 || roleId === 6) {
+            ids = [];
+        } 
+*/
 
         // Si es usuario normal, le preguntamos a la base de datos qué puede ver
         else {
@@ -58,6 +63,11 @@ try {
             if (resMenu && resMenu.status === "success") {
                 ids = (resMenu.data || []).map(id => Number(id));
             }
+        }
+
+        // Forzar SIEMPRE el menú 55 para roles 5 (Asistente) y 6 (Laboratorio)
+        if ([5, 6].includes(roleId) && !ids.includes(55)) {
+            ids.push(55);
         }
 
         // Si después de preguntar, tenemos IDs para mostrar, dibujamos el menú

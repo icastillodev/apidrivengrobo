@@ -1,0 +1,15 @@
+# Carpetas de dependencias
+node_modules/
+vendor/
+
+# Archivos de sistema y logs
+.DS_Store
+*.log
+error_log
+
+# Carpetas de assets pesados (opcional, si no necesitás que la IA lea imágenes)
+assets/img/
+uploads/
+
+# Archivos de configuración sensible
+.env

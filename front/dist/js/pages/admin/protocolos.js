@@ -39,6 +39,8 @@ export async function initProtocolosPage() {
     } catch (error) { console.error("❌ Error:", error); }
 
     // --- EVENTOS ---
+    // Inicializar tipo de búsqueda dinámico (y enganchar auto-filtro)
+    updateSearchInputType();
     
     // Botón Buscar
     document.getElementById('btn-search-prot').onclick = () => { currentPage = 1; renderTable(); };
@@ -91,6 +93,24 @@ function updateSearchInputType() {
         html = `<input type="text" id="search-input-prot" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">`;
     }
     container.innerHTML = html;
+
+    // Auto-búsqueda según tipo de control
+    const inputEl = document.getElementById('search-input-prot');
+    if (inputEl) {
+        const triggerSearch = () => {
+            currentPage = 1;
+            renderTable();
+        };
+
+        if (inputEl.tagName === 'INPUT') {
+            inputEl.addEventListener('input', triggerSearch);
+            inputEl.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') triggerSearch();
+            });
+        } else {
+            inputEl.addEventListener('change', triggerSearch);
+        }
+    }
 }
 
 // --- ESTADÍSTICAS ---
@@ -115,10 +135,12 @@ function renderTableHeader() {
             <th data-key="idprotA" class="py-3 px-2 cursor-pointer" onclick="window.sortTable('idprotA')">ID</th>
             <th data-key="nprotA" class="py-3 px-2 cursor-pointer" onclick="window.sortTable('nprotA')">N° Prot.</th>
             <th data-key="tituloA" class="py-3 px-2 cursor-pointer" onclick="window.sortTable('tituloA')">Título</th>
-            <th data-key="InvestigadorACargA" class="py-3 px-2">Inv. Cargo</th>
-            <th data-key="ResponsableFormat" class="py-3 px-2">Responsable</th>
+            <th data-key="InvestigadorACargA" class="py-3 px-2">Responsable de proyecto</th>
+            <th data-key="ResponsableFormat" class="py-3 px-2">Responsable protocolo</th>
             <th data-key="DeptoFormat" class="py-3 px-2">Departamento</th>
             <th data-key="TipoNombre" class="py-3 px-2 text-center">Tipo</th>
+            <th data-key="AnimalesUsados" class="py-3 px-2 text-center">Gastados</th>
+            <th data-key="SaldoAnimales" class="py-3 px-2 text-center">Saldo</th>
     `;
 
     // Solo mostrar columna Origen si hay RED
@@ -189,6 +211,8 @@ function renderTable() {
             <td class="small fw-bold px-2 text-muted" style="font-size:10px;">${p.ResponsableFormat || '---'}</td>
             <td class="small text-muted px-2">${p.DeptoFormat || p.DeptoOriginal || '-'}</td>
             <td class="text-center px-2 align-middle">${tipoHtml}</td>
+            <td class="text-center px-2 small fw-bold text-secondary">${p.AnimalesUsados ?? 0}</td>
+            <td class="text-center px-2 small fw-bold ${ (p.SaldoAnimales ?? 0) <= 0 ? 'text-danger' : 'text-success' }">${p.SaldoAnimales ?? 0}</td>
             ${origenTd}
             <td class="${fechaStyle}">${fechaText}</td>
         `;
@@ -306,6 +330,10 @@ window.openProtocolModal = async (p = null) => {
 
     const showOtrosCeuas = formDataCache.otrosceuas_enabled || (p && p.IsExterno == 1);
 
+    const usados = p?.AnimalesUsados ?? 0;
+    const saldo = p?.SaldoAnimales ?? (p?.CantidadAniA ?? 0);
+    const totalAprob = p ? (p.AnimalesTotales ?? (usados + saldo)) : 0;
+
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
@@ -324,6 +352,24 @@ window.openProtocolModal = async (p = null) => {
                 <label class="form-check-label fw-bold text-secondary" for="chk-otros-ceuas">PROTOCOLO EXTERNO (OTROS CEUAS)</label>
             </div>` : ''}
 
+            ${p ? `
+            <div class="row g-2 mb-4 bg-light border rounded p-2">
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted d-block">ANIMALES APROBADOS</label>
+                    <span class="fw-bold text-primary">${totalAprob}</span>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted d-block">GASTADOS</label>
+                    <span class="fw-bold text-secondary">${usados}</span>
+                </div>
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted d-block">SALDO DISPONIBLE</label>
+                    <span class="fw-bold ${saldo <= 0 ? 'text-danger' : 'text-success'}">${saldo}</span>
+                </div>
+            </div>
+            <hr class="mb-3">
+            ` : ''}
+
             <div class="row g-3">
                 <div class="col-md-8">
                     <label class="form-label small fw-bold text-muted">TÍTULO</label>
@@ -335,16 +381,19 @@ window.openProtocolModal = async (p = null) => {
                 </div>
                 
                 <div class="col-md-6">
-                    <label class="form-label small fw-bold text-muted">RESP. PROYECTO (Texto)</label>
+                    <label class="form-label small fw-bold text-muted">RESPONSABLE DE PROYECTO (Texto)</label>
                     <input type="text" name="InvestigadorACargA" class="form-control" value="${p?.InvestigadorACargA || ''}" required>
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label small fw-bold text-muted">RESP. PROTOCOLO (Usuario)</label>
+                    <label class="form-label small fw-bold text-muted d-flex justify-content-between align-items-center">
+                        <span>RESPONSABLE PROTOCOLO (Usuario)</span>
+                        <input type="text" id="user-search" class="form-control form-control-sm ms-2" style="max-width: 160px;" placeholder="Buscar usuario...">
+                    </label>
                     <select name="IdUsrA" id="select-user" class="form-select" required>
                         <option value="">-- Seleccionar --</option>
                         ${formDataCache.users.map(u => 
-                            `<option value="${u.IdUsrA}" ${p?.IdUsrA == u.IdUsrA ? 'selected' : ''}>${u.ApellidoA} ${u.NombreA} (${u.UsrA})</option>`
+                            `<option value="${u.IdUsrA}" ${p?.IdUsrA == u.IdUsrA ? 'selected' : ''}>[ID:${u.IdUsrA}] ${u.ApellidoA} ${u.NombreA} (${u.UsrA})</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -407,6 +456,20 @@ window.openProtocolModal = async (p = null) => {
 
     document.getElementById('form-protocolo').onsubmit = (e) => saveProtocol(e, p?.idprotA);
     
+    // Filtro rápido de usuarios por ID, usuario, nombre o apellido
+    const userSearch = document.getElementById('user-search');
+    const userSelect = document.getElementById('select-user');
+    if (userSearch && userSelect) {
+        userSearch.addEventListener('input', () => {
+            const term = userSearch.value.toLowerCase().trim();
+            Array.from(userSelect.options).forEach(opt => {
+                if (!opt.value) return; // dejar placeholder siempre
+                const text = opt.textContent.toLowerCase();
+                opt.hidden = term && !text.includes(term);
+            });
+        });
+    }
+    
     // Switch depto manual
     const chk = document.getElementById('chk-otros-ceuas');
     if(chk) window.toggleDeptoInput(chk, p?.DeptoOriginal);
@@ -446,6 +509,14 @@ async function saveProtocol(e, id) {
     const fd = new FormData(e.target);
     const instId = localStorage.getItem('instId');
     if(fd.get('tituloA').length < 3) return alert('Título corto');
+
+    // Validación básica de rango de fechas en el cliente
+    const ini = fd.get('FechaIniProtA') || '';
+    const fin = fd.get('FechaFinProtA') || '';
+    if (ini && fin && fin < ini) {
+        alert('La fecha de vencimiento no puede ser anterior a la fecha de inicio.');
+        return;
+    }
     
     // Loader
     const btn = e.target.querySelector('button[type="submit"]');

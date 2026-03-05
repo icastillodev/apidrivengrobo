@@ -1,0 +1,28 @@
+# Reglas del Proyecto - GROBO (Gecko Devs)
+
+## 1. Contexto Principal y Origen de Datos
+- Proyecto: GROBO - Sistema Integral de Gestión Científica (SaaS Multi-Tenant API-Driven).
+- Lee SIEMPRE la documentación en la carpeta `/docs` en la raíz antes de proponer código o cambios estructurales.
+- `@database.sql`: Única fuente de verdad para la estructura de tablas. NUNCA asumas columnas o tipos de datos.
+- `@README.md`: Reglas de negocio generales y flujos institucionales.
+- `@READMEBD.md`: Diccionario de datos y relaciones. **IGNORA SIEMPRE** los campos marcados como `(deprecated)`.
+- `@READMELOGICAS.md`: Arquitectura estricta del software y metodología.
+- Resolución de conflictos: Lógica de negocio (READMEs) > Implementación técnica o código previo.
+
+## 2. Estándares de Arquitectura (Backend PHP)
+- **Patrón Estricto - La Triple Capa:** Respeta el flujo `Controller -> Service -> Model`.
+  - **Controller:** Solo recibe request, limpia buffers (`ob_clean`), llama al Service y retorna JSON.
+  - **Service (Business Logic):** Valida negocio, autoriza, procesa datos y decide.
+  - **Model (Persistencia):** Exclusivamente SQL puro con PDO (Prepared Statements). Cero lógica de negocio.
+- **Respuestas:** El Backend es una API pura. Retorna SIEMPRE JSON estandarizado. NUNCA renderices HTML desde PHP.
+
+## 3. Estándares de Frontend (JS/UI)
+- **Stack Tecnológico:** JavaScript Vanilla, Fetch API y Bootstrap 5. 
+- **Excepción CSS:** Tailwind CSS está PERMITIDO ÚNICAMENTE en los componentes del menú.
+- **Renderizado y Estado:** El DOM se genera dinámicamente. La gestión de sesión/permisos (`roleId`, `instId`) se lee desde `localStorage`, sessionStorage o cookies.
+
+## 4. Reglas Críticas de Negocio y Base de Datos
+- **Manejo de Estados:** El valor `2` generalmente significa "Deshabilitado", "Inactivo" o "No existe" (ej: `Existe = 2`, `Habilitado = 2`).
+- **Aislamiento Multi-Tenant:** TODA consulta debe validar y respetar el `IdInstitucion`. Un Bioterio no puede ver datos de otro salvo interconexión explícita.
+- **Regla Financiera:** Todo cobro o consumo de recursos recae sobre `IdUsrA` (usuario pagador responsable del protocolo).
+- **Precios Snapshot:** Al cerrar formularios o alojamientos, siempre congela el precio copiándolo a las tablas correspondientes (`precioformulario`, `precioinsumosformulario`). No calcules deuda en vivo con precios actuales del catálogo.

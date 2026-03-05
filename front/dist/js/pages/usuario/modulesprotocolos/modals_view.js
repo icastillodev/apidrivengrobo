@@ -26,10 +26,11 @@ export async function viewProtocol(id) {
     modal.show();
 
     // --- CÁLCULO DE ANIMALES ---
-    // p.AnimalesUsados viene del SQL (Suma de totalA de formularios)
-    const total = parseInt(p.CantidadAniA) || 0;
+    // p.AnimalesUsados viene del SQL (Suma de totalA de formularios entregados)
     const usados = parseInt(p.AnimalesUsados) || 0; 
-    const restantes = total - usados;
+    const saldoActual = parseInt(p.CantidadAniA) || 0;
+    const total = usados + saldoActual; // Aprobados inicialmente
+    const restantes = saldoActual;
     
     let colorRestante = "text-success";
     if(restantes <= 0) colorRestante = "text-danger fw-bold";

@@ -45,11 +45,20 @@ export async function initUsuariosPage() {
     // 2. CONFIGURACIÓN DE EVENTOS
     // Buscador
     const btnSearch = document.getElementById('btn-search');
+    const searchInput = document.getElementById('search-input');
     if (btnSearch) {
         btnSearch.onclick = () => {
             currentPage = 1;
             renderTable();
         };
+    }
+    if (searchInput) {
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                currentPage = 1;
+                renderTable();
+            }
+        });
     }
 
     // Botón Excel

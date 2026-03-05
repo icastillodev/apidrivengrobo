@@ -96,11 +96,18 @@ function setupSearch() {
     input.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase().trim();
         if(!term) return render(protocolsList); 
-        const filtered = protocolsList.filter(p => 
-            p.nprotA.toLowerCase().includes(term) || 
-            p.tituloA.toLowerCase().includes(term) ||
-            p.Responsable.toLowerCase().includes(term)
-        );
+        const filtered = protocolsList.filter(p => {
+            const nprot = (p.nprotA || '').toLowerCase();
+            const titulo = (p.tituloA || '').toLowerCase();
+            const resp = (p.Responsable || '').toLowerCase();
+            const idProt = String(p.idprotA || '').toLowerCase();
+            const idInv = String(p.IdInvestigador || '').toLowerCase();
+            return nprot.includes(term) ||
+                   titulo.includes(term) ||
+                   resp.includes(term) ||
+                   idProt.includes(term) ||
+                   idInv.includes(term);
+        });
         render(filtered);
     });
 

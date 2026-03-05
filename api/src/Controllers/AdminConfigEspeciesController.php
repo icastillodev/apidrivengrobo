@@ -74,8 +74,28 @@ class AdminConfigEspeciesController {
         header('Content-Type: application/json');
         try {
             Auditoria::getDatosSesion(); // Validamos seguridad
-            
+
             $this->model->toggleSubespecie($_POST['idSub'], $_POST['status']);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function toggleEspecie() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            Auditoria::getDatosSesion(); // Validamos seguridad
+
+            $idEsp   = $_POST['idEsp']   ?? null;
+            $status  = $_POST['status']  ?? null;
+            if (!$idEsp || !$status) {
+                throw new \Exception("Parámetros incompletos para cambiar estado de especie.");
+            }
+
+            $this->model->toggleEspecie($idEsp, $status);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

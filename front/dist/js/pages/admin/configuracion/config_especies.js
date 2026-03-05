@@ -87,6 +87,11 @@ function renderTree() {
                     <button class="btn btn-sm btn-light border" onclick="window.openModalEspecie(${esp.idespA}, '${esp.EspeNombreA}')">
                         <i class="bi bi-pencil"></i>
                     </button>
+                    <button class="btn btn-sm ${isEspInactive ? 'btn-outline-success' : 'btn-outline-secondary'} border" 
+                            onclick="window.toggleEsp(${esp.idespA}, ${esp.Habilitado || 1})"
+                            title="${isEspInactive ? 'Activar especie' : 'Desactivar especie'}">
+                        <i class="bi ${isEspInactive ? 'bi-toggle-off fs-5' : 'bi-toggle-on fs-5'}"></i>
+                    </button>
                     <button class="btn btn-sm btn-light border text-danger" onclick="window.deleteEspecie(${esp.idespA})">
                         <i class="bi bi-trash"></i>
                     </button>
@@ -215,4 +220,24 @@ window.deleteEspecie = async (id) => {
             Swal.fire('Error', res.message, 'error');
         }
     } catch (e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+};
+
+window.toggleEsp = async (id, currentStatus) => {
+    // Si está inactiva (2) pasa a 1 (activa); si no, a 2
+    const newStatus = (String(currentStatus) === "2") ? 1 : 2;
+    const fd = new FormData();
+    fd.append('idEsp', id);
+    fd.append('status', newStatus);
+
+    try {
+        const res = await API.request('/admin/config/especies/toggle', 'POST', fd);
+        if (res.status === 'success') {
+            loadData();
+        } else {
+            Swal.fire('Error', res.message || 'No se pudo cambiar el estado de la especie.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'Error de conexión', 'error');
+    }
 };

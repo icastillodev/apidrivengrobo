@@ -15,8 +15,14 @@ const ROLE_NAMES = {
     7: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }  // Se mantiene por si hay registros legacy
 };
 
+function esc(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
 const MENU_DEFINITION = [
-    { id: 1, name: "Usuario / Mis Formularios" },
     { id: 2, name: "Administración Protocolos" },
     { id: 3, name: "Admin. Formulario Animales" },
     { id: 4, name: "Admin. Formulario Reactivos" },
@@ -108,6 +114,7 @@ function renderUsers() {
         
         const tr = document.createElement('tr');
         tr.className = "clickable-row"; 
+        const isAdminRole = u.CurrentRoleId == 2;
         tr.innerHTML = `
             <td class="ps-3 text-dark">
                 <span class="text-secondary small fw-normal me-1" style="font-size: 0.85em;">#${u.IdUsrA}</span>
@@ -116,7 +123,13 @@ function renderUsers() {
             <td class="text-primary fw-bold" style="letter-spacing: 0.5px;">@${u.UsrA || '---'}</td>
             <td><span class="badge border ${role.class}" style="font-size: 10px;">${role.label}</span></td>
             <td class="text-end pe-3">
-                <button class="btn btn-sm btn-light border shadow-sm" onclick="window.openRoleModal(${u.IdUsrA}, ${u.CurrentRoleId})">
+                <button 
+                    class="btn btn-sm btn-light border shadow-sm"
+                    ${isAdminRole ? 'disabled title="El rol Administrador (2) solo se modifica desde Superadmin."' : ''}
+                    data-usr="${esc(u.UsrA)}"
+                    data-nombre="${esc(u.NombreA)}"
+                    data-apellido="${esc(u.ApellidoA)}"
+                    onclick="window.openRoleModal(${u.IdUsrA}, ${u.CurrentRoleId}, this)">
                     <i class="bi bi-person-gear"></i>
                 </button>
             </td>
@@ -202,9 +215,29 @@ function renderMenuPermissions() {
     });
 }
 
-window.openRoleModal = (userId, currentRole) => {
+window.openRoleModal = (userId, currentRole, btnEl) => {
+    // El rol 2 (Administrador) no se puede cambiar desde aquí
+    if (currentRole == 2) {
+        Swal.fire('Rol protegido', 'El rol Administrador (2) solo puede ser otorgado o quitado por Superadmin.', 'info');
+        return;
+    }
+
     document.getElementById('target-user-id').value = userId;
-    document.getElementById('new-role-select').value = currentRole;
+    const select = document.getElementById('new-role-select');
+    if (select) select.value = currentRole;
+
+    const infoEl = document.getElementById('role-user-info');
+    if (infoEl && btnEl) {
+        const username = btnEl.dataset.usr || '';
+        const nombre = btnEl.dataset.nombre || '';
+        const apellido = btnEl.dataset.apellido || '';
+        infoEl.innerHTML = `
+            <div><span class="text-muted">ID:</span> <span class="fw-bold">${userId}</span></div>
+            <div><span class="text-muted">Usuario:</span> <span class="fw-bold">@${username || '---'}</span></div>
+            <div><span class="text-muted">Nombre:</span> <span class="fw-bold">${apellido} ${nombre}</span></div>
+        `;
+    }
+
     new bootstrap.Modal(document.getElementById('modal-role')).show();
 };
 

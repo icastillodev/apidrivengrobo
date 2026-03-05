@@ -92,6 +92,28 @@ class ProtocolController {
             $isExterno = isset($data['protocoloexpe']) ? 1 : 0;
             $deptoValue = ($isExterno == 1) ? ($data['departamento_manual'] ?? '') : ($data['departamento'] ?? '');
 
+            // Normalización y validación de fechas según esquema (DATE NULL) y reglas de negocio
+            $rawIni = isset($data['FechaIniProtA']) ? trim($data['FechaIniProtA']) : '';
+            $rawFin = isset($data['FechaFinProtA']) ? trim($data['FechaFinProtA']) : '';
+
+            $fechaIni = $rawIni === '' ? null : $rawIni;
+            $fechaFin = $rawFin === '' ? null : $rawFin;
+
+            // Validar formato Y-m-d si vienen valores
+            foreach (['inicio' => $fechaIni, 'vencimiento' => $fechaFin] as $label => $val) {
+                if ($val !== null) {
+                    $dt = \DateTime::createFromFormat('Y-m-d', $val);
+                    if (!$dt || $dt->format('Y-m-d') !== $val) {
+                        throw new \Exception("La fecha de {$label} del protocolo no es válida.");
+                    }
+                }
+            }
+
+            // Regla de negocio: si ambas fechas existen, Fin >= Ini
+            if ($fechaIni !== null && $fechaFin !== null && $fechaFin < $fechaIni) {
+                throw new \Exception("La fecha de vencimiento del protocolo no puede ser anterior a la fecha de inicio.");
+            }
+
             if ($id) {
                 // UPDATE
                 $sql = "UPDATE protocoloexpe SET 
@@ -103,7 +125,7 @@ class ProtocolController {
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute([
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
-                    $data['CantidadAniA'], $data['FechaIniProtA'], $data['FechaFinProtA'], 
+                    $data['CantidadAniA'], $fechaIni, $fechaFin, 
                     $deptoValue, $data['tipoprotocolo'], $data['severidad'], 
                     $data['IdUsrA'], $isExterno, $id
                 ]);
@@ -119,7 +141,7 @@ class ProtocolController {
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute([
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
-                    $data['CantidadAniA'], $data['FechaIniProtA'], $data['FechaFinProtA'], $deptoValue,
+                    $data['CantidadAniA'], $fechaIni, $fechaFin, $deptoValue,
                     $data['tipoprotocolo'], $data['severidad'], $data['IdUsrA'], $instId, $isExterno
                 ]);
                 $currentId = $this->db->lastInsertId();

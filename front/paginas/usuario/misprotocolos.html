@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Protocolos - GROBO</title>
-    
+
+
+
 <script type="module">
-    import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
-    import { initUserProtocols } from '../../../dist/js/pages/usuario/modulesprotocolos/main.js';
-    import { initMenu } from '../../../dist/js/components/MenuComponent.js';
-    import { Auth } from '../../../dist/js/auth.js';
-    import { NotificationManager } from '../../../dist/js/NotificationManager.js';
-    import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+    import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+    import { initUserProtocols } from '../../dist/js/pages/usuario/modulesprotocolos/main.js';
+    import { initMenu } from '../../dist/js/components/MenuComponent.js';
+    import { Auth } from '../../dist/js/auth.js';
+    import { NotificationManager } from '../../dist/js/NotificationManager.js';
+    import { loadLanguage } from '../../dist/js/utils/i18n.js';
 
     
     showLoader();
@@ -123,9 +125,11 @@
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
                             <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
                                 <option value="all">Todo (Texto)</option>
+                                <option value="idprotA">ID Protocolo</option>
+                                <option value="IdUsrA">ID Usuario</option>
                                 <option value="nprotA">N° Protocolo</option>
                                 <option value="tituloA">Título</option>
-                                <option value="InvestigadorACargA">Inv. Cargo</option>
+                                <option value="InvestigadorACargA">Responsable de proyecto</option>
                                 <option value="TipoNombre">Tipo</option>
                                 <option value="Origen">Origen</option>
                                 <option value="Estado" id="opt-filter-estado" class="d-none">Estado</option>

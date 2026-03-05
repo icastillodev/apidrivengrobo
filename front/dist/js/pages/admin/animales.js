@@ -318,7 +318,7 @@ function renderOrderModificationSection(a, sex, cache) {
                 <select id="select-species-modal" name="idsubespA" class="form-select form-select-sm" onchange="window.updateSpeciesPrice(this)"></select>
             </div>
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Raza</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa</label>
                 <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
             </div>
             <div class="col-md-3">
@@ -692,7 +692,7 @@ window.downloadAnimalPDF = async (id) => {
             <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría Especie:</strong><br>${especie}</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">
-                        <strong>Raza:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
+                        <strong>Cepa:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
                     </td>
                 </tr>
             </table>
@@ -779,7 +779,7 @@ window.processExcelExport = () => {
     }
 
     // Encabezados con punto y coma
-    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Raza", "Edad", "Peso", "Total", "Inicio", "Retiro", "Estado"];
+    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Cepa", "Edad", "Peso", "Total", "Inicio", "Retiro", "Estado"];
     const csvRows = [headers.join(";")];
 
     data.forEach(a => {

@@ -332,6 +332,7 @@ $router->post('/admin/config/roles/toggle-menu', 'AdminConfigRolesController@tog
 // ============================================================
 $router->get('/admin/config/especies/all', 'AdminConfigEspeciesController@getAll');
 $router->post('/admin/config/especies/save', 'AdminConfigEspeciesController@saveEspecie');
+$router->post('/admin/config/especies/toggle', 'AdminConfigEspeciesController@toggleEspecie');
 $router->post('/admin/config/especies/delete', 'AdminConfigEspeciesController@deleteEspecie');
 $router->post('/admin/config/subespecies/save', 'AdminConfigEspeciesController@saveSubespecie');
 $router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController@toggleSubespecie');

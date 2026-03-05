@@ -97,9 +97,10 @@
                         </select>
 
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
-                        <select id="filter-type-prot" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
+                        <select id="filter-type-prot" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 180px;">
                             <option value="all">Todo (Texto)</option>
                             <option value="idprotA">ID Protocolo</option> 
+                            <option value="IdUsrA">ID Usuario</option>
                             <option value="nprotA">N° Protocolo</option>
                             <option value="tituloA">Título</option>
                             <option value="InvestigadorACargA">Resp. Proyecto</option>
@@ -120,7 +121,7 @@
                 </div>
                 
                 <div class="col-lg-5 text-lg-end mt-3 mt-lg-0 d-flex justify-content-end gap-2">
-                    <button class="btn btn-outline-dark btn-sm fw-bold position-relative px-3" onclick="window.location.href='solicitud_protocolo.html'">
+                    <button class="btn btn-outline-dark btn-sm fw-bold position-relative px-3" onclick="window.location.href='./solicitud_protocolo'">
                         <i class="bi bi-inbox-fill me-1"></i> Solicitudes
                         <span id="badge-requests" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">0</span>
                     </button>

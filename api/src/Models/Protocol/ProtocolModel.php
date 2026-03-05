@@ -10,14 +10,33 @@ class ProtocolModel {
         $this->db = $db;
     }
 
-public function getByInstitution($instId) {
+    public function getByInstitution($instId) {
         $sql = "SELECT 
                     pe.*, 
-                    pe.idprotA, pe.nprotA, pe.tituloA, pe.CantidadAniA as AniAprob, 
+                    pe.idprotA, 
+                    pe.nprotA, 
+                    pe.tituloA, 
+                    pe.CantidadAniA as SaldoAnimales, 
                     pe.encargaprot as RespProt, 
                     pe.FechaFinProtA as Vencimiento,
                     pe.protocoloexpe as IsExterno,
                     pe.departamento as DeptoOriginal,
+                    
+                    -- Cálculo de animales usados (según sexoe.totalA en formularios ENTREGADOS)
+                    (SELECT COALESCE(SUM(s.totalA), 0)
+                     FROM protformr pf
+                     JOIN formularioe f ON pf.idformA = f.idformA
+                     JOIN sexoe s ON f.idformA = s.idformA
+                     WHERE pf.idprotA = pe.idprotA
+                       AND f.estado = 'Entregado') as AnimalesUsados,
+
+                    -- Total aprobado inicial (usados + saldo actual)
+                    ((SELECT COALESCE(SUM(s.totalA), 0)
+                      FROM protformr pf
+                      JOIN formularioe f ON pf.idformA = f.idformA
+                      JOIN sexoe s ON f.idformA = s.idformA
+                      WHERE pf.idprotA = pe.idprotA
+                        AND f.estado = 'Entregado') + pe.CantidadAniA) as AnimalesTotales,
                     
                     CONCAT('(', u.UsrA, ') ', p.NombreA, ' ', p.ApellidoA, ' (ID:', p.IdUsrA, ')') as ResponsableFormat,
                     
@@ -27,7 +46,7 @@ public function getByInstitution($instId) {
                      LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                      WHERE pd.idprotA = pe.idprotA LIMIT 1) as DeptoFormat,
 
-                    -- LÍNEA AGREGADA: Trae el formato bonito del departamento original del protocolo
+                    -- Departamento original del protocolo
                     (SELECT CONCAT(d2.NombreDeptoA, IF(o2.NombreOrganismoSimple IS NOT NULL, CONCAT(' (', o2.NombreOrganismoSimple, ')'), ''))
                      FROM departamentoe d2 
                      LEFT JOIN organismoe o2 ON d2.organismopertenece = o2.IdOrganismo

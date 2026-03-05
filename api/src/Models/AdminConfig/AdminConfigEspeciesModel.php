@@ -100,4 +100,19 @@ class AdminConfigEspeciesModel {
         Auditoria::log($this->db, 'UPDATE', 'subespecie', "Cambió visibilidad (Existe=$status) de la subespecie ID: $id");
         return $res;
     }
+
+    public function toggleEspecie($id, $status) {
+        // Habilitado: 1 = ACTIVO, 2 = INACTIVO (se mantiene el criterio usado en deleteEspecie)
+        $sql = "UPDATE especiee SET Habilitado = ? WHERE idespA = ?";
+        $res = $this->db->prepare($sql)->execute([$status, $id]);
+
+        Auditoria::log(
+            $this->db,
+            'UPDATE',
+            'especiee',
+            "Cambió visibilidad (Habilitado=$status) de la especie ID: $id"
+        );
+
+        return $res;
+    }
 }

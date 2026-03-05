@@ -83,13 +83,10 @@ export async function initReactivosPage() {
 }
 
 /**
- * 2. MODAL DE DETALLE
- */
-/**
  * 2. MODAL DE DETALLE (Versión Blindada y Sincronizada)
  */
 window.openReactivoModal = async (r) => {
-    const instId = localStorage.getItem('instId');
+    const instId = Auth.getVal('instId');
     const container = document.getElementById('modal-content-reactivo');
     
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
@@ -97,7 +94,6 @@ window.openReactivoModal = async (r) => {
     try {
         const [resMaster, resUsage, resNotify] = await Promise.all([
             API.request(`/reactivos/form-data?inst=${instId}`),
-            // Cambiamos el endpoint para obtener organo y totalA desde Reactivos
             API.request(`/reactivos/usage?id=${r.idformA}`), 
             API.request(`/reactivos/last-notification?id=${r.idformA}`)
         ]);
@@ -106,10 +102,13 @@ window.openReactivoModal = async (r) => {
         const protocols = cache.protocols || cache.protocolos || [];
         const insumos = cache.insumos || [];
         
-        // Mapeamos los datos de la entidad sexoe
         const usage = resUsage.data || { totalA: 0, organo: 0 };
         const lastNotify = resNotify.data;
-        const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+        
+        // 🚀 FIX NULL: Usamos Auth.getVal para buscar en SessionStorage o LocalStorage
+        const userFull = Auth.getVal('userFull') || Auth.getVal('userName') || 'Admin';
+        const userId = Auth.getVal('userId') || '0';
+        const identity = `${userFull} (ID: ${userId})`;
 
         let html = renderModalHeader(r);
         html += renderResearcherContact(r);
@@ -117,7 +116,7 @@ window.openReactivoModal = async (r) => {
         html += renderAdminSection(r, identity);
         html += renderNotificationSection(lastNotify, r.idformA);
         
-        // Pasamos usage (con organo y totalA) y las listas
+        // Pasamos usage y las listas
         html += renderOrderModificationSection(r, usage, { protocols, insumos });
 
         container.innerHTML = html;
@@ -133,7 +132,6 @@ window.openReactivoModal = async (r) => {
         container.innerHTML = `<div class="alert alert-danger">Error al cargar los datos del pedido.</div>`;
     }
 };
-
 /* --- MÓDULOS DE RENDERIZADO DEL MODAL --- */
 
 function renderModalHeader(r) {
@@ -217,25 +215,22 @@ function renderNotificationSection(lastNotify, idformA) {
         </div>
     </div>`;
 }
-/**
- * RENDERIZADO TÉCNICO - VERSIÓN FINAL CON MEDIDAS EN TIEMPO REAL
- */
 function renderOrderModificationSection(r, usage, cache) {
     const t = window.txt.reactivos.modal;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
     const isExterno = r.EsOtrosCeuas == 1;
 
-    // Medida inicial al cargar el modal
+    // Valores para inyectar en el formato (tipo cantidad)
     const unidadMedida = r.Medida ? r.Medida : 'unidades';
+    const presentacionInicial = r.Presentacion || 0;
     
     const optionsReactivos = reactivos.map(i => {
         const iterId = i.idInsumo || i.IdInsumoexp; 
         const isSelected = (iterId == r.idinsumoA) ? 'selected' : '';
         const pres = i.CantidadInsumo ? ` [${i.CantidadInsumo} ${i.TipoInsumo}]` : '';
         
-        // 🚀 FIX: Guardamos el TipoInsumo (ml, gr, caja) en data-medida
-        return `<option value="${iterId}" data-medida="${i.TipoInsumo || 'un.'}" ${isSelected}>${i.NombreInsumo}${pres}</option>`;
+        return `<option value="${iterId}" data-medida="${i.TipoInsumo || 'un.'}" data-presentacion="${i.CantidadInsumo || 0}" ${isSelected}>${i.NombreInsumo}${pres}</option>`;
     }).join('');
 
     return `
@@ -260,14 +255,14 @@ function renderOrderModificationSection(r, usage, cache) {
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-primary uppercase">INSUMO EXPERIMENTAL</label>
                 <select name="reactivo" class="form-select form-select-sm" onchange="window.cambiarMedidaReactivo(this)">
-                    <option value="" data-medida="un.">Seleccione Insumo</option>
+                    <option value="" data-medida="un." data-presentacion="0">Seleccione Insumo</option>
                     ${optionsReactivos}
                 </select>
             </div>
             
             <div class="col-md-3">
-                <label id="lbl-medida-dinamica" class="form-label small fw-bold uppercase">${t.qty_req} (${unidadMedida})</label>
-                <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${usage.organo || 0}">
+                <label id="lbl-medida-dinamica" class="form-label small fw-bold uppercase">(${unidadMedida} ${presentacionInicial}) - ${t.qty_req}</label>
+                <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${r.CantidadReactivo || usage.organo || 0}">
             </div>
             
             <div class="col-md-3">
@@ -293,6 +288,18 @@ function renderOrderModificationSection(r, usage, cache) {
     </form>`;
 }
 
+window.cambiarMedidaReactivo = (selectElement) => {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const medida = selectedOption.getAttribute('data-medida') || 'unidades';
+    const presentacion = selectedOption.getAttribute('data-presentacion') || '0';
+    
+    const label = document.getElementById('lbl-medida-dinamica');
+    if (label) {
+        // 🚀 AQUÍ: Formato exacto (tipo cantidad) - texto dinámico
+        label.innerText = `(${medida} ${presentacion}) - CANT. SOLICITADA`;
+    }
+};
+
 // 🚀 NUEVA FUNCIÓN: Cambia el texto de la medida al instante
 window.cambiarMedidaReactivo = (selectElement) => {
     const selectedOption = selectElement.options[selectElement.selectedIndex];
@@ -302,18 +309,18 @@ window.cambiarMedidaReactivo = (selectElement) => {
         label.innerText = `CANT. SOLICITADA (${medida})`;
     }
 };
-// 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque
+// 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque sin Nulls
 window.updateReactivoStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
     const statusSelect = document.getElementById('modal-status');
     const badgeContainer = document.getElementById('modal-status-badge-container');
     const aclara = document.getElementById('modal-aclaracionadm').value;
     
-    // Obtenemos el nombre. Si no existe, usamos "Admin"
-    let userName = localStorage.getItem('userFull');
-    if (!userName || userName === 'null' || userName === 'undefined') userName = "Admin";
+    // 🚀 FIX NULL: Extracción segura de datos
+    const userName = Auth.getVal('userFull') || Auth.getVal('userName') || "Admin";
+    const userId = Auth.getVal('userId') || "0";
+    const identity = `${userName} (ID: ${userId})`;
     
-    const identity = `${userName} (ID: ${localStorage.getItem('userId')})`;
     const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
     const quienVistoTarget = isSinEstado ? 'Falta revisar' : identity;
 
@@ -321,20 +328,16 @@ window.updateReactivoStatusQuick = async () => {
     fd.append('idformA', id);
     fd.append('estado', statusSelect.value);
     fd.append('aclaracionadm', aclara);
-    // Mandamos el nombre de quien lo vio al backend para que lo guarde
     fd.append('quienvisto', quienVistoTarget); 
 
     try {
         const res = await API.request(`/reactivos/update-status`, 'POST', fd);
         if (res.status === 'success') {
-            // Actualiza la etiqueta visual de color
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(statusSelect.value);
             
-            // 🚀 ACTUALIZACIÓN EN TIEMPO REAL DEL INPUT DEL MODAL
             const inputQuienVisto = document.getElementById('modal-quienvisto');
             if (inputQuienVisto) inputQuienVisto.value = quienVistoTarget;
             
-            // Sincroniza la tabla de fondo
             syncAllData(); 
         }
     } catch (e) { 
@@ -512,6 +515,11 @@ function renderTable() {
             ? `<div class="mt-1"><span class="badge bg-danger shadow-sm" style="font-size: 8px;">${t.table.others_ceuas}</span></div>` 
             : '';
 
+        // Variables limpias
+        const txtMedida = r.Medida || 'un.';
+        const txtPresentacion = r.Presentacion || 0;
+        const txtPedida = r.CantidadReactivo || 0;
+
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${r.idformA}</td>
             <td class="py-2 px-2 small fw-bold">${r.Investigador}</td>
@@ -524,10 +532,12 @@ function renderTable() {
             </td>
             <td class="py-2 px-2 text-center small fw-bold text-muted">${r.AnimalesUsados || 0}</td>
             <td class="py-2 px-2 small fw-bold text-dark">${r.Reactivo || t.table.not_assigned}</td> 
+            
             <td class="py-2 px-2 text-center">
-                <span class="fw-bold text-primary" style="font-size: 11px;">${r.CantidadReactivo || 0}</span>
-                <span class="text-muted fw-bold" style="font-size: 10px;">${r.Medida || ''}</span> 
+                <span class="text-muted fw-bold" style="font-size: 10px;">(${txtMedida} ${txtPresentacion}) - </span>
+                <span class="fw-bold text-primary" style="font-size: 11px;">${txtPedida}</span>
             </td>
+            
             <td class="py-2 px-2 small text-muted">${r.Inicio || '---'}</td>
             <td class="py-2 px-2 small text-muted">${r.Retiro || '---'}</td>
             <td class="py-2 px-2 small text-truncate" style="max-width: 120px;" title="${r.Aclaracion || ''}">

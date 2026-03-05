@@ -255,11 +255,18 @@ function setupSearch() {
             renderList(protocolsList);
             return;
         }
-        const filtered = protocolsList.filter(p => 
-            p.nprotA.toLowerCase().includes(term) || 
-            p.tituloA.toLowerCase().includes(term) ||
-            p.Responsable.toLowerCase().includes(term)
-        );
+        const filtered = protocolsList.filter(p => {
+            const nprot = (p.nprotA || '').toLowerCase();
+            const titulo = (p.tituloA || '').toLowerCase();
+            const resp = (p.Responsable || '').toLowerCase();
+            const idProt = String(p.idprotA || '').toLowerCase();
+            const idInv = String(p.IdInvestigador || '').toLowerCase();
+            return nprot.includes(term) ||
+                   titulo.includes(term) ||
+                   resp.includes(term) ||
+                   idProt.includes(term) ||
+                   idInv.includes(term);
+        });
         renderList(filtered);
     };
 
@@ -446,7 +453,7 @@ async function handleReview(e) {
                 <tbody>
                     <tr><td class="bg-light fw-bold text-muted" width="30%">Especie</td><td>${txtEspecie}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Cepa</td><td>${txtSub}</td></tr>
-                    <tr><td class="bg-light fw-bold text-muted">Raza/Línea</td><td>${raza}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">Cepa/Línea</td><td>${raza}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Peso</td><td>${peso}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Edad</td><td>${edad}</td></tr>
                 </tbody>

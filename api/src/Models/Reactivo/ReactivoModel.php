@@ -16,6 +16,7 @@ class ReactivoModel {
     public function getAllByInstitution($instId, $categoryName) {
         $sql = "SELECT 
                     f.idformA, 
+                    f.IdUsrA as IdInvestigador,
                     pf.idprotA, 
                     f.estado, 
                     f.fechainicioA as Inicio, 
@@ -230,7 +231,7 @@ class ReactivoModel {
         $stmtUser->execute([$userId]);
         $userEmail = $stmtUser->fetchColumn();
 
-        $stmtProt = $this->db->prepare("SELECT p.idprotA, p.nprotA, p.tituloA, CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable FROM protocoloexpe p INNER JOIN personae per ON p.IdUsrA = per.IdUsrA WHERE p.IdInstitucion = ? AND p.FechaFinProtA >= CURDATE() ORDER BY p.nprotA DESC");
+        $stmtProt = $this->db->prepare("SELECT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA as IdInvestigador, CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable FROM protocoloexpe p INNER JOIN personae per ON p.IdUsrA = per.IdUsrA WHERE p.IdInstitucion = ? AND p.FechaFinProtA >= CURDATE() ORDER BY p.nprotA DESC");
         $stmtProt->execute([$instId]);
 
         $stmtIns = $this->db->prepare("SELECT IdInsumoexp, NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1 ORDER BY NombreInsumo ASC");

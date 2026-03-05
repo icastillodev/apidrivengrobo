@@ -54,8 +54,12 @@ class UsuarioTodosProtocolosModel {
                 COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA, CONCAT('ID: ', p.IdUsrA)) as ResponsableName,
                 i_orig.NombreCompletoInst as Origen, i_orig.NombreInst as InstitucionOrigen,
                 
-                -- ANIMALES (0 hasta confirmar columna)
-                0 as AnimalesUsados, 
+                (SELECT COALESCE(SUM(s.totalA), 0)
+                 FROM protformr pf
+                 JOIN formularioe f ON pf.idformA = f.idformA
+                 JOIN sexoe s ON f.idformA = s.idformA
+                 WHERE pf.idprotA = p.idprotA
+                   AND f.estado = 'Entregado') as AnimalesUsados,
                 
                 (SELECT CONCAT(d.NombreDeptoA, IF(o.NombreOrganismoSimple IS NOT NULL, CONCAT(' - [', o.NombreOrganismoSimple, ']'), '')) FROM protdeptor pd JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo WHERE pd.idprotA = p.idprotA LIMIT 1) as DeptoFormat";
     }
@@ -155,11 +159,36 @@ class UsuarioTodosProtocolosModel {
 
     // ESCRITURA
     public function getProtocolSpecies($id){$s=$this->db->prepare("SELECT e.idespA, e.EspeNombreA FROM protesper pe JOIN especiee e ON pe.idespA=e.idespA WHERE pe.idprotA=?");$s->execute([$id]);return $s->fetchAll(PDO::FETCH_ASSOC);}
+    
+    private function normalizeProtocolDates(array $d): array {
+        $rawIni = isset($d['FechaIniProtA']) ? trim($d['FechaIniProtA']) : '';
+        $rawFin = isset($d['FechaFinProtA']) ? trim($d['FechaFinProtA']) : '';
+
+        $ini = $rawIni === '' ? null : $rawIni;
+        $fin = $rawFin === '' ? null : $rawFin;
+
+        foreach (['inicio' => $ini, 'vencimiento' => $fin] as $label => $val) {
+            if ($val !== null) {
+                $dt = \DateTime::createFromFormat('Y-m-d', $val);
+                if (!$dt || $dt->format('Y-m-d') !== $val) {
+                    throw new Exception("La fecha de {$label} del protocolo no es válida.");
+                }
+            }
+        }
+
+        if ($ini !== null && $fin !== null && $fin < $ini) {
+            throw new Exception("La fecha de vencimiento del protocolo no puede ser anterior a la fecha de inicio.");
+        }
+
+        return [$ini, $fin];
+    }
+
     public function createInternal($d, $u) {
         $this->db->beginTransaction();
         try {
+            [$ini, $fin] = $this->normalizeProtocolDates($d);
             $s=$this->db->prepare("INSERT INTO protocoloexpe (tituloA,nprotA,InvestigadorACargA,departamento,tipoprotocolo,CantidadAniA,severidad,FechaIniProtA,FechaFinProtA,IdInstitucion,IdUsrA,variasInst,protocoloexpe) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,0)");
-            $s->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$d['IdInstitucion'],$u]);
+            $s->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$ini,$fin,$d['IdInstitucion'],$u]);
             $p=$this->db->lastInsertId();
             
             if(isset($d['especies'])&&is_array($d['especies'])){
@@ -181,7 +210,8 @@ class UsuarioTodosProtocolosModel {
         $this->db->beginTransaction();
         try {
             $id=$d['idprotA'];
-            $this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$d['FechaIniProtA'],$d['FechaFinProtA'],$id]);
+            [$ini, $fin] = $this->normalizeProtocolDates($d);
+            $this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$ini,$fin,$id]);
             $this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);
             
             if(isset($d['especies'])&&is_array($d['especies'])){

@@ -145,9 +145,8 @@
                     <div class="card-body p-4">
                         <label class="form-label small fw-bold text-muted uppercase">Seleccionar Rol Administrativo</label>
                         <select id="select-role-menu" class="form-select fw-bold mb-4 shadow-sm border-secondary">
-                            <option value="4">Sub Administrador (SecAdmin)</option>
                             <option value="5">Asistente</option>
-                            <option value="7">Laboratorio</option>
+                            <option value="6">Laboratorio</option>
                         </select>
 
                         <div class="list-group shadow-sm" id="menu-list-container">
@@ -168,13 +167,13 @@
                 </div>
                 <div class="modal-body p-4">
                     <input type="hidden" id="target-user-id">
+                    <div class="mb-2 small text-muted" id="role-user-info"></div>
                     <label class="form-label small fw-bold">Nuevo Perfil:</label>
                     <select id="new-role-select" class="form-select fw-bold mb-3">
-                        <option value="2">Administrador</option>
                         <option value="3">Usuario / Investigador</option>
                         <option value="4">Sub Administrador</option>
                         <option value="5">Asistente</option>
-                        <option value="6">Laboratorio</option> </select>
+                        <option value="6">Laboratorio</option>
                     </select>
                     <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="window.processRoleChange()">ACTUALIZAR</button>
                 </div>

@@ -9,6 +9,7 @@ class InsumoModel {
         $sql = "SELECT 
                     f.idformA, f.estado, f.fechainicioA as Inicio, f.fecRetiroA as Retiro,
                     f.aclaracionadm, f.aclaraA as AclaracionUsuario, f.quienvisto, f.depto as idDepto,
+                    f.IdUsrA as IdInvestigador,
                     p.EmailA as EmailInvestigador, p.CelularA as CelularInvestigador,
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
                     d.NombreDeptoA as Departamento,

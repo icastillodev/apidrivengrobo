@@ -302,6 +302,7 @@ public function updateStatus($data) {
         // B. Protocolos
         $sql = "SELECT 
                     p.idprotA, p.nprotA, p.tituloA, 
+                    p.IdUsrA as IdInvestigador,
                     CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable
                 FROM protocoloexpe p
                 INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
