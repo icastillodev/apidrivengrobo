@@ -113,6 +113,23 @@ export const DashboardUI = {
             </div>
 
             <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./precios'">
+                    <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-cash-coin fs-2"></i>
+                        </div>
+                        <h5 class="fw-black text-dark mb-1">Precios</h5>
+                        <span class="small text-muted fw-semibold">Tarifas y valores del sistema</span>
+                    </div>
+                    <div class="card-footer bg-light border-0 p-0">
+                        <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./precios';">
+                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden bg-dark text-white pointer transition-hover" onclick="window.location.href='./estadisticas'">
                     <div class="card-body p-4 d-flex flex-column justify-content-center align-items-center text-center h-100">
                         <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 65px; height: 65px;">

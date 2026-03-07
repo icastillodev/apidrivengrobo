@@ -78,6 +78,7 @@ async function loadStats() {
             generateDeptColors(rawData.por_departamento);
 
             renderGlobalCards();
+            renderAlojamientoTrazabilidadSection();
             renderSpeciesCounters();
             renderTable();
             renderMainChart();
@@ -130,6 +131,60 @@ function renderGlobalCards() {
     setSafeText('box-insumos', g.total_insumos);
     setSafeText('box-protocolos', g.total_protocolos);
     setSafeText('box-alojamientos', g.total_alojamientos);
+}
+
+function renderAlojamientoTrazabilidadSection() {
+    const container = document.getElementById('alojamiento-trazabilidad-section');
+    if (!container || !rawData || !rawData.alojamiento_trazabilidad) return;
+    const at = rawData.alojamiento_trazabilidad;
+
+    let html = `
+        <div class="col-md-3 col-6">
+            <div class="card p-3 border-0 shadow-sm text-center border-top border-3 border-info">
+                <small class="text-muted fw-bold">HISTORIAS</small>
+                <h3 class="mb-0 fw-bold text-info">${(at.total_historias || 0).toLocaleString('es-UY')}</h3>
+                <small class="text-muted" style="font-size: 0.7rem;">Agrupaciones de alojamiento</small>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card p-3 border-0 shadow-sm text-center border-top border-3 border-secondary">
+                <small class="text-muted fw-bold">CAJAS FÍSICAS</small>
+                <h3 class="mb-0 fw-bold text-secondary">${(at.total_cajas || 0).toLocaleString('es-UY')}</h3>
+                <small class="text-muted" style="font-size: 0.7rem;">Unidades de trazabilidad</small>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card p-3 border-0 shadow-sm text-center border-top border-3 border-success">
+                <small class="text-muted fw-bold">OBS. TRAZABILIDAD</small>
+                <h3 class="mb-0 fw-bold text-success">${(at.total_observaciones_trazabilidad || 0).toLocaleString('es-UY')}</h3>
+                <small class="text-muted" style="font-size: 0.7rem;">Registros clínicos</small>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card p-3 border-0 shadow-sm text-center border-top border-3 border-primary">
+                <small class="text-muted fw-bold">ALOJ. ACTIVOS</small>
+                <h3 class="mb-0 fw-bold text-primary">${(at.alojamientos_activos || 0).toLocaleString('es-UY')}</h3>
+                <small class="text-muted" style="font-size: 0.7rem;">Tramos vigentes</small>
+            </div>
+        </div>`;
+
+    if (at.por_especie && at.por_especie.length > 0) {
+        html += `
+        <div class="col-12 mt-2">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-bold small">Alojamiento por especie</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light"><tr><th>Especie</th><th class="text-center">Historias</th><th class="text-center">Tramos</th></tr></thead>
+                        <tbody>
+                            ${at.por_especie.map(e => `<tr><td class="fw-bold">${e.especie}</td><td class="text-center">${e.historias}</td><td class="text-center">${e.tramos}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    }
+    container.innerHTML = html;
 }
 
 function renderSpeciesCounters() {
@@ -416,6 +471,10 @@ function exportToExcel() {
         ["Protocolos", rawData.globales.total_protocolos],
         ["Alojamientos", rawData.globales.total_alojamientos]
     ];
+    if (rawData.alojamiento_trazabilidad) {
+        const at = rawData.alojamiento_trazabilidad;
+        globalData.push(["Historias (aloj.)", at.total_historias], ["Cajas físicas", at.total_cajas], ["Obs. trazabilidad", at.total_observaciones_trazabilidad]);
+    }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(globalData), "Resumen");
 
     // Hoja 2: Departamentos
@@ -446,6 +505,15 @@ function exportToExcel() {
         "Estado": new Date(p.FechaFinProtA) < new Date() ? 'VENCIDO' : 'VIGENTE'
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(protData), "Protocolos");
+
+    if (rawData.alojamiento_trazabilidad && rawData.alojamiento_trazabilidad.por_especie) {
+        const atEsp = rawData.alojamiento_trazabilidad.por_especie.map(e => ({
+            "Especie": e.especie,
+            "Historias": e.historias,
+            "Tramos": e.tramos
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(atEsp), "Alojamiento por especie");
+    }
 
     XLSX.writeFile(wb, `Reporte_GROBO_${new Date().toISOString().slice(0,10)}.xlsx`);
 }

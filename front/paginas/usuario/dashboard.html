@@ -41,6 +41,7 @@
             <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
                 <div class="modal-header bg-danger text-white py-3">
                     <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Seguridad de Cuenta Requerida</h5>
+                    <button type="button" class="btn-close btn-close-white d-none" id="btn-close-security-modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4 bg-light">
                     <p class="text-muted small mb-4">Para continuar utilizando el sistema de forma segura, es obligatorio actualizar la siguiente información.</p>
@@ -59,7 +60,10 @@
                             <input type="email" id="sec-email-input" class="form-control border-primary" placeholder="ejemplo@correo.com">
                         </div>
 
-                        <div class="text-end mt-4">
+                        <div class="text-end mt-4 d-flex flex-wrap justify-content-end gap-2">
+                            <button type="button" class="btn btn-outline-secondary d-none" id="btn-continue-default-pass">
+                                <i class="bi bi-x-circle me-1"></i> Seguir con esta contraseña
+                            </button>
                             <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm"><i class="bi bi-check-circle me-1"></i> Actualizar y Continuar</button>
                         </div>
                     </form>
@@ -96,11 +100,15 @@
                 if (secRes && secRes.status === 'success') {
                     if (secRes.needsPass || secRes.needsEmail) {
                         const modalSec = new bootstrap.Modal(document.getElementById('modal-security-check'));
+                        const btnCloseSec = document.getElementById('btn-close-security-modal');
+                        const btnContinueDefault = document.getElementById('btn-continue-default-pass');
                         
                         if (secRes.needsPass) {
                             document.getElementById('sec-pass-container').classList.remove('d-none');
                             document.getElementById('sec-new-pass').required = true;
                             document.getElementById('sec-confirm-pass').required = true;
+                            if (btnContinueDefault) btnContinueDefault.classList.remove('d-none');
+                            if (btnCloseSec) btnCloseSec.classList.remove('d-none');
                         }
                         if (secRes.needsEmail) {
                             document.getElementById('sec-email-container').classList.remove('d-none');
@@ -108,6 +116,24 @@
                         }
                         
                         modalSec.show();
+
+                        if (btnCloseSec) {
+                            btnCloseSec.onclick = () => {
+                                modalSec.hide();
+                            };
+                        }
+                        if (btnContinueDefault) {
+                            btnContinueDefault.onclick = () => {
+                                modalSec.hide();
+                                Swal.fire({
+                                    icon: 'info',
+                                    title: 'Continuaste con clave temporal',
+                                    text: 'Te lo volveremos a pedir al próximo ingreso.',
+                                    timer: 2200,
+                                    showConfirmButton: false
+                                });
+                            };
+                        }
 
                         document.getElementById('form-security-check').onsubmit = async (e) => {
                             e.preventDefault();

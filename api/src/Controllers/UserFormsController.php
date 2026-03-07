@@ -52,4 +52,46 @@ class UserFormsController {
         }
         exit;
     }
+
+    public function getProtocolsUsedInForms() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $list = $this->model->getProtocolsUsedInForms($sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getInsumosPedidos() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $list = $this->model->getInsumosPedidosByUser($sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getInsumosExperimentalesPedidos() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $list = $this->model->getInsumosExperimentalesPedidosByUser($sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

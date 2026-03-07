@@ -113,4 +113,27 @@ class AdminConfigInstitutionModel {
         Auditoria::log($this->db, 'UPDATE', 'serviciosinst', "Cambió estado de Servicio ID: $id");
         return $res;
     }
+
+    public function updateService($data) {
+        $sql = "UPDATE serviciosinst
+                SET NombreServicioInst = ?, MedidaServicioInst = ?, CantidadPorMedidaInst = ?
+                WHERE IdServicioInst = ? AND IdInstitucion = ?";
+
+        $res = $this->db->prepare($sql)->execute([
+            $data['nombre'],
+            $data['medida'] ?? 'Unidad',
+            $data['cant'] ?? 1,
+            $data['id'],
+            $data['instId']
+        ]);
+
+        Auditoria::log(
+            $this->db,
+            'UPDATE',
+            'serviciosinst',
+            "Modificó Servicio ID: {$data['id']} ({$data['nombre']})"
+        );
+
+        return $res;
+    }
 }

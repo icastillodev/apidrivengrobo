@@ -25,8 +25,13 @@ class UserModel {
                     JOIN protformr pf ON f.idformA = pf.idformA
                     JOIN protocoloexpe pe ON pf.idprotA = pe.idprotA
                     WHERE f.IdUsrA = u.IdUsrA) as OtrosCeuaCount
+                    ,
+                    COALESCE(a.ActivoA, 1) as ActivoA,
+                    t.IdTipousrA
                 FROM usuarioe u
                 JOIN personae p ON u.IdUsrA = p.IdUsrA
+                LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
+                LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
                 WHERE u.IdInstitucion = ?
                 ORDER BY p.ApellidoA ASC";
         

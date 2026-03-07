@@ -9,10 +9,10 @@ class PreciosModel {
     }
 
     public function getInstData($instId) {
-        $sql = "SELECT tituloprecios FROM institucion WHERE IdInstitucion = ?";
+        $sql = "SELECT tituloprecios, NombreInst, PrecioJornadaTrabajoExp FROM institucion WHERE IdInstitucion = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['tituloprecios' => ''];
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['tituloprecios' => '', 'NombreInst' => '', 'PrecioJornadaTrabajoExp' => 0];
     }
 
     public function getEspecies($instId) {

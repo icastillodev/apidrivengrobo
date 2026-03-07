@@ -180,50 +180,27 @@ window.removeRow = (index) => {
     renderRows();
 };
 
-/* --- PDF LOGIC --- */
+/* --- PDF: mismo tarifario completo que dashboard / animales / reactivos --- */
 function setupPDFButton() {
     const btn = document.getElementById('btn-tarifario');
     const lbl = document.getElementById('lbl-tarifario-titulo');
-    if (!btn || !dataFull) return;
+    if (!btn) return;
 
-    const titulo = (dataFull.institucion && dataFull.institucion.tituloprecios) 
+    const titulo = (dataFull && dataFull.institucion && dataFull.institucion.tituloprecios)
         ? dataFull.institucion.tituloprecios : 'VER TARIFARIO';
-    if(lbl) lbl.innerText = titulo;
-    
+    if (lbl) lbl.innerText = titulo;
+
     btn.classList.remove('d-none');
-    btn.onclick = () => generateInsumosPDF(dataFull);
-}
-
-function generateInsumosPDF(data) {
-    // CAMBIO: Usamos el nombre real de la institución target
-    const inst = (data.institucion && data.institucion.NombreInst) 
-                 ? data.institucion.NombreInst.toUpperCase() 
-                 : (localStorage.getItem('NombreInst') || 'INSTITUCIÓN');
-
-    const fecha = new Date().toLocaleDateString();
-    
-    const rows = data.insumos.map(i => `
-        <tr>
-            <td style="padding: 6px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${i.CantidadInsumo} ${i.TipoInsumo}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">$ ${i.PrecioInsumo}</td>
-        </tr>
-    `).join('');
-
-    const template = `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <div style="text-align: center; border-bottom: 2px solid #0d6efd; margin-bottom: 20px;">
-                <h2 style="color: #0d6efd; margin: 0;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0;">TARIFARIO DE INSUMOS</h4>
-                <p style="font-size: 11px;">Fecha: ${fecha}</p>
-            </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                <tr style="background: #f8f9fa;"><th>Nombre</th><th>Presentación</th><th>Precio</th></tr>
-                ${rows}
-            </table>
-        </div>`;
-
-    html2pdf().set({ margin: 10, filename: `Insumos_${inst}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
+    btn.onclick = async () => {
+        try {
+            const mod = await import('../../../services/PreciosService.js');
+            if (mod.PreciosService && mod.PreciosService.downloadUniversalPDF) {
+                await mod.PreciosService.downloadUniversalPDF();
+            }
+        } catch (e) {
+            console.error('Error al abrir tarifario:', e);
+        }
+    };
 }
 
 /* --- ENVÍO --- */

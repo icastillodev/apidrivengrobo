@@ -5,6 +5,7 @@ let allInsumos = [];
 let currentPage = 1;
 const rowsPerPage = 15;
 window.catalogoInsumos = []; // Global para acceso desde addItemRow
+let openedInsumoFromUrl = false;
 
 /**
  * 1. INICIALIZACIÓN
@@ -51,6 +52,7 @@ export async function initInsumosPage() {
         if (res && res.status === 'success') {
             allInsumos = res.data;
             renderTable();
+            openInsumoFromUrlIfNeeded();
         }
     } catch (error) { 
         console.error("Error cargando insumos:", error); 
@@ -68,6 +70,19 @@ export async function initInsumosPage() {
     
     const btnExcel = document.getElementById('btn-excel-insumo');
     if(btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
+}
+
+function openInsumoFromUrlIfNeeded() {
+    if (openedInsumoFromUrl) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const action = (params.get('action') || '').toLowerCase();
+    if (!id || (action && action !== 'view' && action !== 'edit')) return;
+
+    const insumo = allInsumos.find(i => String(i.idformA) === String(id));
+    if (!insumo) return;
+    openedInsumoFromUrl = true;
+    setTimeout(() => window.openInsumoModal(insumo), 200);
 }
 
 /**

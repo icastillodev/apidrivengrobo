@@ -63,4 +63,12 @@ class AlojamientoExportModel {
 
         return $data;
     }
+
+    /** Para exportación pública por token: devuelve [ 'historia' => int, 'instId' => int ] o null */
+    public function getHistoriaAndInstByToken($codigoToken) {
+        $stmt = $this->db->prepare("SELECT historia, IdInstitucion as instId FROM qralojamiento WHERE codigo = ? LIMIT 1");
+        $stmt->execute([$codigoToken]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
 }

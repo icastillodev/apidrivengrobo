@@ -38,6 +38,45 @@ export async function initUserProtocols() {
         searchInput.onkeyup = (e) => { if(e.key === 'Enter') applyFilters(); };
     }
     document.getElementById('form-new-prot').onsubmit = saveProtocol;
+
+    const hash = (window.location.hash || '').replace('#', '');
+    if (hash === 'network') {
+        setTimeout(() => { switchView('network'); }, 150);
+    } else if (hash === 'new') {
+        setTimeout(() => { openNewProtocolModal(); }, 300);
+    }
+
+    const btnAyuda = document.getElementById('btn-ayuda-protocolos');
+    if (btnAyuda) btnAyuda.onclick = openAyudaProtocolosModal;
+    const linkAyudaInline = document.getElementById('link-ayuda-inline');
+    if (linkAyudaInline) linkAyudaInline.onclick = openAyudaProtocolosModal;
+}
+
+function openAyudaProtocolosModal() {
+    const content = document.getElementById('ayuda-protocolos-content');
+    if (!content) return;
+    const hasNetwork = !!(store.formDataCache && store.formDataCache.has_network);
+    if (hasNetwork) {
+        content.innerHTML = `
+            <p class="small text-muted mb-3">Tu institución forma parte de una <strong>red</strong>. Podés tener protocolos disponibles de dos formas:</p>
+            <ul class="small text-start mb-3">
+                <li><strong>Solicitar Nuevo (Interno):</strong> Crear un protocolo en esta institución. Una vez aprobado por la administración, podrás usarlo en formularios y, si querés, <strong>solicitarlo en la red</strong> para usarlo en otras instituciones.</li>
+                <li><strong>Solicitar en OTRA Institución (Red):</strong> Crear un nuevo protocolo que se gestionará en otra institución de la red.</li>
+                <li><strong>Solicitar Aprobación en RED:</strong> Si ya tenés un protocolo propio <strong>aprobado y vigente</strong>, podés pedir que quede disponible en otras instituciones de la red. Solo aparecen protocolos que cumplan esos requisitos.</li>
+            </ul>
+            <div class="alert alert-secondary py-2 px-3 small text-start mb-0">
+                <i class="bi bi-info-circle me-1"></i> <strong>Para usar la red</strong> necesitás al menos un protocolo propio aprobado y vigente. Si no tenés, creá uno con &quot;Solicitar Nuevo (Interno)&quot; y una vez aprobado podrás compartirlo en la red.
+            </div>`;
+    } else {
+        content.innerHTML = `
+            <p class="small text-muted mb-3">Tu institución <strong>no pertenece a una red</strong>.</p>
+            <ul class="small text-start mb-0">
+                <li><strong>Solicitar Nuevo (Interno):</strong> Creá un protocolo en esta institución. Una vez enviada la solicitud, la administración la revisará y, al aprobarla, podrás usar ese protocolo en formularios de animales, reactivos e insumos.</li>
+            </ul>
+            <p class="small text-muted mt-3 mb-0">Para usar formularios necesitás al menos un protocolo aprobado y vigente en esta institución.</p>`;
+    }
+    const modalEl = document.getElementById('modal-ayuda-protocolos');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
 }
 
 // Window Assignments
@@ -51,6 +90,7 @@ window.openCreateExternalModal = openCreateExternalModal;
 window.loadExternalConfig = loadExternalConfig;
 window.addNewSpeciesRow = addNewSpeciesRow;
 window.openNetworkRequestModal = openNetworkRequestModal;
+window.openAyudaProtocolosModal = openAyudaProtocolosModal;
 window.filterMyProtocols = filterMyProtocols;
 window.showProtDetails = showProtDetails;
 window.checkNetBtn = checkNetBtn;

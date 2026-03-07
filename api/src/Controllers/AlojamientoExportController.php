@@ -36,6 +36,39 @@ class AlojamientoExportController {
         }
     }
 
+    /** Exportación pública por token (sin sesión): para "Sacar historia PDF" desde la vista QR */
+    public function publicExport() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $token = $_GET['token'] ?? '';
+        if (empty($token) || strlen($token) !== 6) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Token inválido']);
+            exit;
+        }
+
+        try {
+            $info = $this->model->getHistoriaAndInstByToken($token);
+            if (!$info) {
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => 'Enlace revocado o no encontrado']);
+                exit;
+            }
+            $data = $this->model->getExportData(
+                $info['instId'],
+                (string)$info['historia'],
+                'true',
+                'true'
+            );
+            echo json_encode(['status' => 'success', 'data' => $data, 'historia' => (int)$info['historia']]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     private function generateCSV($data, $historiaId) {
         $filename = "Reporte_Alojamientos_" . $historiaId . "_" . date('Ymd') . ".csv";
         header('Content-Type: text/csv; charset=utf-8');

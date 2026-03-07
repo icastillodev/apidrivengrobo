@@ -319,6 +319,14 @@ async init() {
 
 autoRedirectIfLogged(role) {
         if (!this.getVal('token')) return;
+
+        // 🚀 VOLVER AL QR (o cualquier URL guardada antes del login)
+        const redirectUrl = localStorage.getItem('redirectAfterLogin');
+        if (redirectUrl && redirectUrl.length > 5) {
+            localStorage.removeItem('redirectAfterLogin');
+            window.location.href = redirectUrl;
+            return;
+        }
         
         let basePath = '/';
         const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');

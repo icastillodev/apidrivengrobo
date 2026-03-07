@@ -4,6 +4,7 @@ let protocolsList = [];
 let insumosList = [];
 let userEmail = "";
 let dataFull = null; // Para el PDF
+let protocolHelpConfig = { has_network: false, has_approved_vigent: false };
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 /* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
@@ -62,10 +63,82 @@ export async function initReactivosForm() {
             setupSearch();
             setupInsumosDropdown();
         }
+
+        const resConfig = await API.request(`/user/protocols/config?inst=${instId}`);
+        if (resConfig && resConfig.status === 'success' && resConfig.data) {
+            protocolHelpConfig.has_network = !!resConfig.data.has_network;
+        }
+        const resLists = await API.request(`/user/protocols/all-lists?inst=${instId}&uid=${userId}`);
+        if (resLists && resLists.status === 'success' && resLists.data && Array.isArray(resLists.data.my)) {
+            const today = new Date().toISOString().split('T')[0];
+            protocolHelpConfig.has_approved_vigent = resLists.data.my.some(p =>
+                p.Aprobado == 1 && (!p.Vencimiento || p.Vencimiento >= today)
+            );
+        }
+        setupProtocolHelpModal();
     } catch (e) { console.error("Error init:", e); }
 
     document.querySelectorAll('.qty-input').forEach(i => i.addEventListener('input', calculateTotal));
     document.getElementById('reactivos-form').onsubmit = handleReview;
+}
+
+function getMisProtocolosUrl(hash = '') {
+    const url = `${window.location.origin}${basePath}paginas/usuario/misprotocolos.html`;
+    return hash ? `${url}${hash}` : url;
+}
+
+function setupProtocolHelpModal() {
+    const descEl = document.getElementById('protocol-help-desc');
+    const leyendaEl = document.getElementById('protocol-help-leyenda-red');
+    const btnVer = document.getElementById('btn-protocol-help-ver');
+    const btnSolicitar = document.getElementById('btn-protocol-help-solicitar');
+    if (!descEl || !btnVer || !btnSolicitar) return;
+
+    if (protocolHelpConfig.has_network) {
+        descEl.innerHTML = '<strong><i class="bi bi-globe me-1"></i> Tu institución forma parte de una red.</strong><br class="mb-1">Podés tener protocolos disponibles aquí de dos formas: <strong>solicitando que un protocolo ya aprobado en otra institución de la red</strong> quede disponible en esta sede, o <strong>creando una nueva solicitud de protocolo</strong> en esta institución. Ambas opciones se gestionan desde Mis Protocolos.';
+        if (leyendaEl) {
+            if (protocolHelpConfig.has_approved_vigent) {
+                leyendaEl.classList.add('d-none');
+                leyendaEl.innerHTML = '';
+            } else {
+                leyendaEl.classList.remove('d-none');
+                leyendaEl.innerHTML = '<small class="text-muted"><i class="bi bi-info-circle me-1"></i> <strong>¿Por qué no podés usar la red?</strong> Solo podés solicitar un protocolo en la red si tenés al menos un protocolo <strong>propio aprobado y vigente</strong>. Creá uno nuevo (Solicitar Nuevo Interno) y, una vez aprobado, podrás solicitarlo en otras instituciones de la red desde Mis Protocolos.</small>';
+            }
+        }
+    } else {
+        descEl.innerHTML = '<strong>Tu institución no pertenece a una red.</strong><br class="mb-1">Para usar formularios necesitás un protocolo aprobado en esta institución. Creá uno nuevo desde Mis Protocolos o seguí el procedimiento de tu institución para solicitar la aprobación.';
+        if (leyendaEl) { leyendaEl.classList.add('d-none'); leyendaEl.innerHTML = ''; }
+    }
+
+    btnVer.onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById('modal-protocol-help'))?.hide();
+        window.location.href = getMisProtocolosUrl();
+    };
+
+    btnSolicitar.onclick = () => {
+        bootstrap.Modal.getInstance(document.getElementById('modal-protocol-help'))?.hide();
+        if (protocolHelpConfig.has_network && protocolHelpConfig.has_approved_vigent) {
+            if (typeof window.Swal !== 'undefined') {
+                window.Swal.fire({
+                    title: '¿Qué deseas hacer?',
+                    html: 'Podés <strong>solicitar tu protocolo ya creado en otra institución de la red</strong> para usarlo aquí, o <strong>crear un nuevo protocolo</strong> en esta institución.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Solicitar en la red',
+                    cancelButtonText: 'Crear nuevo protocolo',
+                    confirmButtonColor: '#0d6efd',
+                    cancelButtonColor: '#1a5d3b'
+                }).then((res) => {
+                    if (res.isConfirmed) window.location.href = getMisProtocolosUrl('#network');
+                    else window.location.href = getMisProtocolosUrl('#new');
+                });
+            } else {
+                window.location.href = getMisProtocolosUrl();
+            }
+        } else {
+            window.location.href = getMisProtocolosUrl('#new');
+        }
+    };
 }
 
 /* --- BÚSQUEDA --- */
@@ -181,110 +254,39 @@ function calculateTotal() {
     document.getElementById('qty-total').value = m + f + i;
 }
 
-/* --- LOGICA PDF (GLOBAL) --- */
+/* --- LOGICA PDF (tarifario completo igual que dashboard/animales/insumos) --- */
 function setupPDFButton() {
     const btn = document.getElementById('btn-tarifario');
     const lbl = document.getElementById('lbl-tarifario-titulo');
-    if (!btn || !dataFull) return;
+    if (!btn) return;
 
-    const titulo = (dataFull.institucion && dataFull.institucion.tituloprecios) 
+    const titulo = (dataFull && dataFull.institucion && dataFull.institucion.tituloprecios)
         ? dataFull.institucion.tituloprecios : 'VER TARIFARIO';
-    if(lbl) lbl.innerText = titulo;
-    
+    if (lbl) lbl.innerText = titulo;
+
     btn.classList.remove('d-none');
-    btn.onclick = generateGlobalPDF;
-}
-
-function generateGlobalPDF() {
-    if (!dataFull) return;
-
-    // Usamos el nombre real de la institución target
-    const inst = (dataFull.institucion && dataFull.institucion.NombreInst) 
-                 ? dataFull.institucion.NombreInst.toUpperCase() 
-                 : (localStorage.getItem('NombreInst') || 'INSTITUCIÓN');
-
-    const fechaActual = new Date().toLocaleDateString();
-    const tituloDoc = (dataFull.institucion && dataFull.institucion.tituloprecios) 
-        ? dataFull.institucion.tituloprecios 
-        : 'TARIFARIO OFICIAL';
-
-    let animalRows = '';
-    
-    if (dataFull.especies) {
-        dataFull.especies.forEach(e => {
-            const pAni = parseFloat(e.Panimal) || 0;
-            const pChi = parseFloat(e.PalojamientoChica) || 0;
-            const pGra = parseFloat(e.PalojamientoGrande) || 0;
-
-            if (pAni > 0 || pChi > 0 || pGra > 0) {
-                animalRows += `
-                    <tr style="background-color: #f2f2f2; font-weight: bold;">
-                        <td style="padding: 8px; border: 1px solid #ddd;">${e.EspeNombreA}</td>
-                        <td style="text-align: center; border: 1px solid #ddd;">${pAni > 0 ? '$ ' + pAni : '---'}</td>
-                        <td style="text-align: center; border: 1px solid #ddd;">${pChi > 0 ? '$ ' + pChi : '---'}</td>
-                        <td style="text-align: center; border: 1px solid #ddd;">${pGra > 0 ? '$ ' + pGra : '---'}</td>
-                    </tr>`;
-
-                if (dataFull.subespecies) {
-                    const sub = dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA) && parseFloat(s.Psubanimal) > 0 && String(s.Existe) !== "2");
-                    sub.forEach(s => {
-                        animalRows += `
-                            <tr>
-                                <td style="padding: 6px 6px 6px 30px; border: 1px solid #ddd; font-size: 11px;">└ ${s.SubEspeNombreA}</td>
-                                <td style="text-align: center; border: 1px solid #ddd; font-size: 11px;">$ ${s.Psubanimal}</td>
-                                <td colspan="2" style="border: 1px solid #ddd; background: #fafafa;"></td>
-                            </tr>`;
-                    });
-                }
+    btn.onclick = async () => {
+        try {
+            const mod = await import('../../../services/PreciosService.js');
+            if (mod.PreciosService && mod.PreciosService.downloadUniversalPDF) {
+                await mod.PreciosService.downloadUniversalPDF();
             }
-        });
-    }
-
-    const renderInsumoPDF = (lista) => {
-        if (!lista) return '';
-        return lista.filter(i => parseFloat(i.PrecioInsumo) > 0).map(i => `
-        <tr>
-            <td style="padding: 6px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">$ ${i.PrecioInsumo}</td>
-        </tr>`).join('');
+        } catch (e) {
+            console.error('Error al abrir tarifario:', e);
+        }
     };
-
-    const template = `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <div style="text-align: center; border-bottom: 2px solid #1a5d3b; margin-bottom: 20px;">
-                <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0; text-transform: uppercase;">${tituloDoc}</h4>
-                <p style="font-size: 11px; color: #666;">Fecha: ${fechaActual}</p>
-            </div>
-            <div style="margin-bottom: 10px; font-weight: bold; color: #1a5d3b;">ALOJAMIENTO: CAJA CHICA Y CAJA GRANDE</div>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px;">
-                <thead>
-                    <tr style="background: #1a5d3b; color: white;">
-                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">ESPECIE / VARIEDAD</th>
-                        <th>PRECIO ANIMAL</th><th>CAJA CHICA</th><th>CAJA GRANDE</th>
-                    </tr>
-                </thead>
-                <tbody>${animalRows}</tbody>
-            </table>
-            <h4 style="font-size: 14px; color: #0d6efd; border-bottom: 1px solid #eee;">INSUMOS EXPERIMENTALES</h4>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
-                <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
-                ${renderInsumoPDF(dataFull.insumosExp)}
-            </table>
-            <h4 style="font-size: 14px; color: #6c757d; border-bottom: 1px solid #eee;">INSUMOS COMUNES</h4>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
-                <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
-                ${renderInsumoPDF(dataFull.insumos)}
-            </table>
-            <div style="padding: 10px; background: #fff4f4; border: 1px solid #f5c2c2; font-size: 14px;">
-                <strong>JORNAL DE TRABAJO EXPERIMENTAL:</strong> 
-                <span style="color: #d9534f; font-weight: bold; float: right;">$ ${dataFull.institucion.PrecioJornadaTrabajoExp || 0}</span>
-            </div>
-        </div>`;
-
-    html2pdf().set({ margin: 10, filename: `Tarifario_${inst}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
 }
+
+window.generateGlobalPDF = async () => {
+    try {
+        const mod = await import('../../../services/PreciosService.js');
+        if (mod.PreciosService && mod.PreciosService.downloadUniversalPDF) {
+            await mod.PreciosService.downloadUniversalPDF();
+        }
+    } catch (e) {
+        console.error('Error al abrir tarifario:', e);
+    }
+};
 
 /* --- SUBMIT --- */
 async function handleReview(e) {

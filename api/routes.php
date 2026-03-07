@@ -58,8 +58,13 @@ $router->post('/ia/procesar', 'AiController@processCommand');
 $router->get('/users/institution', 'UserController@index'); 
 $router->get('/users/protocols', 'UserController@getProtocols'); 
 $router->get('/users/forms', 'UserController@getForms');       
+$router->get('/users/alojamientos', 'UserController@getAlojamientos');
+$router->get('/users/protocols-used-in-forms', 'UserController@getProtocolsUsedInFormsForUser');
+$router->get('/users/insumos-pedidos', 'UserController@getInsumosPedidosForUser');
+$router->get('/users/insumos-exp-pedidos', 'UserController@getInsumosExperimentalesPedidosForUser');
 $router->post('/users/update', 'UserController@update');      
 $router->post('/users/reset-pass', 'UserController@resetPassword'); 
+$router->post('/users/delete', 'UserController@delete');
 $router->get('/users/list-investigators', 'UserController@listInvestigators'); // Selector de investigadores
 
 // ============================================================
@@ -67,6 +72,9 @@ $router->get('/users/list-investigators', 'UserController@listInvestigators'); /
 // ============================================================
 $router->get('/user/my-forms', 'UserFormsController@getMyForms');
 $router->get('/user/form-detail/:id', 'UserFormsController@getFormDetail');
+$router->get('/user/protocols-used-in-forms', 'UserFormsController@getProtocolsUsedInForms');
+$router->get('/user/insumos-pedidos', 'UserFormsController@getInsumosPedidos');
+$router->get('/user/insumos-exp-pedidos', 'UserFormsController@getInsumosExperimentalesPedidos');
 
 // ============================================================
 // SECCIÓN: Mis Protocolos (Visor Unificado)
@@ -226,6 +234,7 @@ $router->post('/trazabilidad/clone-past-boxes', 'TrazabilidadController@clonePas
 $router->post('/alojamiento/update-price', 'AlojamientoController@updatePrice');
 $router->get('/alojamiento/tipos-por-especie', 'AlojamientoController@getTiposPorEspecie');
 $router->get('/alojamiento/export', 'AlojamientoExportController@export');
+$router->get('/alojamiento/public-export', 'AlojamientoExportController@publicExport');
 
 // ============================================================
 // SECCIÓN: Facturación y Cobranzas (Billing)
@@ -348,6 +357,7 @@ $router->post('/admin/config/institution/update', 'AdminConfigInstitutionControl
 $router->post('/admin/config/institution/service/add', 'AdminConfigInstitutionController@add_service');
 $router->post('/admin/config/institution/service/delete', 'AdminConfigInstitutionController@delete_service');
 $router->post('/admin/config/institution/service/toggle', 'AdminConfigInstitutionController@toggle_service');
+$router->post('/admin/config/institution/service/update', 'AdminConfigInstitutionController@update_service');
 
 // ============================================================
 // ADMIN: CONFIGURACIÓN DEPARTAMENTOS Y ORGANISMOS

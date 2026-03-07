@@ -73,12 +73,14 @@ async toggleRow(idAlojamiento, idEspecie) {
             html += `<div class="col-12 text-center text-muted fst-italic">No hay estructuras instanciadas en este tramo.</div>`;
         } else {
             data.cajas.forEach(caja => {
+                const ubicacion = (caja.Detalle || '').trim();
                 html += `
                 <div class="col-md-12 mb-3">
                     <div class="card border-primary shadow-sm">
                         <div class="card-header bg-primary text-white py-1 small fw-bold d-flex justify-content-between align-items-center">
                             <span>
                                 <i class="bi bi-box-seam me-1"></i> ${caja.NombreCaja}
+                                ${ubicacion ? `<span class="ms-2 opacity-90 small">📍 ${ubicacion}</span>` : ''}
                                 ${!isReadOnly ? `<button class="btn btn-xs btn-link text-white p-0 ms-2" onclick="window.TrazabilidadUI.renameBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil"></i></button>` : ''}
                             </span>
                             ${!isReadOnly ? `<button class="btn btn-xs btn-danger" onclick="window.TrazabilidadUI.deleteBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${caja.unidades ? caja.unidades.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-trash"></i></button>` : ''}

@@ -91,4 +91,78 @@ class UserFormsModel {
             'details' => $details
         ];
     }
+
+    /**
+     * Protocolos que el usuario utilizó en sus formularios.
+     * animales_usados = solo formularios ENTREGADOS (sexoe.totalA).
+     */
+    public function getProtocolsUsedInForms($userId) {
+        $sql = "SELECT p.idprotA, p.nprotA, p.tituloA, p.FechaFinProtA, p.CantidadAniA as cupo_restante,
+                (SELECT COALESCE(SUM(s.totalA), 0) 
+                 FROM protformr pf2 
+                 JOIN formularioe f2 ON pf2.idformA = f2.idformA AND f2.estado = 'Entregado'
+                 JOIN sexoe s ON f2.idformA = s.idformA 
+                 WHERE pf2.idprotA = p.idprotA AND f2.IdUsrA = ?) as animales_usados
+                FROM protocoloexpe p
+                INNER JOIN protformr pf ON p.idprotA = pf.idprotA
+                INNER JOIN formularioe f ON pf.idformA = f.idformA
+                WHERE f.IdUsrA = ?
+                GROUP BY p.idprotA, p.nprotA, p.tituloA, p.FechaFinProtA, p.CantidadAniA
+                ORDER BY p.nprotA ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$userId, $userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Insumos pedidos por el usuario (formularios categoría Insumos con ítems).
+     * Incluye institución por formulario.
+     */
+    public function getInsumosPedidosByUser($userId) {
+        $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.estado, f.IdInstitucion,
+                i.NombreInst as NombreInstitucion
+                FROM formularioe f
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+                WHERE f.IdUsrA = ? AND tf.categoriaformulario = 'Insumos'
+                ORDER BY f.idformA DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$userId]);
+        $forms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($forms as $row) {
+            $itemsSql = "SELECT i.NombreInsumo, fi.cantidad,
+                         i.CantidadInsumo as PresentacionCant, i.TipoInsumo as PresentacionTipo
+                         FROM forminsumo fi
+                         JOIN insumo i ON fi.IdInsumo = i.idInsumo
+                         JOIN precioinsumosformulario pif ON fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario
+                         WHERE pif.idformA = ?";
+            $stItems = $this->db->prepare($itemsSql);
+            $stItems->execute([$row['idformA']]);
+            $row['items'] = $stItems->fetchAll(PDO::FETCH_ASSOC);
+            $out[] = $row;
+        }
+        return $out;
+    }
+
+    /**
+     * Insumos experimentales (reactivos) pedidos por el usuario.
+     * Incluye institución. Campos: insumo, tipo/cantidad presentación, cantidad pedida, institución.
+     */
+    public function getInsumosExperimentalesPedidosByUser($userId) {
+        $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.estado,
+                ie.NombreInsumo, ie.CantidadInsumo as PresentacionCant, ie.TipoInsumo as PresentacionTipo,
+                COALESCE(s.organo, 0) as Cantidad,
+                f.IdInstitucion, i.NombreInst as NombreInstitucion
+                FROM formularioe f
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+                LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
+                LEFT JOIN sexoe s ON f.idformA = s.idformA
+                WHERE f.IdUsrA = ? AND tf.categoriaformulario = 'Otros reactivos biologicos'
+                ORDER BY f.idformA DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

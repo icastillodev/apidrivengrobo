@@ -6,8 +6,10 @@
     <title>Panel de Administración - Gecko Dev</title>
     
    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
 
@@ -16,9 +18,12 @@
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
         .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
         .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
-        /* Ajuste para que el modal de Bootstrap no se vea afectado por Tailwind */
         .modal-backdrop { z-index: 1040 !important; }
         .modal { z-index: 1050 !important; }
+        /* SweetAlert2 por encima del modal y input clickeable */
+        .swal2-container { z-index: 11000 !important; }
+        .swal2-popup { z-index: 11001 !important; }
+        .swal2-input, .swal2-input:focus { pointer-events: auto !important; }
     </style>
 
     <script type="module">
@@ -30,7 +35,7 @@
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage } from '../../dist/js/utils/i18n.js';
         // Lógica administrativa de usuarios (Alta, baja, modificación y asignación de roles)
-        import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js';
+        import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js?v=3';
 
 
         showLoader();
@@ -94,7 +99,7 @@
                     
                     <div class="input-group shadow-sm" style="max-width: 500px;">
                         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar:</span>
-                                <select id="filter-type" class="form-select form-select-sm fw-bold" style="max-width: 150px;">
+                                <select id="filter-type" title="Filtrar usuarios por campo" class="form-select form-select-sm fw-bold" style="max-width: 150px;">
                                     <option value="all">TODOS</option>
                                     <option value="IdUsrA">ID</option>
                                     <option value="Usuario">Usuario</option>

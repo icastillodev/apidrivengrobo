@@ -26,9 +26,42 @@ export async function initBillingInvestigador() {
         }
 
         await cargarListaInvestigadores();
+        autoLoadFromUrlParams();
     } catch (error) { 
         console.error("Error en init:", error); 
     } finally { hideLoader(); }
+}
+
+function autoLoadFromUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const idUsr = params.get('idUsr');
+    const all = params.get('all');
+    if (!idUsr) return;
+
+    const select = document.getElementById('sel-investigador');
+    if (select) {
+        // Si no existe opción en el select, la inyectamos para permitir carga directa desde Gestión de Usuarios
+        const exists = Array.from(select.options).some(o => String(o.value) === String(idUsr));
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = idUsr;
+            opt.textContent = `Investigador ID ${idUsr}`;
+            select.appendChild(opt);
+        }
+        select.value = idUsr;
+    }
+
+    if (String(all) === '1') {
+        // Historial completo por defecto
+        const fDesde = document.getElementById('f-desde');
+        const fHasta = document.getElementById('f-hasta');
+        if (fDesde) fDesde.value = '2000-01-01';
+        if (fHasta) fHasta.value = new Date().toISOString().split('T')[0];
+    }
+
+    setTimeout(() => {
+        window.cargarFacturacionInvestigador();
+    }, 150);
 }
 
 async function cargarListaInvestigadores() {
@@ -65,7 +98,9 @@ function vincularFiltroRealTime() {
 }
 
 window.cargarFacturacionInvestigador = async () => {
-    const idUsr = document.getElementById('sel-investigador').value;
+    const urlIdUsr = new URLSearchParams(window.location.search).get('idUsr');
+    const idUsrSelected = document.getElementById('sel-investigador').value;
+    const idUsr = idUsrSelected || urlIdUsr;
     const desde = document.getElementById('f-desde').value;
     const hasta = document.getElementById('f-hasta').value;
     const chkAni = document.getElementById('chk-animales').checked;

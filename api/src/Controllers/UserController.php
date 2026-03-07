@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Services\MailService;
 use App\Models\User\UserModel;
+use App\Models\UserForms\UserFormsModel;
 use App\Utils\Auditoria;
 use PDO;
 
@@ -55,13 +56,138 @@ class UserController {
             $sesion = Auditoria::getDatosSesion();
             $id = $_GET['id'] ?? null;
 
-            $query = "SELECT idformA, fechainicioA, tipoA, estado 
-                      FROM formularioe 
-                      WHERE IdUsrA = ? AND IdInstitucion = ? 
+            $query = "SELECT 
+                        f.idformA,
+                        f.fechainicioA,
+                        f.tipoA,
+                        f.estado,
+                        pf.idprotA,
+                        tf.nombreTipo as TipoTramiteNombre,
+                        tf.categoriaformulario as CategoriaFormulario
+                      FROM formularioe f
+                      LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                      LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                      WHERE f.IdUsrA = ? AND f.IdInstitucion = ? 
                       ORDER BY fechainicioA DESC";
             $stmt = $this->db->prepare($query);
             $stmt->execute([$id, $sesion['instId']]);
             echo json_encode(['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getAlojamientos() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = $_GET['id'] ?? null;
+
+            $query = "SELECT
+                        a.historia,
+                        a.IdAlojamiento,
+                        a.fechavisado,
+                        a.hastafecha,
+                        a.totaldiasdefinidos,
+                        a.idprotA,
+                        p.nprotA,
+                        p.tituloA,
+                        e.EspeNombreA as Especie
+                      FROM alojamiento a
+                      LEFT JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                      LEFT JOIN especiee e ON a.TipoAnimal = e.idespA
+                      WHERE a.IdUsrA = ? AND a.IdInstitucion = ?
+                      ORDER BY a.fechavisado DESC, a.historia DESC";
+
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$id, $sesion['instId']]);
+            echo json_encode(['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Para admin: protocolos usados en formularios del usuario (animales utilizados).
+     */
+    public function getProtocolsUsedInFormsForUser() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = $_GET['id'] ?? null;
+            if (!$id) {
+                echo json_encode(['status' => 'error', 'message' => 'ID de usuario requerido']);
+                exit;
+            }
+            $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $stmt->execute([$id, $sesion['instId']]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado']);
+                exit;
+            }
+            $model = new UserFormsModel($this->db);
+            $list = $model->getProtocolsUsedInForms($id);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Para admin: insumos pedidos por el usuario.
+     */
+    public function getInsumosPedidosForUser() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = $_GET['id'] ?? null;
+            if (!$id) {
+                echo json_encode(['status' => 'error', 'message' => 'ID de usuario requerido']);
+                exit;
+            }
+            $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $stmt->execute([$id, $sesion['instId']]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado']);
+                exit;
+            }
+            $model = new UserFormsModel($this->db);
+            $list = $model->getInsumosPedidosByUser($id);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Para admin: insumos experimentales (reactivos) pedidos por el usuario.
+     */
+    public function getInsumosExperimentalesPedidosForUser() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = $_GET['id'] ?? null;
+            if (!$id) {
+                echo json_encode(['status' => 'error', 'message' => 'ID de usuario requerido']);
+                exit;
+            }
+            $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $stmt->execute([$id, $sesion['instId']]);
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado']);
+                exit;
+            }
+            $model = new UserFormsModel($this->db);
+            $list = $model->getInsumosExperimentalesPedidosByUser($id);
+            echo json_encode(['status' => 'success', 'data' => $list]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -115,6 +241,108 @@ class UserController {
                 'status' => $success ? 'success' : 'error',
                 'message' => $success ? 'Contraseña reseteada a 12345678' : 'No se pudo actualizar'
             ]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function delete() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $input = json_decode(file_get_contents('php://input'), true);
+            $id = (int)($input['id'] ?? 0);
+            $password = trim($input['password'] ?? '');
+
+            if ($id <= 0) {
+                throw new \Exception('ID de usuario inválido');
+            }
+            if ($id === (int)$sesion['userId']) {
+                throw new \Exception('No puedes eliminar tu propio usuario.');
+            }
+            if ($password === '') {
+                throw new \Exception('Debes ingresar tu contraseña para confirmar la eliminación.');
+            }
+
+            // Verificar contraseña del administrador que ejecuta la acción
+            $stmtPass = $this->db->prepare("SELECT password_secure FROM usuarioe WHERE IdUsrA = ?");
+            $stmtPass->execute([$sesion['userId']]);
+            $row = $stmtPass->fetch(PDO::FETCH_ASSOC);
+            if (!$row || !password_verify($password, $row['password_secure'])) {
+                throw new \Exception('Contraseña incorrecta. No se eliminó el usuario.');
+            }
+
+            // Solo dentro de la misma institución
+            $stmtUsr = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $stmtUsr->execute([$id, $sesion['instId']]);
+            if (!$stmtUsr->fetch(PDO::FETCH_ASSOC)) {
+                throw new \Exception('Usuario no encontrado en esta institución.');
+            }
+
+            // Solo se pueden eliminar investigadores (IdTipousrA = 3)
+            $stmtTipo = $this->db->prepare("SELECT IdTipousrA FROM tienetipor WHERE IdUsrA = ? LIMIT 1");
+            $stmtTipo->execute([$id]);
+            $tipoRow = $stmtTipo->fetch(PDO::FETCH_ASSOC);
+            $idTipo = $tipoRow ? (int)$tipoRow['IdTipousrA'] : 0;
+            if ($idTipo !== 3) {
+                throw new \Exception('Solo se pueden eliminar usuarios con rol de investigador.');
+            }
+
+            // Dependencias: no eliminar si tiene formularios, protocolos o alojamientos
+            $countFormsStmt = $this->db->prepare("SELECT COUNT(*) FROM formularioe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $countFormsStmt->execute([$id, $sesion['instId']]);
+            $forms = (int)$countFormsStmt->fetchColumn();
+
+            $countProtStmt = $this->db->prepare("SELECT COUNT(*) FROM protocoloexpe WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $countProtStmt->execute([$id, $sesion['instId']]);
+            $protocols = (int)$countProtStmt->fetchColumn();
+
+            $countAlojStmt = $this->db->prepare("SELECT COUNT(*) FROM alojamiento WHERE IdUsrA = ? AND IdInstitucion = ?");
+            $countAlojStmt->execute([$id, $sesion['instId']]);
+            $alojamientos = (int)$countAlojStmt->fetchColumn();
+
+            if ($forms > 0 || $protocols > 0 || $alojamientos > 0) {
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'No se puede eliminar: el usuario tiene registros asociados.',
+                    'details' => [
+                        'formularios' => $forms,
+                        'protocolos' => $protocols,
+                        'alojamientos' => $alojamientos
+                    ]
+                ]);
+                exit;
+            }
+
+            // Datos del usuario eliminado para la bitácora (antes de borrarlo)
+            $stmtInfo = $this->db->prepare("
+                SELECT u.UsrA, COALESCE(p.NombreA, '') as NombreA, COALESCE(p.ApellidoA, '') as ApellidoA 
+                FROM usuarioe u 
+                LEFT JOIN personae p ON p.IdUsrA = u.IdUsrA 
+                WHERE u.IdUsrA = ?
+            ");
+            $stmtInfo->execute([$id]);
+            $infoEliminado = $stmtInfo->fetch(PDO::FETCH_ASSOC);
+            $loginEliminado = $infoEliminado['UsrA'] ?? 'N/A';
+            $nombreEliminado = trim(($infoEliminado['NombreA'] ?? '') . ' ' . ($infoEliminado['ApellidoA'] ?? '')) ?: 'Sin nombre';
+
+            // Registrar en bitácora ANTES de eliminar (trazabilidad con contraseña confirmada)
+            Auditoria::logManual(
+                $this->db,
+                $sesion['userId'],
+                'DELETE_USER',
+                'usuarioe',
+                "Eliminó usuario ID: $id | login: $loginEliminado | $nombreEliminado | confirmado con contraseña de admin."
+            );
+
+            // Eliminación real en base de datos (actividade y usuarioe)
+            $this->db->prepare("DELETE FROM actividade WHERE IdUsrA = ?")->execute([$id]);
+            $stmtDel = $this->db->prepare("DELETE FROM usuarioe WHERE IdUsrA = ?");
+            $stmtDel->execute([$id]);
+
+            echo json_encode(['status' => 'success', 'message' => 'Usuario eliminado correctamente de la base de datos.']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

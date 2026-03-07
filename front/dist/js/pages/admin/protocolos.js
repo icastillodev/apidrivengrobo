@@ -5,6 +5,7 @@ let currentPage = 1;
 const rowsPerPage = 15;
 let sortConfig = { key: 'idprotA', direction: 'desc' };
 let formDataCache = null; // Cache para configuración y listas (Usuarios, Deptos, etc.)
+let openedFromUrl = false;
 
 export async function initProtocolosPage() {
     const instId = localStorage.getItem('instId');
@@ -35,6 +36,7 @@ export async function initProtocolosPage() {
             updateStatsBar();
             renderTableHeader();
             renderTable();
+            openProtocolFromUrlIfNeeded();
         }
     } catch (error) { console.error("❌ Error:", error); }
 
@@ -56,6 +58,19 @@ export async function initProtocolosPage() {
     if (btnAyuda) {
         btnAyuda.onclick = () => new bootstrap.Modal(document.getElementById('modal-protocol-help')).show();
     }
+}
+
+function openProtocolFromUrlIfNeeded() {
+    if (openedFromUrl) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const action = (params.get('action') || '').toLowerCase();
+    if (!id || (action && action !== 'view' && action !== 'edit')) return;
+
+    const protocol = allProtocols.find(p => String(p.idprotA) === String(id));
+    if (!protocol) return;
+    openedFromUrl = true;
+    setTimeout(() => window.openProtocolModal(protocol), 200);
 }
 
 // --- LÓGICA DE FILTROS DINÁMICOS ---

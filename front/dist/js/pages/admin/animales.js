@@ -8,6 +8,7 @@ let currentPage = 1;
 const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
+let openedAnimalFromUrl = false;
 
 /**
  * INICIALIZACIÓN DE LA PÁGINA
@@ -29,6 +30,7 @@ export async function initAnimalesPage() {
             allAnimals = res.data;
             setupSortHeaders();
             renderTable();
+            openAnimalFromUrlIfNeeded();
         }
     } catch (error) { console.error("❌ Error:", error); }
 
@@ -65,6 +67,19 @@ document.addEventListener('focusin', (e) => {
     document.getElementById('btn-search-animal').onclick = () => { currentPage = 1; renderTable(); };
     document.getElementById('filter-status-animal').onchange = () => { currentPage = 1; renderTable(); };
     document.getElementById('search-input-animal').onkeyup = (e) => { if (e.key === 'Enter') { currentPage = 1; renderTable(); } };
+}
+
+function openAnimalFromUrlIfNeeded() {
+    if (openedAnimalFromUrl) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const action = (params.get('action') || '').toLowerCase();
+    if (!id || (action && action !== 'view' && action !== 'edit')) return;
+
+    const animal = allAnimals.find(a => String(a.idformA) === String(id));
+    if (!animal) return;
+    openedAnimalFromUrl = true;
+    setTimeout(() => window.openAnimalModal(animal), 200);
 }
 
 /**

@@ -69,6 +69,21 @@
         .network-option:hover { background-color: #e9ecef; border-color: #adb5bd; }
         .network-option.selected { background-color: #cfe2ff; border-color: #0d6efd; }
         .cursor-help { cursor: help; }
+        /* Mejoras mobile: filtros y dropdown */
+        @media (max-width: 768px) {
+            .container { max-width: 100%; padding-left: 0.75rem; padding-right: 0.75rem; }
+            #view-tabs { flex-wrap: wrap; gap: 0.25rem; }
+            #view-tabs .nav-link { padding: 0.5rem 0.75rem !important; font-size: 0.7rem; }
+            .input-group { flex-wrap: wrap !important; }
+            .input-group .form-select { max-width: 100% !important; min-height: 44px; }
+            .input-group .form-control { min-height: 44px; }
+            .input-group .btn { min-height: 44px; padding: 0.5rem 1rem; }
+            .input-group-text { min-height: 44px; }
+            .dropdown .btn { min-height: 44px; }
+            #btn-ayuda-protocolos { min-height: 44px; min-width: 44px; }
+            .table-responsive { font-size: 0.75rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .table th, .table td { padding: 0.5rem !important; white-space: nowrap; }
+        }
     </style>
 
 </head>
@@ -94,9 +109,12 @@
                     <li class="nav-item d-none" id="tab-network-li"><button class="nav-link px-4 small uppercase" onclick="window.switchView('network')"><i class="bi bi-globe me-2"></i> Red / Multicentro</button></li>
                 </ul>
 
-                <div class="dropdown">
+                <div class="dropdown d-flex align-items-center gap-2">
                     <button class="btn btn-primary fw-bold shadow-sm dropdown-toggle px-4" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-plus-circle me-2"></i> SOLICITUD PROTOCOLO
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btn-ayuda-protocolos" title="¿Cómo funciona?">
+                        <i class="bi bi-question-circle fs-5"></i>
                     </button>
                     <ul class="dropdown-menu shadow border-0 mt-1 p-2">
                         <li>
@@ -121,9 +139,9 @@
 
             <div class="row align-items-end mb-3 border-bottom pb-3">
                 <div class="col-12">
-                    <div class="input-group shadow-sm">
+                    <div class="input-group shadow-sm flex-nowrap flex-md-wrap">
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
-                            <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
+                            <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;" title="Campo por el que filtrar">
                                 <option value="all">Todo (Texto)</option>
                                 <option value="idprotA">ID Protocolo</option>
                                 <option value="IdUsrA">ID Usuario</option>
@@ -134,11 +152,12 @@
                                 <option value="Origen">Origen</option>
                                 <option value="Estado" id="opt-filter-estado" class="d-none">Estado</option>
                             </select>
-                        <div id="dynamic-search-container" class="flex-grow-1">
+                        <div id="dynamic-search-container" class="flex-grow-1 min-width-0">
                             <input type="text" id="search-input" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">
                         </div>
                         <button id="btn-search" class="btn btn-dark fw-bold px-3"><i class="bi bi-search"></i></button>
                     </div>
+                    <p class="small text-muted mt-1 mb-0"><i class="bi bi-info-circle me-1"></i> Use el filtro y el cuadro de búsqueda para encontrar protocolos. <button type="button" class="btn btn-link link-secondary p-0 small" id="link-ayuda-inline" title="Más ayuda"><strong>¿Cómo funciona?</strong></button></p>
                 </div>
             </div>
 
@@ -149,8 +168,8 @@
                             <th class="py-3 px-2">ID</th>
                             <th class="py-3 px-2">N° Prot.</th>
                             <th class="py-3 px-2">Título</th>
-                            <th class="py-3 px-2 text-primary">Responsable (Usuario)</th>
-                            <th class="py-3 px-2">Inv. Referente</th>
+                            <th class="py-3 px-2 text-primary">Responsable protocolo</th>
+                            <th class="py-3 px-2">Responsable de proyecto</th>
                             <th class="py-3 px-2 text-center">Tipo</th>
                             <th class="py-3 px-2 text-center">Origen</th>
                             <th class="py-3 px-2 text-center">Estado</th> 
@@ -205,7 +224,7 @@
                         <div class="row g-3">
                             <div class="col-md-9"><label class="form-label small fw-bold text-muted">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
                             <div class="col-md-3"><label class="form-label small fw-bold text-muted">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">INVESTIGADOR A CARGO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">RESPONSABLE DE PROYECTO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
                             <div class="col-md-6"><label class="form-label small fw-bold text-muted">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
                             <div class="col-md-4"><label class="form-label small fw-bold text-muted">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
                             <div class="col-md-4"><label class="form-label small fw-bold text-muted">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
@@ -224,6 +243,20 @@
                             <button type="submit" class="btn btn-primary px-5 fw-bold" id="btn-save-prot">ENVIAR SOLICITUD</button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-ayuda-protocolos" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-question-circle me-2"></i>¿Cómo funciona?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div id="ayuda-protocolos-content"></div>
                 </div>
             </div>
         </div>

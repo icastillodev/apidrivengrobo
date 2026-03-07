@@ -11,6 +11,7 @@ let currentPage = 1;
 const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
+let openedReactivoFromUrl = false;
 
 /**
  * 1. INICIALIZACIÓN DE PÁGINA DE REACTIVOS
@@ -48,6 +49,7 @@ export async function initReactivosPage() {
             allReactivos = res.data;
             setupSortHeaders();
             renderTable();
+            openReactivoFromUrlIfNeeded();
 
             // LÓGICA DE RE-APERTURA POST-RECARGA
             // Se ejecuta aquí dentro para garantizar que 'allReactivos' ya tiene datos
@@ -80,6 +82,19 @@ export async function initReactivosPage() {
             if (e.key === 'Enter') { currentPage = 1; renderTable(); } 
         };
     }
+}
+
+function openReactivoFromUrlIfNeeded() {
+    if (openedReactivoFromUrl) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const action = (params.get('action') || '').toLowerCase();
+    if (!id || (action && action !== 'view' && action !== 'edit')) return;
+
+    const reactivo = allReactivos.find(r => String(r.idformA) === String(id));
+    if (!reactivo) return;
+    openedReactivoFromUrl = true;
+    setTimeout(() => window.openReactivoModal(reactivo), 200);
 }
 
 /**

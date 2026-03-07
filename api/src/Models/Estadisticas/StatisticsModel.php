@@ -96,6 +96,66 @@ class StatisticsModel {
         $stmtP->execute([$instId, $from, $to]);
         $res['detalle_protocolos'] = $stmtP->fetchAll(\PDO::FETCH_ASSOC);
 
+        // 7. ESTADÍSTICAS AMPLIADAS ALOJAMIENTO / TRAZABILIDAD
+        $res['alojamiento_trazabilidad'] = $this->getAlojamientoTrazabilidadStats($instId);
+
         return $res;
+    }
+
+    /**
+     * Estadísticas ampliadas: historias, cajas físicas, observaciones de trazabilidad, por especie.
+     */
+    public function getAlojamientoTrazabilidadStats($instId) {
+        $instId = (int) $instId;
+
+        // Total historias (agrupaciones de alojamiento)
+        $stmtH = $this->db->prepare("SELECT COUNT(DISTINCT a.historia) FROM alojamiento a WHERE a.IdInstitucion = ? AND a.historia IS NOT NULL");
+        $stmtH->execute([$instId]);
+        $total_historias = (int) $stmtH->fetchColumn();
+
+        // Total cajas físicas (alojamiento_caja)
+        $stmtC = $this->db->prepare("
+            SELECT COUNT(*) FROM alojamiento_caja ac
+            INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+            WHERE a.IdInstitucion = ?
+        ");
+        $stmtC->execute([$instId]);
+        $total_cajas = (int) $stmtC->fetchColumn();
+
+        // Total observaciones de trazabilidad
+        $stmtO = $this->db->prepare("
+            SELECT COUNT(*) FROM observacion_alojamiento_unidad o
+            INNER JOIN especie_alojamiento_unidad eu ON o.IdEspecieAlojUnidad = eu.IdEspecieAlojUnidad
+            INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+            INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+            WHERE a.IdInstitucion = ?
+        ");
+        $stmtO->execute([$instId]);
+        $total_observaciones = (int) $stmtO->fetchColumn();
+
+        // Alojamientos activos (ya lo tenemos en globales; por consistencia)
+        $stmtA = $this->db->prepare("SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion = ? AND a.finalizado = 0");
+        $stmtA->execute([$instId]);
+        $alojamientos_activos = (int) $stmtA->fetchColumn();
+
+        // Por especie (historias con alojamiento por especie)
+        $stmtE = $this->db->prepare("
+            SELECT e.EspeNombreA as especie, COUNT(DISTINCT a.historia) as historias, COUNT(a.IdAlojamiento) as tramos
+            FROM alojamiento a
+            INNER JOIN especiee e ON a.TipoAnimal = e.idespA
+            WHERE a.IdInstitucion = ?
+            GROUP BY e.EspeNombreA
+            ORDER BY historias DESC
+        ");
+        $stmtE->execute([$instId]);
+        $por_especie = $stmtE->fetchAll(\PDO::FETCH_ASSOC);
+
+        return [
+            'total_historias' => $total_historias,
+            'total_cajas' => $total_cajas,
+            'total_observaciones_trazabilidad' => $total_observaciones,
+            'alojamientos_activos' => $alojamientos_activos,
+            'por_especie' => $por_especie,
+        ];
     }
 }

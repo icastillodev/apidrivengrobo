@@ -75,6 +75,34 @@ export const DashboardUI = {
                     </div>
                 </div>
             </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.openTarifarioPDFDashboard()">
+                    <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-file-earmark-pdf fs-2"></i>
+                        </div>
+                        <h5 class="fw-black text-dark mb-1">Precios</h5>
+                        <span class="small text-muted fw-semibold">Tarifario vigente</span>
+                    </div>
+                    <div class="card-footer bg-light border-0 p-0">
+                        <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.openTarifarioPDFDashboard();">
+                            <i class="bi bi-file-earmark-pdf me-2"></i><span style="font-size: 11px;" class="tracking-widest">VER TARIFARIO</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         `;
+    }
+};
+
+window.openTarifarioPDFDashboard = async () => {
+    try {
+        const mod = await import('../../services/PreciosService.js');
+        if (mod?.PreciosService?.downloadUniversalPDF) {
+            mod.PreciosService.downloadUniversalPDF();
+        }
+    } catch (error) {
+        console.error('No se pudo abrir el tarifario PDF:', error);
     }
 };

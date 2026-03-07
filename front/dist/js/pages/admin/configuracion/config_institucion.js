@@ -158,6 +158,51 @@ export async function initConfigInstitution(instId) {
     };
 
     // ============================================================
+    // 5. MODAL DE EDICIÓN DE SERVICIO
+    // ============================================================
+    const editServiceModalEl = document.getElementById('modal-edit-service');
+    const editServiceModal = editServiceModalEl ? bootstrap.Modal.getOrCreateInstance(editServiceModalEl) : null;
+    const formEditService = document.getElementById('form-edit-service');
+    if (formEditService) {
+        formEditService.onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-srv-id').value;
+            const nombre = document.getElementById('edit-srv-nombre').value.trim();
+            const medida = document.getElementById('edit-srv-medida').value.trim();
+            const cant = document.getElementById('edit-srv-cant').value;
+
+            if (!id || !nombre) {
+                return Swal.fire('Atención', 'Faltan datos para modificar el servicio.', 'warning');
+            }
+
+            try {
+                const res = await API.request('/admin/config/institution/service/update', 'POST', {
+                    id,
+                    nombre,
+                    medida,
+                    cant
+                });
+
+                if (res.status === 'success') {
+                    editServiceModal?.hide();
+                    Swal.fire({
+                        title: 'Servicio actualizado',
+                        icon: 'success',
+                        timer: 1000,
+                        showConfirmButton: false
+                    });
+                    loadServices();
+                } else {
+                    Swal.fire('Error', res.message || 'No se pudo actualizar el servicio.', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                Swal.fire('Error', 'Error de conexión', 'error');
+            }
+        };
+    }
+
+    // ============================================================
     // FUNCIONES AUXILIARES
     // ============================================================
 
@@ -245,6 +290,14 @@ export async function initConfigInstitution(instId) {
                 </td>
 
                 <td class="text-end align-middle">
+                    <button class="btn btn-sm btn-link text-primary p-0 border-0 me-2 btn-edit-srv" 
+                        data-id="${s.IdServicioInst}" 
+                        data-nombre="${(s.NombreServicioInst || '').replace(/"/g, '&quot;')}"
+                        data-medida="${(s.MedidaServicioInst || '').replace(/"/g, '&quot;')}"
+                        data-cant="${s.CantidadPorMedidaInst || 1}"
+                        title="Modificar servicio">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
                     <button class="btn btn-sm btn-link text-danger p-0 border-0 btn-del-srv" 
                         data-id="${s.IdServicioInst}" title="Eliminar permanentemente">
                         <i class="bi bi-trash"></i>
@@ -312,6 +365,17 @@ export async function initConfigInstitution(instId) {
                         Swal.fire('Error', 'Error de conexión', 'error');
                     }
                 }
+            };
+        });
+
+        // 3. Botón Editar
+        tbody.querySelectorAll('.btn-edit-srv').forEach(el => {
+            el.onclick = function() {
+                document.getElementById('edit-srv-id').value = this.dataset.id || '';
+                document.getElementById('edit-srv-nombre').value = this.dataset.nombre || '';
+                document.getElementById('edit-srv-medida').value = this.dataset.medida || '';
+                document.getElementById('edit-srv-cant').value = this.dataset.cant || '1';
+                editServiceModal?.show();
             };
         });
     }

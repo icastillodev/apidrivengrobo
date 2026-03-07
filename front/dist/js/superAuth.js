@@ -168,6 +168,7 @@ async handleLogin(e) {
         localStorage.removeItem('userLevel');
         localStorage.removeItem('userName');
         localStorage.setItem('isLoggedIn', 'false');
-        window.location.href = getBasePath() + 'superadmin_login.html';
+        // Salida superadmin → groboapp.com
+        window.location.href = 'https://groboapp.com';
     }
 };

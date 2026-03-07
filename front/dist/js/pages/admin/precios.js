@@ -147,26 +147,26 @@ window.exportPreciosPDF = () => {
 
         if (hasContent) {
             animalRows += `
-                <tr style="background-color: #1a5d3b; color: white; font-weight: bold;">
-                    <td style="padding: 6px; border: 1px solid #ddd;" colspan="2">${e.EspeNombreA} (BASE)</td>
-                    <td style="text-align: center; border: 1px solid #ddd;">${parseFloat(e.Panimal) > 0 ? '$ ' + e.Panimal : '---'}</td>
+                <tr style="background-color: #1a5d3b; color: #fff; font-weight: bold;">
+                    <td style="padding: 6px; border: 1px solid #ddd; color: #fff;" colspan="2">${e.EspeNombreA} (BASE)</td>
+                    <td style="text-align: center; border: 1px solid #ddd; color: #fff;">${parseFloat(e.Panimal) > 0 ? '$ ' + e.Panimal : '---'}</td>
                 </tr>`;
 
             subs.filter(s => parseFloat(s.Psubanimal) > 0).forEach(s => {
                 animalRows += `
                     <tr style="background-color: #fcfcfc;">
-                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px;">└ VARIEDAD: ${s.SubEspeNombreA}</td>
-                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center;">Animal</td>
-                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px;">$ ${s.Psubanimal}</td>
+                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px; color: #000;">└ VARIEDAD: ${s.SubEspeNombreA}</td>
+                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center; color: #000;">Animal</td>
+                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px; color: #000;">$ ${s.Psubanimal}</td>
                     </tr>`;
             });
 
             aloj.filter(a => parseFloat(a.PrecioXunidad) > 0).forEach(a => {
                 animalRows += `
                     <tr>
-                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px; color:#b8860b;">└ ALOJ: ${a.NombreTipoAlojamiento} ${a.DetalleTipoAlojamiento ? `(${a.DetalleTipoAlojamiento})` : ''}</td>
-                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center; color:#b8860b;">Alojamiento</td>
-                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px; font-weight:bold;">$ ${a.PrecioXunidad}</td>
+                        <td style="padding: 4px 4px 4px 20px; border: 1px solid #ddd; font-size: 11px; color: #000;">└ ALOJ: ${a.NombreTipoAlojamiento} ${a.DetalleTipoAlojamiento ? `(${a.DetalleTipoAlojamiento})` : ''}</td>
+                        <td style="border: 1px solid #ddd; font-size: 10px; text-align:center; color: #000;">Alojamiento</td>
+                        <td style="text-align: center; border: 1px solid #ddd; font-size: 11px; font-weight:bold; color: #000;">$ ${a.PrecioXunidad}</td>
                     </tr>`;
             });
         }
@@ -174,58 +174,66 @@ window.exportPreciosPDF = () => {
 
     const renderInsumoPDF = (lista) => lista.filter(i => parseFloat(i.PrecioInsumo) > 0).map(i => `
         <tr>
-            <td style="padding: 4px; border: 1px solid #ddd;">${i.NombreInsumo}</td>
-            <td style="padding: 4px; border: 1px solid #ddd; text-align: center;">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
-            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold;">$ ${i.PrecioInsumo}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; color: #000;">${i.NombreInsumo}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; color: #000;">${i.CantidadInsumo || 0} ${i.TipoInsumo || ''}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${i.PrecioInsumo}</td>
         </tr>`).join('');
 
     const renderServiciosPDF = () => dataFull.servicios.filter(s => parseFloat(s.Precio) > 0).map(s => `
         <tr>
-            <td style="padding: 4px; border: 1px solid #ddd; color: #d9534f; font-weight: bold;">${s.NombreServicioInst}</td>
-            <td style="padding: 4px; border: 1px solid #ddd; text-align: center;">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'U'}</td>
-            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #d9534f;">$ ${s.Precio}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; color: #000; font-weight: bold;">${s.NombreServicioInst}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; color: #000;">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'U'}</td>
+            <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${s.Precio}</td>
         </tr>`).join('');
 
     const template = `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <div style="font-family: Arial, sans-serif; padding: 20px; background: #fff; color: #000;">
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; margin-bottom: 20px;">
                 <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0; text-transform: uppercase;">${tituloDoc}</h4>
-                <p style="font-size: 11px; color: #666;">Fecha: ${fechaActual}</p>
+                <h4 style="margin: 5px 0; text-transform: uppercase; color: #000;">${tituloDoc}</h4>
+                <p style="font-size: 11px; color: #000;">Fecha: ${fechaActual}</p>
             </div>
 
             <h4 style="font-size: 13px; color: #1a5d3b; margin-bottom:5px;">1. ANIMALES Y ALOJAMIENTO</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 12px;">
                 <thead>
                     <tr style="background: #e9ecef;">
-                        <th style="padding: 6px; border: 1px solid #ddd; text-align: left;">Descripción</th>
-                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px;">Tipo</th>
-                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px;">Precio</th>
+                        <th style="padding: 6px; border: 1px solid #ddd; text-align: left; color: #000;">Descripción</th>
+                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px; color: #000;">Tipo</th>
+                        <th style="padding: 6px; border: 1px solid #ddd; width: 100px; color: #000;">Precio</th>
                     </tr>
                 </thead>
-                <tbody>${animalRows || '<tr><td colspan="3" style="text-align:center;">Sin datos</td></tr>'}</tbody>
+                <tbody>${animalRows || '<tr><td colspan="3" style="text-align:center; color: #000;">Sin datos</td></tr>'}</tbody>
             </table>
 
-            <h4 style="font-size: 13px; color: #0d6efd; margin-bottom:5px; border-bottom: 1px solid #eee;">2. INSUMOS EXPERIMENTALES</h4>
+            <h4 style="font-size: 13px; color: #000; margin-bottom:5px; border-bottom: 1px solid #eee;">2. INSUMOS EXPERIMENTALES</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
-                <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
+                <tr style="background: #f8f9fa;"><th style="color: #000;">Nombre</th><th style="color: #000;">Cantidad/Tipo</th><th style="color: #000;">Precio</th></tr>
                 ${renderInsumoPDF(dataFull.insumosExp)}
             </table>
 
-            <h4 style="font-size: 13px; color: #6c757d; margin-bottom:5px; border-bottom: 1px solid #eee;">3. INSUMOS COMUNES</h4>
+            <h4 style="font-size: 13px; color: #000; margin-bottom:5px; border-bottom: 1px solid #eee;">3. INSUMOS COMUNES</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
-                <tr style="background: #f8f9fa;"><th>Nombre</th><th>Cantidad/Tipo</th><th>Precio</th></tr>
+                <tr style="background: #f8f9fa;"><th style="color: #000;">Nombre</th><th style="color: #000;">Cantidad/Tipo</th><th style="color: #000;">Precio</th></tr>
                 ${renderInsumoPDF(dataFull.insumos)}
             </table>
 
-            <h4 style="font-size: 13px; color: #d9534f; margin-bottom:5px; border-bottom: 1px solid #eee;">4. SERVICIOS INSTITUCIONALES</h4>
+            <h4 style="font-size: 13px; color: #000; margin-bottom:5px; border-bottom: 1px solid #eee;">4. SERVICIOS INSTITUCIONALES</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
-                <tr style="background: #fff4f4; color: #d9534f;"><th>Servicio</th><th>Medida</th><th>Precio</th></tr>
+                <tr style="background: #fff4f4;"><th style="color: #000;">Servicio</th><th style="color: #000;">Medida</th><th style="color: #000;">Precio</th></tr>
                 ${renderServiciosPDF()}
             </table>
         </div>`;
 
-    html2pdf().set({ margin: 10, filename: `Tarifario_${inst}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
+    html2pdf().set({
+        margin: 10,
+        filename: `Tarifario_${inst}_${Date.now()}.pdf`,
+        html2canvas: {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            useCORS: true
+        }
+    }).from(template).save();
 };
 
 window.exportPreciosExcel = () => {

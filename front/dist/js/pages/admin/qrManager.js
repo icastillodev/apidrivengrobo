@@ -35,32 +35,79 @@ window.abrirModalPersonalizar = () => {
 
 window.exportarHistoriaPDF = async () => {
     const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
+    const token = localStorage.getItem('token');
     
     Swal.fire({ title: 'Generando PDF...', didOpen: () => Swal.showLoading() });
     
     try {
-        const response = await fetch(API.urlBase + `/alojamiento/export?alojamientos=true&trazabilidad=true&formato=pdf&historia=${historiaId}&instId=${instId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
+        // Usuario logueado: usar export con sesión (blob)
+        if (token) {
+            const response = await fetch(API.urlBase + `/alojamiento/export?alojamientos=true&trazabilidad=true&formato=pdf&historia=${historiaId}&instId=${instId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error("Fallo al generar PDF");
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Historia_${historiaId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            Swal.close();
+            return;
+        }
 
-        if (!response.ok) throw new Error("Fallo al generar PDF");
+        // Vista pública (QR sin login): exportación por token → JSON → generar PDF en front
+        if (!tokenQR) {
+            Swal.close();
+            Swal.fire('Error', 'No hay enlace de etiqueta activo para exportar.', 'error');
+            return;
+        }
+        const res = await fetch(API.urlBase + `/alojamiento/public-export?token=${tokenQR}`);
+        const json = await res.json();
+        if (json.status !== 'success' || !json.data) throw new Error(json.message || 'Error al obtener datos');
 
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Historia_${historiaId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        let y = 15;
+        const lineH = 6;
+
+        doc.setFontSize(14);
+        doc.text(`Historia #${json.historia}`, 14, y); y += lineH + 2;
+        doc.setFontSize(10);
+
+        if (json.data.alojamientos && json.data.alojamientos.length) {
+            doc.setFont(undefined, 'bold');
+            doc.text('Registros de alojamiento', 14, y); y += lineH;
+            doc.setFont(undefined, 'normal');
+            json.data.alojamientos.forEach(row => {
+                const vig = row.finalizado == 1 ? 'FINALIZADO' : 'VIGENTE';
+                doc.text(`${row.fechavisado} - ${row.hastafecha || 'Vigente'} | ${row.CantidadCaja} cajas | ${row.nprotA} | ${vig}`, 14, y);
+                y += lineH;
+                if (y > 270) { doc.addPage(); y = 15; }
+            });
+            y += 4;
+        }
+
+        if (json.data.trazabilidad && json.data.trazabilidad.length) {
+            doc.setFont(undefined, 'bold');
+            doc.text('Trazabilidad clínica', 14, y); y += lineH;
+            doc.setFont(undefined, 'normal');
+            json.data.trazabilidad.forEach(row => {
+                doc.text(`${row.NombreCaja} | ${row.Sujeto} | ${row.fechaObs} | ${row.Metrica}: ${row.Valor}`, 14, y);
+                y += lineH;
+                if (y > 270) { doc.addPage(); y = 15; }
+            });
+        }
+
+        doc.save(`Historia_${json.historia}.pdf`);
         Swal.close();
     } catch (e) {
         console.error(e);
-        Swal.fire('Error', 'No se pudo generar el PDF', 'error');
+        Swal.close();
+        Swal.fire('Error', (e.message || 'No se pudo generar el PDF'), 'error');
     }
 };
 

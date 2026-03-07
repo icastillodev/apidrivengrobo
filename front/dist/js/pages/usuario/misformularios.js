@@ -2,6 +2,7 @@ import { API } from '../../api.js';
 
 let allForms = [];
 let currentPage = 1;
+let protocolsUsedCache = [];
 const rowsPerPage = 12;
 
 export async function initMisFormularios() {
@@ -9,6 +10,13 @@ export async function initMisFormularios() {
     const instId = localStorage.getItem('instId');
 
     document.getElementById('btn-export-excel').onclick = openExcelModal;
+
+    const btnProtocolsUsed = document.getElementById('btn-protocols-used');
+    if (btnProtocolsUsed) btnProtocolsUsed.onclick = openProtocolsUsedModal;
+    const btnInsumosPedidos = document.getElementById('btn-insumos-pedidos');
+    if (btnInsumosPedidos) btnInsumosPedidos.onclick = openInsumosPedidosModal;
+    const btnInsumosExpPedidos = document.getElementById('btn-insumos-exp-pedidos');
+    if (btnInsumosExpPedidos) btnInsumosExpPedidos.onclick = openInsumosExpPedidosModal;
 
     try {
         const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
@@ -456,6 +464,179 @@ function getStatusBadge(estado) {
 }
 
 function openExcelModal() { new bootstrap.Modal(document.getElementById('modal-excel')).show(); }
+
+/* --- PROTOCOLOS UTILIZADOS EN MIS FORMULARIOS --- */
+window.openProtocolsUsedModal = async () => {
+    const listEl = document.getElementById('protocols-used-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const modal = new bootstrap.Modal(document.getElementById('modal-protocols-used'));
+    modal.show();
+
+    try {
+        const res = await API.request('/user/protocols-used-in-forms');
+        if (res.status !== 'success' || !res.data || !res.data.length) {
+            listEl.innerHTML = '<div class="p-4 text-center text-muted">No hay protocolos en tus formularios. Solo se cuentan animales de solicitudes <strong>Entregadas</strong>.</div>';
+            return;
+        }
+        protocolsUsedCache = res.data;
+        const rows = res.data.map(p => {
+            const vence = p.FechaFinProtA ? new Date(p.FechaFinProtA).toLocaleDateString() : '—';
+            const cupo = parseInt(p.cupo_restante, 10) || 0;
+            const usados = parseInt(p.animales_usados, 10) || 0;
+            return `
+                <tr class="clickable-row align-middle" data-idprot="${p.idprotA}" style="cursor: pointer;">
+                    <td class="ps-3 fw-bold text-success">${p.nprotA}</td>
+                    <td class="text-truncate" style="max-width: 220px;" title="${(p.tituloA || '').replace(/"/g, '&quot;')}">${p.tituloA || '—'}</td>
+                    <td class="text-center fw-bold">${usados}</td>
+                    <td class="text-center fw-bold text-success">${cupo}</td>
+                    <td class="small">${vence}</td>
+                    <td class="text-end pe-3">
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); window.showProtocolDetail(${p.idprotA})" title="Ver detalle y cupo">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                </tr>`;
+        }).join('');
+        listEl.innerHTML = `
+            <table class="table table-hover align-middle mb-0" style="font-size: 12px;">
+                <thead class="table-light text-uppercase">
+                    <tr>
+                        <th class="ps-3">N° Prot.</th>
+                        <th>Título</th>
+                        <th class="text-center">Animales que usé</th>
+                        <th class="text-center">Cupo restante</th>
+                        <th>Vence</th>
+                        <th class="text-end pe-3">Ver</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        listEl.querySelectorAll('tr.clickable-row').forEach(tr => {
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return;
+                const id = tr.getAttribute('data-idprot');
+                if (id) window.showProtocolDetail(parseInt(id, 10));
+            });
+        });
+    } catch (e) {
+        listEl.innerHTML = '<div class="p-4 text-center text-danger">Error al cargar los protocolos.</div>';
+    }
+};
+
+window.showProtocolDetail = async (idprotA) => {
+    const body = document.getElementById('modal-protocol-detail-body');
+    if (!body) return;
+    const p = protocolsUsedCache.find(x => parseInt(x.idprotA, 10) === parseInt(idprotA, 10));
+    if (!p) {
+        body.innerHTML = '<div class="alert alert-warning">No se encontró el protocolo en la lista.</div>';
+        new bootstrap.Modal(document.getElementById('modal-protocol-detail')).show();
+        return;
+    }
+    const usados = parseInt(p.animales_usados, 10) || 0;
+    const cupo = parseInt(p.cupo_restante, 10) || 0;
+    const vence = p.FechaFinProtA ? new Date(p.FechaFinProtA).toLocaleDateString() : '—';
+    body.innerHTML = `
+        <div class="mb-3">
+            <h6 class="fw-bold text-dark">${p.nprotA || ''} — ${(p.tituloA || 'Sin título').substring(0, 80)}${(p.tituloA || '').length > 80 ? '…' : ''}</h6>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <div class="bg-primary bg-opacity-10 rounded p-3 text-center border border-primary">
+                    <span class="d-block small text-primary text-uppercase fw-bold">Animales que usé</span>
+                    <span class="fs-4 fw-bold text-primary">${usados}</span>
+                    <div class="small text-muted mt-1">solo en formularios Entregados</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="bg-success bg-opacity-10 rounded p-3 text-center border border-success">
+                    <span class="d-block small text-success text-uppercase fw-bold">Cupo restante</span>
+                    <span class="fs-4 fw-bold text-success">${cupo}</span>
+                    <div class="small text-muted mt-1">del protocolo</div>
+                </div>
+            </div>
+        </div>
+        <p class="small text-muted mb-0"><strong>Vencimiento:</strong> ${vence}</p>
+        <p class="small text-muted mt-2 mb-0">Los animales que usé corresponden a la suma de <code>totalA</code> (sexoe) de tus solicitudes con estado <strong>Entregado</strong> vinculadas a este protocolo.</p>
+    `;
+    new bootstrap.Modal(document.getElementById('modal-protocol-detail')).show();
+};
+
+/* --- INSUMOS PEDIDOS (cantidades y de qué) --- */
+window.openInsumosPedidosModal = async () => {
+    const listEl = document.getElementById('insumos-pedidos-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const modal = new bootstrap.Modal(document.getElementById('modal-insumos-pedidos'));
+    modal.show();
+    try {
+        const res = await API.request('/user/insumos-pedidos');
+        if (res.status !== 'success' || !res.data || !res.data.length) {
+            listEl.innerHTML = '<div class="p-4 text-center text-muted">No tienes pedidos de insumos.</div>';
+            return;
+        }
+        const parts = res.data.map(f => {
+            const estadoBadge = getStatusBadge(f.estado);
+            const inst = f.NombreInstitucion || '—';
+            const items = (f.items || []).map(i => {
+                const pres = `${i.PresentacionCant || ''} ${i.PresentacionTipo || ''}`.trim();
+                return `<tr><td class="ps-2">${i.NombreInsumo || '—'}</td><td class="small text-muted">${pres || '—'}</td><td class="text-center fw-bold">${i.cantidad}</td><td class="small">${inst}</td></tr>`;
+            }).join('');
+            return `
+                <div class="border rounded mb-3 overflow-hidden">
+                    <div class="bg-light px-3 py-2 d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-success">#${f.idformA}</span>
+                        <span class="small">${f.Inicio || '—'}</span>
+                        ${estadoBadge}
+                    </div>
+                    <table class="table table-sm table-hover mb-0" style="font-size: 12px;">
+                        <thead class="table-light"><tr><th class="ps-2">Insumo</th><th>Tipo / Cant.</th><th class="text-center" style="width:80px">Cant. pedida</th><th>Institución</th></tr></thead>
+                        <tbody>${items}</tbody>
+                    </table>
+                </div>`;
+        }).join('');
+        listEl.innerHTML = parts || '<div class="p-4 text-center text-muted">No hay ítems.</div>';
+    } catch (e) {
+        listEl.innerHTML = '<div class="p-4 text-center text-danger">Error al cargar insumos pedidos.</div>';
+    }
+};
+
+/* --- INSUMOS EXPERIMENTALES PEDIDOS --- */
+window.openInsumosExpPedidosModal = async () => {
+    const listEl = document.getElementById('insumos-exp-pedidos-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-info"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const modal = new bootstrap.Modal(document.getElementById('modal-insumos-exp-pedidos'));
+    modal.show();
+    try {
+        const res = await API.request('/user/insumos-exp-pedidos');
+        if (res.status !== 'success' || !res.data || !res.data.length) {
+            listEl.innerHTML = '<div class="p-4 text-center text-muted">No tienes pedidos de insumos experimentales (reactivos).</div>';
+            return;
+        }
+        const rows = res.data.map(r => {
+            const pres = `${r.PresentacionCant || ''} ${r.PresentacionTipo || ''}`.trim();
+            return `
+                <tr>
+                    <td class="ps-2">${r.NombreInsumo || '—'}</td>
+                    <td class="small text-muted">${pres || '—'}</td>
+                    <td class="text-center fw-bold">${r.Cantidad ?? '—'}</td>
+                    <td class="small">${r.NombreInstitucion || '—'}</td>
+                    <td class="small">${r.Inicio || '—'}</td>
+                    <td>${getStatusBadge(r.estado)}</td>
+                </tr>`;
+        }).join('');
+        listEl.innerHTML = `
+            <table class="table table-sm table-hover mb-0" style="font-size: 12px;">
+                <thead class="table-light text-uppercase">
+                    <tr><th class="ps-2">Insumo experimental</th><th>Tipo / Cant.</th><th class="text-center">Cant. pedida</th><th>Institución</th><th>Fecha</th><th>Estado</th></tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    } catch (e) {
+        listEl.innerHTML = '<div class="p-4 text-center text-danger">Error al cargar insumos experimentales.</div>';
+    }
+};
 
 window.processExcelExport = () => {
     const start = document.getElementById('excel-start').value;
