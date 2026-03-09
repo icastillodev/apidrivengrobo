@@ -28,14 +28,17 @@
     document.addEventListener('DOMContentLoaded', async () => {
         showLoader();
 
+        // 0. Hidratar sesión desde cookies ANTES de cualquier otra cosa (para no perder token al abrir perfil)
+        Auth.hydrateSession();
+
         try {
             // 1. CARGA CRÍTICA: Idioma
             // Bloqueamos hasta que window.txt esté listo para las etiquetas del perfil
             await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
             if (window.txt) translatePage();
 
-// 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3, 4, 5, 6)
-            if (!Auth.checkAccess([1, 2, 3, 4, 5, 6])) {
+// 2. VALIDACIÓN DE ACCESO (Niveles 1–6). Con skipInstCheck para no expulsar en perfil.
+            if (!Auth.checkAccess([1, 2, 3, 4, 5, 6], { skipInstCheck: true })) {
                 hideLoader();
                 return;
             }

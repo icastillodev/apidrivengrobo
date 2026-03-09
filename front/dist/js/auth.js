@@ -396,27 +396,30 @@ autoRedirectIfLogged(role) {
         }
     },
 
-    checkAccess(allowed) {
+    checkAccess(allowed, options = {}) {
+        const { skipInstCheck = false } = options; // Para panel/perfil: no expulsar por sede nula
         this.hydrateSession();
 
         const token = this.getVal('token');
-        const userLevel = parseInt(this.getVal('userLevel'));
+        const userLevel = parseInt(this.getVal('userLevel'), 10);
         
         // Forzamos a String para evitar que un null real se evalúe raro
-        const inst = String(this.getVal('NombreInst')).trim().toLowerCase();
-        const instId = String(this.getVal('instId')).trim().toLowerCase();
+        const inst = String(this.getVal('NombreInst') || '').trim().toLowerCase();
+        const instId = String(this.getVal('instId') || '').trim().toLowerCase();
         const path = window.location.pathname.toLowerCase();
         
         // 1. BLOQUEO DE URL CORRUPTA (Si alguien escribe /null/ a mano en la barra)
         if (path.includes('/null/') || path.includes('/undefined/') || path.includes('/0/')) {
             console.error("Acceso bloqueado: URL corrupta detectada.");
-            this.logout(true); // Forzamos expulsión a la raíz
+            this.logout(true);
             return false;
         }
 
-        if (!token || isNaN(userLevel)) {
+        if (!token || Number.isNaN(userLevel)) {
             console.warn("Acceso denegado: No hay sesión activa.");
-            this.redirectToLogin(inst);
+            // Evitar slug vacío para no acabar en raíz; en perfil preferir reenviar a institución conocida
+            const slugForRedirect = (skipInstCheck && inst) ? inst : (inst || 'urbe');
+            this.redirectToLogin(slugForRedirect);
             return false;
         }
 
@@ -429,13 +432,14 @@ autoRedirectIfLogged(role) {
             return false;
         }
 
-        // 2. BLOQUEO DE VARIABLES FANTASMA (Si LocalStorage guardó el texto "null")
-        const invalidValues = ['null', 'undefined', '0', '', 'superadmin', 'sistema global'];
-        
-        if (invalidValues.includes(inst) || invalidValues.includes(instId)) {
-            console.error("Contexto inválido: Sede no asignada o nula.");
-            this.logout(true); // Forzamos expulsión a la raíz
-            return false;
+        // 2. BLOQUEO DE VARIABLES FANTASMA (opcional: en perfil no expulsar por sede nula)
+        if (!skipInstCheck) {
+            const invalidValues = ['null', 'undefined', '0', '', 'superadmin', 'sistema global'];
+            if (invalidValues.includes(inst) || invalidValues.includes(instId)) {
+                console.error("Contexto inválido: Sede no asignada o nula.");
+                this.logout(true);
+                return false;
+            }
         }
 
         return true; 
@@ -475,15 +479,10 @@ redirectToLogin(slug) {
             return;
         }
 
-        // 2. CASO BASURA/NULO: Lo mandamos a la raíz genérica
+        // 2. CASO BASURA/NULO: No mandar a la raíz (front) — usar slug por defecto para que no quede en blanco
         const invalidSlugs = ['null', 'undefined', '0', ''];
-        if (invalidSlugs.includes(safeSlug)) {
-            window.location.href = basePath;
-            return;
-        }
-
-        // 3. CASO INSTITUCIÓN: Lo mandamos al slug limpio (ej: /urbe)
-        window.location.href = `${basePath}${safeSlug}`;
+        const targetSlug = invalidSlugs.includes(safeSlug) ? 'urbe' : safeSlug;
+        window.location.href = `${basePath}${targetSlug}`;
     },
 
     showErrorState() {

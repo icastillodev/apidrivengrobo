@@ -328,6 +328,7 @@ function buildModalHtml(opts) {
     var protocolsUsed = opts.protocolsUsed, insumosPedidos = opts.insumosPedidos, insumosExpPedidos = opts.insumosExpPedidos;
     var disableLegend = opts.disableLegend, facturacionLegend = opts.facturacionLegend, eliminarLegend = opts.eliminarLegend;
     var puedeEliminar = opts.puedeEliminar, puedeFacturar = opts.puedeFacturar;
+    var rolNombre = opts.rolNombre || '';
 
     var html = '<div id="ficha-print-area" class="ficha-print-area">';
     html += '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4 ficha-print-header">';
@@ -336,6 +337,8 @@ function buildModalHtml(opts) {
     html += '<form id="form-usuario-detalle" class="ficha-datos-persona"><div class="row g-3">';
     html += '<div class="col-12 bg-light p-3 rounded border-start border-4 border-success mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_usuario_sistema ? t.ficha_usuario_sistema : 'Usuario de Sistema') + '</label>';
     html += '<input type="text" class="form-control-plaintext fw-bold h5 mb-0" value="' + (u.Usuario || '---') + '" readonly></div>';
+    html += '<div class="col-12"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_tipo_usuario ? t.ficha_tipo_usuario : 'Tipo de usuario') + '</label>';
+    html += '<div class="form-control-plaintext fw-bold border-0 px-0"><span class="badge bg-secondary">' + (rolNombre || '—') + '</span></div></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_apellido ? t.ficha_apellido : 'Apellido') + '</label><input type="text" name="ApellidoA" class="form-control form-control-sm fw-bold" value="' + (u.ApellidoA || '') + '"></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_nombre ? t.ficha_nombre : 'Nombre') + '</label><input type="text" name="NombreA" class="form-control form-control-sm fw-bold" value="' + (u.NombreA || '') + '"></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_correo ? t.ficha_correo : 'Correo') + '</label><input type="email" name="EmailA" class="form-control form-control-sm fw-bold text-primary" value="' + (u.Correo || '') + '"></div>';
@@ -414,6 +417,9 @@ window.openUserModal = async (u) => {
     const disableLegend = isDisabled ? '<div class="small text-danger mt-2"><i class="bi bi-info-circle me-1"></i>Usuario deshabilitado. Motivo: baja administrativa o deshabilitación previa.</div>' : '';
     const facturacionLegend = !puedeFacturar ? '<div class="small text-warning mt-2"><i class="bi bi-receipt me-1"></i>Ver facturación solo disponible si tiene protocolos a cargo o pedidos de formularios de insumos.</div>' : '';
     const eliminarLegend = !puedeEliminar ? '<div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos efectuados.</div>' : '';
+    var rolesMap = (window.txt && window.txt.config_roles) ? { 2: window.txt.config_roles.rol_administrador, 3: window.txt.config_roles.rol_investigador, 4: window.txt.config_roles.rol_secadmin, 5: window.txt.config_roles.rol_tecnico, 6: window.txt.config_roles.rol_laboratorio } : {};
+    var idTipo = u.IdTipousrA != null ? u.IdTipousrA : u.IdTipoUsrA;
+    var rolNombre = (rolesMap[idTipo] || '').trim() || '—';
     console.log('[usuarios] buildModalHtml...');
     content.innerHTML = buildModalHtml({
         u: u,
@@ -430,7 +436,8 @@ window.openUserModal = async (u) => {
         facturacionLegend: facturacionLegend,
         eliminarLegend: eliminarLegend,
         puedeEliminar: puedeEliminar,
-        puedeFacturar: puedeFacturar
+        puedeFacturar: puedeFacturar,
+        rolNombre: rolNombre
     });
     console.log('[usuarios] modal HTML asignado');
     window._lastUserFichaData = { u: u, protocolos: protocolos, formularios: formularios, alojamientos: alojamientos, protocolsUsed: protocolsUsed, insumosPedidos: insumosPedidos, insumosExpPedidos: insumosExpPedidos, departamentos: departamentos, instName: instName };

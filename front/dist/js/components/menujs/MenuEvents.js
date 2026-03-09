@@ -131,27 +131,29 @@ function handleSwipe() {
     });
 
     // 6. ACORDEÓN CLICK (ABRIR / CERRAR Y EXPANSIÓN GRID)
+    // Solo se abre el dropdown del contenedor visible (evita duplicado desktop/móvil)
     document.querySelectorAll('.dropdown-toggle-gecko').forEach(btn => {
         btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
             const currentMenu = btn.nextElementSibling;
-            if(!currentMenu) return;
+            if (!currentMenu || !currentMenu.classList.contains('dropdown-menu-gecko')) return;
+
+            const parentUl = btn.closest('ul');
+            const isParentVisible = parentUl && parentUl.offsetParent !== null && getComputedStyle(parentUl).display !== 'none';
 
             const isHidden = currentMenu.classList.contains('hidden');
-            const liParent = btn.closest('.nav-item'); // Capturamos la caja padre para el Grid Móvil
-            
-            // Cierra todos
+            const liParent = btn.closest('.nav-item');
+
             document.querySelectorAll('.dropdown-menu-gecko').forEach(m => m.classList.add('hidden'));
             document.querySelectorAll('.dropdown-toggle-gecko').forEach(b => b.classList.remove('open'));
             document.querySelectorAll('.nav-item.expanded-grid').forEach(li => li.classList.remove('expanded-grid'));
 
-            // Abre el tocado
-            if(isHidden) {
+            if (isHidden && isParentVisible) {
                 currentMenu.classList.remove('hidden');
-                btn.classList.add('open'); 
+                btn.classList.add('open');
                 if (liParent && window.innerWidth <= 768) {
-                    liParent.classList.add('expanded-grid'); // Expande a 2 columnas en móvil
+                    liParent.classList.add('expanded-grid');
                 }
             }
         };

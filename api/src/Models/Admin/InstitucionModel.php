@@ -56,8 +56,8 @@ class InstitucionModel {
                         NombreInst, NombreCompletoInst, InstCorreo, Pais, Localidad, 
                         Moneda, Web, Logo, DependenciaInstitucion, otrosceuas, 
                         TipoApp, Activo, UltimoPago, PrecioJornadaTrabajoExp,
-                        TipoFacturacion, FechaContrato, Detalle
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        TipoFacturacion, FechaContrato, Detalle, madre_grupo, red
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
@@ -77,7 +77,9 @@ class InstitucionModel {
                 0, 
                 (int)($data['TipoFacturacion'] ?? 1), 
                 $data['FechaContrato'] ?: null, 
-                $data['Detalle'] ?? ''
+                $data['Detalle'] ?? '',
+                (int)($data['madre_grupo'] ?? 0),
+                isset($data['red']) && $data['red'] !== '' ? (string)$data['red'] : null
             ]);
             
             $idNew = $this->db->lastInsertId();
@@ -107,7 +109,8 @@ class InstitucionModel {
                         Pais = ?, Localidad = ?, Moneda = ?, Web = ?, 
                         Logo = ?, DependenciaInstitucion = ?, otrosceuas = ?, 
                         TipoApp = ?, Activo = ?, UltimoPago = ?,
-                        TipoFacturacion = ?, FechaContrato = ?, Detalle = ?
+                        TipoFacturacion = ?, FechaContrato = ?, Detalle = ?,
+                        madre_grupo = ?, red = ?
                     WHERE IdInstitucion = ?";
 
             $this->db->prepare($sql)->execute([
@@ -127,6 +130,8 @@ class InstitucionModel {
                 (int)($data['TipoFacturacion'] ?? 1),
                 $data['FechaContrato'] ?: null,
                 $data['Detalle'] ?? '',
+                (int)($data['madre_grupo'] ?? 0),
+                isset($data['red']) && $data['red'] !== '' ? (string)$data['red'] : null,
                 $id
             ]);
 

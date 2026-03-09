@@ -99,9 +99,9 @@ window.renderAllPriceTables = () => {
     dataFull.servicios.filter(s => s.NombreServicioInst.toLowerCase().includes(term)).forEach(s => {
         htmlServ += `
             <tr data-id="${s.IdServicioInst}" data-type="servicio">
-                <td class="fw-bold text-danger">${s.NombreServicioInst}</td>
+                <td class="fw-bold text-dark">${s.NombreServicioInst}</td>
                 <td class="text-center small text-muted">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'Unidad'}</td>
-                <td><input type="number" class="form-control form-control-sm precio-input fw-bold text-danger" value="${s.Precio}"></td>
+                <td><input type="number" class="form-control form-control-sm precio-input fw-bold text-dark" value="${s.Precio}"></td>
             </tr>`;
     });
     tbodyServ.innerHTML = htmlServ || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_services || 'Sin servicios configurados.'}</td></tr>`;

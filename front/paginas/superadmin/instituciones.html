@@ -138,6 +138,23 @@
                                 <input type="text" id="Logo" class="form-control" placeholder="https://...">
                             </div>
                             
+                            <div class="col-12 border-top pt-3 mt-2">
+                                <h6 class="fw-bold text-secondary mb-2" data-i18n="superadmin_instituciones.label_madre_red">Madre de la red</h6>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="madre_grupo" role="switch">
+                                    <label class="form-check-label" for="madre_grupo">Habilitar como madre de la red</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="en_red_check" role="switch">
+                                    <label class="form-check-label" for="en_red_check"><span data-i18n="superadmin_instituciones.label_en_red">En una red</span></label>
+                                </div>
+                                <div id="wrap_red_input" class="ms-4" style="display: none;">
+                                    <input type="text" id="red" class="form-control" data-i18n="superadmin_instituciones.ph_nombre_red" placeholder="Nombre de la red">
+                                </div>
+                            </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_otros_ceuas">Permitir Otros CEUAS</label>
                                 <select id="otrosceuas" class="form-select">

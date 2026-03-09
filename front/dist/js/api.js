@@ -31,7 +31,10 @@ export const API = {
             // --- 2. MANEJO DE EXPULSIÓN HTTP (401 / 403) ---
             if (response.status === 401 || response.status === 403) {
                 console.warn("🔐 Seguridad: Sesión expirada o token inválido detectado por HTTP Status.");
-                this.forceLogout();
+                // En página de perfil no expulsar: puede ser SuperAdmin (instId 0) y el endpoint /user/config/get fallar
+                if (!window.location.pathname.toLowerCase().includes('perfil')) {
+                    this.forceLogout();
+                }
                 return { status: 'error', message: 'Sesión expirada' };
             }
             
@@ -52,7 +55,10 @@ export const API = {
                     // Evitamos que salte en el propio login
                     if (!endpoint.includes('/login') && !endpoint.includes('/validate-inst')) {
                         console.warn(`🔐 Seguridad: Token rechazado por la API: ${resData.message}`);
-                        this.forceLogout();
+                        // En página de perfil no expulsar: SuperAdmin u otros roles pueden tener respuestas distintas
+                        if (!window.location.pathname.toLowerCase().includes('perfil')) {
+                            this.forceLogout();
+                        }
                         return resData;
                     }
                 }

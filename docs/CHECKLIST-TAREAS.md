@@ -13,6 +13,13 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 
 ---
 
+## Admin – Usuarios (modal)
+
+- [x] **En el modal de ficha de usuario, mostrar el tipo de usuario (rol).**  
+  En el modal de detalle (buildModalHtml) se añadió la línea "Tipo de usuario" con badge que muestra el rol (Investigador, Admin, etc.) usando `IdTipousrA`/`IdTipoUsrA` y `window.txt.config_roles`. Clave i18n `ficha_tipo_usuario` en ES, EN, PT.
+
+---
+
 ## Superadmin – Usuarios globales
 
 - [x] **Paginación y volver atrás:** En la página de usuarios de superadmin, la paginación no funcionaba (los botones perdían el evento al usar `innerHTML +=`). Se corrigió usando solo `appendChild` y listeners en los enlaces. Se añadió enlace "SUPERADMIN" en el breadcrumb para volver al dashboard.
@@ -21,8 +28,8 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 
 ## Superadmin – Instituciones (modal)
 
-- [ ] **En el modal de instituciones: "madre de la red" y "en una red".**  
-  **Instrucciones:** En la vista de superadministrador donde se listan las instituciones, dentro del modal de cada institución: (1) Añadir un botón/toggle para marcar la institución como **madre de la red** (habilitar/deshabilitar). (2) Añadir un **checkbox** "En una red": si está sin marcar, el campo de red queda vacío; si está marcado, mostrar un **input** para escribir el nombre de la red. Al guardar: si el checkbox está marcado y el input tiene valor, guardar ese valor; si está sin marcar, guardar vacío. Persistir en backend los campos correspondientes (p. ej. `madre_grupo`, `red` o los que use la API).
+- [x] **En el modal de instituciones: "madre de la red" y "en una red".**  
+  Implementado: (1) Switch "Madre de la red" en el modal (guarda `madre_grupo`: 1 = sí, 0 = no). (2) Checkbox "En una red": al marcar se muestra input para el nombre de la red; al desmarcar el campo se guarda vacío. Se envían `madre_grupo` y `red` en create/update. Backend: `InstitucionModel` actualizado para INSERT y UPDATE. **Si la tabla `institucion` no tiene las columnas:** ejecutar `ALTER TABLE institucion ADD COLUMN madre_grupo TINYINT(1) DEFAULT 0; ALTER TABLE institucion ADD COLUMN red VARCHAR(255) DEFAULT NULL;`
 
 ---
 
@@ -62,8 +69,8 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
   Añadidos estilos en `MenuStyles.js`: `.gecko-sidebar-logo-mobile` y `.gecko-top-logo-mobile` con mayor `max-height` en móvil (72px / 52px en @media 768px).
 
 ### Items dropdown
-- [ ] **Los ítems de menú que son dropdown deben ocupar un solo lugar; al desplegar, que solo se despliegue en ese lugar (no duplicado en desktop y móvil).**  
-  **Instrucciones:** Revisar `MenuRender.js` y `MenuEvents.js`: en layout "top" se inserta el mismo ítem en `main-menu-ul` y en el sidebar móvil `mobile-menu-ul`. Asegurar que el dropdown (clase `dropdown-menu-gecko`) esté asociado a un único botón por vista. Ver instrucciones detalladas en el párrafo del checklist.
+- [x] **Los ítems de menú que son dropdown deben ocupar un solo lugar; al desplegar, que solo se despliegue en ese lugar (no duplicado en desktop y móvil).**  
+  En `MenuEvents.js` se asegura que al hacer clic en un `.dropdown-toggle-gecko` solo se abra el dropdown si su contenedor (`main-menu-ul` o `mobile-menu-ul`) está visible (`offsetParent` y `getComputedStyle(ul).display !== 'none'`). Así solo se despliega el del contexto activo (desktop o móvil), no el duplicado en el otro contenedor.
 
 ### Flecha del dropdown
 - [x] **Flechita del dropdown centrada y con font-weight más grueso (bolder).**  
@@ -141,8 +148,8 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 
 ## Perfil / Configuración de usuario
 
-- [ ] **Al entrar a configuración del usuario (panel perfil), no debe redirigir a "Validando" ni expulsar de la app.**  
-  Revisar la página `panel/perfil` y su JS (perfil.js): comprobar que no se llame a `Auth.checkAccess` de forma que fuerce redirección al login, o que no se limpie la sesión. Ajustar la lógica para que usuarios con rol permitido puedan entrar sin ser expulsados. En `perfil.html` se corrigió la llamada a `checkAccess([1,2,3,4,5,6])` (sin comas vacías) y se hace `hideLoader()` antes de return si el acceso es denegado.
+- [x] **Al entrar a configuración del usuario (panel perfil), no debe redirigir a "Validando" ni expulsar de la app.**  
+  En `auth.js`, `checkAccess(allowed, options)` admite `options.skipInstCheck`. En `perfil.html` se llama `Auth.checkAccess([1, 2, 3, 4, 5, 6], { skipInstCheck: true })` para no expulsar por sede/inst nula; solo se exige token y rol en [1–6]. Así los usuarios con rol permitido entran sin redirección al login.
 
 - [x] **Cuando la app expulsa al usuario, debe redirigir a la institución donde estaba, no a la raíz.**  
   En `auth.js`, `logout(forceRoot)` ya guardaba el slug antes de limpiar y lo pasaba a `redirectToLogin`. Se mejoró con fallback: si no hay `NombreInst` en almacenamiento, se intenta obtener el slug desde la URL actual antes de redirigir, y por defecto se usa `urbe`. `redirectToLogin(slug)` ya enviaba a `basePath + slug` para instituciones válidas.
@@ -150,6 +157,11 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 ---
 
 ## Mejoras estéticas
+
+## Mejoras estéticas
+
+- [x] **Precios: icono visible en menú/página y líneas de otro color (no rojo).**  
+  En el menú, el ítem "Precios" (dentro del dropdown Facturación) ya tiene `svg` en `MenuTemplates.js` (id 202, children). En la página de precios: botón PDF cambiado de `btn-outline-danger` a `btn-outline-secondary`; sección "4. Servicios Institucionales" de `text-danger` a `text-dark`; filas e inputs de la tabla de servicios de `text-danger` a `text-dark` en `precios.js`. Si el icono no se ve en algún tema, revisar `.dropdown-child-icon` en MenuStyles.js.
 
 - [ ] **Mejorar la estética de la pantalla donde se elige el formulario (selector de formularios): nombre de cada institución más claro en escritorio y móvil.**  
   **Instrucciones:** En la página de selector de formularios (formSelector o similar), revisar el diseño de las cards o listas donde aparece el nombre de la institución. Ajustar tipografía, contraste y espaciado para escritorio y móvil (clases responsive y si hace falta texto más grande o badge para el nombre de institución).
