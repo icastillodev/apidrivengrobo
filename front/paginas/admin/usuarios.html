@@ -33,9 +33,9 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
-        // Lógica administrativa de usuarios (Alta, baja, modificación y asignación de roles)
-        import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js?v=3';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        // Lógica administrativa de usuarios. Cambiar ?v=5 si hace falta forzar recarga (cache-bust).
+        import { initUsuariosPage } from '../../dist/js/pages/admin/usuarios.js?v=5';
 
 
         showLoader();
@@ -44,10 +44,10 @@
 
             try {
                 // 1. CARGA CRÍTICA: Idioma
-                // Bloqueamos la ejecución para asegurar que las traducciones de roles estén listaás
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                if (window.txt) translatePage();
 
-                // 2. VALIDACIÓN DE ACCESO (Niveles administrativos y de gestión)
+                // 2. VALIDACIÓN DE ACCESO
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
 
                 // 3. INICIALIZACIÓN DE COMPONENTES
@@ -84,45 +84,45 @@
             
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_usuarios.bread_grobo">GROBO</li>
                     <li class="breadcrumb-item text-muted" id="institucionbread"></li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_usuarios.bread_admin">Admin</li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Gestión Usuarios</span>
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="admin_usuarios.bread_gestion">Gestión Usuarios</span>
                     </li>
                 </ol>
             </nav>
 
             <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="col-lg-8">
-                    <h1 class="h4 text-secondary text-uppercase mb-4">Directorio de Usuarios</h1>
+                    <h1 class="h4 text-secondary text-uppercase mb-4" data-i18n="admin_usuarios.titulo">Directorio de Usuarios</h1>
                     
                     <div class="input-group shadow-sm" style="max-width: 500px;">
-                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar:</span>
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_usuarios.filtrar">Filtrar:</span>
                                 <select id="filter-type" title="Filtrar usuarios por campo" class="form-select form-select-sm fw-bold" style="max-width: 150px;">
-                                    <option value="all">TODOS</option>
-                                    <option value="IdUsrA">ID</option>
-                                    <option value="Usuario">Usuario</option>
-                                    <option value="ApellidoA">Apellido</option>
-                                    <option value="NombreA">Nombre</option>
-                                    <option value="CelularA">Celular</option>
-                                    <option value="Correo">Correo</option>
-                                    <option value="Laboratorio">Laboratorio</option>
-                                    <option value="OtrosCEUAS">Otros CEUAS</option>
+                                    <option value="all" data-i18n="admin_usuarios.filter_todos">TODOS</option>
+                                    <option value="IdUsrA" data-i18n="admin_usuarios.filter_id">ID</option>
+                                    <option value="Usuario" data-i18n="admin_usuarios.filter_usuario">Usuario</option>
+                                    <option value="ApellidoA" data-i18n="admin_usuarios.filter_apellido">Apellido</option>
+                                    <option value="NombreA" data-i18n="admin_usuarios.filter_nombre">Nombre</option>
+                                    <option value="CelularA" data-i18n="admin_usuarios.filter_celular">Celular</option>
+                                    <option value="Correo" data-i18n="admin_usuarios.filter_correo">Correo</option>
+                                    <option value="Laboratorio" data-i18n="admin_usuarios.filter_laboratorio">Laboratorio</option>
+                                    <option value="OtrosCEUAS" data-i18n="admin_usuarios.filter_otros_ceuas">Otros CEUAS</option>
                                 </select>
-                        <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Escribe...">
-                        <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;">Buscar</button>
+                        <input type="text" id="search-input" class="form-control form-control-sm" data-i18n="admin_usuarios.ph_buscar" placeholder="Escribe...">
+                        <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" data-i18n="admin_usuarios.btn_buscar">Buscar</button>
                     </div>
                 </div>
 
                 <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-                    <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase">Excel</button>
+                    <button id="btn-excel" class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase" data-i18n="admin_usuarios.btn_excel">Excel</button>
                     <button 
     id="btn-ayuda" 
     class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase" 
     data-bs-toggle="modal" 
     data-bs-target="#modal-ayuda">
-    <i class="bi bi-question-circle me-1"></i> Ayuda
+    <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_usuarios.btn_ayuda">Ayuda</span>
 </button>
                 </div>
             </div>
@@ -131,13 +131,13 @@
                 <table class="table table-hover align-middle border" style="font-size: 12px;">
                     <thead class="table-light">
                         <tr class="text-uppercase" style="font-size: 11px;">
-                            <th data-key="IdUsrA" data-sortable="true" class="py-3 px-3">ID - </th>
-                            <th data-key="Usuario" data-sortable="true" class="py-3 px-3">Usuario - </th>
-                            <th data-key="ApellidoA" data-sortable="true" class="py-3 px-3">Apellido y Nombre - </th>
-                            <th data-key="CelularA" data-sortable="true" class="py-3 px-3">Celular - </th>
-                            <th data-key="Correo" data-sortable="true" class="py-3 px-3">Correo - </th>
-                            <th data-key="Laboratorio" data-sortable="true" class="py-3 px-3">Laboratorio - </th>
-                            <th data-key="OtrosCEUAS" class="py-3 px-3 text-center">Otros CEUAS - </th>
+                            <th data-key="IdUsrA" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_id">ID -</th>
+                            <th data-key="Usuario" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_usuario">Usuario -</th>
+                            <th data-key="ApellidoA" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_apellido_nombre">Apellido y Nombre -</th>
+                            <th data-key="CelularA" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_celular">Celular -</th>
+                            <th data-key="Correo" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_correo">Correo -</th>
+                            <th data-key="Laboratorio" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_laboratorio">Laboratorio -</th>
+                            <th data-key="OtrosCEUAS" class="py-3 px-3 text-center" data-i18n="admin_usuarios.col_otros_ceuas">Otros CEUAS -</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -156,7 +156,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 border-top border-5 border-success shadow-lg">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title small fw-bold text-uppercase tracking-widest">Detalles del Registro</h5>
+                    <h5 class="modal-title small fw-bold text-uppercase tracking-widest" data-i18n="admin_usuarios.modal_detalles">Detalles del Registro</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div id="modal-content" class="modal-body p-4 p-md-5">
@@ -169,47 +169,47 @@
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title fw-bold">
-                    <i class="bi bi-question-circle me-2"></i>Guía de Uso
+                    <i class="bi bi-question-circle me-2"></i><span data-i18n="admin_usuarios.ayuda_titulo">Guía de Uso</span>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
                 
                 <section class="mb-4">
-                    <h6 class="fw-black text-uppercase text-success small mb-2">1. Búsqueda y Filtrado Inteligente</h6>
-                    <p class="text-muted small">Localice rápidamente a cualquier usuario utilizando las herramientas de la barra superior:</p>
+                    <h6 class="fw-black text-uppercase text-success small mb-2" data-i18n="admin_usuarios.ayuda_seccion1">1. Búsqueda y Filtrado Inteligente</h6>
+                    <p class="text-muted small" data-i18n="admin_usuarios.ayuda_seccion1_texto">Localice rápidamente a cualquier usuario utilizando las herramientas de la barra superior:</p>
                     <ul class="small mb-0">
-                        <li><strong>Criterio de Búsqueda:</strong> Seleccione en el menú desplegable si desea buscar por <b>Apellido</b>, <b>Nombre</b> o <b>Usuario</b>.</li>
-                        <li><strong>Filtro "Otros CEUAS":</strong> Escriba <span class="badge bg-light text-dark border">otros</span> para ver usuarios con protocolos externos o <span class="badge bg-light text-dark border">no</span> para los que no tienen.</li>
-                        <li><strong>Ejecución:</strong> Presione el botón verde <b>"Buscar"</b> para refrescar la lista.</li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_criterio">Criterio de Búsqueda:</strong> <span data-i18n="admin_usuarios.ayuda_criterio_li">Seleccione en el menú desplegable si desea buscar por Apellido, Nombre o Usuario.</span></li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_filtro_otros">Filtro "Otros CEUAS":</strong> <span data-i18n="admin_usuarios.ayuda_filtro_otros_li">Escriba otros para ver usuarios con protocolos externos o no para los que no tienen.</span></li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_ejecucion">Ejecución:</strong> <span data-i18n="admin_usuarios.ayuda_ejecucion_li">Presione el botón verde "Buscar" para refrescar la lista.</span></li>
                     </ul>
                 </section>
 
                 <hr class="text-light">
 
                 <section class="mb-4">
-                    <h6 class="fw-black text-uppercase text-success small mb-2">2. Edición y Ficha del Usuario</h6>
-                    <p class="text-muted small">Haga clic sobre <b>cualquier fila</b> de la tabla para abrir la ventana de edición:</p>
+                    <h6 class="fw-black text-uppercase text-success small mb-2" data-i18n="admin_usuarios.ayuda_seccion2">2. Edición y Ficha del Usuario</h6>
+                    <p class="text-muted small" data-i18n="admin_usuarios.ayuda_seccion2_texto">Haga clic sobre cualquier fila de la tabla para abrir la ventana de edición:</p>
                     <ul class="small mb-0">
-                        <li><strong>Datos Personales:</strong> Puede actualizar Nombre, Apellido, Email, Celular y asignar un <b>Departamento</b>.</li>
-                        <li><strong>Seguridad:</strong> El botón amarillo permite resetear la contraseña del usuario a <code class="bg-warning-subtle px-1">12345678</code>.</li>
-                        <li><strong>Historial Dinámico:</strong> En la parte inferior de la ficha verá los <b>Protocolos</b> y <b>Formularios</b> vinculados a ese usuario.</li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_datos_personales">Datos Personales:</strong> <span data-i18n="admin_usuarios.ayuda_datos_li">Puede actualizar Nombre, Apellido, Email, Celular y asignar un Departamento.</span></li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_seguridad">Seguridad:</strong> <span data-i18n="admin_usuarios.ayuda_seguridad_li">El botón amarillo permite resetear la contraseña del usuario a 12345678.</span></li>
+                        <li><strong data-i18n="admin_usuarios.ayuda_historial">Historial Dinámico:</strong> <span data-i18n="admin_usuarios.ayuda_historial_li">En la parte inferior de la ficha verá los Protocolos y Formularios vinculados a ese usuario.</span></li>
                     </ul>
                 </section>
 
                 <hr class="text-light">
 
                 <section>
-                    <h6 class="fw-black text-uppercase text-success small mb-2">3. Reportes y Documentación</h6>
+                    <h6 class="fw-black text-uppercase text-success small mb-2" data-i18n="admin_usuarios.ayuda_seccion3">3. Reportes y Documentación</h6>
                     <ul class="small mb-0">
-                        <li><strong>Excel General:</strong> Descargue la lista completa de usuarios (según sus filtros actuales) desde el botón <b>"Excel"</b> superior.</li>
-                        <li><strong>Ficha en PDF:</strong> Dentro de cada usuario, encontrará botones rojos para descargar la <b>Ficha Total</b> (con historial) o la <b>Ficha Básica</b> (solo datos personales).</li>
+                        <li><span data-i18n="admin_usuarios.ayuda_excel_li">Excel General: Descargue la lista completa de usuarios (según sus filtros actuales) desde el botón Excel superior.</span></li>
+                        <li><span data-i18n="admin_usuarios.ayuda_pdf_li">Ficha en PDF: Dentro de cada usuario, encontrará botones rojos para descargar la Ficha Total (con historial) o la Ficha Básica (solo datos personales).</span></li>
                     </ul>
                 </section>
 
             </div>
             <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-success fw-bold w-100 uppercase" data-bs-dismiss="modal">Entendido</button>
+                <button type="button" class="btn btn-success fw-bold w-100 uppercase" data-bs-dismiss="modal" data-i18n="admin_usuarios.btn_entendido">Entendido</button>
             </div>
         </div>
     </div>

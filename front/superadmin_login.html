@@ -17,8 +17,15 @@
     
     <script type="module">
         import { SuperAuth } from './dist/js/superAuth.js';
-        document.addEventListener('DOMContentLoaded', () => {
+        import { loadLanguage, translatePage } from './dist/js/utils/i18n.js';
+        document.addEventListener('DOMContentLoaded', async () => {
+            const lang = localStorage.getItem('lang') || null;
+            try {
+                await loadLanguage(lang);
+                if (window.txt) translatePage();
+            } catch (e) { console.warn('i18n:', e); }
             SuperAuth.init();
+            if (window.setSuperadminLang) window.setSuperadminLang(localStorage.getItem('lang') || 'es');
         });
     </script>
 </head>
@@ -28,34 +35,60 @@
     <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border-t-8 border-green-600">
         
         <div class="text-center mb-8">
-            <h1 class="text-3xl font-black text-gray-800 tracking-tighter">GECKO MASTER</h1>
-            <p class="text-gray-400 text-xs uppercase tracking-widest mt-1">Administración Global</p>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tighter" data-i18n="superadmin_login.titulo">GECKO MASTER</h1>
+            <p class="text-gray-400 text-xs uppercase tracking-widest mt-1" data-i18n="superadmin_login.subtitulo">Administración Global</p>
         </div>
 
         <form id="login-form" class="space-y-5">
             <div id="msg-alert" class="hidden p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm rounded"></div>
 
             <div> 
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Usuario Maestro</label>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="superadmin_login.usuario_label">Usuario Maestro</label>
                 <input type="text" id="username" required 
                     class="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all"
-                    placeholder="Ej: master_admin">
+                    data-i18n="superadmin_login.usuario_ph" placeholder="Ej: master_admin">
             </div>
 
             <div> 
-                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Contraseña</label>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="superadmin_login.password_label">Contraseña</label>
                 <input type="password" id="password" required 
                     class="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all"
                     placeholder="••••••••">
             </div>
 
             <button type="submit" 
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95">
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95" data-i18n="superadmin_login.entrar">
                 Entrar al Sistema
             </button>
         </form>
-        <div class="mt-8 text-center">
-            <a href="index.html" class="text-gray-400 text-sm hover:text-green-600 transition-colors italic">
+        <p class="text-center mt-4 text-[10px] text-gray-400">
+            <span class="font-bold uppercase" data-i18n="login.idioma_label">Idioma</span>
+            <span class="inline-flex ml-2 rounded-lg overflow-hidden border border-green-600/50 shadow-sm">
+                <button type="button" id="btn-sa-lang-es" class="px-3 py-1.5 text-xs font-bold bg-green-600 text-white hover:bg-green-700 transition-colors" onclick="window.setSuperadminLang('es')">ES</button>
+                <button type="button" id="btn-sa-lang-en" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-green-100 transition-colors" onclick="window.setSuperadminLang('en')">EN</button>
+                <button type="button" id="btn-sa-lang-pt" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-green-100 transition-colors" onclick="window.setSuperadminLang('pt')">PT</button>
+            </span>
+        </p>
+        <script>
+            window.setSuperadminLang = function(lang) {
+                localStorage.setItem('lang', lang);
+                localStorage.setItem('idioma', lang);
+                document.querySelectorAll('[id^="btn-sa-lang-"]').forEach(function(btn) {
+                    var isActive = btn.id === 'btn-sa-lang-' + lang;
+                    btn.className = 'px-3 py-1.5 text-xs font-bold transition-colors ' + (isActive ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-700 hover:bg-green-100');
+                });
+                window.location.reload();
+            };
+            document.addEventListener('DOMContentLoaded', function() {
+                var current = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
+                document.querySelectorAll('[id^="btn-sa-lang-"]').forEach(function(btn) {
+                    var isActive = btn.id === 'btn-sa-lang-' + current;
+                    btn.className = 'px-3 py-1.5 text-xs font-bold transition-colors ' + (isActive ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-700 hover:bg-green-100');
+                });
+            });
+        </script>
+        <div class="mt-6 text-center">
+            <a href="index.html" class="text-gray-400 text-sm hover:text-green-600 transition-colors italic" data-i18n="superadmin_login.volver">
                 ← Volver al acceso institucional
             </a>
         </div>

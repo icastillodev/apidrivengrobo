@@ -48,7 +48,7 @@
             
             try {
                 // 1. CARGA CRÍTICA: Idioma
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
                 
                 // 2. VALIDACIÓN DE ACCESO
                 Auth.checkAccess([1, 2, 4, 5, 6]); 

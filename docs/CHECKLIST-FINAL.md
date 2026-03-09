@@ -37,10 +37,14 @@ Estado del proyecto GROBO / URBE-API-DRIVEN.
 
 ## 3. Lo que queda (pendientes / sugeridos)
 
-- [ ] PDF ficha/total en servidor (si en algún navegador sigue en blanco: TCPDF/Dompdf en PHP)
-- [ ] Insumos pedidos / experimentales: columna opcional "Total acumulado hasta hoy" por insumo
+- [x] PDF ficha/total en servidor (si en algún navegador sigue en blanco: TCPDF/Dompdf en PHP)
+- [x] Insumos pedidos / experimentales: columna opcional "Total acumulado hasta hoy" por insumo
 - [x] Auditoría al eliminar usuario: queda registrado en bitácora (DELETE_USER con ID, login, nombre y "confirmado con contraseña de admin"); log se escribe antes del DELETE
-- [ ] Personae al eliminar usuario: decidir si se borra/anonymiza personae o se deja para historial
+- [x] Personae al eliminar usuario: decidir si se borra/anonymiza personae o se deja para historial
+
+---
+
+**Traducción i18n (ES/EN/PT):** Ver listado completo en **`docs/CHECKLIST-I18N.md`**. Se avanza por página/módulo en sucesivos chats.
 
 ---
 

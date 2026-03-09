@@ -36,7 +36,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 translatePage();
 
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
@@ -61,7 +61,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted" data-i18n="generales.admin">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_admin">Admin</li>
                     <li class="breadcrumb-item text-muted" data-i18n="facturacion.titulo">Facturación</li>
                     <li class="breadcrumb-item active">
                         <span class="badge bg-primary px-2 py-1" data-i18n="facturacion.por_investigador">Por Investigador</span>
@@ -77,12 +77,12 @@
 
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h5 class="fw-bold m-0"><i class="bi bi-person-vcard text-primary me-2"></i>Estado de Cuenta del Investigador</h5>
-                    <p class="text-muted small mb-0">Gestión de deudas agrupadas por protocolos y suministros individuales.</p>
+                    <h5 class="fw-bold m-0"><i class="bi bi-person-vcard text-primary me-2"></i><span data-i18n="facturacion.titulo_estado_cuenta_inv"></span></h5>
+                    <p class="text-muted small mb-0" data-i18n="facturacion.subtitulo_estado_cuenta_inv"></p>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm" onclick="window.downloadGlobalPDF()">
-                        <i class="bi bi-file-earmark-pdf me-1"></i> REPORTE INDIVIDUAL
+                        <i class="bi bi-file-earmark-pdf me-1"></i> <span data-i18n="facturacion.reporte_individual"></span>
                     </button>
                     <button type="button" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" onclick="window.abrirAyudaBilling()">
                         <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda">AYUDA</span>
@@ -92,10 +92,10 @@
 
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
                 <div class="col-md-3">
-                    <label class="form-label fw-bold small text-muted uppercase">Investigador Responsable</label>
-                    <input type="text" id="busqueda-investigador" class="form-control form-control-sm mb-2" placeholder="Filtrar por nombre o ID...">
+                    <label class="form-label fw-bold small text-muted uppercase" data-i18n="facturacion.label_investigador_responsable"></label>
+                    <input type="text" id="busqueda-investigador" class="form-control form-control-sm mb-2" data-i18n="facturacion.ph_filtrar_inv" placeholder="Filtrar por nombre o ID...">
                     <select id="sel-investigador" class="form-select form-select-sm border-primary shadow-sm">
-                        <option value="">-- SELECCIONAR --</option>
+                        <option value="" data-i18n="facturacion.opcion_seleccionar"></option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -144,7 +144,7 @@
             <div id="billing-results" class="mt-2">
                 <div class="text-center py-5 text-muted">
                     <i class="bi bi-person-search display-1 opacity-25"></i>
-                    <p class="mt-3">Seleccione un investigador y rango de fechas para ver el detalle de cobros.</p>
+                    <p class="mt-3" data-i18n="facturacion.empty_inv"></p>
                 </div>
             </div>
         </div>
@@ -154,15 +154,15 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow-lg border-top border-5 border-primary">
                 <div class="modal-header bg-light py-2">
-                    <h5 class="modal-title fw-bold text-primary">Ayuda: Facturación por Investigador</h5>
+                    <h5 class="modal-title fw-bold text-primary" data-i18n="facturacion.help_inv_title"></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4 text-secondary">
-                    <p>Esta sección consolida todos los gastos de un <b>Titular de Protocolo</b>.</p>
+                    <p data-i18n="facturacion.help_inv_intro"></p>
                     <ul>
-                        <li><b>Saldos:</b> El saldo mostrado arriba es el total disponible del investigador en la institución.</li>
-                        <li><b>Agrupación:</b> Los consumos se agrupan por protocolo para facilitar la rendición de cuentas.</li>
-                        <li><b>PDF Individual:</b> Puede generar un estado de cuenta específico para el investigador desde el botón superior rojo.</li>
+                        <li><b data-i18n="facturacion.help_inv_saldos"></b></li>
+                        <li><b data-i18n="facturacion.help_inv_agrupacion"></b></li>
+                        <li><b data-i18n="facturacion.help_inv_pdf"></b></li>
                     </ul>
                 </div>
             </div>

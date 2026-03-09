@@ -38,7 +38,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         // Lógica de estadísticas (Charts, reportes y métricas globales)
         import { initStatsPage } from '../../dist/js/pages/admin/GeckoStats.js';
 
@@ -49,7 +49,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Detiene la ejecución hasta que el diccionario esté disponible para los gráficos
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos y Superadmin)
                 Auth.checkAccess([1, 2, 4,5,6]); 
@@ -61,6 +61,7 @@
                     
                     // Inicialización de la lógica de estadísticas avanzada
                     initStatsPage();
+                    translatePage();
                     
                     console.log("✅ Panel de Estadísticas inicializado correctamente.");
                 } else {
@@ -92,35 +93,35 @@
                     
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_estadisticas.bread_grobo"></li>
                     <li class="breadcrumb-item text-muted" id="institucionbread"></li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_estadisticas.bread_admin"></li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Estadisticas</span>
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="admin_estadisticas.bread_estadisticas"></span>
                     </li>
                 </ol>
             </nav>
 
-                    <h5 class="fw-bold mb-4">Panel de Control Estadístico</h5>
+                    <h5 class="fw-bold mb-4" data-i18n="admin_estadisticas.titulo"></h5>
 
                     <div class="row g-3 align-items-end mb-4 pb-3 border-bottom">
                         <div class="col-md-3">
-                            <label class="small fw-bold">DESDE:</label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.desde"></label>
                             <input type="date" id="stats-from" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
-                            <label class="small fw-bold">HASTA:</label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.hasta"></label>
                             <input type="date" id="stats-to" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-2">
-                            <label class="small fw-bold">VISUALIZACIÓN:</label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion"></label>
                             <select id="chart-type" class="form-select form-select-sm">
-                                <option value="bar">Torres (Barras)</option>
-                                <option value="pie">Queso (Circular)</option>
+                                <option value="bar" data-i18n="admin_estadisticas.chart_barras"></option>
+                                <option value="pie" data-i18n="admin_estadisticas.chart_circular"></option>
                             </select>
                         </div>
                         <div class="col-md-4 d-flex gap-2 justify-content-end">
-                            <button class="btn btn-success fw-bold px-4" id="btn-update-stats" style="background-color: #1a5d3b;">ACTUALIZAR</button>
+                            <button class="btn btn-success fw-bold px-4" id="btn-update-stats" style="background-color: #1a5d3b;" data-i18n="admin_estadisticas.btn_actualizar"></button>
                             <button class="btn btn-outline-success btn-sm px-3 fw-bold" id="btn-excel-stats" title="Exportar Excel Global"><i class="bi bi-file-earmark-excel"></i></button>
                             <button class="btn btn-outline-danger btn-sm px-3 fw-bold" id="btn-pdf-stats" title="Exportar PDF Global"><i class="bi bi-file-pdf"></i></button>
                         </div>
@@ -128,27 +129,27 @@
 
                     <div class="card mb-4 border-0 shadow-sm bg-white">
                         <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
-                            <span class="small fw-bold text-muted"><i class="bi bi-funnel-fill"></i> FILTROS VISUALES:</span>
+                            <span class="small fw-bold text-muted"><i class="bi bi-funnel-fill"></i> <span data-i18n="admin_estadisticas.filtros_visuales"></span></span>
                             
                             <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input col-chk" type="checkbox" id="chk-ani" data-col="1" checked>
-                                <label class="form-check-label small fw-bold text-success" for="chk-ani">Animales</label>
+                                <label class="form-check-label small fw-bold text-success" for="chk-ani" data-i18n="admin_estadisticas.label_animales"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input col-chk" type="checkbox" id="chk-rea" data-col="2" checked>
-                                <label class="form-check-label small fw-bold text-warning" for="chk-rea">Reactivos</label>
+                                <label class="form-check-label small fw-bold text-warning" for="chk-rea" data-i18n="admin_estadisticas.label_reactivos"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input col-chk" type="checkbox" id="chk-ins" data-col="3" checked>
-                                <label class="form-check-label small fw-bold text-secondary" for="chk-ins">Insumos</label>
+                                <label class="form-check-label small fw-bold text-secondary" for="chk-ins" data-i18n="admin_estadisticas.label_insumos"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input col-chk" type="checkbox" id="chk-pro" data-col="4" checked>
-                                <label class="form-check-label small fw-bold text-primary" for="chk-pro">Prot. Aprob</label>
+                                <label class="form-check-label small fw-bold text-primary" for="chk-pro" data-i18n="admin_estadisticas.label_prot_aprob"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input col-chk" type="checkbox" id="chk-alo" data-col="5" checked>
-                                <label class="form-check-label small fw-bold text-info" for="chk-alo">Aloj. Activos</label>
+                                <label class="form-check-label small fw-bold text-info" for="chk-alo" data-i18n="admin_estadisticas.label_aloj_activos"></label>
                             </div>
                         </div>
                     </div>
@@ -156,30 +157,30 @@
                     <div id="stats-content" style="display: none;">
 
                         <div class="row g-3 mb-4">
-                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold">ANIMALES</small><h2 class="mb-0 fw-bold text-success" id="box-animales">0</h2></div></div>
-                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold">REACTIVOS</small><h2 class="mb-0 fw-bold text-warning" id="box-reactivos">0</h2></div></div>
-                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold">INSUMOS</small><h2 class="mb-0 fw-bold text-secondary" id="box-insumos">0</h2></div></div>
-                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold">PROT. APROB</small><h2 class="mb-0 fw-bold text-primary" id="box-protocolos">0</h2></div></div>
-                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold">ALOJ. ACTIVOS</small><h2 class="mb-0 fw-bold text-info" id="box-alojamientos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_animales"></small><h2 class="mb-0 fw-bold text-success" id="box-animales">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_reactivos"></small><h2 class="mb-0 fw-bold text-warning" id="box-reactivos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_insumos"></small><h2 class="mb-0 fw-bold text-secondary" id="box-insumos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_protocolos"></small><h2 class="mb-0 fw-bold text-primary" id="box-protocolos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_alojamientos"></small><h2 class="mb-0 fw-bold text-info" id="box-alojamientos">0</h2></div></div>
                         </div>
 
-                        <h6 class="fw-bold mb-2 text-secondary border-bottom pb-2"><i class="bi bi-houses"></i> Alojamientos y Trazabilidad</h6>
+                        <h6 class="fw-bold mb-2 text-secondary border-bottom pb-2"><i class="bi bi-houses"></i> <span data-i18n="admin_estadisticas.seccion_aloj_traz"></span></h6>
                         <div id="alojamiento-trazabilidad-section" class="row g-3 mb-4"></div>
 
                         <div class="row mb-5">
                             <div class="col-lg-7 mb-4 mb-lg-0">
                                 <div class="card shadow-sm border-0 h-100">
-                                    <div class="card-header bg-white fw-bold">DESGLOSE POR DEPARTAMENTO</div>
+                                    <div class="card-header bg-white fw-bold" data-i18n="admin_estadisticas.desglose_depto"></div>
                                     <div class="table-responsive">
                                         <table class="table table-hover align-middle mb-0" style="font-size: 11px;" id="main-stats-table">
                                             <thead class="table-light text-uppercase">
                                                 <tr>
-                                                    <th>Departamento</th>
-                                                    <th class="text-center col-val-1">Animales</th>
-                                                    <th class="text-center col-val-2">Reactivos</th>
-                                                    <th class="text-center col-val-3">Insumos</th>
-                                                    <th class="text-center col-val-4">Prot. Aprob</th>
-                                                    <th class="text-center col-val-5">Aloj. Activos</th>
+                                                    <th data-i18n="admin_estadisticas.th_departamento"></th>
+                                                    <th class="text-center col-val-1" data-i18n="admin_estadisticas.th_animales"></th>
+                                                    <th class="text-center col-val-2" data-i18n="admin_estadisticas.th_reactivos"></th>
+                                                    <th class="text-center col-val-3" data-i18n="admin_estadisticas.th_insumos"></th>
+                                                    <th class="text-center col-val-4" data-i18n="admin_estadisticas.th_prot_aprob"></th>
+                                                    <th class="text-center col-val-5" data-i18n="admin_estadisticas.th_aloj_activos"></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="table-body-stats"></tbody>
@@ -191,7 +192,7 @@
                             <div class="col-lg-5">
                                 <div class="card shadow-sm border-0 h-100">
                                     <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
-                                        <span>ESTADÍSTICAS POR DEPTO</span>
+                                        <span data-i18n="admin_estadisticas.estadisticas_depto"></span>
                                         <div class="chart-header-actions">
                                             <button class="btn btn-outline-danger me-1" onclick="exportChartToPDF('chart-canvas', 'Grafico_Deptos')" title="Descargar PDF"><i class="bi bi-file-pdf"></i></button>
                                             <button class="btn btn-light text-secondary border" onclick="viewChartFullScreen('main')" title="Pantalla Completa"><i class="bi bi-arrows-fullscreen"></i></button>
@@ -205,7 +206,7 @@
                         </div>
 
                         <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">
-                            <i class="bi bi-trophy"></i> Top Especies Utilizadas
+                            <i class="bi bi-trophy"></i> <span data-i18n="admin_estadisticas.top_especies"></span>
                         </h5>
                         <div id="species-counters-container" class="row g-3 mb-4">
                             </div>
@@ -215,10 +216,10 @@
                                 <div class="card shadow-sm border-0">
                                     <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
                                         <div class="d-flex align-items-center gap-2">
-                                            <span>USO DE ESPECIES (TODAS)</span>
+                                            <span data-i18n="admin_estadisticas.uso_especies"></span>
                                             <select id="species-chart-type" class="form-select form-select-sm" style="width: 120px;">
-                                                <option value="bar">Torres (H)</option>
-                                                <option value="pie">Queso</option>
+                                                <option value="bar" data-i18n="admin_estadisticas.chart_torres"></option>
+                                                <option value="pie" data-i18n="admin_estadisticas.chart_queso"></option>
                                             </select>
                                         </div>
                                         <div class="chart-header-actions">
@@ -236,7 +237,7 @@
                         </div>
 
                         <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">
-                            <i class="bi bi-list-nested"></i> Desglose Detallado por Departamento
+                            <i class="bi bi-list-nested"></i> <span data-i18n="admin_estadisticas.desglose_detallado"></span>
                         </h5>
                         <div id="details-container" class="row g-4"></div>
 
@@ -244,7 +245,7 @@
                         <div class="modal-dialog modal-xl modal-dialog-centered">
                             <div class="modal-content">
                                 <div class="modal-header border-0">
-                                    <h5 class="modal-title fw-bold">Vista Detallada</h5>
+                                    <h5 class="modal-title fw-bold" data-i18n="admin_estadisticas.modal_vista_detallada"></h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body" style="height: 600px;">

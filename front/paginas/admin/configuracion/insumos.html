@@ -18,7 +18,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica para la configuración de insumos generales
         import { initConfigInsumos } from '../../../dist/js/pages/admin/configuracion/config_insumos.js';
 
@@ -28,7 +28,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo para i18n
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Administradores)
                 Auth.checkAccess([1, 2]); 
@@ -45,6 +45,7 @@
                     
                     // Inicialización de la lógica de catálogo de insumos generales
                     initConfigInsumos();
+                    translatePage();
                     
                     console.log("✅ Configuración de Insumos inicializada correctamente.");
                 } else {
@@ -71,26 +72,26 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_insumos_cat.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_insumos_cat.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-secondary px-2 py-1">Insumos Generales</span>
+                    <span class="badge bg-secondary px-2 py-1" data-i18n="config_insumos_cat.bread_insumos"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">CATÁLOGO DE MATERIALES</h4>
-                <p class="text-muted small mb-0 mt-1">Gestión de insumos básicos (cajas, alimento, viruta)</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_insumos_cat.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_insumos_cat.subtitulo"></p>
             </div>
             <div class="d-flex gap-2">
                 <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                    <i class="bi bi-arrow-left me-2"></i> VOLVER
+                    <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_insumos_cat.btn_volver"></span>
                 </a>
                 <button class="btn btn-secondary shadow-sm fw-bold" onclick="window.openModalInsumo()">
-                    <i class="bi bi-box-seam me-2"></i> NUEVO INSUMO
+                    <i class="bi bi-box-seam me-2"></i> <span data-i18n="config_insumos_cat.btn_nuevo_insumo"></span>
                 </button>
             </div>
         </div>
@@ -101,11 +102,11 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light text-secondary text-uppercase small">
                             <tr>
-                                <th class="ps-4">Nombre Insumo</th>
-                                <th class="text-center">Presentación / Medida</th>
-                                <th>Categoría</th>
-                                <th class="text-center">Estado</th>
-                                <th class="text-end pe-4">Acciones</th>
+                                <th class="ps-4" data-i18n="config_insumos_cat.th_nombre"></th>
+                                <th class="text-center" data-i18n="config_insumos_cat.th_presentacion"></th>
+                                <th data-i18n="config_insumos_cat.th_categoria"></th>
+                                <th class="text-center" data-i18n="config_insumos_cat.th_estado"></th>
+                                <th class="text-end pe-4" data-i18n="config_insumos_cat.th_acciones"></th>
                             </tr>
                         </thead>
                         <tbody id="table-insumos"></tbody>
@@ -120,7 +121,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-secondary text-white py-2">
-                    <h6 class="modal-title fw-bold">GESTIÓN DE INSUMO</h6>
+                    <h6 class="modal-title fw-bold" data-i18n="config_insumos_cat.modal_titulo"></h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -128,18 +129,18 @@
                         <input type="hidden" name="idInsumo" id="ins-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">NOMBRE DEL MATERIAL</label>
-                            <input type="text" name="NombreInsumo" id="ins-nombre" class="form-control fw-bold" placeholder="Ej: Viruta, Caja Chica" required>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_nombre_material"></label>
+                            <input type="text" name="NombreInsumo" id="ins-nombre" class="form-control fw-bold" data-i18n="config_insumos_cat.ph_material" placeholder="Ej: Viruta, Caja Chica" required>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-4">
-                                <label class="form-label small fw-bold text-muted">CANTIDAD BASE</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_cantidad_base"></label>
                                 <input type="number" name="CantidadInsumo" id="ins-cant" class="form-control" step="0.01" value="1" required>
                             </div>
                             <div class="col-8">
-                                <label class="form-label small fw-bold text-muted">TIPO MEDIDA</label>
-                                <input type="text" name="TipoInsumo" id="ins-tipo" class="form-control" placeholder="Ej: Kg, Paquete, Bolsa" required>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_tipo_medida"></label>
+                                <input type="text" name="TipoInsumo" id="ins-tipo" class="form-control" data-i18n="config_insumos_cat.ph_tipo" placeholder="Ej: Kg, Paquete, Bolsa" required>
                             </div>
                         </div>
 
@@ -148,7 +149,7 @@
 
                         <div class="mb-3" id="status-container"></div>
 
-                        <button type="submit" class="btn btn-secondary w-100 fw-bold shadow-sm">GUARDAR CAMBIOS</button>
+                        <button type="submit" class="btn btn-secondary w-100 fw-bold shadow-sm" data-i18n="config_insumos_cat.btn_guardar"></button>
                     </form>
                 </div>
             </div>

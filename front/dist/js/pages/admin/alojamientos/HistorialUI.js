@@ -232,13 +232,14 @@ renderTable() {
 
     async confirmarFinalizarRango(historiaId, ultimaFechaInicio) {
         const hoy = new Date().toISOString().split('T')[0];
+        const txt = window.txt?.alojamientos || {};
         const { value: fechaFin, isConfirmed } = await Swal.fire({
-            title: 'Finalizar Alojamiento',
-            html: `<div class="text-start small alert alert-warning">Se marcará la estadía como <b>FINALIZADA</b>.<br>El sistema calculará el costo total.</div>
-                   <label class="fw-bold small">FECHA DE RETIRO:</label>
+            title: txt.historial_finish_title || 'Finalizar Alojamiento',
+            html: `<div class="text-start small alert alert-warning">${txt.historial_finish_html || 'Se marcará la estadía como <b>FINALIZADA</b>.'}</div>
+                   <label class="fw-bold small">${txt.historial_fecha_retiro || 'FECHA DE RETIRO:'}</label>
                    <input type="date" id="swal-fecha-fin" class="form-control" value="${hoy}" min="${ultimaFechaInicio}">`,
-            icon: 'info', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: 'CONFIRMAR FINALIZACIÓN',
-            preConfirm: () => document.getElementById('swal-fecha-fin').value || Swal.showValidationMessage("La fecha es obligatoria")
+            icon: 'info', showCancelButton: true, confirmButtonColor: '#dc3545', confirmButtonText: txt.historial_confirm_finish || 'CONFIRMAR FINALIZACIÓN',
+            preConfirm: () => document.getElementById('swal-fecha-fin').value || Swal.showValidationMessage(txt.historial_fecha_required || "La fecha es obligatoria")
         });
 
         if (isConfirmed) {
@@ -246,7 +247,7 @@ renderTable() {
             try {
                 const res = await API.request('/alojamiento/finalizar', 'POST', { historia: historiaId, hastafecha: fechaFin, finalizado: 1 });
                 if (res.status === 'success') {
-                    Swal.fire('¡Finalizado!', 'La estadía ha sido cerrada y facturada.', 'success');
+                    Swal.fire(txt.historial_finalizado_ok || '¡Finalizado!', txt.historial_cerrada_msg || 'La estadía ha sido cerrada y facturada.', 'success');
                     bootstrap.Modal.getInstance(document.getElementById('modal-historial'))?.hide();
                     await loadAlojamientos(); 
                 } else Swal.fire('Error', res.message, 'error');
@@ -255,10 +256,11 @@ renderTable() {
     },
 
     async confirmarDesfinalizar(historiaId) {
+        const txt = window.txt?.alojamientos || {};
         const { isConfirmed } = await Swal.fire({
-            title: '¿Reabrir esta estadía?',
-            text: "El último tramo volverá a quedar como 'VIGENTE'.",
-            icon: 'question', showCancelButton: true, confirmButtonColor: '#f39c12', confirmButtonText: 'SÍ, REABRIR'
+            title: txt.historial_reopen_title || '¿Reabrir esta estadía?',
+            text: txt.historial_reopen_text || "El último tramo volverá a quedar como 'VIGENTE'.",
+            icon: 'question', showCancelButton: true, confirmButtonColor: '#f39c12', confirmButtonText: txt.historial_reopen_btn || 'SÍ, REABRIR'
         });
 
         if (isConfirmed) {
@@ -266,7 +268,7 @@ renderTable() {
             try {
                 const res = await API.request('/alojamiento/desfinalizar', 'POST', { historia: historiaId });
                 if (res.status === 'success') {
-                    Swal.fire('Reabierto', 'La estadía está vigente nuevamente.', 'success');
+                    Swal.fire(txt.historial_reopened || 'Reabierto', txt.historial_vigente_again || 'La estadía está vigente nuevamente.', 'success');
                     await loadAlojamientos();
                     setTimeout(() => this.verHistorial(historiaId), 500);
                 }
@@ -283,6 +285,7 @@ renderTable() {
     async abrirConfiguracion() {
         const first = AlojamientoState.currentHistoryData[0];
         if(!first) return;
+        const txt = window.txt?.alojamientos || {};
 
         this.cfgSelections = {
             historia: first.historia,
@@ -293,7 +296,7 @@ renderTable() {
             IdTipoAlojamiento: parseInt(first.IdTipoAlojamiento)
         };
 
-        document.getElementById('modal-cfg-title').innerText = `CONFIGURACIÓN MAESTRA - HISTORIA #${first.historia}`;
+        document.getElementById('modal-cfg-title').innerText = `${txt.cfg_master_title || 'CONFIGURACIÓN MAESTRA - HISTORIA #'}${first.historia}`;
 
         showLoader();
         try {
@@ -397,9 +400,9 @@ renderTable() {
             <tr id="cfg-row-prot-${p.idprotA}" onclick="window.cfgSelectProtocolo(${p.idprotA})" class="transition-colors ${p.idprotA == this.cfgSelections.idprotA ? 'table-primary border-primary' : ''}">
                 <td class="fw-bold text-muted">#${p.idprotA}</td>
                 <td class="fw-bold text-primary">${p.nprotA}</td>
-                <td class="text-truncate" style="max-width: 150px;">${p.tituloA || 'Sin Título'}</td>
+                <td class="text-truncate" style="max-width: 150px;">${p.tituloA || (window.txt?.alojamientos?.cfg_sin_titulo || 'Sin Título')}</td>
                 <td class="text-info fw-bold" style="font-size: 10px;">${p.DeptoProtocoloFormat || '---'}</td>
-                <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || 'Sin Asignar'}</td>
+                <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || (window.txt?.alojamientos?.cfg_sin_asignar || 'Sin Asignar')}</td>
             </tr>
         `).join('');
     },
@@ -477,7 +480,8 @@ renderTable() {
 
     async loadCfgTipos(idEsp) {
         const container = document.getElementById('cfg-list-tipos');
-        container.innerHTML = '<div class="spinner-border spinner-border-sm text-danger"></div> Buscando estructuras...';
+        const txt = window.txt?.alojamientos || {};
+        container.innerHTML = `<div class="spinner-border spinner-border-sm text-danger"></div> ${txt.cfg_buscando_estructuras || 'Buscando estructuras...'}`;
 
         try {
             const res = await API.request(`/alojamiento/tipos-por-especie?idEsp=${idEsp}`);
@@ -497,7 +501,7 @@ renderTable() {
                         this.cfgSelectTipo(this.cfgSelections.IdTipoAlojamiento);
                     }
                 } else {
-                    container.innerHTML = '<div class="alert alert-danger small p-2 m-0"><i class="bi bi-exclamation-circle"></i> No hay estructuras tarifadas para esta especie.</div>';
+                    container.innerHTML = `<div class="alert alert-danger small p-2 m-0"><i class="bi bi-exclamation-circle"></i> ${txt.cfg_no_estructuras || 'No hay estructuras tarifadas para esta especie.'}</div>`;
                 }
             }
         } catch (e) { console.error("Error cargando tipos:", e); }
@@ -525,16 +529,17 @@ renderTable() {
         if (selDepto) this.cfgSelections.departamento = parseInt(selDepto.value);
 
         const data = this.cfgSelections;
+        const txt = window.txt?.alojamientos || {};
         if (!data.idprotA || !data.IdUsrA || !data.idespA || !data.IdTipoAlojamiento || !data.departamento) {
-            return Swal.fire('Faltan Datos', 'Asegúrese de tener seleccionado un Protocolo, Usuario, Departamento, Especie y Estructura.', 'warning');
+            return Swal.fire(txt.cfg_faltan_datos || 'Faltan Datos', txt.cfg_faltan_datos_msg || 'Asegúrese de tener seleccionado un Protocolo, Usuario, Departamento, Especie y Estructura.', 'warning');
         }
 
         const confirm = await Swal.fire({
-            title: '¿Confirmar Modificación?',
-            text: `Se recalcularán los precios y se actualizará toda la historia #${data.historia}.`,
+            title: txt.cfg_confirm_title || '¿Confirmar Modificación?',
+            text: (txt.cfg_confirm_text || 'Se recalcularán los precios y se actualizará toda la historia #{n}.').replace('{n}', data.historia),
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'SÍ, APLICAR',
+            confirmButtonText: txt.cfg_confirm_btn || 'SÍ, APLICAR',
             confirmButtonColor: '#dc3545',
             target: document.getElementById('modal-config-historia')
         });
@@ -545,7 +550,7 @@ renderTable() {
                 const res = await API.request('/alojamiento/update-config', 'POST', data);
                 if (res.status === 'success') {
                     bootstrap.Modal.getInstance(document.getElementById('modal-config-historia')).hide();
-                    Swal.fire({title: 'Éxito', text: 'Se reconfiguró toda la historia.', icon: 'success', timer: 1500});
+                    Swal.fire({title: txt.cfg_exito || 'Éxito', text: txt.cfg_reconfigurado || 'Se reconfiguró toda la historia.', icon: 'success', timer: 1500});
                     this.verHistorial(data.historia); 
                     loadAlojamientos(); 
                 } else {

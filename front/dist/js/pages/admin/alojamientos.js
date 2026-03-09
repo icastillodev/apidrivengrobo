@@ -68,7 +68,8 @@ window.verPaginaQR = async (historiaId = null) => {
     
     try {
         // 1. Mostramos un pequeño loading porque vamos a hablar con el Backend
-        Swal.fire({ title: 'Generando enlace seguro...', didOpen: () => Swal.showLoading() });
+        const t = window.txt?.alojamientos;
+        Swal.fire({ title: t?.qr_generating_link || 'Generando enlace seguro...', didOpen: () => Swal.showLoading() });
 
         // 2. Pedimos (o creamos) el token único de 6 letras para esta historia
         const res = await API.request('/alojamiento/generar-qr', 'POST', { historia: id });
@@ -80,10 +81,11 @@ window.verPaginaQR = async (historiaId = null) => {
             const url = `${basePath}qr/${res.codigo}`;
             window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
         } else {
-            throw new Error(res.message || "Error al generar el token de seguridad.");
+            throw new Error(res.message || (t?.qr_error_token || "Error al generar el token de seguridad."));
         }
     } catch (error) {
         console.error(error);
-        Swal.fire('Error', 'No se pudo generar el enlace del QR.', 'error');
+        const t = window.txt?.alojamientos;
+        Swal.fire('Error', t?.qr_error_link || 'No se pudo generar el enlace del QR.', 'error');
     }
 };

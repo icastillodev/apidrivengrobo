@@ -22,7 +22,7 @@
     import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
     import { NotificationManager } from '../../dist/js/NotificationManager.js';
     import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-    import { loadLanguage } from '../../dist/js/utils/i18n.js';
+    import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
     import { initProfile } from '../../dist/js/pages/usuario/perfil.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -31,10 +31,14 @@
         try {
             // 1. CARGA CRÍTICA: Idioma
             // Bloqueamos hasta que window.txt esté listo para las etiquetas del perfil
-            await loadLanguage(); 
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+            if (window.txt) translatePage();
 
-            // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
-            Auth.checkAccess([1, 2, 3 , 4, , 5 , 6]); 
+// 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3, 4, 5, 6)
+            if (!Auth.checkAccess([1, 2, 3, 4, 5, 6])) {
+                hideLoader();
+                return;
+            }
 
             // 3. INICIALIZACIÓN DE COMPONENTES
             if (window.txt) {
@@ -66,7 +70,7 @@
     <div class="container my-5 px-4">
         
         <div class="d-flex align-items-center mb-4 border-bottom pb-3">
-            <h4 class="fw-bold mb-0 text-dark text-uppercase">Mi Perfil</h4>
+            <h4 class="fw-bold mb-0 text-dark text-uppercase" data-i18n="perfil.titulo">Mi Perfil</h4>
         </div>
 
         <div class="row g-4">
@@ -78,7 +82,7 @@
                                 <i class="bi bi-person-fill" style="font-size: 3rem;"></i>
                             </div>
                         </div>
-                        <h5 class="fw-bold mb-1" id="lbl-nombre-completo">Cargando...</h5>
+                        <h5 class="fw-bold mb-1" id="lbl-nombre-completo"><span data-i18n="perfil.cargando">Cargando...</span></h5>
                         <p class="text-muted small mb-3" id="lbl-usuario">@usuario</p>
                         <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2" id="lbl-institucion">...</span>
                     </div>
@@ -88,29 +92,29 @@
             <div class="col-lg-8">
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white border-0 py-3">
-                        <h6 class="fw-bold text-primary mb-0"><i class="bi bi-pencil-square me-2"></i>DATOS PERSONALES</h6>
+                        <h6 class="fw-bold text-primary mb-0"><i class="bi bi-pencil-square me-2"></i><span data-i18n="perfil.datos_personales">DATOS PERSONALES</span></h6>
                     </div>
                     <div class="card-body p-4">
                         <form id="form-personal">
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Nombre</label>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_nombre">Nombre</label>
                                     <input type="text" name="nombre" id="input-nombre" class="form-control fw-bold" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Apellido</label>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_apellido">Apellido</label>
                                     <input type="text" name="apellido" id="input-apellido" class="form-control fw-bold" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Correo Electrónico</label>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_email">Correo Electrónico</label>
                                     <input type="email" name="email" id="input-email" class="form-control" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Celular / Teléfono</label>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_celular">Celular / Teléfono</label>
                                     <input type="text" name="celular" id="input-celular" class="form-control">
                                 </div>
                                 <div class="col-12 text-end mt-4">
-                                    <button type="submit" class="btn btn-primary fw-bold shadow-sm px-4">GUARDAR CAMBIOS</button>
+                                    <button type="submit" class="btn btn-primary fw-bold shadow-sm px-4" data-i18n="perfil.btn_guardar">GUARDAR CAMBIOS</button>
                                 </div>
                             </div>
                         </form>
@@ -119,25 +123,25 @@
 
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3">
-                        <h6 class="fw-bold text-danger mb-0"><i class="bi bi-shield-lock me-2"></i>SEGURIDAD</h6>
+                        <h6 class="fw-bold text-danger mb-0"><i class="bi bi-shield-lock me-2"></i><span data-i18n="perfil.seguridad">SEGURIDAD</span></h6>
                     </div>
                     <div class="card-body p-4">
                         <form id="form-security">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label small fw-bold text-muted">Contraseña Actual</label>
-                                    <input type="password" id="pass-current" class="form-control" placeholder="Ingrese su contraseña actual para confirmar" required>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_pass_actual">Contraseña Actual</label>
+                                    <input type="password" id="pass-current" class="form-control" data-i18n="perfil.ph_pass_actual" placeholder="Ingrese su contraseña actual para confirmar" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Nueva Contraseña</label>
-                                    <input type="password" id="pass-new" class="form-control" placeholder="Mínimo 6 caracteres" required>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_nueva_pass">Nueva Contraseña</label>
+                                    <input type="password" id="pass-new" class="form-control" data-i18n="perfil.ph_nueva_min" placeholder="Mínimo 6 caracteres" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted">Confirmar Nueva</label>
-                                    <input type="password" id="pass-confirm" class="form-control" placeholder="Repita la nueva contraseña" required>
+                                    <label class="form-label small fw-bold text-muted" data-i18n="perfil.label_confirmar_nueva">Confirmar Nueva</label>
+                                    <input type="password" id="pass-confirm" class="form-control" data-i18n="perfil.ph_repetir_nueva" placeholder="Repita la nueva contraseña" required>
                                 </div>
                                 <div class="col-12 text-end mt-4">
-                                    <button type="submit" class="btn btn-outline-danger fw-bold shadow-sm px-4">ACTUALIZAR CONTRASEÑA</button>
+                                    <button type="submit" class="btn btn-outline-danger fw-bold shadow-sm px-4" data-i18n="perfil.btn_actualizar_pass">ACTUALIZAR CONTRASEÑA</button>
                                 </div>
                             </div>
                         </form>

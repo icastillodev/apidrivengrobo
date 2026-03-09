@@ -14,9 +14,10 @@ export const DashboardUI = {
             this.renderAdminDashboard(stats);
         } catch (error) {
             console.error("Error cargando el Dashboard:", error);
+            const t = window.txt?.admin_dashboard;
             document.getElementById('dashboard-grid').innerHTML = `
                 <div class="col-12 alert alert-danger text-center shadow-sm border-0 font-bold">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i> No se pudieron cargar las métricas.
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> ${t?.error_metricas || 'No se pudieron cargar las métricas.'}
                 </div>
             `;
         }
@@ -25,6 +26,7 @@ export const DashboardUI = {
     renderAdminDashboard() {
         const grid = document.getElementById('dashboard-grid');
         if (!grid) return;
+        const t = window.txt?.admin_dashboard;
 
         grid.innerHTML = `
             <div class="col-12 col-md-6 col-lg-4">
@@ -33,12 +35,12 @@ export const DashboardUI = {
                         <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-earmark-medical fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Protocolos</h5>
-                        <span class="small text-muted fw-semibold">Gestión de protocolos experimentales</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_protocolos || 'Protocolos'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_protocolos_desc || 'Gestión de protocolos experimentales'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./protocolos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -50,12 +52,12 @@ export const DashboardUI = {
                         <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-bug fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Pedidos de Animales</h5>
-                        <span class="small text-muted fw-semibold">Solicitudes y seguimiento</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_animales || 'Pedidos de Animales'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_animales_desc || 'Solicitudes y seguimiento'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./animales';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -67,12 +69,12 @@ export const DashboardUI = {
                         <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-eyedropper fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Reactivos Biológicos</h5>
-                        <span class="small text-muted fw-semibold">Gestión de sustancias y pedidos</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_reactivos || 'Reactivos Biológicos'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_reactivos_desc || 'Gestión de sustancias y pedidos'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./reactivos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -84,12 +86,12 @@ export const DashboardUI = {
                         <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-box-seam fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Insumos</h5>
-                        <span class="small text-muted fw-semibold">Materiales y equipamiento</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_insumos || 'Insumos'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_insumos_desc || 'Materiales y equipamiento'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./insumos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -101,12 +103,12 @@ export const DashboardUI = {
                         <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-houses-fill fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Alojamientos</h5>
-                        <span class="small text-muted fw-semibold">Gestión de estadías y jaulas</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_alojamientos || 'Alojamientos'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_alojamientos_desc || 'Gestión de estadías y jaulas'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./alojamientos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -116,14 +118,14 @@ export const DashboardUI = {
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./precios'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
                         <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
-                            <i class="bi bi-cash-coin fs-2"></i>
+                            <i class="bi bi-currency-dollar fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Precios</h5>
-                        <span class="small text-muted fw-semibold">Tarifas y valores del sistema</span>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_precios || 'Precios'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_precios_desc || 'Tarifas y valores del sistema'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./precios';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -135,8 +137,8 @@ export const DashboardUI = {
                         <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-bar-chart-fill fs-1"></i>
                         </div>
-                        <h5 class="fw-bold mb-1 tracking-tight">Estadísticas</h5>
-                        <span class="small opacity-75">Métricas operativas y financieras</span>
+                        <h5 class="fw-bold mb-1 tracking-tight">${t?.card_estadisticas || 'Estadísticas'}</h5>
+                        <span class="small opacity-75">${t?.card_estadisticas_desc || 'Métricas operativas y financieras'}</span>
                     </div>
                 </div>
             </div>
@@ -146,24 +148,24 @@ export const DashboardUI = {
 
     // 🎯 Motor Inteligente: Si hay pedidos, rojo urgente. Si no, gris de navegación.
     generarBoton(cantidad, urlUrgente, urlNormal) {
+        const t = window.txt?.admin_dashboard;
         if (cantidad > 0) {
             return `
                 <div class="card-footer bg-danger bg-opacity-10 border-0 p-0 position-relative" style="z-index: 2;">
                     <button class="btn btn-link text-danger text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-between align-items-center px-4" 
                             onclick="event.stopPropagation(); window.location.href='${urlUrgente}';">
-                        <span style="font-size: 11px;" class="tracking-widest">PEDIDOS PARA RESPONDER</span>
+                        <span style="font-size: 11px;" class="tracking-widest">${t?.btn_pedidos_responder || 'PEDIDOS PARA RESPONDER'}</span>
                         <span class="badge bg-danger rounded-pill fs-6 px-3 shadow-sm">${cantidad}</span>
                     </button>
                 </div>
             `;
         }
-        
-        // Si no hay pedidos pendientes (0), mostramos el botón gris neutro
+
         return `
             <div class="card-footer bg-light border-0 p-0 position-relative" style="z-index: 2;">
                 <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center px-4" 
                         onclick="event.stopPropagation(); window.location.href='${urlNormal}';">
-                    <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                    <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                 </button>
             </div>
         `;

@@ -21,14 +21,19 @@
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
         import { initSuperInstituciones } from '../../dist/js/pages/superadmin/instituciones.js';
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
-        showLoader();
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         import { SuperAuth } from '../../dist/js/superAuth.js';
-        document.addEventListener('DOMContentLoaded', () => {
+        showLoader();
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                translatePage();
+            } catch (e) { /* i18n opcional */ }
             if (SuperAuth.checkMasterAccess([1])) {
-            initSuperMenu();
-            initSuperInstituciones();
-            hideLoader();
+                initSuperMenu();
+                initSuperInstituciones();
             }
+            hideLoader();
         });
     </script>
 
@@ -40,11 +45,11 @@
     <main class="container py-5">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h2 class="fw-bold text-dark">Gestión de Instituciones</h2>
-                <p class="text-muted">Administra las sedes activas y sus módulos habilitados en la red.</p>
+                <h2 class="fw-bold text-dark" data-i18n="superadmin_instituciones.titulo">Gestión de Instituciones</h2>
+                <p class="text-muted" data-i18n="superadmin_instituciones.subtitulo">Administra las sedes activas y sus módulos habilitados en la red.</p>
             </div>
             <button class="btn btn-primary fw-bold shadow-sm" onclick="abrirModalCrear()">
-                <i class="bi bi-plus-circle me-2"></i>NUEVA INSTITUCIÓN
+                <i class="bi bi-plus-circle me-2"></i><span data-i18n="superadmin_instituciones.btn_nueva">NUEVA INSTITUCIÓN</span>
             </button>
         </div>
 
@@ -52,7 +57,7 @@
             <div class="card-body">
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" id="busqueda" class="form-control border-start-0" placeholder="Buscar por nombre, ID o localidad...">
+                    <input type="text" id="busqueda" class="form-control border-start-0" data-i18n="superadmin_instituciones.ph_buscar" placeholder="Buscar por nombre, ID o localidad...">
                 </div>
             </div>
         </div>
@@ -62,15 +67,15 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">ID</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" style="min-width: 200px;">Institución / Sede</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Contacto</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Ubicación</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase">Facturación</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center" style="min-width: 180px;">Módulos Activos</th> 
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">Últ. Pago</th>
-                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center">CEUAS</th>
-                                <th class="text-center text-xs font-bold text-gray-500 uppercase">Estado</th>
+                                <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase" data-i18n="superadmin_instituciones.th_id">ID</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" style="min-width: 200px;" data-i18n="superadmin_instituciones.th_institucion">Institución / Sede</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" data-i18n="superadmin_instituciones.th_contacto">Contacto</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" data-i18n="superadmin_instituciones.th_ubicacion">Ubicación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase" data-i18n="superadmin_instituciones.th_facturacion">Facturación</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center" style="min-width: 180px;" data-i18n="superadmin_instituciones.th_modulos">Módulos Activos</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center" data-i18n="superadmin_instituciones.th_ult_pago">Últ. Pago</th>
+                                <th class="py-3 text-xs font-bold text-gray-500 uppercase text-center" data-i18n="superadmin_instituciones.th_ceuas">CEUAS</th>
+                                <th class="text-center text-xs font-bold text-gray-500 uppercase" data-i18n="superadmin_instituciones.th_estado">Estado</th>
                             </tr>
                         </thead>
                         <tbody id="tabla-sedes">
@@ -84,7 +89,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title fw-bold" id="modalLabel">Detalles de la Institución</h5>
+                    <h5 class="modal-title fw-bold" id="modalLabel" data-i18n="superadmin_instituciones.modal_titulo">Detalles de la Institución</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
@@ -93,102 +98,102 @@
                         
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Nombre Corto (Sede)</label>
-                                <input type="text" id="NombreInst" class="form-control" required placeholder="Ej: URBE">
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_corto">Nombre Corto (Sede)</label>
+                                <input type="text" id="NombreInst" class="form-control" required data-i18n="superadmin_instituciones.ph_nombre_corto" placeholder="Ej: URBE">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Correo Electrónico</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_correo">Correo Electrónico</label>
                                 <input type="email" id="InstCorreo" class="form-control" required>
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-bold">Nombre Completo Institucional</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_completo">Nombre Completo Institucional</label>
                                 <input type="text" id="NombreCompletoInst" class="form-control" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">País</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_pais">País</label>
                                 <input type="text" id="Pais" class="form-control" value="Uruguay">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Localidad</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_localidad">Localidad</label>
                                 <input type="text" id="Localidad" class="form-control">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Moneda</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_moneda">Moneda</label>
                                 <select id="Moneda" class="form-select">
-                                    <option value="UYU">Peso Uruguayo (UYU)</option>
-                                    <option value="USD">Dólar (USD)</option>
-                                    <option value="ARS">Peso Argentino (ARS)</option>
+                                    <option value="UYU" data-i18n="superadmin_instituciones.opcion_uyu">Peso Uruguayo (UYU)</option>
+                                    <option value="USD" data-i18n="superadmin_instituciones.opcion_usd">Dólar (USD)</option>
+                                    <option value="ARS" data-i18n="superadmin_instituciones.opcion_ars">Peso Argentino (ARS)</option>
                                 </select>
                             </div>
                             <div class="col-md-8">
-                                <label class="form-label fw-bold">Web Oficial</label>
-                                <input type="url" id="Web" class="form-control" placeholder="https://...">
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_web">Web Oficial</label>
+                                <input type="url" id="Web" class="form-control" data-i18n="superadmin_instituciones.ph_web" placeholder="https://...">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Dependencia (Grupo)</label>
-                                <input type="text" id="DependenciaInstitucion" class="form-control" placeholder="Ej: UDELAR">
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_dependencia">Dependencia (Grupo)</label>
+                                <input type="text" id="DependenciaInstitucion" class="form-control" data-i18n="superadmin_instituciones.ph_dependencia" placeholder="Ej: UDELAR">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">URL del Logo</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_logo">URL del Logo</label>
                                 <input type="text" id="Logo" class="form-control" placeholder="https://...">
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Permitir Otros CEUAS</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_otros_ceuas">Permitir Otros CEUAS</label>
                                 <select id="otrosceuas" class="form-select">
-                                    <option value="1">SÍ (Permitir)</option>
-                                    <option value="2">NO (Bloqueado)</option>
+                                    <option value="1" data-i18n="superadmin_instituciones.opcion_si">SÍ (Permitir)</option>
+                                    <option value="2" data-i18n="superadmin_instituciones.opcion_no">NO (Bloqueado)</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Tipo de App</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_tipo_app">Tipo de App</label>
                                 <select id="TipoApp" class="form-select">
-                                    <option value="1">1 - Común</option>
+                                    <option value="1" data-i18n="superadmin_instituciones.opcion_comun">1 - Común</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Estado Sede</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_estado_sede">Estado Sede</label>
                                 <select id="Activo" class="form-select">
-                                    <option value="1">Activa</option>
-                                    <option value="0">Inactiva (Bloqueada)</option>
+                                    <option value="1" data-i18n="superadmin_instituciones.opcion_activa">Activa</option>
+                                    <option value="0" data-i18n="superadmin_instituciones.opcion_inactiva">Inactiva (Bloqueada)</option>
                                 </select>
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-primary">Ciclo Facturación</label>
+                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_ciclo_fact">Ciclo Facturación</label>
                                 <select id="TipoFacturacion" class="form-select border-primary">
-                                    <option value="1">Mensual (1 mes)</option>
-                                    <option value="3">Trimestral (3 meses)</option>
-                                    <option value="6">Semestral (6 meses)</option>
-                                    <option value="12">Anual (12 meses)</option>
+                                    <option value="1" data-i18n="superadmin_instituciones.opcion_mensual">Mensual (1 mes)</option>
+                                    <option value="3" data-i18n="superadmin_instituciones.opcion_trimestral">Trimestral (3 meses)</option>
+                                    <option value="6" data-i18n="superadmin_instituciones.opcion_semestral">Semestral (6 meses)</option>
+                                    <option value="12" data-i18n="superadmin_instituciones.opcion_anual">Anual (12 meses)</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-primary">Fecha Contrato</label>
+                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_fecha_contrato">Fecha Contrato</label>
                                 <input type="date" id="FechaContrato" class="form-control border-primary">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Último Pago</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_ultimo_pago">Último Pago</label>
                                 <input type="date" id="UltimoPago" class="form-control">
                             </div>
                             
                             <div class="col-12">
-                                <label class="form-label fw-bold">Detalles / Observaciones Internas</label>
-                                <textarea id="Detalle" class="form-control" rows="2" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_detalles">Detalles / Observaciones Internas</label>
+                                <textarea id="Detalle" class="form-control" rows="2" data-i18n="superadmin_instituciones.ph_detalles" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
                             </div>
 
                             <div class="col-12 mt-4">
-                                <h6 class="fw-bold text-primary border-bottom pb-2 uppercase text-xs">Módulos de Sistema Habilitados</h6>
+                                <h6 class="fw-bold text-primary border-bottom pb-2 uppercase text-xs" data-i18n="superadmin_instituciones.modulos_titulo">Módulos de Sistema Habilitados</h6>
                                 <div id="contenedor-modulos" class="row g-2 mt-2">
-                                    <p class="text-muted small italic">Cargando módulos de la plataforma...</p>
+                                    <p class="text-muted small italic" data-i18n="superadmin_instituciones.modulos_cargando">Cargando módulos de la plataforma...</p>
                                 </div>
                             </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">CANCELAR</button>
-                    <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="window.guardarCambios()">GUARDAR SEDE Y MÓDULOS</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="superadmin_instituciones.btn_cancelar">CANCELAR</button>
+                    <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="window.guardarCambios()" data-i18n="superadmin_instituciones.btn_guardar">GUARDAR SEDE Y MÓDULOS</button>
                 </div>
             </div>
         </div>
@@ -198,7 +203,7 @@
         <div id="liveToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body fw-bold">
-                    <i class="bi bi-check-circle-fill me-2"></i> <span id="toast-msg">Datos actualizados correctamente</span>
+                    <i class="bi bi-check-circle-fill me-2"></i> <span id="toast-msg" data-i18n="superadmin_instituciones.toast_ok">Datos actualizados correctamente</span>
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>

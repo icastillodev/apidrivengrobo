@@ -13,7 +13,7 @@
     import { initMenu } from '../../dist/js/components/MenuComponent.js';
     import { Auth } from '../../dist/js/auth.js';
     import { NotificationManager } from '../../dist/js/NotificationManager.js';
-    import { loadLanguage } from '../../dist/js/utils/i18n.js';
+    import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
 
     
     showLoader();
@@ -23,7 +23,8 @@
         try {
             // 1. CARGA CRÍTICA: Idioma
             // Detiene la ejecución hasta que window.txt esté listo para el menú y la página
-            await loadLanguage(); 
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+            if (window.txt) translatePage();
 
             // 2. VALIDACIÓN DE ACCESO
             // Permite acceso a niveles 1, 2, 3 y 4
@@ -95,8 +96,8 @@
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
                     <li class="breadcrumb-item text-muted" id="institucionbread"></li>
-                    <li class="breadcrumb-item text-muted">Investigador</li>
-                    <li class="breadcrumb-item active"><span class="badge bg-primary px-2 py-1">Mis Protocolos</span></li>
+                    <li class="breadcrumb-item text-muted" data-i18n="misprotocolos.bread_investigador">Investigador</li>
+                    <li class="breadcrumb-item active"><span class="badge bg-primary px-2 py-1" data-i18n="misprotocolos.bread_mis_protocolos">Mis Protocolos</span></li>
                 </ol>
             </nav>
 
@@ -104,33 +105,33 @@
 
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-center mb-4 gap-3">
                 <ul class="nav nav-pills p-1 rounded shadow-sm bg-light" id="view-tabs">
-                    <li class="nav-item me-2"><button class="nav-link active px-4 small uppercase" onclick="window.switchView('my')"><i class="bi bi-person-fill me-2"></i> Mis Protocolos</button></li>
-                    <li class="nav-item me-2"><button class="nav-link px-4 small uppercase" onclick="window.switchView('local')"><i class="bi bi-building me-2"></i> Institución Actual</button></li>
-                    <li class="nav-item d-none" id="tab-network-li"><button class="nav-link px-4 small uppercase" onclick="window.switchView('network')"><i class="bi bi-globe me-2"></i> Red / Multicentro</button></li>
+                    <li class="nav-item me-2"><button class="nav-link active px-4 small uppercase" onclick="window.switchView('my')"><i class="bi bi-person-fill me-2"></i> <span data-i18n="misprotocolos.tab_mis">Mis Protocolos</span></button></li>
+                    <li class="nav-item me-2"><button class="nav-link px-4 small uppercase" onclick="window.switchView('local')"><i class="bi bi-building me-2"></i> <span data-i18n="misprotocolos.tab_inst">Institución Actual</span></button></li>
+                    <li class="nav-item d-none" id="tab-network-li"><button class="nav-link px-4 small uppercase" onclick="window.switchView('network')"><i class="bi bi-globe me-2"></i> <span data-i18n="misprotocolos.tab_red">Red / Multicentro</span></button></li>
                 </ul>
 
                 <div class="dropdown d-flex align-items-center gap-2">
                     <button class="btn btn-primary fw-bold shadow-sm dropdown-toggle px-4" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-plus-circle me-2"></i> SOLICITUD PROTOCOLO
+                        <i class="bi bi-plus-circle me-2"></i> <span data-i18n="misprotocolos.btn_solicitud">SOLICITUD PROTOCOLO</span>
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btn-ayuda-protocolos" title="¿Cómo funciona?">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btn-ayuda-protocolos" data-i18n="misprotocolos.btn_ayuda_title" title="¿Cómo funciona?">
                         <i class="bi bi-question-circle fs-5"></i>
                     </button>
                     <ul class="dropdown-menu shadow border-0 mt-1 p-2">
                         <li>
                             <a class="dropdown-item rounded fw-bold py-2" href="#" onclick="window.openNewProtocolModal()">
-                                <i class="bi bi-file-earmark-plus me-2 text-primary"></i> Solicitar Nuevo (Interno)
+                                <i class="bi bi-file-earmark-plus me-2 text-primary"></i> <span data-i18n="misprotocolos.solicitar_nuevo">Solicitar Nuevo (Interno)</span>
                             </a>
                         </li>
                         <li class="d-none" id="action-create-external-li">
                             <a class="dropdown-item rounded fw-bold py-2 text-primary" href="#" onclick="window.openCreateExternalModal()">
-                                <i class="bi bi-globe2 me-2"></i> Solicitar en OTRA Institución (Red)
+                                <i class="bi bi-globe2 me-2"></i> <span data-i18n="misprotocolos.solicitar_otra_inst">Solicitar en OTRA Institución (Red)</span>
                             </a>
                         </li>
                         <li class="d-none" id="action-network-li">
                             <hr class="dropdown-divider">
                             <a class="dropdown-item rounded fw-bold py-2 text-secondary" href="#" onclick="window.openNetworkRequestModal()">
-                                <i class="bi bi-share-fill me-2"></i> Solicitar Aprobación en RED
+                                <i class="bi bi-share-fill me-2"></i> <span data-i18n="misprotocolos.solicitar_aprobacion_red">Solicitar Aprobación en RED</span>
                             </a>
                         </li>
                     </ul>
@@ -140,24 +141,24 @@
             <div class="row align-items-end mb-3 border-bottom pb-3">
                 <div class="col-12">
                     <div class="input-group shadow-sm flex-nowrap flex-md-wrap">
-                        <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
-                            <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;" title="Campo por el que filtrar">
-                                <option value="all">Todo (Texto)</option>
-                                <option value="idprotA">ID Protocolo</option>
-                                <option value="IdUsrA">ID Usuario</option>
-                                <option value="nprotA">N° Protocolo</option>
-                                <option value="tituloA">Título</option>
-                                <option value="InvestigadorACargA">Responsable de proyecto</option>
-                                <option value="TipoNombre">Tipo</option>
-                                <option value="Origen">Origen</option>
-                                <option value="Estado" id="opt-filter-estado" class="d-none">Estado</option>
+                        <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="misprotocolos.filtrar_por">Filtrar por:</span>
+                            <select id="filter-type" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 160px;">
+                                <option value="all" data-i18n="misprotocolos.filter_todo">Todo (Texto)</option>
+                                <option value="idprotA" data-i18n="misprotocolos.filter_id_prot">ID Protocolo</option>
+                                <option value="IdUsrA" data-i18n="misprotocolos.filter_id_usr">ID Usuario</option>
+                                <option value="nprotA" data-i18n="misprotocolos.filter_nprot">N° Protocolo</option>
+                                <option value="tituloA" data-i18n="misprotocolos.filter_titulo">Título</option>
+                                <option value="InvestigadorACargA" data-i18n="misprotocolos.filter_resp_proyecto">Responsable de proyecto</option>
+                                <option value="TipoNombre" data-i18n="misprotocolos.filter_tipo">Tipo</option>
+                                <option value="Origen" data-i18n="misprotocolos.filter_origen">Origen</option>
+                                <option value="Estado" id="opt-filter-estado" class="d-none" data-i18n="misprotocolos.filter_estado">Estado</option>
                             </select>
                         <div id="dynamic-search-container" class="flex-grow-1 min-width-0">
-                            <input type="text" id="search-input" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">
+                            <input type="text" id="search-input" class="form-control form-control-sm border-start-0" data-i18n="misprotocolos.ph_buscar" placeholder="Escribe para buscar...">
                         </div>
                         <button id="btn-search" class="btn btn-dark fw-bold px-3"><i class="bi bi-search"></i></button>
                     </div>
-                    <p class="small text-muted mt-1 mb-0"><i class="bi bi-info-circle me-1"></i> Use el filtro y el cuadro de búsqueda para encontrar protocolos. <button type="button" class="btn btn-link link-secondary p-0 small" id="link-ayuda-inline" title="Más ayuda"><strong>¿Cómo funciona?</strong></button></p>
+                    <p class="small text-muted mt-1 mb-0"><i class="bi bi-info-circle me-1"></i> <span data-i18n="misprotocolos.ayuda_filtro">Use el filtro y el cuadro de búsqueda para encontrar protocolos.</span> <button type="button" class="btn btn-link link-secondary p-0 small" id="link-ayuda-inline" data-i18n="misprotocolos.como_funciona" title="Más ayuda"><strong>¿Cómo funciona?</strong></button></p>
                 </div>
             </div>
 
@@ -165,16 +166,16 @@
                 <table class="table table-hover align-middle border" style="font-size: 11px;">
                     <thead class="table-light text-uppercase text-secondary">
                         <tr>
-                            <th class="py-3 px-2">ID</th>
-                            <th class="py-3 px-2">N° Prot.</th>
-                            <th class="py-3 px-2">Título</th>
-                            <th class="py-3 px-2 text-primary">Responsable protocolo</th>
-                            <th class="py-3 px-2">Responsable de proyecto</th>
-                            <th class="py-3 px-2 text-center">Tipo</th>
-                            <th class="py-3 px-2 text-center">Origen</th>
-                            <th class="py-3 px-2 text-center">Estado</th> 
-                            <th class="py-3 px-2">Vence</th>
-                            <th class="py-3 px-2 text-end">Acciones</th>
+                            <th class="py-3 px-2" data-i18n="misprotocolos.col_id">ID</th>
+                            <th class="py-3 px-2" data-i18n="misprotocolos.col_nprot">N° Prot.</th>
+                            <th class="py-3 px-2" data-i18n="misprotocolos.col_titulo">Título</th>
+                            <th class="py-3 px-2 text-primary" data-i18n="misprotocolos.col_resp_protocolo">Responsable protocolo</th>
+                            <th class="py-3 px-2" data-i18n="misprotocolos.col_resp_proyecto">Responsable de proyecto</th>
+                            <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_tipo">Tipo</th>
+                            <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_origen">Origen</th>
+                            <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_estado">Estado</th> 
+                            <th class="py-3 px-2" data-i18n="misprotocolos.col_vence">Vence</th>
+                            <th class="py-3 px-2 text-end" data-i18n="misprotocolos.col_acciones">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="table-protocols"></tbody>
@@ -190,7 +191,7 @@
             <div class="modal-content border-0 shadow-lg border-top border-5 border-info">
                 <div id="detail-content" class="modal-body p-4"></div>
                 <div class="modal-footer border-0 bg-light p-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" data-i18n="misprotocolos.cerrar">Cerrar</button>
                 </div>
             </div>
         </div>
@@ -200,47 +201,47 @@
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold fs-6" id="modal-new-prot-title">NUEVA SOLICITUD</h5>
+                    <h5 class="modal-title fw-bold fs-6" id="modal-new-prot-title" data-i18n="misprotocolos.modal_nueva_titulo">NUEVA SOLICITUD</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div id="user-info-badge" class="alert alert-primary py-2 small fw-bold mb-3 d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-person-badge me-2"></i> Usted será el RESPONSABLE ADMINISTRATIVO de este protocolo.</span>
-                        <span class="badge bg-white text-primary" id="current-user-display">ID: Cargando...</span>
+                        <span><i class="bi bi-person-badge me-2"></i> <span data-i18n="misprotocolos.modal_resp_admin">Usted será el RESPONSABLE ADMINISTRATIVO de este protocolo.</span></span>
+                        <span class="badge bg-white text-primary" id="current-user-display" data-i18n="misprotocolos.id_cargando">ID: Cargando...</span>
                     </div>
-                    <div id="alert-edit-mode" class="alert alert-warning py-2 small fw-bold mb-3 d-none"><i class="bi bi-pencil-square me-2"></i> MODO EDICIÓN</div>
+                    <div id="alert-edit-mode" class="alert alert-warning py-2 small fw-bold mb-3 d-none"><i class="bi bi-pencil-square me-2"></i> <span data-i18n="misprotocolos.modal_edicion">MODO EDICIÓN</span></div>
                     
                     <form id="form-new-prot">
                         <input type="hidden" name="idprotA" id="edit-prot-id">
                         <input type="hidden" name="IdInstitucion" id="form-inst-id"> <input type="hidden" name="external_mode" id="external-mode-flag" value="0">
 
                         <div id="external-inst-selector" class="mb-3 d-none">
-                            <label class="form-label small fw-bold text-primary">INSTITUCIÓN DESTINO (RED)</label>
+                            <label class="form-label small fw-bold text-primary" data-i18n="misprotocolos.inst_destino_red">INSTITUCIÓN DESTINO (RED)</label>
                             <select id="select-target-inst" class="form-select fw-bold border-primary" onchange="window.loadExternalConfig(this.value)">
-                                <option value="">-- Seleccione Institución --</option>
+                                <option value="" data-i18n="misprotocolos.ph_seleccione_inst">-- Seleccione Institución --</option>
                             </select>
                         </div>
 
                         <div class="row g-3">
-                            <div class="col-md-9"><label class="form-label small fw-bold text-muted">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
-                            <div class="col-md-3"><label class="form-label small fw-bold text-muted">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">RESPONSABLE DE PROYECTO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted">SEVERIDAD</label><select name="severidad" id="new-sev" class="form-select"></select></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">FECHA INICIO</label><input type="date" name="FechaIniProtA" id="inp-ini" class="form-control"></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted">FECHA VENCIMIENTO</label><input type="date" name="FechaFinProtA" id="inp-fin" class="form-control"></div>
+                            <div class="col-md-9"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_titulo">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
+                            <div class="col-md-3"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_expediente">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_resp_proyecto">RESPONSABLE DE PROYECTO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_depto">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_tipo">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_cant_animales">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_severidad">SEVERIDAD</label><select name="severidad" id="new-sev" class="form-select"></select></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_inicio">FECHA INICIO</label><input type="date" name="FechaIniProtA" id="inp-ini" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_venc">FECHA VENCIMIENTO</label><input type="date" name="FechaFinProtA" id="inp-fin" class="form-control"></div>
                             <div class="col-12 mt-3">
                                 <div class="bg-light p-3 rounded border">
-                                    <h6 class="fw-bold small text-muted mb-2">ESPECIES ASOCIADAS</h6>
+                                    <h6 class="fw-bold small text-muted mb-2" data-i18n="misprotocolos.especies_asociadas">ESPECIES ASOCIADAS</h6>
                                     <div id="new-species-container"></div>
-                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="window.addNewSpeciesRow()"><i class="bi bi-plus-lg"></i> Agregar Especie</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="window.addNewSpeciesRow()"><i class="bi bi-plus-lg"></i> <span data-i18n="misprotocolos.agregar_especie">Agregar Especie</span></button>
                                 </div>
                             </div>
                         </div>
                         <div class="mt-4 text-end">
-                            <button type="submit" class="btn btn-primary px-5 fw-bold" id="btn-save-prot">ENVIAR SOLICITUD</button>
+                            <button type="submit" class="btn btn-primary px-5 fw-bold" id="btn-save-prot" data-i18n="misprotocolos.enviar_solicitud">ENVIAR SOLICITUD</button>
                         </div>
                     </form>
                 </div>
@@ -252,7 +253,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-question-circle me-2"></i>¿Cómo funciona?</h5>
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-question-circle me-2"></i><span data-i18n="misprotocolos.como_funciona_titulo">¿Cómo funciona?</span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
@@ -266,14 +267,14 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title fw-bold fs-6">COMPARTIR EN RED</h5>
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="misprotocolos.compartir_red">COMPARTIR EN RED</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="text-muted small mb-4"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Solo puede enviar a la red sus <strong>propios protocolos</strong> vigentes y aprobados localmente.</p>
+                    <p class="text-muted small mb-4"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> <span data-i18n="misprotocolos.red_solo_propios">Solo puede enviar a la red sus propios protocolos vigentes y aprobados localmente.</span></p>
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-muted small">1. SELECCIONE PROTOCOLO</label>
-                        <input type="text" class="form-control form-control-sm mb-1" placeholder="Buscar..." onkeyup="window.filterMyProtocols(this)">
+                        <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_paso1">1. SELECCIONE PROTOCOLO</label>
+                        <input type="text" class="form-control form-control-sm mb-1" data-i18n="misprotocolos.ph_buscar_prot" placeholder="Buscar..." onkeyup="window.filterMyProtocols(this)">
                         <select id="select-my-prot" class="form-select" size="4" onchange="window.showProtDetails()"></select>
                     </div>
                     <div id="prot-details-preview" class="bg-light p-3 rounded border mb-4 d-none">
@@ -281,10 +282,10 @@
                         <span class="small text-muted">ID: <strong id="preview-id"></strong> | Vence: <strong id="preview-date"></strong></span>
                     </div>
                     <div id="step-3-network" class="d-none">
-                        <label class="form-label fw-bold text-muted small">2. DESTINOS</label>
+                        <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_paso2">2. DESTINOS</label>
                         <div id="network-inst-list" class="d-flex flex-wrap gap-2"></div>
                     </div>
-                    <div class="mt-4 text-end"><button type="button" class="btn btn-info text-white px-5 fw-bold" onclick="window.sendNetworkRequest()" id="btn-send-net" disabled>ENVIAR</button></div>
+                    <div class="mt-4 text-end"><button type="button" class="btn btn-info text-white px-5 fw-bold" onclick="window.sendNetworkRequest()" id="btn-send-net" disabled data-i18n="misprotocolos.enviar">ENVIAR</button></div>
                 </div>
             </div>
         </div>

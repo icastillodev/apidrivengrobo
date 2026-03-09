@@ -13,7 +13,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         // Importamos la lógica específica de esta página
         import { initFormSelector } from '../../dist/js/pages/usuario/formSelector.js';
         showLoader();
@@ -23,9 +23,8 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo
-                await loadLanguage(); 
-
-                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                if (window.txt) translatePage();
                 Auth.checkAccess([1, 2, 3,4,5,6]); 
 
                 // 3. INICIALIZACIÓN DE COMPONENTES
@@ -78,23 +77,23 @@
                     <li class="breadcrumb-item text-muted">GROBO</li>
                     <li class="breadcrumb-item text-muted">Usuario</li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;">Nueva Solicitud</span>
+                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="centro_solicitudes.nueva_solicitud">Nueva Solicitud</span>
                     </li>
                 </ol>
             </nav>
 
             <div id="header-container" class="text-center mb-4">
-                <h2 class="fw-bold text-uppercase text-dark mb-1" style="letter-spacing: 1px;">Centro de Solicitudes</h2>
-                <p id="dependency-title" class="text-success text-uppercase small tracking-widest fw-bold mb-3">Cargando contexto...</p>
+                <h2 class="fw-bold text-uppercase text-dark mb-1" style="letter-spacing: 1px;" data-i18n="centro_solicitudes.titulo">Centro de Solicitudes</h2>
+                <p id="dependency-title" class="text-success text-uppercase small tracking-widest fw-bold mb-3" data-i18n="centro_solicitudes.cargando_contexto">Cargando contexto...</p>
                 
                 <div class="d-flex justify-content-center mb-3 d-none">
                     <div class="input-group shadow-sm" style="max-width: 500px;">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="search" id="inst-search" class="form-control border-start-0 ps-0" placeholder="Buscar institución por nombre..." autocomplete="off">
+                        <input type="search" id="inst-search" class="form-control border-start-0 ps-0" data-i18n="centro_solicitudes.buscar_inst" placeholder="Buscar institución por nombre..." autocomplete="off">
                     </div>
                 </div>
 
-                <small class="text-muted fst-italic d-block">Seleccione el trámite debajo de la institución correspondiente</small>
+                <small class="text-muted fst-italic d-block" data-i18n="centro_solicitudes.selecc_tramite">Seleccione el trámite debajo de la institución correspondiente</small>
             </div>
 
             <div id="forms-grid" class="row g-4 justify-content-center px-lg-5">

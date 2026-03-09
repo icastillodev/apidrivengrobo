@@ -50,7 +50,7 @@ export const RegistroUI = {
         document.getElementById('reg-fecha').valueAsDate = new Date();
         document.getElementById('reg-cantidad').value = 1;
         document.getElementById('reg-obs').value = '';
-        document.getElementById('reg-select-depto').innerHTML = '<option value="">Esperando protocolo...</option>';
+        document.getElementById('reg-select-depto').innerHTML = `<option value="">${(window.txt?.alojamientos?.reg_esperando_protocolo || 'Esperando protocolo...')}</option>`;
 
         showLoader();
         // Llamamos a las 3 promesas en paralelo
@@ -78,13 +78,13 @@ export const RegistroUI = {
                 
                 tbody.innerHTML = res.data.map(p => {
                     const responsable = p.ResponsableFormat || `ID: ${p.IdUsrA}`;
-                    const especies = p.EspeciesList || 'A definir';
-
+                    const especies = p.EspeciesList || (window.txt?.alojamientos?.reg_a_definir || 'A definir');
+                    const txt = window.txt?.alojamientos || {};
                     return `
                     <tr id="reg-row-prot-${p.idprotA}" onclick="window.regSelectProtocolo(${p.idprotA})" class="transition-colors">
                         <td class="fw-bold text-muted">#${p.idprotA}</td>
                         <td class="fw-bold text-primary">${p.nprotA}</td>
-                        <td class="text-truncate" style="max-width: 200px;">${p.tituloA || 'Sin Título'}</td>
+                        <td class="text-truncate" style="max-width: 200px;">${p.tituloA || (txt.cfg_sin_titulo || 'Sin Título')}</td>
                         <td class="text-info fw-bold" style="font-size: 10px;">${p.DeptoFormat || '---'}</td>
                         <td class="text-success fw-bold" style="font-size: 10px;">${especies}</td>
                         <td class="text-muted" style="font-size: 10px;"><i class="bi bi-person-fill"></i> ${responsable}</td>
@@ -105,7 +105,7 @@ export const RegistroUI = {
                 this.currentData.usuarios = res.data;
                 
                 if (res.data.length === 0) {
-                    list.innerHTML = '<div class="alert alert-warning small p-2">No hay usuarios activos.</div>';
+                    list.innerHTML = `<div class="alert alert-warning small p-2">${(window.txt?.alojamientos?.reg_no_usuarios || 'No hay usuarios activos.')}</div>`;
                     return;
                 }
 
@@ -137,7 +137,7 @@ export const RegistroUI = {
             document.getElementById('reg-select-depto').innerHTML = `<option value="${prot.departamento}">${prot.DeptoFormat}</option>`;
         } else {
             this.selections.departamento = null;
-            document.getElementById('reg-select-depto').innerHTML = `<option value="">Sin departamento asignado</option>`;
+            document.getElementById('reg-select-depto').innerHTML = `<option value="">${(window.txt?.alojamientos?.reg_sin_depto || 'Sin departamento asignado')}</option>`;
         }
 
         this.selections.IdUsrA = null;
@@ -169,7 +169,8 @@ export const RegistroUI = {
 
     async loadEspecies() {
         const container = document.getElementById('reg-list-especies');
-        container.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div> Cargando...';
+        const txt = window.txt?.alojamientos || {};
+        container.innerHTML = `<div class="spinner-border spinner-border-sm text-warning"></div> ${txt.cfg_cargando || 'Cargando...'}`;
         
         document.getElementById('reg-list-tipos').innerHTML = '';
         document.getElementById('step-4-final').classList.add('d-none');
@@ -188,7 +189,7 @@ export const RegistroUI = {
                     this.selectEspecie(res.data[0].idespA, res.data[0].EspeNombreA);
                 }
             } else {
-                container.innerHTML = '<div class="alert alert-danger small p-2">Este protocolo no tiene especies asignadas.</div>';
+                container.innerHTML = `<div class="alert alert-danger small p-2">${txt.cfg_no_especies || 'Este protocolo no tiene especies asignadas.'}</div>`;
             }
         } catch (e) { console.error("Error cargando especies:", e); }
     },
@@ -213,7 +214,8 @@ export const RegistroUI = {
 
     async loadTipos(idEsp) {
         const container = document.getElementById('reg-list-tipos');
-        container.innerHTML = '<div class="spinner-border spinner-border-sm text-primary"></div> Cargando estructuras...';
+        const txt = window.txt?.alojamientos || {};
+        container.innerHTML = `<div class="spinner-border spinner-border-sm text-primary"></div> ${txt.cfg_buscando_estructuras || 'Cargando estructuras...'}`;
         
         document.getElementById('step-4-final').classList.add('d-none');
         document.getElementById('btn-save-reg').classList.add('d-none');
@@ -230,7 +232,7 @@ export const RegistroUI = {
                         </button>
                     `).join('');
                 } else {
-                    container.innerHTML = '<div class="alert alert-danger small p-2">No hay estructuras tarifadas.</div>';
+                    container.innerHTML = `<div class="alert alert-danger small p-2">${txt.cfg_no_estructuras || 'No hay estructuras tarifadas.'}</div>`;
                 }
             }
         } catch (e) { console.error("Error cargando tipos:", e); }
@@ -251,7 +253,7 @@ export const RegistroUI = {
             selectedBtn.querySelector('i').classList.remove('d-none');
         }
 
-        document.getElementById('lbl-cantidad-dinamico').innerText = `Cantidad Inicial de ${nombre.toUpperCase()}`;
+        document.getElementById('lbl-cantidad-dinamico').innerText = `${(window.txt?.alojamientos?.reg_cantidad_inicial || 'Cantidad Inicial de')} ${nombre.toUpperCase()}`;
         document.getElementById('reg-cantidad').placeholder = `Ej: 5`;
 
         const step4 = document.getElementById('step-4-final');
@@ -275,7 +277,8 @@ export const RegistroUI = {
         };
 
         if (!data.idprotA || !data.IdUsrA || !data.TipoAnimal || !data.IdTipoAlojamiento || !data.fechavisado || !data.CantidadCaja) {
-            return Swal.fire('Incompleto', 'Debe completar todos los pasos del asistente.', 'warning');
+            const t = window.txt?.alojamientos || {};
+            return Swal.fire(t.reg_incompleto || 'Incompleto', t.reg_incompleto_msg || 'Debe completar todos los pasos del asistente.', 'warning');
         }
 
         showLoader();
@@ -283,7 +286,8 @@ export const RegistroUI = {
             const res = await API.request('/alojamiento/save', 'POST', data);
             if (res.status === 'success') {
                 bootstrap.Modal.getInstance(document.getElementById('modal-registro')).hide();
-                Swal.fire({ title: '¡Éxito!', text: 'Alojamiento registrado correctamente.', icon: 'success', timer: 1500, showConfirmButton: false});
+                const t = window.txt?.alojamientos || {};
+                Swal.fire({ title: t.reg_exito_title || '¡Éxito!', text: t.reg_exito_msg || 'Alojamiento registrado correctamente.', icon: 'success', timer: 1500, showConfirmButton: false});
                 await loadAlojamientos(); 
             } else {
                 Swal.fire('Error', res.message, 'error');

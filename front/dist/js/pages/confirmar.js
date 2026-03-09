@@ -9,7 +9,8 @@ export async function initConfirmacion() {
     const slug = urlParams.get('inst'); // Recuperamos el slug de la institución
 
     if (!token || !slug) {
-        showStatus('error', 'Faltan parámetros de seguridad o contexto institucional.');
+        const t = window.txt?.confirmar;
+        showStatus('error', t?.error_faltan_params || 'Faltan parámetros de seguridad o contexto institucional.');
         return;
     }
 
@@ -29,7 +30,8 @@ export async function initConfirmacion() {
             showStatus('error', res.message);
         }
     } catch (err) {
-        showStatus('error', 'No se pudo conectar con el servidor de validación.');
+        const t = window.txt?.confirmar;
+        showStatus('error', t?.error_servidor || 'No se pudo conectar con el servidor de validación.');
     }
 }
 
@@ -39,6 +41,7 @@ function showStatus(type, message = "") {
         document.getElementById('status-success').classList.remove('hidden');
     } else {
         document.getElementById('status-error').classList.remove('hidden');
-        if (message) document.getElementById('error-message').innerText = message;
+        const el = document.getElementById('error-message');
+        if (el) el.innerText = message || (window.txt?.confirmar?.error_default || 'El enlace es inválido o el token ha expirado.');
     }
 }

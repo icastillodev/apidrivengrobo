@@ -26,7 +26,7 @@ export async function initUserProtocols() {
     store.currentUserInfo.id = uid;
     
     const badgeUser = document.getElementById('current-user-display');
-    if(badgeUser) badgeUser.innerText = `ID: ${store.currentUserInfo.id}`;
+    if (badgeUser) badgeUser.innerText = store.currentUserInfo.id ? ((window.txt?.misprotocolos?.id_display) || 'ID: ') + store.currentUserInfo.id : (window.txt?.misprotocolos?.id_cargando || 'ID: Cargando...');
 
     await loadConfig();
     await loadData();

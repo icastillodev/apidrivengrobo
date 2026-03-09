@@ -6,6 +6,7 @@ export const DashboardUI = {
     renderUserDashboard() {
         const grid = document.getElementById('dashboard-grid');
         if (!grid) return;
+        const t = window.txt?.dashboard || {};
 
         grid.innerHTML = `
             <div class="col-12 col-md-6 col-lg-3">
@@ -14,12 +15,12 @@ export const DashboardUI = {
                         <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-plus-square-dotted fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Nuevo Formulario</h5>
-                        <span class="small text-muted fw-semibold">Iniciar una nueva solicitud</span>
+                        <h5 class="fw-black text-dark mb-1">${t.card_nuevo_form || 'Nuevo Formulario'}</h5>
+                        <span class="small text-muted fw-semibold">${t.card_nuevo_form_desc || 'Iniciar una nueva solicitud'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./formularios';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -31,12 +32,12 @@ export const DashboardUI = {
                         <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-ui-checks fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Mis Formularios</h5>
-                        <span class="small text-muted fw-semibold">Historial de solicitudes</span>
+                        <h5 class="fw-black text-dark mb-1">${t.card_mis_form || 'Mis Formularios'}</h5>
+                        <span class="small text-muted fw-semibold">${t.card_mis_form_desc || 'Historial de solicitudes'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./misformularios';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -48,12 +49,12 @@ export const DashboardUI = {
                         <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-medical fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Mis Protocolos</h5>
-                        <span class="small text-muted fw-semibold">Protocolos experimentales</span>
+                        <h5 class="fw-black text-dark mb-1">${t.card_mis_prot || 'Mis Protocolos'}</h5>
+                        <span class="small text-muted fw-semibold">${t.card_mis_prot_desc || 'Protocolos experimentales'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./misprotocolos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -65,12 +66,12 @@ export const DashboardUI = {
                         <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-houses fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Mis Alojamientos</h5>
-                        <span class="small text-muted fw-semibold">Trazabilidad y estadías</span>
+                        <h5 class="fw-black text-dark mb-1">${t.card_mis_aloj || 'Mis Alojamientos'}</h5>
+                        <span class="small text-muted fw-semibold">${t.card_mis_aloj_desc || 'Trazabilidad y estadías'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./misalojamientos';">
-                            <span style="font-size: 11px;" class="tracking-widest">IR AL MÓDULO <i class="bi bi-arrow-right ms-1"></i></span>
+                            <span style="font-size: 11px;" class="tracking-widest">${t.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
                         </button>
                     </div>
                 </div>
@@ -82,12 +83,12 @@ export const DashboardUI = {
                         <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-earmark-pdf fs-2"></i>
                         </div>
-                        <h5 class="fw-black text-dark mb-1">Precios</h5>
-                        <span class="small text-muted fw-semibold">Tarifario vigente</span>
+                        <h5 class="fw-black text-dark mb-1">${t.card_precios || 'Precios'}</h5>
+                        <span class="small text-muted fw-semibold">${t.card_precios_desc || 'Tarifario vigente'}</span>
                     </div>
                     <div class="card-footer bg-light border-0 p-0">
                         <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.openTarifarioPDFDashboard();">
-                            <i class="bi bi-file-earmark-pdf me-2"></i><span style="font-size: 11px;" class="tracking-widest">VER TARIFARIO</span>
+                            <i class="bi bi-file-earmark-pdf me-2"></i><span style="font-size: 11px;" class="tracking-widest">${t.btn_ver_tarifario || 'VER TARIFARIO'}</span>
                         </button>
                     </div>
                 </div>

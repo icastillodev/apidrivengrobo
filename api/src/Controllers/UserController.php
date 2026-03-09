@@ -377,7 +377,8 @@ class UserController {
 
             $mailSent = $mailService->sendRegistrationEmail(
                 $data['EmailA'], $data['NombreA'], $data['usuario'], 
-                $res['token'], $instNameReal, $slug
+                $res['token'], $instNameReal, $slug,
+                $data['lang'] ?? $_GET['lang'] ?? 'es'
             );
 
             echo json_encode([
@@ -429,7 +430,7 @@ class UserController {
             $instInfo = $this->model->getInstitutionName($data['IdInstitucion']);
             $instName = strtoupper(str_replace('APP ', '', $instInfo['NombreInst']));
 
-            $mailSent = (new MailService())->sendResetPasswordEmail($data['email'], $user['NombreA'], $token, $instName, $data['slug']);
+            $mailSent = (new MailService())->sendResetPasswordEmail($data['email'], $user['NombreA'], $token, $instName, $data['slug'], $data['lang'] ?? 'es');
             Auditoria::logManual($this->db, $user['IdUsrA'], 'RECOVERY_REQ', 'usuarioe', "Solicitó recuperación de contraseña");
             echo json_encode(['status' => 'success', 'mail' => $mailSent]);
         } else {

@@ -102,7 +102,9 @@ public function getBySlug($slug) {
                 // CONFIGURA AQUÍ EL CORREO DEL ADMINISTRADOR
                 // ==============================================
                 $adminEmail = "nuevainstitucion@groboapp.com"; // <-- CAMBIA ESTO por el tuyo
-                $subject = "NUEVA ALTA: " . strtoupper($instNombreSede);
+                $lang = $data['lang'] ?? 'es';
+                $tMail = \App\Models\Services\MailLang::get($lang);
+                $subject = $tMail['form_finalized_subject'] . " " . strtoupper($instNombreSede);
                 
                 $htmlBody = "
                     Hola Administrador,<br><br>
@@ -112,8 +114,9 @@ public function getBySlug($slug) {
                     Por favor, ingresa al panel de SuperAdmin de GROBO para revisar la ficha completa, crear la institución y asignar sus módulos.
                 ";
 
-                // Usamos la plantilla profesional de GROBO
-                $body = $this->mailService->getTemplate("Formulario Finalizado", $htmlBody, "https://app.groboapp.com/superadmin/institucionformulario.html", "VER FORMULARIOS");
+                // Usamos la plantilla profesional de GROBO y enlace dinámico al panel SuperAdmin
+                $adminLink = \App\Models\Services\MailService::getFrontBaseUrl() . "/paginas/superadmin/institucionformulario.html";
+                $body = $this->mailService->getTemplate($tMail['form_finalized_title'], $htmlBody, $adminLink, $tMail['form_finalized_btn'], "", $lang);
                 
                 $this->mailService->executeSend($adminEmail, $subject, $body);
             }

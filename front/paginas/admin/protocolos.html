@@ -29,7 +29,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         // Lógica administrativa de protocolos (Gestión de revisiones y aprobaciones)
         import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js';
 
@@ -39,10 +39,10 @@
 
             try {
                 // 1. CARGA CRÍTICA: Idioma
-                // Bloqueamos hasta que window.txt esté listo para las etiquetas de la tabla
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                if (window.txt) translatePage();
 
-                // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 4 - Roles Administrativos)
+                // 2. VALIDACIÓN DE ACCESO
                 Auth.checkAccess([1, 2, 4,5,6]); 
 
                 // 3. INICIALIZACIÓN DE COMPONENTES
@@ -77,10 +77,10 @@
             
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_protocolos.bread_grobo">GROBO</li>
                     <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
-                    <li class="breadcrumb-item active text-dark">Gestión Protocolos</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_protocolos.bread_admin">Admin</li>
+                    <li class="breadcrumb-item active text-dark" data-i18n="admin_protocolos.bread_gestion">Gestión Protocolos</li>
                 </ol>
             </nav>
 
@@ -89,29 +89,29 @@
 <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="col-lg-7">
                     <div class="input-group shadow-sm">
-                        <span class="input-group-text bg-white text-muted fw-bold small uppercase d-none" id="label-origin" style="font-size: 10px;">Origen:</span>
+                        <span class="input-group-text bg-white text-muted fw-bold small uppercase d-none" id="label-origin" style="font-size: 10px;" data-i18n="admin_protocolos.label_origen">Origen:</span>
                         <select id="filter-origin" class="form-select form-select-sm fw-bold border-start-0 d-none" style="max-width: 130px;">
-                            <option value="all">TODOS</option>
-                            <option value="interno">PROPIOS</option>
-                            <option value="externo">EXTERNOS</option>
+                            <option value="all" data-i18n="admin_protocolos.filter_todos">TODOS</option>
+                            <option value="interno" data-i18n="admin_protocolos.filter_propios">PROPIOS</option>
+                            <option value="externo" data-i18n="admin_protocolos.filter_externos">EXTERNOS</option>
                         </select>
 
-                        <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por:</span>
+                        <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_protocolos.filtrar_por">Filtrar por:</span>
                         <select id="filter-type-prot" class="form-select form-select-sm fw-bold border-start-0" style="max-width: 180px;">
-                            <option value="all">Todo (Texto)</option>
-                            <option value="idprotA">ID Protocolo</option> 
-                            <option value="IdUsrA">ID Usuario</option>
-                            <option value="nprotA">N° Protocolo</option>
-                            <option value="tituloA">Título</option>
-                            <option value="InvestigadorACargA">Resp. Proyecto</option>
-                            <option value="ResponsableFormat">Resp. Protocolo</option>
-                            <option value="TipoNombre">Tipo</option>
-                            <option value="DeptoFormat">Departamento</option>
-                            <option value="Vencimiento">Estado Vencimiento</option>
+                            <option value="all" data-i18n="admin_protocolos.filter_todo_texto">Todo (Texto)</option>
+                            <option value="idprotA" data-i18n="admin_protocolos.filter_id_prot">ID Protocolo</option>
+                            <option value="IdUsrA" data-i18n="admin_protocolos.filter_id_usr">ID Usuario</option>
+                            <option value="nprotA" data-i18n="admin_protocolos.filter_nprot">N° Protocolo</option>
+                            <option value="tituloA" data-i18n="admin_protocolos.filter_titulo">Título</option>
+                            <option value="InvestigadorACargA" data-i18n="admin_protocolos.filter_resp_proyecto">Resp. Proyecto</option>
+                            <option value="ResponsableFormat" data-i18n="admin_protocolos.filter_resp_protocolo">Resp. Protocolo</option>
+                            <option value="TipoNombre" data-i18n="admin_protocolos.filter_tipo">Tipo</option>
+                            <option value="DeptoFormat" data-i18n="admin_protocolos.filter_depto">Departamento</option>
+                            <option value="Vencimiento" data-i18n="admin_protocolos.filter_vencimiento">Estado Vencimiento</option>
                         </select>
                         
                         <div id="dynamic-search-container" class="flex-grow-1">
-                            <input type="text" id="search-input-prot" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">
+                            <input type="text" id="search-input-prot" class="form-control form-control-sm border-start-0" data-i18n="admin_protocolos.ph_buscar" placeholder="Escribe para buscar...">
                         </div>
 
                         <button id="btn-search-prot" class="btn btn-dark fw-bold px-4">
@@ -122,15 +122,15 @@
                 
                 <div class="col-lg-5 text-lg-end mt-3 mt-lg-0 d-flex justify-content-end gap-2">
                     <button class="btn btn-outline-dark btn-sm fw-bold position-relative px-3" onclick="window.location.href='./solicitud_protocolo'">
-                        <i class="bi bi-inbox-fill me-1"></i> Solicitudes
+                        <i class="bi bi-inbox-fill me-1"></i> <span data-i18n="admin_protocolos.btn_solicitudes">Solicitudes</span>
                         <span id="badge-requests" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none">0</span>
                     </button>
 
                     <button class="btn btn-primary btn-sm fw-bold px-4 uppercase" onclick="window.openProtocolModal(null)">
-                        <i class="bi bi-plus-lg me-1"></i> Nuevo
+                        <i class="bi bi-plus-lg me-1"></i> <span data-i18n="admin_protocolos.btn_nuevo">Nuevo</span>
                     </button>
                     <button id="btn-excel-prot" class="btn btn-success btn-sm fw-bold px-4 uppercase">
-                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                        <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="admin_protocolos.btn_excel">Excel</span>
                     </button>
                 </div>
             </div>

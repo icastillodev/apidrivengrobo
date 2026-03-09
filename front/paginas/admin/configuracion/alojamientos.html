@@ -33,7 +33,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica de configuración de infraestructura de alojamientos
         import { initConfigAlojamientos } from '../../../dist/js/pages/admin/configuracion/config_alojamientos.js';
 
@@ -43,7 +43,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt sea accesible globalmente
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Roles de Alta Jerarquía)
                 Auth.checkAccess([1, 2]); 
@@ -60,6 +60,7 @@
                     
                     // Inicialización de la lógica de configuración (Salas, Racks, Cajas)
                     initConfigAlojamientos();
+                    translatePage();
                     
                     console.log("✅ Configuración de Alojamientos inicializada correctamente.");
                 } else {
@@ -85,22 +86,22 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_alojamientos.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_alojamientos.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-warning text-dark px-2 py-1">Alojamientos & Clínica</span>
+                    <span class="badge bg-warning text-dark px-2 py-1" data-i18n="config_alojamientos.bread_aloj_clinica"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">INFRAESTRUCTURA Y CLÍNICA</h4>
-                <p class="text-muted small mb-0 mt-1">Configuración de tipos de cajas y variables de historia clínica por especie</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_alojamientos.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_alojamientos.subtitulo"></p>
             </div>
             <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                <i class="bi bi-arrow-left me-2"></i> VOLVER A CONFIGURACIONES
+                <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_alojamientos.btn_volver"></span>
             </a>
         </div>
 
@@ -109,7 +110,7 @@
             <div class="col-lg-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-dark text-white py-3">
-                        <h6 class="fw-bold m-0 small uppercase"><i class="bi bi-list-ul me-2"></i>1. Seleccionar Especie</h6>
+                        <h6 class="fw-bold m-0 small uppercase"><i class="bi bi-list-ul me-2"></i><span data-i18n="config_alojamientos.paso_especie"></span></h6>
                     </div>
                     <div class="list-group list-group-flush" id="list-species">
                         <div class="text-center p-4"><div class="spinner-border spinner-border-sm text-secondary"></div></div>
@@ -121,18 +122,18 @@
                 <div class="card border-0 shadow-sm h-100 d-none" id="config-panel">
                     <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="fw-black text-dark m-0">CONFIGURANDO: <span id="lbl-selected-species" class="text-warning">...</span></h5>
+                            <h5 class="fw-black text-dark m-0"><span data-i18n="config_alojamientos.configurando"></span> <span id="lbl-selected-species" class="text-warning">...</span></h5>
                         </div>
                         
                         <ul class="nav nav-tabs" id="alojTabs" role="tablist">
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link active" id="types-tab" data-bs-toggle="tab" data-bs-target="#types-pane" type="button">
-                                    <i class="bi bi-box me-2"></i>Tipos de Alojamiento
+                                    <i class="bi bi-box me-2"></i><span data-i18n="config_alojamientos.tab_tipos"></span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="clinical-tab" data-bs-toggle="tab" data-bs-target="#clinical-pane" type="button">
-                                    <i class="bi bi-clipboard2-pulse me-2"></i>Variables Historia Clínica
+                                    <i class="bi bi-clipboard2-pulse me-2"></i><span data-i18n="config_alojamientos.tab_clinica"></span>
                                 </button>
                             </li>
                         </ul>
@@ -143,19 +144,19 @@
                             
                             <div class="tab-pane fade show active" id="types-pane">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <p class="text-muted small mb-0">Defina las unidades físicas (cajas, jaulas, corrales) disponibles.</p>
+                                    <p class="text-muted small mb-0" data-i18n="config_alojamientos.desc_tipos"></p>
                                     <button class="btn btn-warning btn-sm fw-bold shadow-sm" onclick="window.openModalType()">
-                                        <i class="bi bi-plus-lg"></i> Agregar Tipo
+                                        <i class="bi bi-plus-lg"></i> <span data-i18n="config_alojamientos.btn_agregar_tipo"></span>
                                     </button>
                                 </div>
                                 <div class="table-responsive border rounded">
                                     <table class="table table-hover align-middle mb-0 text-sm table-aloj">
                                         <thead class="table-light">
                                             <tr>
-                                                <th class="ps-3">Nombre Tipo</th>
-                                                <th>Detalle / Descripción</th>
-                                                <th class="text-center">Estado</th>
-                                                <th class="text-end pe-3">Acción</th>
+                                                <th class="ps-3" data-i18n="config_alojamientos.th_nombre_tipo"></th>
+                                                <th data-i18n="config_alojamientos.th_detalle_desc"></th>
+                                                <th class="text-center" data-i18n="config_alojamientos.th_estado"></th>
+                                                <th class="text-end pe-3" data-i18n="config_alojamientos.th_accion"></th>
                                             </tr>
                                         </thead>
                                         <tbody id="table-types"></tbody>
@@ -165,20 +166,20 @@
 
                             <div class="tab-pane fade" id="clinical-pane">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <p class="text-muted small mb-0">Campos a registrar por cada animal en la historia clínica.</p>
+                                    <p class="text-muted small mb-0" data-i18n="config_alojamientos.desc_variables"></p>
                                     <button class="btn btn-info text-white btn-sm fw-bold shadow-sm" onclick="window.openModalCat()">
-                                        <i class="bi bi-plus-lg"></i> Nueva Variable
+                                        <i class="bi bi-plus-lg"></i> <span data-i18n="config_alojamientos.btn_nueva_variable"></span>
                                     </button>
                                 </div>
                                 <div class="table-responsive border rounded">
                                     <table class="table table-hover align-middle mb-0 text-sm table-aloj">
                                         <thead class="table-light">
                                             <tr>
-                                                <th class="ps-3">Nombre Variable</th>
-                                                <th>Tipo de Dato</th>
-                                                <th>Dependencia</th>
-                                                <th class="text-center">Estado</th>
-                                                <th class="text-end pe-3">Acción</th>
+                                                <th class="ps-3" data-i18n="config_alojamientos.th_nombre_variable"></th>
+                                                <th data-i18n="config_alojamientos.th_tipo_dato"></th>
+                                                <th data-i18n="config_alojamientos.th_dependencia"></th>
+                                                <th class="text-center" data-i18n="config_alojamientos.th_estado"></th>
+                                                <th class="text-end pe-3" data-i18n="config_alojamientos.th_accion"></th>
                                             </tr>
                                         </thead>
                                         <tbody id="table-clinical"></tbody>
@@ -192,7 +193,7 @@
                 
                 <div id="empty-state" class="text-center py-5 text-muted">
                     <i class="bi bi-arrow-left-circle display-4 opacity-25"></i>
-                    <p class="mt-3 fw-bold">Seleccione una especie de la lista para configurar</p>
+                    <p class="mt-3 fw-bold" data-i18n="config_alojamientos.empty_seleccione"></p>
                 </div>
             </div>
         </div>
@@ -202,31 +203,31 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-warning border-0">
-                    <h6 class="modal-title fw-bold text-dark">TIPO DE ALOJAMIENTO</h6>
+                    <h6 class="modal-title fw-bold text-dark" data-i18n="config_alojamientos.modal_tipo_titulo"></h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-type">
                         <input type="hidden" name="IdTipoAlojamiento" id="type-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">NOMBRE (Ej: Caja Metabólica, Corral)</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_ej"></label>
                             <input type="text" name="NombreTipoAlojamiento" id="type-name" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">DETALLE TÉCNICO</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_tecnico"></label>
                             <textarea name="DetalleTipoAlojamiento" id="type-detail" class="form-control" rows="2"></textarea>
                         </div>
                         
                         <div class="mb-3 d-none" id="type-status-container">
-                            <label class="form-label small fw-bold">ESTADO</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado"></label>
                             <select name="Habilitado" id="type-habilitado" class="form-select fw-bold">
-                                <option value="1">Habilitado (Visible)</option>
-                                <option value="2">Deshabilitado (Oculto)</option>
+                                <option value="1" data-i18n="config_alojamientos.opcion_habilitado"></option>
+                                <option value="2" data-i18n="config_alojamientos.opcion_deshabilitado"></option>
                             </select>
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-warning fw-bold shadow-sm">GUARDAR</button>
+                            <button type="submit" class="btn btn-warning fw-bold shadow-sm" data-i18n="config_alojamientos.btn_guardar"></button>
                         </div>
                     </form>
                 </div>
@@ -238,51 +239,51 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-info text-white border-0">
-                    <h6 class="modal-title fw-bold">VARIABLE CLÍNICA</h6>
+                    <h6 class="modal-title fw-bold" data-i18n="config_alojamientos.modal_cat_titulo"></h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-cat">
                         <input type="hidden" name="IdDatosUnidadAloj" id="cat-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">NOMBRE VARIABLE</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_variable"></label>
                             <input type="text" name="NombreCatAlojUnidad" id="cat-name" class="form-control fw-bold" required>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small fw-bold">TIPO DE DATO</label>
+                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_tipo_dato"></label>
                                 <select name="TipoDeDato" id="cat-datatype" class="form-select" required>
-                                    <option value="varchar">Texto Breve (Ej: Código)</option>
-                                    <option value="text">Texto Largo (Ej: Notas)</option>
-                                    <option value="int">Num. Entero (Ej: 1, 5)</option>
-                                    <option value="decimal">Num. Decimal (Ej: Peso)</option>
-                                    <option value="date">Fecha</option>
-                                    <option value="bool">Casilla Sí / No</option>
+                                    <option value="varchar" data-i18n="config_alojamientos.dt_varchar"></option>
+                                    <option value="text" data-i18n="config_alojamientos.dt_text"></option>
+                                    <option value="int" data-i18n="config_alojamientos.dt_int"></option>
+                                    <option value="decimal" data-i18n="config_alojamientos.dt_decimal"></option>
+                                    <option value="date" data-i18n="config_alojamientos.dt_date"></option>
+                                    <option value="bool" data-i18n="config_alojamientos.dt_bool"></option>
                                 </select>
                             </div>
                             <div class="col-6">
-                                <label class="form-label small fw-bold">DEPENDENCIA</label>
+                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_dependencia"></label>
                                 <select name="dependencia_id" id="cat-parent" class="form-select">
-                                    <option value="">-- Ninguna --</option>
+                                    <option value="" data-i18n="config_alojamientos.opcion_ninguna"></option>
                                 </select>
                             </div>
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">DETALLE / INSTRUCCIÓN</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_instruccion"></label>
                             <textarea name="DetalleCatAloj" id="cat-detail" class="form-control" rows="2"></textarea>
                         </div>
 
                         <div class="mb-3 d-none" id="cat-status-container">
-                            <label class="form-label small fw-bold">ESTADO</label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado"></label>
                             <select name="Habilitado" id="cat-habilitado" class="form-select fw-bold">
-                                <option value="1">Habilitado (Visible)</option>
-                                <option value="2">Deshabilitado (Oculto)</option>
+                                <option value="1" data-i18n="config_alojamientos.opcion_habilitado"></option>
+                                <option value="2" data-i18n="config_alojamientos.opcion_deshabilitado"></option>
                             </select>
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-info text-white fw-bold shadow-sm">GUARDAR VARIABLE</button>
+                            <button type="submit" class="btn btn-info text-white fw-bold shadow-sm" data-i18n="config_alojamientos.btn_guardar_variable"></button>
                         </div>
                     </form>
                 </div>

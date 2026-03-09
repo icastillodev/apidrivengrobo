@@ -25,7 +25,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica de configuración de departamentos/cátedras
         import { initConfigDeptos } from '../../../dist/js/pages/admin/configuracion/config_departamentos.js';
 
@@ -35,7 +35,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt sea accesible globalmente
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Roles Administrativos)
                 Auth.checkAccess([1, 2]); 
@@ -52,6 +52,7 @@
                     
                     // Inicialización de la lógica de gestión de departamentos
                     initConfigDeptos();
+                    translatePage();
                     
                     console.log("✅ Configuración de Departamentos inicializada correctamente.");
                 } else {
@@ -78,35 +79,35 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_departamentos.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_departamentos.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-info text-white px-2 py-1" style="background-color: #0dcaf0 !important;">Estructura</span>
+                    <span class="badge bg-info text-white px-2 py-1" style="background-color: #0dcaf0 !important;" data-i18n="config_departamentos.bread_estructura"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">ESTRUCTURA ORGANIZATIVA</h4>
-                <p class="text-muted small mb-0 mt-1">Gestión de áreas, departamentos y organismos asociados</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_departamentos.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_departamentos.subtitulo"></p>
             </div>
             
             <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                <i class="bi bi-arrow-left me-2"></i> VOLVER A CONFIGURACIONES
+                <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_departamentos.btn_volver"></span>
             </a>
         </div>
 
         <ul class="nav nav-tabs nav-fill fw-bold mb-4 border-bottom-0" id="configTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active border-0 shadow-sm rounded me-2" id="deptos-tab" data-bs-toggle="tab" data-bs-target="#deptos-pane" type="button">
-                    <i class="bi bi-diagram-3 me-2"></i>DEPARTAMENTOS
+                    <i class="bi bi-diagram-3 me-2"></i><span data-i18n="config_departamentos.tab_departamentos"></span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link border-0 shadow-sm rounded bg-white text-muted" id="orgs-tab" data-bs-toggle="tab" data-bs-target="#orgs-pane" type="button">
-                    <i class="bi bi-bank me-2"></i>ORGANISMOS
+                    <i class="bi bi-bank me-2"></i><span data-i18n="config_departamentos.tab_organismos"></span>
                 </button>
             </li>
         </ul>
@@ -116,9 +117,9 @@
             <div class="tab-pane fade show active" id="deptos-pane">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="fw-bold text-muted mb-0">LISTADO DE DEPARTAMENTOS</h6>
+                        <h6 class="fw-bold text-muted mb-0" data-i18n="config_departamentos.listado_deptos"></h6>
                         <button class="btn btn-info text-white fw-bold btn-sm shadow-sm" onclick="window.openModalDepto()">
-                            <i class="bi bi-plus-lg me-1"></i> NUEVO DEPARTAMENTO
+                            <i class="bi bi-plus-lg me-1"></i> <span data-i18n="config_departamentos.btn_nuevo_depto"></span>
                         </button>
                     </div>
                     <div class="card-body p-0">
@@ -126,10 +127,10 @@
                             <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="bg-light text-secondary text-uppercase small">
                                     <tr>
-                                        <th class="ps-4">Nombre Departamento</th>
-                                        <th>Detalle</th>
-                                        <th>Organismo Padre</th>
-                                        <th class="text-end pe-4">Acciones</th>
+                                        <th class="ps-4" data-i18n="config_departamentos.th_nombre_depto"></th>
+                                        <th data-i18n="config_departamentos.th_detalle"></th>
+                                        <th data-i18n="config_departamentos.th_organismo_padre"></th>
+                                        <th class="text-end pe-4" data-i18n="config_departamentos.th_acciones"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-deptos"></tbody>
@@ -142,9 +143,9 @@
             <div class="tab-pane fade" id="orgs-pane">
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                        <h6 class="fw-bold text-muted mb-0">ENTIDADES Y ORGANISMOS</h6>
+                        <h6 class="fw-bold text-muted mb-0" data-i18n="config_departamentos.entidades_organismos"></h6>
                         <button class="btn btn-secondary fw-bold btn-sm shadow-sm" onclick="window.openModalOrg()">
-                            <i class="bi bi-plus-lg me-1"></i> NUEVO ORGANISMO
+                            <i class="bi bi-plus-lg me-1"></i> <span data-i18n="config_departamentos.btn_nuevo_organismo"></span>
                         </button>
                     </div>
                     <div class="card-body p-0">
@@ -152,11 +153,11 @@
                             <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="bg-light text-secondary text-uppercase small">
                                     <tr>
-                                        <th class="ps-4">Nombre Corto</th>
-                                        <th>Nombre Completo</th>
-                                        <th>Contacto</th>
-                                        <th>País</th>
-                                        <th class="text-end pe-4">Acciones</th>
+                                        <th class="ps-4" data-i18n="config_departamentos.th_nombre_corto"></th>
+                                        <th data-i18n="config_departamentos.th_nombre_completo"></th>
+                                        <th data-i18n="config_departamentos.th_contacto"></th>
+                                        <th data-i18n="config_departamentos.th_pais"></th>
+                                        <th class="text-end pe-4" data-i18n="config_departamentos.th_acciones"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-orgs"></tbody>
@@ -173,28 +174,28 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title fw-bold fs-6">GESTIÓN DEPARTAMENTO</h5>
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_departamentos.modal_depto_titulo"></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-depto">
                         <input type="hidden" name="iddeptoA" id="depto-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">NOMBRE DEPARTAMENTO *</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_depto"></label>
                             <input type="text" name="NombreDepto" id="depto-nombre" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">ORGANISMO AL QUE PERTENECE , opcional</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_organismo_opcional"></label>
                             <select name="idOrg" id="depto-org" class="form-select" >
                                 
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">DETALLE / UBICACIÓN</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_detalle_ubicacion"></label>
                             <textarea name="Detalle" id="depto-detalle" class="form-control" rows="2"></textarea>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-info text-white fw-bold shadow-sm">GUARDAR</button>
+                            <button type="submit" class="btn btn-info text-white fw-bold shadow-sm" data-i18n="config_departamentos.btn_guardar"></button>
                         </div>
                     </form>
                 </div>
@@ -206,7 +207,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title fw-bold fs-6">GESTIÓN ORGANISMO</h5>
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_departamentos.modal_org_titulo"></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -214,32 +215,32 @@
                         <input type="hidden" name="IdOrganismo" id="org-id">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">NOMBRE CORTO (Siglas)</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_corto"></label>
                                 <input type="text" name="NombreSimple" id="org-simple" class="form-control fw-bold" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">PAÍS</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_pais"></label>
                                 <input type="text" name="Pais" id="org-pais" class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">NOMBRE COMPLETO</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_completo"></label>
                                 <input type="text" name="NombreCompleto" id="org-completo" class="form-control" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">CONTACTO (Teléfono)</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_contacto"></label>
                                 <input type="text" name="Contacto" id="org-contacto" class="form-control">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted">CORREO</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_correo"></label>
                                 <input type="email" name="Correo" id="org-correo" class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted">DIRECCIÓN</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_direccion"></label>
                                 <input type="text" name="Direccion" id="org-dir" class="form-control">
                             </div>
                         </div>
                         <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-secondary fw-bold shadow-sm">GUARDAR</button>
+                            <button type="submit" class="btn btn-secondary fw-bold shadow-sm" data-i18n="config_departamentos.btn_guardar"></button>
                         </div>
                     </form>
                 </div>

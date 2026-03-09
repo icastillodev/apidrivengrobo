@@ -72,7 +72,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica del panel de configuración global
         import { initConfigDashboard } from '../../../dist/js/pages/admin/configuracion/config.js';
 
@@ -82,7 +82,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos hasta que window.txt esté listo para evitar errores de traducción
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Solo Administradores)
                 Auth.checkAccess([1, 2]); 
@@ -94,6 +94,7 @@
                     
                     // Inicialización de la lógica del dashboard de configuración
                     initConfigDashboard();
+                    translatePage();
                     
                     console.log("✅ Dashboard de Configuración inicializado correctamente.");
                 } else {
@@ -120,17 +121,17 @@
             
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_config.bread_grobo"></li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_config.bread_admin"></li>
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-dark px-2 py-1">Panel de Configuración</span>
+                        <span class="badge bg-dark px-2 py-1" data-i18n="admin_config.bread_panel"></span>
                     </li>
                 </ol>
             </nav>
 
             <div class="text-center mb-5">
-                <h4 class="fw-black m-0 uppercase text-dark" style="letter-spacing: -0.5px;">CENTRO DE CONFIGURACIÓN</h4>
-                <p class="text-muted small mt-1">Gestione los parámetros globales de <span id="lbl-inst-name" class="fw-bold text-success">...</span></p>
+                <h4 class="fw-black m-0 uppercase text-dark" style="letter-spacing: -0.5px;" data-i18n="admin_config.titulo"></h4>
+                <p class="text-muted small mt-1"><span data-i18n="admin_config.subtitulo"></span> <span id="lbl-inst-name" class="fw-bold text-success">...</span></p>
             </div>
 
             <div class="row g-4 justify-content-center mb-4" id="config-grid">

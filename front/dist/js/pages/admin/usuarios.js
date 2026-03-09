@@ -1,6 +1,9 @@
 // front/dist/js/pages/admin/usuarios.js
+// v: modal construido por concatenación (sin template literals) + cache-bust
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
+
+console.log('[usuarios.js] módulo cargado (parse OK)');
 
 let allUsers = [];
 let currentPage = 1;
@@ -14,6 +17,12 @@ function getFormPageByCategoria(categoria = '') {
     return 'insumos';
 }
 
+/** Escapa texto para uso en atributos HTML (sin usar regex dentro de templates). */
+function escapeHtmlAttr(str) {
+    const s = String(str == null ? '' : str);
+    return s.split('&').join('&amp;').split('"').join('&quot;').split('<').join('&lt;');
+}
+
 function openWithModal(targetPath, id, queryKey = 'id') {
     if (!id) return;
     const basePath = Auth.getBasePath();
@@ -22,6 +31,19 @@ function openWithModal(targetPath, id, queryKey = 'id') {
 }
 
 export async function initUsuariosPage() {
+    try {
+        return await _initUsuariosPage();
+    } catch (err) {
+        console.error('[admin/usuarios] Error al inicializar:', err.message);
+        console.error('[admin/usuarios] Línea/columna aproximadas:', err.lineNumber, err.columnNumber);
+        console.error('[admin/usuarios] Stack:', err.stack);
+        if (typeof window !== 'undefined') window.__lastUsuariosError = { message: err.message, stack: err.stack, line: err.lineNumber, col: err.columnNumber };
+        throw err;
+    }
+}
+
+async function _initUsuariosPage() {
+    console.log('[usuarios] _initUsuariosPage inicio');
     // 1. OBTENCIÓN ROBUSTA DE ID (Corrección del error null)
     const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
     
@@ -80,6 +102,36 @@ export async function initUsuariosPage() {
     const btnExcel = document.getElementById('btn-excel');
     if (btnExcel) {
         btnExcel.onclick = exportToExcel;
+    }
+
+    // Delegación de clic para botones "Abrir formulario", "Abrir protocolo", "Abrir alojamiento" y "PDF" en la ficha (evita inyectar datos en onclick)
+    const modalUser = document.getElementById('modal-user');
+    if (modalUser) {
+        modalUser.addEventListener('click', (e) => {
+            const btnForm = e.target.closest('.btn-form-from-card');
+            if (btnForm && btnForm.dataset.idform != null) {
+                e.stopPropagation();
+                window.openFormFromUserCard(btnForm.dataset.idform, btnForm.dataset.categoria || '');
+                return;
+            }
+            const btnProt = e.target.closest('.btn-protocol-from-card');
+            if (btnProt && btnProt.dataset.idprot != null) {
+                e.stopPropagation();
+                window.openProtocolFromUserCard(btnProt.dataset.idprot);
+                return;
+            }
+            const btnAloj = e.target.closest('.btn-alojamiento-from-card');
+            if (btnAloj && btnAloj.dataset.historia != null) {
+                e.stopPropagation();
+                window.openAlojamientoFromUserCard(btnAloj.dataset.historia);
+                return;
+            }
+            const btnPdf = e.target.closest('.btn-download-pdf');
+            if (btnPdf && btnPdf.dataset.idusr != null) {
+                e.preventDefault();
+                downloadPDF(parseInt(btnPdf.dataset.idusr, 10), btnPdf.dataset.tipo || 'total');
+            }
+        });
     }
 
     // Inicializar modal de ayuda
@@ -172,7 +224,7 @@ function renderTable() {
     const showOtros = allUsers.some(u => u.OtrosCeuaCount > 0);
 
     if (pageData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron usuarios</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${(window.txt?.admin_usuarios?.empty_usuarios || 'No se encontraron usuarios')}</td></tr>`;
         // IMPORTANTE: Incluso si no hay datos, debemos limpiar la paginación
         const pagContainer = document.getElementById('pagination');
         if(pagContainer) pagContainer.innerHTML = '';
@@ -234,7 +286,7 @@ function renderPagination(totalRows, containerId, targetRenderTable) {
     };
 
     // Botón Anterior
-    pagination.appendChild(createBtn('Anterior', currentPage - 1, currentPage === 1));
+    pagination.appendChild(createBtn((window.txt?.admin_usuarios?.pag_anterior || 'Anterior'), currentPage - 1, currentPage === 1));
 
     // Lógica de números: Primer número
     pagination.appendChild(createBtn(1, 1, false, currentPage === 1));
@@ -264,39 +316,90 @@ function renderPagination(totalRows, containerId, targetRenderTable) {
     pagination.appendChild(createBtn(totalPages, totalPages, false, currentPage === totalPages));
 
     // Botón Siguiente
-    pagination.appendChild(createBtn('Siguiente', currentPage + 1, currentPage === totalPages));
+    pagination.appendChild(createBtn((window.txt?.admin_usuarios?.pag_siguiente || 'Siguiente'), currentPage + 1, currentPage === totalPages));
 }
 
 // --- GESTIÓN DEL MODAL ---
+// v: modal construido por concatenación (sin template literals) + cache-bust
+
+function buildModalHtml(opts) {
+    var u = opts.u, t = opts.t, instName = opts.instName;
+    var protocolos = opts.protocolos, formularios = opts.formularios, alojamientos = opts.alojamientos, departamentos = opts.departamentos;
+    var protocolsUsed = opts.protocolsUsed, insumosPedidos = opts.insumosPedidos, insumosExpPedidos = opts.insumosExpPedidos;
+    var disableLegend = opts.disableLegend, facturacionLegend = opts.facturacionLegend, eliminarLegend = opts.eliminarLegend;
+    var puedeEliminar = opts.puedeEliminar, puedeFacturar = opts.puedeFacturar;
+
+    var html = '<div id="ficha-print-area" class="ficha-print-area">';
+    html += '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4 ficha-print-header">';
+    html += '<div class="fw-black text-success text-uppercase small">' + (instName || '') + '</div>';
+    html += '<div class="text-muted small uppercase fw-bold">' + (t && t.ficha_title ? t.ficha_title : 'Ficha de Usuario N°') + ' ' + (u.IdUsrA || '') + '</div></div>';
+    html += '<form id="form-usuario-detalle" class="ficha-datos-persona"><div class="row g-3">';
+    html += '<div class="col-12 bg-light p-3 rounded border-start border-4 border-success mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_usuario_sistema ? t.ficha_usuario_sistema : 'Usuario de Sistema') + '</label>';
+    html += '<input type="text" class="form-control-plaintext fw-bold h5 mb-0" value="' + (u.Usuario || '---') + '" readonly></div>';
+    html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_apellido ? t.ficha_apellido : 'Apellido') + '</label><input type="text" name="ApellidoA" class="form-control form-control-sm fw-bold" value="' + (u.ApellidoA || '') + '"></div>';
+    html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_nombre ? t.ficha_nombre : 'Nombre') + '</label><input type="text" name="NombreA" class="form-control form-control-sm fw-bold" value="' + (u.NombreA || '') + '"></div>';
+    html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_correo ? t.ficha_correo : 'Correo') + '</label><input type="email" name="EmailA" class="form-control form-control-sm fw-bold text-primary" value="' + (u.Correo || '') + '"></div>';
+    html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_celular ? t.ficha_celular : 'Celular') + '</label><input type="text" name="CelularA" class="form-control form-control-sm fw-bold" value="' + (u.CelularA || '') + '"></div>';
+    html += '<div class="col-12"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_departamento ? t.ficha_departamento : 'Departamento / División') + '</label><select name="iddeptoA" class="form-select form-select-sm fw-bold"><option value="">' + (t && t.ficha_sin_departamento ? t.ficha_sin_departamento : '-- Sin Departamento Asignado --') + '</option>';
+    for (var i = 0; i < departamentos.length; i++) {
+        var d = departamentos[i];
+        var isSelected = (u.iddeptoA == d.iddeptoA) ? ' selected' : '';
+        var detallePart = d.DetalledeptoA ? (' (' + d.DetalledeptoA + ')') : '';
+        html += '<option value="' + (d.iddeptoA || '') + '"' + isSelected + '>' + (d.NombreDeptoA || '') + detallePart + '</option>';
+    }
+    html += '</select></div><div class="mt-4 d-flex gap-2 flex-wrap">';
+    html += '<button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(' + (u.IdUsrA || '') + ')">' + (t && t.btn_guardar_cambios ? t.btn_guardar_cambios : 'Guardar Cambios') + '</button>';
+    html += '<button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(' + (u.IdUsrA || '') + ')">' + (t && t.btn_resetear_clave ? t.btn_resetear_clave : 'Resetear Clave') + '</button>';
+    html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')"' + (puedeEliminar ? '' : ' disabled title="Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos"') + '><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
+    html += '<button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3 uppercase" onclick="openBillingForUser(' + (u.IdUsrA || '') + ')"' + (puedeFacturar ? '' : ' disabled title="Sin protocolos ni pedidos de insumos"') + '><i class="bi bi-receipt"></i> ' + (t && t.btn_ver_facturacion ? t.btn_ver_facturacion : 'Ver Facturación') + '</button></div>';
+    html += (facturacionLegend || '') + (eliminarLegend || '') + (disableLegend || '') + '</form>';
+    html += '<hr class="my-4 border-2 border-secondary"><div class="row g-3 mb-4">';
+    var totalAnimales = 0;
+    for (var j = 0; j < protocolsUsed.length; j++) totalAnimales += (parseInt(protocolsUsed[j].animales_usados, 10) || 0);
+    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-primary small fw-bold text-uppercase mb-1">Animales utilizados en protocolos</div><div class="fs-3 fw-bold text-primary">' + totalAnimales + '</div><div class="small text-muted">total en formularios entregados</div></div></div>';
+    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-success small fw-bold text-uppercase mb-1">Insumos pedidos</div><div class="fs-3 fw-bold text-success">' + insumosPedidos.length + '</div><div class="small text-muted">pedidos de insumos</div></div></div>';
+    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-info small fw-bold text-uppercase mb-1">Insumos experimentales pedidos</div><div class="fs-3 fw-bold text-info">' + insumosExpPedidos.length + '</div><div class="small text-muted">pedidos de reactivos</div></div></div></div>';
+    html += '<hr class="my-5"><div class="mt-5"><h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2"><i class="bi bi-file-earmark-medical me-2"></i>Protocolos a su cargo</h6>';
+    html += '<div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;"><table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;"><thead class="table-light sticky-top"><tr><th class="px-3">ID Prot.</th><th class="px-3">N° Prot.</th><th>Título del Proyecto</th><th class="text-center">Vencimiento</th><th class="text-end pe-3">Abrir</th></tr></thead><tbody>';
+    if (protocolos.length === 0) html += '<tr><td colspan="5" class="text-center py-4 text-muted italic">' + (t && t.empty_protocolos ? t.empty_protocolos : 'No tiene protocolos asignados actualmente.') + '</td></tr>';
+    else for (var pi = 0; pi < protocolos.length; pi++) { var p = protocolos[pi]; var tituloEsc = escapeHtmlAttr(p.tituloA); html += '<tr><td class="px-3 fw-bold text-muted">' + (p.idprotA || '') + '</td><td class="px-3 fw-bold text-success">' + (p.nprotA || '') + '</td><td>' + (tituloEsc || '') + '</td><td class="text-center text-muted">' + (p.FechaFinProtA || 'N/A') + '</td><td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-primary btn-protocol-from-card" data-idprot="' + (p.idprotA || '') + '" title="Abrir protocolo"><i class="bi bi-box-arrow-up-right"></i></button></td></tr>'; }
+    html += '</tbody></table></div></div><div class="mt-4"><h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2"><i class="bi bi-clipboard-check me-2"></i>Historial de Formularios</h6>';
+    html += '<div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;"><table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;"><thead class="table-light sticky-top"><tr><th class="px-3">Fecha</th><th class="px-3">ID Form.</th><th class="px-3">ID Prot.</th><th>Tipo de Trámite</th><th class="text-center">Estado</th><th class="text-end pe-3">Abrir</th></tr></thead><tbody>';
+    if (formularios.length === 0) html += '<tr><td colspan="6" class="text-center py-4 text-muted italic">' + (t && t.empty_formularios ? t.empty_formularios : 'No registra pedidos de formularios.') + '</td></tr>';
+    else for (var fi = 0; fi < formularios.length; fi++) { var f = formularios[fi]; var catAttr = escapeHtmlAttr(f.CategoriaFormulario); var tipoTramiteText = f.TipoTramiteNombre || ('Tipo ' + (f.tipoA || '')); html += '<tr><td class="px-3 text-muted">' + (f.fechainicioA || '') + '</td><td class="px-3 fw-bold text-muted">' + (f.idformA || '') + '</td><td class="px-3 fw-bold text-secondary">' + (f.idprotA || '---') + '</td><td class="fw-bold">' + tipoTramiteText + '<div class="small text-muted">' + (f.CategoriaFormulario || 'Sin categoría') + '</div></td><td class="text-center"><span class="badge rounded-pill bg-opacity-10 text-uppercase" style="background-color: #e8f5e9; color: #1a5d3b; font-size: 10px;">' + (f.estado || '') + '</span></td><td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-primary btn-form-from-card" data-idform="' + (f.idformA || '') + '" data-categoria="' + catAttr + '" title="Abrir formulario"><i class="bi bi-box-arrow-up-right"></i></button></td></tr>'; }
+    html += '</tbody></table></div></div><div class="mt-4"><h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2"><i class="bi bi-houses me-2"></i>Historial de Alojamientos</h6>';
+    html += '<div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;"><table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;"><thead class="table-light sticky-top"><tr><th class="px-3">Historia</th><th class="px-3">ID Aloj.</th><th class="px-3">ID Prot.</th><th>Especie</th><th>Período</th><th class="text-end pe-3">Abrir</th></tr></thead><tbody>';
+    if (alojamientos.length === 0) html += '<tr><td colspan="6" class="text-center py-4 text-muted italic">' + (t && t.empty_alojamientos ? t.empty_alojamientos : 'No registra alojamientos.') + '</td></tr>';
+    else for (var ai = 0; ai < alojamientos.length; ai++) { var a = alojamientos[ai]; var historiaAttr = escapeHtmlAttr(a.historia); html += '<tr><td class="px-3 fw-bold text-muted">#' + (a.historia || '---') + '</td><td class="px-3 text-muted">' + (a.IdAlojamiento || '---') + '</td><td class="px-3 fw-bold text-secondary">' + (a.idprotA || '---') + '</td><td class="fw-bold">' + (a.Especie || '---') + '</td><td class="small text-muted">' + (a.fechavisado || '---') + ' → ' + (a.hastafecha || '---') + '</td><td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-primary btn-alojamiento-from-card" data-historia="' + historiaAttr + '" title="Abrir alojamiento"><i class="bi bi-box-arrow-up-right"></i></button></td></tr>'; }
+    html += '</tbody></table></div></div><div class="mt-5 pt-3 border-top d-flex flex-wrap gap-2 justify-content-between"><div class="d-flex gap-2">';
+    html += '<button type="button" class="btn btn-danger btn-sm fw-bold px-3 uppercase btn-download-pdf" data-idusr="' + (u.IdUsrA || '') + '" data-tipo="total"><i class="bi bi-file-pdf"></i> ' + (t && t.btn_pdf_total ? t.btn_pdf_total : 'PDF Total') + '</button>';
+    html += '<button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase btn-download-pdf" data-idusr="' + (u.IdUsrA || '') + '" data-tipo="simple"><i class="bi bi-person-badge"></i> ' + (t && t.btn_solo_ficha ? t.btn_solo_ficha : 'Solo Ficha') + '</button></div>';
+    html += '<button type="button" class="btn btn-light btn-sm fw-bold text-muted uppercase" data-bs-dismiss="modal">' + (t && t.btn_cerrar ? t.btn_cerrar : 'Cerrar') + '</button></div></div>';
+    return html;
+}
 
 window.openUserModal = async (u) => {
+    console.log('[usuarios] openUserModal inicio', u && u.IdUsrA);
     const instId = localStorage.getItem('instId');
     const instName = localStorage.getItem('NombreInst') || 'URBE - Gestión';
     const modalElement = document.getElementById('modal-user');
     const content = document.getElementById('modal-content');
-    
-    // 1. Loader visual
-    content.innerHTML = `
-        <div class="text-center py-5">
-            <div class="spinner-border text-success" role="status"></div>
-            <p class="mt-2 text-muted">Obteniendo historial completo...</p>
-        </div>`;
-    
-    // Usamos getOrCreateInstance para evitar duplicidad de modales
+    const t = window.txt && window.txt.admin_usuarios ? window.txt.admin_usuarios : {};
+    content.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success" role="status"></div><p class="mt-2 text-muted">' + (t.ficha_loading || 'Obteniendo historial completo...') + '</p></div>';
+    console.log('[usuarios] loader mostrado');
     const myModal = bootstrap.Modal.getOrCreateInstance(modalElement);
     myModal.show();
-
-    // 2. Carga paralela de datos (RUTA DE DEPARTAMENTOS CORREGIDA)
+    console.log('[usuarios] peticiones API...');
     const [resProt, resForms, resDeptos, resAloj, resProtocolsUsed, resInsumosPedidos, resInsumosExpPedidos] = await Promise.all([
-        API.request(`/users/protocols?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/users/forms?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/deptos/list?inst=${instId}`),
-        API.request(`/users/alojamientos?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/users/protocols-used-in-forms?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/users/insumos-pedidos?id=${u.IdUsrA}&inst=${instId}`),
-        API.request(`/users/insumos-exp-pedidos?id=${u.IdUsrA}&inst=${instId}`)
+        API.request('/users/protocols?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/forms?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+        API.request('/deptos/list?inst=' + encodeURIComponent(instId)),
+        API.request('/users/alojamientos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/protocols-used-in-forms?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/insumos-pedidos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/insumos-exp-pedidos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId))
     ]);
-
+    console.log('[usuarios] API respondida');
     const protocolos = resProt.status === 'success' ? resProt.data : [];
     const formularios = resForms.status === 'success' ? resForms.data : [];
     const departamentos = resDeptos.status === 'success' ? resDeptos.data : [];
@@ -304,243 +407,34 @@ window.openUserModal = async (u) => {
     const protocolsUsed = resProtocolsUsed.status === 'success' ? (resProtocolsUsed.data || []) : [];
     const insumosPedidos = resInsumosPedidos.status === 'success' ? (resInsumosPedidos.data || []) : [];
     const insumosExpPedidos = resInsumosExpPedidos.status === 'success' ? (resInsumosExpPedidos.data || []) : [];
-    const isDisabled = String(u.ActivoA) === '0';
-    const tienePedidosInsumos = formularios.some(f => (String(f.CategoriaFormulario || '').toLowerCase()).includes('insumo'));
+    const tienePedidosInsumos = formularios.some(function(f) { return (String(f.CategoriaFormulario || '').toLowerCase()).includes('insumo'); });
     const puedeFacturar = protocolos.length > 0 || tienePedidosInsumos;
     const puedeEliminar = formularios.length === 0 && protocolos.length === 0 && alojamientos.length === 0 && (u.IdTipousrA == 3 || u.IdTipousrA === '3');
-    const disableLegend = isDisabled
-        ? `<div class="small text-danger mt-2"><i class="bi bi-info-circle me-1"></i>Usuario deshabilitado. Motivo: baja administrativa o deshabilitación previa.</div>`
-        : '';
-    const facturacionLegend = !puedeFacturar
-        ? `<div class="small text-warning mt-2"><i class="bi bi-receipt me-1"></i>Ver facturación solo disponible si tiene protocolos a cargo o pedidos de formularios de insumos.</div>`
-        : '';
-    const eliminarLegend = !puedeEliminar
-        ? `<div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos efectuados.</div>`
-        : '';
-
-    content.innerHTML = `
-        <div id="ficha-print-area" class="ficha-print-area">
-            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4 ficha-print-header">
-                <div class="fw-black text-success text-uppercase small">${instName}</div>
-                <div class="text-muted small uppercase fw-bold">Ficha de Usuario N° ${u.IdUsrA}</div>
-            </div>
-
-            <form id="form-usuario-detalle" class="ficha-datos-persona">
-                <div class="row g-3">
-                    <div class="col-12 bg-light p-3 rounded border-start border-4 border-success mb-2">
-                        <label class="text-muted small fw-bold text-uppercase">Usuario de Sistema</label>
-                        <input type="text" class="form-control-plaintext fw-bold h5 mb-0" value="${u.Usuario || '---'}" readonly>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold uppercase">Apellido</label>
-                        <input type="text" name="ApellidoA" class="form-control form-control-sm fw-bold" value="${u.ApellidoA || ''}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold uppercase">Nombre</label>
-                        <input type="text" name="NombreA" class="form-control form-control-sm fw-bold" value="${u.NombreA || ''}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold uppercase">Correo</label>
-                        <input type="email" name="EmailA" class="form-control form-control-sm fw-bold text-primary" value="${u.Correo || ''}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted small fw-bold uppercase">Celular</label>
-                        <input type="text" name="CelularA" class="form-control form-control-sm fw-bold" value="${u.CelularA || ''}">
-                    </div>
-
-                    <div class="col-12">
-                        <label class="form-label text-muted small fw-bold uppercase">Departamento / División</label>
-                        <select name="iddeptoA" class="form-select form-select-sm fw-bold">
-                            <option value="">-- Sin Departamento Asignado --</option>
-                            ${departamentos.map(d => {
-                                const isSelected = (u.iddeptoA == d.iddeptoA) ? 'selected' : '';
-                                return `<option value="${d.iddeptoA}" ${isSelected}>
-                                            ${d.NombreDeptoA} ${d.DetalledeptoA ? `(${d.DetalledeptoA})` : ''}
-                                        </option>`;
-                            }).join('')}
-                        </select>
-                    </div>
-
-                <div class="mt-4 d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(${u.IdUsrA})">Guardar Cambios</button>
-                    <button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(${u.IdUsrA})">Resetear Clave</button>
-                    <button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(${u.IdUsrA})" ${puedeEliminar ? '' : 'disabled title="Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos"'}>
-                        <i class="bi bi-person-x"></i> Eliminar
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3 uppercase" onclick="openBillingForUser(${u.IdUsrA})" ${puedeFacturar ? '' : 'disabled title="Sin protocolos ni pedidos de insumos"'}>
-                        <i class="bi bi-receipt"></i> Ver Facturación
-                    </button>
-                </div>
-                ${facturacionLegend}
-                ${eliminarLegend}
-                ${disableLegend}
-            </form>
-
-            <hr class="my-4 border-2 border-secondary">
-
-            <div class="row g-3 mb-4">
-                <div class="col-4">
-                    <div class="border rounded p-3 text-center bg-light h-100">
-                        <div class="text-primary small fw-bold text-uppercase mb-1">Animales utilizados en protocolos</div>
-                        <div class="fs-3 fw-bold text-primary">${protocolsUsed.reduce((s, p) => s + (parseInt(p.animales_usados, 10) || 0), 0)}</div>
-                        <div class="small text-muted">total en formularios entregados</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="border rounded p-3 text-center bg-light h-100">
-                        <div class="text-success small fw-bold text-uppercase mb-1">Insumos pedidos</div>
-                        <div class="fs-3 fw-bold text-success">${insumosPedidos.length}</div>
-                        <div class="small text-muted">pedidos de insumos</div>
-                    </div>
-                </div>
-                <div class="col-4">
-                    <div class="border rounded p-3 text-center bg-light h-100">
-                        <div class="text-info small fw-bold text-uppercase mb-1">Insumos experimentales pedidos</div>
-                        <div class="fs-3 fw-bold text-info">${insumosExpPedidos.length}</div>
-                        <div class="small text-muted">pedidos de reactivos</div>
-                    </div>
-                </div>
-            </div>
-
-            <hr class="my-5">
-
-            <div class="mt-5">
-                <h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2">
-                    <i class="bi bi-file-earmark-medical me-2"></i>Protocolos a su cargo
-                </h6>
-                <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;">
-                    <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th class="px-3">ID Prot.</th>
-                                <th class="px-3">N° Prot.</th>
-                                <th>Título del Proyecto</th>
-                                <th class="text-center">Vencimiento</th>
-                                <th class="text-end pe-3">Abrir</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${protocolos.length ? protocolos.map(p => `
-                                <tr>
-                                    <td class="px-3 fw-bold text-muted">${p.idprotA}</td>
-                                    <td class="px-3 fw-bold text-success">${p.nprotA}</td>
-                                    <td>${p.tituloA}</td>
-                                    <td class="text-center text-muted">${p.FechaFinProtA || 'N/A'}</td>
-                                    <td class="text-end pe-3">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); window.openProtocolFromUserCard(${p.idprotA})" title="Abrir protocolo">
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </button>
-                                    </td>
-                                </tr>`).join('') : '<tr><td colspan="5" class="text-center py-4 text-muted italic">No tiene protocolos asignados actualmente.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mt-4">
-                <h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2">
-                    <i class="bi bi-clipboard-check me-2"></i>Historial de Formularios
-                </h6>
-                <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;">
-                    <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th class="px-3">Fecha</th>
-                                <th class="px-3">ID Form.</th>
-                                <th class="px-3">ID Prot.</th>
-                                <th>Tipo de Trámite</th>
-                                <th class="text-center">Estado</th>
-                                <th class="text-end pe-3">Abrir</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${formularios.length ? formularios.map(f => `
-                                <tr>
-                                    <td class="px-3 text-muted">${f.fechainicioA}</td>
-                                    <td class="px-3 fw-bold text-muted">${f.idformA}</td>
-                                    <td class="px-3 fw-bold text-secondary">${f.idprotA || '---'}</td>
-                                    <td class="fw-bold">
-                                        ${f.TipoTramiteNombre || `Tipo ${f.tipoA}`}
-                                        <div class="small text-muted">${f.CategoriaFormulario || 'Sin categoría'}</div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge rounded-pill bg-opacity-10 text-uppercase" 
-                                              style="background-color: #e8f5e9; color: #1a5d3b; font-size: 10px;">
-                                            ${f.estado}
-                                        </span>
-                                    </td>
-                                    <td class="text-end pe-3">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); window.openFormFromUserCard(${f.idformA}, '${f.CategoriaFormulario || ''}')" title="Abrir formulario">
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </button>
-                                    </td>
-                                </tr>`).join('') : '<tr><td colspan="6" class="text-center py-4 text-muted italic">No registra pedidos de formularios.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mt-4">
-                <h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2">
-                    <i class="bi bi-houses me-2"></i>Historial de Alojamientos
-                </h6>
-                <div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;">
-                    <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
-                        <thead class="table-light sticky-top">
-                            <tr>
-                                <th class="px-3">Historia</th>
-                                <th class="px-3">ID Aloj.</th>
-                                <th class="px-3">ID Prot.</th>
-                                <th>Especie</th>
-                                <th>Período</th>
-                                <th class="text-end pe-3">Abrir</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${alojamientos.length ? alojamientos.map(a => `
-                                <tr>
-                                    <td class="px-3 fw-bold text-muted">#${a.historia || '---'}</td>
-                                    <td class="px-3 text-muted">${a.IdAlojamiento || '---'}</td>
-                                    <td class="px-3 fw-bold text-secondary">${a.idprotA || '---'}</td>
-                                    <td class="fw-bold">${a.Especie || '---'}</td>
-                                    <td class="small text-muted">${a.fechavisado || '---'} → ${a.hastafecha || '---'}</td>
-                                    <td class="text-end pe-3">
-                                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); window.openAlojamientoFromUserCard(${a.historia || 0})" title="Abrir alojamiento">
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </button>
-                                    </td>
-                                </tr>`).join('') : '<tr><td colspan="6" class="text-center py-4 text-muted italic">No registra alojamientos.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mt-5 pt-3 border-top d-flex flex-wrap gap-2 justify-content-between">
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-danger btn-sm fw-bold px-3 uppercase" onclick="event.preventDefault(); downloadPDF(${u.IdUsrA}, 'total')">
-                        <i class="bi bi-file-pdf"></i> PDF Total
-                    </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="event.preventDefault(); downloadPDF(${u.IdUsrA}, 'simple')">
-                        <i class="bi bi-person-badge"></i> Solo Ficha
-                    </button>
-                </div>
-                <button type="button" class="btn btn-light btn-sm fw-bold text-muted uppercase" data-bs-dismiss="modal">Cerrar</button>
-            </div>
-    `;
-
-    window._lastUserFichaData = {
-        u,
-        protocolos,
-        formularios,
-        alojamientos,
-        protocolsUsed,
-        insumosPedidos,
-        insumosExpPedidos,
-        departamentos,
-        instName
-    };
-};
+    const isDisabled = String(u.ActivoA) === '0';
+    const disableLegend = isDisabled ? '<div class="small text-danger mt-2"><i class="bi bi-info-circle me-1"></i>Usuario deshabilitado. Motivo: baja administrativa o deshabilitación previa.</div>' : '';
+    const facturacionLegend = !puedeFacturar ? '<div class="small text-warning mt-2"><i class="bi bi-receipt me-1"></i>Ver facturación solo disponible si tiene protocolos a cargo o pedidos de formularios de insumos.</div>' : '';
+    const eliminarLegend = !puedeEliminar ? '<div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos efectuados.</div>' : '';
+    console.log('[usuarios] buildModalHtml...');
+    content.innerHTML = buildModalHtml({
+        u: u,
+        t: t,
+        instName: instName,
+        protocolos: protocolos,
+        formularios: formularios,
+        alojamientos: alojamientos,
+        departamentos: departamentos,
+        protocolsUsed: protocolsUsed,
+        insumosPedidos: insumosPedidos,
+        insumosExpPedidos: insumosExpPedidos,
+        disableLegend: disableLegend,
+        facturacionLegend: facturacionLegend,
+        eliminarLegend: eliminarLegend,
+        puedeEliminar: puedeEliminar,
+        puedeFacturar: puedeFacturar
+    });
+    console.log('[usuarios] modal HTML asignado');
+    window._lastUserFichaData = { u: u, protocolos: protocolos, formularios: formularios, alojamientos: alojamientos, protocolsUsed: protocolsUsed, insumosPedidos: insumosPedidos, insumosExpPedidos: insumosExpPedidos, departamentos: departamentos, instName: instName };
+}
 // --- ACCIONES ---
 
 window.saveUserData = async (id) => {
@@ -551,7 +445,7 @@ window.saveUserData = async (id) => {
     const res = await API.request(`/users/update?id=${id}`, 'POST', formData);
     
     if (res.status === 'success') {
-        alert("¡Datos actualizados con éxito!");
+        alert(window.txt?.admin_usuarios?.saved_ok || "¡Datos actualizados con éxito!");
         // Refrescamos la tabla para que se vean los cambios
         initUsuariosPage(); 
         
@@ -560,20 +454,21 @@ window.saveUserData = async (id) => {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
     } else {
-        alert("Hubo un error: " + res.message);
+        alert((window.txt?.admin_usuarios?.error_msg || "Hubo un error:") + " " + res.message);
     }
 };
 
 window.resetPassword = async (id) => {
-    if (!confirm("¿Estás seguro de resetear la clave a '12345678'?")) return;
+    const t = window.txt?.admin_usuarios;
+    if (!confirm(t?.reset_confirm || "¿Estás seguro de resetear la clave a '12345678'?")) return;
     
     // Petición POST sin cuerpo de datos
     const res = await API.request(`/users/reset-pass?id=${id}`, 'POST');
     
     if (res.status === 'success') {
-        alert("Contraseña reseteada correctamente.");
+        alert(t?.reset_ok || "Contraseña reseteada correctamente.");
     } else {
-        alert("Error: " + res.message);
+        alert((t?.reset_error || "Error:") + " " + res.message);
     }
 };
 
@@ -645,7 +540,7 @@ window.deleteUser = async (id) => {
     }
 
     const { value: formValues, isConfirmed } = await Swal.fire({
-        title: 'Eliminar usuario',
+        title: (window.txt?.admin_usuarios?.delete_title || 'Eliminar usuario'),
         html: `
             <div class="text-start small mb-3">
                 <p class="text-muted mb-2">Se eliminará de la base de datos al siguiente usuario. Solo se permite para investigadores sin formularios, protocolos ni alojamientos.</p>
@@ -657,12 +552,12 @@ window.deleteUser = async (id) => {
             </div>
         `,
         input: 'password',
-        inputPlaceholder: 'Tu contraseña para confirmar',
+        inputPlaceholder: (window.txt?.admin_usuarios?.delete_placeholder || 'Tu contraseña para confirmar'),
         inputAttributes: { id: 'swal-delete-password', autocomplete: 'current-password' },
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Eliminar',
-        cancelButtonText: 'Cancelar',
+        confirmButtonText: (window.txt?.admin_usuarios?.delete_confirm || 'Eliminar'),
+        cancelButtonText: (window.txt?.admin_usuarios?.delete_cancel || 'Cancelar'),
         customClass: { popup: 'swal-delete-popup' },
         didOpen: () => {
             const input = document.querySelector('.swal-delete-popup .swal2-input');

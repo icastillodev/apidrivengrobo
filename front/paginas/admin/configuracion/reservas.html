@@ -33,7 +33,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica para la configuración del sistema de reservas y calendarios
         import { initConfigReservas } from '../../../dist/js/pages/admin/configuracion/config_reservas.js';
 
@@ -43,7 +43,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo para i18n
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Administradores)
                 Auth.checkAccess([1, 2]); 
@@ -60,6 +60,7 @@
                     
                     // Inicialización de la lógica de gestión de reservas
                     initConfigReservas();
+                    translatePage();
                     
                     console.log("✅ Configuración de Reservas inicializada correctamente.");
                 } else {
@@ -85,34 +86,34 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_reservas.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_reservas.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-danger bg-opacity-75 px-2 py-1">Reservas y Espacios</span>
+                    <span class="badge bg-danger bg-opacity-75 px-2 py-1" data-i18n="config_reservas.bread_reservas"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">GESTIÓN DE ESPACIOS</h4>
-                <p class="text-muted small mb-0 mt-1">Administración de salas, laboratorios y equipamiento reservable</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_reservas.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_reservas.subtitulo"></p>
             </div>
             <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                <i class="bi bi-arrow-left me-2"></i> VOLVER
+                <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_reservas.btn_volver"></span>
             </a>
         </div>
 
         <ul class="nav nav-tabs mb-4" id="reservaTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="salas-tab" data-bs-toggle="tab" data-bs-target="#salas-pane" type="button">
-                    <i class="bi bi-door-open me-2"></i>SALAS Y HORARIOS
+                    <i class="bi bi-door-open me-2"></i><span data-i18n="config_reservas.tab_salas"></span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="inst-tab" data-bs-toggle="tab" data-bs-target="#inst-pane" type="button">
-                    <i class="bi bi-motherboard me-2"></i>INSTRUMENTOS
+                    <i class="bi bi-motherboard me-2"></i><span data-i18n="config_reservas.tab_instrumentos"></span>
                 </button>
             </li>
         </ul>
@@ -124,16 +125,16 @@
                     <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-3">
                             <button class="btn btn-theme fw-bold shadow-sm btn-sm" onclick="window.openModalSala()">
-                                <i class="bi bi-plus-lg me-1"></i> NUEVA SALA
+                                <i class="bi bi-plus-lg me-1"></i> <span data-i18n="config_reservas.btn_nueva_sala"></span>
                             </button>
                             <div class="dropdown">
                                 <button class="btn btn-outline-dark btn-sm fw-bold dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                    <i class="bi bi-gear-fill me-1"></i> Config. Global Horarios
+                                    <i class="bi bi-gear-fill me-1"></i> <span data-i18n="config_reservas.config_global_horarios"></span>
                                 </button>
                                 <ul class="dropdown-menu shadow">
-                                    <li><h6 class="dropdown-header small">Aplicar a todas las salas:</h6></li>
-                                    <li><a class="dropdown-item small" href="#" onclick="window.updateGlobalTimeType(1)">Reservas por Hora (1h)</a></li>
-                                    <li><a class="dropdown-item small" href="#" onclick="window.updateGlobalTimeType(2)">Reservas por Media Hora (30m)</a></li>
+                                    <li><h6 class="dropdown-header small" data-i18n="config_reservas.aplicar_todas"></h6></li>
+                                    <li><a class="dropdown-item small" href="#" onclick="window.updateGlobalTimeType(1)" data-i18n="config_reservas.reserva_hora"></a></li>
+                                    <li><a class="dropdown-item small" href="#" onclick="window.updateGlobalTimeType(2)" data-i18n="config_reservas.reserva_media"></a></li>
                                 </ul>
                             </div>
                         </div>
@@ -143,11 +144,11 @@
                             <table class="table table-hover align-middle mb-0 text-sm">
                                 <thead class="table-light text-uppercase small">
                                     <tr>
-                                        <th class="ps-4">Sala / Laboratorio</th>
-                                        <th>Ubicación</th>
-                                        <th class="text-center">Tipo Reserva</th>
-                                        <th class="text-center">Estado</th>
-                                        <th class="text-end pe-4">Acciones</th>
+                                        <th class="ps-4" data-i18n="config_reservas.th_sala_lab"></th>
+                                        <th data-i18n="config_reservas.th_ubicacion"></th>
+                                        <th class="text-center" data-i18n="config_reservas.th_tipo_reserva"></th>
+                                        <th class="text-center" data-i18n="config_reservas.th_estado"></th>
+                                        <th class="text-end pe-4" data-i18n="config_reservas.th_acciones"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-salas"></tbody>
@@ -161,7 +162,7 @@
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-0 py-3">
                         <button class="btn btn-secondary fw-bold shadow-sm btn-sm" onclick="window.openModalInst()">
-                            <i class="bi bi-plus-lg me-1"></i> NUEVO INSTRUMENTO
+                            <i class="bi bi-plus-lg me-1"></i> <span data-i18n="config_reservas.btn_nuevo_instrumento"></span>
                         </button>
                     </div>
                     <div class="card-body p-0">
@@ -169,11 +170,11 @@
                             <table class="table table-hover align-middle mb-0 text-sm">
                                 <thead class="table-light text-uppercase small">
                                     <tr>
-                                        <th class="ps-4">Instrumento</th>
-                                        <th>Cantidad Stock</th>
-                                        <th>Detalle</th>
-                                        <th class="text-center">Estado</th>
-                                        <th class="text-end pe-4">Acciones</th>
+                                        <th class="ps-4" data-i18n="config_reservas.th_instrumento"></th>
+                                        <th data-i18n="config_reservas.th_cantidad_stock"></th>
+                                        <th data-i18n="config_reservas.th_detalle"></th>
+                                        <th class="text-center" data-i18n="config_reservas.th_estado"></th>
+                                        <th class="text-end pe-4" data-i18n="config_reservas.th_acciones"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-inst"></tbody>
@@ -190,7 +191,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-theme text-white">
-                    <h5 class="modal-title fw-bold fs-6">GESTIÓN DE SALA</h5>
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_reservas.modal_sala_titulo"></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -199,41 +200,41 @@
                         
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold">NOMBRE SALA</label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_sala"></label>
                                 <input type="text" name="Nombre" id="sala-nombre" class="form-control fw-bold" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold">UBICACIÓN / LUGAR</label>
-                                <input type="text" name="Lugar" id="sala-lugar" class="form-control" placeholder="Ej: Planta Baja, Block B">
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_ubicacion"></label>
+                                <input type="text" name="Lugar" id="sala-lugar" class="form-control" data-i18n="config_reservas.ph_ubicacion" placeholder="Ej: Planta Baja, Block B">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold">TIPO DE BLOQUE HORARIO</label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_tipo_bloque"></label>
                                 <select name="tipohorasalas" id="sala-tipo" class="form-select">
-                                    <option value="1">Por Hora (1:00h)</option>
-                                    <option value="2">Por Media Hora (30m)</option>
-                                    <option value="3">Otro / Especial</option>
+                                    <option value="1" data-i18n="config_reservas.opcion_hora"></option>
+                                    <option value="2" data-i18n="config_reservas.opcion_media"></option>
+                                    <option value="3" data-i18n="config_reservas.opcion_otro"></option>
                                 </select>
                             </div>
                             <div class="col-md-6 d-none" id="sala-status-container">
-                                <label class="form-label small fw-bold">ESTADO</label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado"></label>
                                 <select name="habilitado" id="sala-habilitado" class="form-select fw-bold">
-                                    <option value="1">Habilitada</option>
-                                    <option value="0">Fuera de Servicio</option>
+                                    <option value="1" data-i18n="config_reservas.opcion_habilitada"></option>
+                                    <option value="0" data-i18n="config_reservas.opcion_fuera_servicio"></option>
                                 </select>
                             </div>
                         </div>
 
                         <hr class="text-muted opacity-25">
                         
-                        <h6 class="fw-bold small text-muted mb-3"><i class="bi bi-clock me-2"></i>DISPONIBILIDAD SEMANAL</h6>
+                        <h6 class="fw-bold small text-muted mb-3"><i class="bi bi-clock me-2"></i><span data-i18n="config_reservas.disponibilidad_semanal"></span></h6>
                         <div class="table-responsive bg-light border rounded p-2">
                             <table class="table table-sm table-borderless mb-0 table-schedule">
                                 <thead>
                                     <tr class="text-muted small">
-                                        <th style="width: 120px;">Día</th>
-                                        <th>Hora Inicio</th>
-                                        <th>Hora Fin</th>
-                                        <th class="text-center" style="width: 50px;">Activo</th>
+                                        <th style="width: 120px;" data-i18n="config_reservas.th_dia"></th>
+                                        <th data-i18n="config_reservas.th_hora_inicio"></th>
+                                        <th data-i18n="config_reservas.th_hora_fin"></th>
+                                        <th class="text-center" style="width: 50px;" data-i18n="config_reservas.th_activo"></th>
                                     </tr>
                                 </thead>
                                 <tbody id="schedule-body">
@@ -242,7 +243,7 @@
                         </div>
 
                         <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-theme fw-bold shadow-sm">GUARDAR CONFIGURACIÓN</button>
+                            <button type="submit" class="btn btn-theme fw-bold shadow-sm" data-i18n="config_reservas.btn_guardar_config"></button>
                         </div>
                     </form>
                 </div>
@@ -254,35 +255,35 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title fw-bold fs-6">GESTIÓN DE INSTRUMENTO</h5>
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_reservas.modal_inst_titulo"></h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-inst">
                         <input type="hidden" name="IdReservaInstrumento" id="inst-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">NOMBRE INSTRUMENTO</label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_inst"></label>
                             <input type="text" name="NombreInstrumento" id="inst-nombre" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">CANTIDAD DISPONIBLE</label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_cantidad_disp"></label>
                             <input type="number" name="cantidad" id="inst-cant" class="form-control" value="1" min="0">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">DETALLE</label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_detalle"></label>
                             <textarea name="detalleInstrumento" id="inst-detalle" class="form-control" rows="2"></textarea>
                         </div>
                         
                         <div class="mb-3 d-none" id="inst-status-container">
-                            <label class="form-label small fw-bold">ESTADO</label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado"></label>
                             <select name="habilitado" id="inst-habilitado" class="form-select">
-                                <option value="1">Habilitado</option>
-                                <option value="0">Deshabilitado</option>
+                                <option value="1" data-i18n="config_reservas.opcion_habilitado"></option>
+                                <option value="0" data-i18n="config_reservas.opcion_deshabilitado"></option>
                             </select>
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-secondary fw-bold shadow-sm">GUARDAR</button>
+                            <button type="submit" class="btn btn-secondary fw-bold shadow-sm" data-i18n="config_reservas.btn_guardar"></button>
                         </div>
                     </form>
                 </div>

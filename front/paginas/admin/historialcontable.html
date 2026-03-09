@@ -34,7 +34,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 Auth.checkAccess([1, 2, 4, 5, 6]); // Accesible para Admins
 
                 if (window.txt) {
@@ -68,46 +68,46 @@
         <div class="card shadow-sm border-0 p-4">
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_historialcontable.bread_grobo"></li>
                     <li class="breadcrumb-item text-muted" id="institucionbread">CARGANDO...</li>
                     <li class="breadcrumb-item text-muted" id="role-bread"></li> 
                     <li class="breadcrumb-item active">
-                        <span class="badge bg-success">HISTORIAL CONTABLE</span>
+                        <span class="badge bg-success" data-i18n="admin_historialcontable.bread_historial"></span>
                     </li>
                 </ol>
             </nav>
 
-            <h5 class="fw-bold mb-4">Auditoría Financiera y Pagos</h5>
+            <h5 class="fw-bold mb-4" data-i18n="admin_historialcontable.titulo"></h5>
 
             <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="input-group shadow-sm" style="max-width: 950px;">
-                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Operación</span>
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_historialcontable.operacion"></span>
                     <select id="filter-type" class="form-select form-select-sm fw-bold">
-                        <option value="all">Todas las operaciones</option>
-                        <option value="CARGA_SALDO">Carga de Saldo</option>
-                        <option value="LIQUIDACION">Liquidación / Pago Masivo</option>
-                        <option value="PAGO_INDIVIDUAL">Pago Individual Formulario</option>
-                        <option value="PAGO_INSUMO">Pago Individual Insumo</option>
-                        <option value="PAGO_ALOJ">Pago Alojamiento</option>
-                        <option value="DEVOLUCION">Devolución / Ajuste Negativo</option>
+                        <option value="all" data-i18n="admin_historialcontable.filter_todas"></option>
+                        <option value="CARGA_SALDO" data-i18n="admin_historialcontable.filter_carga_saldo"></option>
+                        <option value="LIQUIDACION" data-i18n="admin_historialcontable.filter_liquidacion"></option>
+                        <option value="PAGO_INDIVIDUAL" data-i18n="admin_historialcontable.filter_pago_individual"></option>
+                        <option value="PAGO_INSUMO" data-i18n="admin_historialcontable.filter_pago_insumo"></option>
+                        <option value="PAGO_ALOJ" data-i18n="admin_historialcontable.filter_pago_aloj"></option>
+                        <option value="DEVOLUCION" data-i18n="admin_historialcontable.filter_devolucion"></option>
                     </select>
 
-                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;">Filtrar por</span>
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_historialcontable.filtrar_por"></span>
                     <select id="filter-column" class="form-select form-select-sm fw-bold" style="max-width: 160px;">
-                        <option value="all">Todos los campos</option>
-                        <option value="Investigador">Investigador</option>
-                        <option value="Admin">Administrador</option>
-                        <option value="Ref">Ref. Pedido</option>
+                        <option value="all" data-i18n="admin_historialcontable.filter_todos_campos"></option>
+                        <option value="Investigador" data-i18n="admin_historialcontable.filter_investigador"></option>
+                        <option value="Admin" data-i18n="admin_historialcontable.filter_admin"></option>
+                        <option value="Ref" data-i18n="admin_historialcontable.filter_ref"></option>
                     </select>
                     
-                    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="Escribe para buscar...">
+                    <input type="text" id="search-input" class="form-control form-control-sm" data-i18n="admin_historialcontable.ph_buscar" placeholder="Escribe para buscar...">
                     
-                    <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;">Buscar</button>
+                    <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" data-i18n="admin_historialcontable.btn_buscar"></button>
                 </div>
 
                 <div class="ms-auto col-md-2 d-flex gap-2 justify-content-end">
                     <button id="btn-excel" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm">
-                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                        <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="admin_historialcontable.btn_excel"></span>
                     </button>
                 </div>
             </div>
@@ -117,13 +117,13 @@
                     <section class="mb-3 text-end"><span id="table-info" class="text-muted small fw-bold"></span></section>
                     <thead class="table-light text-uppercase">
                         <tr>
-                            <th class="py-3 px-2">ID Mov.</th>
-                            <th class="py-3 px-2">Fecha</th>
-                            <th class="py-3 px-2">Administrador</th>
-                            <th class="py-3 px-2">Investigador (Afectado)</th>
-                            <th class="py-3 px-2">Tipo Operación</th>
-                            <th class="py-3 px-2 text-center">Ref. Pedido</th>
-                            <th class="py-3 px-2 text-end">Monto ($)</th>
+                            <th class="py-3 px-2" data-i18n="admin_historialcontable.col_id_mov"></th>
+                            <th class="py-3 px-2" data-i18n="admin_historialcontable.col_fecha"></th>
+                            <th class="py-3 px-2" data-i18n="admin_historialcontable.col_administrador"></th>
+                            <th class="py-3 px-2" data-i18n="admin_historialcontable.col_investigador"></th>
+                            <th class="py-3 px-2" data-i18n="admin_historialcontable.col_tipo_operacion"></th>
+                            <th class="py-3 px-2 text-center" data-i18n="admin_historialcontable.col_ref_pedido"></th>
+                            <th class="py-3 px-2 text-end" data-i18n="admin_historialcontable.col_monto"></th>
                         </tr>
                     </thead>
                     <tbody id="table-body-historial">

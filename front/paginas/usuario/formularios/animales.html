@@ -29,7 +29,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica del formulario de animales
         import { initAnimalForm } from '../../../dist/js/pages/usuario/formularios/animales.js';
 
@@ -39,7 +39,8 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                if (window.txt) translatePage();
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
                 Auth.checkAccess([1, 2, 3,4,5,6]); 
@@ -76,37 +77,37 @@
         
         <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
             <div>
-                <h4 class="fw-bold text-success mb-0 text-uppercase">Solicitud de Animales Vivos</h4>
-                <small class="text-muted">Institución: <span id="lbl-institution-name" class="fw-bold">...</span></small>
+                <h4 class="fw-bold text-success mb-0 text-uppercase" data-i18n="form_animales.titulo">Solicitud de Animales Vivos</h4>
+                <small class="text-muted"><span data-i18n="form_animales.institucion">Institución:</span> <span id="lbl-institution-name" class="fw-bold">...</span></small>
             </div>
             <button id="btn-tarifario" class="btn btn-outline-success btn-sm fw-bold shadow-sm d-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
+                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo" data-i18n="form_animales.ver_tarifario">VER TARIFARIO</span>
             </button>
         </div>
         <div class="mb-4">
             <a href="../formularios" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3">
-                <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A FORMULARIOS
+                <i class="bi bi-arrow-left-circle-fill me-1"></i> <span data-i18n="form_animales.volver_formularios">VOLVER A FORMULARIOS</span>
             </a>
         </div>
         <div id="step-1" class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
-                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Protocolo Aprobado</label>
+                <label class="form-label fw-bold text-uppercase small text-muted" data-i18n="form_animales.step1_protocolo">1. Seleccione Protocolo Aprobado</label>
                 
                 <div class="position-relative">
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="protocol-search" class="form-control form-control-lg border-start-0" placeholder="Buscar por N°, Título o Responsable..." autocomplete="off">
+                        <input type="text" id="protocol-search" class="form-control form-control-lg border-start-0" data-i18n="form_animales.ph_buscar" placeholder="Buscar por N°, Título o Responsable..." autocomplete="off">
                     </div>
                     <div id="protocol-list" class="list-group position-absolute w-100 shadow-lg mt-1 d-none" style="z-index: 1000; max-height: 250px; overflow-y: auto;"></div>
                 </div>
 
                 <div class="d-flex gap-3 mt-2 align-items-center">
                     <button type="button" class="btn btn-link text-decoration-none text-muted small p-0" data-bs-toggle="modal" data-bs-target="#modal-protocol-help">
-                        <i class="bi bi-question-circle"></i> ¿No aparece tu protocolo aquí?
+                        <i class="bi bi-question-circle"></i> <span data-i18n="form_animales.no_aparece_protocolo">¿No aparece tu protocolo aquí?</span>
                     </button>
                     
                     <button id="btn-otros-ceuas" type="button" class="btn btn-warning btn-sm fw-bold text-dark shadow-sm d-none ms-auto">
-                        <i class="bi bi-exclamation-triangle me-1"></i> OTROS CEUAS
+                        <i class="bi bi-exclamation-triangle me-1"></i> <span data-i18n="form_animales.otros_ceuas">OTROS CEUAS</span>
                     </button>
                 </div>
             </div>
@@ -169,71 +170,71 @@
                     <div class="row g-3">
                         
                         <div class="col-12 mb-2">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Tipo de Solicitud</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.tipo_solicitud">Tipo de Solicitud</label>
                             <select id="select-tipo-form" class="form-select border-success" required>
-                                <option value="">Cargando tipos...</option>
+                                <option value="" data-i18n="form_animales.cargando_tipos">Cargando tipos...</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Especie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.especie">Especie</label>
                             <select id="select-especie" class="form-select fw-bold text-primary" required disabled>
-                                <option value="">Seleccione...</option>
+                                <option value="" data-i18n="form_animales.seleccione">Seleccione...</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Cepa / Subespecie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Cepa / Subespecie</label>
                             <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
-                                <option value="">Primero seleccione especie...</option>
+                                <option value="" data-i18n="form_animales.primero_especie">Primero seleccione especie...</option>
                             </select>
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Cepa / Línea</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_linea">Cepa / Línea</label>
                             <input type="text" id="input-raza" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.peso">Peso (g/kg)</label>
                             <input type="text" id="input-peso" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Edad</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.edad">Edad</label>
                             <input type="text" id="input-edad" class="form-control" required>
                         </div>
 
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">MACHOS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.machos">MACHOS</label>
                             <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">HEMBRAS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.hembras">HEMBRAS</label>
                             <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">INDISTINTO</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.indistinto">INDISTINTO</label>
                             <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-success text-center w-100">TOTAL</label>
+                            <label class="form-label fw-bold small text-success text-center w-100" data-i18n="form_animales.total">TOTAL</label>
                             <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
                         </div>
 
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Fecha de Retiro</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.fecha_retiro">Fecha de Retiro</label>
                             <input type="date" id="input-fecha" class="form-control" required>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Aclaraciones</label>
-                            <textarea id="input-aclaracion" class="form-control" rows="1" placeholder="Observaciones opcionales..."></textarea>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.aclaraciones">Aclaraciones</label>
+                            <textarea id="input-aclaracion" class="form-control" rows="1" data-i18n="form_animales.ph_observaciones" placeholder="Observaciones opcionales..."></textarea>
                         </div>
 
                         <div class="col-12 mt-4 text-end">
-                            <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()">CANCELAR</button>
-                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">REVISAR Y ENVIAR</button>
+                            <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()" data-i18n="form_animales.cancelar">CANCELAR</button>
+                            <button type="submit" class="btn btn-success px-5 fw-bold shadow" data-i18n="form_animales.revisar_enviar">REVISAR Y ENVIAR</button>
                         </div>
                     </div>
                 </div>
@@ -363,19 +364,19 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-dark">Ayuda con Protocolos</h5>
+                    <h5 class="modal-title fw-bold text-dark" data-i18n="form_animales.ayuda_titulo">Ayuda con Protocolos</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p id="protocol-help-intro" class="text-muted small mb-3">Si tu protocolo no aparece, verifica que esté vigente y con saldo disponible.</p>
+                    <p id="protocol-help-intro" class="text-muted small mb-3" data-i18n="form_animales.ayuda_intro">Si tu protocolo no aparece, verifica que esté vigente y con saldo disponible.</p>
                     <div id="protocol-help-desc" class="alert alert-light border small text-start mb-4"></div>
                     <div id="protocol-help-leyenda-red" class="alert alert-secondary py-2 px-3 small text-start mb-3 d-none"></div>
                     <div class="d-grid gap-2">
                         <button type="button" id="btn-protocol-help-ver" class="btn btn-outline-primary fw-bold">
-                            <i class="bi bi-list-check me-2"></i> Ver protocolos
+                            <i class="bi bi-list-check me-2"></i> <span data-i18n="form_animales.ver_protocolos">Ver protocolos</span>
                         </button>
                         <button type="button" id="btn-protocol-help-solicitar" class="btn btn-success fw-bold">
-                            <i class="bi bi-plus-circle me-2"></i> Solicitar
+                            <i class="bi bi-plus-circle me-2"></i> <span data-i18n="form_animales.solicitar">Solicitar</span>
                         </button>
                     </div>
                 </div>
@@ -388,16 +389,16 @@
             <div class="modal-content border-0 border-top border-5 border-warning shadow-lg">
                 <div class="modal-body text-center p-5">
                     <i class="bi bi-exclamation-triangle-fill text-warning display-1 mb-3"></i>
-                    <h3 class="fw-bold text-dark">Otros CEUAS</h3>
-                    <p class="text-muted">Usted está por solicitar animales sin un protocolo local vinculado.</p>
+                    <h3 class="fw-bold text-dark" data-i18n="form_animales.otros_ceuas_titulo">Otros CEUAS</h3>
+                    <p class="text-muted" data-i18n="form_animales.otros_ceuas_texto">Usted está por solicitar animales sin un protocolo local vinculado.</p>
                     <div class="alert alert-secondary text-start small">
-                        <i class="bi bi-info-circle me-1"></i> <strong>Nota:</strong> Usted quedará registrado como el responsable administrativo y financiero de este pedido.
+                        <i class="bi bi-info-circle me-1"></i> <strong data-i18n="form_animales.otros_ceuas_nota">Nota: Usted quedará registrado como el responsable administrativo y financiero de este pedido.</strong>
                     </div>
                     <div class="d-grid gap-2 mt-4">
-                        <button class="btn btn-warning fw-bold text-dark" onclick="window.confirmOtrosCeuas()">
+                        <button class="btn btn-warning fw-bold text-dark" onclick="window.confirmOtrosCeuas()" data-i18n="form_animales.continuar_responsable">
                             CONTINUAR COMO RESPONSABLE
                         </button>
-                        <button class="btn btn-light text-muted fw-bold" data-bs-dismiss="modal">CANCELAR</button>
+                        <button class="btn btn-light text-muted fw-bold" data-bs-dismiss="modal" data-i18n="form_animales.cancelar">CANCELAR</button>
                     </div>
                 </div>
             </div>

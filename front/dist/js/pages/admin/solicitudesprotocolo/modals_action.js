@@ -25,7 +25,7 @@ export function setupModal() {
             let originalText = "";
             if(activeBtn) {
                 originalText = activeBtn.innerHTML;
-                activeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Enviando...';
+                activeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> ' + (txt.enviando || 'Enviando...');
             }
 
             // 4. Enviar datos al servidor
@@ -63,6 +63,10 @@ export function openRequestDetails(row) {
         if (el) el.innerText = text;
     };
 
+    const sp = window.txt?.solicitudprotocolo || {};
+    const txt = sp.modal || {};
+    const tabla = sp.tabla || {};
+
     // 1. IDs ocultos para el formulario
     document.getElementById('decision-id').value = row.idSolicitudProtocolo;
     document.getElementById('decision-val').value = ""; // Se define al clickear el botón
@@ -79,28 +83,27 @@ export function openRequestDetails(row) {
     setVal('view-vence', row.FechaFinProtA || '-');
 
     // Datos Personas
-    setVal('view-investigator', row.Solicitante || 'Desconocido');
+    setVal('view-investigator', row.Solicitante || (tabla.desconocido || 'Desconocido'));
     setVal('view-email', row.Email || '');
     setVal('view-director', row.InvestigadorACargA || '-');
     
     // Datos Técnicos
-    setVal('view-depto', row.DeptoFormat || 'No especificado');
-    setVal('view-tipo', row.TipoNombre || 'Estándar');
+    setVal('view-depto', row.DeptoFormat || (txt.no_especificado || 'No especificado'));
+    setVal('view-tipo', row.TipoNombre || (txt.estandar || 'Estándar'));
     setVal('view-cant', row.CantidadAniA || '0');
-    setVal('view-especies', row.Especies || 'No registradas');
-    setVal('view-origin', row.Origen || 'Interno');
+    setVal('view-especies', row.Especies || (txt.no_registradas || 'No registradas'));
+    setVal('view-origin', row.Origen || (txt.interno || 'Interno'));
 
     // 3. Badge de Tipo (HTML)
     const isInternal = row.TipoEtiqueta === 'INTERNA';
     const badgeHtml = isInternal 
-        ? `<span class="badge badge-type-internal px-3 py-2 text-uppercase">INTERNA</span>`
-        : `<span class="badge badge-type-network px-3 py-2 text-uppercase"><i class="bi bi-globe me-2"></i>SOLICITUD DE RED</span>`;
+        ? `<span class="badge badge-type-internal px-3 py-2 text-uppercase">${(tabla.tipo_interna || 'INTERNA')}</span>`
+        : `<span class="badge badge-type-network px-3 py-2 text-uppercase"><i class="bi bi-globe me-2"></i>${txt.solicitud_red || 'SOLICITUD DE RED'}</span>`;
     
     const badgeContainer = document.getElementById('view-badge');
     if(badgeContainer) badgeContainer.innerHTML = badgeHtml;
 
     // 4. Textos de Ayuda y Placeholder (Traducción)
-    const txt = window.txt?.solicitudprotocolo?.modal || {};
     const textArea = document.querySelector('textarea[name="mensaje"]');
     
     if(textArea) {

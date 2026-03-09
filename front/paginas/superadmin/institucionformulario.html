@@ -9,12 +9,16 @@
     <script type="module">
         import { initFormAdmin } from '../../dist/js/pages/superadmin/formRegistroManager.js';
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
-
-                import { SuperAuth } from '../../dist/js/superAuth.js';
-        document.addEventListener('DOMContentLoaded', () => {
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        import { SuperAuth } from '../../dist/js/superAuth.js';
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                translatePage();
+            } catch (e) { /* i18n opcional */ }
             if (SuperAuth.checkMasterAccess([1])) {
-        initSuperMenu();
-        initFormAdmin
+                initSuperMenu();
+                initFormAdmin();
             }
         });
     </script>
@@ -23,21 +27,21 @@
     <div class="container-fluid py-5 px-5">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="font-black text-slate-800 uppercase italic mb-0">Gestión de Links de Registro</h5>
-                <button class="btn btn-dark btn-sm font-bold" onclick="window.openCreateLinkModal()">+ CREAR NUEVO LINK</button>
+                <h5 class="font-black text-slate-800 uppercase italic mb-0" data-i18n="superadmin_formulario.titulo">Gestión de Links de Registro</h5>
+                <button class="btn btn-dark btn-sm font-bold" onclick="window.openCreateLinkModal()"><span data-i18n="superadmin_formulario.btn_crear">+ CREAR NUEVO LINK</span></button>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle" style="font-size: 12px;">
                         <thead class="table-light text-muted uppercase">
                             <tr>
-                                <th>ID</th>
-                                <th>Institución Previa</th>
-                                <th>Encargado</th>
-                                <th>Slug / URL</th>
-                                <th>Progreso</th>
-                                <th>Fecha Creación</th>
-                                <th class="text-center">Acciones</th>
+                                <th data-i18n="superadmin_formulario.th_id">ID</th>
+                                <th data-i18n="superadmin_formulario.th_inst_previa">Institución Previa</th>
+                                <th data-i18n="superadmin_formulario.th_encargado">Encargado</th>
+                                <th data-i18n="superadmin_formulario.th_slug">Slug / URL</th>
+                                <th data-i18n="superadmin_formulario.th_progreso">Progreso</th>
+                                <th data-i18n="superadmin_formulario.th_fecha_creacion">Fecha Creación</th>
+                                <th class="text-center" data-i18n="superadmin_formulario.th_acciones">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="table-body-forms"></tbody>
@@ -51,7 +55,7 @@
         <div class="modal-dialog modal-xl">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title font-bold">DETALLES COMPLETADOS POR LA INSTITUCIÓN</h5>
+                    <h5 class="modal-title font-bold" data-i18n="superadmin_formulario.modal_titulo">DETALLES COMPLETADOS POR LA INSTITUCIÓN</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div id="content-detalle-eav" class="modal-body bg-light p-4" style="max-height: 70vh; overflow-y: auto;">

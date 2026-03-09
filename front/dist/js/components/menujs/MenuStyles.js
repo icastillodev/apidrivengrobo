@@ -265,6 +265,7 @@ function getDesktopSidebarStyles() {
         .gecko-sidebar .dropdown-item-gecko { 
             padding: 10px 10px !important; opacity: 0.8; transition: all 0.2s; font-size: 12px; white-space: normal !important; line-height: 1.2; cursor: pointer;
         }
+        .dropdown-child-icon svg { width: 18px !important; height: 18px !important; fill: currentColor !important; flex-shrink: 0; }
         .gecko-sidebar .dropdown-item-gecko:hover { 
             opacity: 1; background-color: rgba(26, 93, 59, 0.15) !important; border-radius: 6px; color: #1a5d3b !important; font-weight: bold !important;
         }
@@ -292,6 +293,13 @@ function getDesktopSidebarStyles() {
 
 function getMobileMenuStyles() {
     return `
+    /* Logo más grande en menú móvil (sidebar y top) */
+    .gecko-sidebar-logo-mobile { max-height: 56px !important; }
+    .gecko-top-logo-mobile { max-height: 44px !important; }
+    @media (max-width: 768px) {
+        .gecko-sidebar-logo-mobile { max-height: 72px !important; }
+        .gecko-top-logo-mobile { max-height: 52px !important; }
+    }
     @media (max-width: 1000px) {
             #main-menu-ul { display: none !important; }
             .gecko-top-bar-info { display: none !important; }

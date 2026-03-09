@@ -27,7 +27,7 @@ export async function initFormSelector() {
             allSedes = sedes; 
 
             if (is_multi_sede) {
-                depTitle.innerText = `RED: ${dependency_name || 'GRUPO INSTITUCIONAL'}`;
+                depTitle.innerText = `${(window.txt?.centro_solicitudes?.red) || 'RED:'} ${dependency_name || (window.txt?.centro_solicitudes?.grupo_inst || 'GRUPO INSTITUCIONAL')}`;
                 if(searchInput) searchInput.parentElement.parentElement.classList.remove('d-none');
             } else {
                 if(sedes.length > 0) depTitle.innerText = sedes[0].NombreCompletoInst;
@@ -49,7 +49,8 @@ export async function initFormSelector() {
         }
     } catch (e) {
         console.error("Error:", e);
-        container.innerHTML = `<div class="alert alert-danger text-center">Error cargando red institucional.</div>`;
+        const t = window.txt?.centro_solicitudes;
+        container.innerHTML = `<div class="alert alert-danger text-center">${t?.error_red || 'Error cargando red institucional.'}</div>`;
     }
 }
 
@@ -58,7 +59,8 @@ function renderSedesList(sedes, isMulti) {
     let html = '';
 
     if (sedes.length === 0) {
-        container.innerHTML = `<div class="text-center text-muted py-5">No se encontraron instituciones.</div>`;
+        const t = window.txt?.centro_solicitudes;
+        container.innerHTML = `<div class="text-center text-muted py-5">${t?.sin_instituciones || 'No se encontraron instituciones.'}</div>`;
         return;
     }
 
@@ -66,7 +68,8 @@ function renderSedesList(sedes, isMulti) {
         const isCurrent = (sede.IdInstitucion == currentInstId);
         const headerClass = isCurrent ? "bg-success text-white" : "bg-white text-success border border-success";
         const iconColor = isCurrent ? "text-white" : "text-success";
-        const labelText = isCurrent ? "(TU SEDE ACTUAL)" : "";
+        const t = window.txt?.centro_solicitudes;
+        const labelText = isCurrent ? (t?.tu_sede_actual || "(TU SEDE ACTUAL)") : "";
 
         if (isMulti) {
             html += `
@@ -124,8 +127,9 @@ function renderActionButtons(sede) {
 
     // 1. Animales
     if (checkPermission(sede.flag_animales)) {
+        const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
-            'Solicitud Animales', 
+            t?.solicitud_animales || 'Solicitud Animales', 
             'bi bi-mouse', 
             'bg-success text-white', 
             'panel/formularios/animales', 
@@ -135,8 +139,9 @@ function renderActionButtons(sede) {
 
     // 2. Reactivos
     if (checkPermission(sede.flag_reactivos)) {
+        const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
-            'Reactivos Biológicos', 
+            t?.reactivos_biologicos || 'Reactivos Biológicos', 
             'bi bi-eyedropper', 
             'bg-warning text-dark', 
             'panel/formularios/reactivos', 
@@ -146,8 +151,9 @@ function renderActionButtons(sede) {
 
     // 3. Insumos
     if (checkPermission(sede.flag_insumos)) {
+        const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
-            'Pedido de Insumos', 
+            t?.pedido_insumos || 'Pedido de Insumos', 
             'bi bi-box-seam', 
             'bg-primary text-white', 
             'panel/formularios/insumos', 
@@ -157,8 +163,9 @@ function renderActionButtons(sede) {
     
     // 4. Reservas
     if (checkPermission(sede.flag_reservas)) {
+        const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
-            'Reserva de Salas', 
+            t?.reserva_salas || 'Reserva de Salas', 
             'bi bi-calendar-check', 
             'bg-info text-dark', 
             'panel/formularios/reservas', 
@@ -167,7 +174,8 @@ function renderActionButtons(sede) {
     }
 
     if (buttonsHtml === '') {
-        buttonsHtml = `<div class="col-12 text-center text-muted small italic py-2">Sin formularios habilitados para tu nivel de acceso.</div>`;
+        const t = window.txt?.centro_solicitudes;
+        buttonsHtml = `<div class="col-12 text-center text-muted small italic py-2">${t?.sin_formularios || 'Sin formularios habilitados para tu nivel de acceso.'}</div>`;
     }
 
     return `<div class="row g-3 justify-content-start w-100 mb-3 px-3">${buttonsHtml}</div>`;
@@ -185,7 +193,7 @@ function createCard(title, iconClass, bgClass, modulePath, targetId) {
                 <div>
                     <h6 class="fw-bold mb-1 text-dark text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">${title}</h6>
                     <span class="text-success fw-bold" style="font-size: 0.65rem;">
-                        Iniciar <i class="bi bi-arrow-right-short"></i>
+                        ${window.txt?.centro_solicitudes?.iniciar || 'Iniciar'} <i class="bi bi-arrow-right-short"></i>
                     </span>
                 </div>
             </div>

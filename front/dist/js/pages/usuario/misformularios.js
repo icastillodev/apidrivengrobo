@@ -61,7 +61,7 @@ function renderTable() {
 
         const categoryHtml = `
             <div class="d-flex flex-column">
-                <span class="fw-bold text-dark" style="font-size: 11px;">${f.Categoria || 'General'}</span>
+                <span class="fw-bold text-dark" style="font-size: 11px;">${f.Categoria || (window.txt?.misformularios?.general || 'General')}</span>
                 <span class="text-muted text-uppercase" style="font-size: 9px;">${f.TipoPedido || ''}</span>
             </div>
         `;

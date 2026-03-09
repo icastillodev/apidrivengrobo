@@ -1,8 +1,33 @@
 // dist/js/utils/i18n.js
 
+/**
+ * Obtiene el idioma preferido del usuario desde la BD si hay sesión activa.
+ */
+async function getLangFromBackendIfLogged() {
+    try {
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        if (!token) return null;
+        const { API } = await import('../api.js');
+        const res = await API.request('/user/config/get', 'GET');
+        if (res?.status === 'success' && res?.data?.idioma_preferido) {
+            const lang = res.data.idioma_preferido;
+            localStorage.setItem('lang', lang);
+            localStorage.setItem('idioma', lang);
+            return lang;
+        }
+    } catch (e) {
+        console.warn("No se pudo cargar idioma desde BD, se usará localStorage.", e);
+    }
+    return null;
+}
+
 export async function loadLanguage(lang = null) {
-    // 1. Si no viene idioma, buscamos en localStorage o usamos español
-    const selectedLang = lang || localStorage.getItem('lang') || 'es';
+    // Si no se pasó idioma y hay sesión, usar el guardado en BD
+    if (lang == null) {
+        const fromBackend = await getLangFromBackendIfLogged();
+        if (fromBackend) lang = fromBackend;
+    }
+    const selectedLang = lang || localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
     
     console.log(`⏳ Cargando idioma: ${selectedLang}...`);
 
@@ -18,7 +43,8 @@ export async function loadLanguage(lang = null) {
 
         // 4. Asignamos a la variable global
         window.txt = module[selectedLang];
-        
+        localStorage.setItem('lang', selectedLang);
+
         console.log(`✅ Idioma cargado correctamente: ${selectedLang}`);
         return true;
 
@@ -51,4 +77,50 @@ export const translatePage = () => {
             else el.innerHTML = text; 
         }
     });
+
+    applyPageTitle();
 };
+
+const PATH_TO_TITLE_KEY = {
+    'admin/dashboard': 'dashboard_admin', 'usuario/dashboard': 'dashboard_usuario', 'panel/dashboard': 'dashboard_usuario',
+    'admin/usuarios': 'usuarios', 'admin/protocolos': 'protocolos', 'admin/animales': 'animales', 'admin/reactivos': 'reactivos',
+    'admin/insumos': 'insumos', 'admin/alojamientos': 'alojamientos', 'admin/estadisticas': 'estadisticas', 'admin/precios': 'precios',
+    'admin/configuracion/config': 'config', 'admin/configuracion/institucion': 'config_institucion', 'admin/configuracion/departamentos': 'config_departamentos',
+    'admin/configuracion/especies': 'config_especies', 'admin/configuracion/roles': 'config_roles', 'admin/configuracion/tipos-form': 'config_tipos_form',
+    'admin/configuracion/reservas': 'config_reservas', 'admin/configuracion/insumos-exp': 'config_insumos_exp', 'admin/configuracion/insumos': 'insumos_config',
+    'admin/configuracion/alojamientos': 'alojamientos_config', 'admin/configuracion/protocolos-config': 'config_protocolos',
+    'admin/facturacion/index': 'facturacion', 'admin/facturacion/depto': 'facturacion_depto', 'admin/facturacion/investigador': 'facturacion_investigador',
+    'admin/facturacion/protocolo': 'facturacion_protocolo', 'admin/historialcontable': 'historial_contable',
+    'admin/solicitud_protocolo': 'solicitud_protocolo', 'usuario/formularios': 'formularios', 'usuario/formularios/animales': 'formularios_animales',
+    'usuario/formularios/reactivos': 'formularios_reactivos', 'usuario/formularios/insumos': 'formularios_insumos', 'usuario/misformularios': 'mis_formularios',
+    'usuario/misprotocolos': 'mis_protocolos', 'usuario/misalojamientos': 'mis_alojamientos', 'usuario/perfil': 'perfil',
+    'superadmin/dashboard': 'superadmin_dashboard', 'superadmin/instituciones': 'superadmin_instituciones',
+    'superadmin/institucionformulario': 'superadmin_formulario', 'superadmin/usuarios_global': 'superadmin_usuarios', 'superadmin/bitacora': 'superadmin_dashboard',
+    'registro': 'registro', 'recuperar': 'recuperar', 'confirmar': 'confirmar', 'resetear': 'resetear', 'error404': 'error404', 'construccion': 'construccion',
+    'formulario/index': 'formulario_registro_inst', 'qr-alojamiento': 'qr_alojamiento'
+};
+
+export function applyPageTitle() {
+    if (!window.txt || !window.txt.titulos_pagina) return;
+    let key = document.body?.getAttribute('data-page-title-key')
+        || PATH_TO_TITLE_KEY[pathnameToKey(window.location.pathname)];
+    if (!key && (window.location.pathname === '/' || window.location.pathname.match(/\/[a-z]+\/?$/))) key = 'login';
+    if (key && window.txt.titulos_pagina[key]) {
+        document.title = window.txt.titulos_pagina[key] + ' - GROBO';
+    }
+    if (!document.querySelector('meta[name="robots"]')) {
+        const meta = document.createElement('meta');
+        meta.name = 'robots';
+        meta.content = 'noindex, nofollow';
+        document.head.appendChild(meta);
+    }
+}
+
+function pathnameToKey(pathname) {
+    let p = pathname.replace(/\.html$/, '').replace(/^\//, '');
+    const idxPaginas = p.indexOf('paginas/');
+    if (idxPaginas !== -1) p = p.substring(idxPaginas + 8);
+    else if (p.includes('admin/') || p.includes('usuario/') || p.includes('superadmin/')) p = p.replace(/^[^/]*\//, '');
+    const parts = p.split('/').filter(Boolean);
+    return parts.length ? parts.join('/') : null;
+}

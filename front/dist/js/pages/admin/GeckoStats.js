@@ -62,9 +62,10 @@ async function loadStats() {
     const instId = localStorage.getItem('instId') || '1';
     
     const btn = document.getElementById('btn-update-stats');
+    const t = window.txt?.admin_estadisticas;
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> CARGANDO...`;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || 'CARGANDO...'}`;
     }
 
     try {
@@ -94,7 +95,7 @@ async function loadStats() {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = 'ACTUALIZAR';
+            btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
         }
     }
 }

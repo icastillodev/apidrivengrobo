@@ -36,7 +36,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
            
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 translatePage();
 
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
@@ -63,7 +63,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted" data-i18n="generales.admin">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_admin">Admin</li>
                     <li class="breadcrumb-item text-muted" data-i18n="facturacion.titulo">Facturación</li>
                     <li class="breadcrumb-item active">
                         <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="facturacion.por_depto">Por Departamento</span>
@@ -73,7 +73,7 @@
 
             <div class="mb-3">
                 <a href="index" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3" style="font-size: 11px;">
-                    <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A SELECCIÓN
+                    <i class="bi bi-arrow-left-circle-fill me-1"></i> <span data-i18n="facturacion.volver_seleccion"></span>
                 </a>
             </div>
 
@@ -81,11 +81,11 @@
                 <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i><span data-i18n="facturacion.titulo_liquidacion">Liquidación de Departamentos</span></h5>
                     <div class="d-flex gap-2">
                         <button class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm" onclick="window.downloadGlobalPDF()">
-                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF GLOBAL
+                            <i class="bi bi-file-earmark-pdf me-1"></i> <span data-i18n="facturacion.pdf_global"></span>
                         </button>
 
                         <button class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" onclick="window.exportExcelDeptoGlobal()">
-                            <i class="bi bi-file-earmark-excel me-1"></i> EXCEL GLOBAL
+                            <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="facturacion.excel_global"></span>
                         </button>
 
                         <button class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" onclick="window.abrirAyudaBilling()">
@@ -176,11 +176,11 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow-lg border-top border-5 border-primary">
                 <div class="modal-header bg-light py-2">
-                    <h5 class="modal-title fw-bold text-primary">Guía: Facturación Depto</h5>
+                    <h5 class="modal-title fw-bold text-primary" data-i18n="facturacion.help_depto_title"></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p class="small text-muted">Use los filtros para buscar. Puede descargar el <b>PDF individual</b> de cada protocolo usando el icono rojo en el resumen inferior de cada tarjeta, o el <b>PDF de insumos</b> desde el icono superior azul.</p>
+                    <p class="small text-muted" data-i18n="facturacion.help_depto_body"></p>
                 </div>
             </div>
         </div>

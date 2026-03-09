@@ -40,7 +40,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
 
                 if (window.txt) {
@@ -100,7 +100,7 @@
                 <div class="col-md-8">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" id="lbl-buscador" data-i18n="precios.search">Buscador:</span>
-                        <input type="text" id="search-input-precios" class="form-control form-control-sm" placeholder="Buscar item..." oninput="window.renderAllPriceTables()">
+                        <input type="text" id="search-input-precios" class="form-control form-control-sm" data-i18n="precios.search_placeholder" placeholder="Buscar item..." oninput="window.renderAllPriceTables()">
                     </div>
                 </div>
                 <div class="col-md-4 d-flex gap-2 justify-content-end mt-3 mt-md-0">

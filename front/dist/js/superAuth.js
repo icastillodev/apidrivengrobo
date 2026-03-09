@@ -94,7 +94,9 @@ async handleLogin(e) {
                 if (res?.status === 'success') {
                     this.completeLogin(res, box);
                 } else {
-                    Swal.fire('Error', 'Código incorrecto o vencido', 'error');
+                    Swal.fire('Error', 'Código incorrecto o vencido', 'error').then(() => {
+                        window.location.href = getBasePath() + 'geckoadm/login';
+                    });
                 }
             } catch (e) {
                 console.error(e);

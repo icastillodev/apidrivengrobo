@@ -10,6 +10,7 @@ import { getMenuTemplates } from './menujs/MenuTemplates.js';
 import { renderTopMenuStructure, renderSideMenuStructure } from './menujs/MenuRender.js';
 import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
+import { applyPageTitle } from '../utils/i18n.js';
 
 export { refreshMenuNotifications }; 
 
@@ -89,6 +90,7 @@ try {
             }
 
             applyGlobalHeadConfigs();
+            applyPageTitle();
             setupEventListeners();
             updateBreadcrumbInstitution();
 

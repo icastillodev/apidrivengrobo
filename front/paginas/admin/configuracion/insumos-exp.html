@@ -18,7 +18,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica para la configuración de insumos experimentales
         import { initConfigInsumosExp } from '../../../dist/js/pages/admin/configuracion/config_insumos_exp.js';
 
@@ -28,7 +28,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo para evitar el error de installHook
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Administradores)
                 Auth.checkAccess([1, 2]); 
@@ -45,6 +45,7 @@
                     
                     // Inicialización de la lógica de catálogo de insumos
                     initConfigInsumosExp();
+                    translatePage();
                     
                     console.log("✅ Configuración de Insumos Exp inicializada correctamente.");
                 } else {
@@ -71,26 +72,26 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_insumos_exp.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_insumos_exp.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-primary px-2 py-1">Insumos Experimentales</span>
+                    <span class="badge bg-primary px-2 py-1" data-i18n="config_insumos_exp.bread_insumos_exp"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">REACTIVOS Y MATERIALES EXP.</h4>
-                <p class="text-muted small mb-0 mt-1">Configuración de reactivos biológicos y materiales específicos</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_insumos_exp.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_insumos_exp.subtitulo"></p>
             </div>
             <div class="d-flex gap-2">
                 <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                    <i class="bi bi-arrow-left me-2"></i> VOLVER
+                    <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_insumos_exp.btn_volver"></span>
                 </a>
                 <button class="btn btn-primary shadow-sm fw-bold" onclick="window.openModalInsumoExp()">
-                    <i class="bi bi-flask me-2"></i> NUEVO REACTIVO
+                    <i class="bi bi-flask me-2"></i> <span data-i18n="config_insumos_exp.btn_nuevo_reactivo"></span>
                 </button>
             </div>
         </div>
@@ -101,11 +102,11 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light text-primary text-uppercase small">
                             <tr>
-                                <th class="ps-4">Nombre Insumo / Reactivo</th>
-                                <th class="text-center">Presentación</th>
-                                <th>Especie Asociada</th>
-                                <th class="text-center">Estado</th>
-                                <th class="text-end pe-4">Acciones</th>
+                                <th class="ps-4" data-i18n="config_insumos_exp.th_nombre"></th>
+                                <th class="text-center" data-i18n="config_insumos_exp.th_presentacion"></th>
+                                <th data-i18n="config_insumos_exp.th_especie_asociada"></th>
+                                <th class="text-center" data-i18n="config_insumos_exp.th_estado"></th>
+                                <th class="text-end pe-4" data-i18n="config_insumos_exp.th_acciones"></th>
                             </tr>
                         </thead>
                         <tbody id="table-insumos-exp"></tbody>
@@ -120,7 +121,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-primary text-white py-2">
-                    <h6 class="modal-title fw-bold">GESTIÓN REACTIVO / MATERIAL</h6>
+                    <h6 class="modal-title fw-bold" data-i18n="config_insumos_exp.modal_titulo"></h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -128,32 +129,32 @@
                         <input type="hidden" name="IdInsumoexp" id="exp-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">NOMBRE</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_nombre"></label>
                             <input type="text" name="NombreInsumo" id="exp-nombre" class="form-control fw-bold" required>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-4">
-                                <label class="form-label small fw-bold text-muted">CANTIDAD</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_cantidad"></label>
                                 <input type="number" name="CantidadInsumo" id="exp-cant" class="form-control" step="0.01" value="1" required>
                             </div>
                             <div class="col-8">
-                                <label class="form-label small fw-bold text-muted">TIPO / UNIDAD</label>
-                                <input type="text" name="TipoInsumo" id="exp-tipo" class="form-control" placeholder="Ej: ml, mg, Dosis" required>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_tipo_unidad"></label>
+                                <input type="text" name="TipoInsumo" id="exp-tipo" class="form-control" data-i18n="config_insumos_exp.ph_tipo" placeholder="Ej: ml, mg, Dosis" required>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">ESPECIE ASOCIADA (Opcional)</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_especie_opcional"></label>
                             <select name="IdespA" id="exp-especie" class="form-select">
-                                <option value="0">-- General / Ninguna --</option>
+                                <option value="0" data-i18n="config_insumos_exp.opcion_general"></option>
                             </select>
-                            <div class="form-text small">Si selecciona una especie, este insumo se sugerirá preferentemente para ella.</div>
+                            <div class="form-text small" data-i18n="config_insumos_exp.ayuda_especie"></div>
                         </div>
 
                         <div class="mb-3" id="exp-status-container"></div>
 
-                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">GUARDAR CAMBIOS</button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm" data-i18n="config_insumos_exp.btn_guardar"></button>
                     </form>
                 </div>
             </div>

@@ -116,6 +116,7 @@ async init() {
                 
                 localStorage.setItem('instId', inst.id);
                 localStorage.setItem('NombreInst', this.slug);
+                localStorage.setItem('instLogo', inst.Logo || '');
                 if (!storedToken) {
                     sessionStorage.setItem('instId', inst.id);
                     sessionStorage.setItem('NombreInst', this.slug);
@@ -159,11 +160,16 @@ async init() {
             if (id === 'logo-url') {
                 const logoContainer = document.getElementById('logo-container');
                 const logoImg = document.getElementById('inst-logo');
+                const welcomeEl = document.getElementById('inst-welcome');
                 if (val && val.length > 4 && logoContainer && logoImg) {
                     const basePath = this.getBasePath(); 
                     const src = val.includes('http') ? val : `${basePath}dist/multimedia/imagenes/logos/${val}`;
                     logoImg.src = src;
                     logoContainer.classList.remove('hidden');
+                    if (welcomeEl) { welcomeEl.textContent = ''; welcomeEl.classList.add('hidden'); }
+                } else {
+                    if (logoContainer) logoContainer.classList.add('hidden');
+                    if (welcomeEl) welcomeEl.classList.remove('hidden');
                 }
                 continue;
             }
@@ -199,7 +205,7 @@ async init() {
             
             if (res?.status === 'success') {
                 window.Swal.close();
-                this.completeLoginProcess(res, remember);
+                await this.completeLoginProcess(res, remember);
 
             } else if (res?.status === '2fa_required') {
                 window.Swal.fire({
@@ -271,20 +277,46 @@ async init() {
             const res = await API.request('/verify-2fa', 'POST', { userId, code, instId });
             if (res?.status === 'success') {
                 if (this.resendTimer) clearInterval(this.resendTimer);
-                this.completeLoginProcess(res, this.tempRemember);
+                await this.completeLoginProcess(res, this.tempRemember);
             } else {
-                alert('CÓDIGO INCORRECTO');
+                const modal = document.getElementById('modal-2fa');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+                const loginForm = document.getElementById('login-form');
+                if (loginForm) loginForm.classList.remove('hidden');
+                window.Swal.fire({
+                    icon: 'error',
+                    title: (window.txt?.login?.twofa?.codigo_incorrecto) || 'Código incorrecto',
+                    text: (window.txt?.login?.twofa?.vuelve_login) || 'Serás redirigido al login.'
+                }).then(() => {
+                    this.redirectToLogin(this.slug || this.getVal('NombreInst'));
+                });
                 document.getElementById('code-2fa').value = '';
             }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            const modal = document.getElementById('modal-2fa');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            const loginForm = document.getElementById('login-form');
+            if (loginForm) loginForm.classList.remove('hidden');
+            this.redirectToLogin(this.slug || this.getVal('NombreInst'));
+        }
     },
 
-    completeLoginProcess(res, remember) {
+    completeLoginProcess: async function(res, remember) {
         const role = parseInt(res.role);
-        
-        localStorage.clear(); 
+
+        const savedLang = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
+        const savedLogo = localStorage.getItem('instLogo') || '';
+
+        localStorage.clear();
         sessionStorage.clear();
         this.clearAllCookies();
+        if (savedLogo) localStorage.setItem('instLogo', savedLogo);
 
         const sessionData = {
             token: res.token,
@@ -296,6 +328,7 @@ async init() {
             instId: res.instId,
             NombreInst: this.slug || localStorage.getItem('NombreInst')
         };
+        if (res.instLogo) localStorage.setItem('instLogo', res.instLogo);
 
         if (remember) {
             SESSION_KEYS.forEach(key => {
@@ -312,6 +345,14 @@ async init() {
             });
             localStorage.setItem('instId', sessionData.instId);
             localStorage.setItem('NombreInst', sessionData.NombreInst);
+        }
+
+        localStorage.setItem('lang', savedLang);
+        localStorage.setItem('idioma', savedLang);
+        try {
+            await API.request('/user/config/update', 'POST', { lang: savedLang });
+        } catch (e) {
+            console.warn("No se pudo guardar idioma en BD:", e);
         }
 
         this.autoRedirectIfLogged(role);
@@ -402,7 +443,20 @@ autoRedirectIfLogged(role) {
 
     // Le agregamos un parámetro para forzar ir a la raíz si todo se rompe
     logout(forceRoot = false) {
-        const slug = forceRoot ? '' : (this.getVal('NombreInst') || 'urbe');
+        let slug = '';
+        if (!forceRoot) {
+            slug = this.getVal('NombreInst') || '';
+            // Fallback: intentar obtener slug de la URL actual (ej. /urbe/admin/...)
+            if (!slug || slug === 'null' || slug === 'undefined') {
+                const path = (window.location.pathname || '').split('/').filter(B => B);
+                const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                const idx = isLocal ? path.indexOf('front') + 1 : 0;
+                if (idx >= 0 && path[idx] && !['paginas', 'admin', 'panel', 'superadmin', 'dist'].includes(path[idx])) {
+                    slug = path[idx];
+                }
+            }
+            if (!slug || slug === 'null' || slug === 'undefined') slug = 'urbe';
+        }
         
         localStorage.clear();
         sessionStorage.clear();

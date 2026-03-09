@@ -36,7 +36,7 @@ export async function initAnimalForm() {
         document.getElementById('step-1').classList.remove('hidden-section');
         const form = document.getElementById('animal-form');
         if(form) form.reset();
-        document.getElementById('select-subespecie').innerHTML = '<option value="">Primero seleccione especie...</option>';
+        document.getElementById('select-subespecie').innerHTML = '<option value="">' + (window.txt?.form_animales?.primero_especie || 'Primero seleccione especie...') + '</option>';
         document.getElementById('select-subespecie').disabled = true;
         document.getElementById('qty-total').value = 0;
     };
@@ -65,7 +65,7 @@ export async function initAnimalForm() {
             // LLENAR SELECTOR DE TIPOS
             const typeSel = document.getElementById('select-tipo-form');
             if(typeSel) {
-                typeSel.innerHTML = '<option value="">Seleccione tipo...</option>';
+                typeSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.seleccione_tipo || 'Seleccione tipo...') + '</option>';
                 if (form_types && form_types.length > 0) {
                     form_types.forEach(t => {
                         const opt = document.createElement('option');
@@ -75,7 +75,7 @@ export async function initAnimalForm() {
                     });
                     if (form_types.length === 1) typeSel.selectedIndex = 1;
                 } else {
-                    typeSel.innerHTML = '<option value="">Error: Sin tipos configurados</option>';
+                    typeSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.error_sin_tipos || 'Error: Sin tipos configurados') + '</option>';
                     typeSel.disabled = true;
                 }
             }

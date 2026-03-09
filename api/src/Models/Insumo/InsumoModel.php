@@ -149,4 +149,12 @@ public function getInsumosResumenText($idformA) {
     }
     return $resumen ?: "No se registraron productos en este pedido.";
 }
+
+    /** Idioma preferido del destinatario por email (para correos en su idioma) */
+    public function getIdiomaByEmail($email) {
+        $stmt = $this->db->prepare("SELECT COALESCE(NULLIF(TRIM(idioma_preferido), ''), 'es') as lang FROM personae WHERE EmailA = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ? $row['lang'] : null;
+    }
 }

@@ -8,7 +8,9 @@ export async function initRecuperar() {
     const instName = localStorage.getItem('NombreReal') || slug.toUpperCase();
 
     // 2. Personalizar UI
-    document.getElementById('inst-label').innerText = `Institución: ${instName}`;
+    const t = window.txt?.recuperar;
+    const instPrefix = t?.inst_prefijo ? t.inst_prefijo + ' ' : 'Institución: ';
+    document.getElementById('inst-label').innerText = instPrefix + instName;
     const loginPath = `${basePath}${slug}/`;
     document.getElementById('link-volver-login').href = loginPath;
     document.getElementById('btn-volver-exito').href = loginPath;
@@ -24,7 +26,7 @@ export async function initRecuperar() {
         const btn = document.getElementById('btn-enviar');
 
         btn.disabled = true;
-        btn.innerText = "PROCESANDO...";
+        btn.innerText = (window.txt?.recuperar?.btn_procesando) || "PROCESANDO...";
 
         try {
             // Enviamos el objeto con la clave 'user' que espera el Backend
@@ -32,20 +34,22 @@ export async function initRecuperar() {
                 email: emailValue,
                 user: userValue, 
                 slug: slug,
-                IdInstitucion: localStorage.getItem('instId') 
+                IdInstitucion: localStorage.getItem('instId'),
+                lang: localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es'
             });
 
             if (res.status === 'success') {
                 document.getElementById('recovery-form-container').classList.add('hidden');
                 document.getElementById('recovery-success').classList.remove('hidden');
             } else {
-                Swal.fire("Aviso", res.message || "Los datos no coinciden con nuestros registros", "warning");
+                const t = window.txt?.recuperar;
+                Swal.fire(t?.swal_aviso || "Aviso", res.message || (t?.swal_datos_no_coinciden || "Los datos no coinciden con nuestros registros"), "warning");
                 btn.disabled = false;
-                btn.innerText = "ENVIAR ENLACE";
+                btn.innerText = (window.txt?.recuperar?.btn_enviar) || "ENVIAR ENLACE";
             }
         } catch (err) {
             btn.disabled = false;
-            btn.innerText = "ENVIAR ENLACE";
+            btn.innerText = (window.txt?.recuperar?.btn_enviar) || "ENVIAR ENLACE";
             console.error("Error en recuperación:", err);
         }
     };

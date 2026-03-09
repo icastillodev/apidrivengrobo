@@ -18,7 +18,7 @@
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica para definir y configurar los tipos de formularios del sistema
         import { initConfigFormTypes } from '../../../dist/js/pages/admin/configuracion/config_tipos_form.js';
 
@@ -28,7 +28,7 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos la ejecución hasta que window.txt esté listo para i18n
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2 - Administradores)
                 Auth.checkAccess([1, 2]); 
@@ -45,6 +45,7 @@
                     
                     // Inicialización de la lógica de gestión de tipos de formularios
                     initConfigFormTypes();
+                    translatePage();
                     
                     console.log("✅ Configuración de Tipos de Formulario inicializada.");
                 } else {
@@ -71,26 +72,26 @@
         
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                <li class="breadcrumb-item text-muted">GROBO</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_tipos_form.bread_grobo"></li>
                 <li class="breadcrumb-item text-muted" id="institucionbread">...</li>
-                <li class="breadcrumb-item text-muted">Admin</li>
+                <li class="breadcrumb-item text-muted" data-i18n="config_tipos_form.bread_admin"></li>
                 <li class="breadcrumb-item active">
-                    <span class="badge bg-warning text-dark px-2 py-1">Tipos de Formulario</span>
+                    <span class="badge bg-warning text-dark px-2 py-1" data-i18n="config_tipos_form.bread_tipos_form"></span>
                 </li>
             </ol>
         </nav>
 
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <div>
-                <h4 class="fw-black text-dark m-0">CONFIGURACIÓN DE PEDIDOS</h4>
-                <p class="text-muted small mb-0 mt-1">Definición de tipos de solicitudes, descuentos y exenciones</p>
+                <h4 class="fw-black text-dark m-0" data-i18n="config_tipos_form.titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="config_tipos_form.subtitulo"></p>
             </div>
             <div class="d-flex gap-2">
                 <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
-                    <i class="bi bi-arrow-left me-2"></i> VOLVER
+                    <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_tipos_form.btn_volver"></span>
                 </a>
                 <button class="btn btn-warning shadow-sm fw-bold text-dark" onclick="window.openModalFormType()">
-                    <i class="bi bi-plus-circle me-2"></i> NUEVO TIPO
+                    <i class="bi bi-plus-circle me-2"></i> <span data-i18n="config_tipos_form.btn_nuevo_tipo"></span>
                 </button>
             </div>
         </div>
@@ -98,17 +99,17 @@
         <ul class="nav nav-tabs nav-fill fw-bold mb-4 border-bottom-0" id="catTabs" role="tablist">
             <li class="nav-item">
                 <button class="nav-link active border-0 shadow-sm rounded me-2" data-bs-toggle="tab" data-bs-target="#pane-animal">
-                    <i class="bi bi-piggy-bank me-2"></i>ANIMAL VIVO
+                    <i class="bi bi-piggy-bank me-2"></i><span data-i18n="config_tipos_form.tab_animal"></span>
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link border-0 shadow-sm rounded me-2 bg-white text-muted" data-bs-toggle="tab" data-bs-target="#pane-reactivos">
-                    <i class="bi bi-virus me-2"></i>OTROS REACTIVOS BIO.
+                    <i class="bi bi-virus me-2"></i><span data-i18n="config_tipos_form.tab_reactivos"></span>
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link border-0 shadow-sm rounded bg-white text-muted" data-bs-toggle="tab" data-bs-target="#pane-insumos">
-                    <i class="bi bi-box-seam me-2"></i>INSUMOS
+                    <i class="bi bi-box-seam me-2"></i><span data-i18n="config_tipos_form.tab_insumos"></span>
                 </button>
             </li>
         </ul>
@@ -132,7 +133,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-warning text-dark py-2">
-                    <h6 class="modal-title fw-bold">GESTIÓN DE TIPO DE PEDIDO</h6>
+                    <h6 class="modal-title fw-bold" data-i18n="config_tipos_form.modal_titulo"></h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -140,22 +141,22 @@
                         <input type="hidden" name="IdTipoFormulario" id="type-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">NOMBRE DEL TIPO</label>
-                            <input type="text" name="nombreTipo" id="type-name" class="form-control fw-bold" placeholder="Ej: Solicitud Regular, Pedido Urgente" required>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_nombre_tipo"></label>
+                            <input type="text" name="nombreTipo" id="type-name" class="form-control fw-bold" data-i18n="config_tipos_form.ph_nombre" placeholder="Ej: Solicitud Regular, Pedido Urgente" required>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted">CATEGORÍA</label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_categoria"></label>
                             <select name="categoriaformulario" id="type-cat" class="form-select" required>
-                                <option value="Animal vivo">Animal vivo</option>
-                                <option value="Otros reactivos biologicos">Otros reactivos biológicos</option>
-                                <option value="Insumos">Insumos</option>
+                                <option value="Animal vivo" data-i18n="config_tipos_form.opcion_animal"></option>
+                                <option value="Otros reactivos biologicos" data-i18n="config_tipos_form.opcion_reactivos"></option>
+                                <option value="Insumos" data-i18n="config_tipos_form.opcion_insumos"></option>
                             </select>
                         </div>
 
                         <div class="row g-3 align-items-center mb-3">
                             <div class="col-6">
-                                <label class="form-label small fw-bold text-muted">DESCUENTO (%)</label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_descuento"></label>
                                 <div class="input-group">
                                     <input type="number" name="descuento" id="type-discount" class="form-control" value="0" min="0" max="100">
                                     <span class="input-group-text">%</span>
@@ -164,12 +165,12 @@
                             <div class="col-6">
                                 <div class="form-check form-switch pt-4">
                                     <input class="form-check-input" type="checkbox" name="exento" id="type-exempt">
-                                    <label class="form-check-label fw-bold ms-2" for="type-exempt">Exento de Pago</label>
+                                    <label class="form-check-label fw-bold ms-2" for="type-exempt" data-i18n="config_tipos_form.label_exento"></label>
                                 </div>
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark">GUARDAR CAMBIOS</button>
+                        <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark" data-i18n="config_tipos_form.btn_guardar"></button>
                     </form>
                 </div>
             </div>

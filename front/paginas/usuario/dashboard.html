@@ -12,6 +12,17 @@
     
     <link rel="stylesheet" href="../../dist/style/css/styles.css">
     <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <style>
+        #dashboard-grid .card.pointer.transition-hover {
+            cursor: pointer;
+        }
+        #dashboard-grid .card.pointer.transition-hover:hover {
+            filter: brightness(1.04);
+            box-shadow: 0 0.5rem 1.2rem rgba(0,0,0,0.12) !important;
+            transform: translateY(-2px);
+            transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+    </style>
 </head>
 
 <body class="bg-gray-50 font-sans">
@@ -20,10 +31,10 @@
         <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6">
             <div class="max-w-3xl">
                 <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                    Hola <span id="welcome-name" class="text-primary">Investigador</span>, Bienvenido al Bioterio
+                    <span data-i18n="dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Investigador</span><span data-i18n="dashboard.bienvenido">, Bienvenido al Bioterio</span>
                 </h1>
                 <p class="text-gray-500 font-medium leading-relaxed mb-0">
-                    Panel de investigador <strong>GROBO</strong>. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.
+                    <span data-i18n="dashboard.panel_desc">Panel de investigador</span> <strong data-i18n="dashboard.grobo">GROBO</strong><span data-i18n="dashboard.panel_uso">. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.</span>
                 </p>
             </div>
         </section>
@@ -31,7 +42,7 @@
         <div class="row g-4" id="dashboard-grid">
             <div class="col-12 text-center text-muted py-5">
                 <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-3 fw-bold tracking-widest text-uppercase text-[10px]">Cargando módulos...</p>
+                <p class="mt-3 fw-bold tracking-widest text-uppercase text-[10px]" data-i18n="dashboard.cargando">Cargando módulos...</p>
             </div>
         </div>
     </main>
@@ -40,31 +51,31 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
                 <div class="modal-header bg-danger text-white py-3">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Seguridad de Cuenta Requerida</h5>
+                    <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i><span data-i18n="dashboard.modal_titulo">Seguridad de Cuenta Requerida</span></h5>
                     <button type="button" class="btn-close btn-close-white d-none" id="btn-close-security-modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4 bg-light">
-                    <p class="text-muted small mb-4">Para continuar utilizando el sistema de forma segura, es obligatorio actualizar la siguiente información.</p>
+                    <p class="text-muted small mb-4" data-i18n="dashboard.modal_desc">Para continuar utilizando el sistema de forma segura, es obligatorio actualizar la siguiente información.</p>
                     <form id="form-security-check">
                         
                         <div id="sec-pass-container" class="d-none mb-3 p-3 bg-white border border-danger rounded">
-                            <label class="form-label fw-bold small text-danger uppercase"><i class="bi bi-key-fill me-1"></i>Cambio de Contraseña</label>
-                            <p class="small text-muted mb-2">Tu contraseña actual es la predeterminada (insegura).</p>
-                            <input type="password" id="sec-new-pass" class="form-control mb-2 border-danger" placeholder="Nueva Contraseña (Min. 6 caracteres)">
-                            <input type="password" id="sec-confirm-pass" class="form-control border-danger" placeholder="Repetir Contraseña">
+                            <label class="form-label fw-bold small text-danger uppercase"><i class="bi bi-key-fill me-1"></i><span data-i18n="dashboard.cambio_pass">Cambio de Contraseña</span></label>
+                            <p class="small text-muted mb-2" data-i18n="dashboard.pass_insegura">Tu contraseña actual es la predeterminada (insegura).</p>
+                            <input type="password" id="sec-new-pass" class="form-control mb-2 border-danger" data-i18n="dashboard.ph_nueva_pass" placeholder="Nueva Contraseña (Min. 6 caracteres)">
+                            <input type="password" id="sec-confirm-pass" class="form-control border-danger" data-i18n="dashboard.ph_repetir_pass" placeholder="Repetir Contraseña">
                         </div>
 
                         <div id="sec-email-container" class="d-none mb-3 p-3 bg-white border border-primary rounded">
-                            <label class="form-label fw-bold small text-primary uppercase"><i class="bi bi-envelope-fill me-1"></i>Correo Electrónico</label>
-                            <p class="small text-muted mb-2">No tienes un correo válido registrado.</p>
-                            <input type="email" id="sec-email-input" class="form-control border-primary" placeholder="ejemplo@correo.com">
+                            <label class="form-label fw-bold small text-primary uppercase"><i class="bi bi-envelope-fill me-1"></i><span data-i18n="dashboard.correo_label">Correo Electrónico</span></label>
+                            <p class="small text-muted mb-2" data-i18n="dashboard.correo_invalido">No tienes un correo válido registrado.</p>
+                            <input type="email" id="sec-email-input" class="form-control border-primary" data-i18n="dashboard.ph_email" placeholder="ejemplo@correo.com">
                         </div>
 
                         <div class="text-end mt-4 d-flex flex-wrap justify-content-end gap-2">
                             <button type="button" class="btn btn-outline-secondary d-none" id="btn-continue-default-pass">
-                                <i class="bi bi-x-circle me-1"></i> Seguir con esta contraseña
+                                <i class="bi bi-x-circle me-1"></i> <span data-i18n="dashboard.seguir_con_pass">Seguir con esta contraseña</span>
                             </button>
-                            <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm"><i class="bi bi-check-circle me-1"></i> Actualizar y Continuar</button>
+                            <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm"><i class="bi bi-check-circle me-1"></i> <span data-i18n="dashboard.actualizar_continuar">Actualizar y Continuar</span></button>
                         </div>
                     </form>
                 </div>
@@ -79,19 +90,20 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../dist/js/utils/i18n.js';
-        
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
 
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                if (window.txt) translatePage();
                 Auth.checkAccess([3]); 
 
                 const userName = localStorage.getItem('userName');
                 const welcomeSpan = document.getElementById('welcome-name');
                 if (welcomeSpan) {
-                    const primerNombre = userName ? userName.split(' ')[0] : 'Investigador';
+                    const t = window.txt?.dashboard;
+                    const primerNombre = userName ? userName.split(' ')[0] : (t?.hola || 'Investigador');
                     welcomeSpan.innerText = primerNombre;
                 }
 
@@ -125,10 +137,11 @@
                         if (btnContinueDefault) {
                             btnContinueDefault.onclick = () => {
                                 modalSec.hide();
+                                const t = window.txt?.dashboard;
                                 Swal.fire({
                                     icon: 'info',
-                                    title: 'Continuaste con clave temporal',
-                                    text: 'Te lo volveremos a pedir al próximo ingreso.',
+                                    title: t?.swal_continuaste || 'Continuaste con clave temporal',
+                                    text: t?.swal_volvera_pedir || 'Te lo volveremos a pedir al próximo ingreso.',
                                     timer: 2200,
                                     showConfirmButton: false
                                 });
@@ -140,11 +153,12 @@
                             const pass = document.getElementById('sec-new-pass').value;
                             const conf = document.getElementById('sec-confirm-pass').value;
                             const email = document.getElementById('sec-email-input').value;
+                            const t = window.txt?.dashboard;
 
-                            if (secRes.needsPass && pass !== conf) return Swal.fire('Error', 'Las contraseñas no coinciden', 'error');
-                            if (secRes.needsPass && pass.length < 6) return Swal.fire('Error', 'La contraseña debe tener al menos 6 caracteres', 'error');
+                            if (secRes.needsPass && pass !== conf) return Swal.fire(t?.swal_error || 'Error', t?.pass_no_coinciden || 'Las contraseñas no coinciden', 'error');
+                            if (secRes.needsPass && pass.length < 6) return Swal.fire(t?.swal_error || 'Error', t?.pass_min_6 || 'La contraseña debe tener al menos 6 caracteres', 'error');
 
-                            Swal.fire({ title: 'Procesando...', didOpen: () => Swal.showLoading() });
+                            Swal.fire({ title: t?.swal_procesando || 'Procesando...', didOpen: () => Swal.showLoading() });
 
                             const payload = {};
                             if (secRes.needsPass) payload.pass = pass;
@@ -153,9 +167,9 @@
                             const upRes = await API.request('/auth/update-security', 'POST', payload);
                             if (upRes.status === 'success') {
                                 modalSec.hide();
-                                Swal.fire('¡Listo!', 'Tu cuenta ha sido asegurada exitosamente.', 'success');
+                                Swal.fire(t?.swal_listo || '¡Listo!', t?.swal_cuenta_asegurada || 'Tu cuenta ha sido asegurada exitosamente.', 'success');
                             } else {
-                                Swal.fire('Error', 'No se pudo actualizar', 'error');
+                                Swal.fire(t?.swal_error || 'Error', t?.swal_no_actualizar || 'No se pudo actualizar', 'error');
                             }
                         };
                     }

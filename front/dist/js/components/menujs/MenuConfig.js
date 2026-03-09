@@ -22,16 +22,14 @@ export function getCorrectPath(rawPath) {
 
 
 export function getRoleName(level) {
-    // Accedemos al objeto global cargado por tu i18n.js
-    // Si window.txt.roles no existe todavía, devolvemos el número como fallback
     if (window.txt && window.txt.roles) {
-        return window.txt.roles[level] || `Rol ${level}`;
+        return window.txt.roles[level] || (window.txt.menu?.rol_fallback || 'Rol') + ' ' + level;
     }
-    return `${level}`;
+    return (window.txt?.menu?.rol_fallback || 'Rol') + ' ' + level;
 }
 
 export function getUserDisplayText() {
-    const user = getSession('userName') || 'Usuario';
+    const user = getSession('userName') || (window.txt?.menu?.usuario_default || 'Usuario');
     const id = getSession('userId') || '?';
     const nombre = getSession('userFull'); 
     const apellido = getSession('userApe'); 
@@ -125,7 +123,8 @@ export const UserPreferences = {
         localStorage.setItem('fontSize', size);
         document.querySelectorAll('.btn-font-switch').forEach(btn => {
             btn.innerHTML = UserPreferences.icons[`font_${size}`] || UserPreferences.icons.font_chica;
-            btn.title = `Tamaño: ${size.toUpperCase()}`;
+            const label = (window.txt?.menu?.tamanio_label || 'Tamaño:') + ' ' + size.toUpperCase();
+            btn.title = label;
         });
     },
 

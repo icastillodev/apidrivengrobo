@@ -13,19 +13,19 @@ export const ExportUI = {
     // -------------------------------------------------------------
     async downloadAlojamientoPDF() {
         const historyData = AlojamientoState.currentHistoryData;
-        if (!historyData || historyData.length === 0) return Swal.fire('Error', 'No hay una historia abierta para exportar.', 'error');
+        const t = window.txt?.alojamientos || {};
+        if (!historyData || historyData.length === 0) return Swal.fire('Error', t.export_no_historia || 'No hay una historia abierta para exportar.', 'error');
         
         const first = historyData[0];
         const historiaId = first.historia;
-        const t = window.txt.alojamientos || {};
         const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
         const instName = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
 
         const { value: options } = await Swal.fire({
-            title: t.exp_title || 'Exportar PDF',
+            title: t.export_pdf_title || t.exp_title || 'Exportar PDF',
             html: `
                 <div class="text-start p-3 bg-light border rounded">
-                    <p class="small text-muted mb-3">Seleccione qué información incluir:</p>
+                    <p class="small text-muted mb-3">${t.export_select_info || 'Seleccione qué información incluir:'}</p>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="chk-aloj" checked>
                         <label class="form-check-label fw-bold small">${t.exp_opt_aloj || 'Tramos de Alojamiento'}</label>
@@ -41,7 +41,7 @@ export const ExportUI = {
                 </div>
             `,
             showCancelButton: true,
-            confirmButtonText: '<i class="bi bi-file-pdf"></i> Generar Documento',
+            confirmButtonText: `<i class="bi bi-file-pdf"></i> ${t.export_btn_doc || 'Generar Documento'}`,
             confirmButtonColor: '#dc3545',
             preConfirm: () => ({
                 aloj: document.getElementById('chk-aloj').checked,
@@ -85,7 +85,7 @@ export const ExportUI = {
         let trazabilidadHtml = '';
         
         if (options.traz) {
-            Swal.fire({ title: 'Recopilando datos clínicos...', text: 'Por favor espere.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: t.export_recopilando || 'Recopilando datos clínicos...', text: t.export_esperar || 'Por favor espere.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             
             for (let h of historyData) {
                 try {
@@ -143,7 +143,7 @@ export const ExportUI = {
             Swal.close();
 
             if (trazabilidadHtml === '') {
-                trazabilidadHtml = '<p style="font-size: 11px; font-style: italic; color: #888;">Los animales no tienen variables clínicas registradas.</p>';
+                trazabilidadHtml = `<p style="font-size: 11px; font-style: italic; color: #888;">${t.export_sin_variables || 'Los animales no tienen variables clínicas registradas.'}</p>`;
             }
         }
 
@@ -151,14 +151,14 @@ export const ExportUI = {
             <div style="font-family: Arial, sans-serif; color: #333; padding: 15px;">
                 <div style="text-align: center; border-bottom: 2px solid #0d6efd; padding-bottom: 10px; margin-bottom: 20px;">
                     <h2 style="margin: 0; color: #0d6efd;">GROBO - ${instName}</h2>
-                    <h4 style="margin: 5px 0;">FICHA TÉCNICA: ALOJAMIENTO ANIMAL</h4>
+                    <h4 style="margin: 5px 0;">${t.export_ficha_tecnica || 'FICHA TÉCNICA: ALOJAMIENTO ANIMAL'}</h4>
                     <p style="margin: 0; font-size: 11px; color: #666;">Historia #${historiaId} | Generado: ${new Date().toLocaleString()}</p>
                 </div>
 
                 <div style="margin-bottom: 20px;">
                     <p style="margin: 5px 0;"><strong>Investigador:</strong> ${first.Investigador}</p>
                     <p style="margin: 5px 0;"><strong>Protocolo:</strong> [${first.nprotA}] ${first.tituloA || ''}</p>
-                    <p style="margin: 15px 0; font-size: 14px;"><strong>ESTADO DE ESTADÍA:</strong> <span style="color: ${isFinalizado ? '#dc3545' : '#198754'}; font-weight: bold;">${statusTxt}</span></p>
+                    <p style="margin: 15px 0; font-size: 14px;"><strong>${t.export_estado_estadia || 'ESTADO DE ESTADÍA:'}</strong> <span style="color: ${isFinalizado ? '#dc3545' : '#198754'}; font-weight: bold;">${statusTxt}</span></p>
                 </div>
 
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -169,7 +169,7 @@ export const ExportUI = {
                 </table>
 
                 ${options.aloj ? `
-                <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #444;">TRAMOS DE ALOJAMIENTO (Contabilidad):</p>
+                <p style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #444;">${t.export_tramos_label || 'TRAMOS DE ALOJAMIENTO (Contabilidad):'}</p>
                 <table style="width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px; font-size: 11px;">
                     <tr style="background-color: #f2f2f2;">
                         <th style="padding: 6px; border: 1px solid #ddd;">ID</th>
@@ -181,8 +181,8 @@ export const ExportUI = {
                     </tr>
                     ${tableRows}
                     <tr style="background-color: #f2f2f2; font-weight: bold;">
-                        <td colspan="3" style="text-align: right; padding: 8px; border: 1px solid #ddd;">TOTALES GLOBALES:</td>
-                        <td style="padding: 8px; border: 1px solid #ddd;">${totalDias} Días</td>
+                        <td colspan="3" style="text-align: right; padding: 8px; border: 1px solid #ddd;">${t.export_totales || 'TOTALES GLOBALES:'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${totalDias} ${t.days_suffix || 'Días'}</td>
                         ${options.precio ? `<td colspan="2" style="padding: 8px; border: 1px solid #ddd; color: #1a5d3b; font-size: 14px;">$${totalCosto.toFixed(2)}</td>` : ''}
                     </tr>
                 </table>
@@ -213,11 +213,11 @@ export const ExportUI = {
     // 2. EXCEL GLOBAL PLANO (Todos los datos cruzados en una hoja)
     // -------------------------------------------------------------
     async processExcelExportAlojamientos() {
+        const t = window.txt?.alojamientos || {};
         if (typeof XLSX === 'undefined') {
-            return Swal.fire('Error', 'La librería SheetJS no está cargada. Asegúrese de mantener el script en el HTML.', 'error');
+            return Swal.fire('Error', t.export_sheetjs_error || 'La librería SheetJS no está cargada. Asegúrese de mantener el script en el HTML.', 'error');
         }
 
-        const t = window.txt.alojamientos || {};
         const instId = localStorage.getItem('instId') || 1;
         const instName = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         
@@ -225,14 +225,14 @@ export const ExportUI = {
             title: t.exp_title || 'Exportar Base de Datos (Excel)',
             html: `
                 <div class="text-start p-3 bg-light border rounded mb-3">
-                    <label class="small fw-bold">Fecha Inicio</label>
+                    <label class="small fw-bold">${t.export_fecha_inicio || 'Fecha Inicio'}</label>
                     <input type="date" id="exc-start" class="form-control form-control-sm mb-2">
-                    <label class="small fw-bold">Fecha Fin</label>
+                    <label class="small fw-bold">${t.export_fecha_fin || 'Fecha Fin'}</label>
                     <input type="date" id="exc-end" class="form-control form-control-sm mb-3 border-bottom pb-3">
                     
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="chk-exc-traz" checked>
-                        <label class="form-check-label fw-bold small text-primary">Detallar Clínica por Animal (Filas Múltiples)</label>
+                        <label class="form-check-label fw-bold small text-primary">${t.export_detallar_clinica || 'Detallar Clínica por Animal (Filas Múltiples)'}</label>
                     </div>
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="chk-exc-precio" checked>
@@ -241,12 +241,12 @@ export const ExportUI = {
                 </div>
             `,
             showCancelButton: true,
-            confirmButtonText: '<i class="bi bi-file-earmark-spreadsheet"></i> Descargar Data',
+            confirmButtonText: '<i class="bi bi-file-earmark-spreadsheet"></i> ' + (t.export_descargar_data || 'Descargar Data'),
             confirmButtonColor: '#198754',
             preConfirm: () => {
                 const s = document.getElementById('exc-start').value;
                 const e = document.getElementById('exc-end').value;
-                if (!s || !e) { Swal.showValidationMessage('Ambas fechas son obligatorias'); return false; }
+                if (!s || !e) { Swal.showValidationMessage(t.export_fechas_obligatorias || 'Ambas fechas son obligatorias'); return false; }
                 return { 
                     start: s, 
                     end: e, 
@@ -262,12 +262,12 @@ export const ExportUI = {
         data = data.filter(r => r.fechavisado >= options.start && r.fechavisado <= options.end);
 
         if (data.length === 0) {
-            return Swal.fire('Sin resultados', 'No hay alojamientos en esas fechas.', 'info');
+            return Swal.fire(t.export_sin_resultados || 'Sin resultados', t.export_sin_alojamientos_fechas || 'No hay alojamientos en esas fechas.', 'info');
         }
 
         Swal.fire({ 
-            title: 'Procesando...', 
-            text: 'Cruzando datos administrativos y clínicos.', 
+            title: t.export_procesando || 'Procesando...', 
+            text: t.export_cruzando || 'Cruzando datos administrativos y clínicos.', 
             allowOutsideClick: false, 
             didOpen: () => Swal.showLoading() 
         });

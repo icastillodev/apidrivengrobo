@@ -47,10 +47,31 @@ export async function initRegistro() {
     const confirmInput = document.getElementById('reg-pass-confirm');
     const btnSubmit = document.getElementById('btn-finalizar');
 
+    // Evitar pegar o escribir espacios en el usuario
+    userInput.addEventListener('input', () => {
+        const raw = userInput.value;
+        if (/\s/.test(raw)) {
+            userInput.value = raw.replace(/\s/g, '');
+        }
+    });
+    userInput.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\s/g, '');
+        const start = userInput.selectionStart;
+        const end = userInput.selectionEnd;
+        userInput.value = userInput.value.substring(0, start) + text + userInput.value.substring(end);
+        userInput.setSelectionRange(start + text.length, start + text.length);
+    });
+
     // --- VALIDACIÓN DE USUARIO EN TIEMPO REAL ---
     let typingTimer;
     userInput.addEventListener('keyup', () => {
         clearTimeout(typingTimer);
+        // Quitar espacios en tiempo real
+        const raw = userInput.value;
+        if (/\s/.test(raw)) {
+            userInput.value = raw.replace(/\s/g, '');
+        }
         const val = userInput.value.trim();
         
         if (val.length < 3) {
@@ -113,9 +134,10 @@ export async function initRegistro() {
         
         // Bloqueo para evitar envíos múltiples
         btnSubmit.disabled = true;
+        const t = window.txt?.registro || {};
         Swal.fire({
-            title: 'Procesando Registro...',
-            html: `Estamos creando su cuenta en <b>${instSlug.toUpperCase()}</b>, por favor espere.`,
+            title: t.swal_procesando || 'Procesando Registro...',
+            html: `${t.swal_creando || 'Estamos creando su cuenta en'} <b>${instSlug.toUpperCase()}</b>, ${t.swal_espere || 'por favor espere.'}`,
             allowOutsideClick: false,
             didOpen: () => { Swal.showLoading(); }
         });
@@ -125,6 +147,7 @@ export async function initRegistro() {
         
         // Contexto institucional desde el storage
         data.IdInstitucion = instId; // Ya lo capturamos arriba
+        data.lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
 
         try {
             // Enviamos el registro a la API inyectando el slug en la URL
@@ -133,26 +156,28 @@ export async function initRegistro() {
             Swal.close();
 
             if (res.status === 'success') {
+                const t = window.txt?.registro || {};
                 Swal.fire({
-                    title: '¡REGISTRO ENVIADO!',
+                    title: t.swal_enviado || '¡REGISTRO ENVIADO!',
                     html: `
                         <div class="text-center">
-                            <p>Se ha enviado un mail a <b>${data.EmailA}</b>.</p>
-                            <p class="mt-2 text-sm italic">Confirme su cuenta para activar su acceso.</p>
+                            <p>${t.swal_mail_a || 'Se ha enviado un mail a'} <b>${data.EmailA}</b>.</p>
+                            <p class="mt-2 text-sm italic">${t.swal_confirmar || 'Confirme su cuenta para activar su acceso.'}</p>
                             <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-700 font-bold uppercase text-[10px]">
-                                IMPORTANTE: Si no lo recibes, revisa tu carpeta de CORREO NO DESEADO (SPAM).
+                                ${t.swal_spam || 'IMPORTANTE: Si no lo recibes, revisa tu carpeta de CORREO NO DESEADO (SPAM).'}
                             </div>
                         </div>
                     `,
                     icon: 'success',
                     confirmButtonColor: '#000',
-                    confirmButtonText: 'VOLVER AL LOGIN'
+                    confirmButtonText: t.swal_volver_login || 'VOLVER AL LOGIN'
                 }).then(() => {
                     window.location.href = `${basePath}${instSlug}/`;
                 });
             } else {
                 btnSubmit.disabled = false;
-                Swal.fire("Error", res.message || "Error en el servidor", "error");
+                const t = window.txt?.registro || {};
+                Swal.fire(t.swal_error || "Error", res.message || (t.swal_error_servidor || "Error en el servidor"), "error");
             }
         } catch (err) { 
             btnSubmit.disabled = false;

@@ -119,13 +119,53 @@ window.deleteLink = async (id) => {
     }
 };
 
-// VISOR DE DETALLES
+// VISOR DE DETALLES (bloques legibles + i18n)
+const SECCION_ORDER = [
+    'institucion', 'organizaciones', 'departamentos', 'tipo_protocolo', 'severidad', 'tipo_formulario',
+    'reactivos', 'insumos', 'servicios', 'reservas', 'especies',
+    'permisos_rol_4_sec_admin', 'permisos_rol_5_asistente', 'permisos_rol_6_laboratorio'
+];
+const SECCION_I18N = {
+    institucion: 'seccion_institucion',
+    organizaciones: 'seccion_organizaciones',
+    departamentos: 'seccion_departamentos',
+    tipo_protocolo: 'seccion_tipo_protocolo',
+    severidad: 'seccion_severidad',
+    tipo_formulario: 'seccion_tipo_formulario',
+    reactivos: 'seccion_reactivos',
+    insumos: 'seccion_insumos',
+    servicios: 'seccion_servicios',
+    reservas: 'seccion_reservas',
+    especies: 'seccion_especies',
+    permisos_rol_4_sec_admin: 'seccion_permisos_sec_admin',
+    permisos_rol_5_asistente: 'seccion_permisos_asistente',
+    permisos_rol_6_laboratorio: 'seccion_permisos_laboratorio'
+};
+function getCampoLabel(campo, t) {
+    const map = {
+        inst_nombre_sede: t.campo_nombre_sede, inst_contacto: t.campo_contacto,
+        org_nom: t.campo_organizacion, depto_nom: t.campo_departamento, depto_org: t.campo_organizacion,
+        prot_tipo: t.campo_protocolo, sev_tipo: t.campo_severidad,
+        form_cat: t.campo_categoria, form_nom: t.campo_nombre_form, form_exento: t.campo_exento,
+        reac_nom: t.campo_reactivo, reac_cant: t.campo_cantidad, reac_medida: t.campo_cantidad, reac_esp: t.campo_especie,
+        ins_nom: t.campo_insumo, ins_cant: t.campo_cantidad, ins_medida: t.campo_cantidad, ins_esp: t.campo_especie,
+        serv_nom: t.campo_servicio, serv_cant: t.campo_cantidad, serv_medida: t.campo_cantidad,
+        sala_nom: t.campo_sala, sala_lugar: t.campo_ubicacion, instru_nom: t.campo_instrumento, instru_cant: t.campo_cantidad,
+        esp_nombre: t.campo_especie, sub_nom: t.campo_subespecie, aloj_nom: t.campo_alojamiento, aloj_det: t.campo_ubicacion,
+        traz_nom: t.campo_trazabilidad, traz_tipo: t.campo_trazabilidad
+    };
+    const base = (campo || '').replace(/\[\]$/, '').replace(/_?\d+$/g, '').replace(/_\d+_/g, '_');
+    const key = Object.keys(map).find(k => base === k || base.startsWith(k + '_'));
+    return (key && map[key]) ? map[key] : (base.replace(/_/g, ' ').replace(/^\w/, w => w.toUpperCase()));
+}
+
 window.verDetalleCompleto = async (id) => {
     Swal.fire({ title: 'Cargando datos...', didOpen: () => Swal.showLoading() });
     
     const res = await API.request(`/superadmin/form-registros/detail/${id}`);
     const container = document.getElementById('content-detalle-eav');
-    
+    const t = window.txt?.superadmin_formulario || {};
+
     Swal.close();
 
     if (!res || res.status !== 'success' || !res.data) {
@@ -136,31 +176,37 @@ window.verDetalleCompleto = async (id) => {
     container.innerHTML = '';
 
     if (Object.keys(res.data).length === 0) {
-        container.innerHTML = `<div class="alert alert-info text-center font-bold uppercase">La institución aún no ha cargado datos en este formulario.</div>`;
+        container.innerHTML = `<div class="alert alert-info text-center font-bold uppercase">${t.detalle_sin_datos || 'La institución aún no ha cargado datos en este formulario.'}</div>`;
     } else {
-        for (const [categoria, campos] of Object.entries(res.data)) {
+        const categoriasOrdenadas = SECCION_ORDER.filter(cat => res.data[cat]);
+        const restantes = Object.keys(res.data).filter(cat => !SECCION_ORDER.includes(cat));
+        const ordenFinal = [...categoriasOrdenadas, ...restantes];
+
+        ordenFinal.forEach(categoria => {
+            const campos = res.data[categoria];
+            if (!campos || !campos.length) return;
+
+            const tituloSeccion = t[SECCION_I18N[categoria]] || categoria.replace(/_/g, ' ');
             let sectionHtml = `
-                <div class="mb-4 bg-white p-3 rounded shadow-sm border-l-4 border-success">
+                <div class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-success">
                     <h6 class="font-black text-success uppercase text-xs mb-3 italic tracking-wider border-bottom pb-2">
-                        <i class="bi bi-folder-fill me-1"></i> CATEGORÍA: ${categoria}
+                        <i class="bi bi-folder-fill me-1"></i> ${tituloSeccion}
                     </h6>
                     <div class="row g-3">
             `;
 
-     campos.forEach(c => {
-                let nombreCampo = c.campo.replace('inst_', '')
-                                         .replace('menuRol4_', '')
-                                         .replace('menuRol5_', '')
-                                         .replace('menuRol6_', '')
-                                         .replace(/_/g, ' ');
-                nombreCampo = nombreCampo.replace('[]', '').replace(/[0-9]+$/, '');
+            campos.forEach(c => {
+                const label = getCampoLabel(c.campo, t);
+                let valor = c.valor || '';
+                if (valor === '1' || valor === '2') valor = valor === '1' ? (t.valor_si || 'Sí') : (t.valor_no || 'No');
+                if (c.campo && c.campo.includes('menuRol')) valor = valor ? (t.valor_si || 'Sí') : (t.valor_no || 'No');
 
                 sectionHtml += `
                     <div class="col-md-3">
                         <div class="bg-slate-50 p-2 rounded border h-100">
-                            <label class="d-block text-muted fw-bold uppercase mb-1" style="font-size: 10px;">${nombreCampo}</label>
+                            <label class="d-block text-muted fw-bold uppercase mb-1" style="font-size: 10px;">${label}</label>
                             <div class="text-slate-800 font-medium" style="font-size: 13px;">
-                                ${c.valor || '<span class="text-slate-300 italic">N/A</span>'}
+                                ${valor || '<span class="text-slate-300 italic">N/A</span>'}
                             </div>
                         </div>
                     </div>
@@ -169,7 +215,7 @@ window.verDetalleCompleto = async (id) => {
 
             sectionHtml += `</div></div>`;
             container.insertAdjacentHTML('beforeend', sectionHtml);
-        }
+        });
     }
 
     new bootstrap.Modal(document.getElementById('modal-detalle-form')).show();

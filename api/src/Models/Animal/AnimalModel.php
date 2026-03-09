@@ -521,8 +521,8 @@ public function saveOrder($data) {
 
 // Recupera email, nombre y nombre de institución
     public function getUserAndInstInfo($userId, $instId) {
-        $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst 
-                FROM personae p 
+$sql = "SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_preferido), ''), 'es') as idioma_preferido
+                FROM personae p
                 JOIN institucion i ON i.IdInstitucion = ?
                 WHERE p.IdUsrA = ?";
         $stmt = $this->db->prepare($sql);

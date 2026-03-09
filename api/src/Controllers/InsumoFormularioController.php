@@ -51,7 +51,7 @@ class InsumoFormularioController {
 
             // Preparar y Enviar Correo
             $stmtInfo = $this->db->prepare("
-                SELECT p.EmailA, p.NombreA, p.ApellidoA, i.NombreInst, d.NombreDeptoA
+                SELECT p.EmailA, p.NombreA, p.ApellidoA, i.NombreInst, d.NombreDeptoA, COALESCE(NULLIF(TRIM(p.idioma_preferido), ''), 'es') as idioma_preferido
                 FROM personae p
                 JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
                 JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
@@ -87,7 +87,7 @@ class InsumoFormularioController {
                     'items' => $itemsParaCorreo
                 ];
 
-                $mail->sendInsumoExpOrder($info['EmailA'], $nombreCompleto, $info['NombreInst'], $mailData);
+                $mail->sendInsumoExpOrder($info['EmailA'], $nombreCompleto, $info['NombreInst'], $mailData, null, $input['lang'] ?? $info['idioma_preferido'] ?? 'es');
             }
 
             echo json_encode(['status' => 'success', 'id' => $idForm]);

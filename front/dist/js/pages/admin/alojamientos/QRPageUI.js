@@ -14,10 +14,10 @@ export const QRPageUI = {
     },
 
     renderHeader(isAdmin) {
-        const txt = window.txt.alojamientos;
+        const txt = window.txt?.alojamientos || {};
         document.getElementById('qr-header').innerHTML = `
-            <button class="btn btn-sm btn-outline-dark me-2"><i class="bi bi-qr-code"></i> Etiqueta QR</button>
-            <button class="btn btn-sm btn-outline-danger me-2" onclick="window.exportarFichaPDF()"><i class="bi bi-file-pdf"></i> PDF Completo</button>
+            <button class="btn btn-sm btn-outline-dark me-2"><i class="bi bi-qr-code"></i> ${txt.qr_etiqueta_btn || 'Etiqueta QR'}</button>
+            <button class="btn btn-sm btn-outline-danger me-2" onclick="window.exportarFichaPDF()"><i class="bi bi-file-pdf"></i> ${txt.qr_pdf_completo || 'PDF Completo'}</button>
             ${isAdmin 
                 ? `<button class="btn btn-sm btn-secondary" onclick="window.logout()"><i class="bi bi-box-arrow-right"></i> ${txt.qr_logout}</button>`
                 : `<button class="btn btn-sm btn-primary" onclick="window.location.href='/login'"><i class="bi bi-person-fill"></i> ${txt.qr_login}</button>`
@@ -46,7 +46,7 @@ export const QRPageUI = {
             document.getElementById('qr-table-body').innerHTML = data.map(h => `
                 <tr class="pointer table-light" onclick="window.TrazabilidadUI.toggleRow(${h.IdAlojamiento}, ${h.TipoAnimal})">
                     <td>${h.fechavisado}</td>
-                    <td>${h.CantidadCaja} Cajas</td>
+                    <td>${h.CantidadCaja} ${txt.qr_cajas || 'Cajas'}</td>
                     <td>${h.observaciones || ''}</td>
                     ${isAdmin ? `<td>
                         <button class="btn btn-xs btn-outline-primary"><i class="bi bi-pencil"></i></button>
@@ -64,7 +64,12 @@ export const QRPageUI = {
     },
 
     calcularDias(historyArray) {
-        // Tu lógica de cálculo de fechas...
-        return "X Días"; 
+        if (!historyArray || historyArray.length === 0) return (window.txt?.alojamientos?.qr_dias_placeholder || '0') + ' ' + (window.txt?.alojamientos?.days_suffix || 'Días');
+        const first = historyArray[0];
+        const last = historyArray[historyArray.length - 1];
+        const inicio = new Date(first.fechavisado);
+        const fin = last.hastafecha ? new Date(last.hastafecha) : new Date();
+        const dias = Math.max(0, Math.floor((fin - inicio) / (1000 * 60 * 60 * 24)));
+        return `${dias} ${window.txt?.alojamientos?.qr_dias_placeholder || 'Días'}`;
     }
 };

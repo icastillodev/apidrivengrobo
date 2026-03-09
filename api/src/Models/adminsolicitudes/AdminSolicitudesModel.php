@@ -90,7 +90,9 @@ class AdminSolicitudesModel {
                 $info['tituloA'], 
                 $data['decision'], 
                 $data['mensaje'], 
-                $instName
+                $instName,
+                null,
+                $info['lang'] ?? 'es'
             );
 
             $this->db->commit();
@@ -103,7 +105,8 @@ class AdminSolicitudesModel {
 
     private function getRequestInfo($solId) {
         $sql = "SELECT p.tituloA, pers.EmailA as Email, 
-                COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA) as NombreUser
+                COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA) as NombreUser,
+                COALESCE(NULLIF(TRIM(pers.idioma_preferido), ''), 'es') as lang
                 FROM solicitudprotocolo s
                 JOIN protocoloexpe p ON s.idprotA = p.idprotA
                 JOIN usuarioe u ON p.IdUsrA = u.IdUsrA

@@ -310,7 +310,7 @@ class ReactivoModel {
     }
 
     public function getUserAndInstInfo($userId, $instId) {
-        $stmt = $this->db->prepare("SELECT p.EmailA, p.NombreA, i.NombreInst FROM personae p JOIN institucion i ON i.IdInstitucion = ? WHERE p.IdUsrA = ?");
+        $stmt = $this->db->prepare("SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_preferido), ''), 'es') as idioma_preferido FROM personae p JOIN institucion i ON i.IdInstitucion = ? WHERE p.IdUsrA = ?");
         $stmt->execute([$instId, $userId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }

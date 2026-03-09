@@ -26,7 +26,7 @@
     import { initMenu } from '../../../dist/js/components/MenuComponent.js';
     import { NotificationManager } from '../../../dist/js/NotificationManager.js';
     import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-    import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+    import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
     // Lógica específica del formulario de insumos
     import { initInsumosForm } from '../../../dist/js/pages/usuario/formularios/insumos.js';
 
@@ -37,7 +37,8 @@
         try {
             // 1. CARGA CRÍTICA: Idioma
             // Bloqueamos la ejecución hasta que window.txt esté listo
-            await loadLanguage(); 
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+            if (window.txt) translatePage();
 
             // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
             Auth.checkAccess([1, 2, 3 ,4, 5,6]); 
@@ -73,31 +74,31 @@
     <div class="container my-5 pb-5">
         <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
             <div>
-                <h4 class="fw-bold text-primary mb-0 text-uppercase">Solicitud de Insumos Experimentales</h4>
-                <small class="text-muted">Institución: <span id="lbl-institution-name" class="fw-bold text-dark">...</span></small>
+                <h4 class="fw-bold text-primary mb-0 text-uppercase" data-i18n="form_insumos.titulo">Solicitud de Insumos Experimentales</h4>
+                <small class="text-muted"><span data-i18n="form_insumos.institucion">Institución:</span> <span id="lbl-institution-name" class="fw-bold text-dark">...</span></small>
             </div>
             <button id="btn-tarifario" class="btn btn-outline-primary btn-sm fw-bold shadow-sm d-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
+                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo" data-i18n="form_insumos.ver_tarifario">VER TARIFARIO</span>
             </button>
         </div>
         <div class="mb-4">
             <a href="../formularios" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3">
-                <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A FORMULARIOS
+                <i class="bi bi-arrow-left-circle-fill me-1"></i> <span data-i18n="form_insumos.volver_formularios">VOLVER A FORMULARIOS</span>
             </a>
         </div>
         <div id="step-1" class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
-                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Departamento Solicitante</label>
+                <label class="form-label fw-bold text-uppercase small text-muted" data-i18n="form_insumos.step1_depto">1. Seleccione Departamento Solicitante</label>
                 <div class="position-relative">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-building"></i></span>
-                        <input type="text" id="depto-search" class="form-control form-control-lg border-start-0" placeholder="Escriba el nombre del departamento..." autocomplete="off">
+                        <input type="text" id="depto-search" class="form-control form-control-lg border-start-0" data-i18n="form_insumos.ph_buscar_depto" placeholder="Escriba el nombre del departamento..." autocomplete="off">
                     </div>
                     <div id="depto-list" class="list-group position-absolute w-100 shadow-lg mt-1 d-none" style="z-index: 1000; max-height: 250px; overflow-y: auto;"></div>
                 </div>
                 <div class="mt-2">
                     <button type="button" class="btn btn-link text-decoration-none text-muted small p-0" data-bs-toggle="modal" data-bs-target="#modal-depto-help">
-                        <i class="bi bi-question-circle"></i> ¿No aparece tu departamento aquí?
+                        <i class="bi bi-question-circle"></i> <span data-i18n="form_insumos.no_aparece_depto">¿No aparece tu departamento aquí?</span>
                     </button>
                 </div>
             </div>
@@ -106,13 +107,13 @@
         <div id="step-2" class="hidden-section">
             <div class="mb-3">
                 <button type="button" class="btn btn-link text-decoration-none text-muted p-0 fw-bold small" onclick="window.resetSelection()">
-                    <i class="bi bi-arrow-left"></i> CAMBIAR DEPARTAMENTO
+                    <i class="bi bi-arrow-left"></i> <span data-i18n="form_insumos.cambiar_depto">CAMBIAR DEPARTAMENTO</span>
                 </button>
             </div>
 
             <div class="card border-0 shadow-sm mb-4" style="background: #f0f7ff; border-left: 5px solid #0d6efd !important;">
                 <div class="card-body p-3">
-                    <h6 class="text-muted small mb-1 text-uppercase">Departamento:</h6>
+                    <h6 class="text-muted small mb-1 text-uppercase" data-i18n="form_insumos.departamento">Departamento:</h6>
                     <h5 id="info-depto" class="fw-bold mb-0 text-dark">---</h5>
                 </div>
             </div>
@@ -125,8 +126,8 @@
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="bg-light">
                             <tr>
-                                <th class="ps-4 py-3 small text-muted text-uppercase">Insumo / Artículo</th>
-                                <th class="py-3 small text-muted text-uppercase text-center" style="width: 200px;">Cantidad</th>
+                                <th class="ps-4 py-3 small text-muted text-uppercase" data-i18n="form_insumos.insumo_articulo">Insumo / Artículo</th>
+                                <th class="py-3 small text-muted text-uppercase text-center" style="width: 200px;" data-i18n="form_insumos.cantidad">Cantidad</th>
                                 <th class="pe-4 py-3 text-end" style="width: 80px;"></th>
                             </tr>
                         </thead>
@@ -134,7 +135,7 @@
                     </table>
                     <div class="p-3 bg-light border-top">
                         <button type="button" id="btn-add-row" class="btn btn-sm btn-primary fw-bold rounded-pill px-3">
-                            <i class="bi bi-plus-lg me-1"></i> AGREGAR OTRO INSUMO
+                            <i class="bi bi-plus-lg me-1"></i> <span data-i18n="form_insumos.agregar_otro">AGREGAR OTRO INSUMO</span>
                         </button>
                     </div>
                 </div>
@@ -143,7 +144,7 @@
                     <div class="col-md-4">
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-body p-3">
-                                <label for="fecha-retiro" class="form-label fw-bold small text-muted text-uppercase">Fecha Estimada de Retiro</label>
+                                <label for="fecha-retiro" class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_insumos.fecha_retiro">Fecha Estimada de Retiro</label>
                                 <input type="date" id="fecha-retiro" class="form-control fw-bold text-primary" required>
                             </div>
                         </div>
@@ -151,16 +152,16 @@
                     <div class="col-md-8">
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-body p-3">
-                                <label for="aclaracion-pedido" class="form-label fw-bold small text-muted text-uppercase">Aclaraciones / Observaciones</label>
-                                <textarea id="aclaracion-pedido" class="form-control" rows="1" placeholder="Aclaraciones para el pedido..."></textarea>
+                                <label for="aclaracion-pedido" class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_insumos.aclaraciones">Aclaraciones / Observaciones</label>
+                                <textarea id="aclaracion-pedido" class="form-control" rows="1" data-i18n="form_insumos.ph_aclaraciones" placeholder="Aclaraciones para el pedido..."></textarea>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="mt-4 text-end">
-                    <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()">CANCELAR</button>
-                    <button type="submit" class="btn btn-primary px-5 fw-bold shadow">ENVIAR SOLICITUD</button>
+                    <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()" data-i18n="form_insumos.cancelar">CANCELAR</button>
+                    <button type="submit" class="btn btn-primary px-5 fw-bold shadow" data-i18n="form_insumos.enviar_solicitud">ENVIAR SOLICITUD</button>
                 </div>
             </form>
         </div>
@@ -170,21 +171,21 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-dark">Ayuda de Departamentos</h5>
+                    <h5 class="modal-title fw-bold text-dark" data-i18n="form_insumos.ayuda_titulo">Ayuda de Departamentos</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center p-4">
                     <i class="bi bi-envelope-exclamation text-primary fs-1 mb-3"></i>
-                    <p class="text-muted">Si tu departamento no figura en la lista, es posible que no esté dado de alta en esta sede.</p>
+                    <p class="text-muted" data-i18n="form_insumos.ayuda_texto">Si tu departamento no figura en la lista, es posible que no esté dado de alta en esta sede.</p>
                     
                     <div class="d-grid gap-2 mt-3">
-                        <a id="mail-to-inst" href="#" class="btn btn-primary fw-bold text-white text-decoration-none py-2">
+                        <a id="mail-to-inst" href="#" class="btn btn-primary fw-bold text-white text-decoration-none py-2" data-i18n="form_insumos.enviar_mensaje">
                             <i class="bi bi-send me-2"></i> ENVIAR MENSAJE A LA INSTITUCIÓN
                         </a>
                     </div>
                     
                     <div class="mt-3 pt-3 border-top">
-                        <small class="text-muted">El correo se enviará a:</small><br>
+                        <small class="text-muted" data-i18n="form_insumos.correo_se_enviara">El correo se enviará a:</small><br>
                         <span id="lbl-inst-correo" class="fw-bold text-dark">...</span>
                     </div>
                 </div>

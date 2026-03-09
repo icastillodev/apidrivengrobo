@@ -24,7 +24,7 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
-        import { loadLanguage } from '../../../dist/js/utils/i18n.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica del formulario de reactivos
         import { initReactivosForm } from '../../../dist/js/pages/usuario/formularios/reactivos.js';
         showLoader();
@@ -33,7 +33,8 @@
             try {
                 // 1. CARGA CRÍTICA: Idioma
                 // Bloqueamos hasta que window.txt esté listo para las etiquetas del formulario
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                if (window.txt) translatePage();
 
                 // 2. VALIDACIÓN DE ACCESO (Niveles 1, 2, 3)
                 Auth.checkAccess([1, 2, 3,4,5,6]); 
@@ -70,32 +71,32 @@
         
         <div class="d-flex justify-content-between align-items-end mb-4 border-bottom pb-2">
             <div>
-                <h4 class="fw-bold text-success mb-0 text-uppercase">Solicitud de Reactivos Biológicos</h4>
-                <small class="text-muted">Institución: <span id="lbl-institution-name" class="fw-bold">...</span></small>
+                <h4 class="fw-bold text-success mb-0 text-uppercase" data-i18n="form_reactivos.titulo">Solicitud de Reactivos Biológicos</h4>
+                <small class="text-muted"><span data-i18n="form_reactivos.institucion">Institución:</span> <span id="lbl-institution-name" class="fw-bold">...</span></small>
             </div>
             <button id="btn-tarifario" class="btn btn-outline-success btn-sm fw-bold shadow-sm d-none">
-                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo">VER TARIFARIO</span>
+                <i class="bi bi-file-earmark-pdf me-1"></i> <span id="lbl-tarifario-titulo" data-i18n="form_reactivos.ver_tarifario">VER TARIFARIO</span>
             </button>
         </div>
         <div class="mb-4">
             <a href="../formularios" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3">
-                <i class="bi bi-arrow-left-circle-fill me-1"></i> VOLVER A FORMULARIOS
+                <i class="bi bi-arrow-left-circle-fill me-1"></i> <span data-i18n="form_reactivos.volver_formularios">VOLVER A FORMULARIOS</span>
             </a>
         </div>
         <div id="step-1" class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
-                <label class="form-label fw-bold text-uppercase small text-muted">1. Seleccione Protocolo</label>
+                <label class="form-label fw-bold text-uppercase small text-muted" data-i18n="form_reactivos.step1_protocolo">1. Seleccione Protocolo</label>
                 <div class="position-relative">
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="protocol-search" class="form-control form-control-lg border-start-0" placeholder="Buscar protocolo..." autocomplete="off">
+                        <input type="text" id="protocol-search" class="form-control form-control-lg border-start-0" data-i18n="form_reactivos.ph_buscar" placeholder="Buscar protocolo..." autocomplete="off">
                     </div>
                     <div id="protocol-list" class="list-group position-absolute w-100 shadow-lg mt-1 d-none" style="z-index: 1000; max-height: 250px; overflow-y: auto;"></div>
                 </div>
                 
                 <div class="mt-2">
                     <button type="button" class="btn btn-link text-decoration-none text-muted small p-0" data-bs-toggle="modal" data-bs-target="#modal-protocol-help">
-                        <i class="bi bi-question-circle"></i> ¿No aparece tu protocolo aquí?
+                        <i class="bi bi-question-circle"></i> <span data-i18n="form_reactivos.no_aparece_protocolo">¿No aparece tu protocolo aquí?</span>
                     </button>
                 </div>
             </div>
@@ -208,19 +209,19 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-dark">Ayuda con Protocolos</h5>
+                    <h5 class="modal-title fw-bold text-dark" data-i18n="form_reactivos.ayuda_titulo">Ayuda con Protocolos</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
-                    <p id="protocol-help-intro" class="text-muted small mb-3">Si tu protocolo no aparece, verifica que esté vigente.</p>
+                    <p id="protocol-help-intro" class="text-muted small mb-3" data-i18n="form_reactivos.ayuda_intro">Si tu protocolo no aparece, verifica que esté vigente.</p>
                     <div id="protocol-help-desc" class="alert alert-light border small text-start mb-4"></div>
                     <div id="protocol-help-leyenda-red" class="alert alert-secondary py-2 px-3 small text-start mb-3 d-none"></div>
                     <div class="d-grid gap-2">
                         <button type="button" id="btn-protocol-help-ver" class="btn btn-outline-primary fw-bold">
-                            <i class="bi bi-list-check me-2"></i> Ver protocolos
+                            <i class="bi bi-list-check me-2"></i> <span data-i18n="form_reactivos.ver_protocolos">Ver protocolos</span>
                         </button>
                         <button type="button" id="btn-protocol-help-solicitar" class="btn btn-success fw-bold">
-                            <i class="bi bi-plus-circle me-2"></i> Solicitar
+                            <i class="bi bi-plus-circle me-2"></i> <span data-i18n="form_reactivos.solicitar">Solicitar</span>
                         </button>
                     </div>
                 </div>

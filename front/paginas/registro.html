@@ -9,8 +9,21 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
     <script type="module">
+        import { loadLanguage, translatePage } from '../dist/js/utils/i18n.js';
         import { initRegistro } from '../dist/js/pages/registro.js';
-        document.addEventListener('DOMContentLoaded', initRegistro);
+        document.addEventListener('DOMContentLoaded', async () => {
+            const lang = localStorage.getItem('lang') || null;
+            try {
+                await loadLanguage(lang);
+                if (window.txt) translatePage();
+            } catch (e) { console.warn('i18n:', e); }
+            initRegistro();
+            var current = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
+            document.querySelectorAll('[id^="btn-reg-lang-"]').forEach(function(btn) {
+                var isActive = btn.id === 'btn-reg-lang-' + current;
+                btn.className = 'px-3 py-1.5 text-xs font-bold transition-colors ' + (isActive ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-100 text-gray-700 hover:bg-amber-100');
+            });
+        });
     </script>
 </head>
 <body class="bg-[#f2f2f2] font-sans gecko-loaded">
@@ -19,86 +32,102 @@
             
             <div class="w-full md:w-[40%] h-auto md:h-[80vh] rounded-lg flex flex-col justify-end text-white p-8 bg-gradient-to-b from-gray-900 to-black">
                 <div class="text-center pb-4">
-                    <h1 class="text-3xl font-bold mb-2 tracking-tighter">G.R.O.B.O.</h1>
-                    <p class="text-amber-500 text-[10px] uppercase tracking-widest mb-6">Registro para Investigadores</p>
+                    <h1 class="text-3xl font-bold mb-2 tracking-tighter" data-i18n="registro.titulo_lateral">G.R.O.B.O.</h1>
+                    <p class="text-amber-500 text-[10px] uppercase tracking-widest mb-6" data-i18n="registro.subtitulo_lateral">Registro para Investigadores</p>
                     <p class="text-[#888] text-[10px] leading-relaxed text-justify border-t border-gray-800 pt-4">
-                        Al registrarse, quedará vinculado a la sede <strong class="text-white" id="reg-inst-description-name">...</strong>.
+                        <span data-i18n="registro.desc_vinculo">Al registrarse, quedará vinculado a la sede</span> <strong class="text-white" id="reg-inst-description-name">...</strong>.
                     </p>
                 </div>
             </div>
 
             <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col p-8">
                 <div id="error-state" class="hidden flex-1 flex flex-col justify-center items-center text-center">
-                    <h2 class="text-2xl font-black text-red-600 mb-4 uppercase">Sede No Válida</h2>
-                    <p class="text-gray-600 mb-6 font-medium">No puedes crear una cuenta sin estar en una sede institucional.</p>
-                    <a href="https://groboapp.com" class="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase text-xs">Regresar</a>
+                    <h2 class="text-2xl font-black text-red-600 mb-4 uppercase" data-i18n="registro.error_sede_titulo">Sede No Válida</h2>
+                    <p class="text-gray-600 mb-6 font-medium" data-i18n="registro.error_sede_msg">No puedes crear una cuenta sin estar en una sede institucional.</p>
+                    <a href="https://groboapp.com" class="bg-black text-white px-8 py-3 rounded-xl font-bold uppercase text-xs" data-i18n="registro.btn_regresar">Regresar</a>
                 </div>
 
                 <div id="auth-content">
                     <div class="flex justify-between items-start mb-8 border-bottom">
                         <div>
-                            <h2 id="reg-inst-name" class="text-xl font-black text-gray-900 uppercase leading-none tracking-tight text-success">Validando...</h2>
+                            <h2 id="reg-inst-name" class="text-xl font-black text-gray-900 uppercase leading-none tracking-tight text-success" data-i18n="registro.validando">Validando...</h2>
                             <p id="reg-inst-full-name" class="text-[9px] text-gray-400 font-bold uppercase mt-1"></p>
                         </div>
-                        <a href="#" id="btn-volver-login" class="text-xs font-bold text-amber-600 hover:underline">&#8617; Volver al Login</a>
+                        <a href="#" id="btn-volver-login" class="text-xs font-bold text-amber-600 hover:underline" data-i18n="registro.volver_login">&#8617; Volver al Login</a>
                     </div>
 
                     <form id="registro-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
                         <div class="col-span-1 md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre de Usuario (Login) *</label>
+                            <p class="text-[10px] text-amber-600 font-bold uppercase mb-1.5 ml-1 tracking-tighter" data-i18n="registro.usuario_sin_espacios">No se permiten espacios en el nombre de usuario.</p>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_usuario">Nombre de Usuario (Login) *</label>
                             <input type="text" id="reg-user" name="usuario" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-all text-sm">
-                            <p id="user-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Este usuario ya se encuentra registrado</p>
-                            <p id="user-success" class="text-[9px] text-green-600 mt-1 font-bold uppercase hidden">Nombre de usuario disponible</p>
+                            <p id="user-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden" data-i18n="registro.user_error">Este usuario ya se encuentra registrado</p>
+                            <p id="user-success" class="text-[9px] text-green-600 mt-1 font-bold uppercase hidden" data-i18n="registro.user_ok">Nombre de usuario disponible</p>
                         </div>
 
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Nombre *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_nombre">Nombre *</label>
                             <input type="text" name="NombreA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Apellido *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_apellido">Apellido *</label>
                             <input type="text" name="ApellidoA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
 
                         <div class="col-span-1 md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Correo Electrónico *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_email">Correo Electrónico *</label>
                             <input type="email" name="EmailA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
-                            <p class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-tighter">
+                            <p class="text-[9px] text-amber-600 mt-1 font-bold uppercase tracking-tighter" data-i18n="registro.email_aviso">
                                 * Se enviará un correo de confirmación. Por favor ingrese su correo real para activar la cuenta.
                             </p>
                         </div>
 
                         <div class="col-span-1 md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">País de Residencia *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_pais">País de Residencia *</label>
                             <select id="reg-pais" name="PaisA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm appearance-none cursor-pointer"></select>
                         </div>
 
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_password">Contraseña *</label>
                             <input type="password" id="reg-pass" name="contrasena" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
-                            <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase">Debe tener entre 5 y 20 caracteres</p>
+                            <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase" data-i18n="registro.pass_hint">Debe tener entre 5 y 20 caracteres</p>
                         </div>
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Confirmar Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_confirmar">Confirmar Contraseña *</label>
                             <input type="password" id="reg-pass-confirm" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
-                            <p id="pass-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden">Las contraseñas no coinciden</p>
+                            <p id="pass-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden" data-i18n="registro.pass_error">Las contraseñas no coinciden</p>
                         </div>
 
                         <div class="col-span-1 md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Celular / Teléfono (Opcional)</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_celular">Celular / Teléfono (Opcional)</label>
                             <input type="text" name="CelularA" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                         </div>
 
                         <div class="col-span-1 md:col-span-2 mt-4">
-                            <button type="submit" id="btn-finalizar" class="w-full bg-black text-white py-4 rounded-lg font-bold uppercase text-xs tracking-widest shadow-lg opacity-50 cursor-not-allowed" disabled>
+                            <button type="submit" id="btn-finalizar" class="w-full bg-black text-white py-4 rounded-lg font-bold uppercase text-xs tracking-widest shadow-lg opacity-50 cursor-not-allowed" disabled data-i18n="registro.btn_finalizar">
                                 Finalizar Registro
                             </button>
                         </div>
                     </form>
+                    <p class="text-center mt-4 text-[10px] text-gray-400">
+                        <span class="font-bold uppercase" data-i18n="registro.idioma_label">Idioma</span>
+                        <span class="inline-flex ml-2 rounded-lg overflow-hidden border border-amber-500/50 shadow-sm">
+                            <button type="button" id="btn-reg-lang-es" class="px-3 py-1.5 text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors" onclick="window.setRegistroLang('es')">ES</button>
+                            <button type="button" id="btn-reg-lang-en" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-amber-100 transition-colors" onclick="window.setRegistroLang('en')">EN</button>
+                            <button type="button" id="btn-reg-lang-pt" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-amber-100 transition-colors" onclick="window.setRegistroLang('pt')">PT</button>
+                        </span>
+                    </p>
+                    <script>
+                        window.setRegistroLang = function(lang) {
+                            localStorage.setItem('lang', lang);
+                            localStorage.setItem('idioma', lang);
+                            window.location.reload();
+                        };
+                    </script>
                 </div>
             </div>
         </section>

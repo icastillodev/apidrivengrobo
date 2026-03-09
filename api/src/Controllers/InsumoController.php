@@ -104,9 +104,12 @@ class InsumoController {
             
             $resumenInsumos = $this->model->getInsumosResumenText($data['idformA']);
             $mailService = new \App\Models\Services\MailService();
+            $recipientLang = $this->model->getIdiomaByEmail($data['email']) ?? $data['lang'] ?? 'es';
             $mailSent = $mailService->sendInsumoNotification(
                 $data['email'], $data['investigador'], $data['idformA'], 
-                $data['mensaje'], $data['estado'], $resumenInsumos, "Institución" 
+                $data['mensaje'], $data['estado'], $resumenInsumos, "Institución",
+                $data['slug'] ?? null,
+                $recipientLang
             );
 
             if ($mailSent) {

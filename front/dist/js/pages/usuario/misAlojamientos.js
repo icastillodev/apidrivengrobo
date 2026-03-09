@@ -45,7 +45,7 @@ window.openDetailModal = async (id) => {
     const body = document.getElementById('modal-visor-body');
     const actions = document.getElementById('modal-actions');
     
-    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">Buscando historia...</p></div>`;
+    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">${window.txt?.misalojamientos?.buscando_historia || 'Buscando historia...'}</p></div>`;
     modal.show();
 
     try {
@@ -60,10 +60,10 @@ window.openDetailModal = async (id) => {
             actions.innerHTML = `
                 <div class="d-flex gap-2">
                     <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="window.downloadPDF(${h.IdHistoria})">
-                        <i class="bi bi-file-earmark-pdf me-2"></i> PDF FICHA
+                        <i class="bi bi-file-earmark-pdf me-2"></i> ${window.txt?.misalojamientos?.pdf_ficha || 'PDF FICHA'}
                     </button>
                     <button class="btn btn-outline-dark btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${contactString}')">
-                        <i class="bi bi-envelope-at me-2"></i> CONTACTAR SEDE
+                        <i class="bi bi-envelope-at me-2"></i> ${window.txt?.misalojamientos?.contactar_sede || 'CONTACTAR SEDE'}
                     </button>
                 </div>
             `;
@@ -76,30 +76,30 @@ window.openDetailModal = async (id) => {
                 <div class="header-card bg-white shadow-sm border border-success border-2 border-top-0 border-end-0 border-start-0 p-3 mb-4">
                     <div class="row text-center g-3">
                         <div class="col-md-2 border-end">
-                            <span class="header-label">HISTORIA</span>
+                            <span class="header-label">${window.txt?.misalojamientos?.label_historia || 'HISTORIA'}</span>
                             <span class="badge bg-dark fs-6">#${h.IdHistoria}</span>
                         </div>
                         <div class="col-md-3 border-end text-start px-3">
-                            <span class="header-label">PROTOCOLO</span>
+                            <span class="header-label">${window.txt?.misalojamientos?.label_protocolo || 'PROTOCOLO'}</span>
                             <span class="header-value text-primary d-block text-truncate">${h.Protocolo}</span>
                         </div>
                         <div class="col-md-3 border-end text-start px-3">
-                            <span class="header-label">ESPECIE / TIPO</span>
+                            <span class="header-label">${window.txt?.misalojamientos?.label_especie_tipo || 'ESPECIE / TIPO'}</span>
                             <span class="header-value text-success d-block">${h.Especie}</span>
                         </div>
                         <div class="col-md-2 border-end">
-                            <span class="header-label">DÍAS ESTADÍA</span>
+                            <span class="header-label">${window.txt?.misalojamientos?.label_dias_estadia || 'DÍAS ESTADÍA'}</span>
                             <span class="header-value">${h.TotalDias}</span>
                         </div>
                         <div class="col-md-2">
-                            <span class="header-label text-success">COSTO ACUM.</span>
+                            <span class="header-label text-success">${window.txt?.misalojamientos?.label_costo_acum || 'COSTO ACUM.'}</span>
                             <span class="header-value text-success">$ ${h.TotalCosto}</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
-                    <i class="bi bi-info-circle-fill me-1"></i> Haga clic en una fila para desplegar la trazabilidad clínica y física.
+                    <i class="bi bi-info-circle-fill me-1"></i> ${window.txt?.misalojamientos?.hint_clic_trazabilidad || 'Haga clic en una fila para desplegar la trazabilidad clínica y física.'}
                 </div>
             `;
 
@@ -112,7 +112,7 @@ window.openDetailModal = async (id) => {
                 <tr class="clickable-row bg-white" onclick="window.toggleTrazabilidadReadOnly(${r.IdAlojamiento}, ${espId})">
                     <td class="text-muted small fw-bold">#${r.IdAlojamiento}</td>
                     <td class="small fw-bold text-secondary">${r.fechavisado}</td>
-                    <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || 'Vigente'}</td>
+                    <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || (window.txt?.misalojamientos?.vigente || 'Vigente')}</td>
                     <td class="text-center fw-bold text-primary">${r.totalcajagrande > 0 ? r.totalcajagrande + ' Gr' : r.totalcajachica + ' Ch'}</td>
                     <td class="text-center fw-bold text-dark">${r.totaldiasdefinidos}</td>
                     <td class="text-center"><i class="bi bi-chevron-down text-muted"></i></td>
@@ -131,12 +131,12 @@ window.openDetailModal = async (id) => {
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-secondary text-uppercase small text-muted text-center">
                             <tr>
-                                <th>Tramo</th>
-                                <th>Desde</th>
-                                <th>Hasta</th>
-                                <th>Cajas</th>
-                                <th>Días</th>
-                                <th>Clínica</th>
+                                <th>${window.txt?.misalojamientos?.tramo || 'Tramo'}</th>
+                                <th>${window.txt?.misalojamientos?.desde || 'Desde'}</th>
+                                <th>${window.txt?.misalojamientos?.hasta || 'Hasta'}</th>
+                                <th>${window.txt?.misalojamientos?.cajas || 'Cajas'}</th>
+                                <th>${window.txt?.misalojamientos?.dias || 'Días'}</th>
+                                <th>${window.txt?.misalojamientos?.clinica || 'Clínica'}</th>
                             </tr>
                         </thead>
                         <tbody>${tableRows}</tbody>
@@ -189,9 +189,10 @@ function renderTable() {
         tr.onclick = (e) => { if (!e.target.closest('button')) openDetailModal(h.IdHistoria); };
 
         const isVigente = h.Estado === 'Vigente';
+        const t = window.txt?.misalojamientos;
         const badge = isVigente 
-            ? '<span class="badge bg-success shadow-sm badge-status px-3">VIGENTE</span>' 
-            : '<span class="badge bg-secondary shadow-sm badge-status px-3">FINALIZADO</span>';
+            ? `<span class="badge bg-success shadow-sm badge-status px-3">${t?.badge_vigente || 'VIGENTE'}</span>` 
+            : `<span class="badge bg-secondary shadow-sm badge-status px-3">${t?.badge_finalizado || 'FINALIZADO'}</span>`;
 
         tr.innerHTML = `
             <td class="ps-3 fw-bold text-muted small">#${h.IdHistoria}</td>
@@ -251,7 +252,7 @@ window.openDetailModal = async (id) => {
     const body = document.getElementById('modal-visor-body');
     const actions = document.getElementById('modal-actions');
     
-    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">Buscando historia...</p></div>`;
+    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">${window.txt?.misalojamientos?.buscando_historia || 'Buscando historia...'}</p></div>`;
     modal.show();
 
     try {
@@ -266,10 +267,10 @@ window.openDetailModal = async (id) => {
             actions.innerHTML = `
                 <div class="d-flex gap-2">
                     <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="window.downloadPDF(${h.IdHistoria})">
-                        <i class="bi bi-file-earmark-pdf me-2"></i> PDF FICHA
+                        <i class="bi bi-file-earmark-pdf me-2"></i> ${window.txt?.misalojamientos?.pdf_ficha || 'PDF FICHA'}
                     </button>
                     <button class="btn btn-outline-dark btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${contactString}')">
-                        <i class="bi bi-envelope-at me-2"></i> CONTACTAR SEDE
+                        <i class="bi bi-envelope-at me-2"></i> ${window.txt?.misalojamientos?.contactar_sede || 'CONTACTAR SEDE'}
                     </button>
                 </div>
             `;
@@ -315,7 +316,7 @@ window.openDetailModal = async (id) => {
                 <tr class="clickable-row bg-white" onclick="window.toggleTrazabilidadReadOnly(${r.IdAlojamiento}, ${r.TipoAnimal || h.EspecieID})">
                     <td class="text-muted small fw-bold">#${r.IdAlojamiento}</td>
                     <td class="small fw-bold text-secondary">${r.fechavisado}</td>
-                    <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || 'Vigente'}</td>
+                    <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || (window.txt?.misalojamientos?.vigente || 'Vigente')}</td>
                     <td class="text-center fw-bold text-primary">${r.totalcajagrande > 0 ? r.totalcajagrande + ' Gr' : r.totalcajachica + ' Ch'}</td>
                     <td class="text-center fw-bold text-dark">${r.totaldiasdefinidos}</td>
                     <td class="text-center"><i class="bi bi-chevron-down text-muted"></i></td>
@@ -323,7 +324,7 @@ window.openDetailModal = async (id) => {
                 <tr id="trazabilidad-row-${r.IdAlojamiento}" class="d-none bg-light">
                     <td colspan="6" class="p-0 border-0">
                         <div id="trazabilidad-content-${r.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner">
-                            <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> Cargando cajas...</div>
+                            <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${window.txt?.misalojamientos?.cargando_cajas || 'Cargando cajas...'}</div>
                         </div>
                     </td>
                 </tr>
@@ -334,12 +335,12 @@ window.openDetailModal = async (id) => {
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-secondary text-uppercase small text-muted text-center">
                             <tr>
-                                <th>Tramo</th>
-                                <th>Desde</th>
-                                <th>Hasta</th>
-                                <th>Cajas</th>
-                                <th>Días</th>
-                                <th>Clínica</th>
+                                <th>${window.txt?.misalojamientos?.tramo || 'Tramo'}</th>
+                                <th>${window.txt?.misalojamientos?.desde || 'Desde'}</th>
+                                <th>${window.txt?.misalojamientos?.hasta || 'Hasta'}</th>
+                                <th>${window.txt?.misalojamientos?.cajas || 'Cajas'}</th>
+                                <th>${window.txt?.misalojamientos?.dias || 'Días'}</th>
+                                <th>${window.txt?.misalojamientos?.clinica || 'Clínica'}</th>
                             </tr>
                         </thead>
                         <tbody>${tableRows}</tbody>

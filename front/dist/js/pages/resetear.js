@@ -7,7 +7,8 @@ export async function initReset() {
     const slug = urlParams.get('inst');
 
     if (!token || !slug) {
-        Swal.fire("Error", "Enlace de recuperación inválido", "error");
+        const t = window.txt?.resetear;
+        Swal.fire(t?.swal_error || "Error", t?.swal_enlace_invalido || "Enlace de recuperación inválido", "error");
         return;
     }
 
@@ -16,7 +17,8 @@ export async function initReset() {
     const btn = document.getElementById('btn-reset');
     const instTag = document.getElementById('inst-tag');
 
-    instTag.innerText = `Institución: ${slug.toUpperCase()}`;
+    const t = window.txt?.resetear;
+    instTag.innerText = (t?.inst_prefijo ? t.inst_prefijo + ' ' : 'Institución: ') + slug.toUpperCase();
 
     // Validación en tiempo real
     const validate = () => {
@@ -51,10 +53,12 @@ export async function initReset() {
                 document.getElementById('reset-success').classList.remove('hidden');
                 document.getElementById('btn-login-final').href = `${basePath}${slug}/`;
             } else {
-                Swal.fire("Error", res.message, "error");
+                const t = window.txt?.resetear;
+                Swal.fire(t?.swal_error || "Error", res.message, "error");
             }
         } catch (err) {
-            Swal.fire("Error", "No se pudo conectar con el servidor", "error");
+            const t = window.txt?.resetear;
+            Swal.fire(t?.swal_error || "Error", t?.swal_servidor || "No se pudo conectar con el servidor", "error");
         }
     };
 }

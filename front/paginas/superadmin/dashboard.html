@@ -23,11 +23,15 @@
 
     <script type="module">
         import { initSuperMenu } from '../../dist/js/components/SuperMenuComponent.js';
-
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         import { SuperAuth } from '../../dist/js/superAuth.js';
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                translatePage();
+            } catch (e) { /* i18n opcional */ }
             if (SuperAuth.checkMasterAccess([1])) {
-            initSuperMenu();
+                initSuperMenu();
             }
         });
     </script>

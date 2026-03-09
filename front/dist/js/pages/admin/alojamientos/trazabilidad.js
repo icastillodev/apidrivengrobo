@@ -30,7 +30,7 @@ async toggleRow(idAlojamiento, idEspecie) {
     async refreshArbol(idAlojamiento, idEspecie) {
         const contentDiv = document.getElementById(`trazabilidad-content-${idAlojamiento}`);
         if (!contentDiv) return;
-        contentDiv.innerHTML = `<div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> Cargando...</div>`;
+        contentDiv.innerHTML = `<div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${(window.txt?.alojamientos?.trace_loading || 'Cargando...')}</div>`;
         
         try {
             const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
@@ -42,7 +42,8 @@ async toggleRow(idAlojamiento, idEspecie) {
 
 // DENTRO DE renderArbol, al principio:
     renderArbol(container, data, idAlojamiento, idEspecie) {
-        const tipoNombre = data.tipoAlojamiento || window.txt.alojamientos.box_name;
+        const txt = window.txt?.alojamientos || {};
+        const tipoNombre = data.tipoAlojamiento || txt.box_name;
         const hoy = new Date().toISOString().split('T')[0];
         const limite = data.limiteCajas || 1;
         const cajasActuales = data.cajas ? data.cajas.length : 0;
@@ -53,15 +54,15 @@ async toggleRow(idAlojamiento, idEspecie) {
 
         let html = `
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                <h6 class="text-primary fw-bold m-0"><i class="bi bi-diagram-3"></i> Trazabilidad Física <span class="badge bg-secondary ms-2">${cajasActuales} / ${limite}</span></h6>
+                <h6 class="text-primary fw-bold m-0"><i class="bi bi-diagram-3"></i> ${txt.trace_physical || 'Trazabilidad Física'} <span class="badge bg-secondary ms-2">${cajasActuales} / ${limite}</span></h6>
                 <div>
                     ${!isReadOnly ? `
                         <button class="btn btn-sm btn-outline-secondary fw-bold me-2" onclick="window.TrazabilidadUI.importarCajaExistente(${idAlojamiento}, ${idEspecie}, ${limite}, ${cajasActuales})">
-                            <i class="bi bi-box-arrow-in-down"></i> Traer ${tipoNombre} Anterior
+                            <i class="bi bi-box-arrow-in-down"></i> ${(txt.trace_bring_previous || 'Traer {tipo} Anterior').replace('{tipo}', tipoNombre)}
                         </button>
                         ${canAddBox 
-                            ? `<button class="btn btn-sm btn-outline-primary fw-bold" onclick="window.TrazabilidadUI.addCaja(${idAlojamiento}, ${idEspecie})"><i class="bi bi-plus-lg"></i> Nueva ${tipoNombre}</button>` 
-                            : `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Límite alcanzado</span>`
+                            ? `<button class="btn btn-sm btn-outline-primary fw-bold" onclick="window.TrazabilidadUI.addCaja(${idAlojamiento}, ${idEspecie})"><i class="bi bi-plus-lg"></i> ${(txt.trace_new_box || 'Nueva {tipo}').replace('{tipo}', tipoNombre)}</button>` 
+                            : `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> ${txt.trace_limit_reached || 'Límite alcanzado'}</span>`
                         }
                     ` : ''}
                 </div>
@@ -70,7 +71,7 @@ async toggleRow(idAlojamiento, idEspecie) {
         `;
 
         if (cajasActuales === 0) {
-            html += `<div class="col-12 text-center text-muted fst-italic">No hay estructuras instanciadas en este tramo.</div>`;
+            html += `<div class="col-12 text-center text-muted fst-italic">${txt.trace_no_structures || 'No hay estructuras instanciadas en este tramo.'}</div>`;
         } else {
             data.cajas.forEach(caja => {
                 const ubicacion = (caja.Detalle || '').trim();
@@ -104,9 +105,9 @@ async toggleRow(idAlojamiento, idEspecie) {
                         if (!isReadOnly) {
                             html += `
                             <form onsubmit="event.preventDefault(); window.guardarObservacion(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie}, this)">
-                                <div class="row g-2 align-items-end">
+                                    <div class="row g-2 align-items-end">
                                     <div class="col-auto">
-                                        <label style="font-size: 9px;" class="text-uppercase text-primary fw-bold">Fecha</label>
+                                        <label style="font-size: 9px;" class="text-uppercase text-primary fw-bold">${txt.trace_fecha || 'Fecha'}</label>
                                         <input type="date" name="fechaObs" class="form-control form-control-sm border-primary" value="${hoy}" required>
                                     </div>`;
                             
@@ -140,7 +141,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                     html += `
                         <div class="text-center mt-2">
                             <button class="btn btn-sm btn-outline-success fw-bold shadow-sm" onclick="window.TrazabilidadUI.addSubject(${caja.IdCajaAlojamiento}, ${idAlojamiento}, ${idEspecie})">
-                                <i class="bi bi-plus-circle"></i> Añadir Sujeto
+                                <i class="bi bi-plus-circle"></i> ${(window.txt?.alojamientos?.trace_add_subject || 'Añadir Sujeto')}
                             </button>
                         </div>`;
                 }
@@ -153,7 +154,8 @@ async toggleRow(idAlojamiento, idEspecie) {
     mapInputType(t) { const d = {'int':'number','text':'text','date':'date','var':'text'}; return d[t]||'text'; },
 
     renderPivotTable(obsPivot, categorias) {
-        if (!obsPivot || obsPivot.length === 0) return `<tr><td colspan="${(categorias?categorias.length:0)+1}" class="text-muted fst-italic">Sin registros</td></tr>`;
+        const txt = window.txt?.alojamientos || {};
+        if (!obsPivot || obsPivot.length === 0) return `<tr><td colspan="${(categorias?categorias.length:0)+1}" class="text-muted fst-italic">${txt.trace_sin_registros || 'Sin registros'}</td></tr>`;
         return obsPivot.map(row => `
             <tr>
                 <td class="fw-bold text-secondary">${row.fechaObs}</td>

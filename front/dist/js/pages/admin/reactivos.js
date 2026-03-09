@@ -144,7 +144,8 @@ window.openReactivoModal = async (r) => {
 
     } catch (e) {
         console.error("❌ Error abriendo modal:", e);
-        container.innerHTML = `<div class="alert alert-danger">Error al cargar los datos del pedido.</div>`;
+        const t = window.txt?.reactivos?.alerts;
+        container.innerHTML = `<div class="alert alert-danger">${t?.tech_error || 'Error al cargar los datos del pedido.'}</div>`;
     }
 };
 /* --- MÓDULOS DE RENDERIZADO DEL MODAL --- */
@@ -268,9 +269,9 @@ function renderOrderModificationSection(r, usage, cache) {
             </div>
             
             <div class="col-md-6">
-                <label class="form-label small fw-bold text-primary uppercase">INSUMO EXPERIMENTAL</label>
+                <label class="form-label small fw-bold text-primary uppercase">${t.insumo_exp_label || 'INSUMO EXPERIMENTAL'}</label>
                 <select name="reactivo" class="form-select form-select-sm" onchange="window.cambiarMedidaReactivo(this)">
-                    <option value="" data-medida="un." data-presentacion="0">Seleccione Insumo</option>
+                    <option value="" data-medida="un." data-presentacion="0">${t.select_insumo || 'Seleccione Insumo'}</option>
                     ${optionsReactivos}
                 </select>
             </div>
@@ -310,18 +311,18 @@ window.cambiarMedidaReactivo = (selectElement) => {
     
     const label = document.getElementById('lbl-medida-dinamica');
     if (label) {
-        // 🚀 AQUÍ: Formato exacto (tipo cantidad) - texto dinámico
-        label.innerText = `(${medida} ${presentacion}) - CANT. SOLICITADA`;
+        const t = window.txt?.reactivos?.modal;
+        label.innerText = `(${medida} ${presentacion}) - ${t?.cant_solicitada || 'CANT. SOLICITADA'}`;
     }
 };
 
-// 🚀 NUEVA FUNCIÓN: Cambia el texto de la medida al instante
 window.cambiarMedidaReactivo = (selectElement) => {
     const selectedOption = selectElement.options[selectElement.selectedIndex];
     const medida = selectedOption.getAttribute('data-medida') || 'unidades';
     const label = document.getElementById('lbl-medida-dinamica');
     if (label) {
-        label.innerText = `CANT. SOLICITADA (${medida})`;
+        const t = window.txt?.reactivos?.modal;
+        label.innerText = `${t?.cant_solicitada || 'CANT. SOLICITADA'} (${medida})`;
     }
 };
 // 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque sin Nulls
@@ -657,10 +658,10 @@ window.changePage = (page) => {
  * 2. POPUP DE NOTIFICACIÓN (Con blindaje de foco y validación)
  */
 window.openNotifyPopupReactivo = async (idformA) => {
-    // Si llegara a fallar el paso del parámetro, lo detectamos aquí
+    const t = window.txt?.reactivos?.alerts;
     if (!idformA || idformA === 'undefined') {
         console.error("ID no válido recibido:", idformA);
-        return window.Swal.fire('Error', 'ID de formulario no válido o vacío', 'error');
+        return window.Swal.fire('Error', t?.notify_error_id || 'ID de formulario no válido o vacío', 'error');
     }
 
     const modalEl = document.getElementById('modal-reactivo');
@@ -669,12 +670,12 @@ window.openNotifyPopupReactivo = async (idformA) => {
     modalInstance._config.focus = false;
 
     const { value: nota } = await window.Swal.fire({
-        title: 'Enviar Notificación',
+        title: t?.notify_title || 'Enviar Notificación',
         input: 'textarea',
-        inputLabel: 'Mensaje para el investigador',
-        inputPlaceholder: 'Escriba aquí la observación...',
+        inputLabel: t?.notify_label || 'Mensaje para el investigador',
+        inputPlaceholder: t?.notify_placeholder || 'Escriba aquí la observación...',
         showCancelButton: true,
-        confirmButtonText: 'Enviar Correo',
+        confirmButtonText: t?.notify_confirm || 'Enviar Correo',
         confirmButtonColor: '#1a5d3b',
         didOpen: () => {
             const input = window.Swal.getInput();
@@ -687,7 +688,7 @@ window.openNotifyPopupReactivo = async (idformA) => {
     });
 
     if (nota) {
-        window.Swal.fire({ title: 'Enviando...', allowOutsideClick: false, didOpen: () => { window.Swal.showLoading(); }});
+        window.Swal.fire({ title: t?.notify_sending || 'Enviando...', allowOutsideClick: false, didOpen: () => { window.Swal.showLoading(); }});
 
         try {
             const res = await API.request('/reactivos/send-notification', 'POST', { 
@@ -699,13 +700,13 @@ window.openNotifyPopupReactivo = async (idformA) => {
             
             if (res && res.status === 'success') {
                 sessionStorage.setItem('reopenReactivoId', idformA);
-                window.Swal.fire({ title: '¡Enviado!', icon: 'success', timer: 1000, showConfirmButton: false })
+                window.Swal.fire({ title: t?.notify_sent || '¡Enviado!', icon: 'success', timer: 1000, showConfirmButton: false })
                       .then(() => { location.reload(); });
             } else {
-                window.Swal.fire('Error', res.message || 'Fallo en el servidor', 'error');
+                window.Swal.fire('Error', res.message || (t?.notify_error_server || 'Fallo en el servidor'), 'error');
             }
         } catch (e) { 
-            window.Swal.fire('Error', 'Fallo de conexión', 'error');
+            window.Swal.fire('Error', t?.notify_error_conn || 'Fallo de conexión', 'error');
         }
     }
 };

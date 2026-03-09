@@ -18,6 +18,7 @@ export const HotkeyManager = {
         const list = [
             { keys: 'ESC', desc: 'Cerrar Buscador / Modales', role: 'all' },
             { keys: 'CTRL + G', desc: 'Abrir Gecko Search (IA)', role: 'all' },
+            { keys: 'ALT + D', desc: 'Ir al Dashboard', role: 'all' },
             { keys: 'ALT + K', desc: 'Ver esta ayuda', role: 'all' },
             { keys: 'ALT + F', desc: 'Ir a Formularios', role: 'all' },
             { keys: 'ALT + P', desc: 'Mis Protocolos', role: 'all' },
@@ -95,6 +96,11 @@ export const HotkeyManager = {
 
         const actions = {
             'k': () => document.getElementById('btn-hotkeys-help')?.click(),
+            'd': () => {
+                const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel'));
+                const isAdmin = roleId === 1 || roleId === 2 || roleId === 4;
+                window.location.href = getCorrectPath(isAdmin ? 'admin/dashboard.html' : 'usuario/dashboard.html');
+            },
             'qs': () => Auth.logout(),
             'f': () => window.location.href = getCorrectPath('usuario/formularios.html'),
             'p': () => window.location.href = getCorrectPath('usuario/misprotocolos.html'),

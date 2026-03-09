@@ -9,8 +9,10 @@ window.cambiarIdioma = async (lang) => {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadLanguage();
+    const lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || null;
+    await loadLanguage(lang);
     translatePage(); 
+    const txt = window.txt || {};
 
     const urlParams = new URLSearchParams(window.location.search);
     let slug = urlParams.get('inst');
@@ -24,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!slug) {
-        mostrarErrorPantalla(txt.onboarding.err_invalid_url || "URL Inválida");
+        mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_invalid_url) || "URL Inválida");
         return;
     }
 
@@ -33,13 +35,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (res && res.status === 'success') {
             if (res.data && parseInt(res.data.activo) === 0) {
-                mostrarErrorPantalla("Este formulario ha sido pausado o desactivado por el administrador de GROBO. Comuníquese con soporte si cree que es un error.");
+                mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_pausado) || "Este formulario ha sido pausado o desactivado por el administrador de GROBO. Comuníquese con soporte si cree que es un error.");
                 return;
             }
 
             document.getElementById('id_form_config').value = res.data.id_form_config;
-            document.getElementById('display-nombre-inst').innerText = `${txt.onboarding.config_title} ${res.data.nombre_inst_previa}`;
-            document.getElementById('display-encargado').innerText = `${txt.onboarding.resp_title} ${res.data.encargado_nombre}`;
+            document.getElementById('display-nombre-inst').innerText = `${(txt.onboarding && txt.onboarding.config_title) || 'Configuración:'} ${res.data.nombre_inst_previa}`;
+            document.getElementById('display-encargado').innerText = `${(txt.onboarding && txt.onboarding.resp_title) || 'Responsable:'} ${res.data.encargado_nombre}`;
             
             // LA MAGIA: Si existen respuestas, reconstruimos. Si no, cargamos los defaults.
             if (res.respuestas && Object.keys(res.respuestas).length > 0) {
@@ -48,25 +50,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 cargarValoresPorDefecto();
             }
         } else {
-            throw new Error(txt.onboarding.err_expired);
+            throw new Error((txt.onboarding && txt.onboarding.err_expired) || "El enlace ha expirado o no es válido.");
         }
     } catch (e) { 
-        mostrarErrorPantalla(txt.onboarding.err_conn);
+        mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_conn) || "El enlace no es válido o el servidor no responde.");
         return; 
     }
 
     // LISTENERS
-    document.getElementById('btn-add-org').onclick = () => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', txt.onboarding.ph_org);
+    document.getElementById('btn-add-org').onclick = () => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', (txt.onboarding && txt.onboarding.ph_org) || "Ej: Facultad de Medicina");
     document.getElementById('btn-add-depto').onclick = () => agregarDepartamento();
     
-    document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', txt.onboarding.ph_prot);
-    document.getElementById('btn-add-sev').onclick = () => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', txt.onboarding.ph_sev);
+    document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', (txt.onboarding && txt.onboarding.ph_prot) || "Ej: Investigación, Docencia");
+    document.getElementById('btn-add-sev').onclick = () => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', (txt.onboarding && txt.onboarding.ph_sev) || "Ej: Leve, Moderada");
     
     document.getElementById('btn-add-form').onclick = () => agregarTipoFormulario();
     document.getElementById('btn-add-reactivo').onclick = () => agregarReactivo(); 
     document.getElementById('btn-add-insumo').onclick = () => agregarInsumo();
-    document.getElementById('btn-add-sala').onclick = () => agregarItemDoble('contenedor-salas', 'sala_nom[]', 'sala_lugar[]', txt.onboarding.ph_room_name, txt.onboarding.ph_room_loc);
-    document.getElementById('btn-add-instrumento').onclick = () => agregarItemDoble('contenedor-instrumentos', 'instru_nom[]', 'instru_cant[]', txt.onboarding.ph_equip_name, txt.onboarding.ph_qty_disp, 'number');
+    document.getElementById('btn-add-sala').onclick = () => agregarItemDoble('contenedor-salas', 'sala_nom[]', 'sala_lugar[]', (txt.onboarding && txt.onboarding.ph_room_name) || "Nombre Sala", (txt.onboarding && txt.onboarding.ph_room_loc) || "Ubicación Física");
+    document.getElementById('btn-add-instrumento').onclick = () => agregarItemDoble('contenedor-instrumentos', 'instru_nom[]', 'instru_cant[]', (txt.onboarding && txt.onboarding.ph_equip_name) || "Nombre Instrumento", (txt.onboarding && txt.onboarding.ph_qty_disp) || "Cantidad a disposición", 'number');
     
     document.getElementById('btn-add-especie').onclick = () => agregarEspecie();
     const btnServicio = document.getElementById('btn-add-servicio');
@@ -93,7 +95,7 @@ function reconstruirFormulario(db) {
 
     // 2. Organizaciones
     if (db['organizaciones']) {
-        getVals(db['organizaciones'], 'org_nom[]').forEach(v => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', txt.onboarding.ph_org, v));
+        getVals(db['organizaciones'], 'org_nom[]').forEach(v => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', (window.txt?.onboarding?.ph_org || 'Ej: Facultad de Medicina'), v));
     }
 
     // 3. Departamentos
@@ -472,7 +474,7 @@ async function saveForm(action) {
     Swal.fire({ title: txt.onboarding.loading_save, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
-        const payload = { id_form: idForm, respuestas: respuestas, action: action };
+        const payload = { id_form: idForm, respuestas: respuestas, action: action, lang: localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es' };
         const res = await API.request('/form-registro/submit', 'POST', payload);
 
         if (res && res.status === 'success') {
@@ -480,9 +482,12 @@ async function saveForm(action) {
                 title: txt.onboarding.saved_title,
                 text: action === 'confirm' ? txt.onboarding.saved_send_txt : txt.onboarding.saved_draft_txt,
                 icon: 'success',
-                confirmButtonColor: '#1a5d3b'
+                confirmButtonColor: '#1a5d3b',
+                confirmButtonText: (txt.onboarding && txt.onboarding.saved_seguir_editando) || 'Seguir editando'
             }).then(() => {
-                if(action === 'confirm') window.location.href = 'https://groboapp.com';
+                if (action === 'confirm') {
+                    // No redirigir; el usuario permanece en el formulario para seguir editando
+                }
             });
         }
     } catch (e) {

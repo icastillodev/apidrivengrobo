@@ -1,5 +1,18 @@
 import { getUserDisplayText, getCorrectPath } from './MenuConfig.js';
 
+const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+
+function getDashboardPath() {
+    const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0');
+    return (roleId === 1 || roleId === 2 || roleId === 4) ? getCorrectPath('admin/dashboard') : getCorrectPath('panel/dashboard');
+}
+
+function getInstLogoUrl() {
+    const logo = localStorage.getItem('instLogo') || '';
+    if (!logo || logo.trim() === '') return '';
+    return logo.includes('http') ? logo : `${getBasePath()}dist/multimedia/imagenes/logos/${logo}`;
+}
+
 function renderOmniComponents(mode) {
     const existing = document.getElementById('gecko-search-trigger');
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -60,17 +73,22 @@ export function renderSideMenuStructure(container, menuIds, templates) {
     document.body.classList.add('with-sidebar');
     const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
     const userText = getUserDisplayText();
+    const logoUrl = getInstLogoUrl();
+    const dashboardPath = getDashboardPath();
 
     const sidebar = document.createElement('aside');
     sidebar.id = "gecko-sidebar-element";
     sidebar.className = "gecko-sidebar shadow-sm";
     
+    const brandBlock = logoUrl
+        ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 48px; width: auto; object-fit: contain;"></a><span class="text-success fw-black text-uppercase mt-1" style="font-size: 13px;">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>`
+        : `<a href="${dashboardPath}" class="d-flex flex-column pe-2 text-decoration-none text-body" style="line-height: 1.2; word-break: break-word;"><span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span></a>`;
+    
     sidebar.innerHTML = `
         <div class="gecko-sidebar-top-section">
             <div class="d-flex justify-content-between align-items-start w-100">
-                <div class="d-flex flex-column pe-2" style="line-height: 1.2; word-break: break-word;">
-                    <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
-                    <span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>
+                <div class="d-flex flex-column pe-2 flex-grow-1">
+                    ${brandBlock}
                 </div>
                 <button class="btn-close mt-1 gecko-btn-close" id="gecko-close-sidebar"></button>
             </div>
@@ -113,18 +131,25 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     document.body.classList.remove('with-sidebar');
     const instName = localStorage.getItem('NombreInst') || 'INSTITUCIÓN';
     const userText = getUserDisplayText();
+    const logoUrl = getInstLogoUrl();
+    const dashboardPath = getDashboardPath();
+
+    const topBrandBlock = `
+        <a href="${dashboardPath}" class="d-flex align-items-center gap-2 text-decoration-none text-body" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}">
+            ${logoUrl ? `<img src="${logoUrl}" alt="${instName}" class="gecko-top-logo gecko-top-logo-mobile" style="max-height: 36px; width: auto; object-fit: contain;">` : ''}
+            <span class="text-secondary fw-black text-uppercase border-start border-secondary ps-2 ms-1">${instName}</span>
+            <span class="text-success fw-bold ms-1">— Dashboard</span>
+        </a>
+        <span class="text-muted fw-bold ms-2 d-none d-lg-inline border-start border-secondary ps-2" style="font-size: 11px;">${userText}</span>`;
 
     const header = document.createElement('header');
     header.className = "w-full gecko-header gecko-header-top bg-transparent mb-2"; 
     header.innerHTML = `
         <div class="container-fluid pt-2 pb-1">
             <div class="gecko-top-bar-info justify-content-between align-items-center w-100 px-md-5 mb-2" style="font-size: 11px;">
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
-                    <div class="d-flex flex-column lh-1 border-start ps-3">
-                        <span class="text-secondary fw-black text-uppercase">${instName}</span>
-                        <span class="text-muted fw-bold mt-1" style="font-size: 10px;">${userText}</span>
-                    </div>
+                    <div class="d-flex align-items-center border-start border-secondary ps-3">${topBrandBlock}</div>
                 </div>
                 <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link text-end">Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
             </div>
@@ -142,9 +167,11 @@ export function renderTopMenuStructure(container, menuIds, templates) {
         <aside id="gecko-sidebar-element" class="gecko-sidebar d-md-none shadow-sm">
             <div class="gecko-sidebar-top-section">
                 <div class="d-flex justify-content-between align-items-start w-100">
-                    <div class="d-flex flex-column pe-2" style="line-height: 1.2; word-break: break-word;">
-                        <span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span>
-                        <span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>
+                    <div class="d-flex flex-column pe-2 flex-grow-1">
+                        ${logoUrl ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 56px; width: auto; object-fit: contain;"></a>` : ''}
+                        <span class="fs-5 fw-black text-success text-uppercase lh-1 mt-1">${instName}</span>
+                        <span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span>
+                        <span class="text-muted mt-2 d-block" style="font-size: 11px; font-weight: 600;">${userText}</span>
                     </div>
                     <button class="btn-close mt-1 gecko-btn-close" id="gecko-close-sidebar"></button>
                 </div>
@@ -207,25 +234,25 @@ function buildMenuItemHTML(id, layout, templates) {
         // Auto-abrir o marcar si uno de sus hijos es la página actual
         const isChildActive = item.children.some(c => currentPath.includes(c.path));
         const activeDropClass = isChildActive ? 'active-gecko-link' : ''; 
-        const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="10" height="10" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
+        const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="12" height="12" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease; flex-shrink: 0;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
         
         const childrenHTML = item.children.map(child => {
             const isSubActive = currentPath.includes(child.path);
-            return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${child.label}</a></li>`;
+            const childIcon = (child.svg) ? `<span class="dropdown-child-icon me-2 d-flex align-items-center" style="width: 18px; height: 18px;">${child.svg}</span>` : '';
+            return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${childIcon}${child.label}</a></li>`;
         }).join('');
 
         // 🚀 LA MAGIA ESTÁ AQUÍ: Construimos distinto si es Lateral o Superior
         let dropLinkClass, dropInner;
         
         if (isSide) {
-            // Diseño Menú Lateral: Horizontal, Icono -> Texto -> Flecha separada al final
+            // Diseño Menú Lateral: Horizontal, Icono -> Texto -> Flecha centrada al final
             dropLinkClass = `nav-link d-flex align-items-center text-body gap-3 px-3 py-2 rounded-2 dropdown-toggle-gecko justify-content-between ${activeDropClass}`;
-            dropInner = `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> ${arrowIcon}`;
+            dropInner = `<div class="d-flex align-items-center gap-2">${iconHTML} ${labelHTML}</div> <div class="d-flex align-items-center">${arrowIcon}</div>`;
         } else {
-            // 🚀 Diseño Menú Superior: Vertical (flex-column), usa gecko-nav-link para el hover
+            // Menú Superior: Icono arriba, texto y flecha centrados abajo
             dropLinkClass = `gecko-nav-link d-flex flex-column align-items-center text-decoration-none px-3 py-2 text-body dropdown-toggle-gecko ${activeDropClass}`;
-            // Icono Arriba, Texto y Flecha juntos abajo
-            dropInner = `${iconHTML} <div class="d-flex align-items-center gap-1">${labelHTML} ${arrowIcon}</div>`;
+            dropInner = `${iconHTML} <div class="d-flex align-items-center justify-content-center gap-1">${labelHTML} ${arrowIcon}</div>`;
         }
 
         return `

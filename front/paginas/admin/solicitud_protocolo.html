@@ -33,7 +33,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 Auth.checkAccess([1, 2]); 
 
                 if (window.txt) {

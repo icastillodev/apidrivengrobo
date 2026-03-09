@@ -33,9 +33,10 @@ async function loadData() {
 function poblarFiltroInstituciones() {
     const selectInst = document.getElementById('filter-inst');
     const institucionesUnicas = [...new Set(BitacoraState.dataFull.map(row => row.Institucion))].sort();
-    
-    // Dejamos la opción "Todas" y agregamos el resto
-    selectInst.innerHTML = '<option value="all">Todas las Sedes</option>';
+    const txt = window.txt?.superadmin_bitacora;
+    const labelSedes = txt?.opcion_todas_sedes || 'Todas las Sedes';
+
+    selectInst.innerHTML = `<option value="all">${labelSedes}</option>`;
     institucionesUnicas.forEach(inst => {
         if(inst) {
             selectInst.innerHTML += `<option value="${inst}">${inst}</option>`;

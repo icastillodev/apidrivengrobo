@@ -16,14 +16,18 @@
     </style>
 
     <script type="module">
+        import { loadLanguage, translatePage } from '../dist/js/utils/i18n.js';
         import { initMenu } from '../dist/js/components/MenuComponent.js';
         import { Auth } from '../dist/js/auth.js';
         import { NotificationManager } from '../dist/js/NotificationManager.js';
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Permitimos acceso a todos los roles (1, 2, 3) ya que es una página genérica
+            const lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || null;
+            try {
+                await loadLanguage(lang);
+                if (window.txt) translatePage();
+            } catch (e) { console.warn('i18n:', e); }
             if (!Auth.checkAccess([1, 2, 3])) return;
-            
             await initMenu();
             NotificationManager.init();
         });
@@ -38,22 +42,22 @@
                 <i class="bi bi-cone-striped construction-icon"></i>
             </div>
 
-            <h1 class="fw-black text-dark text-uppercase mb-3" style="letter-spacing: 2px;">
+            <h1 class="fw-black text-dark text-uppercase mb-3" style="letter-spacing: 2px;" data-i18n="construccion.titulo">
                 Sección en Desarrollo
             </h1>
 
             <p class="text-muted fs-5 mb-5" style="max-width: 600px;">
-                Estamos trabajando arduamente para traerte esta funcionalidad pronto.<br>
-                El equipo de <strong class="text-success">GROBO</strong> está ajustando los últimos detalles.
+                <span data-i18n="construccion.descripcion">Estamos trabajando arduamente para traerte esta funcionalidad pronto.</span><br>
+                <span data-i18n="construccion.equipo">El equipo de</span> <strong class="text-success" data-i18n="construccion.grobo">GROBO</strong> <span data-i18n="construccion.detalles">está ajustando los últimos detalles.</span>
             </p>
 
             <div class="d-flex gap-3 justify-content-center">
                 <button onclick="history.back()" class="btn btn-outline-secondary fw-bold px-4 shadow-sm">
-                    <i class="bi bi-arrow-left me-2"></i> VOLVER ATRÁS
+                    <i class="bi bi-arrow-left me-2"></i> <span data-i18n="construccion.btn_atras">VOLVER ATRÁS</span>
                 </button>
                 
                 <a href="usuario/dashboard.html" class="btn btn-success fw-bold px-4 shadow-sm">
-                    <i class="bi bi-house-door me-2"></i> IR AL INICIO
+                    <i class="bi bi-house-door me-2"></i> <span data-i18n="construccion.btn_inicio">IR AL INICIO</span>
                 </a>
             </div>
         </div>

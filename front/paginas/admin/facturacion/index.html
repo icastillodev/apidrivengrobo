@@ -51,7 +51,7 @@
         
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                await loadLanguage(); 
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 translatePage();
 
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
@@ -78,7 +78,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted" data-i18n="generales.admin">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_admin">Admin</li>
                     <li class="breadcrumb-item active">
                         <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="facturacion.titulo">Facturación</span>
                     </li>
@@ -86,8 +86,8 @@
             </nav>
 
             <div class="text-center mb-5">
-                <h4 class="fw-bold m-0 uppercase" style="letter-spacing: -0.5px;">Centro de Liquidación y Cobranzas</h4>
-                <p class="text-muted small">Seleccione el método de procesamiento para las boletas de pago</p>
+                <h4 class="fw-bold m-0 uppercase" style="letter-spacing: -0.5px;" data-i18n="facturacion.centro_liquidacion"></h4>
+                <p class="text-muted small" data-i18n="facturacion.subtitulo"></p>
             </div>
 
             <div class="row g-4 justify-content-center mb-4">
@@ -98,9 +98,7 @@
                             <i class="bi bi-building-gear"></i>
                         </div>
                         <h6 class="fw-bold uppercase mb-2" data-i18n="facturacion.por_depto">Por Departamento</h6>
-                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;">
-                            Liquidación masiva agrupada por Facultades o Unidades Académicas. Ideal para reportes institucionales.
-                        </p>
+                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;" data-i18n="facturacion.desc_depto"></p>
                     </div>
                 </div>
 
@@ -110,9 +108,7 @@
                             <i class="bi bi-person-vcard"></i>
                         </div>
                         <h6 class="fw-bold uppercase mb-2" data-i18n="facturacion.por_investigador">Por Persona</h6>
-                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;">
-                            Gestión de cuenta corriente individual. Permite cargar saldos a favor y liquidar deudas personales.
-                        </p>
+                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;" data-i18n="facturacion.desc_investigador"></p>
                     </div>
                 </div>
 
@@ -122,9 +118,7 @@
                             <i class="bi bi-file-earmark-medical"></i>
                         </div>
                         <h6 class="fw-bold uppercase mb-2" data-i18n="facturacion.por_protocolo">Por Protocolo</h6>
-                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;">
-                            Facturación específica por proyecto de investigación. Útil para rendiciones de subsidios o proyectos financiados.
-                        </p>
+                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;" data-i18n="facturacion.desc_protocolo"></p>
                     </div>
                 </div>
 

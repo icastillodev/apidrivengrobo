@@ -5,13 +5,11 @@ let currentPage = 1;
 const rowsPerPage = 15;
 let modalUser;
 
-const rolesMap = {
-    2: 'Administrador Sede',
-    3: 'Investigador',
-    4: 'SecAdmin',
-    5: 'Técnico',
-    6: 'Laboratorio'
-};
+function getRolesMap() {
+    const t = window.txt?.superadmin_usuarios_global;
+    if (t) return { 2: t.rol_administrador, 3: t.rol_investigador, 4: t.rol_secadmin, 5: t.rol_tecnico, 6: t.rol_laboratorio };
+    return { 2: 'Administrador Sede', 3: 'Investigador', 4: 'SecAdmin', 5: 'Técnico', 6: 'Laboratorio' };
+}
 
 export async function initSuperUsuarios() {
     modalUser = new bootstrap.Modal(document.getElementById('modal-user'));
@@ -45,6 +43,7 @@ async function cargarUsuarios() {
 }
 
 function poblarSelectRoles() {
+    const rolesMap = getRolesMap();
     const select = document.getElementById('IdTipoUsrA');
     select.innerHTML = Object.entries(rolesMap).map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('');
 }
@@ -52,6 +51,7 @@ function poblarSelectRoles() {
 // --- RENDERIZADO Y BÚSQUEDA ---
 
 function renderTable() {
+    const rolesMap = getRolesMap();
     const term = document.getElementById('search-input').value.toLowerCase().trim();
     
     const filtered = allUsers.filter(u => {
@@ -101,9 +101,26 @@ function renderPagination(totalRows) {
     const createBtn = (label, targetPage, isDisabled, isActive = false) => {
         const li = document.createElement('li');
         li.className = `page-item ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`;
-        li.innerHTML = `<a class="page-link shadow-none" href="#">${label}</a>`;
-        if (!isDisabled) li.onclick = (e) => { e.preventDefault(); currentPage = targetPage; renderTable(); };
+        const a = document.createElement('a');
+        a.className = 'page-link shadow-none';
+        a.href = '#';
+        a.textContent = label;
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!isDisabled) {
+                currentPage = targetPage;
+                renderTable();
+            }
+        });
+        li.appendChild(a);
         return li;
+    };
+
+    const addEllipsis = () => {
+        const li = document.createElement('li');
+        li.className = 'page-item disabled';
+        li.innerHTML = '<span class="page-link border-0">...</span>';
+        pagination.appendChild(li);
     };
 
     pagination.appendChild(createBtn('Anterior', currentPage - 1, currentPage === 1));
@@ -112,9 +129,9 @@ function renderPagination(totalRows) {
     let start = Math.max(2, currentPage - 2);
     let end = Math.min(totalPages - 1, currentPage + 2);
 
-    if (start > 2) pagination.innerHTML += `<li class="page-item disabled"><span class="page-link border-0">...</span></li>`;
+    if (start > 2) addEllipsis();
     for (let i = start; i <= end; i++) pagination.appendChild(createBtn(i, i, false, i === currentPage));
-    if (end < totalPages - 1) pagination.innerHTML += `<li class="page-item disabled"><span class="page-link border-0">...</span></li>`;
+    if (end < totalPages - 1) addEllipsis();
 
     pagination.appendChild(createBtn(totalPages, totalPages, false, currentPage === totalPages));
     pagination.appendChild(createBtn('Siguiente', currentPage + 1, currentPage === totalPages));
@@ -186,6 +203,7 @@ window.resetPassword = async () => {
 };
 
 function exportToExcel() {
+    const rolesMap = getRolesMap();
     const ws = XLSX.utils.json_to_sheet(allUsers.map(u => ({
         "ID": u.IdUsrA, "Institución": u.NombreInst, "Apellido": u.ApellidoA, "Nombre": u.NombreA, "Email": u.EmailA, "Rol": rolesMap[u.IdTipoUsrA]
     })));

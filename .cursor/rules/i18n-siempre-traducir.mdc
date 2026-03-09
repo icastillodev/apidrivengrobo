@@ -1,0 +1,22 @@
+---
+description: Todo texto de interfaz debe estar traducido en ES, EN y PT. Obligatorio para lo nuevo.
+alwaysApply: true
+---
+
+# i18n obligatorio (ES / EN / PT)
+
+**Regla:** Cualquier texto visible al usuario (títulos, botones, etiquetas, mensajes, placeholders, columnas de tablas, modales, alertas) **debe** estar traducido en los 3 idiomas.
+
+## Al crear o modificar UI
+
+1. **Nunca** dejar strings fijos en español/inglés/portugués para la interfaz.
+2. **Añadir** la clave en los 3 archivos con la misma ruta:
+   - `front/dist/js/utils/i18n/es.js`
+   - `front/dist/js/utils/i18n/en.js`
+   - `front/dist/js/utils/i18n/pt.js`
+3. **En HTML:** usar `data-i18n="seccion.clave"` y asegurar `loadLanguage()` + `translatePage()` al cargar.
+4. **En JS:** usar `window.txt?.seccion?.clave` para todos los textos de UI (no traducir datos del API).
+
+Si agregas una pantalla, modal, botón o mensaje nuevo, incluir siempre las claves en es, en y pt en la misma estructura. No dejar "para traducir después".
+
+Referencia: `docs/CHECKLIST-I18N.md`.

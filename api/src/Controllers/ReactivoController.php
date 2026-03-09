@@ -238,7 +238,7 @@ class ReactivoController {
             ];
 
             $mailService = new MailService();
-            $mailService->sendReactivoOrderConfirmation($userInfo['EmailA'], $userInfo['NombreA'], $userInfo['NombreInst'], $mailData);
+            $mailService->sendReactivoOrderConfirmation($userInfo['EmailA'], $userInfo['NombreA'], $userInfo['NombreInst'], $mailData, $data['lang'] ?? $userInfo['idioma_preferido'] ?? 'es');
 
             echo json_encode(['status' => 'success', 'id' => $idForm]);
 

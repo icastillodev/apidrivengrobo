@@ -41,8 +41,8 @@ export const TramosUI = {
         if (!actual) return;
 
         document.getElementById('act-info-header').innerHTML = `
-            <div class="d-flex justify-content-between mb-1"><span class="fw-bold text-dark">HISTORIA #${actual.historia}</span><span class="badge bg-primary">${actual.EspeNombreA}</span></div>
-            <div class="text-truncate"><b>Protocolo:</b> ${actual.nprotA}</div>
+            <div class="d-flex justify-content-between mb-1"><span class="fw-bold text-dark">${(window.txt?.generales?.historia || 'HISTORIA')} #${actual.historia}</span><span class="badge bg-primary">${actual.EspeNombreA}</span></div>
+            <div class="text-truncate"><b>${window.txt?.alojamientos?.reg_step1?.replace('1. ', '') || 'Protocolo'}:</b> ${actual.nprotA}</div>
         `;
 
         document.getElementById('reg-fecha-qr').valueAsDate = new Date();
@@ -64,14 +64,15 @@ export const TramosUI = {
         const container = document.getElementById('arbol-continuidad-container');
         if (!container) return;
 
-        container.innerHTML = `<div class="text-center text-muted small py-3"><div class="spinner-border spinner-border-sm"></div> Buscando animales en el alojamiento actual...</div>`;
+        const txt = window.txt?.alojamientos || {};
+        container.innerHTML = `<div class="text-center text-muted small py-3"><div class="spinner-border spinner-border-sm"></div> ${txt.continuity_searching || 'Buscando animales...'}</div>`;
         
         try {
             const instId = localStorage.getItem('instId') || 1;
             const res = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${idAlojamiento}&idEspecie=${idEspecie}&instId=${instId}`);
             
             if (res.status === 'success' && res.data.cajas && res.data.cajas.length > 0) {
-                let html = `<label class="small fw-bold text-primary mb-3"><i class="bi bi-diagram-3-fill"></i> DESMARQUE LOS ANIMALES O CAJAS QUE NO CONTINUARÁN EN ESTE NUEVO TRAMO:</label>`;
+                let html = `<label class="small fw-bold text-primary mb-3"><i class="bi bi-diagram-3-fill"></i> ${txt.continuity_uncheck_label || 'DESMARQUE LOS ANIMALES O CAJAS...'}</label>`;
                 html += `<div class="accordion accordion-flush border rounded" id="acc-continuidad">`; 
                 
                 res.data.cajas.forEach(caja => {
@@ -82,7 +83,7 @@ export const TramosUI = {
                                 <input class="form-check-input check-caja-continuidad" type="checkbox" id="cont_caja_${caja.IdCajaAlojamiento}" value="${caja.IdCajaAlojamiento}" checked onchange="window.toggleCajaCheckbox(${caja.IdCajaAlojamiento})">
                             </div>
                             <button class="accordion-button collapsed py-1 px-2 bg-light fw-bold small text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#col-caja-${caja.IdCajaAlojamiento}">
-                                ${caja.NombreCaja || 'Caja #' + caja.IdCajaAlojamiento} <span class="badge bg-secondary ms-2">${caja.unidades ? caja.unidades.length : 0} Sujetos</span>
+                                ${caja.NombreCaja || (window.txt?.alojamientos?.box_name + ' #' + caja.IdCajaAlojamiento)} <span class="badge bg-secondary ms-2">${caja.unidades ? caja.unidades.length : 0} ${txt.continuity_subjects || 'Sujetos'}</span>
                             </button>
                         </h2>
                         <div id="col-caja-${caja.IdCajaAlojamiento}" class="accordion-collapse collapse" data-bs-parent="#acc-continuidad">
@@ -97,18 +98,18 @@ export const TramosUI = {
                                 </div>`;
                         });
                     } else {
-                        html += `<div class="text-muted small fst-italic px-3 py-2">No hay sujetos asignados a esta caja.</div>`;
+                        html += `<div class="text-muted small fst-italic px-3 py-2">${txt.continuity_no_subjects || 'No hay sujetos asignados a esta caja.'}</div>`;
                     }
                     html += `</div></div></div>`;
                 });
                 html += `</div>`;
                 container.innerHTML = html;
             } else {
-                container.innerHTML = `<div class="alert alert-warning small m-0"><i class="bi bi-info-circle me-1"></i> No hay cajas físicas registradas en el tramo actual. Se generará un nuevo tramo limpio.</div>`;
+                container.innerHTML = `<div class="alert alert-warning small m-0"><i class="bi bi-info-circle me-1"></i> ${txt.continuity_no_boxes || 'No hay cajas físicas registradas.'}</div>`;
             }
         } catch (e) {
             console.error(e);
-            container.innerHTML = `<div class="text-danger small py-2">Error cargando el layout físico.</div>`;
+            container.innerHTML = `<div class="text-danger small py-2">${txt.continuity_error_layout || 'Error cargando el layout físico.'}</div>`;
         }
     },
 
@@ -117,15 +118,16 @@ async guardarNuevoTramo() {
         const historiaId = modalEl.dataset.historia;
         const idTramoViejo = modalEl.dataset.idTramoActual;
         const f = AlojamientoState.dataFull.find(a => a.historia == historiaId);
+        const txt = window.txt?.alojamientos || {};
 
-        if (!f) return Swal.fire('Error', 'No se pudo recuperar información base.', 'error');
+        if (!f) return Swal.fire('Error', txt.tramo_error_base || 'No se pudo recuperar información base.', 'error');
 
         const nuevaFecha = document.getElementById('reg-fecha-qr').value;
         const rawCantidad = document.getElementById('reg-cantidad-qr').value;
         const nuevaCantidad = rawCantidad !== "" ? parseInt(rawCantidad) : null;
         
         if (!nuevaFecha || nuevaCantidad === null || nuevaCantidad < 0) {
-            return Swal.fire('Atención', 'Fecha y Cantidad (puede ser 0) son obligatorias.', 'warning');
+            return Swal.fire(window.txt?.generales?.atencion || 'Atención', txt.tramo_attention_date_qty || 'Fecha y Cantidad (puede ser 0) son obligatorias.', 'warning');
         }
 
         // Capturamos lo que está checkeado (usamos LET porque podríamos vaciarlos)
@@ -139,9 +141,11 @@ async guardarNuevoTramo() {
             unidadesClonar = [];
         } else if (nuevaCantidad < cajasClonar.length) {
             // Solo validamos si es mayor a 0 pero intentan traer más cajas físicas de las que declararon.
+            const txt = window.txt?.alojamientos || {};
+            const msg = (txt.tramo_incoherence || 'Has marcado {n} caja(s) para continuar, pero indicaste un límite total de {max} cajas.').replace('{n}', cajasClonar.length).replace('{max}', nuevaCantidad);
             return Swal.fire(
-                'Incoherencia Física', 
-                `Has marcado ${cajasClonar.length} caja(s) para continuar, pero indicaste un límite total de ${nuevaCantidad} cajas. Desmarca las que no continúan.`, 
+                window.txt?.generales?.atencion || 'Incoherencia Física', 
+                msg, 
                 'warning'
             );
         }
@@ -171,9 +175,10 @@ async guardarNuevoTramo() {
             const res = await API.request('/alojamiento/save', 'POST', payload);
             if (res.status === 'success') {
                 bootstrap.Modal.getInstance(modalEl)?.hide();
+                const txt = window.txt?.alojamientos || {};
                 Swal.fire({ 
-                    title: '¡Tramo Generado!', 
-                    text: nuevaCantidad === 0 ? 'Tramo en Stand By iniciado.' : 'Nuevo periodo contable abierto.', 
+                    title: txt.tramo_success_title || '¡Tramo Generado!', 
+                    text: nuevaCantidad === 0 ? (txt.tramo_standby || 'Tramo en Stand By iniciado.') : (txt.tramo_new_period || 'Nuevo periodo contable abierto.'), 
                     icon: 'success', 
                     timer: 1500, 
                     showConfirmButton: false 
@@ -197,8 +202,8 @@ async guardarNuevoTramo() {
         bootstrap.Modal.getInstance(document.getElementById('modal-historial'))?.hide();
 
         document.getElementById('edit-info-header').innerHTML = `
-            <div class="d-flex justify-content-between mb-1"><span><b>Reg:</b> #${row.IdAlojamiento}</span><span><b>Hist:</b> #${row.historia}</span></div>
-            <div class="text-truncate"><b>Protocolo:</b> ${row.nprotA}</div>
+            <div class="d-flex justify-content-between mb-1"><span><b>${window.txt?.generales?.reg || 'Reg'}:</b> #${row.IdAlojamiento}</span><span><b>${window.txt?.alojamientos?.th_history || 'Hist'}:</b> #${row.historia}</span></div>
+            <div class="text-truncate"><b>${window.txt?.alojamientos?.reg_step1?.replace('1. ', '') || 'Protocolo'}:</b> ${row.nprotA}</div>
         `;
 
         document.getElementById('edit-caja-cant').value = row.CantidadCaja || 0;
@@ -225,14 +230,15 @@ async updateTramoData(event) {
         IdInstitucion: AlojamientoState.instId
     };
 
-    if (!data.fechavisado) return Swal.fire('Atención', 'Fecha requerida.', 'warning');
+    if (!data.fechavisado) return Swal.fire(window.txt?.generales?.atencion || 'Atención', (window.txt?.alojamientos?.tramo_fecha_required || 'Fecha requerida.'), 'warning');
 
     showLoader();
     try {
         const res = await API.request('/alojamiento/update-row', 'POST', data);
         if (res.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('modal-modificar-tramo'))?.hide();
-            Swal.fire({ title: 'Éxito', text: 'Tramo actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
+            const txt = window.txt?.alojamientos || {};
+            Swal.fire({ title: txt.cfg_exito || 'Éxito', text: txt.tramo_success_updated || 'Tramo actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
             await loadAlojamientos();
             setTimeout(() => window.verHistorial(hId), 600);
         } else Swal.fire('Error', res.message, 'error');
@@ -240,8 +246,9 @@ async updateTramoData(event) {
 },
 
     async eliminarTramo(idAlojamiento, historiaId) {
+        const txt = window.txt?.alojamientos || {};
         const { isConfirmed } = await Swal.fire({
-            title: '¿Eliminar?', text: "Se borrará este tramo y sus observaciones.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545'
+            title: txt.tramo_delete_title || '¿Eliminar?', text: txt.tramo_delete_text || "Se borrará este tramo y sus observaciones.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc3545'
         });
 
         if (isConfirmed) {
@@ -249,7 +256,7 @@ async updateTramoData(event) {
             try {
                 const res = await API.request('/alojamiento/delete-row', 'POST', { IdAlojamiento: idAlojamiento, historia: historiaId });
                 if (res.status === 'success') {
-                    Swal.fire({ title: 'Eliminado', icon: 'success', timer: 1500, showConfirmButton: false });
+                    Swal.fire({ title: txt.tramo_deleted || 'Eliminado', icon: 'success', timer: 1500, showConfirmButton: false });
                     await loadAlojamientos();
                     setTimeout(() => window.verHistorial(historiaId), 500);
                 } else Swal.fire('Error', res.message, 'error');
@@ -265,9 +272,9 @@ async updateTramoData(event) {
             inputValue: precioActual,
             target: document.getElementById('modal-historial') || 'body',
             showCancelButton: true,
-            confirmButtonText: 'Guardar Precio',
+            confirmButtonText: window.txt?.alojamientos?.tramo_guardar_precio || 'Guardar Precio',
             inputValidator: (value) => {
-                if (!value || value < 0) return 'Ingrese un precio válido';
+                if (!value || value < 0) return (window.txt?.alojamientos?.tramo_precio_invalido || 'Ingrese un precio válido');
             }
         });
 
