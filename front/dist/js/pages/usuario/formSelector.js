@@ -74,17 +74,17 @@ function renderSedesList(sedes, isMulti) {
         if (isMulti) {
             html += `
             <div class="col-12 mt-4 mb-2 fade-in">
-                <div class="d-flex align-items-center border-bottom border-2 border-success border-opacity-25 pb-2">
-                    <div class="${headerClass} rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" 
-                         style="width: 45px; height: 45px; font-weight: 900; font-size: 20px;">
+                <div class="d-flex align-items-center border-bottom border-2 border-success border-opacity-25 pb-3 pt-1">
+                    <div class="${headerClass} rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm flex-shrink-0" 
+                         style="width: 48px; height: 48px; font-weight: 900; font-size: 22px;">
                         <i class="bi bi-building ${iconColor}"></i>
                     </div>
-                    <div>
-                        <h5 class="fw-bold mb-0 text-dark">
+                    <div class="flex-grow-1 min-w-0">
+                        <h5 class="fw-bold mb-1 text-dark institution-name-selector" style="font-size: 1.1rem; line-height: 1.3;">
                             ${sede.NombreCompletoInst} 
-                            <span class="text-success small fw-bold ms-2" style="font-size: 10px;">${labelText}</span>
+                            ${labelText ? `<span class="badge bg-success bg-opacity-25 text-success border border-success ms-2 align-middle" style="font-size: 0.65rem;">${labelText}</span>` : ''}
                         </h5>
-                        <span class="text-muted text-uppercase small" style="font-size: 0.7rem;">
+                        <span class="text-success fw-semibold text-uppercase d-inline-block mt-0" style="font-size: 0.8rem; letter-spacing: 0.5px;">
                             ${sede.NombreInst}
                         </span>
                     </div>

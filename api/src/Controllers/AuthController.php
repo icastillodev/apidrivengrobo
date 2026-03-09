@@ -196,7 +196,8 @@ class AuthController {
                     "nombre_completo" => $instData['NombreCompletoInst'],
                     "dependencia" => $instData['DependenciaInstitucion'],
                     "web" => $instData['Web'],
-                    "Logo" => $instData['Logo']
+                    "Logo" => $instData['Logo'],
+                    "LogoEnPdf" => isset($instData['LogoEnPdf']) ? (int)$instData['LogoEnPdf'] : 0
                 ]
             ]);
         } else {

@@ -122,7 +122,7 @@
             <div class="row g-2 mb-4 p-3 bg-light rounded shadow-sm">
                 <div class="col-md-6">
                     <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.search_global">Búsqueda Global</label>
-                    <input type="text" id="search-alojamiento" class="form-control form-control-sm" placeholder="..." oninput="window.renderAlojamientosTable()">
+                    <input type="text" id="search-alojamiento" class="form-control form-control-sm" data-i18n="alojamientos.ph_buscar_global" placeholder="Escribe para buscar..." oninput="window.renderAlojamientosTable()">
                 </div>
                 <div class="col-md-3">
                     <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>
@@ -297,7 +297,7 @@
                 
                 <div id="step-1-protocolo" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-primary transition-all">
                     <h6 class="fw-bold text-primary mb-3"><i class="bi bi-file-earmark-text me-2"></i>1. SELECCIONAR PROTOCOLO</h6>
-                    <input type="text" id="reg-search-prot" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, N° Protocolo, Título o Investigador...">
+                    <input type="text" id="reg-search-prot" class="form-control form-control-sm mb-2" data-i18n="alojamientos.ph_buscar_prot_reg" placeholder="Buscar por ID, N° Protocolo, Título o Investigador...">
                     <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
                         <table class="table table-hover table-sm border align-middle text-start" style="font-size: 11px; cursor: pointer;">
                             <thead class="table-light sticky-top">
@@ -323,7 +323,7 @@
                 </div>
                 <div id="step-2-usuario" class="mb-4 bg-white p-3 rounded shadow-sm border-start border-4 border-success d-none transition-all">
                     <h6 class="fw-bold text-success mb-3"><i class="bi bi-person-badge me-2"></i>2. RESPONSABLE DEL ALOJAMIENTO</h6>
-                    <input type="text" id="reg-search-user" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, Usuario, Nombre o Apellido...">
+                    <input type="text" id="reg-search-user" class="form-control form-control-sm mb-2" data-i18n="alojamientos.ph_buscar_user_reg" placeholder="Buscar por ID, Usuario, Nombre o Apellido...">
                     <div class="list-group" id="reg-list-usuarios" style="max-height: 180px; overflow-y: auto; font-size: 12px; cursor: pointer;">
                         </div>
                 </div>
@@ -357,7 +357,7 @@
                         </div>
                         <div class="col-12">
                             <label class="small fw-bold text-muted text-uppercase">Observaciones Generales</label>
-                            <textarea id="reg-obs" class="form-control form-control-sm" rows="2" placeholder="Anotaciones administrativas opcionales..."></textarea>
+                            <textarea id="reg-obs" class="form-control form-control-sm" rows="2" data-i18n="alojamientos.ph_obs_opcional" placeholder="Anotaciones administrativas opcionales..."></textarea>
                         </div>
                     </div>
                 </div>
@@ -389,7 +389,7 @@
                     <div class="col-lg-7 border-end">
                         <div class="mb-3">
                             <h6 class="fw-bold text-primary mb-2" style="font-size: 11px;"><i class="bi bi-file-earmark-text me-1"></i> PROTOCOLO VINCULADO</h6>
-                            <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-2" placeholder="Filtrar protocolos...">
+                            <input type="text" id="cfg-search-prot" class="form-control form-control-sm mb-2" data-i18n="alojamientos.ph_filtrar_prot" placeholder="Filtrar protocolos...">
                             <div class="table-responsive border bg-white shadow-sm" style="height: 180px; overflow-y: auto;">
                                 <table class="table table-hover table-sm align-middle text-start mb-0" style="font-size: 11px; cursor: pointer;">
                                     <tbody id="cfg-grid-protocolos">

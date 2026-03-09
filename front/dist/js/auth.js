@@ -117,6 +117,7 @@ async init() {
                 localStorage.setItem('instId', inst.id);
                 localStorage.setItem('NombreInst', this.slug);
                 localStorage.setItem('instLogo', inst.Logo || '');
+                localStorage.setItem('instLogoEnPdf', (inst.LogoEnPdf == 1 || inst.LogoEnPdf === '1') ? '1' : '0');
                 if (!storedToken) {
                     sessionStorage.setItem('instId', inst.id);
                     sessionStorage.setItem('NombreInst', this.slug);

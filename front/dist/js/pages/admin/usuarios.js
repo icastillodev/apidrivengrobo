@@ -2,6 +2,7 @@
 // v: modal construido por concatenación (sin template literals) + cache-bust
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
+import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
 
@@ -726,10 +727,11 @@ window.downloadPDF = async (id, mode = 'total') => {
     document.body.style.paddingRight = '';
 
     const htmlString = mode === 'simple' ? buildFichaSimpleHTML(data) : buildFichaTotalHTML(data);
+    const logoHeader = getPdfLogoHeaderFromStorage();
     const wrapper = document.createElement('div');
     wrapper.setAttribute('id', 'pdf-export-container');
     wrapper.style.cssText = 'position:fixed;top:0;left:0;width:794px;min-height:1122px;background:#fff;z-index:99999;padding:20px;box-sizing:border-box;overflow:auto;visibility:visible;opacity:1;';
-    wrapper.innerHTML = htmlString;
+    wrapper.innerHTML = (logoHeader ? logoHeader + htmlString : htmlString);
     document.body.appendChild(wrapper);
     const contentEl = wrapper.firstElementChild;
     if (contentEl) {

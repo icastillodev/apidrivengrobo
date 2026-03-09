@@ -97,15 +97,16 @@ function updateSearchInputType() {
     }
     // Si filtra por VENCIMIENTO -> Select Vigente/Vencido
     else if (type === 'Vencimiento') {
+        const t = window.txt?.generales;
         html = `<select id="search-input-prot" class="form-select form-select-sm border-start-0 fw-bold">
-                    <option value="">-- Todos --</option>
-                    <option value="vigente">Vigentes</option>
-                    <option value="vencido">Vencidos</option>
+                    <option value="">-- ${t?.todos ?? 'Todos'} --</option>
+                    <option value="vigente">${t?.vigentes ?? 'Vigentes'}</option>
+                    <option value="vencido">${t?.vencidos ?? 'Vencidos'}</option>
                 </select>`;
     }
     // Default -> Input Texto
     else {
-        html = `<input type="text" id="search-input-prot" class="form-control form-control-sm border-start-0" placeholder="Escribe para buscar...">`;
+        html = `<input type="text" id="search-input-prot" class="form-control form-control-sm border-start-0" placeholder="${(window.txt?.generales?.escribebuscar || 'Escribe para buscar...')}">`;
     }
     container.innerHTML = html;
 

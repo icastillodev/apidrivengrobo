@@ -104,6 +104,16 @@
 
                     <h5 class="fw-bold mb-4" data-i18n="admin_estadisticas.titulo"></h5>
 
+                    <div id="stats-red-card" class="card mb-4 border-success border-2 shadow-sm" style="display: none;">
+                        <div class="card-body d-flex flex-md-row flex-column align-items-md-center justify-content-between gap-3">
+                            <div>
+                                <h6 class="card-title text-success fw-bold mb-1" data-i18n="admin_estadisticas.red_card_title"></h6>
+                                <p class="card-text small text-muted mb-0" data-i18n="admin_estadisticas.red_card_desc"></p>
+                            </div>
+                            <button type="button" class="btn btn-success fw-bold px-4" id="btn-open-red-stats" style="background-color: #1a5d3b;" data-i18n="admin_estadisticas.red_btn_ver"></button>
+                        </div>
+                    </div>
+
                     <div class="row g-3 align-items-end mb-4 pb-3 border-bottom">
                         <div class="col-md-3">
                             <label class="small fw-bold" data-i18n="admin_estadisticas.desde"></label>
@@ -205,6 +215,28 @@
                             </div>
                         </div>
 
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-0">
+                                    <div class="card-header bg-white fw-bold" data-i18n="admin_estadisticas.desglose_org"></div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0" style="font-size: 11px;" id="org-stats-table">
+                                            <thead class="table-light text-uppercase">
+                                                <tr>
+                                                    <th data-i18n="admin_estadisticas.th_organizacion"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_animales"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_reactivos"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_insumos"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_prot_aprob"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="table-body-org"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">
                             <i class="bi bi-trophy"></i> <span data-i18n="admin_estadisticas.top_especies"></span>
                         </h5>
@@ -241,7 +273,30 @@
                         </h5>
                         <div id="details-container" class="row g-4"></div>
 
-                    </div> <div class="modal fade" id="chartModal" tabindex="-1" aria-hidden="true">
+                    </div>
+                    <div class="modal fade" id="modal-stats-red" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header border-0">
+                                    <h5 class="modal-title fw-bold" data-i18n="admin_estadisticas.red_modal_title"></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row g-2 align-items-end mb-3">
+                                        <div class="col-auto"><label class="small fw-bold" data-i18n="admin_estadisticas.red_desde"></label><input type="date" id="red-stats-from" class="form-control form-control-sm"></div>
+                                        <div class="col-auto"><label class="small fw-bold" data-i18n="admin_estadisticas.red_hasta"></label><input type="date" id="red-stats-to" class="form-control form-control-sm"></div>
+                                        <div class="col-auto"><button type="button" class="btn btn-success btn-sm fw-bold" id="btn-load-red-stats" data-i18n="admin_estadisticas.red_btn_cargar"></button></div>
+                                        <div class="col-auto ms-auto d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" id="btn-red-export-pdf" disabled><i class="bi bi-file-pdf"></i> <span data-i18n="admin_estadisticas.red_export_pdf"></span></button>
+                                            <button type="button" class="btn btn-outline-success btn-sm" id="btn-red-export-excel" disabled><i class="bi bi-file-earmark-excel"></i> <span data-i18n="admin_estadisticas.red_export_excel"></span></button>
+                                        </div>
+                                    </div>
+                                    <div id="red-stats-content" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="chartModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-xl modal-dialog-centered">
                             <div class="modal-content">
                                 <div class="modal-header border-0">

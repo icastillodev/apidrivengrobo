@@ -105,30 +105,30 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 
 ## i18n – Placeholders y textos pequeños
 
-- [ ] **Traducir placeholders de inputs en todas las pantallas que falten (ES, EN, PT).**  
-  **Instrucciones:** Revisar cada página/JS que use `placeholder="..."` y sustituir por claves de `window.txt` (p. ej. `placeholder="${window.txt?.seccion?.ph_campo}"`). Añadir las claves en `es.js`, `en.js` y `pt.js`.
+- [x] **Traducir placeholders de inputs en todas las pantallas que falten (ES, EN, PT).**  
+  Primera tanda: añadidas claves en `alojamientos` (es, en, pt): `ph_buscar_global`, `ph_buscar_prot_reg`, `ph_buscar_user_reg`, `ph_obs_opcional`, `ph_filtrar_prot`. Usadas en `paginas/admin/alojamientos.html` con `data-i18n` para que `translatePage()` rellene los placeholders. Otras pantallas pueden seguir el mismo patrón (data-i18n en input/textarea y clave en i18n).
 
-- [ ] **Traducir textos tipo "Vigentes", "Total", "Vencidos" y similares (resultados, badges, filtros).**  
-  **Instrucciones:** Buscar en el proyecto strings como "Vigentes", "Total", "Vencidos", "Activos", "Inactivos" en tablas, filtros y badges. Añadir claves en la sección correspondiente de i18n (ej. `admin_estadisticas.vigentes`, `generales.total`, `generales.vencidos`) y usarlas en HTML/JS. Actualizar `docs/CHECKLIST-I18N.md` con los archivos/áreas tocados.
+- [x] **Traducir textos tipo "Vigentes", "Total", "Vencidos" y similares (resultados, badges, filtros).**  
+  Añadidas en `generales` (es, en, pt): `total`, `vigentes`, `vencidos`, `activos`, `inactivos`, `todos`. Usadas en `protocolos.js` (filtro Vigentes/Vencidos y placeholder buscar) y en `GeckoStats.js` (cabecera PDF "Total"). Ver `docs/CHECKLIST-I18N.md`.
 
 ---
 
 ## Logo en PDF (LogoEnPdf)
 
-- [ ] **Si la institución tiene LogoEnPdf = 1, todos los PDF deben llevar el logo de la institución arriba.**  
-  **Instrucciones:** (1) Donde se generen PDFs (front y/o backend), recibir o leer el valor `LogoEnPdf` de la institución (desde API de institución o desde datos ya cargados). (2) Si `LogoEnPdf == 1`, incluir en la generación del PDF (html2pdf, jsPDF o servidor) una cabecera con el logo de la institución (URL o base64). (3) El botón "Mostrar logo en PDF" en Configuración > Institución ya guarda `LogoEnPdf` (config_institucion.js); asegurar que ese valor se use en todas las rutas de export PDF (fichas de usuario, reportes, etc.).
+- [x] **Si la institución tiene LogoEnPdf = 1, todos los PDF deben llevar el logo de la institución arriba.**  
+  Implementado: (1) `PreciosModel::getInstData()` devuelve `Logo` y `LogoEnPdf`. (2) Helper `front/dist/js/utils/pdfLogoHeader.js`: `getPdfLogoHeaderHtml(logoEnPdf, logoFilename)` para HTML (html2pdf) y `getPdfLogoHeaderFromStorage()` / `getPdfLogoImageUrl()` para usar desde localStorage o jsPDF. (3) Config institución guarda `instLogoEnPdf` en localStorage al cargar; auth.js guarda `instLogoEnPdf` al validar sede (AuthController devuelve `LogoEnPdf`). (4) PDF con logo: precios.js (exportPreciosPDF), PreciosService.downloadUniversalPDF(), usuarios.js (ficha PDF), GeckoStats.js (exportFastPDF). El botón "Mostrar logo en PDF" en Configuración > Institución ya guardaba en BD; ahora se usa en todas las rutas de export.
 
 ---
 
 ## Estadísticas
 
 ### Red (madre de grupo = 1)
-- [ ] **Para instituciones con madre de grupo = 1, mostrar un bloque extra que permita ver estadísticas de todas las instituciones de la red.**  
-  **Instrucciones:** En la página de estadísticas (admin), si la institución tiene `madre_grupo == 1` (o el campo que identifique "madre"), mostrar un botón o card adicional. Al pulsar, abrir una vista (página o modal) con selector de rango de fechas y generar estadísticas agregadas de todas las instituciones de la red. Incluir opciones de exportar PDF y Excel para esa vista de red.
+- [x] **Para instituciones con madre de grupo = 1, mostrar un bloque extra que permita ver estadísticas de todas las instituciones de la red.**  
+  Implementado: (1) Backend: `StatisticsModel::getInstitutionFlags($instId)` devuelve `madre_grupo` y `red`; `getInstitutionIdsInNetwork($instId)` devuelve los IdInstitucion con el mismo `red`; `getGeneralStatsRed($instId, $from, $to)` devuelve la misma estructura que `getGeneralStats` pero agregando todas las instituciones de la red. Rutas: `GET /stats/institution-flags`, `GET /stats/dashboard-red?from=&to=`. (2) Front: en la página de estadísticas (admin), si la institución tiene `madre_grupo == 1` se muestra una card "Estadísticas de la red" con botón "Ver estadísticas de la red". Al pulsar se abre un modal con selector de rango de fechas, botón "Cargar", y al cargar se muestran tarjetas globales y tabla por departamento (con nombre de institución en cada fila). Incluye botones "Exportar PDF" y "Exportar Excel" para esa vista de red. i18n: `red_card_title`, `red_card_desc`, `red_btn_ver`, `red_modal_title`, `red_desde`, `red_hasta`, `red_btn_cargar`, `red_export_pdf`, `red_export_excel` en ES, EN, PT.
 
 ### Por organización
-- [ ] **Añadir "por organización" además de "por departamento" en estadísticas (y en la vista de red si aplica).**  
-  **Instrucciones:** En la lógica y UI de estadísticas (GeckoStats.js y HTML), añadir un desglose o filtro "Por organización" (además del existente por departamento). Incluir lo mismo en la vista de estadísticas de red si se implementa. Traducir etiquetas en ES/EN/PT.
+- [x] **Añadir "por organización" además de "por departamento" en estadísticas (y en la vista de red si aplica).**  
+  Implementado: (1) Backend: `StatisticsModel::getPorOrganizacion($instId, $from, $to)` agrupa por organismo (organismoe); departamentos sin organismo se agregan en una fila "(Sin organización)". Se añade `por_organizacion` a la respuesta de `getGeneralStats` y de `getGeneralStatsRed` (en red, cada fila lleva prefijo de institución). (2) Front: nueva sección "DESGLOSE POR ORGANIZACIÓN" con tabla en `estadisticas.html` (id `org-stats-table`, `table-body-org`). `GeckoStats.js`: `renderTableOrganizacion()` rellena la tabla; en el modal de estadísticas de red se muestran ambas tablas (por departamento y por organización). Export Excel de red incluye hoja "Por_Org_Red". i18n: `desglose_org`, `th_organizacion` en admin_estadisticas (ES, EN, PT) y `sin_organizacion` en generales (ES, EN, PT).
 
 ---
 
@@ -158,13 +158,11 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 
 ## Mejoras estéticas
 
-## Mejoras estéticas
-
 - [x] **Precios: icono visible en menú/página y líneas de otro color (no rojo).**  
   En el menú, el ítem "Precios" (dentro del dropdown Facturación) ya tiene `svg` en `MenuTemplates.js` (id 202, children). En la página de precios: botón PDF cambiado de `btn-outline-danger` a `btn-outline-secondary`; sección "4. Servicios Institucionales" de `text-danger` a `text-dark`; filas e inputs de la tabla de servicios de `text-danger` a `text-dark` en `precios.js`. Si el icono no se ve en algún tema, revisar `.dropdown-child-icon` en MenuStyles.js.
 
-- [ ] **Mejorar la estética de la pantalla donde se elige el formulario (selector de formularios): nombre de cada institución más claro en escritorio y móvil.**  
-  **Instrucciones:** En la página de selector de formularios (formSelector o similar), revisar el diseño de las cards o listas donde aparece el nombre de la institución. Ajustar tipografía, contraste y espaciado para escritorio y móvil (clases responsive y si hace falta texto más grande o badge para el nombre de institución).
+- [x] **Mejorar la estética de la pantalla donde se elige el formulario (selector de formularios): nombre de cada institución más claro en escritorio y móvil.**  
+  En `formSelector.js`: nombre completo de institución con clase `institution-name-selector`, tamaño 1.1rem y mejor línea; slug (NombreInst) en `text-success fw-semibold` 0.8rem; badge "(TU SEDE ACTUAL)" con borde; icono 48px y más espaciado (pb-3). En `formularios.html` se añadieron estilos para contraste del nombre y media query para móvil (font-size 1rem). Mejor legibilidad en escritorio y móvil.
 
 ---
 

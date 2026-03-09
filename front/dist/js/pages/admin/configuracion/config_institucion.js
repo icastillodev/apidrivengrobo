@@ -231,6 +231,8 @@ export async function initConfigInstitution(instId) {
                 // Checkboxes
                 document.getElementById('check-otrosceuas').checked = (d.otrosceuas == 1);
                 document.getElementById('check-logopdf').checked = (d.LogoEnPdf == 1);
+                // Para que otros PDFs (fichas, estadísticas) puedan mostrar logo sin volver a pedir la config
+                localStorage.setItem('instLogoEnPdf', d.LogoEnPdf == 1 ? '1' : '0');
 
                 // VISOR DE LOGO ACTUAL
                 const currentLogoBox = document.getElementById('current-logo-container');

@@ -404,6 +404,8 @@ $router->post('/admin/config/reservas/inst/toggle', 'AdminConfigReservasControll
 // SECCIÓN: Estadísticas (Agregado al final o en su sección)
 // ============================================================
 $router->get('/stats/dashboard', 'StatisticsController@getStats');
+$router->get('/stats/institution-flags', 'StatisticsController@getInstitutionFlags');
+$router->get('/stats/dashboard-red', 'StatisticsController@getStatsRed');
 
 
 // ============================================================

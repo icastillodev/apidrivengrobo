@@ -1,4 +1,5 @@
 import { API } from '../api.js';
+import { getPdfLogoHeaderHtml } from '../utils/pdfLogoHeader.js';
 
 /**
  * Servicio del tarifario oficial.
@@ -82,9 +83,12 @@ export const PreciosService = {
                     <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${s.Precio}</td>
                 </tr>`).join('');
 
+            const logoHeader = getPdfLogoHeaderHtml(data.institucion?.LogoEnPdf, data.institucion?.Logo || '');
+
             // 4. Template del PDF: fondo blanco y TODO el texto color oscuro para que se vea bien en dark mode
             const template = `
                 <div style="font-family: Arial, sans-serif; padding: 30px; color: #000; background: #fff;">
+                    ${logoHeader}
                     <div style="text-align: center; border-bottom: 3px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                         <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${instNombre}</h2>
                         <h4 style="margin: 5px 0; color: #000;">TARIFARIO OFICIAL VIGENTE</h4>

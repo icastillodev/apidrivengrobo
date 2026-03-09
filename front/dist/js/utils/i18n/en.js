@@ -80,7 +80,14 @@ export const en = {
         departamento: "Department:",
         desde: "From:",
         hasta: "To:",
-        error: "Error"
+        error: "Error",
+        total: "Total",
+        vigentes: "Current",
+        vencidos: "Expired",
+        sin_organizacion: "(No organization)",
+        activos: "Active",
+        inactivos: "Inactive",
+        todos: "All"
     },
     excel_export: {
         title: "Export to Excel",
@@ -263,6 +270,11 @@ alojamientos: {
         status: "Status",
         status_active: "Active",
         status_finished: "Finished",
+        ph_buscar_global: "Type to search...",
+        ph_buscar_prot_reg: "Search by ID, Protocol No., Title or Investigator...",
+        ph_buscar_user_reg: "Search by ID, User, First or Last Name...",
+        ph_obs_opcional: "Optional administrative notes...",
+        ph_filtrar_prot: "Filter protocols...",
         th_history: "History",
         th_boxes: "Boxes (Qty/Type)",
         th_days: "Days Stay",
@@ -1482,7 +1494,18 @@ alojamientos: {
         chart_queso: "Pie",
         desglose_detallado: "Detailed Breakdown by Department",
         modal_vista_detallada: "Detailed View",
-        cargando: "LOADING..."
+        cargando: "LOADING...",
+        desglose_org: "BREAKDOWN BY ORGANIZATION",
+        th_organizacion: "Organization",
+        red_card_title: "Network statistics",
+        red_card_desc: "This site is the group parent. You can view aggregated statistics for all institutions in the network.",
+        red_btn_ver: "View network statistics",
+        red_modal_title: "Aggregated network statistics",
+        red_desde: "From",
+        red_hasta: "To",
+        red_btn_cargar: "Load",
+        red_export_pdf: "Export PDF",
+        red_export_excel: "Export Excel"
     },
     admin_historialcontable: {
         bread_grobo: "GROBO",

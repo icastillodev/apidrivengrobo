@@ -65,6 +65,12 @@
         /* Animación suave de entrada */
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Nombre de institución más claro en selector (escritorio y móvil) */
+        .institution-name-selector { color: #1a1a1a !important; }
+        @media (max-width: 767px) {
+            .institution-name-selector { font-size: 1rem !important; }
+            #forms-grid .border-bottom.pb-3 { padding-bottom: 0.75rem !important; }
+        }
     </style>
     
 </head>

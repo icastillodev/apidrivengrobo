@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { getPdfLogoHeaderHtml } from '../../utils/pdfLogoHeader.js';
 
 let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {} };
 
@@ -186,8 +187,11 @@ window.exportPreciosPDF = () => {
             <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${s.Precio}</td>
         </tr>`).join('');
 
+    const logoHeader = getPdfLogoHeaderHtml(dataFull.institucion?.LogoEnPdf, dataFull.institucion?.Logo || '');
+
     const template = `
         <div style="font-family: Arial, sans-serif; padding: 20px; background: #fff; color: #000;">
+            ${logoHeader}
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; margin-bottom: 20px;">
                 <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${inst}</h2>
                 <h4 style="margin: 5px 0; text-transform: uppercase; color: #000;">${tituloDoc}</h4>

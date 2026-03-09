@@ -6,9 +6,11 @@
 
 // ¡AQUÍ ESTABA EL ERROR! Faltaba importar la API para que pudiera hacer la petición.
 import { API } from '../../api.js';
+import { getPdfLogoImageUrl } from '../../utils/pdfLogoHeader.js';
 
 let charts = {};
 let rawData = null;
+let redRawData = null; // Datos agregados de la red (para modal)
 let deptColors = {}; // Caché de colores para consistencia visual
 
 export async function initStatsPage() {
@@ -51,6 +53,17 @@ export async function initStatsPage() {
     // 6. Exponer funciones al ámbito global (para los onclick en HTML)
     window.viewChartFullScreen = openChartModal;
     window.exportChartToPDF = exportChartToPDF;
+
+    // 7. Bloque "Estadísticas de la red" (solo si madre_grupo = 1)
+    loadInstitutionFlags();
+    const btnOpenRed = document.getElementById('btn-open-red-stats');
+    if (btnOpenRed) btnOpenRed.onclick = openRedModal;
+    const btnLoadRed = document.getElementById('btn-load-red-stats');
+    if (btnLoadRed) btnLoadRed.onclick = loadStatsRed;
+    const btnRedPdf = document.getElementById('btn-red-export-pdf');
+    if (btnRedPdf) btnRedPdf.onclick = () => exportRedPDF();
+    const btnRedExcel = document.getElementById('btn-red-export-excel');
+    if (btnRedExcel) btnRedExcel.onclick = () => exportRedExcel();
 }
 
 /**
@@ -82,6 +95,7 @@ async function loadStats() {
             renderAlojamientoTrazabilidadSection();
             renderSpeciesCounters();
             renderTable();
+            renderTableOrganizacion();
             renderMainChart();
             renderSpeciesChart();
             renderDetailsSection();
@@ -98,6 +112,164 @@ async function loadStats() {
             btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
         }
     }
+}
+
+async function loadInstitutionFlags() {
+    try {
+        const res = await API.request('/stats/institution-flags');
+        if (res.status === 'success' && res.data && res.data.madre_grupo == 1) {
+            const card = document.getElementById('stats-red-card');
+            if (card) card.style.display = 'block';
+        }
+    } catch (e) {
+        console.warn('No se pudieron cargar flags de institución:', e);
+    }
+}
+
+function openRedModal() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const today = now.toISOString().split('T')[0];
+    const fromEl = document.getElementById('red-stats-from');
+    const toEl = document.getElementById('red-stats-to');
+    if (fromEl) fromEl.value = firstDay;
+    if (toEl) toEl.value = today;
+    redRawData = null;
+    document.getElementById('red-stats-content').innerHTML = '';
+    const modal = new bootstrap.Modal(document.getElementById('modal-stats-red'));
+    modal.show();
+}
+
+async function loadStatsRed() {
+    const from = document.getElementById('red-stats-from')?.value;
+    const to = document.getElementById('red-stats-to')?.value;
+    const btn = document.getElementById('btn-load-red-stats');
+    const t = window.txt?.admin_estadisticas;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = t?.cargando || 'CARGANDO...';
+    }
+    try {
+        const res = await API.request(`/stats/dashboard-red?from=${from}&to=${to}&v=${Date.now()}`);
+        if (res.status === 'success') {
+            redRawData = res.data;
+            renderRedStatsContent();
+            document.getElementById('btn-red-export-pdf').disabled = false;
+            document.getElementById('btn-red-export-excel').disabled = false;
+        } else {
+            alert(res.message || 'Error al cargar estadísticas de la red.');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = t?.red_btn_cargar || 'Cargar';
+        }
+    }
+}
+
+function renderRedStatsContent() {
+    const container = document.getElementById('red-stats-content');
+    if (!container || !redRawData) return;
+    const t = window.txt?.admin_estadisticas;
+    const g = redRawData.globales || {};
+    const labelSinOrg = window.txt?.generales?.sin_organizacion || '(Sin organización)';
+    const deptRows = (redRawData.por_departamento || []).map(d => `
+        <tr><td>${d.departamento || ''}</td><td class="text-center">${(parseInt(d.total_animales, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.total_reactivos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.total_insumos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.protocolos_aprobados, 10) || 0).toLocaleString()}</td><td class="text-center">–</td></tr>
+    `).join('');
+    const orgRows = (redRawData.por_organizacion || []).map(o => {
+        const orgLabel = (o.organizacion === '(Sin organización)' || (o.organizacion && o.organizacion.endsWith(' – (Sin organización)')) ? (o.institucion ? o.institucion + ' – ' + labelSinOrg : labelSinOrg) : (o.organizacion || '–');
+        return `<tr><td>${orgLabel}</td><td class="text-center">${(parseInt(o.total_animales, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.total_reactivos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.total_insumos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.protocolos_aprobados, 10) || 0).toLocaleString()}</td></tr>`;
+    }).join('');
+    container.innerHTML = `
+        <div class="row g-2 mb-3">
+            <div class="col"><div class="card p-2 border-0 bg-light text-center"><small class="text-muted fw-bold">${t?.box_animales || 'ANIMALES'}</small><h5 class="mb-0 fw-bold text-success">${(parseInt(g.total_animales, 10) || 0).toLocaleString()}</h5></div></div>
+            <div class="col"><div class="card p-2 border-0 bg-light text-center"><small class="text-muted fw-bold">${t?.box_reactivos || 'REACTIVOS'}</small><h5 class="mb-0 fw-bold text-warning">${(parseInt(g.total_reactivos, 10) || 0).toLocaleString()}</h5></div></div>
+            <div class="col"><div class="card p-2 border-0 bg-light text-center"><small class="text-muted fw-bold">${t?.box_insumos || 'INSUMOS'}</small><h5 class="mb-0 fw-bold text-secondary">${(parseInt(g.total_insumos, 10) || 0).toLocaleString()}</h5></div></div>
+            <div class="col"><div class="card p-2 border-0 bg-light text-center"><small class="text-muted fw-bold">${t?.box_protocolos || 'PROT.'}</small><h5 class="mb-0 fw-bold text-primary">${(parseInt(g.total_protocolos, 10) || 0).toLocaleString()}</h5></div></div>
+            <div class="col"><div class="card p-2 border-0 bg-light text-center"><small class="text-muted fw-bold">${t?.box_alojamientos || 'ALOJ.'}</small><h5 class="mb-0 fw-bold text-info">${(parseInt(g.total_alojamientos, 10) || 0).toLocaleString()}</h5></div></div>
+        </div>
+        <h6 class="fw-bold mb-2 text-secondary">${t?.desglose_depto ?? 'Por departamento'}</h6>
+        <div class="table-responsive mb-4">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light"><tr><th>${t?.th_departamento || 'Departamento'}</th><th class="text-center">${t?.th_animales || 'Anim.'}</th><th class="text-center">${t?.th_reactivos || 'Reac.'}</th><th class="text-center">${t?.th_insumos || 'Ins.'}</th><th class="text-center">${t?.th_prot_aprob || 'Prot.'}</th><th class="text-center">${t?.th_aloj_activos || 'Aloj.'}</th></tr></thead>
+                <tbody>${deptRows || '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>'}</tbody>
+            </table>
+        </div>
+        <h6 class="fw-bold mb-2 text-secondary">${t?.desglose_org ?? 'Por organización'}</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light"><tr><th>${t?.th_organizacion || 'Organización'}</th><th class="text-center">${t?.th_animales || 'Anim.'}</th><th class="text-center">${t?.th_reactivos || 'Reac.'}</th><th class="text-center">${t?.th_insumos || 'Ins.'}</th><th class="text-center">${t?.th_prot_aprob || 'Prot.'}</th></tr></thead>
+                <tbody>${orgRows || '<tr><td colspan="5" class="text-center text-muted">Sin datos</td></tr>'}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function exportRedPDF() {
+    if (!redRawData) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const t = window.txt?.generales;
+    const lblTotal = t?.total ?? 'Total';
+    let titleY = 15;
+    const logoUrl = getPdfLogoImageUrl(localStorage.getItem('instLogoEnPdf'), localStorage.getItem('instLogo'));
+    if (logoUrl) {
+        try {
+            const resp = await fetch(logoUrl);
+            const blob = await resp.blob();
+            const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+            doc.addImage(dataUrl, 'JPEG', 14, 5, 35, 12);
+            titleY = 24;
+        } catch (e) { console.warn('Logo no cargado:', e); }
+    }
+    doc.setFontSize(14);
+    doc.text("ESTADÍSTICAS DE LA RED - GROBO", 14, titleY);
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, titleY + 7);
+    const g = redRawData.globales || {};
+    doc.autoTable({
+        startY: titleY + 14,
+        head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
+        body: [['Animales', g.total_animales, 'Reactivos', g.total_reactivos], ['Insumos', g.total_insumos, 'Protocolos', g.total_protocolos], ['Alojamientos', g.total_alojamientos, '', '']],
+        theme: 'grid',
+        headStyles: { fillColor: [26, 93, 59] }
+    });
+    doc.save(`Reporte_Red_GROBO_${Date.now()}.pdf`);
+}
+
+function exportRedExcel() {
+    if (!redRawData) return;
+    const wb = XLSX.utils.book_new();
+    const g = redRawData.globales || {};
+    const hojaResumen = [
+        ['Métrica', 'Total'],
+        ['Animales', g.total_animales],
+        ['Reactivos', g.total_reactivos],
+        ['Insumos', g.total_insumos],
+        ['Protocolos', g.total_protocolos],
+        ['Alojamientos', g.total_alojamientos]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hojaResumen), 'Resumen_Red');
+    const deptData = (redRawData.por_departamento || []).map(d => ({
+        Departamento: d.departamento,
+        Animales: d.total_animales,
+        Reactivos: d.total_reactivos,
+        Insumos: d.total_insumos,
+        'Prot. Aprob': d.protocolos_aprobados
+    }));
+    if (deptData.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Por_Depto_Red');
+    const orgData = (redRawData.por_organizacion || []).map(o => ({
+        Organización: o.organizacion || '',
+        Animales: o.total_animales,
+        Reactivos: o.total_reactivos,
+        Insumos: o.total_insumos,
+        'Prot. Aprob': o.protocolos_aprobados
+    }));
+    if (orgData.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(orgData), 'Por_Org_Red');
+    XLSX.writeFile(wb, `Reporte_Red_GROBO_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 // ==========================================
@@ -251,6 +423,27 @@ function renderTable() {
     document.querySelectorAll('.col-chk').forEach(chk => {
         toggleTableColumn(chk.dataset.col, chk.checked);
     });
+}
+
+function renderTableOrganizacion() {
+    const tbody = document.getElementById('table-body-org');
+    if (!tbody || !rawData || !rawData.por_organizacion) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">–</td></tr>';
+        return;
+    }
+    const t = window.txt?.generales;
+    const labelSinOrg = t?.sin_organizacion || '(Sin organización)';
+    tbody.innerHTML = rawData.por_organizacion.map(o => {
+        const orgLabel = (o.organizacion === '(Sin organización)') ? labelSinOrg : (o.organizacion || '–');
+        return `
+            <tr>
+                <td class="fw-bold text-success small py-2">${orgLabel}</td>
+                <td class="text-center">${parseInt(o.total_animales, 10) || 0}</td>
+                <td class="text-center">${parseInt(o.total_reactivos, 10) || 0}</td>
+                <td class="text-center">${parseInt(o.total_insumos, 10) || 0}</td>
+                <td class="text-center text-primary">${parseInt(o.protocolos_aprobados, 10) || 0}</td>
+            </tr>`;
+    }).join('');
 }
 
 function toggleTableColumn(colNum, isVisible) {
@@ -541,17 +734,38 @@ async function exportFastPDF(includeCharts) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
 
+    let titleY = 15;
+    const logoUrl = getPdfLogoImageUrl(localStorage.getItem('instLogoEnPdf'), localStorage.getItem('instLogo'));
+    if (logoUrl) {
+        try {
+            const resp = await fetch(logoUrl);
+            const blob = await resp.blob();
+            const dataUrl = await new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = () => res(r.result);
+                r.onerror = rej;
+                r.readAsDataURL(blob);
+            });
+            doc.addImage(dataUrl, 'JPEG', 14, 5, 35, 12);
+            titleY = 24;
+        } catch (e) {
+            console.warn('Logo no cargado para PDF:', e);
+        }
+    }
+
     // Título
     doc.setFontSize(16);
-    doc.text("REPORTE ESTADÍSTICO - GROBO", 14, 15);
+    doc.text("REPORTE ESTADÍSTICO - GROBO", 14, titleY);
     doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 22);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, titleY + 7);
 
     // Tabla Resumen
     const g = rawData.globales;
+    const t = window.txt?.generales;
+    const lblTotal = t?.total ?? 'Total';
     doc.autoTable({
-        startY: 28,
-        head: [['Métrica', 'Total', 'Métrica', 'Total']],
+        startY: titleY + 13,
+        head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
         body: [
             ['Animales', g.total_animales, 'Reactivos', g.total_reactivos],
             ['Insumos', g.total_insumos, 'Protocolos', g.total_protocolos],

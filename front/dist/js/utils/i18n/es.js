@@ -80,7 +80,14 @@ export const es = {
         departamento: "Departamento:",
         desde: "Desde:",
         hasta: "Hasta:",
-        error: "Error"
+        error: "Error",
+        total: "Total",
+        vigentes: "Vigentes",
+        vencidos: "Vencidos",
+        sin_organizacion: "(Sin organización)",
+        activos: "Activos",
+        inactivos: "Inactivos",
+        todos: "Todos"
     },
     excel_export: {
         title: "Exportar a Excel",
@@ -262,6 +269,11 @@ precios: {
         status: "Estado",
         status_active: "Vigentes",
         status_finished: "Finalizados",
+        ph_buscar_global: "Escribe para buscar...",
+        ph_buscar_prot_reg: "Buscar por ID, N° Protocolo, Título o Investigador...",
+        ph_buscar_user_reg: "Buscar por ID, Usuario, Nombre o Apellido...",
+        ph_obs_opcional: "Anotaciones administrativas opcionales...",
+        ph_filtrar_prot: "Filtrar protocolos...",
         th_history: "Historia",
         th_boxes: "Cajas (Tipo/Cant)",
         th_days: "Días Aloj.",
@@ -1483,7 +1495,18 @@ precios: {
         chart_queso: "Queso",
         desglose_detallado: "Desglose Detallado por Departamento",
         modal_vista_detallada: "Vista Detallada",
-        cargando: "CARGANDO..."
+        cargando: "CARGANDO...",
+        desglose_org: "DESGLOSE POR ORGANIZACIÓN",
+        th_organizacion: "Organización",
+        red_card_title: "Estadísticas de la red",
+        red_card_desc: "Esta sede es madre de grupo. Puede ver estadísticas agregadas de todas las instituciones de la red.",
+        red_btn_ver: "Ver estadísticas de la red",
+        red_modal_title: "Estadísticas agregadas de la red",
+        red_desde: "Desde",
+        red_hasta: "Hasta",
+        red_btn_cargar: "Cargar",
+        red_export_pdf: "Exportar PDF",
+        red_export_excel: "Exportar Excel"
     },
     admin_historialcontable: {
         bread_grobo: "GROBO",

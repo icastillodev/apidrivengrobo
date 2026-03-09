@@ -175,8 +175,8 @@ Al agregar **cualquier** texto de interfaz (título, botón, mensaje, modal, col
 
 ## Pendiente de traducir (placeholders y textos pequeños)
 
-- [ ] **Placeholders de inputs:** Revisar todas las pantallas y reemplazar `placeholder="..."` por claves i18n (ej. `window.txt?.seccion?.ph_campo`). Añadir las claves en es/en/pt.
-- [ ] **Textos tipo resultados/filtros:** Traducir "Vigentes", "Total", "Vencidos", "Activos", "Inactivos" y similares en tablas, badges y filtros. Añadir claves (ej. `admin_estadisticas.vigentes`, `generales.total`, `generales.vencidos`) en los 3 idiomas y usarlas en el código.
+- [x] **Placeholders de inputs:** Primera tanda en Admin > Alojamientos: claves `alojamientos.ph_buscar_global`, `ph_buscar_prot_reg`, `ph_buscar_user_reg`, `ph_obs_opcional`, `ph_filtrar_prot` en es/en/pt; usadas con `data-i18n` en `paginas/admin/alojamientos.html`. Otras pantallas pueden seguir el mismo patrón.
+- [x] **Textos tipo resultados/filtros:** "Vigentes", "Total", "Vencidos", "Activos", "Inactivos" en tablas, badges y filtros. Añadidas claves en `generales` (es.js, en.js, pt.js): `total`, `vigentes`, `vencidos`, `activos`, `inactivos`, `todos`. Usadas en `protocolos.js` (filtro por vencimiento y placeholder buscar) y en `GeckoStats.js` (cabecera PDF).
 - [ ] Al completar cada uno, marcar [x] y actualizar los archivos JS/HTML correspondientes en la tabla de "Archivos JS con textos de interfaz" más arriba.
 
 ---
