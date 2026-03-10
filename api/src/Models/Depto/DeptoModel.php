@@ -12,7 +12,8 @@ class DeptoModel {
     }
 
     public function getAllByInstitution($instId) {
-        $sql = "SELECT d.iddeptoA, d.NombreDeptoA, o.NombreOrganismoSimple 
+        $sql = "SELECT d.iddeptoA, d.NombreDeptoA, d.externodepto,
+                o.NombreOrganismoSimple, o.externoorganismo
                 FROM departamentoe d 
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo 
                 WHERE d.IdInstitucion = ? 

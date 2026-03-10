@@ -97,6 +97,16 @@
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
                 <div class="col-md-3">
                     <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.filtro_ambito">Ámbito:</span>
+                        <select id="filter-ambito-depto" class="form-select form-select-sm fw-bold border-success shadow-none">
+                            <option value="all" data-i18n="facturacion.ambito_todos">TODOS</option>
+                            <option value="interno" data-i18n="facturacion.ambito_internos">INTERNOS</option>
+                            <option value="externo" data-i18n="facturacion.ambito_externos">EXTERNOS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group shadow-sm">
                         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.departamento">Departamento:</span>
                         <select id="sel-depto" class="form-select form-select-sm fw-bold border-success shadow-none"></select>
                     </div>

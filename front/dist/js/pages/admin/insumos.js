@@ -100,10 +100,17 @@ function renderTable() {
         const tr = document.createElement('tr');
         tr.className = "clickable-row";
         tr.onclick = () => window.openInsumoModal(f);
+        const labelSinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+        const protLabel = (f.NProtocolo && f.TituloProtocolo)
+            ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
+            : '---';
+
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">#${f.idformA}</td>
             <td class="py-2 px-2 small fw-bold">${f.Investigador}</td>
+            <td class="py-2 px-2 small text-primary fw-bold">${protLabel}</td>
             <td class="py-2 px-2 small text-primary fw-bold">${f.Departamento || '---'}</td>
+            <td class="py-2 px-2 small text-muted">${(f.Organizacion && String(f.Organizacion).trim()) ? f.Organizacion : labelSinOrg}</td>
             <td class="py-2 px-2" style="font-size: 13px;">${f.ResumenInsumos || '---'}</td>
             <td class="py-2 px-2 small">${f.Inicio || '---'}</td>
             <td class="py-2 px-2 small">${f.Retiro || '---'}</td>
@@ -125,19 +132,21 @@ window.openInsumoModal = async (f) => {
     const container = document.getElementById('modal-content-insumo');
     
     try {
-        // Hacemos las peticiones: detalles del pedido y la lista de departamentos
-        const [resItems, resFormData, resCat, resNotify] = await Promise.all([
+        // Hacemos las peticiones: detalles del pedido, departamentos, catálogo y protocolos activos
+        const [resItems, resFormData, resCat, resNotify, resProt] = await Promise.all([
             API.request(`/insumos/details?id=${f.idPrecioinsumosformulario}`),
             API.request(`/insumos/form-data?inst=${instId}`), // <--- Trae la lista de departamentoe
             API.request(`/insumos/catalog?inst=${instId}`),
-            API.request(`/reactivos/last-notification?id=${f.idformA}`)
+            API.request(`/reactivos/last-notification?id=${f.idformA}`),
+            API.request(`/billing/list-active-protocols`)
         ]);
 
         window.catalogoInsumos = resCat.data || [];
         const items = resItems.data || [];
         
-        // Extraemos el array de departamentos
+        // Extraemos el array de departamentos y protocolos
         const deptos = (resFormData.data && resFormData.data.deptos) ? resFormData.data.deptos : [];
+        const protocolos = (resProt && resProt.status === 'success' && Array.isArray(resProt.data)) ? resProt.data : [];
         
         const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
 
@@ -147,11 +156,25 @@ window.openInsumoModal = async (f) => {
         html += renderAdminSection(f, identity);
         html += renderNotificationSection(resNotify.data, f.idformA);
         
-        // Pasamos f (que tiene f.depto) y el array deptos
-        html += renderOrderModificationSection(f, items, deptos);
+        // Pasamos f (que tiene f.depto / IdProtocolo) y los arrays deptos + protocolos
+        html += renderOrderModificationSection(f, items, deptos, protocolos);
 
         container.innerHTML = html;
         document.getElementById('form-insumo-full').onsubmit = (e) => window.saveFullInsumoForm(e);
+
+        // Buscador rápido de protocolo en el modal
+        const protSearch = document.getElementById('insumo-prot-search');
+        const protSelect = document.getElementById('insumo-prot-select');
+        if (protSearch && protSelect) {
+            protSearch.addEventListener('input', () => {
+                const term = protSearch.value.toLowerCase().trim();
+                Array.from(protSelect.options).forEach(opt => {
+                    if (!opt.value) return; // dejar placeholder
+                    const text = opt.textContent.toLowerCase();
+                    opt.hidden = term && !text.includes(term);
+                });
+            });
+        }
         
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-insumo')).show();
     } catch (e) { console.error("Error:", e); }
@@ -160,8 +183,16 @@ window.openInsumoModal = async (f) => {
 /* --- FUNCIONES DE APOYO (DEFINICIONES FALTANTES) --- */
 
 function renderModalHeader(f) {
+    const protLabel = (f.NProtocolo && f.TituloProtocolo)
+        ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
+        : null;
+
     return `<div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
-        <div><h5 class="fw-bold mb-0 text-success">Ficha de Pedido de Insumos</h5><span class="small text-muted">ID: <strong>#${f.idformA}</strong></span></div>
+        <div>
+            <h5 class="fw-bold mb-0 text-success">Ficha de Pedido de Insumos</h5>
+            <span class="small text-muted d-block">ID: <strong>#${f.idformA}</strong></span>
+            ${protLabel ? `<span class="small text-muted d-block">Protocolo: <strong>${protLabel}</strong></span>` : ''}
+        </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
 }
@@ -241,8 +272,31 @@ function renderNotificationSection(lastNotify, idformA) {
     </div>`;
 }
 
-function renderOrderModificationSection(f, items, deptos) {
+function renderOrderModificationSection(f, items, deptos, protocolos) {
     const listaDeptos = Array.isArray(deptos) ? deptos : [];
+    const listaProt = Array.isArray(protocolos) ? protocolos : [];
+
+    const tIns = window.txt?.admin_insumos || {};
+    const labelProt = tIns.label_protocolo || 'Protocolo';
+    const phBuscarProt = tIns.ph_buscar_protocolo || 'Buscar por número, título o investigador...';
+
+    const currentProtId = f.IdProtocolo || '';
+    const currentProtLabel = (f.NProtocolo && f.TituloProtocolo)
+        ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
+        : '—';
+
+    // Aseguramos que el protocolo actual siempre esté en la lista (aunque ya no esté activo)
+    let listaProtFinal = Array.isArray(listaProt) ? [...listaProt] : [];
+    if (currentProtId && !listaProtFinal.some(p => String(p.idprotA) === String(currentProtId))) {
+        if (f.NProtocolo && f.TituloProtocolo) {
+            listaProtFinal.unshift({
+                idprotA: currentProtId,
+                nprotA: f.NProtocolo,
+                tituloA: f.TituloProtocolo,
+                Investigador: f.Investigador || ''
+            });
+        }
+    }
 
     return `
     <div class="p-4 bg-white">
@@ -253,16 +307,28 @@ function renderOrderModificationSection(f, items, deptos) {
             
             <div class="row g-3 mb-4 text-start">
                 <div class="col-md-12">
+                    <label class="small fw-bold uppercase text-muted d-flex justify-content-between align-items-center">
+                        <span>${labelProt}</span>
+                        <input type="text" id="insumo-prot-search" class="form-control form-control-sm ms-2" style="max-width: 260px;" placeholder="${phBuscarProt}">
+                    </label>
+                    <select name="idProt" id="insumo-prot-select" class="form-select form-select-sm fw-bold border-secondary text-primary mt-1" required>
+                        ${listaProtFinal.map(p => {
+                            const isSelected = currentProtId && String(currentProtId) === String(p.idprotA) ? 'selected' : '';
+                            return `<option value="${p.idprotA}" ${isSelected}>#${p.nprotA} - ${p.tituloA} (${p.Investigador})</option>`;
+                        }).join('')}
+                    </select>
+                    <p class="small text-muted mt-1 mb-0"><strong>Actual:</strong> ${currentProtLabel}</p>
+                </div>
+                <div class="col-md-12">
                     <label class="small fw-bold uppercase text-muted">Departamento (departamentoe)</label>
                     <select name="depto" class="form-select form-select-sm fw-bold border-primary text-primary">
                         <option value="">Seleccione Departamento...</option>
                         ${listaDeptos.map(d => {
-                            // CORRECCIÓN: Comparamos d.iddeptoA con f.idDepto (que es el alias del SQL)
-                            // Usamos == para permitir comparación entre string y número
                             const isSelected = (d.iddeptoA == f.idDepto) ? 'selected' : '';
                             return `<option value="${d.iddeptoA}" ${isSelected}>${d.NombreDeptoA}</option>`;
                         }).join('')}
                     </select>
+                    <p class="small text-muted mt-1 mb-0" id="insumo-org-display"><strong>Organización:</strong> ${(f.Organizacion && String(f.Organizacion).trim()) ? f.Organizacion : (window.txt?.generales?.sin_organizacion || '– (sin organización)')}</p>
                 </div>
                 <div class="col-md-6">
                     <label class="small fw-bold uppercase">Fecha Inicio</label>
@@ -395,6 +461,7 @@ function getFilteredAndSortedData() {
                 matchSearch = String(f.idformA || '').includes(term) || 
                               String(f.Investigador || '').toLowerCase().includes(term) || 
                               String(f.Departamento || '').toLowerCase().includes(term) ||
+                              String(f.Organizacion || '').toLowerCase().includes(term) ||
                               String(f.ResumenInsumos || '').toLowerCase().includes(term);
             } else {
                 // Búsqueda específica por columna
@@ -598,6 +665,7 @@ window.downloadInsumoPDF = async (id) => {
 
     const estadoActual = document.getElementById('insumo-status')?.options[document.getElementById('insumo-status').selectedIndex]?.text || '---';
     const deptoNombre = getSelTextByName('depto');
+    const orgNombre = (document.getElementById('insumo-org-display')?.innerText || '').replace(/Organización:\s*/i, '').trim() || (window.txt?.generales?.sin_organizacion || '– (sin organización)');
 
     // 3. CAPTURA DINÁMICA DE PRODUCTOS (La tabla del modal)
     const productRows = document.querySelectorAll('#tbody-items-edit tr');
@@ -627,6 +695,7 @@ window.downloadInsumoPDF = async (id) => {
                 <p style="margin: 5px 0;"><strong>Investigador Responsable:</strong> ${invHeader}</p>
                 <p style="margin: 5px 0; font-size: 11px; color: #555;">${contactoInfo}</p>
                 <p style="margin: 10px 0 0 0;"><strong>Departamento Destino:</strong> <span style="color: #0d6efd;">${deptoNombre}</span></p>
+                <p style="margin: 6px 0 0 0;"><strong>Organización:</strong> <span style="color: #0d6efd;">${orgNombre}</span></p>
                 <p style="margin: 15px 0 0 0; font-size: 14px;"><strong>ESTADO DEL PEDIDO:</strong> <span style="color: #1a5d3b; font-weight: bold; text-transform: uppercase;">${estadoActual}</span></p>
             </div>
 
@@ -661,7 +730,7 @@ window.downloadInsumoPDF = async (id) => {
     `;
 
     const opt = { 
-        margin: [10, 10], 
+        margin: [18, 18, 18, 18], 
         filename: `Pedido_Insumos_${id}_${new Date().getTime()}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 3, useCORS: true, letterRendering: true },
@@ -704,6 +773,7 @@ window.processExcelExportInsumos = () => {
         "ID", 
         "Investigador", 
         "Departamento", 
+        "Organización",
         "Insumos (Cantidad/Medida)", 
         "Fecha Inicio", 
         "Fecha Retiro", 
@@ -722,6 +792,7 @@ window.processExcelExportInsumos = () => {
             r.idformA,
             r.Investigador,
             r.Departamento || '---',
+            (r.Organizacion && String(r.Organizacion).trim()) ? r.Organizacion : (window.txt?.generales?.sin_organizacion || '– (sin organización)'),
             insumosLimpio,
             `="${r.Inicio || '---'}"`, // Truco Excel para mantener formato fecha
             `="${r.Retiro || '---'}"`,

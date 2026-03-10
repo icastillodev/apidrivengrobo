@@ -28,7 +28,25 @@ class InsumoFormularioModel {
         $stmtIns = $this->db->prepare("SELECT idInsumo, NombreInsumo, CantidadInsumo, TipoInsumo, PrecioInsumo FROM insumo WHERE IdInstitucion = ? AND Existencia != 2 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);
 
-        // 4. Tipo de Formulario (Busca el ID correspondiente a la categoría 'Insumos')
+        // 4. Protocolos vigentes (para flujo nuevo por protocolo)
+        $stmtProt = $this->db->prepare("
+            SELECT 
+                p.idprotA,
+                p.nprotA,
+                p.tituloA,
+                CONCAT(per.ApellidoA, ', ', per.NombreA) as Responsable,
+                COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoNombre,
+                pd.iddeptoA as IdDepto
+            FROM protocoloexpe p
+            INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
+            LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
+            LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+            WHERE p.IdInstitucion = ? AND p.FechaFinProtA >= CURDATE()
+            ORDER BY p.nprotA DESC
+        ");
+        $stmtProt->execute([$instId]);
+
+        // 5. Tipo de Formulario (Busca el ID correspondiente a la categoría 'Insumos')
         $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario = 'Insumos' AND IdInstitucion = ? LIMIT 1");
         $stmtType->execute([$instId]);
 
@@ -36,6 +54,7 @@ class InsumoFormularioModel {
             'institucion' => $institucion,
             'departamentos' => $stmtDepto->fetchAll(PDO::FETCH_ASSOC),
             'insumos' => $stmtIns->fetchAll(PDO::FETCH_ASSOC),
+            'protocolos' => $stmtProt->fetchAll(PDO::FETCH_ASSOC),
             'id_tipo_default' => $stmtType->fetchColumn()
         ];
     }
@@ -43,9 +62,19 @@ class InsumoFormularioModel {
     /**
      * Guarda el pedido completo en una transacción
      */
-public function saveOrder($data) {
+    public function saveOrder($data) {
         $this->db->beginTransaction();
         try {
+            // Determinar departamento final: si viene protocolo, lo usamos como fuente
+            $finalDepto = 0;
+            if (!empty($data['idProt'])) {
+                $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
+                $stmtDepto->execute([$data['idProt']]);
+                $finalDepto = $stmtDepto->fetchColumn() ?: 0;
+            } elseif (!empty($data['idDepto'])) {
+                $finalDepto = $data['idDepto'];
+            }
+
             $sqlForm = "INSERT INTO formularioe (
                             tipoA, fechainicioA, fecRetiroA, aclaraA, IdUsrA, 
                             IdInstitucion, depto, estado, visto
@@ -58,7 +87,7 @@ public function saveOrder($data) {
                 $data['aclaraA'],    
                 $data['userId'],
                 $data['instId'],     
-                $data['idDepto']     
+                $finalDepto     
             ]);
             $idForm = $this->db->lastInsertId();
 
@@ -76,10 +105,18 @@ public function saveOrder($data) {
                 $stmtItem->execute([$idPrecioForm, $item['idInsumo'], $item['cantidad'], $precioActual]);
             }
 
+            // Vincular formulario con protocolo (formato nuevo)
+            if (!empty($data['idProt'])) {
+                $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")->execute([$idForm, $data['idProt']]);
+            }
+
             \App\Utils\Auditoria::log($this->db, 'INSERT', 'formularioe', "Nuevo Pedido de Insumos Generales #$idForm");
             
             $this->db->commit();
-            return $idForm; 
+            return [
+                'id' => $idForm,
+                'idDepto' => $finalDepto
+            ]; 
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e; 

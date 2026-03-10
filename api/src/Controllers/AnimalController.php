@@ -16,7 +16,9 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad Total
-            $data = $this->model->getByInstitution($sesion['instId']);
+            // ✅ Respetar la institución que manda el Front (como en protocolos)
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $data = $this->model->getByInstitution($targetInst);
             
             header('Content-Type: application/json');
             echo json_encode(['status' => 'success', 'data' => $data]);
@@ -70,7 +72,8 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion();
-            $count = $this->model->getPendingCount($sesion['instId']);
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $count = $this->model->getPendingCount($targetInst);
             header('Content-Type: application/json');
             echo json_encode(['status' => 'success', 'data' => ['animales' => $count]]);
         } catch (\Exception $e) {

@@ -148,7 +148,7 @@
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_categoria"></label>
                             <select name="categoriaformulario" id="type-cat" class="form-select" required>
-                                <option value="Animal vivo" data-i18n="config_tipos_form.opcion_animal"></option>
+                                <option value="Animal" data-i18n="config_tipos_form.opcion_animal"></option>
                                 <option value="Otros reactivos biologicos" data-i18n="config_tipos_form.opcion_reactivos"></option>
                                 <option value="Insumos" data-i18n="config_tipos_form.opcion_insumos"></option>
                             </select>
@@ -168,6 +168,23 @@
                                     <label class="form-check-label fw-bold ms-2" for="type-exempt" data-i18n="config_tipos_form.label_exento"></label>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_color"></label>
+                            <select name="color" id="type-color" class="form-select">
+                                <option value="" data-i18n="config_tipos_form.color_sin">Sin color (gris)</option>
+                                <option value="verde" data-i18n="config_tipos_form.color_verde">Verde</option>
+                                <option value="rosado" data-i18n="config_tipos_form.color_rosado">Rosado</option>
+                                <option value="rojo" data-i18n="config_tipos_form.color_rojo">Rojo</option>
+                                <option value="violeta" data-i18n="config_tipos_form.color_violeta">Violeta</option>
+                                <option value="azul" data-i18n="config_tipos_form.color_azul">Azul</option>
+                                <option value="celeste" data-i18n="config_tipos_form.color_celeste">Celeste</option>
+                                <option value="bordo" data-i18n="config_tipos_form.color_bordo">Bordo</option>
+                                <option value="amarillo" data-i18n="config_tipos_form.color_amarillo">Amarillo</option>
+                                <option value="verde claro" data-i18n="config_tipos_form.color_verde_claro">Verde claro</option>
+                                <option value="negro" data-i18n="config_tipos_form.color_negro">Negro (texto blanco)</option>
+                            </select>
                         </div>
 
                         <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm text-dark" data-i18n="config_tipos_form.btn_guardar"></button>

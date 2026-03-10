@@ -17,7 +17,7 @@ class UserFormsModel {
         $stmtInst->execute([$currentInstId]);
         $institucion = $stmtInst->fetch(PDO::FETCH_ASSOC);
 
-        $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, f.estado, i.NombreInst as NombreInstitucion, tf.nombreTipo as TipoPedido, tf.categoriaformulario as Categoria, COALESCE(px.nprotA, 'N/A') as Protocolo, COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento FROM formularioe f INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr pf ON f.idformA = pf.idformA LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA LEFT JOIN departamentoe d ON f.depto = d.iddeptoA WHERE f.IdUsrA = ? ORDER BY f.idformA DESC";
+        $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, f.estado, i.NombreInst as NombreInstitucion, tf.nombreTipo as TipoPedido, tf.categoriaformulario as Categoria, tf.color as colorTipo, COALESCE(px.nprotA, 'N/A') as Protocolo, COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento, COALESCE(o.NombreOrganismoSimple, '') as Organizacion FROM formularioe f INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr pf ON f.idformA = pf.idformA LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA LEFT JOIN departamentoe d ON f.depto = d.iddeptoA LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo WHERE f.IdUsrA = ? ORDER BY f.idformA DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
@@ -58,7 +58,7 @@ class UserFormsModel {
             $stmtItems->execute([$id]);
             $details = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
-        } elseif ($head['categoriaformulario'] === 'Animal vivo') {
+        } elseif ($head['categoriaformulario'] === 'Animal') {
             // ANIMALES (Sin cambios en estructura de datos)
             $sqlAni = "SELECT s.machoA, s.hembraA, s.indistintoA, s.totalA, e.EspeNombreA, sub.SubEspeNombreA
                        FROM sexoe s

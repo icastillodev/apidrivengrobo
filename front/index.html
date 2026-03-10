@@ -47,9 +47,9 @@
                 
                 <div class="w-full opacity-50 hover:opacity-100 transition-opacity duration-700">
                     <p class="text-[9px] text-gray-500 uppercase tracking-[2px] font-bold mb-2">
-                        <span class="text-amber-600">●</span> Política de Cookies
+                        <span class="text-amber-600">●</span> <span data-i18n="login.politica_cookies_titulo">Política de Cookies</span>
                     </p>
-                    <p class="text-[9px] text-gray-600 leading-relaxed text-justify font-medium">
+                    <p class="text-[9px] text-gray-600 leading-relaxed text-justify font-medium" data-i18n="login.politica_cookies_texto">
                         Este sistema utiliza cookies técnicas locales estrictamente necesarias para gestionar la seguridad de su sesión y navegación. No se utilizan rastreadores de terceros ni cookies publicitarias. Al acceder, acepta el uso operativo de las mismas.
                     </p>
                 </div>
@@ -63,8 +63,8 @@
                         <a href="https://www.appgrobo.com">
                         <h1 class="text-4xl font-bold mb-2 tracking-tighter italic">G.R.O.B.O.</h1>
                         <h2 class="text-sm font-light mb-6 text-amber-500 uppercase tracking-widest">Gestor de Reactivos Biológicos Online</h2></a>
-                        <p class="text-[#888] leading-relaxed text-[11px] text-justify border-t border-gray-800 pt-6">
-                            Desarrollado por <strong>Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación con la direccion de Martin Breijo</strong>, GROBO es una ERP web que permite gestionar protocolos, gastos y peticiones referentes al uso de animales, alineada a estándares de la CNEA.
+                        <p class="text-[#888] leading-relaxed text-[11px] text-justify border-t border-gray-800 pt-6" data-i18n="login.desarrollado_por_geckos">
+                            Desarrollado por Geckos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación
                         </p>
                     </div>
                 </div>
@@ -85,16 +85,14 @@
  
                     <div class="p-8 pb-0 flex justify-between items-center w-full">
                         <div id="web-link-container" class="hidden">
-                            <a id="inst-web-link" href="#" target="_blank" class="text-green-700 font-bold text-[11px] uppercase transition-colors tracking-tighter italic">
-                                &#8617; regresar web
-                            </a>
+                            <a id="inst-web-link" href="#" target="_blank" class="text-green-700 font-bold text-[11px] uppercase transition-colors tracking-tighter italic" data-i18n="login.regresar_web">&#8617; regresar web</a>
                         </div>
                         
                         <button id="btn-opciones" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-700 rounded-full transition-all text-[10px] font-bold uppercase tracking-widest ml-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
-                            Opciones de acceso
+                            <span data-i18n="login.opciones_acceso">Opciones de acceso</span>
                         </button>
                     </div>
 
@@ -107,8 +105,7 @@
 
                                 <h2 id="inst-welcome" class="text-3xl font-black text-gray-900 mb-0 uppercase tracking-tighter italic" data-i18n="login.validando">Validando...</h2>
                                 <p id="inst-full-name" class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-4"></p>
-                                <p class="text-gray-500 text-sm font-medium mb-4" data-i18n="login.tagline">Grobo gestor de reactivos biológicos online</p>
-                                <p class="text-gray-500 text-sm italic font-medium" data-i18n="login.credenciales">Ingresa tus credenciales para continuar</p>
+                                <p class="text-gray-500 text-sm italic font-medium mb-4" data-i18n="login.credenciales">Ingresa tus credenciales para continuar</p>
                             </div>
 
                             <form id="login-form" class="space-y-4 sm:space-y-5 hidden">
@@ -279,7 +276,18 @@
                         title: '<span class="text-2xl font-black italic text-gray-800">OPCIONES</span>',
                         html: `
                             <div class="flex flex-col gap-4 mt-4">
-                                
+                                <a id="btn-open-page" href="#" class="flex flex-col items-center justify-center gap-1 w-full p-3 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors focus:outline-none group text-decoration-none">
+                                    <div class="flex items-center gap-2 text-amber-700 group-hover:text-amber-800 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                        <span class="font-bold text-sm uppercase tracking-widest">
+                                            Abrir página de acceso
+                                        </span>
+                                    </div>
+                                    <span class="text-[9px] text-amber-600 font-medium">Abrir esta página en el navegador (para guardar en favoritos)</span>
+                                </a>
+
                                 <button id="btn-browser-bookmark" class="flex flex-col items-center justify-center gap-1 w-full p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors focus:outline-none group">
                                     <div class="flex items-center gap-2 text-gray-400 group-hover:text-amber-500 transition-colors">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -301,7 +309,24 @@
                         showConfirmButton: false,
                         showCloseButton: true,
                         didOpen: () => {
-                            
+                            const currentUrl = window.location.href;
+
+                            // Abrir página de acceso: navega a la URL HTML (evita descarga .txt)
+                            const btnOpenPage = document.getElementById('btn-open-page');
+                            if (btnOpenPage) {
+                                btnOpenPage.href = currentUrl;
+                                btnOpenPage.setAttribute('target', '_blank');
+                                var spans = btnOpenPage.querySelectorAll('span');
+                                if (window.txt && window.txt.login) {
+                                    if (window.txt.login.opciones_abrir_pagina && spans[0]) spans[0].textContent = window.txt.login.opciones_abrir_pagina;
+                                    if (window.txt.login.opciones_abrir_pagina_desc && spans[1]) spans[1].textContent = window.txt.login.opciones_abrir_pagina_desc;
+                                }
+                                btnOpenPage.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    window.open(currentUrl, '_blank', 'noopener');
+                                });
+                            }
+
                             // Lógica del botón de Marcadores
                             const btnBookmark = document.getElementById('btn-browser-bookmark');
                             btnBookmark.addEventListener('click', () => {
@@ -318,19 +343,19 @@
                             const btnDesktop = document.getElementById('btn-desktop-shortcut');
                             if (btnDesktop) {
                                 btnDesktop.addEventListener('click', () => {
-                                    // Limpiamos el nombre de la institución si existe para el nombre del archivo
                                     const instName = document.getElementById('inst-name') ? document.getElementById('inst-name').innerText : 'GROBO';
-                                    const fileName = `${instName}_Acceso.url`.replace(/[^a-z0-9]/gi, '_');
+                                    const fileName = `${instName}_Acceso.url`.replace(/[^a-z0-9_.]/gi, '_');
 
                                     const url = window.location.href;
-                                    const fileContent = "[InternetShortcut]\nURL=" + url;
-                                    
-                                    const blob = new Blob([fileContent], { type: "text/plain" });
+                                    const fileContent = "[InternetShortcut]\r\nURL=" + url + "\r\n";
+
+                                    const blob = new Blob([fileContent], { type: "application/internet-shortcut" });
                                     const a = document.createElement("a");
                                     a.href = URL.createObjectURL(blob);
-                                    a.download = fileName;
+                                    a.download = fileName.endsWith('.url') ? fileName : fileName + '.url';
                                     document.body.appendChild(a);
                                     a.click();
+                                    URL.revokeObjectURL(a.href);
                                     document.body.removeChild(a);
 
                                     Swal.fire({

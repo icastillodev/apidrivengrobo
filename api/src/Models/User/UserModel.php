@@ -26,6 +26,8 @@ class UserModel {
                     JOIN protocoloexpe pe ON pf.idprotA = pe.idprotA
                     WHERE f.IdUsrA = u.IdUsrA) as OtrosCeuaCount
                     ,
+                    (SELECT COUNT(*) FROM protocoloexpe WHERE IdUsrA = u.IdUsrA AND IdInstitucion = u.IdInstitucion) as ProtocolCount
+                    ,
                     COALESCE(a.ActivoA, 1) as ActivoA,
                     t.IdTipousrA
                 FROM usuarioe u
@@ -44,14 +46,21 @@ class UserModel {
         try {
             $this->db->beginTransaction();
 
-            $token = bin2hex(random_bytes(32)); 
+            $email = isset($data['EmailA']) && is_string($data['EmailA']) ? trim($data['EmailA']) : '';
+            if ($email !== '' && $this->existsEmailInInstitution($email, $data['IdInstitucion'] ?? 0)) {
+                $this->db->rollBack();
+                return ['status' => false, 'message' => 'email_duplicate_institution'];
+            }
+
+            $usuario = is_string($data['usuario'] ?? '') ? strtolower(trim($data['usuario'])) : ($data['usuario'] ?? '');
+            $token = bin2hex(random_bytes(32));
             $passHash = password_hash($data['contrasena'], PASSWORD_BCRYPT);
 
-            $sqlUser = "INSERT INTO usuarioe (UsrA, password_secure, IdInstitucion, token_confirmacion, confirmado) 
+            $sqlUser = "INSERT INTO usuarioe (UsrA, password_secure, IdInstitucion, token_confirmacion, confirmado)
                         VALUES (?, ?, ?, ?, 0)";
             $stmtUser = $this->db->prepare($sqlUser);
             $stmtUser->execute([
-                $data['usuario'], 
+                $usuario, 
                 $passHash, 
                 $data['IdInstitucion'], 
                 $token
@@ -110,8 +119,23 @@ class UserModel {
     }
 
     public function existsUsername($user) {
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM usuarioe WHERE UsrA = ?");
+        $user = is_string($user) ? strtolower(trim($user)) : $user;
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM usuarioe WHERE LOWER(TRIM(UsrA)) = ?");
         $stmt->execute([$user]);
+        return $stmt->fetchColumn() > 0;
+    }
+
+    /**
+     * Comprueba si el correo ya está registrado en la misma institución.
+     * El mismo correo puede existir en distintas instituciones.
+     */
+    public function existsEmailInInstitution($email, $instId) {
+        if (!is_string($email) || trim($email) === '') return false;
+        $sql = "SELECT 1 FROM personae p 
+                INNER JOIN usuarioe u ON p.IdUsrA = u.IdUsrA 
+                WHERE TRIM(p.EmailA) = ? AND u.IdInstitucion = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([trim($email), $instId]);
         return $stmt->fetchColumn() > 0;
     }
 
@@ -153,9 +177,10 @@ class UserModel {
     }
 
     public function getUserForRecovery($email, $username, $instId) {
+        $username = is_string($username) ? strtolower(trim($username)) : $username;
         $sql = "SELECT p.IdUsrA, p.NombreA FROM personae p 
                 JOIN usuarioe u ON p.IdUsrA = u.IdUsrA 
-                WHERE p.EmailA = ? AND u.UsrA = ? AND u.IdInstitucion = ? LIMIT 1";
+                WHERE p.EmailA = ? AND LOWER(TRIM(u.UsrA)) = ? AND u.IdInstitucion = ? LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$email, $username, $instId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);

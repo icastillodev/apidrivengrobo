@@ -21,6 +21,11 @@
             background: rgba(255,255,255,0.8); z-index: 9999;
             display: flex; align-items: center; justify-content: center;
         }
+        /* Evitar que la sección Servicios quede truncada (texto/tabla cortada) */
+        .precios-seccion-servicios { overflow: visible; min-height: 0; }
+        .precios-seccion-servicios .table-responsive { overflow-x: auto; overflow-y: visible; max-height: none; }
+        .precios-seccion-servicios .table td { white-space: normal; word-wrap: break-word; }
+        .precios-seccion-servicios .precios-servicios-ayuda { white-space: normal; }
     </style>
 
     <script type="module">
@@ -158,8 +163,9 @@
                 </div>
             </div>
 
-            <div class="mb-4">
+            <div class="mb-4 precios-seccion-servicios">
                 <h6 class="fw-bold text-dark text-uppercase small border-bottom pb-2 mb-3" id="lbl-sec-serv" data-i18n="precios.sec_services">4. Servicios Institucionales</h6>
+                <p class="small text-muted precios-servicios-ayuda mb-3" id="lbl-sec-serv-desc" data-i18n="precios.sec_services_desc">Servicios adicionales de la institución (ej. análisis, autoclave, mano de obra).</p>
                 <div class="table-responsive">
                     <table class="table table-sm border shadow-sm align-middle">
                         <thead class="bg-light small uppercase">

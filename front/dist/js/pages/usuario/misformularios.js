@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 
 let allForms = [];
 let currentPage = 1;
@@ -59,10 +60,11 @@ function renderTable() {
         tr.className = 'clickable-row align-middle';
         tr.onclick = (e) => { if (!e.target.closest('button')) openDetailModal(f.idformA); };
 
+        const badgeStyle = getTipoFormBadgeStyle(f.colorTipo);
+        const tipoLabel = (f.TipoPedido || f.Categoria || '').trim() || (window.txt?.misformularios?.general || 'General');
         const categoryHtml = `
             <div class="d-flex flex-column">
-                <span class="fw-bold text-dark" style="font-size: 11px;">${f.Categoria || (window.txt?.misformularios?.general || 'General')}</span>
-                <span class="text-muted text-uppercase" style="font-size: 9px;">${f.TipoPedido || ''}</span>
+                <span class="${badgeStyle.className}" style="${badgeStyle.style} font-size: 10px; padding: 3px 8px; width: fit-content;">${tipoLabel.replace(/</g, '&lt;')}</span>
             </div>
         `;
 
@@ -74,6 +76,7 @@ function renderTable() {
             <td class="small">${f.Retiro || '-'}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Protocolo}">${f.Protocolo}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Departamento}">${f.Departamento}</td>
+            <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
             <td class="text-center">${getStatusBadge(f.estado)}</td>
             <td class="text-end pe-3">
                 <button class="btn btn-sm btn-light border shadow-sm text-danger" onclick="window.downloadPDF(${f.idformA})" title="Descargar PDF">
@@ -215,7 +218,7 @@ window.openDetailModal = async (id) => {
                     </div>`;
             } 
             // 2. CASO ANIMALES VIVOS
-            else if (h.categoriaformulario === 'Animal vivo') {
+            else if (h.categoriaformulario === 'Animal') {
                 contentHtml += `
                     <div class="card bg-light border-0 p-3">
                         <p class="mb-2 fs-6"><strong>Especie:</strong> ${d.EspeNombreA} - ${d.SubEspeNombreA}</p>
@@ -325,7 +328,7 @@ window.downloadPDF = async (id) => {
                     </table>`;
             } 
             // 2. CASO ANIMAL VIVO
-            else if (categoria === 'Animal vivo' && d) {
+            else if (categoria === 'Animal' && d) {
                 technicalHtml = `
                     <div style="border:1px solid #ddd; padding:10px; margin-top:10px; border-radius:4px;">
                         <p style="margin:0 0 5px 0; font-size:12px;"><strong>Especie:</strong> ${d.EspeNombreA || ''} - ${d.SubEspeNombreA || ''}</p>
@@ -417,7 +420,7 @@ window.downloadPDF = async (id) => {
             Swal.close();
             
             const opt = { 
-                margin: 10, 
+                margin: [18, 18, 18, 18], 
                 filename: `Pedido_${h.idformA}_${instName}.pdf`, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 html2canvas: { scale: 2, useCORS: true } 
@@ -645,10 +648,10 @@ window.processExcelExport = () => {
     if (!start || !end) return Swal.fire('Atención', 'Seleccione fechas.', 'warning');
     const data = allForms.filter(r => { const f = r.Inicio || '0000-00-00'; return f >= start && f <= end; });
     if (data.length === 0) return Swal.fire('Sin datos', 'No hay registros.', 'info');
-    const headers = ["ID", "Institución", "Categoría", "Tipo", "Inicio", "Retiro", "Protocolo", "Departamento", "Estado"];
+    const headers = ["ID", "Institución", "Categoría", "Tipo", "Inicio", "Retiro", "Protocolo", "Departamento", "Organización", "Estado"];
     const rows = [headers.join(";")];
     data.forEach(r => {
-        const row = [r.idformA, r.NombreInstitucion, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.estado];
+        const row = [r.idformA, r.NombreInstitucion, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', r.estado];
         rows.push(row.map(v => String(v).replace(/;/g, ',')).join(";"));
     });
     const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });

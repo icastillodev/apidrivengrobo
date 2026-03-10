@@ -26,18 +26,19 @@ class AdminConfigFormTypesModel {
         $descuento = $data['descuento'] ?? 0;
         $exento = isset($data['exento']) ? 1 : 0; 
         $instId = $data['instId'];
+        $color = !empty($data['color']) ? trim($data['color']) : null;
 
         if (empty($id)) {
-            $sql = "INSERT INTO tipoformularios (nombreTipo, categoriaformulario, exento, descuento, IdInstitucion) 
-                    VALUES (?, ?, ?, ?, ?)";
-            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $instId]);
+            $sql = "INSERT INTO tipoformularios (nombreTipo, categoriaformulario, exento, descuento, IdInstitucion, color) 
+                    VALUES (?, ?, ?, ?, ?, ?)";
+            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $instId, $color]);
             
             Auditoria::log($this->db, 'INSERT', 'tipoformularios', "Creó Formulario: $nombre ($categoria)");
             return $res;
         } else {
-            $sql = "UPDATE tipoformularios SET nombreTipo=?, categoriaformulario=?, exento=?, descuento=? 
+            $sql = "UPDATE tipoformularios SET nombreTipo=?, categoriaformulario=?, exento=?, descuento=?, color=? 
                     WHERE IdTipoFormulario=?";
-            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $id]);
+            $res = $this->db->prepare($sql)->execute([$nombre, $categoria, $exento, $descuento, $color, $id]);
             
             Auditoria::log($this->db, 'UPDATE', 'tipoformularios', "Modificó Formulario ID: $id");
             return $res;

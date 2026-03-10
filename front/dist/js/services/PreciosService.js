@@ -126,7 +126,7 @@ export const PreciosService = {
                         </div>
                     </div>
 
-                    <div style="padding: 15px; background: #fff4f4; border: 1px solid #f5c2c2; border-radius: 4px;">
+                    <div style="padding: 15px; background: #f0f2f5; border: 1px solid #dee2e6; border-radius: 4px;">
                         <span style="font-size: 14px; font-weight: bold; color: #000;">JORNAL DE TRABAJO EXPERIMENTAL:</span>
                         <span style="float: right; color: #000; font-weight: bold; font-size: 16px;">
                             $ ${data.institucion.PrecioJornadaTrabajoExp || 0}
@@ -144,7 +144,7 @@ export const PreciosService = {
 
             // 5. Generar PDF (filename con timestamp para evitar cache del navegador)
             const opt = {
-                margin: 0,
+                margin: [18, 18, 18, 18],
                 filename: `Tarifario_${instNombre}_${fechaActual.replace(/\//g, '-')}_${Date.now()}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2, logging: false, backgroundColor: '#ffffff', useCORS: true },

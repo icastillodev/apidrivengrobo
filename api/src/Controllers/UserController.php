@@ -363,12 +363,13 @@ class UserController {
             echo json_encode(['status' => 'error', 'message' => 'Datos de registro vacíos']);
             exit;
         }
+        $data['usuario'] = isset($data['usuario']) && is_string($data['usuario']) ? strtolower(trim($data['usuario'])) : ($data['usuario'] ?? '');
 
         $res = $this->model->registerUser($data);
 
         if ($res['status']) {
             // Log manual público
-            Auditoria::logManual($this->db, 0, 'INSERT', 'usuarioe', "Nuevo Registro Público: {$data['usuario']}");
+            Auditoria::logManual($this->db, 0, 'INSERT', 'usuarioe', "Nuevo Registro Público: " . strtolower(trim($data['usuario'] ?? '')));
 
             $mailService = new MailService();
             $instInfo = $this->model->getInstitutionName($data['IdInstitucion']);
@@ -412,7 +413,7 @@ class UserController {
     public function checkUsername() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $user = $_GET['user'] ?? '';
+        $user = isset($_GET['user']) && is_string($_GET['user']) ? strtolower(trim($_GET['user'])) : '';
         echo json_encode(['available' => !$this->model->existsUsername($user)]);
         exit;
     }
@@ -421,7 +422,9 @@ class UserController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents("php://input"), true);
-        
+        if (isset($data['user']) && is_string($data['user'])) {
+            $data['user'] = strtolower(trim($data['user']));
+        }
         $user = $this->model->getUserForRecovery($data['email'], $data['user'], $data['IdInstitucion']);
 
         if ($user) {

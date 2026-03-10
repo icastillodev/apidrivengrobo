@@ -42,6 +42,38 @@ class BillingController {
             $deudaAnimales = 0; $deudaReactivos = 0; $deudaAlojamiento = 0;
             $totalPagadoGlobal = $pagadoInsumos;
 
+            // Formato viejo: pedidos del departamento sin vincular a ningún protocolo
+            $pedidosSinProt = $this->model->getPedidosDeptoSinProtocolo($deptoId, $desde, $hasta);
+            if (!empty($pedidosSinProt)) {
+                $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
+                foreach ($pedidosSinProt as $form) {
+                    $cat = strtolower($form['categoria'] ?? '');
+                    $montoDebe = (float)$form['debe'];
+                    if (strpos($cat, 'reactivo') !== false) {
+                        $sumDebeRea += $montoDebe;
+                    } else {
+                        $sumDebeAni += $montoDebe;
+                    }
+                    $sumPagadoF += (float)$form['pagado'];
+                }
+                $reporte[] = [
+                    'idProt'           => 0,
+                    'nprotA'           => 'Departamento (sin protocolo)',
+                    'tituloA'          => '',
+                    'investigador'     => '—',
+                    'idUsr'            => 0,
+                    'saldoInv'         => 0,
+                    'deudaAnimales'    => $sumDebeAni,
+                    'deudaReactivos'   => $sumDebeRea,
+                    'deudaAlojamiento' => 0,
+                    'formularios'      => $pedidosSinProt,
+                    'alojamientos'     => []
+                ];
+                $deudaAnimales += $sumDebeAni;
+                $deudaReactivos += $sumDebeRea;
+                $totalPagadoGlobal += $sumPagadoF;
+            }
+
             foreach ($protocolosRaw as $p) {
                 $idProt = $p['idprotA'];
                 $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
@@ -99,6 +131,102 @@ class BillingController {
                 'insumosGenerales' => $insumosGenerales,
                 'protocolos'       => $reporte
             ]);
+        } catch (\Exception $e) { $this->sendError($e->getMessage()); }
+    }
+
+    /**
+     * Reporte de facturación agrupado por organización (cada org con sus departamentos y datos de billing).
+     */
+    public function getOrgReport() {
+        if (ob_get_length()) ob_clean();
+        $f = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $sesion['instId'];
+            $desde  = $f['desde'] ?? null;
+            $hasta  = $f['hasta'] ?? null;
+
+            $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
+            $organizacionesRaw = $this->model->getOrganizacionesConDeptos($instId);
+            $organizaciones = [];
+
+            foreach ($organizacionesRaw as $org) {
+                $totalesOrg = ['globalDeuda' => 0, 'deudaAnimales' => 0, 'deudaReactivos' => 0, 'deudaAlojamiento' => 0, 'deudaInsumos' => 0, 'totalPagado' => 0];
+                $departamentos = [];
+
+                foreach ($org['departamentos'] as $d) {
+                    $deptoId = $d['iddeptoA'];
+                    $insumosGenerales = $this->model->getInsumosGenerales($deptoId, $desde, $hasta);
+                    foreach ($insumosGenerales as &$ins) {
+                        $ins['saldoInv'] = (float)($mapaSaldos[$ins['IdUsrA'] ?? 0] ?? 0);
+                    }
+                    $deudaInsumos = array_sum(array_column($insumosGenerales, 'debe'));
+                    $pagadoInsumos = array_sum(array_column($insumosGenerales, 'pagado'));
+
+                    $protocolosRaw = $this->model->getProtocolosByDepto($deptoId);
+                    $reporte = [];
+                    $deudaAnimales = 0; $deudaReactivos = 0; $deudaAlojamiento = 0; $totalPagadoDepto = $pagadoInsumos;
+
+                    foreach ($protocolosRaw as $p) {
+                        $idProt = $p['idprotA'];
+                        $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                        $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+
+                        if (!empty($formularios) || !empty($alojamientos)) {
+                            $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
+                            foreach ($formularios as $form) {
+                                $cat = strtolower($form['categoria'] ?? '');
+                                $montoDebe = (float)$form['debe'];
+                                if (strpos($cat, 'reactivo') !== false) $sumDebeRea += $montoDebe;
+                                else $sumDebeAni += $montoDebe;
+                                $sumPagadoF += (float)$form['pagado'];
+                            }
+                            $sumDebeAlo = array_sum(array_column($alojamientos, 'debe'));
+                            $sumPagadoAlo = array_sum(array_column($alojamientos, 'pagado'));
+                            $uid = $p['IdUsrA'];
+                            $reporte[] = [
+                                'idProt' => $idProt, 'nprotA' => $p['nprotA'], 'tituloA' => $p['tituloA'],
+                                'investigador' => $p['Investigador'], 'idUsr' => $uid,
+                                'saldoInv' => (float)($mapaSaldos[$uid] ?? 0),
+                                'deudaAnimales' => $sumDebeAni, 'deudaReactivos' => $sumDebeRea, 'deudaAlojamiento' => $sumDebeAlo,
+                                'formularios' => $formularios, 'alojamientos' => $alojamientos
+                            ];
+                            $deudaAnimales += $sumDebeAni; $deudaReactivos += $sumDebeRea; $deudaAlojamiento += $sumDebeAlo;
+                            $totalPagadoDepto += ($sumPagadoF + $sumPagadoAlo);
+                        }
+                    }
+
+                    $totalesDepto = [
+                        'globalDeuda' => ($deudaAnimales + $deudaReactivos + $deudaAlojamiento + $deudaInsumos),
+                        'deudaAnimales' => $deudaAnimales, 'deudaReactivos' => $deudaReactivos,
+                        'deudaAlojamiento' => $deudaAlojamiento, 'deudaInsumos' => $deudaInsumos,
+                        'totalPagado' => $totalPagadoDepto
+                    ];
+                    $totalesOrg['globalDeuda'] += $totalesDepto['globalDeuda'];
+                    $totalesOrg['deudaAnimales'] += $totalesDepto['deudaAnimales'];
+                    $totalesOrg['deudaReactivos'] += $totalesDepto['deudaReactivos'];
+                    $totalesOrg['deudaAlojamiento'] += $totalesDepto['deudaAlojamiento'];
+                    $totalesOrg['deudaInsumos'] += $totalesDepto['deudaInsumos'];
+                    $totalesOrg['totalPagado'] += $totalesDepto['totalPagado'];
+
+                    $departamentos[] = [
+                        'iddeptoA' => $deptoId,
+                        'NombreDeptoA' => $d['NombreDeptoA'],
+                        'totales' => $totalesDepto,
+                        'insumosGenerales' => $insumosGenerales,
+                        'protocolos' => $reporte
+                    ];
+                }
+
+                $organizaciones[] = [
+                    'idOrganismo' => $org['idOrganismo'],
+                    'nombre' => $org['nombre'],
+                    'totales' => $totalesOrg,
+                    'departamentos' => $departamentos
+                ];
+            }
+
+            $this->sendSuccess(['organizaciones' => $organizaciones]);
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
     }
 
@@ -264,6 +392,7 @@ class BillingController {
             $info = $this->model->getProtocolHeaderInfo($idProt);
             $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
             $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+            $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
 
             $deudaAni = 0; $deudaRea = 0; $pagadoTotal = 0;
 
@@ -276,15 +405,20 @@ class BillingController {
             $deudaAloj = array_sum(array_column($alojamientos, 'debe'));
             $pagadoTotal += array_sum(array_column($alojamientos, 'pagado'));
 
+            $deudaInsumos = array_sum(array_column($insumos, 'debe'));
+            $pagadoTotal += array_sum(array_column($insumos, 'pagado'));
+
             $this->jsonResponse('success', [
                 'info' => $info,
                 'formularios' => $formularios,
                 'alojamientos' => $alojamientos,
+                'insumos' => $insumos,
                 'totales' => [
                     'deudaAnimales'    => $deudaAni,
                     'deudaReactivos'   => $deudaRea,
                     'deudaAlojamiento' => $deudaAloj,
-                    'deudaTotal'       => ($deudaAni + $deudaRea + $deudaAloj),
+                    'deudaInsumos'     => $deudaInsumos,
+                    'deudaTotal'       => ($deudaAni + $deudaRea + $deudaAloj + $deudaInsumos),
                     'totalPagado'      => $pagadoTotal
                 ]
             ]);

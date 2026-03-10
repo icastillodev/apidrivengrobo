@@ -106,7 +106,7 @@ window.cargarFacturacionInvestigador = async () => {
     const chkAni = document.getElementById('chk-animales').checked;
     const chkIns = document.getElementById('chk-insumos').checked;
 
-    if (!idUsr) return Swal.fire('Atención', 'Seleccione un investigador de la lista.', 'warning');
+    if (!idUsr) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_investigador || 'Seleccione un investigador de la lista.', 'warning');
 
     try {
         showLoader();
@@ -114,7 +114,7 @@ window.cargarFacturacionInvestigador = async () => {
         if (res.status === 'success') {
             window.currentReportData = res.data; 
             renderizarResultados(res.data);
-        } else { Swal.fire('Error', res.message, 'error'); }
+        } else { Swal.fire(window.txt?.generales?.error || 'Error', res.message, 'error'); }
     } catch (error) { console.error("Error en búsqueda:", error); } finally { hideLoader(); }
 };
 
@@ -437,11 +437,14 @@ window.abrirAyudaBilling = () => { new bootstrap.Modal(document.getElementById('
 // EXPORTADOR DE PDF GLOBAL
 // =====================================
 window.downloadGlobalPDF = async () => {
-    if (!window.currentReportData) return Swal.fire('Aviso', 'No hay datos cargados.', 'info');
+    if (!window.currentReportData) return Swal.fire(window.txt?.generales?.swal_atencion || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
     
     showLoader();
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4'); 
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const M = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const invNombre = window.currentReportData.perfil?.NombreCompleto || 'INVESTIGADOR';
     const azulGecko = [13, 110, 253];
@@ -449,15 +452,15 @@ window.downloadGlobalPDF = async () => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     doc.setTextColor(azulGecko[0], azulGecko[1], azulGecko[2]);
-    doc.text("ESTADO DE CUENTA INTEGRAL", 148, 15, { align: "center" });
+    doc.text("ESTADO DE CUENTA INTEGRAL", 148, M, { align: "center" });
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text(`INVESTIGADOR: ${invNombre.toUpperCase()}`, 148, 22, { align: "center" });
-    doc.line(15, 25, 282, 25);
+    doc.text(`INVESTIGADOR: ${invNombre.toUpperCase()}`, 148, M + 7, { align: "center" });
+    doc.line(M, M + 10, right, M + 10);
 
     const t = window.currentReportData.totales;
     doc.autoTable({
-        startY: 30,
+        startY: M + 15, margin: { left: M, right: M },
         head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'TOTAL PAGADO (+EX)', 'DEUDA TOTAL']],
         body: [[
             `$ ${t.deudaAnimales.toFixed(2)}`, `$ ${t.deudaReactivos.toFixed(2)}`, 
@@ -473,14 +476,14 @@ window.downloadGlobalPDF = async () => {
     let currentY = doc.lastAutoTable.finalY + 10;
 
     window.currentReportData.protocolos.forEach((prot) => {
-        if (currentY > 160) { doc.addPage(); currentY = 20; }
+        if (currentY > 160) { doc.addPage(); currentY = M; }
 
         doc.setFillColor(245, 245, 245);
-        doc.rect(15, currentY, 267, 8, 'F');
+        doc.rect(M, currentY, right - M, 8, 'F');
         doc.setFontSize(9);
         doc.setTextColor(0);
         doc.setFont("helvetica", "bold");
-        doc.text(`PROT: ${prot.nprotA} - ${prot.tituloA}`, 18, currentY + 6);
+        doc.text(`PROT: ${prot.nprotA} - ${prot.tituloA}`, M + 3, currentY + 6);
         
         const bodyItems = [
             ...(prot.formularios || []).map(f => {
@@ -509,7 +512,7 @@ window.downloadGlobalPDF = async () => {
         ];
 
         doc.autoTable({
-            startY: currentY + 8,
+            startY: currentY + 8, margin: { left: M, right: M },
             head: [['ID', 'Fecha', 'Especie', 'Detalle', 'Total', 'Pagado', 'Debe']],
             body: bodyItems,
             theme: 'striped',
@@ -544,20 +547,23 @@ window.downloadProtocoloPDF = async (idProt) => {
 
     showLoader();
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF(); 
+    const doc = new jsPDF();
+    const M = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const invNombre = window.currentReportData.perfil?.NombreCompleto || 'INVESTIGADOR';
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
+    doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
 
     doc.setFontSize(11); doc.setTextColor(100);
-    doc.text("ESTADO DE CUENTA INDIVIDUAL POR PROTOCOLO", 105, 22, { align: "center" });
-    doc.line(20, 25, 190, 25);
+    doc.text("ESTADO DE CUENTA INDIVIDUAL POR PROTOCOLO", 105, M + 7, { align: "center" });
+    doc.line(M, M + 10, right, M + 10);
 
     doc.setFontSize(9); doc.setTextColor(0);
-    doc.text(`Protocolo: ${prot.tituloA}`, 20, 35);
-    doc.text(`Investigador: ${invNombre}`, 20, 41);
+    doc.text(`Protocolo: ${prot.tituloA}`, M, M + 20);
+    doc.text(`Investigador: ${invNombre}`, M, M + 26);
 
     const bodyAll = [
         ...(prot.formularios || []).map(f => {
@@ -576,7 +582,7 @@ window.downloadProtocoloPDF = async (idProt) => {
     ];
 
     doc.autoTable({
-        startY: 55, head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
+        startY: M + 32, margin: { left: M, right: M }, head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
         styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
     });
@@ -586,7 +592,7 @@ window.downloadProtocoloPDF = async (idProt) => {
     const pPago = pTotal - pDebe;
 
     let currentY = doc.lastAutoTable.finalY + 10;
-    if (currentY > 250) { doc.addPage(); currentY = 20; }
+    if (currentY > 250) { doc.addPage(); currentY = M; }
 
     doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
     doc.setFontSize(9); doc.setTextColor(100);

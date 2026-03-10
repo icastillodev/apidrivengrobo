@@ -30,9 +30,9 @@ export async function initRecuperar() {
 
         try {
             // Enviamos el objeto con la clave 'user' que espera el Backend
-            const res = await API.request('/forgot-password', 'POST', { 
+            const res = await API.request('/forgot-password', 'POST', {
                 email: emailValue,
-                user: userValue, 
+                user: (userValue || '').trim().toLowerCase(),
                 slug: slug,
                 IdInstitucion: localStorage.getItem('instId'),
                 lang: localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es'

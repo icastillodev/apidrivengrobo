@@ -55,6 +55,20 @@ class ProtocolModel {
                     tp.NombreTipoprotocolo as TipoNombre, 
                     ts.NombreSeveridad as SeveridadNombre,
 
+                    -- Bandera de interno/externo según Deptos/Organismos
+                    (
+                        SELECT 
+                            CASE 
+                                WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2
+                                ELSE 1
+                            END
+                        FROM protdeptor pd2
+                        JOIN departamentoe d ON pd2.iddeptoA = d.iddeptoA
+                        LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
+                        WHERE pd2.idprotA = pe.idprotA
+                        LIMIT 1
+                    ) AS DeptoExternoFlag,
+
                     COALESCE(
                         (SELECT GROUP_CONCAT(e.EspeNombreA SEPARATOR ', ') 
                          FROM protesper pre 

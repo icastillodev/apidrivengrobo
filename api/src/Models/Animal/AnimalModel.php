@@ -13,23 +13,38 @@ class AnimalModel {
 
 // api/src/Models/Animal/AnimalModel.php
 
-public function getByInstitution($instId) {
+    public function getByInstitution($instId) {
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
                     f.aclaraA as Aclaracion, f.estado, f.quienvisto as QuienVio, 
                     f.edadA as Edad, f.pesoA as Peso, f.aclaracionadm as AclaracionAdm,
-                    f.raza, -- 🚀 AQUI AGREGAMOS LA RAZA
+                    f.raza,
                     f.IdUsrA as IdInvestigador, f.idsubespA,
                     CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
                     pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
                     tf.nombreTipo as TipoNombre,
+                    tf.color as colorTipo,
                     px.nprotA as NProtocolo, px.idprotA,
                     px.protocoloexpe as IsExterno, 
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
                     CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie, 
                     COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
-                    se.Psubanimal as PrecioUnit 
+                    se.Psubanimal as PrecioUnit,
+                    (
+                        SELECT 
+                            CASE 
+                                WHEN d2.externodepto = 2 OR (d2.externodepto IS NULL AND o2.externoorganismo = 2) THEN 2
+                                ELSE 1
+                            END
+                        FROM protformr pf2
+                        JOIN protocoloexpe px2 ON pf2.idprotA = px2.idprotA
+                        LEFT JOIN protdeptor pd2 ON px2.idprotA = pd2.idprotA
+                        LEFT JOIN departamentoe d2 ON pd2.iddeptoA = d2.iddeptoA
+                        LEFT JOIN organismoe o2 ON d2.organismopertenece = o2.IdOrganismo
+                        WHERE pf2.idformA = f.idformA
+                        LIMIT 1
+                    ) as DeptoExternoFlag
                 FROM formularioe f
                 INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
@@ -39,9 +54,10 @@ public function getByInstitution($instId) {
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
                 LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
                 WHERE f.IdInstitucion = ? 
-                  AND tf.categoriaformulario = 'Animal vivo'
+                  AND tf.categoriaformulario IN ('Animal', 'Animal vivo')
                 ORDER BY f.idformA DESC";
         
         $stmt = $this->db->prepare($sql);
@@ -112,22 +128,22 @@ public function updateStatus($data) {
     }
 
     public function getPendingCount($instId) {
-    $sql = "SELECT COUNT(*) as total 
-            FROM formularioe f
-            INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
-            WHERE f.IdInstitucion = ? 
-            AND tf.categoriaformulario = 'Animal vivo'
-            AND (f.estado IS NULL OR f.estado = '' OR LOWER(f.estado) = 'sin estado')";
-            
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute([$instId]);
-    return $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+        $sql = "SELECT COUNT(*) as total 
+                FROM formularioe f
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                WHERE f.IdInstitucion = ? 
+                  AND tf.categoriaformulario IN ('Animal', 'Animal vivo')
+                  AND (f.estado IS NULL OR f.estado = '' OR LOWER(f.estado) = 'sin estado')";
+                
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
     }
 
     // api/src/Models/Animal/AnimalModel.php
 
     public function getFormData($instId) {
-        $stmtTypes = $this->db->prepare("SELECT IdTipoFormulario, nombreTipo, exento, descuento FROM tipoformularios WHERE IdInstitucion = ? AND categoriaformulario = 'Animal vivo'");
+        $stmtTypes = $this->db->prepare("SELECT IdTipoFormulario, nombreTipo, exento, descuento, color FROM tipoformularios WHERE IdInstitucion = ? AND categoriaformulario IN ('Animal', 'Animal vivo')");
         $stmtTypes->execute([$instId]);
         
         $stmtProt = $this->db->prepare("SELECT idprotA, nprotA, tituloA, protocoloexpe as IsExterno FROM protocoloexpe WHERE IdInstitucion = ?");
@@ -319,11 +335,11 @@ public function updateStatus($data) {
         $userEmail = $stmtUser->fetchColumn();
 
         // D. TIPOS DE FORMULARIO (NUEVO)
-        // Filtramos por Categoria = 'Animal vivo' e Institución
+        // Filtramos por Categoria = 'Animal' e Institución
         $stmtTypes = $this->db->prepare("
             SELECT IdTipoFormulario, nombreTipo 
             FROM tipoformularios 
-            WHERE categoriaformulario = 'Animal vivo' 
+            WHERE categoriaformulario = 'Animal' 
             AND IdInstitucion = ?
             ORDER BY nombreTipo ASC
         ");
@@ -434,7 +450,7 @@ public function getDetailsAndSpecies($protId) {
 public function saveOrder($data) {
         $this->db->beginTransaction();
         try {
-            $stmtCheck = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE IdTipoFormulario = ? AND categoriaformulario = 'Animal vivo' AND IdInstitucion = ?");
+            $stmtCheck = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE IdTipoFormulario = ? AND categoriaformulario = 'Animal' AND IdInstitucion = ?");
             $stmtCheck->execute([$data['idTipoFormulario'], $data['instId']]);
             
             if (!$stmtCheck->fetchColumn()) throw new \Exception("Error: El tipo de formulario seleccionado no es válido.");

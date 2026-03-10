@@ -67,6 +67,11 @@ function renderTree() {
                             onclick="window.openModalSub(${esp.idespA}, ${s.idsubespA}, '${s.SubEspeNombreA}', ${s.Existe}, '${s.SubEspTipo || ''}', ${s.SubEspCantidad || 1})">
                         <i class="bi bi-pencil-fill text-primary"></i>
                     </button>
+                    <button class="btn btn-sm btn-light border-0 ms-1" 
+                            onclick="window.deleteSubespecie(${s.idsubespA})"
+                            title="${(window.txt?.config_especies?.btn_eliminar_subespecie) || 'Eliminar'}">
+                        <i class="bi bi-trash text-danger"></i>
+                    </button>
                 </td>
             </tr>`;
         }).join('');
@@ -197,13 +202,14 @@ window.toggleSub = async (id, currentStatus) => {
 };
 
 window.deleteEspecie = async (id) => {
+    const t = window.txt?.config_especies;
     const confirm = await Swal.fire({
-        title: '¿Eliminar Especie?',
-        text: 'Se eliminará o desactivará si tiene datos asociados.',
+        title: t?.confirm_eliminar_esp_titulo || '¿Eliminar Especie?',
+        text: t?.confirm_eliminar_esp_texto || 'Se eliminará o desactivará si tiene datos asociados.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Eliminar'
+        confirmButtonText: t?.btn_eliminar || 'Eliminar'
     });
 
     if (!confirm.isConfirmed) return;
@@ -213,13 +219,41 @@ window.deleteEspecie = async (id) => {
         fd.append('idEsp', id);
         const res = await API.request('/admin/config/especies/delete', 'POST', fd);
         if (res.status === 'success') {
-            const msg = res.mode === 'deactivated' ? 'Especie desactivada por tener historial.' : 'Especie eliminada permanentemente.';
-            Swal.fire('Procesado', msg, 'success');
+            const msg = res.mode === 'deactivated' ? (t?.esp_desactivada || 'Especie desactivada por tener historial.') : (t?.esp_eliminada || 'Especie eliminada permanentemente.');
+            Swal.fire(t?.procesado || 'Procesado', msg, 'success');
             loadData();
         } else {
-            Swal.fire('Error', res.message, 'error');
+            Swal.fire(t?.error || 'Error', res.message, 'error');
         }
-    } catch (e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+    } catch (e) { Swal.fire(t?.error || 'Error', t?.error_conexion || 'Error de conexión', 'error'); }
+};
+
+window.deleteSubespecie = async (idSub) => {
+    const t = window.txt?.config_especies;
+    const confirm = await Swal.fire({
+        title: t?.confirm_eliminar_sub_titulo || '¿Eliminar subespecie?',
+        text: t?.confirm_eliminar_sub_texto || 'Se borrará de forma permanente. Si tiene formularios asociados no se podrá eliminar.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: t?.btn_eliminar_subespecie || 'Eliminar'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+        const fd = new FormData();
+        fd.append('idSub', idSub);
+        const res = await API.request('/admin/config/subespecies/delete', 'POST', fd);
+        if (res.status === 'success') {
+            Swal.fire({ title: t?.success_eliminar_sub || 'Subespecie eliminada.', icon: 'success', timer: 1500, showConfirmButton: false });
+            loadData();
+        } else {
+            Swal.fire(t?.error || 'Error', res.message || (t?.error_eliminar_sub || 'No se pudo eliminar la subespecie.'), 'error');
+        }
+    } catch (e) {
+        Swal.fire(t?.error || 'Error', t?.error_eliminar_sub || 'No se pudo eliminar la subespecie.', 'error');
+    }
 };
 
 window.toggleEsp = async (id, currentStatus) => {

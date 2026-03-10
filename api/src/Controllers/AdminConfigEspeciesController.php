@@ -83,6 +83,23 @@ class AdminConfigEspeciesController {
         exit;
     }
 
+    public function deleteSubespecie() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idSub = $_POST['idSub'] ?? null;
+            if (!$idSub) {
+                throw new \Exception("Falta el ID de la subespecie.");
+            }
+            $this->model->deleteSubespecie($idSub, $sesion['instId']);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function toggleEspecie() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

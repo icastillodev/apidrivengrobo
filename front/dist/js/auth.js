@@ -184,7 +184,7 @@ async init() {
         const box = document.getElementById('msg-alert');
         if (box) box.classList.add('hidden');
 
-        const username = document.getElementById('username').value;
+        const username = (document.getElementById('username').value || '').trim().toLowerCase();
         const password = document.getElementById('password').value;
         const remember = document.getElementById('remember-me')?.checked || false;
 

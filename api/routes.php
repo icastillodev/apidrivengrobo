@@ -242,6 +242,7 @@ $router->get('/alojamiento/public-export', 'AlojamientoExportController@publicEx
 
 // Reportes
 $router->post('/billing/depto-report', 'BillingController@getDeptoReport');
+$router->post('/billing/org-report', 'BillingController@getOrgReport');
 $router->post('/billing/investigador-report', 'BillingController@getInvestigadorReport');
 $router->post('/billing/protocol-report', 'BillingController@getProtocolReport');
 
@@ -345,6 +346,7 @@ $router->post('/admin/config/especies/toggle', 'AdminConfigEspeciesController@to
 $router->post('/admin/config/especies/delete', 'AdminConfigEspeciesController@deleteEspecie');
 $router->post('/admin/config/subespecies/save', 'AdminConfigEspeciesController@saveSubespecie');
 $router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController@toggleSubespecie');
+$router->post('/admin/config/subespecies/delete', 'AdminConfigEspeciesController@deleteSubespecie');
 
 
 // ============================================================

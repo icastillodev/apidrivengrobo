@@ -1,73 +1,94 @@
 /**
  * URL ROUTER - AUTO OPENER
  * Se encarga de abrir modales o ejecutar acciones si la URL trae parámetros
- * Ejemplo: protocolos.html?id=105&action=edit -> Abre el modal del protocolo 105
+ * Compatible con rutas reescritas (ej: /admin/animales sin .html)
  */
 
 export function checkUrlParamsAndOpen() {
     const params = new URLSearchParams(window.location.search);
-    
-    // Obtenemos los parámetros comunes
-    const id = params.get('id'); 
-    const historia = params.get('historia'); // Para alojamientos
-    const action = params.get('action');     // edit, view, pdf, qr
+    const href = window.location.href;
+    const pathname = window.location.pathname || '';
 
-    // Si no hay ID ni Historia, no hacemos nada
+    const id = params.get('id');
+    const historia = params.get('historia');
+    const action = params.get('action') || '';
+
     if (!id && !historia) return;
 
     console.log(`🌍 UrlRouter: Detectado ID=${id || historia} Action=${action}`);
 
-    // Limpiar la URL para que si recarga no se abra de nuevo (Opcional, descomentar si te gusta)
-    // window.history.replaceState({}, document.title, window.location.pathname);
+    const isPage = (slug) => href.includes(slug + '.html') || pathname.includes('/' + slug);
 
     // =======================================================
-    // 1. LÓGICA PARA PROTOCOLOS
+    // 1. PROTOCOLOS
     // =======================================================
-    if (window.location.href.includes('protocolos.html')) {
+    if (isPage('protocolos')) {
         if (action === 'pdf') {
-            // Si tienes una función global para PDF
             if (window.exportPdfProtocol) window.exportPdfProtocol(id);
         } else {
-            // Abrir Modal de Edición/Ver
-            // NOTA: Reemplaza 'openModal' por el nombre REAL de tu función en protocolos.js
             if (typeof openModal === 'function') openModal(id);
             else if (typeof editProtocol === 'function') editProtocol(id);
-            else console.warn("No encontré la función openModal() o editProtocol() en esta página.");
         }
+        return;
     }
 
     // =======================================================
-    // 2. LÓGICA PARA USUARIOS
+    // 2. USUARIOS
     // =======================================================
-    else if (window.location.href.includes('usuarios.html')) {
-        // Reemplaza 'openUserModal' por tu función real
-        if (typeof openUserModal === 'function') openUserModal(id);
-        else if (typeof editUser === 'function') editUser(id);
+    if (isPage('usuarios')) {
+        const userObj = typeof openUserModal === 'function' ? { IdUsrA: id } : null;
+        if (typeof openUserModal === 'function') {
+            const u = window._allUsersForRouter && window._allUsersForRouter.find(x => String(x.IdUsrA) === String(id));
+            if (u) openUserModal(u);
+            else openUserModal({ IdUsrA: id });
+        } else if (typeof editUser === 'function') editUser(id);
+        return;
     }
 
     // =======================================================
-    // 3. LÓGICA PARA ALOJAMIENTOS
+    // 3. ALOJAMIENTOS (historia o id)
     // =======================================================
-    else if (window.location.href.includes('alojamientos.html')) {
-        const searchVal = historia || id; // Puede venir por historia
-        
+    if (isPage('alojamientos')) {
+        const searchVal = historia || id;
         if (action === 'qr') {
             if (typeof showQrModal === 'function') showQrModal(searchVal);
         } else {
-            // Abrir detalle de alojamiento
-            if (typeof openAlojamientoModal === 'function') openAlojamientoModal(searchVal);
+            if (typeof window.verHistorial === 'function') window.verHistorial(searchVal);
+            else if (typeof openAlojamientoModal === 'function') openAlojamientoModal(searchVal);
             else if (typeof editAlojamiento === 'function') editAlojamiento(searchVal);
         }
+        return;
     }
 
     // =======================================================
-    // 4. LÓGICA PARA INSUMOS / FORMULARIOS
+    // 4. ANIMALES (id = idformA)
     // =======================================================
-    else if (window.location.href.includes('insumos.html') || window.location.href.includes('misformularios.html')) {
-        if (typeof openFormDetail === 'function') {
-            openFormDetail(id);
-        } else if (typeof viewOrder === 'function') {
-            viewOrder(id);
+    if (isPage('animales')) {
+        if (typeof window.openAnimalModal === 'function' && id) {
+            const a = window._allAnimalsForRouter && window._allAnimalsForRouter.find(x => String(x.idformA) === String(id));
+            if (a) window.openAnimalModal(a);
+            else window.openAnimalModal({ idformA: id });
         }
+        return;
+    }
+
+    // =======================================================
+    // 5. REACTIVOS (id = idformA)
+    // =======================================================
+    if (isPage('reactivos')) {
+        if (typeof window.openReactivoModal === 'function' && id) {
+            const r = window._allReactivosForRouter && window._allReactivosForRouter.find(x => String(x.idformA) === String(id));
+            if (r) window.openReactivoModal(r);
+            else window.openReactivoModal({ idformA: id });
+        }
+        return;
+    }
+
+    // =======================================================
+    // 6. INSUMOS / FORMULARIOS (id = idformA)
+    // =======================================================
+    if (isPage('insumos') || isPage('misformularios')) {
+        if (typeof openFormDetail === 'function') openFormDetail(id);
+        else if (typeof viewOrder === 'function') viewOrder(id);
     }
 }

@@ -72,7 +72,7 @@ export async function initRegistro() {
         if (/\s/.test(raw)) {
             userInput.value = raw.replace(/\s/g, '');
         }
-        const val = userInput.value.trim();
+        const val = userInput.value.trim().toLowerCase();
         
         if (val.length < 3) {
             hideUserFeedback();
@@ -82,7 +82,8 @@ export async function initRegistro() {
         }
 
         typingTimer = setTimeout(async () => {
-            const res = await API.request(`/check-username?user=${val}`);
+            const userLower = val.toLowerCase();
+            const res = await API.request(`/check-username?user=${encodeURIComponent(userLower)}`);
             isUserValid = res.available;
             
             // Feedback visual: Verde si disponible / Rojo si existe
@@ -144,6 +145,7 @@ export async function initRegistro() {
 
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
+        data.usuario = (data.usuario || '').trim().toLowerCase();
         
         // Contexto institucional desde el storage
         data.IdInstitucion = instId; // Ya lo capturamos arriba
@@ -177,7 +179,10 @@ export async function initRegistro() {
             } else {
                 btnSubmit.disabled = false;
                 const t = window.txt?.registro || {};
-                Swal.fire(t.swal_error || "Error", res.message || (t.swal_error_servidor || "Error en el servidor"), "error");
+                const msg = (res.message === 'email_duplicate_institution' && t.email_duplicate_institution)
+                    ? t.email_duplicate_institution
+                    : (res.message || (t.swal_error_servidor || "Error en el servidor"));
+                Swal.fire(t.swal_error || "Error", msg, "error");
             }
         } catch (err) { 
             btnSubmit.disabled = false;

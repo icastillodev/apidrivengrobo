@@ -80,9 +80,10 @@ export function renderSideMenuStructure(container, menuIds, templates) {
     sidebar.id = "gecko-sidebar-element";
     sidebar.className = "gecko-sidebar shadow-sm";
     
+    const dashboardLabel = window.txt?.menu?.panel_inicio || 'Dashboard';
     const brandBlock = logoUrl
-        ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 48px; width: auto; object-fit: contain;"></a><span class="text-success fw-black text-uppercase mt-1" style="font-size: 13px;">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>`
-        : `<a href="${dashboardPath}" class="d-flex flex-column pe-2 text-decoration-none text-body" style="line-height: 1.2; word-break: break-word;"><span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span></a>`;
+        ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 48px; width: auto; object-fit: contain;"></a><span class="text-success fw-black text-uppercase mt-1" style="font-size: 13px;">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>`
+        : `<a href="${dashboardPath}" class="d-flex flex-column pe-2 text-decoration-none text-body" style="line-height: 1.2; word-break: break-word;"><span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span></a>`;
     
     sidebar.innerHTML = `
         <div class="gecko-sidebar-top-section">
@@ -102,7 +103,7 @@ export function renderSideMenuStructure(container, menuIds, templates) {
         <div class="gecko-sidebar-bottom-section text-center d-flex flex-column pt-4 pb-4">
             <div class="px-2 order-2 order-md-1 mt-4 mt-md-0 mb-md-3">
                 <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px; opacity: 0.9;">GROBO - ERP BIOTERIOS</a>
-                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">Desarrollado por Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">${window.txt?.login?.desarrollado_por_geckos || 'Desarrollado por Geckos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación'}</a>
             </div>
             <ul class="nav nav-pills d-flex flex-row justify-content-center align-items-center w-100 m-0 p-0 order-1 order-md-2" id="side-controls-ul"></ul>
         </div>
@@ -134,11 +135,12 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     const logoUrl = getInstLogoUrl();
     const dashboardPath = getDashboardPath();
 
+    const dashboardLabel = window.txt?.menu?.panel_inicio || 'Dashboard';
     const topBrandBlock = `
         <a href="${dashboardPath}" class="d-flex align-items-center gap-2 text-decoration-none text-body" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}">
             ${logoUrl ? `<img src="${logoUrl}" alt="${instName}" class="gecko-top-logo gecko-top-logo-mobile" style="max-height: 36px; width: auto; object-fit: contain;">` : ''}
             <span class="text-secondary fw-black text-uppercase border-start border-secondary ps-2 ms-1">${instName}</span>
-            <span class="text-success fw-bold ms-1">— Dashboard</span>
+            <span class="text-success fw-bold ms-1">— ${dashboardLabel}</span>
         </a>
         <span class="text-muted fw-bold ms-2 d-none d-lg-inline border-start border-secondary ps-2" style="font-size: 11px;">${userText}</span>`;
 
@@ -151,7 +153,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold">GROBO - ERP BIOTERIOS</a>
                     <div class="d-flex align-items-center border-start border-secondary ps-3">${topBrandBlock}</div>
                 </div>
-                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link text-end">Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
+                <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-dark border-bottom border-success fw-bold geckos-link text-end">${window.txt?.login?.desarrollado_por_geckos || 'Geckos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación'}</a>
             </div>
 
             <nav class="w-full d-flex flex-column align-items-center position-relative">
@@ -170,7 +172,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
                     <div class="d-flex flex-column pe-2 flex-grow-1">
                         ${logoUrl ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 56px; width: auto; object-fit: contain;"></a>` : ''}
                         <span class="fs-5 fw-black text-success text-uppercase lh-1 mt-1">${instName}</span>
-                        <span class="text-success fw-bold mt-1" style="font-size: 11px;">— Dashboard</span>
+                        <span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span>
                         <span class="text-muted mt-2 d-block" style="font-size: 11px; font-weight: 600;">${userText}</span>
                     </div>
                     <button class="btn-close mt-1 gecko-btn-close" id="gecko-close-sidebar"></button>
@@ -186,7 +188,7 @@ export function renderTopMenuStructure(container, menuIds, templates) {
                 <ul class="nav nav-pills d-flex flex-row justify-content-center align-items-center w-100 mb-4 p-0" id="mobile-controls-ul"></ul>
                 <div class="px-2 mt-2">
                     <a href="https://groboapp.com" target="_blank" class="text-decoration-none text-success fw-bold d-block mb-1" style="font-size: 10px; opacity: 0.9;">GROBO - ERP BIOTERIOS</a>
-                    <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">Desarrollado por Gekos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación</a>
+                    <a href="https://geckos.uy" target="_blank" class="text-decoration-none text-muted d-block geckos-link" style="font-size: 9px; line-height: 1.4;">${window.txt?.login?.desarrollado_por_geckos || 'Desarrollado por Geckos.uy & UDELAR - Unidad de Reactivos y Biomodelos de Experimentación'}</a>
                 </div>
             </div>
         </aside>

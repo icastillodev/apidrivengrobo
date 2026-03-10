@@ -12,13 +12,67 @@ class BillingModel {
     }
 
     // ... [TODO EL BLOQUE DE GETTERS SE MANTIENE EXACTAMENTE IGUAL HASTA "updateBalance"] ...
-public function getProtocolosByDepto($deptoId) {
+    public function getProtocolosByDepto($deptoId) {
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
                        CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
                 FROM protocoloexpe p JOIN personae u ON p.IdUsrA = u.IdUsrA
                 WHERE p.departamento = ? AND p.idprotA > 0"; 
         $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Pedidos (formularios) del departamento que NO están vinculados a ningún protocolo (formato viejo).
+     */
+    public function getPedidosDeptoSinProtocolo($deptoId, $desde = null, $hasta = null) {
+        $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
+                f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
+                se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
+                tf.nombreTipo as nombre_tipo, tf.exento, tf.descuento, ie.NombreInsumo,
+                ie.CantidadInsumo, ie.TipoInsumo, s.totalA as cant_animal, s.organo as cant_organo,
+                pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado
+                FROM formularioe f
+                LEFT JOIN protformr pf_link ON f.idformA = pf_link.idformA
+                JOIN personae u ON f.IdUsrA = u.IdUsrA JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                LEFT JOIN sexoe s ON f.idformA = s.idformA LEFT JOIN precioformulario pf ON f.idformA = pf.idformA
+                LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
+                LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
+                LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA
+                LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
+                WHERE f.depto = ? AND f.estado = 'Entregado' AND pf_link.idformA IS NULL";
+        
+        $params = [$deptoId];
+        if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
+        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$r) {
+            $r['is_exento'] = ((int)$r['exento'] === 1);
+            $totalForm = (float)$r['precioformulario'] + (float)$r['total_ins'];
+            $pagadoTotal = (float)$r['pago_ani'] + (float)$r['pago_ins'];
+            $pMomento = (float)$r['precioanimalmomento'];
+            $esRea = (strpos(strtolower($r['categoria']), 'reactivo') !== false);
+            $cantDiv = $esRea ? (float)$r['cant_organo'] : (float)$r['cant_animal'];
+
+            if ($pMomento <= 0 && $cantDiv > 0) $pMomento = $totalForm / $cantDiv;
+
+            $r['total'] = $totalForm; $r['p_unit'] = $pMomento; $r['pagado'] = $pagadoTotal;
+            $r['debe'] = $r['is_exento'] ? 0 : max(0, $r['total'] - $r['pagado']);
+
+            $cat = $r['categoria'] ?: ""; $nom = $r['nombre_tipo'] ?: "";
+            $dcto = ($r['descuento'] > 0) ? " <small class='text-success'>(Dcto: {$r['descuento']}%)</small>" : "";
+
+            if ($esRea) {
+                 $r['cantidad_display'] = "<b>{$r['NombreInsumo']} {$r['CantidadInsumo']} {$r['TipoInsumo']} - {$r['cant_organo']} un</b>";
+                 $r['detalle_display'] = (strpos(strtolower($cat), 'otros reactivos') !== false) 
+                    ? "<b>$cat</b> - $nom$dcto" : "<b>Reactivo</b> : <b>{$r['NombreInsumo']}</b>$dcto";
+            } else {
+                 $r['cantidad_display'] = "{$r['cant_animal']} un.";
+                 $r['detalle_display'] = ($cat === $nom) ? "<b>$cat</b>$dcto" : "<b>$cat</b> - $nom$dcto";
+            }
+            $r['taxonomia'] = ($r['nombre_especie'] ?? '-') . ($r['nombre_subespecie'] ? " : {$r['nombre_subespecie']}" : "");
+        }
+        return $rows;
+    }
+
 public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
@@ -123,6 +177,33 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
+            $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
+        }
+        return $rows;
+    }
+
+    /**
+     * Insumos (pedidos de tipo insumo) vinculados al protocolo vía protformr.
+     * Misma estructura que getInsumosGenerales para mostrar en facturación por protocolo.
+     */
+    public function getInsumosByProtocolo($idProt, $desde = null, $hasta = null) {
+        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
+                GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado
+                FROM formularioe f
+                JOIN protformr pf ON f.idformA = pf.idformA AND pf.idprotA = ?
+                JOIN personae u ON f.IdUsrA = u.IdUsrA
+                JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
+                JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
+                JOIN insumo i ON fi.IdInsumo = i.idInsumo
+                JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                WHERE f.estado = 'Entregado' AND tf.categoriaformulario LIKE '%insumo%'";
+        $params = [$idProt];
+        if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
+        $sql .= " GROUP BY f.idformA";
+        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado'];
             $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
         }
         return $rows;
@@ -271,6 +352,42 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     }
+
+    /**
+     * Lista organizaciones de la institución con sus departamentos (para facturación por organización).
+     * Incluye fila "(Sin organización)" para departamentos con organismopertenece IS NULL.
+     */
+    public function getOrganizacionesConDeptos($instId) {
+        $out = [];
+        $stmtOrg = $this->db->prepare("SELECT IdOrganismo, NombreOrganismoSimple FROM organismoe WHERE IdInstitucion = ? ORDER BY NombreOrganismoSimple ASC");
+        $stmtOrg->execute([$instId]);
+        $orgs = $stmtOrg->fetchAll(\PDO::FETCH_ASSOC);
+
+        foreach ($orgs as $o) {
+            $stmtD = $this->db->prepare("SELECT iddeptoA, NombreDeptoA FROM departamentoe WHERE IdInstitucion = ? AND organismopertenece = ? ORDER BY NombreDeptoA ASC");
+            $stmtD->execute([$instId, $o['IdOrganismo']]);
+            $deptos = $stmtD->fetchAll(\PDO::FETCH_ASSOC);
+            $out[] = [
+                'idOrganismo'   => (int)$o['IdOrganismo'],
+                'nombre'        => $o['NombreOrganismoSimple'],
+                'departamentos' => $deptos
+            ];
+        }
+
+        $stmtNull = $this->db->prepare("SELECT iddeptoA, NombreDeptoA FROM departamentoe WHERE IdInstitucion = ? AND (organismopertenece IS NULL OR organismopertenece = 0) ORDER BY NombreDeptoA ASC");
+        $stmtNull->execute([$instId]);
+        $deptosSinOrg = $stmtNull->fetchAll(\PDO::FETCH_ASSOC);
+        if (!empty($deptosSinOrg)) {
+            $out[] = [
+                'idOrganismo'   => null,
+                'nombre'        => '(Sin organización)',
+                'departamentos' => $deptosSinOrg
+            ];
+        }
+
+        return $out;
+    }
+
     public function getAnimalDetailById($id) {
         $sql = "SELECT f.idformA, p.idprotA as id_protocolo, p.IdUsrA as id_usr_protocolo, f.tipoA as id_tipo_form, tf.nombreTipo as nombre_tipo, CONCAT(p.nprotA, ' - ', p.tituloA) as protocolo_info, CONCAT(e.EspeNombreA, ' : ', COALESCE(se.SubEspeNombreA, 'N/A')) as taxonomia, f.edadA as edad, f.pesoa as peso, tf.exento as is_exento, COALESCE(s.machoA, 0) as machos, COALESCE(s.hembraA, 0) as hembras, COALESCE(s.indistintoA, 0) as indistintos, COALESCE(s.totalA, 0) as cantidad, f.fechainicioA as fecha_inicio, f.fecRetiroA as fecha_fin, f.aclaraA as aclaracion_usuario, COALESCE(f.aclaracionadm, 'No hay aclaraciones del administrador.') as nota_admin, COALESCE(pf.precioanimalmomento, 0) as precio_unitario, COALESCE(pf.precioformulario, 0) as total_calculado, COALESCE(pf.totalpago, 0) as totalpago, COALESCE(tf.descuento, 0) as descuento, COALESCE(d.SaldoDinero, 0) as saldoInv, CONCAT(u_tit.ApellidoA, ', ', u_tit.NombreA) as titular_nombre, CONCAT(u_sol.ApellidoA, ', ', u_sol.NombreA) as solicitante FROM formularioe f INNER JOIN personae u_sol ON f.IdUsrA = u_sol.IdUsrA LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr rf ON f.idformA = rf.idformA LEFT JOIN protocoloexpe p ON rf.idprotA = p.idprotA LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA LEFT JOIN precioformulario pf ON f.idformA = pf.idformA LEFT JOIN sexoe s ON f.idformA = s.idformA LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA LEFT JOIN dinero d ON p.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion WHERE f.idformA = ?";
         $stmt = $this->db->prepare($sql);

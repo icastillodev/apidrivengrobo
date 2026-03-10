@@ -21,12 +21,24 @@ export async function initProtocolosPage() {
         const conf = await API.request(`/protocols/form-data?inst=${instId}`);
         formDataCache = conf.data;
         
-        // 2. Configurar Visibilidad de Filtro Origen (Solo si tiene RED)
+        // 2. Configurar visibilidad/valores del filtro de ámbito (Interno / Externo / Red)
         const filterOrigin = document.getElementById('filter-origin');
         const labelOrigin = document.getElementById('label-origin');
-        if (formDataCache.has_network) {
+        if (filterOrigin && labelOrigin) {
+            // Mostrar siempre el filtro para Interno/Externo
             filterOrigin.classList.remove('d-none');
             labelOrigin.classList.remove('d-none');
+
+            // Opción "De red" solo visible si la institución trabaja en red
+            const optRed = filterOrigin.querySelector('option[value="red"]');
+            if (optRed) {
+                if (formDataCache.has_network) {
+                    optRed.classList.remove('d-none');
+                } else {
+                    optRed.classList.add('d-none');
+                    if (filterOrigin.value === 'red') filterOrigin.value = 'all';
+                }
+            }
         }
 
         // 3. Cargar Protocolos
@@ -154,12 +166,13 @@ function renderTableHeader() {
             <th data-key="InvestigadorACargA" class="py-3 px-2">Responsable de proyecto</th>
             <th data-key="ResponsableFormat" class="py-3 px-2">Responsable protocolo</th>
             <th data-key="DeptoFormat" class="py-3 px-2">Departamento</th>
+            <th data-key="DeptoExternoFlag" class="py-3 px-2 text-center" style="width: 80px;">Ámbito</th>
             <th data-key="TipoNombre" class="py-3 px-2 text-center">Tipo</th>
             <th data-key="AnimalesUsados" class="py-3 px-2 text-center">Gastados</th>
             <th data-key="SaldoAnimales" class="py-3 px-2 text-center">Saldo</th>
     `;
 
-    // Solo mostrar columna Origen si hay RED
+    // Columna Origen (red) solo si hay red
     if (formDataCache && formDataCache.has_network) {
         html += `<th data-key="OrigenRed" class="py-3 px-2 text-center">Origen</th>`;
     }
@@ -195,10 +208,22 @@ function renderTable() {
         tr.className = "clickable-row";
         tr.onclick = (e) => window.openProtocolModal(p);
         
-        // Columna Tipo: Nombre + Badge Externo si aplica
+        // Columna Tipo: Nombre + Badge Externo si aplica (otros CEUAS)
         let tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '---'}</span>`;
         if(p.IsExterno == 1) {
             tipoHtml += `<br><span class="badge bg-danger mt-1" style="font-size:9px;">OTROS CEUAS</span>`;
+        }
+
+        // Columna Ámbito (Interno / Externo) según depto/organismo local
+        const extFlag = Number(p.DeptoExternoFlag || 1);
+        const isExternoLocal = (extFlag === 2);
+        let ambitoHtml = '';
+        if (isExternoLocal) {
+            const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+            ambitoHtml = `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>`;
+        } else {
+            const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+            ambitoHtml = `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
         }
 
         // Columna Origen (Solo si hay red)
@@ -226,6 +251,7 @@ function renderTable() {
             <td class="small px-2">${p.InvestigadorACargA || '---'}</td>
             <td class="small fw-bold px-2 text-muted" style="font-size:10px;">${p.ResponsableFormat || '---'}</td>
             <td class="small text-muted px-2">${p.DeptoFormat || p.DeptoOriginal || '-'}</td>
+            <td class="text-center px-2 align-middle">${ambitoHtml}</td>
             <td class="text-center px-2 align-middle">${tipoHtml}</td>
             <td class="text-center px-2 small fw-bold text-secondary">${p.AnimalesUsados ?? 0}</td>
             <td class="text-center px-2 small fw-bold ${ (p.SaldoAnimales ?? 0) <= 0 ? 'text-danger' : 'text-success' }">${p.SaldoAnimales ?? 0}</td>
@@ -350,6 +376,9 @@ window.openProtocolModal = async (p = null) => {
     const saldo = p?.SaldoAnimales ?? (p?.CantidadAniA ?? 0);
     const totalAprob = p ? (p.AnimalesTotales ?? (usados + saldo)) : 0;
 
+    const extFlag = p ? Number(p.DeptoExternoFlag || 1) : 1;
+    const isExtLocal = (extFlag === 2);
+
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
@@ -369,7 +398,7 @@ window.openProtocolModal = async (p = null) => {
             </div>` : ''}
 
             ${p ? `
-            <div class="row g-2 mb-4 bg-light border rounded p-2">
+            <div class="row g-2 mb-3 bg-light border rounded p-2">
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted d-block">ANIMALES APROBADOS</label>
                     <span class="fw-bold text-primary">${totalAprob}</span>
@@ -381,6 +410,13 @@ window.openProtocolModal = async (p = null) => {
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted d-block">SALDO DISPONIBLE</label>
                     <span class="fw-bold ${saldo <= 0 ? 'text-danger' : 'text-success'}">${saldo}</span>
+                </div>
+                <div class="col-md-12 mt-2">
+                    <small class="small fw-bold text-muted me-2">ÁMBITO LOCAL:</small>
+                    ${isExtLocal 
+                        ? `<span class="badge bg-danger text-white" style="font-size:10px;">${window.txt?.config_departamentos?.badge_externo || 'EXTERNO'}</span>`
+                        : `<span class="badge bg-success text-white" style="font-size:10px;">${window.txt?.config_departamentos?.badge_interno || 'INTERNO'}</span>`
+                    }
                 </div>
             </div>
             <hr class="mb-3">
@@ -583,7 +619,7 @@ window.downloadProtocolPDF = async (id) => {
     const h = cloned.querySelector('.d-none.d-print-block');
     if(h) h.classList.remove('d-none');
 
-    const opt = { margin: 10, filename: `Protocolo_${id}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+    const opt = { margin: [18, 18, 18, 18], filename: `Protocolo_${id}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
     await html2pdf().set(opt).from(cloned).save();
 };
 

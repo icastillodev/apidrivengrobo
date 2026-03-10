@@ -37,15 +37,51 @@ class AdminConfigDeptoModel {
     }
 
     public function saveOrganismo($data) {
+        // 1 = interno (default), 2 = externo
+        $externoOrganismo = 1;
+        if (isset($data['externoorganismo']) && (int)$data['externoorganismo'] === 2) {
+            $externoOrganismo = 2;
+        }
+
         if (empty($data['IdOrganismo'])) {
-            $sql = "INSERT INTO organismoe (NombreOrganismoSimple, NombreOrganismoCompleto, ContactoOrgnismo, CorreoOrganismo, DireccionOrganismo, PaisOrganismo,IdInstitucion) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais'], $data['instId']]);
+            $sql = "INSERT INTO organismoe (
+                        NombreOrganismoSimple, NombreOrganismoCompleto, ContactoOrgnismo, 
+                        CorreoOrganismo, DireccionOrganismo, PaisOrganismo,
+                        IdInstitucion, externoorganismo
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $res = $this->db->prepare($sql)->execute([
+                $data['NombreSimple'],
+                $data['NombreCompleto'],
+                $data['Contacto'],
+                $data['Correo'],
+                $data['Direccion'],
+                $data['Pais'],
+                $data['instId'],
+                $externoOrganismo
+            ]);
             
             Auditoria::log($this->db, 'INSERT', 'organismoe', "Creó organismo: " . $data['NombreSimple']);
             return $res;
         } else {
-            $sql = "UPDATE organismoe SET NombreOrganismoSimple=?, NombreOrganismoCompleto=?, ContactoOrgnismo=?, CorreoOrganismo=?, DireccionOrganismo=?, PaisOrganismo=? WHERE IdOrganismo=?";
-            $res = $this->db->prepare($sql)->execute([$data['NombreSimple'], $data['NombreCompleto'], $data['Contacto'], $data['Correo'], $data['Direccion'], $data['Pais'], $data['IdOrganismo']]);
+            $sql = "UPDATE organismoe SET 
+                        NombreOrganismoSimple=?,
+                        NombreOrganismoCompleto=?,
+                        ContactoOrgnismo=?,
+                        CorreoOrganismo=?,
+                        DireccionOrganismo=?,
+                        PaisOrganismo=?,
+                        externoorganismo=?
+                    WHERE IdOrganismo=?";
+            $res = $this->db->prepare($sql)->execute([
+                $data['NombreSimple'],
+                $data['NombreCompleto'],
+                $data['Contacto'],
+                $data['Correo'],
+                $data['Direccion'],
+                $data['Pais'],
+                $externoOrganismo,
+                $data['IdOrganismo']
+            ]);
             
             Auditoria::log($this->db, 'UPDATE', 'organismoe', "Modificó organismo ID: " . $data['IdOrganismo']);
             return $res;
@@ -61,31 +97,52 @@ class AdminConfigDeptoModel {
     }
 
     public function saveDepartamento($data) {
-        // --- FIX 1366: Validación final en el Model ---
-        // Nos aseguramos 100% que si viene vacío, pase un 'null' real a PDO para la llave foránea
+        // Validación final en el Model
         $idOrg = (isset($data['idOrg']) && trim($data['idOrg']) !== '') ? $data['idOrg'] : null;
 
+        // Determinar flag externo del departamento:
+        // 1 = interno (default), 2 = externo
+        $externoDepto = 1;
+        if (isset($data['externodepto'])) {
+            $externoDepto = ((int)$data['externodepto'] === 2) ? 2 : 1;
+        } elseif ($idOrg) {
+            // Si no viene explícito pero hay organismo, tomar por defecto el flag del organismo
+            $stmt = $this->db->prepare("SELECT externoorganismo FROM organismoe WHERE IdOrganismo = ?");
+            $stmt->execute([$idOrg]);
+            $flagOrg = $stmt->fetchColumn();
+            if ((int)$flagOrg === 2) {
+                $externoDepto = 2;
+            }
+        }
+
         if (empty($data['iddeptoA'])) {
-            $sql = "INSERT INTO departamentoe (NombreDeptoA, DetalledeptoA, organismopertenece, IdInstitucion) VALUES (?, ?, ?, ?)";
+            $sql = "INSERT INTO departamentoe (
+                        NombreDeptoA, DetalledeptoA, organismopertenece, IdInstitucion, externodepto
+                    ) VALUES (?, ?, ?, ?, ?)";
             
-            // Pasamos $idOrg validado, en lugar de $data['idOrg']
             $res = $this->db->prepare($sql)->execute([
                 $data['NombreDepto'], 
                 $data['Detalle'], 
                 $idOrg, 
-                $data['instId']
+                $data['instId'],
+                $externoDepto
             ]);
             
             Auditoria::log($this->db, 'INSERT', 'departamentoe', "Creó departamento: " . $data['NombreDepto']);
             return $res;
         } else {
-            $sql = "UPDATE departamentoe SET NombreDeptoA=?, DetalledeptoA=?, organismopertenece=? WHERE iddeptoA=?";
+            $sql = "UPDATE departamentoe SET 
+                        NombreDeptoA=?,
+                        DetalledeptoA=?,
+                        organismopertenece=?,
+                        externodepto=?
+                    WHERE iddeptoA=?";
             
-            // Pasamos $idOrg validado también aquí
             $res = $this->db->prepare($sql)->execute([
                 $data['NombreDepto'], 
                 $data['Detalle'], 
                 $idOrg, 
+                $externoDepto,
                 $data['iddeptoA']
             ]);
             

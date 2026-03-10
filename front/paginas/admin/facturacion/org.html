@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturación por Organización - Bioterio</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
+        .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
+        .card-org { border-left: 5px solid #0891b2; }
+        .card-depto { border-left: 3px solid #0d6efd; }
+    </style>
+
+    <script type="module">
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
+        import { Auth } from '../../../dist/js/auth.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
+        import { initBillingOrg } from '../../../dist/js/pages/admin/facturacion/billingOrg.js';
+        showLoader();
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                translatePage();
+                Auth.checkAccess([1, 2, 4, 5, 6]); 
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    initBillingOrg();
+                }
+                setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
+            } catch (error) { console.error("Fallo init BillingOrg:", error); } 
+            finally { hideLoader(); }
+        });
+    </script>
+</head>
+<body>
+    <div class="container-fluid my-5 px-4 px-md-5">
+        <div class="card shadow-sm border-0 p-4">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_admin">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.titulo">Facturación</li>
+                    <li class="breadcrumb-item active">
+                        <span class="badge px-2 py-1" style="background-color: #0891b2 !important;" data-i18n="facturacion.por_organizacion">Por Organización</span>
+                    </li>
+                </ol>
+            </nav>
+
+            <div class="mb-3">
+                <a href="index" class="btn btn-sm btn-light border fw-bold text-secondary shadow-sm px-3" style="font-size: 11px;">
+                    <i class="bi bi-arrow-left-circle-fill me-1"></i> <span data-i18n="facturacion.volver_seleccion"></span>
+                </a>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold m-0"><i class="bi bi-diagram-3 text-info me-2"></i><span data-i18n="facturacion.titulo_liquidacion_org">Liquidación por Organización</span></h5>
+            </div>
+
+            <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.desde">Desde:</span>
+                        <input type="date" id="f-desde-org" class="form-control form-control-sm shadow-none">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.hasta">Hasta:</span>
+                        <input type="date" id="f-hasta-org" class="form-control form-control-sm shadow-none">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-3 bg-white p-1 rounded border shadow-sm px-3" style="height: 31px; align-items: center;">
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="chk-animales-org" checked>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_animales">ANIMALES/REA</label>
+                        </div>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="chk-alojamiento-org" checked>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_alojamiento">ALOJAMIENTO</label>
+                        </div>
+                        <div class="form-check form-switch m-0 border-start ps-4">
+                            <input class="form-check-input" type="checkbox" id="chk-insumos-org" checked>
+                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;" data-i18n="facturacion.filtro_insumos">INSUMOS</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-info btn-sm w-100 fw-bold shadow-sm text-white" id="btn-cargar-org" style="background-color: #0891b2;">
+                        <i class="bi bi-search me-1"></i> <span data-i18n="generales.buscar">Cargar</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="billing-results-org" class="mt-4"></div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

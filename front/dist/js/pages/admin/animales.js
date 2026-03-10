@@ -2,6 +2,7 @@
 import { API } from '../../api.js';
 import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
+import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 
 let allAnimals = [];
 let currentPage = 1;
@@ -134,13 +135,14 @@ function renderTable() {
         const badgeExterno = a.IsExterno == 1 
             ? '<span class="badge bg-danger mt-1 shadow-sm" style="font-size: 7px; width: fit-content; padding: 2px 4px;">OTROS CEUAS</span>' 
             : '';
+        const tipoBadgeStyle = getTipoFormBadgeStyle(a.colorTipo);
+        const tipoBadgeHtml = `<span class="${tipoBadgeStyle.className}" style="${tipoBadgeStyle.style} font-size: 9px; padding: 3px 6px;">${(a.TipoNombre || 'Animal').replace(/</g, '&lt;')}</span>`;
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${a.idformA}</td>
             <td class="py-2 px-2">
                 <div class="d-flex flex-column">
-                    <span class="fw-bold" style="font-size: 10px;">${a.TipoNombre}</span>
-                    <span class="badge border text-dark bg-light" style="font-size: 7px; width: fit-content; padding: 2px 4px;">Animal vivo</span>
+                    ${tipoBadgeHtml}
                     ${badgeExterno}
                 </div>
             </td>
@@ -151,6 +153,18 @@ function renderTable() {
             <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Peso || '---'}</td>
             <td class="py-2 px-2 text-center fw-bold">${a.CantAnimal}</td>
+            <td class="py-2 px-2 text-center">
+                ${(() => {
+                    const extFlag = Number(a.DeptoExternoFlag || 1);
+                    const isExt = extFlag === 2;
+                    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+                    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+                    if (isExt) {
+                        return `<span class="badge bg-danger text-white" style="font-size:8px;">${labelExt}</span>`;
+                    }
+                    return `<span class="badge bg-success text-white" style="font-size:8px;">${labelInt}</span>`;
+                })()}
+            </td>
             <td class="py-2 px-2 small text-muted">${a.Inicio || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Retiro || '---'}</td>
             <td class="py-2 px-2 text-center">${getStatusBadge(a.estado)}</td>
@@ -233,7 +247,7 @@ function renderModalHeader(a) {
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div>
-            <h5 class="fw-bold mb-0">Detalle Animal Vivo</h5>
+            <h5 class="fw-bold mb-0">Detalle Animal</h5>
             <span class="small text-muted">ID: <strong>${a.idformA}</strong> | Investigador: ${a.Investigador}</span>
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
@@ -689,7 +703,7 @@ window.downloadAnimalPDF = async (id) => {
         <div style="font-family: Arial, sans-serif; color: #333; padding: 10px;">
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                 <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0; color: #444;">FICHA DE PEDIDO: ANIMAL VIVO</h4>
+                <h4 style="margin: 5px 0; color: #444;">FICHA DE PEDIDO: ANIMAL</h4>
                 <p style="margin: 0; font-size: 12px; color: #666;">ID Pedido: ${id} | Generado: ${new Date().toLocaleString()}</p>
             </div>
 
@@ -754,7 +768,7 @@ window.downloadAnimalPDF = async (id) => {
 
     // Configuración de html2pdf
     const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [18, 18, 18, 18],
         filename: `GROBO_${inst}_Pedido_${id}.pdf`,
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }

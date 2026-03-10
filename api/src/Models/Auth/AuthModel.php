@@ -15,19 +15,19 @@ class AuthModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-public function getUserByUsername($username) {
+    public function getUserByUsername($username) {
         // --- CORRECCIÓN CRÍTICA ---
         // Cambiamos JOIN por LEFT JOIN en 'institucion'.
-        // Esto permite que el Superadmin (IdInstitucion=0) sea encontrado 
+        // Esto permite que el Superadmin (IdInstitucion=0) sea encontrado
         // aunque el ID 0 no exista en la tabla de instituciones.
-        
+        // Búsqueda case-insensitive: usuario se interpreta siempre en minúsculas.
         $sql = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
-                FROM usuarioe u 
-                LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion 
+                FROM usuarioe u
+                LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
                 LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
-                WHERE u.UsrA = ?";
-                
+                WHERE LOWER(TRIM(u.UsrA)) = LOWER(TRIM(?))";
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$username]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -35,15 +35,15 @@ public function getUserByUsername($username) {
 
 public function getSuperAdminByUsername($username) {
     // CORRECCIÓN: Quitamos validaciones extrañas, solo usuario y rol 1
-    // Asegúrate que en la tabla 'tienetipor' tu usuario tenga IdTipousrA = 1
-    $sql = "SELECT u.IdUsrA, u.UsrA, u.password_secure, t.IdTipousrA as role, 
+    // Búsqueda case-insensitive para coincidir con login en minúsculas.
+    $sql = "SELECT u.IdUsrA, u.UsrA, u.password_secure, t.IdTipousrA as role,
                    COALESCE(p.EmailA, 'admin@admin.com') as EmailA, -- Fallback si no tiene mail
-                   COALESCE(p.NombreA, 'Super') as NombreA, 
+                   COALESCE(p.NombreA, 'Super') as NombreA,
                    COALESCE(p.ApellidoA, 'Admin') as ApellidoA
-            FROM usuarioe u 
-            JOIN tienetipor t ON u.IdUsrA = t.IdUsrA 
+            FROM usuarioe u
+            JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
             LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
-            WHERE u.UsrA = ? AND t.IdTipousrA = 1 
+            WHERE LOWER(TRIM(u.UsrA)) = LOWER(TRIM(?)) AND t.IdTipousrA = 1
             LIMIT 1";
 
     $stmt = $this->db->prepare($sql);

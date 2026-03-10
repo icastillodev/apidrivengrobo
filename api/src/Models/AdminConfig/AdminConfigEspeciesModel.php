@@ -101,6 +101,34 @@ class AdminConfigEspeciesModel {
         return $res;
     }
 
+    /**
+     * Elimina una subespecie por ID si no tiene formularios asociados.
+     * Verifica que la subespecie pertenezca a una especie de la institución del usuario.
+     */
+    public function deleteSubespecie($idSub, $instId) {
+        $stmt = $this->db->prepare("
+            SELECT s.idsubespA FROM subespecie s
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE s.idsubespA = ? AND e.IdInstitucion = ?
+        ");
+        $stmt->execute([$idSub, $instId]);
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            throw new \Exception("Subespecie no encontrada o no pertenece a esta institución.");
+        }
+
+        $stmtUse = $this->db->prepare("SELECT COUNT(*) FROM formularioe WHERE idsubespA = ?");
+        $stmtUse->execute([$idSub]);
+        $inUse = (int) $stmtUse->fetchColumn() > 0;
+
+        if ($inUse) {
+            throw new \Exception("No se puede eliminar: la subespecie está en uso en formularios. Puede desactivarla desde el estado.");
+        }
+
+        $this->db->prepare("DELETE FROM subespecie WHERE idsubespA = ?")->execute([$idSub]);
+        Auditoria::log($this->db, 'DELETE', 'subespecie', "Eliminó subespecie ID: $idSub");
+        return true;
+    }
+
     public function toggleEspecie($id, $status) {
         // Habilitado: 1 = ACTIVO, 2 = INACTIVO (se mantiene el criterio usado en deleteEspecie)
         $sql = "UPDATE especiee SET Habilitado = ? WHERE idespA = ?";

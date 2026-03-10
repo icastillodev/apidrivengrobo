@@ -53,7 +53,7 @@ function vincularFiltro() {
 
 window.cargarFacturacionProtocolo = async () => {
     const idProt = document.getElementById('sel-protocolo').value;
-    if (!idProt) return Swal.fire('Atención', 'Seleccione un protocolo.', 'warning');
+    if (!idProt) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_protocolo || 'Seleccione un protocolo.', 'warning');
     try {
         showLoader();
         const res = await API.request('/billing/protocol-report', 'POST', {
@@ -109,6 +109,7 @@ function renderizarResultados(data) {
             <div class="card-body p-3">
                 ${getFormsTableHTML(data.formularios, data.info.idprotA)}
                 ${data.alojamientos?.length > 0 ? getAlojTableHTML(data.alojamientos, data.info.idprotA) : ''}
+                ${getInsumosProtocoloTableHTML(data.insumos)}
             </div>
             ${getFooterHTML(data)}
         </div>`;
@@ -213,6 +214,52 @@ function getAlojTableHTML(alojamientos, idProt) {
         </table>`;
 }
 
+function getInsumosProtocoloTableHTML(insumos) {
+    if (!insumos || insumos.length === 0) return '';
+    const titulo = window.txt?.facturacion?.insumos_protocolo ?? 'Insumos del protocolo';
+    const filas = insumos.map(i => {
+        const total = parseFloat(i.total_item || 0);
+        const pagado = parseFloat(i.pagado || 0);
+        const debe = Math.max(0, total - pagado);
+        const badge = (debe <= 0) ? '<span class="badge bg-success shadow-sm">PAGO</span>' :
+            (pagado > 0 ? '<span class="badge bg-warning text-dark">PARCIAL</span>' : '<span class="badge bg-danger shadow-sm">PENDIENTE</span>');
+        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
+        const rowStyle = (debe <= 0) ? 'background-color: #f0fff4 !important;' : '';
+        return `
+            <tr class="text-center align-middle pointer" style="${rowStyle}"
+                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
+                <td class="small text-muted">#${i.id}</td>
+                <td>${badge}</td>
+                <td class="small">${i.solicitante}</td>
+                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
+                <td class="text-end fw-bold">$ ${total.toFixed(2)}</td>
+                <td class="text-end text-success">$ ${pagado.toFixed(2)}</td>
+                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+            </tr>`;
+    }).join('');
+
+    return `
+        <div class="mt-4">
+            <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;"><i class="bi bi-box-seam me-1"></i>${titulo}</h6>
+            <div class="table-responsive">
+                <table class="table table-bordered table-billing mb-0">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th style="width:5%">ID</th>
+                            <th style="width:8%">Estado</th>
+                            <th style="width:12%">Solicitante</th>
+                            <th>Concepto / Detalle</th>
+                            <th style="width:10%">Total</th>
+                            <th style="width:10%">Pagado</th>
+                            <th style="width:10%">Debe</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
 function getFooterHTML(data) {
     const p = data.info;
     // Agregamos type="button"
@@ -276,6 +323,7 @@ function renderDashboardProtocolo(totales) {
         animales: 'total-deuda-animales',
         reactivos: 'total-deuda-reactivos',
         alojamiento: 'total-deuda-alojamiento',
+        insumos: 'total-deuda-insumos',
         pagado: 'total-pagado'
     };
 
@@ -285,6 +333,7 @@ function renderDashboardProtocolo(totales) {
     if (document.getElementById(ids.animales)) document.getElementById(ids.animales).innerText = f(totales.deudaAnimales);
     if (document.getElementById(ids.reactivos)) document.getElementById(ids.reactivos).innerText = f(totales.deudaReactivos);
     if (document.getElementById(ids.alojamiento)) document.getElementById(ids.alojamiento).innerText = f(totales.deudaAlojamiento);
+    if (document.getElementById(ids.insumos)) document.getElementById(ids.insumos).innerText = f(totales.deudaInsumos);
     if (document.getElementById(ids.pagado)) document.getElementById(ids.pagado).innerText = f(totales.totalPagado);
 }
 
@@ -293,41 +342,44 @@ function renderDashboardProtocolo(totales) {
 // =====================================
 window.downloadProtocoloPDF = async (idProt) => {
     if (!window.currentReportData || !window.currentReportData.protocolos || window.currentReportData.protocolos.length === 0) {
-        return Swal.fire('Aviso', 'No hay datos cargados.', 'info');
+        return Swal.fire(window.txt?.generales?.swal_atencion || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
     }
 
     const data = window.currentReportData.protocolos[0];
     const info = data.info;
     const totales = data.totales;
 
-    if (!info) return Swal.fire('Error', 'No se encontró la información.', 'error');
+    if (!info) return Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_info_no_encontrada || 'No se encontró la información.', 'error');
 
     showLoader();
 
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+        const M = 18;
+        const pageW = doc.internal.pageSize.getWidth();
+        const right = pageW - M;
         const inst = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
         const verdeGecko = [25, 135, 84];
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
-        doc.text(`${inst}`, 105, 15, { align: "center" });
+        doc.text(`${inst}`, 105, M, { align: "center" });
 
         doc.setFontSize(11); doc.setTextColor(100);
-        doc.text("ESTADO DE CUENTA DETALLADO POR PROTOCOLO", 105, 22, { align: "center" });
-        doc.setDrawColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.line(20, 25, 190, 25);
+        doc.text("ESTADO DE CUENTA DETALLADO POR PROTOCOLO", 105, M + 7, { align: "center" });
+        doc.setDrawColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.line(M, M + 10, right, M + 10);
 
         doc.setFontSize(10); doc.setTextColor(0);
-        doc.text(`PROTOCOLO:`, 20, 35);
-        doc.setFont("helvetica", "normal"); doc.text(`${info.tituloA} (${info.nprotA})`, 50, 35);
-        doc.setFont("helvetica", "bold"); doc.text(`RESPONSABLE:`, 20, 41);
-        doc.setFont("helvetica", "normal"); doc.text(`${info.Responsable} (ID: ${info.IdUsrA})`, 50, 41);
-        doc.setFont("helvetica", "bold"); doc.text(`DEPARTAMENTO:`, 20, 47);
-        doc.setFont("helvetica", "normal"); doc.text(`${info.Departamento}`, 50, 47);
-        doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, 20, 53);
-        doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, 53);
+        doc.text(`PROTOCOLO:`, M, M + 20);
+        doc.setFont("helvetica", "normal"); doc.text(`${info.tituloA} (${info.nprotA})`, 50, M + 20);
+        doc.setFont("helvetica", "bold"); doc.text(`RESPONSABLE:`, M, M + 26);
+        doc.setFont("helvetica", "normal"); doc.text(`${info.Responsable} (ID: ${info.IdUsrA})`, 50, M + 26);
+        doc.setFont("helvetica", "bold"); doc.text(`DEPARTAMENTO:`, M, M + 32);
+        doc.setFont("helvetica", "normal"); doc.text(`${info.Departamento}`, 50, M + 32);
+        doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, M, M + 38);
+        doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, M + 38);
 
-        let currentY = 60;
+        let currentY = M + 45;
 
         if (data.formularios?.length > 0) {
             const bodyForms = data.formularios.map(f => {
@@ -346,6 +398,7 @@ window.downloadProtocoloPDF = async (idProt) => {
 
             doc.autoTable({
                 startY: currentY,
+                margin: { left: M, right: M },
                 head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
                 body: bodyForms,
                 theme: 'grid', headStyles: { fillColor: verdeGecko }, styles: { fontSize: 8 },
@@ -362,6 +415,7 @@ window.downloadProtocoloPDF = async (idProt) => {
 
             doc.autoTable({
                 startY: currentY,
+                margin: { left: M, right: M },
                 head: [['Hist.', 'Especie', 'Periodo Alojamiento', 'Total', 'Pagado', 'Debe']],
                 body: bodyAloj,
                 theme: 'grid', headStyles: { fillColor: [40, 40, 40] }, styles: { fontSize: 8 },
@@ -370,7 +424,27 @@ window.downloadProtocoloPDF = async (idProt) => {
             currentY = doc.lastAutoTable.finalY + 15;
         }
 
-        if (currentY > 250) { doc.addPage(); currentY = 20; }
+        if (data.insumos?.length > 0) {
+            if (currentY > 200) { doc.addPage(); currentY = M; }
+            const bodyIns = data.insumos.map(i => {
+                const total = parseFloat(i.total_item || 0);
+                const pagado = parseFloat(i.pagado || 0);
+                const debe = Math.max(0, total - pagado);
+                const detalle = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 60);
+                return [`#${i.id}`, (i.solicitante || '').substring(0, 25), detalle, `$ ${total.toFixed(2)}`, `$ ${pagado.toFixed(2)}`, `$ ${debe.toFixed(2)}`];
+            });
+            doc.autoTable({
+                startY: currentY,
+                margin: { left: M, right: M },
+                head: [['ID', 'Solicitante', 'Concepto', 'Total', 'Pagado', 'Debe']],
+                body: bodyIns,
+                theme: 'grid', headStyles: { fillColor: [80, 80, 80] }, styles: { fontSize: 7 },
+                columnStyles: { 2: { cellWidth: 55 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+        }
+
+        if (currentY > 250) { doc.addPage(); currentY = M; }
 
         doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
         doc.setFontSize(9); doc.setTextColor(100);
@@ -384,6 +458,6 @@ window.downloadProtocoloPDF = async (idProt) => {
         doc.save(`Ficha_Financiera_Prot_${info.nprotA}.pdf`);
     } catch (e) {
         console.error("Error generando PDF:", e);
-        Swal.fire('Error', 'No se pudo generar el documento PDF.', 'error');
+        Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_pdf || 'No se pudo generar el documento PDF.', 'error');
     } finally { hideLoader(); }
 };

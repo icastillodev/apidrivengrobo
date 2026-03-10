@@ -518,7 +518,7 @@ window.downloadPDF = async (id) => {
             </div>`;
 
         Swal.close();
-        html2pdf().set({ margin: 10, filename: `Alojamiento_${h.IdHistoria}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
+        html2pdf().set({ margin: [18, 18, 18, 18], filename: `Alojamiento_${h.IdHistoria}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
         
     } catch (e) {
         Swal.fire('Error', e.message || 'No se pudo generar PDF', 'error');

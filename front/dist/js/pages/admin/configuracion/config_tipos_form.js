@@ -1,9 +1,10 @@
 import { API } from '../../../api.js';
+import { getTipoFormBadgeStyle } from '../../../utils/badgeTipoForm.js';
 
 let allTypes = [];
 
 // Definimos las categorías exactas como constantes
-const CAT_ANIMAL_LABEL = 'Animal vivo';
+const CAT_ANIMAL_LABEL = 'Animal';
 const CAT_REACTIVOS_LABEL = 'Otros reactivos biologicos';
 const CAT_INSUMOS_LABEL = 'Insumos';
 
@@ -58,8 +59,9 @@ function renderTables() {
     const headerHtml = `
         <thead class="bg-light text-secondary text-uppercase small">
             <tr>
-                <th class="ps-4">Nombre Tipo</th>
-                <th class="text-center">Descuento</th>
+                <th class="ps-4">${window.txt?.config_tipos_form?.label_nombre_tipo || 'Nombre Tipo'}</th>
+                <th class="text-center">${window.txt?.config_tipos_form?.label_color || 'Color'}</th>
+                <th class="text-center">${window.txt?.config_tipos_form?.label_descuento || 'Descuento'}</th>
                 <th class="text-center">Cobro</th>
                 <th class="text-end pe-4">Acciones</th>
             </tr>
@@ -81,10 +83,13 @@ function renderTables() {
         const isInsumo = catBD.includes('insumo');
 
         const isExempt = t.exento == 1;
+        const badgeStyle = getTipoFormBadgeStyle(t.color || '');
+        const badgePreview = `<span class="${badgeStyle.className}" style="${badgeStyle.style} font-size: 9px; padding: 2px 6px;">${(t.nombreTipo || '').replace(/</g, '&lt;').substring(0, 20)}</span>`;
         
         const row = `
             <tr>
                 <td class="ps-4 fw-bold text-dark">${t.nombreTipo}</td>
+                <td class="text-center">${badgePreview}</td>
                 <td class="text-center">
                     ${t.descuento > 0 ? `<span class="badge bg-success">-${t.descuento}% OFF</span>` : '<span class="text-muted small">-</span>'}
                 </td>
@@ -120,7 +125,7 @@ function injectHtml(tableId, htmlContent) {
     if ((htmlContent.match(/<tr>/g) || []).length === 1) { 
         el.innerHTML = `
             ${htmlContent.replace('<tbody>', '')} 
-            <tbody><tr><td colspan="4" class="text-center py-4 text-muted fst-italic">No hay tipos configurados en esta categoría.</td></tr></tbody>
+            <tbody><tr><td colspan="5" class="text-center py-4 text-muted fst-italic">No hay tipos configurados en esta categoría.</td></tr></tbody>
         `;
     } else {
         el.innerHTML = htmlContent + '</tbody>';
@@ -142,6 +147,8 @@ window.openModalFormType = (id = null) => {
             select.value = t.categoriaformulario; // Debe coincidir exacto
             document.getElementById('type-discount').value = t.descuento;
             document.getElementById('type-exempt').checked = (t.exento == 1);
+            const colorEl = document.getElementById('type-color');
+            if (colorEl) colorEl.value = (t.color || '');
         }
     } 
     // CASO 2: NUEVO (Detecta pestaña activa para pre-seleccionar)

@@ -47,7 +47,9 @@ class InsumoFormularioController {
             // 🚀 FIX: Si viene instId en el POST lo usamos, sino el de sesión
             $input['instId'] = !empty($input['instId']) ? $input['instId'] : $sesion['instId']; 
             
-            $idForm = $this->model->saveOrder($input);
+            $res = $this->model->saveOrder($input);
+            $idForm = is_array($res) ? ($res['id'] ?? null) : $res;
+            $finalDepto = is_array($res) ? ($res['idDepto'] ?? ($input['idDepto'] ?? null)) : ($input['idDepto'] ?? null);
 
             // Preparar y Enviar Correo
             $stmtInfo = $this->db->prepare("
@@ -58,7 +60,7 @@ class InsumoFormularioController {
                 LEFT JOIN departamentoe d ON d.iddeptoA = ?
                 WHERE p.IdUsrA = ? AND i.IdInstitucion = ?
             ");
-            $stmtInfo->execute([$input['idDepto'], $input['userId'], $input['instId']]);
+            $stmtInfo->execute([$finalDepto, $input['userId'], $input['instId']]);
             $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
             if ($info && !empty($info['EmailA'])) {

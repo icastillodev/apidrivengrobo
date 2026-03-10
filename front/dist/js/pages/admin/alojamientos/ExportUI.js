@@ -200,7 +200,7 @@ export const ExportUI = {
         `;
 
         const opt = { 
-            margin: 10, 
+            margin: [18, 18, 18, 18], 
             filename: `Alojamiento_H${historiaId}.pdf`, 
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             html2canvas: { scale: 2 } 

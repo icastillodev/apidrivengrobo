@@ -7,6 +7,8 @@ import './billingPayments.js';
 import './modals/manager.js' ;
 
 let currentReportData = null;
+/** Lista completa de departamentos (para filtrar por ámbito sin nueva petición) */
+let deptosRaw = [];
 
 export async function initBillingDepto() {
     try {
@@ -21,7 +23,32 @@ export async function initBillingDepto() {
             fHasta.value = hoy.toISOString().split('T')[0];
         }
         await cargarListaDeptos();
+        const filterAmbito = document.getElementById('filter-ambito-depto');
+        if (filterAmbito) filterAmbito.addEventListener('change', () => renderDeptoOptions(filterAmbito.value));
+        aplicarParamsUrlDepto();
     } catch (error) { console.error("Error en init:", error); } finally { hideLoader(); }
+}
+
+function aplicarParamsUrlDepto() {
+    const params = new URLSearchParams(window.location.search);
+    const desde = params.get('desde');
+    const hasta = params.get('hasta');
+    const deptoId = params.get('depto');
+    if (desde) {
+        const el = document.getElementById('f-desde');
+        if (el) el.value = desde;
+    }
+    if (hasta) {
+        const el = document.getElementById('f-hasta');
+        if (el) el.value = hasta;
+    }
+    if (deptoId) {
+        const sel = document.getElementById('sel-depto');
+        if (sel) {
+            sel.value = deptoId;
+            if (desde && hasta && sel.value === deptoId) setTimeout(() => window.cargarFacturacionDepto && window.cargarFacturacionDepto(), 300);
+        }
+    }
 }
 
 async function cargarListaDeptos() {
@@ -29,17 +56,34 @@ async function cargarListaDeptos() {
     try {
         const res = await API.request(`/deptos/list?inst=${instId}`);
         if (res.status === 'success' && res.data) {
-            const select = document.getElementById('sel-depto');
-            if (select) {
-                select.innerHTML = '<option value="">-- SELECCIONAR --</option>' + 
-                    res.data.map(d => {
-                        // Si tiene organismo, lo encierra en paréntesis
-                        const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
-                        return `<option value="${d.iddeptoA}">${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})</option>`;
-                    }).join('');
-            }
+            deptosRaw = res.data;
+            const filterAmbito = document.getElementById('filter-ambito-depto');
+            const ambito = filterAmbito ? filterAmbito.value : 'all';
+            renderDeptoOptions(ambito);
         }
     } catch (e) { console.error(e); }
+}
+
+/** Filtra deptos por ámbito (all | interno | externo) y rellena el select. */
+function renderDeptoOptions(ambito) {
+    const select = document.getElementById('sel-depto');
+    if (!select) return;
+    const currentVal = select.value;
+
+    const isExterno = (d) => (d.externodepto == 2) || (d.externoorganismo != null && d.externoorganismo == 2);
+    let list = deptosRaw;
+    if (ambito === 'interno') list = deptosRaw.filter(d => !isExterno(d));
+    if (ambito === 'externo') list = deptosRaw.filter(d => isExterno(d));
+
+    select.innerHTML = '<option value="">-- SELECCIONAR --</option>' +
+        list.map(d => {
+            const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
+            return `<option value="${d.iddeptoA}">${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})</option>`;
+        }).join('');
+
+    if (currentVal && list.some(d => String(d.iddeptoA) === String(currentVal))) {
+        select.value = currentVal;
+    }
 }
 
 window.cargarFacturacionDepto = async () => {
@@ -52,11 +96,11 @@ window.cargarFacturacionDepto = async () => {
     const chkIns = document.getElementById('chk-insumos').checked;
 
     if (!chkAni && !chkAlo && !chkIns) {
-        Swal.fire('Atención', 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_filtro || 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
         return;
     }
 
-    if (!deptoId) { Swal.fire('Atención', 'Seleccione un departamento.', 'warning'); return; }
+    if (!deptoId) { Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_depto || 'Seleccione un departamento.', 'warning'); return; }
 
     try {
         showLoader();
@@ -136,18 +180,11 @@ function vincularChecksPago() {
 }
 
 function getHeaderHTML(prot) {
-    return `
-        <div class="card-header bg-white py-3 border-bottom">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="badge bg-success mb-2 uppercase" style="font-size: 9px;">Protocolo: ${prot.nprotA}</span>
-                    <h5 class="fw-bold m-0 text-dark">${prot.tituloA}</h5>
-                    <div class="small text-muted mt-1">
-                        <i class="bi bi-person-circle me-1"></i>Investigador: <b class="text-dark">${prot.investigador} (ID: ${prot.idUsr})</b>
-                    </div>
-                </div>
-                <div class="text-end">
-                    <div class="d-flex flex-column align-items-end gap-1">
+    const isSinProtocolo = (prot.idProt === 0);
+    const protocoloLabel = isSinProtocolo ? (window.txt?.facturacion?.depto_sin_protocolo || prot.nprotA) : prot.nprotA;
+    const tituloDisplay = isSinProtocolo ? '' : (prot.tituloA || '');
+    const investigadorDisplay = isSinProtocolo ? '—' : `${prot.investigador} (ID: ${prot.idUsr})`;
+    const bloqueSaldo = isSinProtocolo ? '' : `
                         <div class="d-flex align-items-center gap-2 mb-1">
                             <small class="text-muted fw-bold uppercase" style="font-size: 10px;">Saldo Actual:</small>
                             <span class="badge bg-light text-success border fs-6 fw-bold">$ ${parseFloat(prot.saldoInv).toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
@@ -157,7 +194,20 @@ function getHeaderHTML(prot) {
                             <input type="number" id="inp-saldo-prot-${prot.idProt}" class="form-control border-start-0 border-end-0 border-primary" placeholder="Monto a ajustar...">
                             <button type="button" class="btn btn-success" onclick="window.updateBalance(${prot.idUsr}, 'add', true, ${prot.idProt})"><i class="bi bi-plus-lg"></i></button>
                             <button type="button" class="btn btn-danger" onclick="window.updateBalance(${prot.idUsr}, 'sub', true, ${prot.idProt})"><i class="bi bi-dash-lg"></i></button>
-                        </div>
+                        </div>`;
+    return `
+        <div class="card-header bg-white py-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="badge bg-success mb-2 uppercase" style="font-size: 9px;">Protocolo: ${protocoloLabel}</span>
+                    ${tituloDisplay ? `<h5 class="fw-bold m-0 text-dark">${tituloDisplay}</h5>` : ''}
+                    <div class="small text-muted mt-1">
+                        <i class="bi bi-person-circle me-1"></i>Investigador: <b class="text-dark">${investigadorDisplay}</b>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="d-flex flex-column align-items-end gap-1">
+                        ${bloqueSaldo}
                     </div>
                 </div>
             </div>
@@ -301,7 +351,7 @@ function getFooterHTML(prot, showAni, showAlo) {
         prot.formularios.forEach(f => {
             const t = parseFloat(f.total || 0), p = parseFloat(f.pagado || 0), d = parseFloat(f.debe || 0);
             sumTotal += t; sumPagado += p; sumDebe += d;
-            const cat = f.categoria.toLowerCase();
+            const cat = (f.categoria || '').toLowerCase();
             if (cat.includes('otros reactivos biologicos')) totOtr += t;
             else if (cat.includes('reactivo')) totRea += t;
             else totAni += t;
@@ -314,6 +364,19 @@ function getFooterHTML(prot, showAni, showAlo) {
             totAlo += t; sumTotal += t; sumPagado += p; sumDebe += d;
         });
     }
+
+    const isSinProtocolo = (prot.idProt === 0);
+    const bloquePago = isSinProtocolo ? `
+                <div class="small text-muted">${window.txt?.facturacion?.liquidar_sin_protocolo_ayuda || 'Para liquidar pedidos sin protocolo use Facturación por investigador.'}</div>` : `
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-end me-2">
+                        <small class="text-muted d-block fw-bold uppercase" style="font-size: 9px;">Seleccionado:</small>
+                        <span class="fs-5 fw-bold text-primary" id="pago-seleccionado-${prot.idProt}">$ 0.00</span>
+                    </div>
+                <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
+                        <i class="bi bi-wallet2 me-2"></i> Pagar Selección
+                    </button>
+                </div>`;
 
 return `
         <div class="card-footer bg-white border-top py-3 shadow-sm">
@@ -339,15 +402,7 @@ return `
                     </button>
                 </div>
 
-                <div class="d-flex align-items-center gap-3">
-                    <div class="text-end me-2">
-                        <small class="text-muted d-block fw-bold uppercase" style="font-size: 9px;">Seleccionado:</small>
-                        <span class="fs-5 fw-bold text-primary" id="pago-seleccionado-${prot.idProt}">$ 0.00</span>
-                    </div>
-                <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
-                        <i class="bi bi-wallet2 me-2"></i> Pagar Selección
-                    </button>
-                </div>
+                ${bloquePago}
             </div>
         </div>`;
 }
@@ -613,26 +668,29 @@ window.downloadProtocoloPDF = async (idProt) => {
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+        const M = 18;
+        const pageW = doc.internal.pageSize.getWidth();
+        const right = pageW - M;
         const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         const verdeGecko = [25, 135, 84];
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
-        doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
+        doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
 
         doc.setFontSize(11); doc.setTextColor(100);
-        doc.text("ESTADO DE CUENTA DETALLADO POR PROTOCOLO", 105, 22, { align: "center" });
+        doc.text("ESTADO DE CUENTA DETALLADO POR PROTOCOLO", 105, M + 7, { align: "center" });
         doc.setDrawColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
-        doc.line(20, 25, 190, 25);
+        doc.line(M, M + 10, right, M + 10);
 
         doc.setFontSize(10); doc.setTextColor(0);
-        doc.text(`PROTOCOLO:`, 20, 35);
-        doc.setFont("helvetica", "normal"); doc.text(`${prot.tituloA} (${prot.nprotA})`, 50, 35);
-        doc.setFont("helvetica", "bold"); doc.text(`RESPONSABLE:`, 20, 41);
-        doc.setFont("helvetica", "normal"); doc.text(`${prot.investigador} (ID: ${prot.idUsr})`, 50, 41);
-        doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, 20, 47);
-        doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, 47);
+        doc.text(`PROTOCOLO:`, M, M + 20);
+        doc.setFont("helvetica", "normal"); doc.text(`${prot.tituloA} (${prot.nprotA})`, 50, M + 20);
+        doc.setFont("helvetica", "bold"); doc.text(`RESPONSABLE:`, M, M + 26);
+        doc.setFont("helvetica", "normal"); doc.text(`${prot.investigador} (ID: ${prot.idUsr})`, 50, M + 26);
+        doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, M, M + 32);
+        doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, M + 32);
 
-        let currentY = 55;
+        let currentY = M + 40;
 
         if (prot.formularios && prot.formularios.length > 0) {
             const bodyForms = prot.formularios.map(f => {
@@ -652,6 +710,7 @@ window.downloadProtocoloPDF = async (idProt) => {
 
             doc.autoTable({
                 startY: currentY,
+                margin: { left: M, right: M },
                 head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
                 body: bodyForms,
                 theme: 'grid',
@@ -674,6 +733,7 @@ window.downloadProtocoloPDF = async (idProt) => {
 
             doc.autoTable({
                 startY: currentY,
+                margin: { left: M, right: M },
                 head: [['Hist.', 'Especie', 'Periodo Alojamiento', 'Total', 'Pagado', 'Debe']],
                 body: bodyAloj,
                 theme: 'grid',
@@ -684,7 +744,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             currentY = doc.lastAutoTable.finalY + 15;
         }
 
-        if (currentY > 250) { doc.addPage(); currentY = 20; }
+        if (currentY > 250) { doc.addPage(); currentY = M; }
 
         const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
         const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0);
@@ -713,24 +773,27 @@ window.downloadInsumosPDF = async () => {
 
     showLoader();
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF(); 
+    const doc = new jsPDF();
+    const M = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
     const azulInsumos = [13, 110, 253];
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(azulInsumos[0], azulInsumos[1], azulInsumos[2]);
-    doc.text(`GROBO - ${inst}`, 105, 15, { align: "center" });
-    doc.setFontSize(11); doc.setTextColor(100); doc.text("REPORTE DE INSUMOS GENERALES", 105, 22, { align: "center" });
-    doc.setFontSize(9); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 105, 27, { align: "center" });
-    doc.line(20, 30, 190, 30);
+    doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
+    doc.setFontSize(11); doc.setTextColor(100); doc.text("REPORTE DE INSUMOS GENERALES", 105, M + 7, { align: "center" });
+    doc.setFontSize(9); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 105, M + 12, { align: "center" });
+    doc.line(M, M + 15, right, M + 15);
 
     const body = insumos.map(i => [
-        i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), 
+        i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'),
         `$ ${parseFloat(i.total_item || 0).toFixed(2)}`, `$ ${parseFloat(i.pagado || 0).toFixed(2)}`, `$ ${parseFloat(i.debe || 0).toFixed(2)}`
     ]);
 
     doc.autoTable({
-        startY: 35, head: [['ID', 'Solicitante', 'Detalle de Productos / Cantidades', 'Total', 'Pagado', 'Debe']],
+        startY: M + 20, margin: { left: M, right: M }, head: [['ID', 'Solicitante', 'Detalle de Productos / Cantidades', 'Total', 'Pagado', 'Debe']],
         body: body, theme: 'striped', headStyles: { fillColor: azulInsumos },
         styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
         columnStyles: { 2: { cellWidth: 70 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
@@ -751,19 +814,22 @@ window.downloadGlobalPDF = async () => {
     
     showLoader();
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4'); 
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const M = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
     const verdeGrobo = [26, 93, 59];
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]);
-    doc.text("REPORTE DE FACTURACIÓN", 148, 15, { align: "center" });
-    doc.setFontSize(12); doc.setTextColor(100); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 148, 22, { align: "center" });
-    doc.setDrawColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]); doc.line(15, 25, 282, 25);
+    doc.text("REPORTE DE FACTURACIÓN", 148, M, { align: "center" });
+    doc.setFontSize(12); doc.setTextColor(100); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 148, M + 7, { align: "center" });
+    doc.setDrawColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]); doc.line(M, M + 10, right, M + 10);
 
     const t = window.currentReportData.totales;
     doc.autoTable({
-        startY: 32, head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'PAGADO GLOBAL', 'DEUDA GLOBAL']],
+        startY: M + 17, margin: { left: M, right: M }, head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'PAGADO GLOBAL', 'DEUDA GLOBAL']],
         body: [[
             `$ ${t.deudaAnimales.toFixed(2)}`, `$ ${t.deudaReactivos.toFixed(2)}`, `$ ${t.deudaAlojamiento.toFixed(2)}`, 
             `$ ${t.deudaInsumos.toFixed(2)}`, `$ ${t.totalPagado.toFixed(2)}`,
@@ -775,12 +841,12 @@ window.downloadGlobalPDF = async () => {
     let currentY = doc.lastAutoTable.finalY + 12;
 
     window.currentReportData.protocolos.forEach((prot) => {
-        if (currentY > 180) { doc.addPage(); currentY = 20; }
+        if (currentY > 180) { doc.addPage(); currentY = M; }
 
-        doc.setFillColor(245, 245, 245); doc.rect(15, currentY, 267, 8, 'F');
+        doc.setFillColor(245, 245, 245); doc.rect(M, currentY, right - M, 8, 'F');
         doc.setFontSize(10); doc.setTextColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]);
-        doc.text(`PROT: ${prot.nprotA} | INVESTIGADOR: ${prot.investigador}`, 18, currentY + 6);
-        
+        doc.text(`PROT: ${prot.nprotA} | INVESTIGADOR: ${prot.investigador}`, M + 3, currentY + 6);
+
         if (prot.formularios?.length > 0) {
             const bodyForms = prot.formularios.map(f => {
                 const isExento = (f.is_exento == 1 || f.exento == 1);
@@ -798,7 +864,7 @@ window.downloadGlobalPDF = async () => {
             });
 
             doc.autoTable({
-                startY: currentY + 10, head: [['ID', 'Solicitante', 'Especie', 'Detalle', 'Cantidad', 'Total', 'Debe']],
+                startY: currentY + 10, margin: { left: M, right: M }, head: [['ID', 'Solicitante', 'Especie', 'Detalle', 'Cantidad', 'Total', 'Debe']],
                 body: bodyForms, theme: 'grid', headStyles: { fillColor: verdeGrobo },
                 styles: { fontSize: 7 }, columnStyles: { 3: { cellWidth: 50 }, 4: { cellWidth: 55 } }
             });
@@ -812,9 +878,9 @@ window.downloadGlobalPDF = async () => {
             ]);
 
             doc.autoTable({
-                startY: currentY, head: [['ID Historia', 'Concepto', 'Ingreso', 'Salida', 'Total', 'Debe']],
+                startY: currentY, margin: { left: M, right: M }, head: [['ID Historia', 'Concepto', 'Ingreso', 'Salida', 'Total', 'Debe']],
                 body: bodyAloj, theme: 'grid', headStyles: { fillColor: [100, 100, 100] },
-                styles: { fontSize: 7 }, margin: { left: 50 }
+                styles: { fontSize: 7 }
             });
             currentY = doc.lastAutoTable.finalY + 12;
         } else {

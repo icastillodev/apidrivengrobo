@@ -19,7 +19,9 @@ class ProtocolController {
 
         try {
             $sesion = Auditoria::getDatosSesion(); // Extrae instId seguro
-            $data = $this->model->getByInstitution($sesion['instId']);
+            // ✅ Respetar la institución que manda el Front (como en animales/reactivos)
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $data = $this->model->getByInstitution($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -34,7 +36,8 @@ class ProtocolController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data = $this->model->getFormData($sesion['instId']);
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $data = $this->model->getFormData($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -49,7 +52,8 @@ class ProtocolController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
-            $count = $this->model->getPendingRequestsCount($sesion['instId']);
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $count = $this->model->getPendingRequestsCount($targetInst);
             echo json_encode(['status' => 'success', 'count' => $count]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

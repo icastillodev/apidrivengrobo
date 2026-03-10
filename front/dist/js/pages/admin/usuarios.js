@@ -2,6 +2,7 @@
 // v: modal construido por concatenación (sin template literals) + cache-bust
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
+import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
@@ -26,8 +27,8 @@ function escapeHtmlAttr(str) {
 
 function openWithModal(targetPath, id, queryKey = 'id') {
     if (!id) return;
-    const basePath = Auth.getBasePath();
-    const url = `${window.location.origin}${basePath}${targetPath}?${queryKey}=${encodeURIComponent(id)}&action=view`;
+    const pathWithBase = getCorrectPath(targetPath);
+    const url = `${window.location.origin}${pathWithBase}${pathWithBase.includes('?') ? '&' : '?'}${queryKey}=${encodeURIComponent(id)}&action=view`;
     window.open(url, '_blank');
 }
 
@@ -223,9 +224,10 @@ function renderTable() {
 
     tbody.innerHTML = '';
     const showOtros = allUsers.some(u => u.OtrosCeuaCount > 0);
+    const colCount = showOtros ? 8 : 7;
 
     if (pageData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${(window.txt?.admin_usuarios?.empty_usuarios || 'No se encontraron usuarios')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-4 text-muted">${(window.txt?.admin_usuarios?.empty_usuarios || 'No se encontraron usuarios')}</td></tr>`;
         // IMPORTANTE: Incluso si no hay datos, debemos limpiar la paginación
         const pagContainer = document.getElementById('pagination');
         if(pagContainer) pagContainer.innerHTML = '';
@@ -245,6 +247,7 @@ function renderTable() {
             <td class="py-3 px-3">${u.CelularA || '-'}</td>
             <td class="py-3 px-3 text-secondary">${u.Correo || '-'}</td>
             <td class="py-3 px-3 text-muted">${u.Laboratorio || '-'}</td>
+            <td class="py-3 px-3 text-center fw-bold">${u.ProtocolCount ?? 0}</td>
             ${showOtros ? `<td class="py-3 px-3 text-center"><span class="badge ${u.OtrosCeuaCount > 0 ? 'bg-danger' : 'bg-light text-secondary border'}">${u.OtrosCeuaCount > 0 ? 'OTROS CEUAS' : 'NO'}</span></td>` : ''}
         `;
         tbody.appendChild(tr);
@@ -351,7 +354,12 @@ function buildModalHtml(opts) {
         var detallePart = d.DetalledeptoA ? (' (' + d.DetalledeptoA + ')') : '';
         html += '<option value="' + (d.iddeptoA || '') + '"' + isSelected + '>' + (d.NombreDeptoA || '') + detallePart + '</option>';
     }
-    html += '</select></div><div class="mt-4 d-flex gap-2 flex-wrap">';
+    html += '</select></div>';
+    var deptoSel = (departamentos || []).find(function(d) { return d.iddeptoA == u.iddeptoA; });
+    var orgLabel = (t && t.ficha_organizacion ? t.ficha_organizacion : 'Organización');
+    var orgVal = (deptoSel && deptoSel.NombreOrganismoSimple && String(deptoSel.NombreOrganismoSimple).trim()) ? deptoSel.NombreOrganismoSimple : (window.txt && window.txt.generales && window.txt.generales.sin_organizacion ? window.txt.generales.sin_organizacion : '– (sin organización)');
+    html += '<div class="col-12"><label class="form-label text-muted small fw-bold uppercase">' + orgLabel + '</label><div class="form-control-plaintext fw-bold border-0 px-0">' + (orgVal || '') + '</div></div>';
+    html += '<div class="mt-4 d-flex gap-2 flex-wrap">';
     html += '<button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(' + (u.IdUsrA || '') + ')">' + (t && t.btn_guardar_cambios ? t.btn_guardar_cambios : 'Guardar Cambios') + '</button>';
     html += '<button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(' + (u.IdUsrA || '') + ')">' + (t && t.btn_resetear_clave ? t.btn_resetear_clave : 'Resetear Clave') + '</button>';
     html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')"' + (puedeEliminar ? '' : ' disabled title="Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos"') + '><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
@@ -603,9 +611,15 @@ function esc(s) {
 }
 
 function buildFichaSimpleHTML(data) {
-    const { u, departamentos, instName } = data;
+    const { u, departamentos, instName, servicios = [] } = data;
     const deptoNombre = (departamentos || []).find(d => d.iddeptoA == u.iddeptoA);
     const deptoText = deptoNombre ? (deptoNombre.NombreDeptoA + (deptoNombre.DetalledeptoA ? ' (' + deptoNombre.DetalledeptoA + ')' : '')) : '—';
+    const orgText = (deptoNombre && deptoNombre.NombreOrganismoSimple && String(deptoNombre.NombreOrganismoSimple).trim()) ? deptoNombre.NombreOrganismoSimple : (window.txt?.generales?.sin_organizacion || '– (sin organización)');
+    const t = window.txt?.admin_usuarios || {};
+    const servTitle = t.pdf_servicios_institucionales || 'Servicios institucionales';
+    const rowsServ = (servicios || []).length ? (servicios || []).map(s => `
+        <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(s.NombreServicioInst || '—')}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc((s.CantidadPorMedidaInst || '') + ' ' + (s.MedidaServicioInst || 'U'))}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: right;">${esc(s.Precio != null ? '$ ' + parseFloat(s.Precio) : '—')}</td></tr>`).join('')
+        : '<tr><td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: center; color: #666;">—</td></tr>';
     return `
     <div style="font-family: Arial, sans-serif; padding: 24px; color: #333; max-width: 210mm; background: #fff;">
         <div style="border-bottom: 3px solid #1a5d3b; padding-bottom: 12px; margin-bottom: 24px;">
@@ -620,16 +634,31 @@ function buildFichaSimpleHTML(data) {
                 <tr><td style="padding: 6px 0; color: #666;">Correo</td><td style="padding: 6px 0;">${esc(u.Correo || '—')}</td></tr>
                 <tr><td style="padding: 6px 0; color: #666;">Celular</td><td style="padding: 6px 0;">${esc(u.CelularA || '—')}</td></tr>
                 <tr><td style="padding: 6px 0; color: #666;">Departamento / División</td><td style="padding: 6px 0;">${esc(deptoText)}</td></tr>
+                <tr><td style="padding: 6px 0; color: #666;">Organización</td><td style="padding: 6px 0;">${esc(orgText)}</td></tr>
+            </table>
+        </div>
+        <div style="margin-top: 20px;">
+            <div style="font-weight: bold; color: #1a5d3b; font-size: 11px; margin-bottom: 6px;">${esc(servTitle)}</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                <thead><tr style="background: #f0f0f0;"><th style="padding: 6px; border: 1px solid #ddd;">Servicio</th><th style="padding: 6px; border: 1px solid #ddd;">Medida</th><th style="padding: 6px; border: 1px solid #ddd;">Precio</th></tr></thead>
+                <tbody>${rowsServ}</tbody>
             </table>
         </div>
     </div>`;
 }
 
 function buildFichaTotalHTML(data) {
-    const { u, protocolos, formularios, alojamientos, protocolsUsed, insumosPedidos, insumosExpPedidos, departamentos, instName } = data;
+    const { u, protocolos, formularios, alojamientos, protocolsUsed, insumosPedidos, insumosExpPedidos, departamentos, instName, servicios = [] } = data;
     const deptoNombre = (departamentos || []).find(d => d.iddeptoA == u.iddeptoA);
     const deptoText = deptoNombre ? (deptoNombre.NombreDeptoA + (deptoNombre.DetalledeptoA ? ' (' + deptoNombre.DetalledeptoA + ')' : '')) : '—';
+    const orgText = (deptoNombre && deptoNombre.NombreOrganismoSimple && String(deptoNombre.NombreOrganismoSimple).trim()) ? deptoNombre.NombreOrganismoSimple : (window.txt?.generales?.sin_organizacion || '– (sin organización)');
+    const t = window.txt?.admin_usuarios || {};
+    const servTitle = t.pdf_servicios_institucionales || 'Servicios institucionales';
     const totalAnimales = (protocolsUsed || []).reduce((s, p) => s + (parseInt(p.animales_usados, 10) || 0), 0);
+
+    const rowsServ = (servicios || []).length ? (servicios || []).map(s => `
+        <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(s.NombreServicioInst || '—')}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc((s.CantidadPorMedidaInst || '') + ' ' + (s.MedidaServicioInst || 'U'))}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: right;">${esc(s.Precio != null ? '$ ' + parseFloat(s.Precio) : '—')}</td></tr>`).join('')
+        : '<tr><td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: center; color: #666;">—</td></tr>';
 
     const rowsProt = (protocolos || []).length ? protocolos.map(p => `
         <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.idprotA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.nprotA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.tituloA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: center;">${esc(p.FechaFinProtA || 'N/A')}</td></tr>`).join('')
@@ -657,6 +686,7 @@ function buildFichaTotalHTML(data) {
                 <tr><td style="padding: 4px 0; color: #666;">Correo</td><td style="padding: 4px 0;">${esc(u.Correo || '—')}</td></tr>
                 <tr><td style="padding: 4px 0; color: #666;">Celular</td><td style="padding: 4px 0;">${esc(u.CelularA || '—')}</td></tr>
                 <tr><td style="padding: 4px 0; color: #666;">Departamento</td><td style="padding: 4px 0;">${esc(deptoText)}</td></tr>
+                <tr><td style="padding: 4px 0; color: #666;">Organización</td><td style="padding: 4px 0;">${esc(orgText)}</td></tr>
             </table>
         </div>
 
@@ -703,6 +733,14 @@ function buildFichaTotalHTML(data) {
                 <tbody>${rowsAloj}</tbody>
             </table>
         </div>
+
+        <div style="margin-top: 14px;">
+            <div style="font-weight: bold; color: #1a5d3b; font-size: 11px; margin-bottom: 6px;">${esc(servTitle)}</div>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead><tr style="background: #f0f0f0;"><th style="padding: 6px; border: 1px solid #ddd;">Servicio</th><th style="padding: 6px; border: 1px solid #ddd;">Medida</th><th style="padding: 6px; border: 1px solid #ddd;">Precio</th></tr></thead>
+                <tbody>${rowsServ}</tbody>
+            </table>
+        </div>
     </div>`;
 }
 
@@ -717,6 +755,17 @@ window.downloadPDF = async (id, mode = 'total') => {
         return;
     }
 
+    let servicios = [];
+    try {
+        const resPrecios = await API.request('/precios/all-data?inst=' + encodeURIComponent(localStorage.getItem('instId') || ''));
+        if (resPrecios && resPrecios.status === 'success' && resPrecios.data && Array.isArray(resPrecios.data.servicios)) {
+            servicios = resPrecios.data.servicios;
+        }
+    } catch (e) {
+        console.warn('No se pudieron cargar servicios para el PDF:', e);
+    }
+    const dataWithServicios = { ...data, servicios };
+
     const modalEl = document.getElementById('modal-user');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
@@ -726,7 +775,7 @@ window.downloadPDF = async (id, mode = 'total') => {
     document.body.style.overflow = '';
     document.body.style.paddingRight = '';
 
-    const htmlString = mode === 'simple' ? buildFichaSimpleHTML(data) : buildFichaTotalHTML(data);
+    const htmlString = mode === 'simple' ? buildFichaSimpleHTML(dataWithServicios) : buildFichaTotalHTML(dataWithServicios);
     const logoHeader = getPdfLogoHeaderFromStorage();
     const wrapper = document.createElement('div');
     wrapper.setAttribute('id', 'pdf-export-container');
@@ -740,8 +789,9 @@ window.downloadPDF = async (id, mode = 'total') => {
     await new Promise(r => setTimeout(r, 300));
 
     const fileName = mode === 'simple' ? `Ficha_Datos_Personales_${id}.pdf` : `Ficha_Completa_${id}.pdf`;
+    const PDF_MARGIN_MM = 18;
     const opt = {
-        margin: [10, 10, 10, 10],
+        margin: [PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM, PDF_MARGIN_MM],
         filename: fileName,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },

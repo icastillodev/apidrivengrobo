@@ -20,6 +20,8 @@ export async function initPreciosPage() {
             document.getElementById('lbl-sec-insexp').innerText = window.txt.precios.sec_ins_exp;
             document.getElementById('lbl-sec-inscom').innerText = window.txt.precios.sec_ins_com;
             document.getElementById('lbl-sec-serv').innerText = window.txt.precios.sec_services;
+            const lblServDesc = document.getElementById('lbl-sec-serv-desc');
+            if (lblServDesc && window.txt.precios.sec_services_desc) lblServDesc.innerText = window.txt.precios.sec_services_desc;
             document.getElementById('lbl-btn-guardar').innerText = window.txt.precios.btn_save;
         }
 
@@ -224,13 +226,13 @@ window.exportPreciosPDF = () => {
 
             <h4 style="font-size: 13px; color: #000; margin-bottom:5px; border-bottom: 1px solid #eee;">4. SERVICIOS INSTITUCIONALES</h4>
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
-                <tr style="background: #fff4f4;"><th style="color: #000;">Servicio</th><th style="color: #000;">Medida</th><th style="color: #000;">Precio</th></tr>
+                <tr style="background: #f0f2f5;"><th style="color: #000;">Servicio</th><th style="color: #000;">Medida</th><th style="color: #000;">Precio</th></tr>
                 ${renderServiciosPDF()}
             </table>
         </div>`;
 
     html2pdf().set({
-        margin: 10,
+        margin: [18, 18, 18, 18],
         filename: `Tarifario_${inst}_${Date.now()}.pdf`,
         html2canvas: {
             scale: 2,

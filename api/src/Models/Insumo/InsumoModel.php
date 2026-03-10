@@ -13,7 +13,11 @@ class InsumoModel {
                     p.EmailA as EmailInvestigador, p.CelularA as CelularInvestigador,
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
                     d.NombreDeptoA as Departamento,
+                    o.NombreOrganismoSimple as Organizacion,
                     pif.idPrecioinsumosformulario,
+                    prot.idprotA AS IdProtocolo,
+                    prot.nprotA AS NProtocolo,
+                    prot.tituloA AS TituloProtocolo,
                     (SELECT GROUP_CONCAT(CONCAT(i.NombreInsumo, ' <b>(', fi.cantidad, ' ', i.TipoInsumo, ')</b>') SEPARATOR ', ')
                     FROM forminsumo fi
                     INNER JOIN insumo i ON fi.idInsumo = i.idInsumo
@@ -22,7 +26,10 @@ class InsumoModel {
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
                 INNER JOIN departamentoe d ON f.depto = d.iddeptoA 
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
                 WHERE f.IdInstitucion = ? AND t.categoriaformulario = 'insumos'
                 ORDER BY f.idformA DESC";
         $stmt = $this->db->prepare($sql);
@@ -95,6 +102,16 @@ public function updateFullInsumo($data) {
 
             $sqlP = "UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?";
             $this->db->prepare($sqlP)->execute([$nuevoTotal, $idPrecio]);
+
+            // Asociar / actualizar protocolo si se envió idProt (solo para insumos por protocolo)
+            if (!empty($data['idProt'])) {
+                $idProt = (int)$data['idProt'];
+                $idForm = (int)$data['idformA'];
+
+                // Eliminamos vínculos previos y dejamos uno único
+                $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idForm]);
+                $this->db->prepare("INSERT INTO protformr (idprotA, idformA) VALUES (?, ?)")->execute([$idProt, $idForm]);
+            }
 
             \App\Utils\Auditoria::log($this->db, 'UPDATE_FULL', 'formularioe', "Modificación Administrativa de Pedido Insumos #{$data['idformA']}");
             

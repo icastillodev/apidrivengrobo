@@ -212,26 +212,28 @@ async function exportRedPDF() {
     if (!redRawData) return;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
+    const M = 18;
     const t = window.txt?.generales;
     const lblTotal = t?.total ?? 'Total';
-    let titleY = 15;
+    let titleY = M;
     const logoUrl = getPdfLogoImageUrl(localStorage.getItem('instLogoEnPdf'), localStorage.getItem('instLogo'));
     if (logoUrl) {
         try {
             const resp = await fetch(logoUrl);
             const blob = await resp.blob();
             const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
-            doc.addImage(dataUrl, 'JPEG', 14, 5, 35, 12);
-            titleY = 24;
+            doc.addImage(dataUrl, 'JPEG', M, M, 35, 12);
+            titleY = M + 19;
         } catch (e) { console.warn('Logo no cargado:', e); }
     }
     doc.setFontSize(14);
-    doc.text("ESTADÍSTICAS DE LA RED - GROBO", 14, titleY);
+    doc.text("ESTADÍSTICAS DE LA RED - GROBO", M, titleY);
     doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, titleY + 7);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, M, titleY + 7);
     const g = redRawData.globales || {};
     doc.autoTable({
         startY: titleY + 14,
+        margin: { left: M, right: M },
         head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
         body: [['Animales', g.total_animales, 'Reactivos', g.total_reactivos], ['Insumos', g.total_insumos, 'Protocolos', g.total_protocolos], ['Alojamientos', g.total_alojamientos, '', '']],
         theme: 'grid',
@@ -733,8 +735,8 @@ async function exportFastPDF(includeCharts) {
     if (!rawData) return;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
-
-    let titleY = 15;
+    const M = 18;
+    let titleY = M;
     const logoUrl = getPdfLogoImageUrl(localStorage.getItem('instLogoEnPdf'), localStorage.getItem('instLogo'));
     if (logoUrl) {
         try {
@@ -746,8 +748,8 @@ async function exportFastPDF(includeCharts) {
                 r.onerror = rej;
                 r.readAsDataURL(blob);
             });
-            doc.addImage(dataUrl, 'JPEG', 14, 5, 35, 12);
-            titleY = 24;
+            doc.addImage(dataUrl, 'JPEG', M, M, 35, 12);
+            titleY = M + 19;
         } catch (e) {
             console.warn('Logo no cargado para PDF:', e);
         }
@@ -755,9 +757,9 @@ async function exportFastPDF(includeCharts) {
 
     // Título
     doc.setFontSize(16);
-    doc.text("REPORTE ESTADÍSTICO - GROBO", 14, titleY);
+    doc.text("REPORTE ESTADÍSTICO - GROBO", M, titleY);
     doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, titleY + 7);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, M, titleY + 7);
 
     // Tabla Resumen
     const g = rawData.globales;
@@ -765,6 +767,7 @@ async function exportFastPDF(includeCharts) {
     const lblTotal = t?.total ?? 'Total';
     doc.autoTable({
         startY: titleY + 13,
+        margin: { left: M, right: M },
         head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
         body: [
             ['Animales', g.total_animales, 'Reactivos', g.total_reactivos],
@@ -794,12 +797,13 @@ async function exportFastPDF(includeCharts) {
     }
 
     // Tabla Departamentos
-    if (currentY + 30 > 280) { doc.addPage(); currentY = 15; }
-    doc.text("Desglose por Departamento", 14, currentY);
-    
+    if (currentY + 30 > 280) { doc.addPage(); currentY = M; }
+    doc.text("Desglose por Departamento", M, currentY);
+
     const rowsDept = rawData.por_departamento.map(d => [d.departamento, d.total_animales, d.total_reactivos, d.total_insumos, d.protocolos_aprobados]);
     doc.autoTable({
         startY: currentY + 5,
+        margin: { left: M, right: M },
         head: [['Departamento', 'Anim.', 'Reac.', 'Ins.', 'Prot.']],
         body: rowsDept,
         theme: 'striped'
@@ -807,10 +811,11 @@ async function exportFastPDF(includeCharts) {
 
     // Tabla Especies
     doc.addPage();
-    doc.text("Detalle de Especies Utilizadas", 14, 15);
+    doc.text("Detalle de Especies Utilizadas", M, M);
     const rowsEsp = rawData.detalle_especies.map(e => [e.departamento, e.especie, e.subespecie||'-', e.cantidad_animales]);
     doc.autoTable({
-        startY: 20,
+        startY: M + 5,
+        margin: { left: M, right: M },
         head: [['Depto', 'Especie', 'Subespecie', 'Cant.']],
         body: rowsEsp,
         theme: 'plain',

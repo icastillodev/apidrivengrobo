@@ -67,11 +67,11 @@ class AuthController {
         }
 
         $data = json_decode(file_get_contents("php://input"), true);
-        
         if (!isset($data['user'], $data['pass'], $data['instSlug'])) {
             echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
             exit;
         }
+        $data['user'] = is_string($data['user']) ? strtolower(trim($data['user'])) : $data['user'];
 
         // Determinar qué tipo de validación hacer según el Slug
         if ($data['instSlug'] === 'master' || $data['instSlug'] === 'superadmin') {

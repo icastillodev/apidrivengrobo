@@ -244,14 +244,14 @@ function agregarDepartamento(nom = '', org = '') {
     document.getElementById('contenedor-deptos').insertAdjacentHTML('beforeend', html);
 }
 
-function agregarTipoFormulario(cat = 'Animal vivo', nom = '', exento = '2') {
+function agregarTipoFormulario(cat = 'Animal', nom = '', exento = '2') {
     const html = `
         <div class="row g-2 mb-2 p-2 bg-light border rounded position-relative shadow-sm">
             <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.6rem" onclick="this.parentElement.remove()"></button>
             <div class="col-md-4">
                 <label class="small text-muted fw-bold">${txt.onboarding.form_cat}</label>
                 <select class="form-select form-select-sm fw-bold text-primary" name="form_cat[]">
-                    <option value="Animal vivo" ${cat==='Animal vivo'?'selected':''}>Animal Vivo</option>
+                    <option value="Animal" ${cat==='Animal'?'selected':''}>Animal</option>
                     <option value="Otros reactivos biologicos" ${cat==='Otros reactivos biologicos'?'selected':''}>Otros Reactivos</option>
                     <option value="Insumos" ${cat==='Insumos'?'selected':''}>Insumos</option>
                 </select>

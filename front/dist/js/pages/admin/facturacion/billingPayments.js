@@ -10,7 +10,7 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
     const input = document.querySelector(inputSelector);
     
     if (!input || !input.value) {
-        Swal.fire('Atención', 'Ingrese un monto antes de operar.', 'warning');
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.ingrese_monto_antes || 'Ingrese un monto antes de operar.', 'warning');
         return;
     }
 
@@ -37,7 +37,7 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
             }
 
             Swal.fire({
-                title: 'Saldo Actualizado',
+                title: window.txt?.facturacion?.saldo_act || 'Saldo Actualizado',
                 icon: 'success',
                 toast: true,
                 position: 'top-end',
@@ -68,7 +68,7 @@ window.procesarPagoProtocolo = async (idProt) => {
     });
 
     if (totalAPagar <= 0) {
-        Swal.fire('Atención', 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_que_pagar || 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
         return;
     }
 
@@ -76,7 +76,7 @@ window.procesarPagoProtocolo = async (idProt) => {
 
     if (totalAPagar > saldoActual) {
         Swal.fire({
-            title: 'Saldo Insuficiente',
+            title: window.txt?.facturacion?.saldo_insuficiente || 'Saldo Insuficiente',
             html: `
                 <div class="alert alert-danger">
                     El monto seleccionado (<b>$ ${totalAPagar.toLocaleString('es-UY')}</b>) 
@@ -89,7 +89,7 @@ window.procesarPagoProtocolo = async (idProt) => {
     }
 
     const confirm = await Swal.fire({
-        title: 'Confirmar Liquidación',
+        title: window.txt?.facturacion?.confirm_pago || 'Confirmar Liquidación',
         html: `
             <div class="text-start">
                 <p>Estás por liquidar <b>${items.length}</b> ítems.</p>
@@ -107,7 +107,7 @@ window.procesarPagoProtocolo = async (idProt) => {
             </div>`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, pagar ahora',
+        confirmButtonText: window.txt?.facturacion?.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#1a5d3b',
         cancelButtonText: 'Cancelar'
     });
@@ -128,7 +128,7 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
 
         if (res.status === 'success') {
             hideLoader();
-            await Swal.fire('¡Pago Procesado!', 'El saldo ha sido actualizado.', 'success');
+            await Swal.fire(window.txt?.facturacion?.pago_procesado || '¡Pago Procesado!', 'El saldo ha sido actualizado.', 'success');
 
             if (typeof window.cargarFacturacionProtocolo === "function") {
                 await window.cargarFacturacionProtocolo();
@@ -173,7 +173,7 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
 window.procesarPagoInsumosGenerales = async () => {
     const seleccionados = document.querySelectorAll('.check-item-insumo:checked');
     
-    if (seleccionados.length === 0) return Swal.fire('Atención', 'Seleccione al menos un insumo para pagar.', 'info');
+    if (seleccionados.length === 0) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_insumo_pagar || 'Seleccione al menos un insumo para pagar.', 'info');
 
     let totalAPagar = 0;
     const items = [];
@@ -199,7 +199,7 @@ window.procesarPagoInsumosGenerales = async () => {
 
     if (totalAPagar > saldoActual) {
         Swal.fire({
-            title: 'Saldo Insuficiente',
+            title: window.txt?.facturacion?.saldo_insuficiente || 'Saldo Insuficiente',
             html: `
                 <div class="text-start">
                     <p><b>Investigador:</b> ${nombreInvestigador}</p>

@@ -30,7 +30,7 @@ class NotificationController {
                        FROM formularioe f 
                        INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
                        WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.categoriaformulario = 'Animal vivo'";
+                       AND t.categoriaformulario = 'Animal'";
             $stmtAni = $this->db->prepare($sqlAni);
             $stmtAni->execute([$instId]);
             $countAni = $stmtAni->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;

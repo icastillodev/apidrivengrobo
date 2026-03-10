@@ -85,7 +85,7 @@ window.ajustarPago = async (accion, id) => {
     }
 
     if (montoFinal <= 0) {
-        return Swal.fire('Operación cancelada', 'No hay montos pendientes o saldo suficiente para procesar.', 'warning');
+        return Swal.fire(window.txt?.facturacion?.operacion_cancelada || 'Operación cancelada', window.txt?.facturacion?.operacion_cancelada_msg || 'No hay montos pendientes o saldo suficiente para procesar.', 'warning');
     }
 
     const confirm = await Swal.fire({
@@ -175,7 +175,7 @@ window.ajustarPagoAloj = async (accion, id) => {
     }
 
     if (montoAProcesar <= 0) {
-        return Swal.fire('Operación no requerida', 'El monto resultante es 0 o no hay saldo/deuda para procesar.', 'info');
+        return Swal.fire(window.txt?.facturacion?.operacion_no_requerida || 'Operación no requerida', window.txt?.facturacion?.operacion_no_requerida_msg || 'El monto resultante es 0 o no hay saldo/deuda para procesar.', 'info');
     }
 
     const confirm = await Swal.fire({
@@ -250,7 +250,7 @@ window.ajustarPagoRea = async (accion, id) => {
         if (montoFinal > pagado) montoFinal = pagado;
     }
 
-    if (montoFinal <= 0) return Swal.fire('Aviso', 'Monto no válido o sin saldo/deuda.', 'info');
+    if (montoFinal <= 0) return Swal.fire(window.txt?.generales?.swal_atencion || 'Aviso', window.txt?.facturacion?.monto_invalido_saldo || 'Monto no válido o sin saldo/deuda.', 'info');
 
     const confirm = await Swal.fire({
         title: `¿Confirmar ${accion}?`,
@@ -384,6 +384,9 @@ window.descargarFichaPDF = async (id, tipo) => {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+    const M = 18;
+    const pageW = doc.internal.pageSize.getWidth();
+    const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
 
     const findValue = (labelTxt) => {
@@ -411,13 +414,13 @@ window.descargarFichaPDF = async (id, tipo) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, 20, { align: "center" });
-    
+    doc.text(`GROBO - ${inst}`, 105, M + 2, { align: "center" });
+
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text("FICHA DE PEDIDO: ANIMALES DE LABORATORIO", 105, 28, { align: "center" });
+    doc.text("FICHA DE PEDIDO: ANIMALES DE LABORATORIO", 105, M + 10, { align: "center" });
     doc.setDrawColor(26, 93, 59);
-    doc.line(20, 32, 190, 32);
+    doc.line(M, M + 14, right, M + 14);
 
     doc.setFontSize(10);
     doc.setTextColor(0);
@@ -439,7 +442,7 @@ window.descargarFichaPDF = async (id, tipo) => {
     doc.setTextColor(0);
 
     doc.autoTable({
-        startY: 98,
+        startY: 98, margin: { left: M, right: M },
         head: [['MACHOS', 'HEMBRAS', 'INDISTINTOS', 'TOTAL ANIMALES']],
         body: [[m, h, i, total]],
         headStyles: { fillColor: [26, 93, 59], halign: 'center' },

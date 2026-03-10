@@ -265,6 +265,7 @@ function getDesktopSidebarStyles() {
         .gecko-sidebar .dropdown-item-gecko { 
             padding: 10px 10px !important; opacity: 0.8; transition: all 0.2s; font-size: 12px; white-space: normal !important; line-height: 1.2; cursor: pointer;
         }
+        .dropdown-child-icon { display: inline-flex !important; align-items: center; justify-content: center; min-width: 18px; color: inherit; }
         .dropdown-child-icon svg { width: 18px !important; height: 18px !important; fill: currentColor !important; flex-shrink: 0; }
         .gecko-sidebar .dropdown-item-gecko:hover { 
             opacity: 1; background-color: rgba(26, 93, 59, 0.15) !important; border-radius: 6px; color: #1a5d3b !important; font-weight: bold !important;
