@@ -18,6 +18,7 @@ class InsumoModel {
                     prot.idprotA AS IdProtocolo,
                     prot.nprotA AS NProtocolo,
                     prot.tituloA AS TituloProtocolo,
+                    (CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END) as DeptoExternoFlag,
                     (SELECT GROUP_CONCAT(CONCAT(i.NombreInsumo, ' <b>(', fi.cantidad, ' ', i.TipoInsumo, ')</b>') SEPARATOR ', ')
                     FROM forminsumo fi
                     INNER JOIN insumo i ON fi.idInsumo = i.idInsumo

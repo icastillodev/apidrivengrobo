@@ -108,7 +108,6 @@
                                     <option value="CelularA" data-i18n="admin_usuarios.filter_celular">Celular</option>
                                     <option value="Correo" data-i18n="admin_usuarios.filter_correo">Correo</option>
                                     <option value="Laboratorio" data-i18n="admin_usuarios.filter_laboratorio">Laboratorio</option>
-                                    <option value="OtrosCEUAS" data-i18n="admin_usuarios.filter_otros_ceuas">Otros CEUAS</option>
                                 </select>
                         <input type="text" id="search-input" class="form-control form-control-sm" data-i18n="admin_usuarios.ph_buscar" placeholder="Escribe...">
                         <button id="btn-search" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" data-i18n="admin_usuarios.btn_buscar">Buscar</button>
@@ -137,8 +136,6 @@
                             <th data-key="CelularA" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_celular">Celular -</th>
                             <th data-key="Correo" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_correo">Correo -</th>
                             <th data-key="Laboratorio" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_laboratorio">Laboratorio -</th>
-                            <th data-key="ProtocolCount" data-sortable="true" class="py-3 px-3 text-center" data-i18n="admin_usuarios.col_protocolos">Protocolos -</th>
-                            <th data-key="OtrosCEUAS" class="py-3 px-3 text-center" data-i18n="admin_usuarios.col_otros_ceuas">Otros CEUAS -</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -165,6 +162,35 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="modal-delete-full" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 border-top border-5 border-danger shadow-lg">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h5 class="modal-title small fw-bold text-uppercase" data-i18n="admin_usuarios.delete_modal_titulo">Eliminación total de usuario</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small" data-i18n="admin_usuarios.delete_modal_intro">Se eliminará el usuario y todos sus datos asociados:</p>
+                    <ul id="admin-delete-preview-list" class="list-group list-group-flush mb-3"></ul>
+                    <p id="admin-delete-code-sent" class="small text-success d-none"></p>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold" data-i18n="admin_usuarios.delete_modal_password">Tu contraseña de administrador</label>
+                        <input type="password" id="admin-delete-password" class="form-control form-control-sm" placeholder="">
+                    </div>
+                    <div>
+                        <label class="form-label small fw-bold" data-i18n="admin_usuarios.delete_modal_code">Código de verificación (enviado a tu correo)</label>
+                        <input type="text" id="admin-delete-code" class="form-control form-control-sm" placeholder="000000" maxlength="6">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal" data-i18n="admin_usuarios.delete_modal_btn_cancelar">Cancelar</button>
+                    <button type="button" id="btn-admin-confirm-delete-full" class="btn btn-danger btn-sm fw-bold" data-i18n="admin_usuarios.delete_modal_btn_confirmar" onclick="typeof window.confirmarEliminacionTotalAdmin === 'function' && window.confirmarEliminacionTotalAdmin()">Confirmar eliminación</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <div class="modal fade" id="modal-ayuda" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
@@ -181,7 +207,6 @@
                     <p class="text-muted small" data-i18n="admin_usuarios.ayuda_seccion1_texto">Localice rápidamente a cualquier usuario utilizando las herramientas de la barra superior:</p>
                     <ul class="small mb-0">
                         <li><strong data-i18n="admin_usuarios.ayuda_criterio">Criterio de Búsqueda:</strong> <span data-i18n="admin_usuarios.ayuda_criterio_li">Seleccione en el menú desplegable si desea buscar por Apellido, Nombre o Usuario.</span></li>
-                        <li><strong data-i18n="admin_usuarios.ayuda_filtro_otros">Filtro "Otros CEUAS":</strong> <span data-i18n="admin_usuarios.ayuda_filtro_otros_li">Escriba otros para ver usuarios con protocolos externos o no para los que no tienen.</span></li>
                         <li><strong data-i18n="admin_usuarios.ayuda_ejecucion">Ejecución:</strong> <span data-i18n="admin_usuarios.ayuda_ejecucion_li">Presione el botón verde "Buscar" para refrescar la lista.</span></li>
                     </ul>
                 </section>

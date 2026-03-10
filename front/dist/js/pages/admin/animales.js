@@ -67,6 +67,8 @@ document.addEventListener('focusin', (e) => {
 }, true);
     document.getElementById('btn-search-animal').onclick = () => { currentPage = 1; renderTable(); };
     document.getElementById('filter-status-animal').onchange = () => { currentPage = 1; renderTable(); };
+    const filterRetiroAnimal = document.getElementById('filter-retiro-animal');
+    if (filterRetiroAnimal) filterRetiroAnimal.onchange = () => { currentPage = 1; renderTable(); };
     document.getElementById('search-input-animal').onkeyup = (e) => { if (e.key === 'Enter') { currentPage = 1; renderTable(); } };
 }
 
@@ -132,20 +134,12 @@ function renderTable() {
         tr.className = "clickable-row";
         tr.onclick = () => window.openAnimalModal(a);
 
-        const badgeExterno = a.IsExterno == 1 
-            ? '<span class="badge bg-danger mt-1 shadow-sm" style="font-size: 7px; width: fit-content; padding: 2px 4px;">OTROS CEUAS</span>' 
-            : '';
         const tipoBadgeStyle = getTipoFormBadgeStyle(a.colorTipo);
         const tipoBadgeHtml = `<span class="${tipoBadgeStyle.className}" style="${tipoBadgeStyle.style} font-size: 9px; padding: 3px 6px;">${(a.TipoNombre || 'Animal').replace(/</g, '&lt;')}</span>`;
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${a.idformA}</td>
-            <td class="py-2 px-2">
-                <div class="d-flex flex-column">
-                    ${tipoBadgeHtml}
-                    ${badgeExterno}
-                </div>
-            </td>
+            <td class="py-2 px-2">${tipoBadgeHtml}</td>
             <td class="py-2 px-2 small">${a.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${a.NProtocolo || '---'}</td>
             <td class="py-2 px-2 small">${a.CatEspecie}</td>
@@ -181,10 +175,16 @@ function getFilteredAndSortedData() {
     const statusFilter = document.getElementById('filter-status-animal').value.toLowerCase();
     const term = document.getElementById('search-input-animal').value.toLowerCase().trim();
     const filterType = document.getElementById('filter-column-animal').value;
+    const retiroDate = document.getElementById('filter-retiro-animal');
+    const retiroVal = retiroDate ? (retiroDate.value || '').trim() : '';
 
     let data = allAnimals.filter(a => {
         const estadoFila = (a.estado || "sin estado").toString().toLowerCase().trim();
         if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
+        if (retiroVal) {
+            const aRetiro = (a.Retiro || '').toString().substring(0, 10);
+            if (aRetiro !== retiroVal) return false;
+        }
         if (!term) return true;
         if (filterType === 'all') return JSON.stringify(a).toLowerCase().includes(term);
         return String(a[filterType] || '').toLowerCase().includes(term);
@@ -208,12 +208,14 @@ window.openAnimalModal = async (a) => {
     const container = document.getElementById('modal-content-animal');
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
     
-    const [resMaster, resSex, resNotify] = await Promise.all([
+    const [resMaster, resSex, resNotify, resDeptos] = await Promise.all([
         formDataCache ? Promise.resolve({status:'success', data:formDataCache}) : API.request(`/animals/form-data?inst=${instId}`),
         API.request(`/animals/get-sex-data?id=${a.idformA}`),
-        API.request(`/animals/last-notification?id=${a.idformA}`)
+        API.request(`/animals/last-notification?id=${a.idformA}`),
+        API.request(`/deptos/list?inst=${instId}`)
     ]);
     formDataCache = resMaster.data;
+    if (resDeptos && resDeptos.status === 'success' && resDeptos.data) formDataCache.deptos = resDeptos.data;
     const sex = resSex.data || { machoA: 0, hembraA: 0, indistintoA: 0, totalA: 0 };
     const lastNotify = resNotify.data;
 
@@ -233,6 +235,10 @@ window.openAnimalModal = async (a) => {
     html += renderOrderModificationSection(a, sex, formDataCache);
 
     container.innerHTML = html;
+
+    // Actualizar org/ámbito al cambiar departamento
+    const selDepto = document.getElementById('modal-depto-animal');
+    if (selDepto) selDepto.onchange = function() { window.updateDeptoOrgAmbito(this, 'modal-org-animal', 'modal-ambito-animal'); };
 
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
@@ -314,11 +320,24 @@ function renderNotificationSection(lastNotify, idformA) {
 }
 
 function renderOrderModificationSection(a, sex, cache) {
+    const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const idDepto = a.idDepto != null ? a.idDepto : '';
+    const orgActual = (a.Organizacion && String(a.Organizacion).trim()) ? a.Organizacion : sinOrg;
+    const extFlag = Number(a.DeptoExternoFlag || 1);
+    const isExt = extFlag === 2;
+    const ambitoBadge = isExt ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+    const optionsDepto = deptos.map(d => {
+        const ext = (d.externodepto == 2) || (d.externodepto == null && d.externoorganismo == 2) ? 2 : 1;
+        const org = (d.NombreOrganismoSimple && String(d.NombreOrganismoSimple).trim()) ? d.NombreOrganismoSimple : sinOrg;
+        const sel = (d.iddeptoA == idDepto) ? ' selected' : '';
+        return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
+    }).join('');
+
     return `
     <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">MODIFICACIÓN DEL FORMULARIO (DATOS DEL PEDIDO)</h6>
-    <div id="alert-otros-ceuas" class="alert alert-danger py-1 px-2 mb-3 fw-bold" style="font-size: 10px; display: ${a.IsExterno == 1 ? 'block' : 'none'};">
-        ⚠️ PROTOCOLO PERTENECE A OTROS CEUAS (EXTERNO)
-    </div>
     
     <form id="form-animal-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${a.idformA}">
@@ -336,6 +355,21 @@ function renderOrderModificationSection(a, sex, cache) {
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" onchange="window.handleProtocolChange(this)">
                     ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${p.nprotA} - ${p.tituloA}</option>`).join('')}
                 </select>
+            </div>
+            <div class="col-md-12">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Departamento</label>
+                <select name="depto" id="modal-depto-animal" class="form-select form-select-sm fw-bold">
+                    <option value="">— Sin departamento —</option>
+                    ${optionsDepto}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Organización</label>
+                <div id="modal-org-animal" class="form-control-plaintext form-control-sm bg-light border rounded px-2 py-1 small">${orgActual}</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Ámbito</label>
+                <div id="modal-ambito-animal" class="pt-1">${ambitoBadge}</div>
             </div>
 
             <div class="col-12 mt-4">
@@ -518,9 +552,25 @@ window.updateSpeciesPrice = (select) => {
 };
 
 window.handleProtocolChange = async (select) => {
-    const isExterno = select.options[select.selectedIndex].dataset.externo == "1";
-    document.getElementById('alert-otros-ceuas').style.display = isExterno ? 'block' : 'none';
     window.loadSpeciesForProtocol(select.value);
+};
+
+window.updateDeptoOrgAmbito = (selectEl, idOrg, idAmbito) => {
+    const opt = selectEl && selectEl.options[selectEl.selectedIndex];
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const orgEl = idOrg ? document.getElementById(idOrg) : null;
+    const ambitoEl = idAmbito ? document.getElementById(idAmbito) : null;
+    if (opt && opt.value) {
+        const org = opt.dataset.org || sinOrg;
+        const ext = parseInt(opt.dataset.externo, 10) === 2;
+        if (orgEl) orgEl.textContent = org;
+        if (ambitoEl) ambitoEl.innerHTML = ext ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+    } else {
+        if (orgEl) orgEl.textContent = sinOrg;
+        if (ambitoEl) ambitoEl.innerHTML = '';
+    }
 };
 
 window.filterProtocolList = (input) => {

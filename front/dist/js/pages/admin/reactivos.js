@@ -77,6 +77,8 @@ export async function initReactivosPage() {
 
     if (btnSearch) btnSearch.onclick = () => { currentPage = 1; renderTable(); };
     if (filterStatus) filterStatus.onchange = () => { currentPage = 1; renderTable(); };
+    const filterRetiroReactivo = document.getElementById('filter-retiro-reactivo');
+    if (filterRetiroReactivo) filterRetiroReactivo.onchange = () => { currentPage = 1; renderTable(); };
     if (searchInput) {
         searchInput.onkeyup = (e) => { 
             if (e.key === 'Enter') { currentPage = 1; renderTable(); } 
@@ -107,15 +109,17 @@ window.openReactivoModal = async (r) => {
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
     
     try {
-        const [resMaster, resUsage, resNotify] = await Promise.all([
+        const [resMaster, resUsage, resNotify, resDeptos] = await Promise.all([
             API.request(`/reactivos/form-data?inst=${instId}`),
             API.request(`/reactivos/usage?id=${r.idformA}`), 
-            API.request(`/reactivos/last-notification?id=${r.idformA}`)
+            API.request(`/reactivos/last-notification?id=${r.idformA}`),
+            API.request(`/deptos/list?inst=${instId}`)
         ]);
 
         const cache = resMaster.data || {};
         const protocols = cache.protocols || cache.protocolos || [];
         const insumos = cache.insumos || [];
+        if (resDeptos && resDeptos.status === 'success' && resDeptos.data) cache.deptos = resDeptos.data;
         
         const usage = resUsage.data || { totalA: 0, organo: 0 };
         const lastNotify = resNotify.data;
@@ -131,10 +135,13 @@ window.openReactivoModal = async (r) => {
         html += renderAdminSection(r, identity);
         html += renderNotificationSection(lastNotify, r.idformA);
         
-        // Pasamos usage y las listas
-        html += renderOrderModificationSection(r, usage, { protocols, insumos });
+        // Pasamos usage y cache (con protocols, insumos y deptos)
+        html += renderOrderModificationSection(r, usage, cache);
 
         container.innerHTML = html;
+
+        const selDepto = document.getElementById('modal-depto-reactivo');
+        if (selDepto) selDepto.onchange = function() { window.updateDeptoOrgAmbito(this, 'modal-org-reactivo', 'modal-ambito-reactivo'); };
 
         document.getElementById('form-reactivo-full').onsubmit = (e) => window.saveFullReactivoForm(e);
         
@@ -235,7 +242,20 @@ function renderOrderModificationSection(r, usage, cache) {
     const t = window.txt.reactivos.modal;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
-    const isExterno = r.EsOtrosCeuas == 1;
+    const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const idDepto = r.idDepto != null ? r.idDepto : '';
+    const orgActual = (r.Organizacion && String(r.Organizacion).trim()) ? r.Organizacion : sinOrg;
+    const extFlag = Number(r.DeptoExternoFlag || 1);
+    const ambitoBadge = extFlag === 2 ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+    const optionsDepto = deptos.map(d => {
+        const ext = (d.externodepto == 2) || (d.externodepto == null && d.externoorganismo == 2) ? 2 : 1;
+        const org = (d.NombreOrganismoSimple && String(d.NombreOrganismoSimple).trim()) ? d.NombreOrganismoSimple : sinOrg;
+        const sel = (d.iddeptoA == idDepto) ? ' selected' : '';
+        return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
+    }).join('');
 
     // Valores para inyectar en el formato (tipo cantidad)
     const unidadMedida = r.Medida ? r.Medida : 'unidades';
@@ -250,22 +270,36 @@ function renderOrderModificationSection(r, usage, cache) {
     }).join('');
 
     return `
-    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 11px;">${t.tech_mod}</h6>
-    <div class="alert alert-danger py-1 px-2 mb-3 fw-bold" style="font-size: 10px; display: ${isExterno ? 'block' : 'none'};">${t.external_warning}</div>
+    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">${t.tech_mod}</h6>
 
-    <form id="form-reactivo-full">
+    <form id="form-reactivo-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${r.idformA}">
         <div class="row g-3">
             <div class="col-md-12">
-                <label class="form-label small fw-bold uppercase">${t.protocol_label}</label>
-                <input type="text" class="form-control form-control-sm mb-1" placeholder="${t.filter_placeholder}" onkeyup="window.filterProtocolList(this)">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${t.protocol_label}</label>
+                <input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="${t.filter_placeholder}" onkeyup="window.filterProtocolListReactivo(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm">
                     <option value="">${t.select_proto}</option>
                     ${protocolos.map(p => {
                         const isSelected = (p.idprotA == r.idprotA) ? 'selected' : '';
-                        return `<option value="${p.idprotA}" ${isSelected}>${p.nprotA} - ${p.tituloA} (ID:${p.idprotA})</option>`;
+                        return `<option value="${p.idprotA}" ${isSelected}>${p.nprotA} - ${p.tituloA}</option>`;
                     }).join('')}
                 </select>
+            </div>
+            <div class="col-md-12">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_departamento ?? 'Departamento'}</label>
+                <select name="depto" id="modal-depto-reactivo" class="form-select form-select-sm fw-bold">
+                    <option value="">— ${window.txt?.usuarios?.ficha_sin_departamento ?? 'Sin departamento'} —</option>
+                    ${optionsDepto}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_organizacion ?? 'Organización'}</label>
+                <div id="modal-org-reactivo" class="form-control-plaintext form-control-sm bg-light border rounded px-2 py-1 small">${orgActual}</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_ambito ?? 'Ámbito'}</label>
+                <div id="modal-ambito-reactivo" class="pt-1">${ambitoBadge}</div>
             </div>
             
             <div class="col-md-6">
@@ -287,22 +321,46 @@ function renderOrderModificationSection(r, usage, cache) {
             </div>
             
             <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">${t.start_date}</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${t.start_date}</label>
                 <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}">
             </div>
             
             <div class="col-md-6">
-                <label class="form-label small fw-bold uppercase">${t.end_date}</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${t.end_date}</label>
                 <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}">
             </div>
             
-            <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3">
-                <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadReactivoPDF(${r.idformA})">PDF</button>
-                <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">${t.save_btn}</button>
+            <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
+                <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadReactivoPDF(${r.idformA})"><i class="bi bi-file-pdf"></i> PDF</button>
+                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;">${t.save_btn}</button>
             </div>
         </div>
     </form>`;
 }
+
+window.filterProtocolListReactivo = (input) => {
+    const term = (input && input.value) ? input.value.toLowerCase() : '';
+    const select = document.getElementById('select-protocol-modal');
+    if (select) Array.from(select.options).forEach(opt => opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none');
+};
+
+window.updateDeptoOrgAmbito = window.updateDeptoOrgAmbito || function(selectEl, idOrg, idAmbito) {
+    const opt = selectEl && selectEl.options[selectEl.selectedIndex];
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const orgEl = idOrg ? document.getElementById(idOrg) : null;
+    const ambitoEl = idAmbito ? document.getElementById(idAmbito) : null;
+    if (opt && opt.value) {
+        const org = opt.dataset.org || sinOrg;
+        const ext = parseInt(opt.dataset.externo, 10) === 2;
+        if (orgEl) orgEl.textContent = org;
+        if (ambitoEl) ambitoEl.innerHTML = ext ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+    } else {
+        if (orgEl) orgEl.textContent = sinOrg;
+        if (ambitoEl) ambitoEl.innerHTML = '';
+    }
+};
 
 window.cambiarMedidaReactivo = (selectElement) => {
     const selectedOption = selectElement.options[selectElement.selectedIndex];
@@ -312,19 +370,10 @@ window.cambiarMedidaReactivo = (selectElement) => {
     const label = document.getElementById('lbl-medida-dinamica');
     if (label) {
         const t = window.txt?.reactivos?.modal;
-        label.innerText = `(${medida} ${presentacion}) - ${t?.cant_solicitada || 'CANT. SOLICITADA'}`;
+        label.innerText = `(${medida} ${presentacion}) - ${t?.cant_solicitada || t?.qty_req || 'CANT. SOLICITADA'}`;
     }
 };
 
-window.cambiarMedidaReactivo = (selectElement) => {
-    const selectedOption = selectElement.options[selectElement.selectedIndex];
-    const medida = selectedOption.getAttribute('data-medida') || 'unidades';
-    const label = document.getElementById('lbl-medida-dinamica');
-    if (label) {
-        const t = window.txt?.reactivos?.modal;
-        label.innerText = `${t?.cant_solicitada || 'CANT. SOLICITADA'} (${medida})`;
-    }
-};
 // 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque sin Nulls
 window.updateReactivoStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
@@ -527,22 +576,20 @@ function renderTable() {
         tr.className = "clickable-row";
         tr.onclick = () => window.openReactivoModal(r);
 
-        const badgeCeua = (r.EsOtrosCeuas == 1) 
-            ? `<div class="mt-1"><span class="badge bg-danger shadow-sm" style="font-size: 8px;">${t.table.others_ceuas}</span></div>` 
-            : '';
-
-        // Variables limpias
         const txtMedida = r.Medida || 'un.';
         const txtPresentacion = r.Presentacion || 0;
         const txtPedida = r.CantidadReactivo || 0;
+        const extFlag = Number(r.DeptoExternoFlag || 1);
+        const isExt = extFlag === 2;
+        const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+        const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+        const ambitoBadge = isExt ? `<span class="badge bg-danger text-white" style="font-size:8px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:8px;">${labelInt}</span>`;
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${r.idformA}</td>
             <td class="py-2 px-2 small fw-bold">${r.Investigador}</td>
-            <td class="py-2 px-2 small fw-bold text-success">
-                ${r.NProtocolo || '---'}
-                ${badgeCeua}
-            </td>
+            <td class="py-2 px-2 small fw-bold text-success">${r.NProtocolo || '---'}</td>
+            <td class="py-2 px-2 text-center">${ambitoBadge}</td>
             <td class="py-2 px-2 small text-uppercase text-muted" style="font-size: 10px;">
                 ${r.Especie || `<span class="opacity-50 italic">${t.table.no_species}</span>`}
             </td>
@@ -588,10 +635,16 @@ function getFilteredAndSortedData() {
     const statusFilter = document.getElementById('filter-status-reactivo').value.toLowerCase();
     const term = document.getElementById('search-input-reactivo').value.toLowerCase().trim();
     const filterType = document.getElementById('filter-column-reactivo').value;
+    const retiroEl = document.getElementById('filter-retiro-reactivo');
+    const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
 
     let data = allReactivos.filter(r => {
         const estadoFila = (r.estado || "sin estado").toString().toLowerCase().trim();
         if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
+        if (retiroVal) {
+            const rRetiro = (r.Retiro || '').toString().substring(0, 10);
+            if (rRetiro !== retiroVal) return false;
+        }
         if (!term) return true;
         if (filterType === 'all') return JSON.stringify(r).toLowerCase().includes(term);
         return String(r[filterType] || '').toLowerCase().includes(term);

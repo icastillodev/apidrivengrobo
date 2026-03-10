@@ -28,7 +28,10 @@ class ReactivoModel {
                     px.nprotA as NProtocolo, 
                     px.tituloA as TituloProtocolo,  /* 🚀 FIX: Para mostrar el título completo */
                     px.protocoloexpe as EsOtrosCeuas,
+                    (CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END) as DeptoExternoFlag,
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as Departamento,
+                    COALESCE(f.depto, pd.iddeptoA) as idDepto,
+                    COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     ins.NombreInsumo as Reactivo, 
                     ins.TipoInsumo as Medida,       /* 🚀 FIX: ml, gr, un... */
                     ins.CantidadInsumo as Presentacion, /* 🚀 FIX: 50, 100, 200... */
@@ -42,7 +45,8 @@ class ReactivoModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+                LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
                 WHERE f.IdInstitucion = ? 
@@ -142,8 +146,8 @@ class ReactivoModel {
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare("UPDATE formularioe SET reactivo = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?")
-                    ->execute([$idInsumoReactivo, $data['fechainicioA'], $data['fecRetiroA'], $id]);
+            $this->db->prepare("UPDATE formularioe SET reactivo = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?")
+                    ->execute([$idInsumoReactivo, $data['fechainicioA'], $data['fecRetiroA'], !empty($data['depto']) ? $data['depto'] : null, $id]);
             
             $this->db->prepare("UPDATE sexoe SET organo = ?, totalA = ? WHERE idformA = ?")
                     ->execute([$nuevaCantidadReactivo, $newTotal, $id]);

@@ -71,7 +71,6 @@ async function _initUsuariosPage() {
             console.log("✅ Datos procesados. Total:", allUsers.length);
 
             // Renderizado inicial
-            checkOtrosCeuaVisibility();
             setupSortHeaders();
             renderTable();
         } else {
@@ -142,18 +141,6 @@ async function _initUsuariosPage() {
 
 // --- LÓGICA DE TABLA Y FILTROS ---
 
-function checkOtrosCeuaVisibility() {
-    const hasAny = allUsers.some(u => u.OtrosCeuaCount > 0);
-    const th = document.querySelector('th[data-key="OtrosCEUAS"]');
-    if (th) {
-        th.style.display = hasAny ? '' : 'none';
-    }
-    if (!hasAny) {
-        const option = document.querySelector('#filter-type option[value="OtrosCEUAS"]');
-        if (option) option.remove();
-    }
-}
-
 function setupSortHeaders() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         th.style.cursor = 'pointer';
@@ -185,16 +172,9 @@ function getFilteredAndSortedData() {
 
     let data = allUsers.filter(u => {
         if (!term) return true;
-        
-        // Búsqueda especial para CEUAS
-        if (filterType === 'OtrosCEUAS') {
-            if (term.includes('otro')) return u.OtrosCeuaCount > 0;
-            if (term === 'no') return u.OtrosCeuaCount == 0;
-            return true;
-        }
 
         // Búsqueda general o por columna
-        const val = filterType === 'all' 
+        const val = filterType === 'all'
             ? `${u.Usuario} ${u.ApellidoA} ${u.NombreA} ${u.Correo}`.toLowerCase() 
             : String(u[filterType] || '').toLowerCase();
             
@@ -223,8 +203,7 @@ function renderTable() {
     const pageData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
     tbody.innerHTML = '';
-    const showOtros = allUsers.some(u => u.OtrosCeuaCount > 0);
-    const colCount = showOtros ? 8 : 7;
+    const colCount = 6;
 
     if (pageData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-4 text-muted">${(window.txt?.admin_usuarios?.empty_usuarios || 'No se encontraron usuarios')}</td></tr>`;
@@ -247,8 +226,6 @@ function renderTable() {
             <td class="py-3 px-3">${u.CelularA || '-'}</td>
             <td class="py-3 px-3 text-secondary">${u.Correo || '-'}</td>
             <td class="py-3 px-3 text-muted">${u.Laboratorio || '-'}</td>
-            <td class="py-3 px-3 text-center fw-bold">${u.ProtocolCount ?? 0}</td>
-            ${showOtros ? `<td class="py-3 px-3 text-center"><span class="badge ${u.OtrosCeuaCount > 0 ? 'bg-danger' : 'bg-light text-secondary border'}">${u.OtrosCeuaCount > 0 ? 'OTROS CEUAS' : 'NO'}</span></td>` : ''}
         `;
         tbody.appendChild(tr);
     });
@@ -342,7 +319,7 @@ function buildModalHtml(opts) {
     html += '<div class="col-12 bg-light p-3 rounded border-start border-4 border-success mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_usuario_sistema ? t.ficha_usuario_sistema : 'Usuario de Sistema') + '</label>';
     html += '<input type="text" class="form-control-plaintext fw-bold h5 mb-0" value="' + (u.Usuario || '---') + '" readonly></div>';
     html += '<div class="col-12"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_tipo_usuario ? t.ficha_tipo_usuario : 'Tipo de usuario') + '</label>';
-    html += '<div class="form-control-plaintext fw-bold border-0 px-0"><span class="badge bg-secondary">' + (rolNombre || '—') + '</span></div></div>';
+    html += '<div class="form-control-plaintext fw-bold border-0 px-0"><span class="badge bg-primary">' + (rolNombre || '—') + '</span></div></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_apellido ? t.ficha_apellido : 'Apellido') + '</label><input type="text" name="ApellidoA" class="form-control form-control-sm fw-bold" value="' + (u.ApellidoA || '') + '"></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_nombre ? t.ficha_nombre : 'Nombre') + '</label><input type="text" name="NombreA" class="form-control form-control-sm fw-bold" value="' + (u.NombreA || '') + '"></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_correo ? t.ficha_correo : 'Correo') + '</label><input type="email" name="EmailA" class="form-control form-control-sm fw-bold text-primary" value="' + (u.Correo || '') + '"></div>';
@@ -362,15 +339,20 @@ function buildModalHtml(opts) {
     html += '<div class="mt-4 d-flex gap-2 flex-wrap">';
     html += '<button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(' + (u.IdUsrA || '') + ')">' + (t && t.btn_guardar_cambios ? t.btn_guardar_cambios : 'Guardar Cambios') + '</button>';
     html += '<button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(' + (u.IdUsrA || '') + ')">' + (t && t.btn_resetear_clave ? t.btn_resetear_clave : 'Resetear Clave') + '</button>';
-    html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')"' + (puedeEliminar ? '' : ' disabled title="Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos"') + '><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
+    if (t && t.reset_leyenda) html += '<span class="small text-muted align-middle ms-1" title="' + (t.reset_leyenda || '').replace(/"/g, '&quot;') + '"><i class="bi bi-info-circle"></i></span>';
+    html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')"' + (puedeEliminar ? '' : ' disabled') + ' title="' + (t && t.eliminar_leyenda ? t.eliminar_leyenda.replace(/"/g, '&quot;') : 'Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos') + '"><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
+    var tieneDatosEliminar = (protocolos ? protocolos.length : 0) + (formularios ? formularios.length : 0) + (alojamientos ? alojamientos.length : 0) > 0;
+    html += '<button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="abrirModalEliminacionTotalAdmin(' + (u.IdUsrA || '') + ')"' + (tieneDatosEliminar ? '' : ' disabled') + ' title="' + (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda.replace(/"/g, '&quot;') : 'Elimina el perfil y todo lo asociado; requiere contraseña y código') + '"><i class="bi bi-trash"></i> ' + (t && t.btn_eliminacion_total ? t.btn_eliminacion_total : 'Eliminación total') + '</button>';
     html += '<button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3 uppercase" onclick="openBillingForUser(' + (u.IdUsrA || '') + ')"' + (puedeFacturar ? '' : ' disabled title="Sin protocolos ni pedidos de insumos"') + '><i class="bi bi-receipt"></i> ' + (t && t.btn_ver_facturacion ? t.btn_ver_facturacion : 'Ver Facturación') + '</button></div>';
-    html += (facturacionLegend || '') + (eliminarLegend || '') + (disableLegend || '') + '</form>';
+    html += (facturacionLegend || '') + (disableLegend || '') + '</form>';
+    html += '<div class="small text-muted mt-2 border-top pt-2">' + (t && t.leyenda_acciones ? t.leyenda_acciones : (t && t.eliminar_leyenda ? t.eliminar_leyenda + ' ' + (t.eliminacion_total_leyenda || '') : 'Eliminar: solo si no tiene datos asociados. Eliminación total: borra perfil y todo lo asociado (protocolos, formularios, alojamientos).')) + '</div>';
     html += '<hr class="my-4 border-2 border-secondary"><div class="row g-3 mb-4">';
+    html += '<div class="col-3"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-secondary small fw-bold text-uppercase mb-1">' + (t && t.ficha_protocolos_cargo ? t.ficha_protocolos_cargo : 'Protocolos a su cargo') + '</div><div class="fs-3 fw-bold text-secondary">' + (protocolos ? protocolos.length : 0) + '</div><div class="small text-muted">' + (t && t.ficha_protocolos_total ? t.ficha_protocolos_total : 'total') + '</div></div></div>';
     var totalAnimales = 0;
     for (var j = 0; j < protocolsUsed.length; j++) totalAnimales += (parseInt(protocolsUsed[j].animales_usados, 10) || 0);
-    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-primary small fw-bold text-uppercase mb-1">Animales utilizados en protocolos</div><div class="fs-3 fw-bold text-primary">' + totalAnimales + '</div><div class="small text-muted">total en formularios entregados</div></div></div>';
-    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-success small fw-bold text-uppercase mb-1">Insumos pedidos</div><div class="fs-3 fw-bold text-success">' + insumosPedidos.length + '</div><div class="small text-muted">pedidos de insumos</div></div></div>';
-    html += '<div class="col-4"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-info small fw-bold text-uppercase mb-1">Insumos experimentales pedidos</div><div class="fs-3 fw-bold text-info">' + insumosExpPedidos.length + '</div><div class="small text-muted">pedidos de reactivos</div></div></div></div>';
+    html += '<div class="col-3"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-primary small fw-bold text-uppercase mb-1">Animales utilizados en protocolos</div><div class="fs-3 fw-bold text-primary">' + totalAnimales + '</div><div class="small text-muted">total en formularios entregados</div></div></div>';
+    html += '<div class="col-3"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-success small fw-bold text-uppercase mb-1">Insumos pedidos</div><div class="fs-3 fw-bold text-success">' + insumosPedidos.length + '</div><div class="small text-muted">pedidos de insumos</div></div></div>';
+    html += '<div class="col-3"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-info small fw-bold text-uppercase mb-1">Insumos experimentales pedidos</div><div class="fs-3 fw-bold text-info">' + insumosExpPedidos.length + '</div><div class="small text-muted">pedidos de reactivos</div></div></div></div>';
     html += '<hr class="my-5"><div class="mt-5"><h6 class="fw-bold text-uppercase text-success small mb-3 border-bottom pb-2"><i class="bi bi-file-earmark-medical me-2"></i>Protocolos a su cargo</h6>';
     html += '<div class="table-responsive border rounded bg-white shadow-sm" style="max-height: 250px;"><table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;"><thead class="table-light sticky-top"><tr><th class="px-3">ID Prot.</th><th class="px-3">N° Prot.</th><th>Título del Proyecto</th><th class="text-center">Vencimiento</th><th class="text-end pe-3">Abrir</th></tr></thead><tbody>';
     if (protocolos.length === 0) html += '<tr><td colspan="5" class="text-center py-4 text-muted italic">' + (t && t.empty_protocolos ? t.empty_protocolos : 'No tiene protocolos asignados actualmente.') + '</td></tr>';
@@ -425,10 +407,10 @@ window.openUserModal = async (u) => {
     const isDisabled = String(u.ActivoA) === '0';
     const disableLegend = isDisabled ? '<div class="small text-danger mt-2"><i class="bi bi-info-circle me-1"></i>Usuario deshabilitado. Motivo: baja administrativa o deshabilitación previa.</div>' : '';
     const facturacionLegend = !puedeFacturar ? '<div class="small text-warning mt-2"><i class="bi bi-receipt me-1"></i>Ver facturación solo disponible si tiene protocolos a cargo o pedidos de formularios de insumos.</div>' : '';
-    const eliminarLegend = !puedeEliminar ? '<div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos efectuados.</div>' : '';
-    var rolesMap = (window.txt && window.txt.config_roles) ? { 2: window.txt.config_roles.rol_administrador, 3: window.txt.config_roles.rol_investigador, 4: window.txt.config_roles.rol_secadmin, 5: window.txt.config_roles.rol_tecnico, 6: window.txt.config_roles.rol_laboratorio } : {};
+    const eliminarLegend = '';
+    var rolesMap = (window.txt && window.txt.config_roles) ? { 1: window.txt.config_roles.rol_superadmin_sistema, 2: window.txt.config_roles.rol_superadmin, 3: window.txt.config_roles.rol_investigador, 4: window.txt.config_roles.rol_administrador, 5: window.txt.config_roles.rol_tecnico, 6: window.txt.config_roles.rol_laboratorio } : {};
     var idTipo = u.IdTipousrA != null ? u.IdTipousrA : u.IdTipoUsrA;
-    var rolNombre = (rolesMap[idTipo] || '').trim() || '—';
+    var rolNombre = (rolesMap[idTipo] || rolesMap[Number(idTipo)] || '').trim() || (idTipo != null && idTipo !== '' ? 'Rol ' + idTipo : '—');
     console.log('[usuarios] buildModalHtml...');
     content.innerHTML = buildModalHtml({
         u: u,
@@ -602,6 +584,139 @@ window.deleteUser = async (id) => {
     }
 };
 
+let adminDeletePreviewUserId = null;
+let adminDeletePreviewData = null;
+
+window.abrirModalEliminacionTotalAdmin = async function(id) {
+    if (!id) return;
+    const t = window.txt?.admin_usuarios || {};
+    try {
+        const res = await API.request('/users/delete-preview?id=' + encodeURIComponent(id));
+        if (res.status !== 'success' || !res.data) {
+            (window.mostrarNotificacion || alert)(res.message || (t.delete_error || 'Error'));
+            return;
+        }
+        adminDeletePreviewUserId = id;
+        adminDeletePreviewData = res.data;
+        const listEl = document.getElementById('admin-delete-preview-list');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        const items = [
+            [t.delete_modal_usuario || 'Usuario', res.data.usuario + ' (' + (res.data.nombre || res.data.usuario) + ')'],
+            [t.delete_modal_institucion || 'Institución', res.data.institucion],
+            [t.delete_modal_protocolos || 'Protocolos', res.data.protocolos],
+            [t.delete_modal_formularios || 'Formularios', res.data.formularios],
+            [t.delete_modal_alojamientos || 'Alojamientos', res.data.alojamientos]
+        ];
+        items.forEach(function(item) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between small';
+            li.innerHTML = '<span class="text-muted">' + item[0] + '</span><span class="fw-bold">' + item[1] + '</span>';
+            listEl.appendChild(li);
+        });
+        const pl = res.data.protocolos_list || [];
+        const fl = res.data.formularios_list || [];
+        const al = res.data.alojamientos_list || [];
+        if (pl.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = t.delete_modal_list_protocolos || 'Protocolos que se eliminarán:';
+            listEl.appendChild(sec);
+            pl.forEach(function(p) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = (p.nprotA || '') + ' — ' + (p.tituloA || '');
+                listEl.appendChild(li);
+            });
+        }
+        if (fl.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = t.delete_modal_list_formularios || 'Formularios que se eliminarán:';
+            listEl.appendChild(sec);
+            fl.forEach(function(f) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = '#' + (f.idformA || '') + ' ' + (f.tipo_nombre || f.tipoA || '') + (f.categoria ? ' (' + f.categoria + ')' : '') + (f.nprot ? ' — Protocolo ' + f.nprot : '');
+                listEl.appendChild(li);
+            });
+        }
+        if (al.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = t.delete_modal_list_alojamientos || 'Alojamientos que se eliminarán:';
+            listEl.appendChild(sec);
+            al.slice(0, 100).forEach(function(a) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = 'Historia ' + (a.historia || '') + (a.idprotA ? ' (Protocolo ' + a.idprotA + ')' : '');
+                listEl.appendChild(li);
+            });
+            if (al.length > 100) {
+                const more = document.createElement('li');
+                more.className = 'list-group-item small ps-4 text-muted';
+                more.textContent = '... y ' + (al.length - 100) + ' más.';
+                listEl.appendChild(more);
+            }
+        }
+        document.getElementById('admin-delete-password').value = '';
+        document.getElementById('admin-delete-code').value = '';
+        const codeSentEl = document.getElementById('admin-delete-code-sent');
+        if (codeSentEl) {
+            if (res.data.code_sent) {
+                codeSentEl.textContent = t.delete_code_sent || 'Código enviado a tu correo.';
+                codeSentEl.classList.remove('d-none');
+            } else {
+                codeSentEl.classList.add('d-none');
+            }
+        }
+        const modalUserEl = document.getElementById('modal-user');
+        if (modalUserEl && bootstrap.Modal.getInstance(modalUserEl)) bootstrap.Modal.getInstance(modalUserEl).hide();
+        const modalDelEl = document.getElementById('modal-delete-full');
+        if (modalDelEl) bootstrap.Modal.getOrCreateInstance(modalDelEl).show();
+    } catch (e) {
+        (window.mostrarNotificacion || alert)(t.delete_error || 'Error');
+        console.error(e);
+    }
+};
+
+window.confirmarEliminacionTotalAdmin = async function() {
+    if (!adminDeletePreviewUserId || !adminDeletePreviewData) return;
+    const t = window.txt?.admin_usuarios || {};
+    const password = document.getElementById('admin-delete-password');
+    const codeEl = document.getElementById('admin-delete-code');
+    const passwordVal = password ? password.value.trim() : '';
+    const codeVal = codeEl ? codeEl.value.trim() : '';
+    if (!passwordVal || !codeVal) {
+        (window.mostrarNotificacion || alert)(t.delete_modal_password ? 'Ingresa contraseña y código.' : 'Ingresa contraseña y código.');
+        return;
+    }
+    const btn = document.getElementById('btn-admin-confirm-delete-full');
+    if (btn) btn.disabled = true;
+    try {
+        const res = await API.request('/users/delete-full', 'POST', {
+            id: parseInt(adminDeletePreviewUserId, 10),
+            password: passwordVal,
+            code: codeVal
+        });
+        if (res.status === 'success') {
+            const modalDelEl = document.getElementById('modal-delete-full');
+            if (modalDelEl && bootstrap.Modal.getInstance(modalDelEl)) bootstrap.Modal.getInstance(modalDelEl).hide();
+            adminDeletePreviewUserId = null;
+            adminDeletePreviewData = null;
+            await initUsuariosPage();
+            (window.mostrarNotificacion || alert)(t.delete_success || res.message);
+        } else {
+            (window.mostrarNotificacion || alert)(res.message || (t.delete_error || 'Error'));
+        }
+    } catch (e) {
+        (window.mostrarNotificacion || alert)(e?.message || (t.delete_error || 'Error'));
+        console.error(e);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+};
+
 // front/dist/js/pages/admin/usuarios.js
 
 function esc(s) {
@@ -611,15 +726,10 @@ function esc(s) {
 }
 
 function buildFichaSimpleHTML(data) {
-    const { u, departamentos, instName, servicios = [] } = data;
+    const { u, departamentos, instName } = data;
     const deptoNombre = (departamentos || []).find(d => d.iddeptoA == u.iddeptoA);
     const deptoText = deptoNombre ? (deptoNombre.NombreDeptoA + (deptoNombre.DetalledeptoA ? ' (' + deptoNombre.DetalledeptoA + ')' : '')) : '—';
     const orgText = (deptoNombre && deptoNombre.NombreOrganismoSimple && String(deptoNombre.NombreOrganismoSimple).trim()) ? deptoNombre.NombreOrganismoSimple : (window.txt?.generales?.sin_organizacion || '– (sin organización)');
-    const t = window.txt?.admin_usuarios || {};
-    const servTitle = t.pdf_servicios_institucionales || 'Servicios institucionales';
-    const rowsServ = (servicios || []).length ? (servicios || []).map(s => `
-        <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(s.NombreServicioInst || '—')}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc((s.CantidadPorMedidaInst || '') + ' ' + (s.MedidaServicioInst || 'U'))}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: right;">${esc(s.Precio != null ? '$ ' + parseFloat(s.Precio) : '—')}</td></tr>`).join('')
-        : '<tr><td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: center; color: #666;">—</td></tr>';
     return `
     <div style="font-family: Arial, sans-serif; padding: 24px; color: #333; max-width: 210mm; background: #fff;">
         <div style="border-bottom: 3px solid #1a5d3b; padding-bottom: 12px; margin-bottom: 24px;">
@@ -637,28 +747,15 @@ function buildFichaSimpleHTML(data) {
                 <tr><td style="padding: 6px 0; color: #666;">Organización</td><td style="padding: 6px 0;">${esc(orgText)}</td></tr>
             </table>
         </div>
-        <div style="margin-top: 20px;">
-            <div style="font-weight: bold; color: #1a5d3b; font-size: 11px; margin-bottom: 6px;">${esc(servTitle)}</div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                <thead><tr style="background: #f0f0f0;"><th style="padding: 6px; border: 1px solid #ddd;">Servicio</th><th style="padding: 6px; border: 1px solid #ddd;">Medida</th><th style="padding: 6px; border: 1px solid #ddd;">Precio</th></tr></thead>
-                <tbody>${rowsServ}</tbody>
-            </table>
-        </div>
     </div>`;
 }
 
 function buildFichaTotalHTML(data) {
-    const { u, protocolos, formularios, alojamientos, protocolsUsed, insumosPedidos, insumosExpPedidos, departamentos, instName, servicios = [] } = data;
+    const { u, protocolos, formularios, alojamientos, protocolsUsed, insumosPedidos, insumosExpPedidos, departamentos, instName } = data;
     const deptoNombre = (departamentos || []).find(d => d.iddeptoA == u.iddeptoA);
     const deptoText = deptoNombre ? (deptoNombre.NombreDeptoA + (deptoNombre.DetalledeptoA ? ' (' + deptoNombre.DetalledeptoA + ')' : '')) : '—';
     const orgText = (deptoNombre && deptoNombre.NombreOrganismoSimple && String(deptoNombre.NombreOrganismoSimple).trim()) ? deptoNombre.NombreOrganismoSimple : (window.txt?.generales?.sin_organizacion || '– (sin organización)');
-    const t = window.txt?.admin_usuarios || {};
-    const servTitle = t.pdf_servicios_institucionales || 'Servicios institucionales';
     const totalAnimales = (protocolsUsed || []).reduce((s, p) => s + (parseInt(p.animales_usados, 10) || 0), 0);
-
-    const rowsServ = (servicios || []).length ? (servicios || []).map(s => `
-        <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(s.NombreServicioInst || '—')}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc((s.CantidadPorMedidaInst || '') + ' ' + (s.MedidaServicioInst || 'U'))}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: right;">${esc(s.Precio != null ? '$ ' + parseFloat(s.Precio) : '—')}</td></tr>`).join('')
-        : '<tr><td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: center; color: #666;">—</td></tr>';
 
     const rowsProt = (protocolos || []).length ? protocolos.map(p => `
         <tr><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.idprotA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.nprotA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd;">${esc(p.tituloA)}</td><td style="padding: 5px 6px; border: 1px solid #ddd; text-align: center;">${esc(p.FechaFinProtA || 'N/A')}</td></tr>`).join('')
@@ -733,14 +830,6 @@ function buildFichaTotalHTML(data) {
                 <tbody>${rowsAloj}</tbody>
             </table>
         </div>
-
-        <div style="margin-top: 14px;">
-            <div style="font-weight: bold; color: #1a5d3b; font-size: 11px; margin-bottom: 6px;">${esc(servTitle)}</div>
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead><tr style="background: #f0f0f0;"><th style="padding: 6px; border: 1px solid #ddd;">Servicio</th><th style="padding: 6px; border: 1px solid #ddd;">Medida</th><th style="padding: 6px; border: 1px solid #ddd;">Precio</th></tr></thead>
-                <tbody>${rowsServ}</tbody>
-            </table>
-        </div>
     </div>`;
 }
 
@@ -755,17 +844,6 @@ window.downloadPDF = async (id, mode = 'total') => {
         return;
     }
 
-    let servicios = [];
-    try {
-        const resPrecios = await API.request('/precios/all-data?inst=' + encodeURIComponent(localStorage.getItem('instId') || ''));
-        if (resPrecios && resPrecios.status === 'success' && resPrecios.data && Array.isArray(resPrecios.data.servicios)) {
-            servicios = resPrecios.data.servicios;
-        }
-    } catch (e) {
-        console.warn('No se pudieron cargar servicios para el PDF:', e);
-    }
-    const dataWithServicios = { ...data, servicios };
-
     const modalEl = document.getElementById('modal-user');
     const modal = bootstrap.Modal.getInstance(modalEl);
     if (modal) modal.hide();
@@ -775,7 +853,7 @@ window.downloadPDF = async (id, mode = 'total') => {
     document.body.style.overflow = '';
     document.body.style.paddingRight = '';
 
-    const htmlString = mode === 'simple' ? buildFichaSimpleHTML(dataWithServicios) : buildFichaTotalHTML(dataWithServicios);
+    const htmlString = mode === 'simple' ? buildFichaSimpleHTML(data) : buildFichaTotalHTML(data);
     const logoHeader = getPdfLogoHeaderFromStorage();
     const wrapper = document.createElement('div');
     wrapper.setAttribute('id', 'pdf-export-container');

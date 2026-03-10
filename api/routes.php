@@ -65,6 +65,8 @@ $router->get('/users/insumos-exp-pedidos', 'UserController@getInsumosExperimenta
 $router->post('/users/update', 'UserController@update');      
 $router->post('/users/reset-pass', 'UserController@resetPassword'); 
 $router->post('/users/delete', 'UserController@delete');
+$router->get('/users/delete-preview', 'UserController@getDeletePreview');
+$router->post('/users/delete-full', 'UserController@deleteFull');
 $router->get('/users/list-investigators', 'UserController@listInvestigators'); // Selector de investigadores
 
 // ============================================================
@@ -428,6 +430,8 @@ $router->post('/superadmin/usuarios/create', 'UsuarioController@create');
 $router->post('/superadmin/usuarios/update', 'UsuarioController@update');
 $router->post('/superadmin/usuarios/reset-pass', 'UsuarioController@resetPass');
 $router->get('/superadmin/usuarios/check-username', 'UsuarioController@checkUsername');
+$router->get('/superadmin/usuarios/delete-preview', 'UsuarioController@getDeletePreview');
+$router->post('/superadmin/usuarios/delete-full', 'UsuarioController@deleteFull');
 
 
 

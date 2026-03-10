@@ -41,7 +41,7 @@ async function cargarInstituciones() {
 function renderizarTabla(data) {
     const tbody = document.getElementById('tabla-sedes');
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">No se encontraron instituciones</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No se encontraron instituciones</td></tr>`;
         return;
     }
 
@@ -49,10 +49,6 @@ function renderizarTabla(data) {
         const estadoBadge = inst.Activo == 1 
             ? '<span class="badge bg-success-subtle text-success border border-success-subtle px-2">ACTIVA</span>' 
             : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">INACTIVA</span>';
-        
-        const ceuasBadge = inst.otrosceuas == 1
-            ? '<span class="badge bg-info-subtle text-info border border-info-subtle px-2">SÍ</span>'
-            : '<span class="badge bg-light text-muted border px-2">NO</span>';
 
         // LÓGICA DE DIBUJADO DE MÓDULOS EN LA TABLA
         let modulosHtml = '';
@@ -92,7 +88,6 @@ function renderizarTabla(data) {
                         ${inst.UltimoPago || 'PENDIENTE'}
                     </div>
                 </td>
-                <td class="text-center">${ceuasBadge}</td>
                 <td class="text-center">${estadoBadge}</td>
             </tr>
         `;
@@ -178,7 +173,6 @@ function abrirModalEditar(id) {
     document.getElementById('Moneda').value = inst.Moneda || 'UYU';
     document.getElementById('Web').value = inst.Web || '';
     document.getElementById('Logo').value = inst.Logo || '';
-    document.getElementById('otrosceuas').value = inst.otrosceuas || 2;
     document.getElementById('TipoApp').value = inst.TipoApp || 1;
     document.getElementById('Activo').value = inst.Activo;
     document.getElementById('UltimoPago').value = inst.UltimoPago || '';
@@ -213,7 +207,7 @@ async function guardarCambios() {
         Moneda: document.getElementById('Moneda').value,
         Web: document.getElementById('Web').value,
         Logo: document.getElementById('Logo').value || '',
-        otrosceuas: document.getElementById('otrosceuas').value,
+        otrosceuas: 2,
         TipoApp: document.getElementById('TipoApp').value,
         Activo: document.getElementById('Activo').value,
         UltimoPago: document.getElementById('UltimoPago').value || null,

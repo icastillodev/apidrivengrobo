@@ -365,4 +365,34 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
 
             return $this->executeSend($to, $subject, $body);
         }
+
+    /**
+     * Envía el código de verificación para eliminación total de usuario (Superadmin).
+     */
+    public function sendDeleteVerificationCode($to, $adminName, $code, $userLogin, $lang = 'es') {
+        $t = MailLang::get($lang);
+        $subject = $t['delete_code_subject'] . ' - GROBO';
+        $msg = $t['delete_code_hello'] . ' <b>' . htmlspecialchars($adminName) . '</b>,<br><br>'
+            . $t['delete_code_intro'] . ' <b>' . htmlspecialchars($userLogin) . '</b>.<br><br>'
+            . '<p style="font-size: 18px; font-weight: bold; letter-spacing: 4px; color: #1a5d3b;">' . htmlspecialchars($code) . '</p>'
+            . '<p style="color: #666;">' . $t['delete_code_code'] . '</p>'
+            . '<p style="font-size: 12px; color: #999;">' . $t['delete_code_expires'] . '</p>';
+        $body = $this->getTemplate($t['delete_code_title'], $msg, '', '', 'GROBO', $lang);
+        return $this->executeSend($to, $subject, $body);
+    }
+
+    /**
+     * Envía el resumen tras eliminación total de usuario (Superadmin).
+     */
+    public function sendDeleteSummary($to, $adminName, $deletedUserLogin, $code, $detail, $lang = 'es') {
+        $t = MailLang::get($lang);
+        $subject = $t['delete_summary_subject'] . ' - GROBO';
+        $msg = $t['delete_code_hello'] . ' <b>' . htmlspecialchars($adminName) . '</b>,<br><br>'
+            . $t['delete_summary_intro'] . '<br><br>'
+            . '<strong>' . $t['delete_summary_user'] . '</strong> ' . htmlspecialchars($deletedUserLogin) . '<br>'
+            . '<strong>' . $t['delete_summary_code'] . '</strong> ' . htmlspecialchars($code) . '<br><br>'
+            . '<strong>' . $t['delete_summary_detail'] . '</strong><br>' . nl2br(htmlspecialchars($detail));
+        $body = $this->getTemplate($t['delete_summary_title'], $msg, '', '', 'GROBO', $lang);
+        return $this->executeSend($to, $subject, $body);
+    }
 }

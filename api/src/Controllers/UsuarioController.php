@@ -2,12 +2,15 @@
 namespace App\Controllers;
 
 use App\Models\Admin\UsuarioModel;
+use App\Models\Services\MailService;
 use App\Utils\Auditoria;
 
 class UsuarioController {
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new UsuarioModel($db);
     }
 
@@ -97,5 +100,121 @@ public function list() {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit; 
+    }
+
+    /**
+     * Vista previa para eliminación total: devuelve qué se borrará y envía por email el código de verificación.
+     */
+    public function getDeletePreview() {
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if ((int)$sesion['role'] !== 1) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Acceso denegado.'], 403);
+            }
+            $id = (int)($_GET['id'] ?? 0);
+            if ($id <= 0) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'ID inválido.'], 400);
+            }
+            if ($id === (int)$sesion['userId']) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'No puedes eliminar tu propio usuario.'], 400);
+            }
+            $preview = $this->model->getDeletePreview($id);
+            if (!$preview) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Usuario no encontrado.'], 404);
+            }
+            $code = (string) random_int(100000, 999999);
+            UsuarioModel::storeVerificationCode($id, $sesion['userId'], $code);
+            $mail = new MailService();
+            $admin = $this->model->getPersonaByUserId($sesion['userId']);
+            $adminEmail = $admin['EmailA'] ?? null;
+            $adminName = trim(($admin['NombreA'] ?? '') . ' ' . ($admin['ApellidoA'] ?? ''));
+            if (!$adminName) $adminName = 'Superadmin';
+            $lang = $sesion['idioma'] ?? 'es';
+            if ($adminEmail) {
+                $mail->sendDeleteVerificationCode($adminEmail, $adminName, $code, $preview['UsrA'], $lang);
+            }
+            $this->jsonOut([
+                'status' => 'success',
+                'data' => [
+                    'usuario' => $preview['UsrA'],
+                    'nombre' => trim($preview['NombreA'] . ' ' . $preview['ApellidoA']) ?: $preview['UsrA'],
+                    'institucion' => $preview['NombreInst'] ?? '—',
+                    'protocolos' => (int) $preview['protocolos'],
+                    'formularios' => (int) $preview['formularios'],
+                    'alojamientos' => (int) $preview['alojamientos'],
+                    'protocolos_list' => $preview['protocolos_list'] ?? [],
+                    'formularios_list' => $preview['formularios_list'] ?? [],
+                    'alojamientos_list' => $preview['alojamientos_list'] ?? [],
+                    'code_sent' => !empty($adminEmail),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Eliminación total de usuario: valida contraseña + código y ejecuta borrado en cascada; envía email de resumen.
+     */
+    public function deleteFull() {
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if ((int)$sesion['role'] !== 1) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Acceso denegado.'], 403);
+            }
+            $input = json_decode(file_get_contents('php://input'), true);
+            $id = (int)($input['id'] ?? 0);
+            $password = trim($input['password'] ?? '');
+            $code = trim($input['code'] ?? '');
+            if ($id <= 0 || $password === '' || $code === '') {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Faltan id, contraseña o código.'], 400);
+            }
+            if ($id === (int)$sesion['userId']) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'No puedes eliminar tu propio usuario.'], 400);
+            }
+            $stmtPass = $this->db->prepare("SELECT password_secure FROM usuarioe WHERE IdUsrA = ?");
+            $stmtPass->execute([$sesion['userId']]);
+            $row = $stmtPass->fetch(\PDO::FETCH_ASSOC);
+            if (!$row || !password_verify($password, $row['password_secure'])) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Contraseña incorrecta.'], 400);
+            }
+            if (!UsuarioModel::validateVerificationCode($id, $sesion['userId'], $code)) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Código inválido o expirado.'], 400);
+            }
+            $preview = $this->model->getDeletePreview($id);
+            if (!$preview) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Usuario no encontrado.'], 404);
+            }
+            $detail = sprintf(
+                "Usuario: %s | Institución: %s | Protocolos: %d | Formularios: %d | Alojamientos: %d",
+                $preview['UsrA'],
+                $preview['NombreInst'] ?? '—',
+                $preview['protocolos'],
+                $preview['formularios'],
+                $preview['alojamientos']
+            );
+            $this->model->deleteUserFullCascade($id);
+            Auditoria::logManual(
+                $this->db,
+                $sesion['userId'],
+                'DELETE_USER_FULL',
+                'usuarioe',
+                "Eliminación total usuario ID: $id | " . $detail
+            );
+            $mail = new MailService();
+            $admin = $this->model->getPersonaByUserId($sesion['userId']);
+            $adminEmail = $admin['EmailA'] ?? null;
+            $adminName = trim(($admin['NombreA'] ?? '') . ' ' . ($admin['ApellidoA'] ?? ''));
+            if (!$adminName) $adminName = 'Superadmin';
+            $lang = $sesion['idioma'] ?? 'es';
+            if ($adminEmail) {
+                $mail->sendDeleteSummary($adminEmail, $adminName, $preview['UsrA'], $code, $detail, $lang);
+            }
+            $this->jsonOut(['status' => 'success', 'message' => 'Usuario y datos asociados eliminados correctamente.']);
+        } catch (\Exception $e) {
+            $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
     }
 }

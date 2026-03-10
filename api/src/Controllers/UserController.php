@@ -1,6 +1,7 @@
 <?php
 namespace App\Controllers;
 
+use App\Models\Admin\UsuarioModel;
 use App\Models\Services\MailService;
 use App\Models\User\UserModel;
 use App\Models\UserForms\UserFormsModel;
@@ -343,6 +344,129 @@ class UserController {
             $stmtDel->execute([$id]);
 
             echo json_encode(['status' => 'success', 'message' => 'Usuario eliminado correctamente de la base de datos.']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Vista previa para eliminación total (Admin, misma institución): listado detallado de lo que se borrará + envío de código por email.
+     */
+    public function getDeletePreview() {
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = (int)($_GET['id'] ?? 0);
+            if ($id <= 0) {
+                echo json_encode(['status' => 'error', 'message' => 'ID inválido.']);
+                exit;
+            }
+            if ($id === (int)$sesion['userId']) {
+                echo json_encode(['status' => 'error', 'message' => 'No puedes eliminar tu propio usuario.']);
+                exit;
+            }
+            $usuarioModel = new UsuarioModel($this->db);
+            $preview = $usuarioModel->getDeletePreview($id, $sesion['instId']);
+            if (!$preview) {
+                echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado en esta institución.']);
+                exit;
+            }
+            $code = (string) random_int(100000, 999999);
+            UsuarioModel::storeVerificationCode($id, $sesion['userId'], $code);
+            $mail = new MailService();
+            $admin = $usuarioModel->getPersonaByUserId($sesion['userId']);
+            $adminEmail = $admin['EmailA'] ?? null;
+            $adminName = trim(($admin['NombreA'] ?? '') . ' ' . ($admin['ApellidoA'] ?? ''));
+            if (!$adminName) $adminName = 'Administrador';
+            $lang = $sesion['idioma'] ?? 'es';
+            if ($adminEmail) {
+                $mail->sendDeleteVerificationCode($adminEmail, $adminName, $code, $preview['UsrA'], $lang);
+            }
+            $nombreCompleto = trim($preview['NombreA'] . ' ' . $preview['ApellidoA']) ?: $preview['UsrA'];
+            echo json_encode([
+                'status' => 'success',
+                'data' => [
+                    'usuario' => $preview['UsrA'],
+                    'nombre' => $nombreCompleto,
+                    'institucion' => $preview['NombreInst'] ?? '—',
+                    'protocolos' => (int) $preview['protocolos'],
+                    'formularios' => (int) $preview['formularios'],
+                    'alojamientos' => (int) $preview['alojamientos'],
+                    'protocolos_list' => $preview['protocolos_list'] ?? [],
+                    'formularios_list' => $preview['formularios_list'] ?? [],
+                    'alojamientos_list' => $preview['alojamientos_list'] ?? [],
+                    'code_sent' => !empty($adminEmail),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Eliminación total de usuario (Admin, misma institución): contraseña + código, borrado en cascada, email de resumen.
+     */
+    public function deleteFull() {
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $input = json_decode(file_get_contents('php://input'), true);
+            $id = (int)($input['id'] ?? 0);
+            $password = trim($input['password'] ?? '');
+            $code = trim($input['code'] ?? '');
+            if ($id <= 0 || $password === '' || $code === '') {
+                echo json_encode(['status' => 'error', 'message' => 'Faltan id, contraseña o código.']);
+                exit;
+            }
+            if ($id === (int)$sesion['userId']) {
+                echo json_encode(['status' => 'error', 'message' => 'No puedes eliminar tu propio usuario.']);
+                exit;
+            }
+            $stmtPass = $this->db->prepare("SELECT password_secure FROM usuarioe WHERE IdUsrA = ?");
+            $stmtPass->execute([$sesion['userId']]);
+            $row = $stmtPass->fetch(PDO::FETCH_ASSOC);
+            if (!$row || !password_verify($password, $row['password_secure'])) {
+                echo json_encode(['status' => 'error', 'message' => 'Contraseña incorrecta.']);
+                exit;
+            }
+            if (!UsuarioModel::validateVerificationCode($id, $sesion['userId'], $code)) {
+                echo json_encode(['status' => 'error', 'message' => 'Código inválido o expirado.']);
+                exit;
+            }
+            $usuarioModel = new UsuarioModel($this->db);
+            $preview = $usuarioModel->getDeletePreview($id, $sesion['instId']);
+            if (!$preview) {
+                echo json_encode(['status' => 'error', 'message' => 'Usuario no encontrado en esta institución.']);
+                exit;
+            }
+            $detail = sprintf(
+                "Usuario: %s | Institución: %s | Protocolos: %d | Formularios: %d | Alojamientos: %d",
+                $preview['UsrA'],
+                $preview['NombreInst'] ?? '—',
+                $preview['protocolos'],
+                $preview['formularios'],
+                $preview['alojamientos']
+            );
+            $usuarioModel->deleteUserFullCascade($id);
+            Auditoria::logManual(
+                $this->db,
+                $sesion['userId'],
+                'DELETE_USER_FULL',
+                'usuarioe',
+                "Eliminación total usuario ID: $id | " . $detail
+            );
+            $mail = new MailService();
+            $admin = $usuarioModel->getPersonaByUserId($sesion['userId']);
+            $adminEmail = $admin['EmailA'] ?? null;
+            $adminName = trim(($admin['NombreA'] ?? '') . ' ' . ($admin['ApellidoA'] ?? ''));
+            if (!$adminName) $adminName = 'Administrador';
+            $lang = $sesion['idioma'] ?? 'es';
+            if ($adminEmail) {
+                $mail->sendDeleteSummary($adminEmail, $adminName, $preview['UsrA'], $code, $detail, $lang);
+            }
+            echo json_encode(['status' => 'success', 'message' => 'Usuario y datos asociados eliminados correctamente.']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

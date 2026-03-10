@@ -81,7 +81,7 @@ export async function initConfigInstitution(instId) {
         fd.append('instId', instId);
         
         // Checkboxes: HTML no los envía si no están marcados, los forzamos
-        fd.append('otrosceuas', document.getElementById('check-otrosceuas').checked ? 1 : 0);
+        fd.append('otrosceuas', 0);
         fd.append('LogoEnPdf', document.getElementById('check-logopdf').checked ? 1 : 0);
 
         Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
@@ -229,7 +229,6 @@ export async function initConfigInstitution(instId) {
                 document.getElementById('sel-idioma').value = d.idioma || 'es'; // Importante: campo 'idioma'
                 
                 // Checkboxes
-                document.getElementById('check-otrosceuas').checked = (d.otrosceuas == 1);
                 document.getElementById('check-logopdf').checked = (d.LogoEnPdf == 1);
                 // Para que otros PDFs (fichas, estadísticas) puedan mostrar logo sin volver a pedir la config
                 localStorage.setItem('instLogoEnPdf', d.LogoEnPdf == 1 ? '1' : '0');

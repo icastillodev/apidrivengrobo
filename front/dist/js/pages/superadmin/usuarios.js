@@ -4,6 +4,9 @@ let allUsers = [];
 let currentPage = 1;
 const rowsPerPage = 15;
 let modalUser;
+let modalDeleteFull;
+let deletePreviewUserId = null;
+let deletePreviewData = null;
 
 function getRolesMap() {
     const t = window.txt?.superadmin_usuarios_global;
@@ -13,15 +16,19 @@ function getRolesMap() {
 
 export async function initSuperUsuarios() {
     modalUser = new bootstrap.Modal(document.getElementById('modal-user'));
+    modalDeleteFull = new bootstrap.Modal(document.getElementById('modal-delete-full'));
     await cargarSedes();
     await cargarUsuarios();
     poblarSelectRoles();
-    
+
     document.getElementById('btn-search').onclick = () => {
         currentPage = 1;
         renderTable();
     };
     document.getElementById('btn-excel').onclick = exportToExcel;
+
+    document.getElementById('btn-eliminacion-total').onclick = abrirModalEliminacionTotal;
+    document.getElementById('btn-confirm-delete-full').onclick = confirmarEliminacionTotal;
 }
 
 // --- CARGA DE DATOS ---
@@ -144,6 +151,7 @@ window.abrirModalCrear = () => {
     document.getElementById('IdUsrA').value = "";
     document.getElementById('hint-pass').classList.remove('d-none');
     document.getElementById('btn-reset').style.display = "none";
+    document.getElementById('btn-eliminacion-total').style.display = 'none';
     modalUser.show();
 };
 
@@ -163,6 +171,8 @@ window.abrirModalEditar = (id) => {
     document.getElementById('confirmado').value = u.confirmado;
     document.getElementById('hint-pass').classList.add('d-none');
     document.getElementById('btn-reset').style.display = "block";
+    const btnDel = document.getElementById('btn-eliminacion-total');
+    btnDel.style.display = id ? 'inline-block' : 'none';
     modalUser.show();
 };
 
@@ -210,6 +220,129 @@ function exportToExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Usuarios_Global");
     XLSX.writeFile(wb, "Reporte_Gecko_Personal.xlsx");
+}
+
+async function abrirModalEliminacionTotal() {
+    const id = document.getElementById('IdUsrA').value;
+    if (!id) return;
+    const t = window.txt?.superadmin_usuarios_global;
+    try {
+        const res = await API.request(`/superadmin/usuarios/delete-preview?id=${id}`);
+        if (res.status !== 'success' || !res.data) {
+            (window.mostrarNotificacion || alert)(res.message || (t?.delete_error ?? 'Error'));
+            return;
+        }
+        deletePreviewUserId = id;
+        deletePreviewData = res.data;
+        const listEl = document.getElementById('delete-preview-list');
+        listEl.innerHTML = '';
+        const items = [
+            [t?.delete_modal_usuario ?? 'Usuario', res.data.usuario + ' (' + (res.data.nombre || res.data.usuario) + ')'],
+            [t?.delete_modal_institucion ?? 'Institución', res.data.institucion],
+            [t?.delete_modal_protocolos ?? 'Protocolos', res.data.protocolos],
+            [t?.delete_modal_formularios ?? 'Formularios', res.data.formularios],
+            [t?.delete_modal_alojamientos ?? 'Alojamientos', res.data.alojamientos]
+        ];
+        items.forEach(([label, value]) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between small';
+            li.innerHTML = '<span class="text-muted">' + label + '</span><span class="fw-bold">' + value + '</span>';
+            listEl.appendChild(li);
+        });
+        const pl = res.data.protocolos_list || [];
+        const fl = res.data.formularios_list || [];
+        const al = res.data.alojamientos_list || [];
+        if (pl.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = (t?.delete_modal_list_protocolos ?? 'Protocolos que se eliminarán:');
+            listEl.appendChild(sec);
+            pl.forEach(function(p) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = (p.nprotA || '') + ' — ' + (p.tituloA || '');
+                listEl.appendChild(li);
+            });
+        }
+        if (fl.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = (t?.delete_modal_list_formularios ?? 'Formularios que se eliminarán:');
+            listEl.appendChild(sec);
+            fl.forEach(function(f) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = '#' + (f.idformA || '') + ' ' + (f.tipo_nombre || f.tipoA || '') + (f.categoria ? ' (' + f.categoria + ')') + '' + (f.nprot ? ' — Protocolo ' + f.nprot : '');
+                listEl.appendChild(li);
+            });
+        }
+        if (al.length > 0) {
+            const sec = document.createElement('li');
+            sec.className = 'list-group-item small fw-bold text-danger bg-light';
+            sec.textContent = (t?.delete_modal_list_alojamientos ?? 'Alojamientos que se eliminarán:');
+            listEl.appendChild(sec);
+            al.slice(0, 100).forEach(function(a) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item small ps-4';
+                li.textContent = 'Historia ' + (a.historia || '') + (a.idprotA ? ' (Protocolo ' + a.idprotA + ')' : '');
+                listEl.appendChild(li);
+            });
+            if (al.length > 100) {
+                const more = document.createElement('li');
+                more.className = 'list-group-item small ps-4 text-muted';
+                more.textContent = '... y ' + (al.length - 100) + ' más.';
+                listEl.appendChild(more);
+            }
+        }
+        document.getElementById('delete-password').value = '';
+        document.getElementById('delete-code').value = '';
+        const codeSentEl = document.getElementById('delete-code-sent');
+        if (res.data.code_sent) {
+            codeSentEl.textContent = t?.delete_code_sent ?? 'Código enviado a tu correo.';
+            codeSentEl.classList.remove('d-none');
+        } else {
+            codeSentEl.classList.add('d-none');
+        }
+        modalUser.hide();
+        modalDeleteFull.show();
+    } catch (e) {
+        (window.mostrarNotificacion || alert)(t?.delete_error ?? 'Error');
+        console.error(e);
+    }
+}
+
+async function confirmarEliminacionTotal() {
+    if (!deletePreviewUserId || !deletePreviewData) return;
+    const password = document.getElementById('delete-password').value.trim();
+    const code = document.getElementById('delete-code').value.trim();
+    const t = window.txt?.superadmin_usuarios_global;
+    if (!password || !code) {
+        (window.mostrarNotificacion || alert)(t?.delete_modal_password ?? 'Ingresa contraseña y código.');
+        return;
+    }
+    const btn = document.getElementById('btn-confirm-delete-full');
+    btn.disabled = true;
+    try {
+        const res = await API.request('/superadmin/usuarios/delete-full', 'POST', {
+            id: parseInt(deletePreviewUserId, 10),
+            password,
+            code
+        });
+        if (res.status === 'success') {
+            modalDeleteFull.hide();
+            deletePreviewUserId = null;
+            deletePreviewData = null;
+            await cargarUsuarios();
+            (window.mostrarNotificacion || alert)(t?.delete_success ?? res.message);
+        } else {
+            (window.mostrarNotificacion || alert)(res.message || (t?.delete_error ?? 'Error'));
+        }
+    } catch (e) {
+        (window.mostrarNotificacion || alert)(e?.message || (t?.delete_error ?? 'Error'));
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 let debounceTimer;

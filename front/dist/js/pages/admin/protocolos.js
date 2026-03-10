@@ -208,11 +208,8 @@ function renderTable() {
         tr.className = "clickable-row";
         tr.onclick = (e) => window.openProtocolModal(p);
         
-        // Columna Tipo: Nombre + Badge Externo si aplica (otros CEUAS)
-        let tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '---'}</span>`;
-        if(p.IsExterno == 1) {
-            tipoHtml += `<br><span class="badge bg-danger mt-1" style="font-size:9px;">OTROS CEUAS</span>`;
-        }
+        // Columna Tipo: solo nombre del tipo
+        const tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '---'}</span>`;
 
         // Columna Ámbito (Interno / Externo) según depto/organismo local
         const extFlag = Number(p.DeptoExternoFlag || 1);
@@ -264,7 +261,6 @@ function renderTable() {
 }
 
 function getFilteredAndSortedData() {
-    const originFilter = document.getElementById('filter-origin').value;
     const filterType = document.getElementById('filter-type-prot').value;
     
     // Obtenemos el valor sea input o select dinámico
@@ -274,11 +270,7 @@ function getFilteredAndSortedData() {
     const today = new Date().toISOString().split('T')[0];
 
     let data = allProtocols.filter(p => {
-        // 1. Filtro Origen
-        if (originFilter === 'interno' && p.IsExterno == 1) return false;
-        if (originFilter === 'externo' && p.IsExterno != 1) return false;
-
-        // 2. Filtro de Búsqueda
+        // Filtro de Búsqueda
         if (!term) return true;
 
         if (filterType === 'Vencimiento') {
@@ -370,7 +362,7 @@ window.openProtocolModal = async (p = null) => {
         if (resSpec.status === 'success') currentSpeciesIds = resSpec.data;
     }
 
-    const showOtrosCeuas = formDataCache.otrosceuas_enabled || (p && p.IsExterno == 1);
+    const showOtrosCeuas = false; // Funcionalidad Otros CEUAS retirada
 
     const usados = p?.AnimalesUsados ?? 0;
     const saldo = p?.SaldoAnimales ?? (p?.CantidadAniA ?? 0);
@@ -391,12 +383,6 @@ window.openProtocolModal = async (p = null) => {
         <form id="form-protocolo">
             <input type="hidden" name="IdInstitucion" value="${instId}">
             
-            ${showOtrosCeuas ? `
-            <div class="form-check form-switch mb-3 bg-light p-2 ps-5 rounded border">
-                <input class="form-check-input" type="checkbox" name="protocoloexpe" id="chk-otros-ceuas" value="1" ${p?.IsExterno == 1 ? 'checked' : ''} onchange="window.toggleDeptoInput(this)">
-                <label class="form-check-label fw-bold text-secondary" for="chk-otros-ceuas">PROTOCOLO EXTERNO (OTROS CEUAS)</label>
-            </div>` : ''}
-
             ${p ? `
             <div class="row g-2 mb-3 bg-light border rounded p-2">
                 <div class="col-md-4">
@@ -522,10 +508,8 @@ window.openProtocolModal = async (p = null) => {
         });
     }
     
-    // Switch depto manual
-    const chk = document.getElementById('chk-otros-ceuas');
-    if(chk) window.toggleDeptoInput(chk, p?.DeptoOriginal);
-    else window.toggleDeptoInput({checked: false});
+    // Departamento: siempre selector (sin opción Otros CEUAS)
+    window.toggleDeptoInput({ checked: false });
 
     window.updateAvailableSpecies();
 };
@@ -597,16 +581,6 @@ window.downloadProtocolPDF = async (id) => {
     // Convertir Inputs a Texto
     cloned.querySelectorAll('input, select').forEach(el => {
         let txt = el.tagName === 'SELECT' ? (el.options[el.selectedIndex]?.text || '-') : el.value;
-        if(el.type === 'checkbox' && el.id === 'chk-otros-ceuas') {
-            txt = el.checked ? 'PROTOCOLO EXTERNO (OTROS CEUAS)' : '';
-            if(el.checked) {
-                const badge = document.createElement('div');
-                badge.className = 'alert alert-danger fw-bold text-center p-1 mb-2';
-                badge.innerText = txt;
-                el.parentNode.replaceChild(badge, el);
-                return;
-            }
-        }
         const p = document.createElement('div');
         p.className = 'border-bottom pb-1 mb-2 fw-bold small';
         p.innerText = txt;

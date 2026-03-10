@@ -43,7 +43,6 @@ export function renderTable() {
         }
 
         let tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '-'}</span>`;
-        if (p.IsExterno == 1) tipoHtml += `<br><span class="badge bg-danger mt-1" style="font-size:9px">OTROS CEUAS</span>`;
 
         let origenHtml = `<span class="badge bg-light text-dark border">PROPIA</span>`;
         if (p.OrigenCalculado === 'RED' || (p.Origen && p.Origen !== store.formDataCache.NombreCompletoInst)) {

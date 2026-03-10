@@ -25,12 +25,6 @@ export async function initAnimalForm() {
     // Inicialmente ponemos "Cargando..." o el del storage temporalmente para que no se vea vacío
     if(lblInst) lblInst.innerText = localStorage.getItem('NombreInst') || '...';
 
-    window.confirmOtrosCeuas = () => {
-        const modalEl = document.getElementById('modal-otros-ceuas');
-        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-        activateOtherCeuasMode();
-    };
-
     window.resetSelection = () => {
         document.getElementById('step-2').classList.add('hidden-section');
         document.getElementById('step-1').classList.remove('hidden-section');
@@ -80,13 +74,6 @@ export async function initAnimalForm() {
                 }
             }
 
-            if (config && config.otrosceuas == 1) {
-                const btn = document.getElementById('btn-otros-ceuas');
-                if(btn) {
-                    btn.classList.remove('d-none');
-                    btn.onclick = () => new bootstrap.Modal(document.getElementById('modal-otros-ceuas')).show();
-                }
-            }
             setupSearch();
         }
 
@@ -315,34 +302,6 @@ async function selectProtocol(p) {
             document.getElementById('info-saldo').innerText = saldo;
             document.getElementById('info-total-orig').innerText = totalOriginal;
 
-            populateSpeciesSelect();
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function activateOtherCeuasMode() {
-    const instId = getContextInstId(); // Usamos el helper también aquí por seguridad
-    const userName = localStorage.getItem('userFull') || 'Usuario'; 
-
-    document.getElementById('step-1').classList.add('hidden-section');
-    document.getElementById('step-2').classList.remove('hidden-section');
-    document.getElementById('selected-prot-id').value = "";
-    document.getElementById('is-otros-ceuas').value = "1";
-
-    document.getElementById('info-vencimiento').innerText = 'Externo';
-    document.getElementById('info-total-orig').innerText = "---";
-    document.getElementById('info-saldo').innerText = "∞";  
-
-    document.getElementById('info-titulo').innerText = "SOLICITUD EXTERNA / OTROS CEUAS";
-    document.getElementById('info-nprot').innerText = "SIN PROTOCOLO VINCULADO";
-    document.getElementById('info-nprot').className = "badge bg-warning text-dark mb-2";
-    document.getElementById('info-investigador').innerText = userName;
-    document.getElementById('info-depto').innerText = "Responsable Financiero";
-
-    try {
-        const res = await API.request(`/animals/protocol-details?otros_ceuas=1&inst=${instId}`);
-        if (res.status === 'success') {
-            speciesData = res.data;
             populateSpeciesSelect();
         }
     } catch (e) { console.error(e); }

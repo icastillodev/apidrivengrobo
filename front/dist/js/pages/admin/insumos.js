@@ -41,6 +41,8 @@ export async function initInsumosPage() {
         };
     }
 
+    const filterRetiroInsumo = document.getElementById('filter-retiro-insumo');
+    if (filterRetiroInsumo) filterRetiroInsumo.onchange = () => { currentPage = 1; renderTable(); };
 
     document.addEventListener('focusin', (e) => {
         if (e.target.closest(".swal2-container")) e.stopImmediatePropagation();
@@ -110,7 +112,15 @@ function renderTable() {
             <td class="py-2 px-2 small fw-bold">${f.Investigador}</td>
             <td class="py-2 px-2 small text-primary fw-bold">${protLabel}</td>
             <td class="py-2 px-2 small text-primary fw-bold">${f.Departamento || '---'}</td>
-            <td class="py-2 px-2 small text-muted">${(f.Organizacion && String(f.Organizacion).trim()) ? f.Organizacion : labelSinOrg}</td>
+            <td class="py-2 px-2 text-center">
+                ${(() => {
+                    const extFlag = Number(f.DeptoExternoFlag || 1);
+                    const isExt = extFlag === 2;
+                    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+                    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+                    return isExt ? `<span class="badge bg-danger text-white" style="font-size:8px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:8px;">${labelInt}</span>`;
+                })()}
+            </td>
             <td class="py-2 px-2" style="font-size: 13px;">${f.ResumenInsumos || '---'}</td>
             <td class="py-2 px-2 small">${f.Inicio || '---'}</td>
             <td class="py-2 px-2 small">${f.Retiro || '---'}</td>
@@ -132,20 +142,23 @@ window.openInsumoModal = async (f) => {
     const container = document.getElementById('modal-content-insumo');
     
     try {
-        // Hacemos las peticiones: detalles del pedido, departamentos, catálogo y protocolos activos
-        const [resItems, resFormData, resCat, resNotify, resProt] = await Promise.all([
+        // Hacemos las peticiones: detalles del pedido, departamentos (completos con org/ámbito), catálogo y protocolos activos
+        const [resItems, resFormData, resCat, resNotify, resProt, resDeptos] = await Promise.all([
             API.request(`/insumos/details?id=${f.idPrecioinsumosformulario}`),
-            API.request(`/insumos/form-data?inst=${instId}`), // <--- Trae la lista de departamentoe
+            API.request(`/insumos/form-data?inst=${instId}`),
             API.request(`/insumos/catalog?inst=${instId}`),
             API.request(`/reactivos/last-notification?id=${f.idformA}`),
-            API.request(`/billing/list-active-protocols`)
+            API.request(`/billing/list-active-protocols`),
+            API.request(`/deptos/list`)
         ]);
 
         window.catalogoInsumos = resCat.data || [];
         const items = resItems.data || [];
         
-        // Extraemos el array de departamentos y protocolos
-        const deptos = (resFormData.data && resFormData.data.deptos) ? resFormData.data.deptos : [];
+        // Usamos lista completa de deptos (org + externo) desde /deptos/list; si falla, usamos la de form-data
+        let deptos = [];
+        if (resDeptos && resDeptos.status === 'success' && Array.isArray(resDeptos.data)) deptos = resDeptos.data;
+        else if (resFormData.data && resFormData.data.deptos) deptos = resFormData.data.deptos;
         const protocolos = (resProt && resProt.status === 'success' && Array.isArray(resProt.data)) ? resProt.data : [];
         
         const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
@@ -160,6 +173,8 @@ window.openInsumoModal = async (f) => {
         html += renderOrderModificationSection(f, items, deptos, protocolos);
 
         container.innerHTML = html;
+        const selDepto = document.getElementById('modal-depto-insumo');
+        if (selDepto) selDepto.onchange = function() { window.updateDeptoOrgAmbito(this, 'modal-org-insumo', 'modal-ambito-insumo'); };
         document.getElementById('form-insumo-full').onsubmit = (e) => window.saveFullInsumoForm(e);
 
         // Buscador rápido de protocolo en el modal
@@ -279,11 +294,26 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
     const tIns = window.txt?.admin_insumos || {};
     const labelProt = tIns.label_protocolo || 'Protocolo';
     const phBuscarProt = tIns.ph_buscar_protocolo || 'Buscar por número, título o investigador...';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
 
     const currentProtId = f.IdProtocolo || '';
     const currentProtLabel = (f.NProtocolo && f.TituloProtocolo)
         ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
         : '—';
+
+    const idDepto = f.idDepto != null ? f.idDepto : '';
+    const orgActual = (f.Organizacion && String(f.Organizacion).trim()) ? f.Organizacion : sinOrg;
+    const extFlag = Number(f.DeptoExternoFlag || 1);
+    const ambitoBadge = extFlag === 2 ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+
+    const optionsDepto = listaDeptos.map(d => {
+        const ext = (d.externodepto == 2) || (d.externodepto == null && d.externoorganismo == 2) ? 2 : 1;
+        const org = (d.NombreOrganismoSimple && String(d.NombreOrganismoSimple).trim()) ? d.NombreOrganismoSimple : sinOrg;
+        const sel = (d.iddeptoA == idDepto) ? ' selected' : '';
+        return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
+    }).join('');
 
     // Aseguramos que el protocolo actual siempre esté en la lista (aunque ya no esté activo)
     let listaProtFinal = Array.isArray(listaProt) ? [...listaProt] : [];
@@ -300,18 +330,18 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
 
     return `
     <div class="p-4 bg-white">
-        <h6 class="fw-bold text-success uppercase mb-3 small text-start">Modificación Técnica (Formulario)</h6>
-        <form id="form-insumo-full">
+        <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">Modificación Técnica (Formulario)</h6>
+        <form id="form-insumo-full" class="bg-white p-3 border rounded shadow-sm">
             <input type="hidden" name="idformA" value="${f.idformA}">
             <input type="hidden" name="idPrecioinsumosformulario" value="${f.idPrecioinsumosformulario}">
             
             <div class="row g-3 mb-4 text-start">
                 <div class="col-md-12">
-                    <label class="small fw-bold uppercase text-muted d-flex justify-content-between align-items-center">
+                    <label class="small fw-bold uppercase text-muted d-flex justify-content-between align-items-center mb-1">
                         <span>${labelProt}</span>
-                        <input type="text" id="insumo-prot-search" class="form-control form-control-sm ms-2" style="max-width: 260px;" placeholder="${phBuscarProt}">
+                        <input type="text" id="insumo-prot-search" class="form-control form-control-sm ms-2 bg-light border-0" style="max-width: 260px;" placeholder="${phBuscarProt}">
                     </label>
-                    <select name="idProt" id="insumo-prot-select" class="form-select form-select-sm fw-bold border-secondary text-primary mt-1" required>
+                    <select name="idProt" id="insumo-prot-select" class="form-select form-select-sm fw-bold border-secondary text-primary" required>
                         ${listaProtFinal.map(p => {
                             const isSelected = currentProtId && String(currentProtId) === String(p.idprotA) ? 'selected' : '';
                             return `<option value="${p.idprotA}" ${isSelected}>#${p.nprotA} - ${p.tituloA} (${p.Investigador})</option>`;
@@ -320,22 +350,26 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
                     <p class="small text-muted mt-1 mb-0"><strong>Actual:</strong> ${currentProtLabel}</p>
                 </div>
                 <div class="col-md-12">
-                    <label class="small fw-bold uppercase text-muted">Departamento (departamentoe)</label>
-                    <select name="depto" class="form-select form-select-sm fw-bold border-primary text-primary">
-                        <option value="">Seleccione Departamento...</option>
-                        ${listaDeptos.map(d => {
-                            const isSelected = (d.iddeptoA == f.idDepto) ? 'selected' : '';
-                            return `<option value="${d.iddeptoA}" ${isSelected}>${d.NombreDeptoA}</option>`;
-                        }).join('')}
+                    <label class="small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_departamento ?? 'Departamento'}</label>
+                    <select name="depto" id="modal-depto-insumo" class="form-select form-select-sm fw-bold">
+                        <option value="">— ${window.txt?.usuarios?.ficha_sin_departamento ?? 'Sin departamento'} —</option>
+                        ${optionsDepto}
                     </select>
-                    <p class="small text-muted mt-1 mb-0" id="insumo-org-display"><strong>Organización:</strong> ${(f.Organizacion && String(f.Organizacion).trim()) ? f.Organizacion : (window.txt?.generales?.sin_organizacion || '– (sin organización)')}</p>
                 </div>
                 <div class="col-md-6">
-                    <label class="small fw-bold uppercase">Fecha Inicio</label>
+                    <label class="small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_organizacion ?? 'Organización'}</label>
+                    <div id="modal-org-insumo" class="form-control-plaintext form-control-sm bg-light border rounded px-2 py-1 small">${orgActual}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_ambito ?? 'Ámbito'}</label>
+                    <div id="modal-ambito-insumo" class="pt-1">${ambitoBadge}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="small fw-bold uppercase text-muted mb-1">Fecha Inicio</label>
                     <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${f.Inicio || ''}">
                 </div>
                 <div class="col-md-6">
-                    <label class="small fw-bold uppercase">Fecha Retiro</label>
+                    <label class="small fw-bold uppercase text-muted mb-1">Fecha Retiro</label>
                     <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${f.Retiro || ''}">
                 </div>
             </div>
@@ -355,13 +389,32 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
                 <p class="mb-0 small italic" style="font-size: 11px;">${f.AclaracionUsuario || 'Sin observaciones.'}</p>
             </div>
 
-            <div class="mt-2 d-flex justify-content-end gap-2 border-top pt-3">
-                <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadInsumoPDF(${f.idformA})">PDF</button>
-                <button type="submit" class="btn btn-primary btn-sm px-5 fw-bold shadow">GUARDAR CAMBIOS</button>
+            <div class="mt-2 d-flex justify-content-end gap-2 border-top pt-3 w-100">
+                <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadInsumoPDF(${f.idformA})"><i class="bi bi-file-pdf"></i> PDF</button>
+                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;">GUARDAR CAMBIOS</button>
             </div>
         </form>
     </div>`;
 }
+
+window.updateDeptoOrgAmbito = window.updateDeptoOrgAmbito || function(selectEl, idOrg, idAmbito) {
+    const opt = selectEl && selectEl.options[selectEl.selectedIndex];
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+    const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
+    const orgEl = idOrg ? document.getElementById(idOrg) : null;
+    const ambitoEl = idAmbito ? document.getElementById(idAmbito) : null;
+    if (opt && opt.value) {
+        const org = opt.dataset.org || sinOrg;
+        const ext = parseInt(opt.dataset.externo, 10) === 2;
+        if (orgEl) orgEl.textContent = org;
+        if (ambitoEl) ambitoEl.innerHTML = ext ? `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:9px;">${labelInt}</span>`;
+    } else {
+        if (orgEl) orgEl.textContent = sinOrg;
+        if (ambitoEl) ambitoEl.innerHTML = '';
+    }
+};
+
 function renderItemRow(item = {}, index) {
     return `
         <tr class="item-row">
@@ -446,12 +499,19 @@ function getFilteredAndSortedData() {
     const statusFilter = document.getElementById('filter-status-insumo').value.toLowerCase().trim();
     const term = document.getElementById('search-input-insumo').value.toLowerCase().trim();
     const filterType = document.getElementById('filter-column-insumo').value;
+    const retiroEl = document.getElementById('filter-retiro-insumo');
+    const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
 
     let data = allInsumos.filter(f => {
         // A. Normalización del estado
-        // Si el estado es nulo o vacío, lo tratamos como "sin estado"
         const estadoFila = (f.estado || "sin estado").toString().toLowerCase().trim();
         const matchStatus = statusFilter === 'all' || estadoFila === statusFilter;
+        if (!matchStatus) return false;
+        // Filtro por fecha de retiro
+        if (retiroVal) {
+            const fRetiro = (f.Retiro || '').toString().substring(0, 10);
+            if (fRetiro !== retiroVal) return false;
+        }
         
         // B. Validación de Búsqueda (Texto en tiempo real)
         let matchSearch = true;
@@ -461,7 +521,6 @@ function getFilteredAndSortedData() {
                 matchSearch = String(f.idformA || '').includes(term) || 
                               String(f.Investigador || '').toLowerCase().includes(term) || 
                               String(f.Departamento || '').toLowerCase().includes(term) ||
-                              String(f.Organizacion || '').toLowerCase().includes(term) ||
                               String(f.ResumenInsumos || '').toLowerCase().includes(term);
             } else {
                 // Búsqueda específica por columna
@@ -773,7 +832,6 @@ window.processExcelExportInsumos = () => {
         "ID", 
         "Investigador", 
         "Departamento", 
-        "Organización",
         "Insumos (Cantidad/Medida)", 
         "Fecha Inicio", 
         "Fecha Retiro", 
@@ -792,7 +850,6 @@ window.processExcelExportInsumos = () => {
             r.idformA,
             r.Investigador,
             r.Departamento || '---',
-            (r.Organizacion && String(r.Organizacion).trim()) ? r.Organizacion : (window.txt?.generales?.sin_organizacion || '– (sin organización)'),
             insumosLimpio,
             `="${r.Inicio || '---'}"`, // Truco Excel para mantener formato fecha
             `="${r.Retiro || '---'}"`,

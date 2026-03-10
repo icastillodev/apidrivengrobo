@@ -95,9 +95,10 @@
                         <option value="IdInvestigador" data-i18n="admin_insumos.filter_id_investigador">ID INVESTIGADOR</option>
                         <option value="Investigador" data-i18n="admin_insumos.filter_investigador">INVESTIGADOR</option>
                         <option value="Departamento" data-i18n="admin_insumos.filter_departamento">DEPARTAMENTO</option>
-                        <option value="Organizacion" data-i18n="admin_insumos.filter_organizacion">ORGANIZACIÓN</option>
                     </select>
                     <input type="text" id="search-input-insumo" class="form-control form-control-sm" data-i18n="admin_insumos.ph_buscar" placeholder="Escribe para buscar..." onkeyup="if(event.key === 'Enter') { currentPage = 1; renderTable(); }">
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_insumos.filter_fecha_retiro">Fecha retiro:</span>
+                    <input type="date" id="filter-retiro-insumo" class="form-control form-control-sm" style="max-width: 150px;">
                     <button id="btn-search-insumo" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" onclick="currentPage = 1; renderTable();" data-i18n="admin_insumos.btn_buscar">BUSCAR</button>
                 </div>
                 <div class="ms-auto col-md-2 d-flex gap-2 justify-content-end">
@@ -118,7 +119,7 @@
                             <th style="width: 180px;" class="py-3 px-2" data-i18n="admin_insumos.col_investigador">Investigador</th>
                             <th style="width: 140px;" class="py-3 px-2" data-i18n="admin_insumos.col_protocolo">Protocolo</th>
                             <th style="width: 130px;" class="py-3 px-2" data-i18n="admin_insumos.col_departamento">Departamento</th>
-                            <th style="width: 130px;" class="py-3 px-2" data-i18n="admin_insumos.col_organizacion">Organización</th>
+                            <th style="width: 90px;" class="py-3 px-2 text-center" data-i18n="admin_insumos.col_ambito">Ámbito</th>
                             <th class="py-3 px-2" data-i18n="admin_insumos.col_resumen">Resumen de Productos (Cant. Medida)</th>
                             <th style="width: 100px;" class="py-3 px-2" data-i18n="admin_insumos.col_inicio">Inicio</th>
                             <th style="width: 100px;" class="py-3 px-2" data-i18n="admin_insumos.col_retiro">Retiro</th>

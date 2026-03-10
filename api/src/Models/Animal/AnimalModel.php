@@ -27,6 +27,8 @@ class AnimalModel {
                     px.nprotA as NProtocolo, px.idprotA,
                     px.protocoloexpe as IsExterno, 
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
+                    COALESCE(f.depto, pd.iddeptoA) as idDepto,
+                    COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie, 
                     COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
@@ -40,7 +42,7 @@ class AnimalModel {
                         FROM protformr pf2
                         JOIN protocoloexpe px2 ON pf2.idprotA = px2.idprotA
                         LEFT JOIN protdeptor pd2 ON px2.idprotA = pd2.idprotA
-                        LEFT JOIN departamentoe d2 ON pd2.iddeptoA = d2.iddeptoA
+                        LEFT JOIN departamentoe d2 ON COALESCE(f.depto, pd2.iddeptoA) = d2.iddeptoA
                         LEFT JOIN organismoe o2 ON d2.organismopertenece = o2.IdOrganismo
                         WHERE pf2.idformA = f.idformA
                         LIMIT 1
@@ -53,7 +55,7 @@ class AnimalModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+                LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
                 WHERE f.IdInstitucion = ? 
@@ -185,7 +187,7 @@ public function updateStatus($data) {
 
         $this->db->beginTransaction();
         try {
-            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
+            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?";
             $this->db->prepare($sqlForm)->execute([
                 $data['tipoA'] ?? null, 
                 $idSubesp, 
@@ -194,6 +196,7 @@ public function updateStatus($data) {
                 $data['pesoA'] ?? '', 
                 $data['fechainicioA'] ?? null, 
                 $data['fecRetiroA'] ?? null, 
+                !empty($data['depto']) ? $data['depto'] : null, 
                 $id
             ]);
             

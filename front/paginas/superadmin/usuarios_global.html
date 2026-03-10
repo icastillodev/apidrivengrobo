@@ -145,10 +145,39 @@
             </div>
             <div class="modal-footer bg-light p-3 d-flex justify-content-between">
                 <button type="button" onclick="resetPassword()" id="btn-reset" class="btn btn-warning btn-sm fw-bold" data-i18n="superadmin_usuarios_global.btn_reset">RESET CLAVE</button>
-                <div>
+                <div class="d-flex gap-2">
+                    <button type="button" id="btn-eliminacion-total" class="btn btn-outline-danger btn-sm fw-bold" data-i18n="superadmin_usuarios_global.btn_eliminacion_total">Eliminación total</button>
                     <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal" data-i18n="superadmin_usuarios_global.btn_cerrar">CERRAR</button>
                     <button type="button" onclick="window.guardarUsuario()" class="btn btn-success btn-sm fw-bold px-4 badge-gecko text-white" data-i18n="superadmin_usuarios_global.btn_guardar">GUARDAR</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal-delete-full" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 border-top border-5 border-danger shadow-lg">
+            <div class="modal-header bg-dark text-white py-2">
+                <h5 class="modal-title small fw-bold text-uppercase" data-i18n="superadmin_usuarios_global.delete_modal_titulo">Eliminación total de usuario</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small" data-i18n="superadmin_usuarios_global.delete_modal_intro">Se eliminará el usuario y todos sus datos asociados:</p>
+                <ul id="delete-preview-list" class="list-group list-group-flush mb-3"></ul>
+                <p id="delete-code-sent" class="small text-success d-none"></p>
+                <div class="mb-2">
+                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_password">Tu contraseña de Superadmin</label>
+                    <input type="password" id="delete-password" class="form-control form-control-sm" placeholder="">
+                </div>
+                <div>
+                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_code">Código de verificación (enviado a tu correo)</label>
+                    <input type="text" id="delete-code" class="form-control form-control-sm" placeholder="000000" maxlength="6">
+                </div>
+            </div>
+            <div class="modal-footer bg-light p-3">
+                <button type="button" class="btn btn-light btn-sm fw-bold" data-bs-dismiss="modal" data-i18n="superadmin_usuarios_global.delete_modal_btn_cancelar">Cancelar</button>
+                <button type="button" id="btn-confirm-delete-full" class="btn btn-danger btn-sm fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_btn_confirmar">Confirmar eliminación</button>
             </div>
         </div>
     </div>
