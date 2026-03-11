@@ -241,10 +241,9 @@ window.openAnimalModal = async (a) => {
     const lastNotify = resNotify.data;
 
     // --- CORRECCIÓN IDENTIDAD ---
-    // Evitamos que salga "null" si falla el localStorage
-    const userFull = localStorage.getItem('userFull') || 'Usuario';
-    const userId = localStorage.getItem('userId') || '?';
-    const identity = `${userFull} (ID: ${userId})`;
+    const userFull = localStorage.getItem('userFull') || localStorage.getItem('userName') || 'Usuario';
+    const userId = localStorage.getItem('userId') || '—';
+    const identity = `${String(userFull).trim() || 'Usuario'} (ID: ${userId})`;
 
     // ENSAMBLADO MODULAR
     let html = renderModalHeader(a);
@@ -295,9 +294,10 @@ function renderResearcherContact(a) {
 
 // --- CORRECCIÓN VISUALIZACIÓN "REVISADO POR" ---
 function renderAdminSection(a, identity) {
-    // Si a.QuienVio es null/vacío, mostramos el texto por defecto.
-    // Si tiene dato, mostramos el dato.
-    const visorTexto = (a.QuienVio && a.QuienVio !== 'null') ? a.QuienVio : "Sin visor asignado";
+    // Mostrar nombre + ID como en Reactivos; si no hay visor → "Falta revisar"
+    const visorTexto = (a.QuienVio && String(a.QuienVio).trim() && a.QuienVio.toLowerCase() !== 'null') ? a.QuienVio : 'Falta revisar';
+    const t = window.txt?.admin_animales?.modal || {};
+    const lblRevisado = t.reviewed_by || "Revisado por";
 
     return `
     <div class="bg-light p-3 rounded border shadow-sm mb-3">
@@ -317,7 +317,7 @@ function renderAdminSection(a, identity) {
                 </div>
             </div>
             <div class="col-md-6">
-                <label class="form-label small fw-bold text-muted uppercase">Revisado por</label>
+                <label class="form-label small fw-bold text-muted uppercase">${lblRevisado}</label>
                 <input type="text" id="modal-quienvisto" class="form-control form-control-sm bg-light fw-bold text-primary" value="${visorTexto}" readonly>
             </div>
             <div class="col-12">
@@ -491,25 +491,23 @@ window.updateAnimalStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
     const statusSelect = document.getElementById('modal-status');
     const aclara = document.getElementById('modal-aclaracionadm').value;
-    
-    // Generamos la identidad fresca para enviar al backend
-    const userFull = localStorage.getItem('userFull') || 'Admin';
-    const userId = localStorage.getItem('userId') || '?';
-    const identity = `${userFull} (ID: ${userId})`;
+    const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
 
     const fd = new FormData();
     fd.append('idformA', id);
     fd.append('estado', statusSelect.value);
     fd.append('aclaracionadm', aclara);
-    fd.append('userName', identity); 
+    fd.append('userName', '');
 
     try {
         const res = await API.request(`/animals/update-status`, 'POST', fd);
         if (res.status === 'success') {
-            // Al guardar éxito, actualizamos el input visualmente con el nombre actual
-            document.getElementById('modal-quienvisto').value = identity;
+            const inputVisor = document.getElementById('modal-quienvisto');
+            if (inputVisor) {
+                inputVisor.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : (isSinEstado ? 'Falta revisar' : '');
+            }
             document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value);
-            syncAllData(); 
+            syncAllData();
         }
     } catch (e) { console.error(e); }
 };

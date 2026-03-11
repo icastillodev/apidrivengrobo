@@ -4,11 +4,14 @@ namespace App\Controllers;
 use App\Models\Animal\AnimalModel;
 use App\Models\Services\MailService;
 use App\Utils\Auditoria;
+use App\Utils\VisorHelper;
 
 class AnimalController {
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AnimalModel($db);
     }
 
@@ -49,18 +52,17 @@ class AnimalController {
             $sesion = Auditoria::getDatosSesion();
             $estado = $data['estado'] ?? 'Sin estado';
 
-            // 🚀 FIX LÓGICA "QUIEN VISTO"
+            // Visor = quien cambia el estado. Siempre nombre + apellido + ID desde BD.
             if (strtolower(trim($estado)) === 'sin estado') {
                 $quienvisto = "Falta revisar";
             } else {
-                $nombreAdmin = !empty($sesion['userFull']) ? $sesion['userFull'] : "Admin ID " . $sesion['userId'];
-                $quienvisto = $nombreAdmin;
+                $quienvisto = VisorHelper::getNombreApellidoYId($this->db, $sesion['userId']);
             }
 
             $data['quienvisto'] = $quienvisto; 
 
             $this->model->updateStatus($data);
-            echo json_encode(['status' => 'success']);
+            echo json_encode(['status' => 'success', 'quienvisto' => $quienvisto]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

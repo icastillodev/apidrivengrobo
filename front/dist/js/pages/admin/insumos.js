@@ -168,7 +168,9 @@ window.openInsumoModal = async (f) => {
         else if (resFormData.data && resFormData.data.deptos) deptos = resFormData.data.deptos;
         const protocolos = (resProt && resProt.status === 'success' && Array.isArray(resProt.data)) ? resProt.data : [];
         
-        const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+        const userFull = localStorage.getItem('userFull') || localStorage.getItem('userName') || 'Usuario';
+        const userId = localStorage.getItem('userId') || '—';
+        const identity = `${String(userFull).trim() || 'Usuario'} (ID: ${userId})`;
 
         // Construimos el HTML
         let html = renderModalHeader(f);
@@ -228,6 +230,9 @@ function renderResearcherContact(f) {
 }
 
 function renderAdminSection(f, identity) {
+    const t = window.txt?.admin_insumos?.modal || {};
+    const lblRevisado = t.reviewed_by || "Revisado por";
+    const revisadoVal = (f.quienvisto && String(f.quienvisto).trim()) ? f.quienvisto : (identity || "Falta revisar");
     return `
     <div class="p-4 bg-white border-bottom shadow-sm">
         <div class="row g-3">
@@ -246,8 +251,8 @@ function renderAdminSection(f, identity) {
                 </div>
             </div>
             <div class="col-md-6 text-start">
-                <label class="small fw-bold text-muted uppercase">Revisado por</label>
-                <input type="text" id="insumo-reviewer" class="form-control form-control-sm bg-light fw-bold" value="${f.quienvisto || identity}" readonly>
+                <label class="small fw-bold text-muted uppercase">${lblRevisado}</label>
+                <input type="text" id="insumo-reviewer" class="form-control form-control-sm bg-light fw-bold text-primary" value="${revisadoVal}" readonly>
             </div>
             <div class="col-12 text-start">
                 <label class="small fw-bold text-muted uppercase">Aclaración Administrativa (Auto-guardado)</label>
@@ -462,21 +467,22 @@ window.updateInsumoStatusQuick = async (id) => {
     const status = document.getElementById('insumo-status').value;
     const badgeContainer = document.getElementById('insumo-status-badge-container');
     const aclara = document.getElementById('insumo-admin-note').value;
-    const identity = `${localStorage.getItem('userFull')} (ID: ${localStorage.getItem('userId')})`;
+    const isSinEstado = status.trim().toLowerCase() === 'sin estado';
 
     const fd = new FormData();
     fd.append('idformA', id);
     fd.append('estado', status);
     fd.append('aclaracionadm', aclara);
-    fd.append('userName', identity); 
+    fd.append('userName', '');
 
     try {
         const res = await API.request(`/insumos/update-status`, 'POST', fd);
         if (res.status === 'success') {
-            document.getElementById('insumo-reviewer').value = identity;
+            const inputVisor = document.getElementById('insumo-reviewer');
+            if (inputVisor) {
+                inputVisor.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : (isSinEstado ? 'Falta revisar' : '');
+            }
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status);
-            
-            // Refrescar grilla de fondo
             const r = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
             allInsumos = r.data;
             renderTable();

@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Models\Reactivo\ReactivoModel;
 use App\Models\Services\MailService; 
 use App\Utils\Auditoria;
+use App\Utils\VisorHelper;
 
 class ReactivoController {
     private $model;
@@ -72,23 +73,16 @@ class ReactivoController {
             $sesion = Auditoria::getDatosSesion();
             $estado = $data['estado'] ?? 'Sin estado';
             
-            // 🚀 FIX: Si el Frontend mandó quién lo vio, lo usamos. 
-            // Si no, lo armamos nosotros verificando variables de sesión (ideal para SuperAdmins)
+            // Visor = quien cambia el estado. Siempre nombre + apellido + ID desde BD.
             if (strtolower(trim($estado)) === 'sin estado') {
                 $quienvisto = "Falta revisar";
             } else {
-                if (!empty($data['quienvisto'])) {
-                    $quienvisto = $data['quienvisto'];
-                } else {
-                    // Si el Frontend falló, lo respaldamos desde el token del Backend
-                    $nombreAdmin = !empty($sesion['userFull']) ? $sesion['userFull'] : (!empty($sesion['NombreA']) ? $sesion['NombreA'] : "Admin ID " . $sesion['userId']);
-                    $quienvisto = $nombreAdmin . " (ID: " . $sesion['userId'] . ")";
-                }
+                $quienvisto = VisorHelper::getNombreApellidoYId($this->db, $sesion['userId']);
             }
 
             $this->model->updateQuickStatus($data['idformA'], $estado, $data['aclaracionadm'] ?? '', $quienvisto);
             
-            echo json_encode(['status' => 'success']);
+            echo json_encode(['status' => 'success', 'quienvisto' => $quienvisto]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

@@ -21,14 +21,14 @@
     <script type="module">
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { Auth } from '../../dist/js/auth.js';
-        import { initMenu } from '../../dist/js/components/MenuComponent.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
         import { getRoleName } from '../../dist/js/components/menujs/menuconfig.js'; 
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         
         // Importamos el módulo específico de esta página
-        import { initHistorialContable } from '../../dist/js/pages/admin/historialcontable.js';
+        import { initHistorialContable } from '../../dist/js/pages/admin/historialcontable.js?v=20260311';
 
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {

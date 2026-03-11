@@ -3,11 +3,14 @@ namespace App\Controllers;
 
 use App\Models\Insumo\InsumoModel;
 use App\Utils\Auditoria;
+use App\Utils\VisorHelper;
 
 class InsumoController {
     private $model;
+    private $db;
 
     public function __construct($db) { 
+        $this->db = $db;
         $this->model = new InsumoModel($db); 
     }
 
@@ -56,11 +59,21 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $data = $_POST;
-            $data['userName'] = "Admin (ID: " . $sesion['userId'] . ")"; // Sobrescribe por seguridad
+            $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $estado = $data['estado'] ?? 'Sin estado';
+
+            // Visor = quien cambia el estado. Siempre nombre + apellido + ID desde BD.
+            if (strtolower(trim($estado)) === 'sin estado') {
+                $data['userName'] = "Falta revisar";
+            } else {
+                $data['userName'] = VisorHelper::getNombreApellidoYId($this->db, $sesion['userId']);
+            }
 
             $success = $this->model->updateStatus($data);
-            echo json_encode(['status' => $success ? 'success' : 'error']);
+            echo json_encode([
+                'status' => $success ? 'success' : 'error',
+                'quienvisto' => $data['userName'] ?? ''
+            ]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

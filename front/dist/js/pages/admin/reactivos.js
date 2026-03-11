@@ -398,7 +398,7 @@ window.updateReactivoStatusQuick = async () => {
     const userId = Auth.getVal('userId') || "0";
     const identity = `${userName} (ID: ${userId})`;
     
-    const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
+        const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
     const quienVistoTarget = isSinEstado ? 'Falta revisar' : identity;
 
     const fd = new FormData();
@@ -413,7 +413,7 @@ window.updateReactivoStatusQuick = async () => {
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(statusSelect.value);
             
             const inputQuienVisto = document.getElementById('modal-quienvisto');
-            if (inputQuienVisto) inputQuienVisto.value = quienVistoTarget;
+            if (inputQuienVisto) inputQuienVisto.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : quienVistoTarget;
             
             syncAllData(); 
         }

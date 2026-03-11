@@ -25,13 +25,13 @@
     <script type="module">
         import { Auth } from '../../../dist/js/auth.js';
         import { API } from '../../../dist/js/api.js';
-        import { initMenu } from '../../../dist/js/components/MenuComponent.js';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260311';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
         // Lógica específica del formulario de animales
-        import { initAnimalForm } from '../../../dist/js/pages/usuario/formularios/animales.js';
+        import { initAnimalForm } from '../../../dist/js/pages/usuario/formularios/animales.js?v=20260311';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
