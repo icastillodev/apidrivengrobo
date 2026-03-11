@@ -153,7 +153,10 @@ function renderTable() {
         const tipoBadgeHtml = `<span class="${tipoBadgeStyle.className}" style="${tipoBadgeStyle.style} font-size: 9px; padding: 3px 6px;">${(a.TipoNombre || 'Animal').replace(/</g, '&lt;')}</span>`;
         const cepaNueva = (a.CepaNombre || '').toString().trim();
         const cepaLegacy = (a.raza || '').toString().trim();
-        const cepaDisplay = cepaNueva ? cepaNueva : (cepaLegacy ? `${cepaLegacy} (cepa anterior)` : '-');
+        const isValidCepaText = (v) => !!v && v !== '0' && v !== '-' && v.toLowerCase() !== 'null';
+        const cepaDisplay = isValidCepaText(cepaNueva)
+            ? cepaNueva
+            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (cepa anterior)` : '-');
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${a.idformA}</td>
@@ -934,7 +937,10 @@ window.processExcelExport = () => {
     data.forEach(a => {
         const cepaNueva = (a.CepaNombre || '').toString().trim();
         const cepaLegacy = (a.raza || '').toString().trim();
-        const cepaDisplay = cepaNueva ? cepaNueva : (cepaLegacy ? `${cepaLegacy} (cepa anterior)` : '-');
+        const isValidCepaText = (v) => !!v && v !== '0' && v !== '-' && v.toLowerCase() !== 'null';
+        const cepaDisplay = isValidCepaText(cepaNueva)
+            ? cepaNueva
+            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (cepa anterior)` : '-');
         const row = [
             a.idformA,
             a.TipoNombre,
