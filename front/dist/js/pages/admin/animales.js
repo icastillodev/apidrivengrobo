@@ -151,6 +151,9 @@ function renderTable() {
 
         const tipoBadgeStyle = getTipoFormBadgeStyle(a.colorTipo);
         const tipoBadgeHtml = `<span class="${tipoBadgeStyle.className}" style="${tipoBadgeStyle.style} font-size: 9px; padding: 3px 6px;">${(a.TipoNombre || 'Animal').replace(/</g, '&lt;')}</span>`;
+        const cepaNueva = (a.CepaNombre || '').toString().trim();
+        const cepaLegacy = (a.raza || '').toString().trim();
+        const cepaDisplay = cepaNueva ? cepaNueva : (cepaLegacy ? `${cepaLegacy} (cepa anterior)` : '-');
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${a.idformA}</td>
@@ -158,7 +161,7 @@ function renderTable() {
             <td class="py-2 px-2 small">${a.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${a.NProtocolo || '---'}</td>
             <td class="py-2 px-2 small">${a.CatEspecie}</td>
-            <td class="py-2 px-2 small text-muted">${a.CepaNombre || (a.raza ? `${a.raza} (cepa anterior)` : '-')}</td>
+            <td class="py-2 px-2 small text-muted">${cepaDisplay}</td>
             <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Peso || '---'}</td>
             <td class="py-2 px-2 text-center fw-bold">${a.CantAnimal}</td>
@@ -929,13 +932,16 @@ window.processExcelExport = () => {
     const csvRows = [headers.join(";")];
 
     data.forEach(a => {
+        const cepaNueva = (a.CepaNombre || '').toString().trim();
+        const cepaLegacy = (a.raza || '').toString().trim();
+        const cepaDisplay = cepaNueva ? cepaNueva : (cepaLegacy ? `${cepaLegacy} (cepa anterior)` : '-');
         const row = [
             a.idformA,
             a.TipoNombre,
             a.Investigador,
             a.NProtocolo || '---',
             a.CatEspecie || '---',
-            a.CepaNombre || (a.raza ? `${a.raza} (cepa anterior)` : '-'),
+            cepaDisplay,
             a.Edad || '---',  // NUEVO
             a.Peso || '---',  // NUEVO
             a.CantAnimal,
