@@ -158,7 +158,7 @@ function renderTable() {
             <td class="py-2 px-2 small">${a.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${a.NProtocolo || '---'}</td>
             <td class="py-2 px-2 small">${a.CatEspecie}</td>
-            <td class="py-2 px-2 small text-muted">${a.CepaNombre || '-'}</td>
+            <td class="py-2 px-2 small text-muted">${a.CepaNombre || (a.raza ? `${a.raza} (cepa anterior)` : '-')}</td>
             <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Peso || '---'}</td>
             <td class="py-2 px-2 text-center fw-bold">${a.CantAnimal}</td>
@@ -935,7 +935,7 @@ window.processExcelExport = () => {
             a.Investigador,
             a.NProtocolo || '---',
             a.CatEspecie || '---',
-            a.CepaNombre || '-',
+            a.CepaNombre || (a.raza ? `${a.raza} (cepa anterior)` : '-'),
             a.Edad || '---',  // NUEVO
             a.Peso || '---',  // NUEVO
             a.CantAnimal,
