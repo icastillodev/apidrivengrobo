@@ -262,9 +262,13 @@ window.openAnimalModal = async (a) => {
 
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
-    if (a.idprotA) window.loadSpeciesForProtocol(a.idprotA, a.idsubespA);
-    // Inicializar cepas (nuevo) con valor actual si existe
-    window.loadCepasForSubespecieModal(a.idsubespA, a.idcepaA);
+    if (a.idprotA) {
+        await window.loadSpeciesForProtocol(a.idprotA, a.idsubespA);
+        const selSp = document.getElementById('select-species-modal');
+        const optSp = selSp && selSp.options[selSp.selectedIndex];
+        const idespA = optSp && (optSp.dataset.idespA || optSp.getAttribute('data-idesp-a'));
+        if (idespA) window.loadCepasForEspecieModal(idespA, a.idcepaA);
+    }
     
     new bootstrap.Modal(document.getElementById('modal-animal')).show();
 };
@@ -559,7 +563,7 @@ window.loadSpeciesForProtocol = async (protId, selectedSubId = null) => {
             const filtered = res.data.filter(s => s.existe != 2);
             if (filtered.length > 0) {
                 select.innerHTML = filtered.map(s => `
-                    <option value="${s.idsubespA}" data-price="${s.Psubanimal}" ${selectedSubId == s.idsubespA ? 'selected' : ''}>
+                    <option value="${s.idsubespA}" data-price="${s.Psubanimal || 0}" data-idesp-a="${s.idespA ?? ''}" ${selectedSubId == s.idsubespA ? 'selected' : ''}>
                         ${s.EspeNombreA} - ${s.SubEspeNombreA}
                     </option>`).join('');
                 window.updateSpeciesPrice(select);
@@ -575,11 +579,12 @@ window.updateSpeciesPrice = (select) => {
     if (selected) {
         document.getElementById('price-unit-modal').value = selected.dataset.price || 0;
         window.calculateAnimalTotals();
-        window.loadCepasForSubespecieModal(selected.value);
+        const idespA = selected.dataset.idespA || selected.getAttribute('data-idesp-a');
+        if (idespA) window.loadCepasForEspecieModal(idespA);
     }
 };
 
-window.loadCepasForSubespecieModal = async (idSubespA, currentIdCepa = null) => {
+window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
     const instId = localStorage.getItem('instId');
     const sel = document.getElementById('select-cepa-modal');
     const help = document.getElementById('cepa-modal-help');
@@ -587,8 +592,12 @@ window.loadCepasForSubespecieModal = async (idSubespA, currentIdCepa = null) => 
     sel.innerHTML = `<option value="0">-</option>`;
     sel.disabled = true;
     if (help) help.textContent = 'Cargando...';
+    if (!idespA) {
+        if (help) help.textContent = 'Seleccione especie/categoría.';
+        return;
+    }
     try {
-        const res = await API.request(`/animals/cepas?inst=${instId}&idsubespA=${encodeURIComponent(idSubespA)}`);
+        const res = await API.request(`/animals/cepas?inst=${instId}&idespA=${encodeURIComponent(idespA)}`);
         const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
         sel.innerHTML = '';
         if (list.length > 0) {
@@ -601,7 +610,7 @@ window.loadCepasForSubespecieModal = async (idSubespA, currentIdCepa = null) => 
                 sel.appendChild(opt);
             });
             if (currentIdCepa) sel.value = String(currentIdCepa);
-            if (help) help.textContent = 'Si existen cepas habilitadas para esta categoría, debe seleccionar una.';
+            if (help) help.textContent = 'Si existen cepas habilitadas para esta especie, debe seleccionar una.';
         } else {
             sel.disabled = true;
             sel.innerHTML = `<option value="0">-</option>`;

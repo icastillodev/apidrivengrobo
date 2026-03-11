@@ -40,8 +40,8 @@
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         
-        // Importamos el maestro orquestador de alojamientos
-        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=20260311';
+        // Importamos el maestro orquestador de alojamientos (v=rev4 fix estado duplicado)
+        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=rev4';
         
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
@@ -127,8 +127,8 @@
                 <div class="col-md-3">
                     <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>
                     <select id="filter-estado" class="form-select form-select-sm" onchange="window.renderAlojamientosTable()">
-                        <option value="" data-i18n="estadosformularios.todosestados">Todos los Estados</option>
-                        <option value="0" selected data-i18n="alojamientos.status_active">Vigentes</option>
+                        <option value="" selected data-i18n="estadosformularios.todosestados">Todos los Estados</option>
+                        <option value="0" data-i18n="alojamientos.status_active">Vigentes</option>
                         <option value="1" data-i18n="alojamientos.status_finished">Finalizados</option>
                     </select>
                 </div>

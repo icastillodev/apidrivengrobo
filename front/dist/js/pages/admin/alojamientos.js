@@ -20,8 +20,9 @@ export const AlojamientoState = {
     currentHistoryData: [],
     instId: parseInt(localStorage.getItem('instId'))
 };
+if (typeof window !== 'undefined') window.__AlojamientoState = AlojamientoState;
+
 export async function initAlojamientosPage() {
-    // Inicializar listeners y configuraciones de cada submódulo
     TableUI.init();
     HistorialUI.init();
     TramosUI.init();
@@ -30,7 +31,6 @@ export async function initAlojamientosPage() {
 
     await loadAlojamientos();
 
-    // MAGIA IA: Detectar si la IA pide crear nuevo alojamiento
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('action') === 'nuevo') {
         setTimeout(() => {
@@ -45,14 +45,27 @@ export async function initAlojamientosPage() {
 export async function loadAlojamientos() {
     try {
         showLoader();
-        const res = await API.request(`/alojamiento/list?inst=${AlojamientoState.instId}`);
+        const rawInst = AlojamientoState.instId;
+        const inst = (typeof rawInst === 'number' && Number.isFinite(rawInst) && rawInst > 0) ? rawInst : null;
+        const url = inst != null ? `/alojamiento/list?inst=${inst}` : '/alojamiento/list';
+        const sep = url.includes('?') ? '&' : '?';
+        const fullUrl = `${url}${sep}_=${Date.now()}`;
+
+        const res = await API.request(fullUrl);
+
         if (res.status === 'success') {
-            AlojamientoState.dataFull = res.data;
-            TableUI.render();
-            refreshMenuNotifications(); 
+            const raw = res.data;
+            AlojamientoState.dataFull = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
+        } else {
+            AlojamientoState.dataFull = [];
         }
+
+        TableUI.render();
+        if (res.status === 'success') refreshMenuNotifications();
     } catch (e) {
         console.error("Error cargando alojamientos:", e);
+        AlojamientoState.dataFull = [];
+        TableUI.render();
     } finally {
         hideLoader();
     }

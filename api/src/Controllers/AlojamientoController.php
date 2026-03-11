@@ -15,8 +15,20 @@ class AlojamientoController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            $sesion = Auditoria::getDatosSesion(); // Seguridad
-            echo json_encode(['status' => 'success', 'data' => $this->model->getAllGrouped($sesion['instId'])]);
+            $sesion = Auditoria::getDatosSesion();
+            $instParam = $_GET['inst'] ?? null;
+            // Normalizar: si el front manda "NaN", "" o no es número válido, usar institución de la sesión
+            $targetInst = null;
+            if ($instParam !== null && $instParam !== '') {
+                $targetInst = filter_var($instParam, FILTER_VALIDATE_INT);
+                if ($targetInst === false || $targetInst < 0) {
+                    $targetInst = null;
+                }
+            }
+            if ($targetInst === null) {
+                $targetInst = isset($sesion['instId']) ? (int) $sesion['instId'] : 0;
+            }
+            echo json_encode(['status' => 'success', 'data' => $this->model->getAllGrouped($targetInst)]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

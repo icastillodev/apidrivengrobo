@@ -353,6 +353,8 @@ $router->post('/admin/config/subespecies/delete', 'AdminConfigEspeciesController
 $router->get('/admin/config/cepas/all', 'AdminConfigEspeciesController@getCepas');
 $router->post('/admin/config/cepas/save', 'AdminConfigEspeciesController@saveCepa');
 $router->post('/admin/config/cepas/toggle', 'AdminConfigEspeciesController@toggleCepa');
+$router->post('/admin/config/cepas/update', 'AdminConfigEspeciesController@updateCepa');
+$router->post('/admin/config/cepas/delete', 'AdminConfigEspeciesController@deleteCepa');
 
 
 // ============================================================

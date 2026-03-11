@@ -125,11 +125,15 @@ class AdminConfigEspeciesController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $idespA = $_GET['idespA'] ?? null;
             $idSub = $_GET['idsubespA'] ?? null;
-            if (!$idSub) {
-                throw new \Exception("Falta idsubespA.");
+            if ($idespA !== null && $idespA !== '') {
+                $data = $this->model->getCepasByEspecieAdmin($sesion['instId'], $idespA);
+            } elseif ($idSub) {
+                $data = $this->model->getCepasBySubespecieAdmin($sesion['instId'], $idSub);
+            } else {
+                throw new \Exception("Falta idespA o idsubespA.");
             }
-            $data = $this->model->getCepasBySubespecieAdmin($sesion['instId'], $idSub);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -142,12 +146,19 @@ class AdminConfigEspeciesController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $idespA = $_POST['idespA'] ?? null;
             $idSub = $_POST['idsubespA'] ?? null;
             $nombre = $_POST['CepaNombreA'] ?? null;
-            if (!$idSub || !$nombre) {
+            if (!$nombre) {
                 throw new \Exception("Parámetros incompletos para guardar cepa.");
             }
-            $this->model->saveCepa($sesion['instId'], $idSub, $nombre);
+            if ($idespA !== null && $idespA !== '') {
+                $this->model->saveCepaByEspecie($sesion['instId'], $idespA, $nombre);
+            } elseif ($idSub) {
+                $this->model->saveCepa($sesion['instId'], $idSub, $nombre);
+            } else {
+                throw new \Exception("Falta idespA o idsubespA.");
+            }
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -166,6 +177,41 @@ class AdminConfigEspeciesController {
                 throw new \Exception("Parámetros incompletos para cambiar estado de cepa.");
             }
             $this->model->toggleCepa($sesion['instId'], $idCepa, $status);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function updateCepa() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idCepa = $_POST['idcepaA'] ?? null;
+            $nombre = $_POST['CepaNombreA'] ?? null;
+            if (!$idCepa || $nombre === null || trim($nombre) === '') {
+                throw new \Exception("Parámetros incompletos para actualizar cepa.");
+            }
+            $this->model->updateCepa($sesion['instId'], $idCepa, $nombre);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function deleteCepa() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idCepa = $_POST['idcepaA'] ?? null;
+            if (!$idCepa) {
+                throw new \Exception("Falta el ID de la cepa.");
+            }
+            $this->model->deleteCepa($sesion['instId'], $idCepa);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

@@ -294,13 +294,13 @@ function resetCepaSelect() {
     });
 }
 
-async function loadCepasForSubespecie(idsubespA) {
+async function loadCepasForEspecie(idespA) {
     const t = window.txt?.form_animales;
     const instId = getContextInstId();
     const controls = getCepaControls();
     if (!controls.length) return;
 
-    if (!idsubespA) {
+    if (!idespA) {
         resetCepaSelect();
         return;
     }
@@ -314,7 +314,7 @@ async function loadCepasForSubespecie(idsubespA) {
     });
 
     try {
-        const res = await API.request(`/animals/cepas?inst=${instId}&idsubespA=${encodeURIComponent(idsubespA)}`);
+        const res = await API.request(`/animals/cepas?inst=${instId}&idespA=${encodeURIComponent(idespA)}`);
         const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
         cepasState.hasCepas = list.length > 0;
 
@@ -334,7 +334,7 @@ async function loadCepasForSubespecie(idsubespA) {
                 });
                 // Mensaje: debe seleccionar
                 const help = container.querySelector('small');
-                if (help) help.innerText = t?.cepa_help || 'Si existen cepas configuradas para esta categoría, debe seleccionar una.';
+                if (help) help.innerText = t?.cepa_help || 'Si existen cepas configuradas para esta especie, debe seleccionar una.';
             } else {
                 select.required = false;
                 select.disabled = true;
@@ -422,6 +422,7 @@ function populateSpeciesSelect() {
         const opt = document.createElement('option');
         opt.value = JSON.stringify(s.subs); 
         opt.text = s.name;
+        opt.setAttribute('data-idesp-a', String(s.id ?? ''));
         sel.appendChild(opt);
     });
 
@@ -431,6 +432,7 @@ function populateSpeciesSelect() {
         resetCepaSelect();
 
         if (e.target.value) {
+            const idespA = e.target.options[e.target.selectedIndex].dataset.idespA || e.target.options[e.target.selectedIndex].getAttribute('data-idesp-a');
             const subs = JSON.parse(e.target.value);
             subs.forEach(sub => {
                 const opt = document.createElement('option');
@@ -439,18 +441,16 @@ function populateSpeciesSelect() {
                 subSel.appendChild(opt);
             });
             subSel.disabled = false;
+            loadCepasForEspecie(idespA);
             if (subs.length === 1) {
                 subSel.selectedIndex = 1;
                 subSel.style.backgroundColor = "#e8f5e9"; 
                 setTimeout(() => subSel.style.backgroundColor = "", 500);
-                loadCepasForSubespecie(subSel.value);
             }
         }
     };
 
-    subSel.onchange = () => {
-        loadCepasForSubespecie(subSel.value);
-    };
+    subSel.onchange = () => { };
 
     if (speciesData.length === 1) {
         sel.selectedIndex = 1;
@@ -469,6 +469,7 @@ function calculateTotal() {
 
 async function handleReview(e) {
     e.preventDefault();
+    const t = window.txt?.form_animales || {};
     const totalEl = document.getElementById('qty-total');
     const total = totalEl ? parseInt(totalEl.value) : 0;
     
@@ -478,11 +479,10 @@ async function handleReview(e) {
     if (!typeSel.value) return Swal.fire('Falta Información', 'Debe seleccionar el Tipo de Solicitud.', 'warning');
     const typeText = typeSel.options[typeSel.selectedIndex].text;
 
-    // Cepa obligatoria si existen cepas configuradas para la categoría
+    // Cepa obligatoria si existen cepas configuradas para la especie
     const cepaSel = document.getElementById('select-cepa') || document.getElementById('select-cepa-2');
     const cepaVal = cepaSel ? String(cepaSel.value || '0') : '0';
     if (cepasState.hasCepas && (!cepaVal || cepaVal === '0')) {
-        const t = window.txt?.form_animales;
         return Swal.fire(
             t?.debe_seleccionar_cepa_titulo || 'Falta información',
             t?.debe_seleccionar_cepa_texto || 'Debe seleccionar una cepa.',

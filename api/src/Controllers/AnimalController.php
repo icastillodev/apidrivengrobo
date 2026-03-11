@@ -256,14 +256,18 @@ public function getProtocolDetails() {
         try {
             $sesion = Auditoria::getDatosSesion();
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $idespA = $_GET['idespA'] ?? null;
             $idSub = $_GET['idsubespA'] ?? $_GET['idSub'] ?? null;
 
-            if (!$idSub) {
-                echo json_encode(['status' => 'error', 'message' => 'Falta idsubespA']);
+            if ($idespA !== null && $idespA !== '') {
+                $data = $this->model->getCepasByEspecie($targetInst, $idespA);
+            } elseif ($idSub) {
+                $data = $this->model->getCepasBySubespecie($targetInst, $idSub);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Falta idespA o idsubespA']);
                 exit;
             }
 
-            $data = $this->model->getCepasBySubespecie($targetInst, $idSub);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);

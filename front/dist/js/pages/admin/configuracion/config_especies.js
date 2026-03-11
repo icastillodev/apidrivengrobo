@@ -10,6 +10,8 @@ export async function initConfigEspecies() {
     document.getElementById('form-subespecie').onsubmit = saveSubespecie;
     const formCepa = document.getElementById('form-cepa');
     if (formCepa) formCepa.onsubmit = saveCepa;
+    const formEditCepa = document.getElementById('form-editar-cepa');
+    if (formEditCepa) formEditCepa.onsubmit = saveEditCepa;
 }
 
 async function loadData() {
@@ -54,20 +56,6 @@ function renderTree() {
                 <td class="ps-4 fw-bold">
                     ${isInactive ? '<i class="bi bi-circle text-muted me-2" style="font-size:10px;"></i>' : '<i class="bi bi-circle-fill text-success me-2" style="font-size:10px;"></i>'} 
                     <div>${s.SubEspeNombreA}</div>
-                    <div class="mt-1 ms-4 d-flex gap-2 flex-wrap">
-                        <button class="btn btn-xs btn-outline-primary py-0 px-2 fw-bold"
-                                style="font-size:10px;"
-                                onclick="window.toggleCepasInline(${s.idsubespA})"
-                                title="${(window.txt?.config_especies?.btn_cepas) || 'Cepas'}">
-                            <i class="bi bi-list-ul me-1"></i> ${(window.txt?.config_especies?.btn_cepas) || 'Cepas'}
-                        </button>
-                        <button class="btn btn-xs btn-outline-success py-0 px-2 fw-bold"
-                                style="font-size:10px;"
-                                onclick="window.openModalCepas(${s.idsubespA})"
-                                title="${(window.txt?.config_especies?.btn_agregar_cepa) || 'Agregar'}">
-                            <i class="bi bi-plus-circle me-1"></i> ${(window.txt?.config_especies?.btn_agregar_cepa) || 'Agregar'}
-                        </button>
-                    </div>
                 </td>
                 <td class="text-center small font-monospace">${medidaTexto}</td>
                 <td class="text-center">
@@ -91,13 +79,16 @@ function renderTree() {
                         <i class="bi bi-trash text-danger"></i>
                     </button>
                 </td>
-            </tr>
-            <tr id="cepas-inline-row-${s.idsubespA}" class="${isInactive ? 'bg-light' : ''}" style="display:none;">
-                <td colspan="4" class="ps-5 pe-4 py-2">
-                    <div id="cepas-inline-${s.idsubespA}" class="border rounded bg-white p-2"></div>
-                </td>
             </tr>`;
         }).join('');
+
+        // Bloque de cepas siempre visible, con "Agregar" arriba y lista debajo
+        const cepasBoxId = `cepas-inline-esp-${esp.idespA}`;
+        const t = window.txt?.config_especies;
+        const btnCepas = (t?.btn_cepas) || 'Cepas';
+        const btnAgregar = (t?.btn_agregar_cepa) || 'Agregar';
+        const phCepa = (t?.ph_cepa) || 'Ej: C57BL/6J';
+        const labelNombreCepa = (t?.label_nombre_cepa) || 'Nombre';
 
         card.innerHTML = `
             <div class="${headerClass} d-flex justify-content-between align-items-center">
@@ -112,7 +103,7 @@ function renderTree() {
                     <button class="btn btn-sm btn-light border fw-bold text-success" onclick="window.openModalSub(${esp.idespA})">
                         <i class="bi bi-plus-lg me-1"></i> ${(window.txt?.config_especies?.btn_agregar_categoria) || 'Categoría de especie'}
                     </button>
-                    <button class="btn btn-sm btn-light border" onclick="window.openModalEspecie(${esp.idespA}, '${esp.EspeNombreA}')">
+                    <button class="btn btn-sm btn-light border" onclick="window.openModalEspecie(${esp.idespA}, '${(esp.EspeNombreA || '').replace(/'/g, "\\'")}')">
                         <i class="bi bi-pencil"></i>
                     </button>
                     <button class="btn btn-sm ${isEspInactive ? 'btn-outline-success' : 'btn-outline-secondary'} border" 
@@ -140,8 +131,35 @@ function renderTree() {
                     </tbody>
                 </table>
             </div>
+            <div class="border-top bg-white p-3">
+                <h6 class="fw-bold text-primary mb-2 small text-uppercase">${btnCepas}</h6>
+                <form class="form-cepa-inline mb-3" data-idesp-a="${esp.idespA}">
+                    <label class="form-label small fw-bold mb-1">${labelNombreCepa}</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control form-control-sm cepa-nombre-inline" placeholder="${phCepa}" required>
+                        <button type="submit" class="btn btn-success btn-sm fw-bold">${btnAgregar}</button>
+                    </div>
+                </form>
+                <div id="${cepasBoxId}" class="border rounded bg-light p-2 min-h-50"></div>
+            </div>
         `;
         container.appendChild(card);
+
+        // Enlazar formulario inline de cepa y cargar lista
+        const formInline = card.querySelector('.form-cepa-inline');
+        if (formInline) {
+            formInline.onsubmit = (e) => {
+                e.preventDefault();
+                const input = formInline.querySelector('.cepa-nombre-inline');
+                const idespA = formInline.getAttribute('data-idesp-a');
+                if (!idespA || !input?.value?.trim()) return;
+                saveCepaInline(idespA, input.value.trim()).then(() => {
+                    input.value = '';
+                    loadCepasInline(idespA);
+                });
+            };
+        }
+        loadCepasInline(esp.idespA);
     });
 }
 
@@ -176,23 +194,71 @@ window.openModalSub = (espId, subId = "", nombre = "", estado = 1, tipo = "", ca
     new bootstrap.Modal(document.getElementById('modal-subespecie')).show();
 };
 
-window.openModalCepas = async (idSubespA) => {
-    document.getElementById('cepa-id-sub').value = idSubespA;
+window.openModalCepas = async (idespA) => {
+    const elSub = document.getElementById('cepa-id-sub');
+    const elEsp = document.getElementById('cepa-id-esp');
+    if (elEsp) elEsp.value = idespA;
+    if (elSub) elSub.value = '';
     document.getElementById('cepa-nombre').value = '';
-    await loadCepas(idSubespA);
+    await loadCepas(idespA);
     new bootstrap.Modal(document.getElementById('modal-cepas')).show();
 };
 
-async function loadCepas(idSubespA) {
+async function saveCepaInline(idespA, nombre) {
+    const fd = new FormData();
+    fd.append('idespA', idespA);
+    fd.append('CepaNombreA', nombre);
+    const res = await API.request('/admin/config/cepas/save', 'POST', fd);
+    if (res.status === 'success') {
+        const list = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
+        if (list.status === 'success') cepasCache[idespA] = list.data || [];
+    } else throw new Error(res.message || 'Error al guardar');
+}
+
+window.openModalEditCepa = (idcepaA, nombreActual, idespA) => {
+    document.getElementById('cepa-edit-id').value = idcepaA;
+    document.getElementById('cepa-edit-idesp').value = idespA;
+    document.getElementById('cepa-edit-nombre').value = (nombreActual || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    new bootstrap.Modal(document.getElementById('modal-editar-cepa')).show();
+};
+
+window.deleteCepaConfirm = async (idcepaA, idespA) => {
+    const t = window.txt?.config_especies;
+    const result = await Swal.fire({
+        title: t?.confirm_eliminar_cepa_titulo || '¿Eliminar cepa?',
+        text: t?.confirm_eliminar_cepa_texto || 'No se podrá eliminar si ya hay formularios con esta cepa asignada.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: t?.btn_eliminar || 'Eliminar'
+    });
+    if (!result.isConfirmed) return;
+    try {
+        const fd = new FormData();
+        fd.append('idcepaA', idcepaA);
+        const res = await API.request('/admin/config/cepas/delete', 'POST', fd);
+        if (res.status === 'success') {
+            Swal.fire({ title: t?.procesado || 'Procesado', text: t?.cepa_eliminada || 'Cepa eliminada.', icon: 'success', timer: 1500, showConfirmButton: false });
+            cepasCache[idespA] = (cepasCache[idespA] || []).filter(c => c.idcepaA != idcepaA);
+            renderCepasInline(idespA);
+        } else {
+            Swal.fire(t?.error || 'Error', res.message || '', 'error');
+        }
+    } catch (e) {
+        Swal.fire(t?.error || 'Error', (e.message || e)?.message || t?.error_conexion || 'Error de conexión', 'error');
+    }
+};
+
+async function loadCepas(idespA) {
     const listEl = document.getElementById('cepas-list');
     const t = window.txt?.config_especies;
     if (!listEl) return;
     listEl.innerHTML = `<div class="text-center text-muted small py-3">${t?.cargando || 'Cargando...'}</div>`;
     try {
-        const res = await API.request(`/admin/config/cepas/all?idsubespA=${idSubespA}&t=${Date.now()}`);
+        const res = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
         if (res.status === 'success') {
-            cepasCache[idSubespA] = res.data || [];
-            renderCepasList(idSubespA);
+            cepasCache[idespA] = res.data || [];
+            renderCepasList(idespA);
         } else {
             listEl.innerHTML = `<div class="text-center text-danger small py-3">${t?.error || 'Error'}</div>`;
         }
@@ -202,11 +268,11 @@ async function loadCepas(idSubespA) {
     }
 }
 
-function renderCepasList(idSubespA) {
+function renderCepasList(idespA) {
     const listEl = document.getElementById('cepas-list');
     const t = window.txt?.config_especies;
     if (!listEl) return;
-    const items = Array.isArray(cepasCache[idSubespA]) ? cepasCache[idSubespA] : [];
+    const items = Array.isArray(cepasCache[idespA]) ? cepasCache[idespA] : [];
     if (!items.length) {
         listEl.innerHTML = `<div class="text-center text-muted small py-3">${t?.empty_cepas || 'No hay cepas registradas.'}</div>`;
         return;
@@ -233,30 +299,30 @@ function renderCepasList(idSubespA) {
     }).join('');
 }
 
-window.toggleCepasInline = async (idSubespA) => {
-    const row = document.getElementById(`cepas-inline-row-${idSubespA}`);
+window.toggleCepasInline = async (idespA) => {
+    const row = document.getElementById(`cepas-inline-row-esp-${idespA}`);
     if (!row) return;
-    const isOpen = !!cepasInlineOpen[idSubespA];
+    const isOpen = !!cepasInlineOpen[idespA];
     if (isOpen) {
         row.style.display = 'none';
-        cepasInlineOpen[idSubespA] = false;
+        cepasInlineOpen[idespA] = false;
         return;
     }
-    cepasInlineOpen[idSubespA] = true;
+    cepasInlineOpen[idespA] = true;
     row.style.display = '';
-    await loadCepasInline(idSubespA);
+    await loadCepasInline(idespA);
 };
 
-async function loadCepasInline(idSubespA) {
-    const box = document.getElementById(`cepas-inline-${idSubespA}`);
+async function loadCepasInline(idespA) {
+    const box = document.getElementById(`cepas-inline-esp-${idespA}`);
     const t = window.txt?.config_especies;
     if (!box) return;
     box.innerHTML = `<div class="text-center text-muted small py-2">${t?.cargando || 'Cargando...'}</div>`;
     try {
-        const res = await API.request(`/admin/config/cepas/all?idsubespA=${idSubespA}&t=${Date.now()}`);
+        const res = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
         if (res.status === 'success') {
-            cepasCache[idSubespA] = res.data || [];
-            renderCepasInline(idSubespA);
+            cepasCache[idespA] = res.data || [];
+            renderCepasInline(idespA);
         } else {
             box.innerHTML = `<div class="text-center text-danger small py-2">${t?.error || 'Error'}</div>`;
         }
@@ -266,28 +332,38 @@ async function loadCepasInline(idSubespA) {
     }
 }
 
-function renderCepasInline(idSubespA) {
-    const box = document.getElementById(`cepas-inline-${idSubespA}`);
+function renderCepasInline(idespA) {
+    const box = document.getElementById(`cepas-inline-esp-${idespA}`);
     const t = window.txt?.config_especies;
     if (!box) return;
-    const items = Array.isArray(cepasCache[idSubespA]) ? cepasCache[idSubespA] : [];
+    const items = Array.isArray(cepasCache[idespA]) ? cepasCache[idespA] : [];
     if (!items.length) {
         box.innerHTML = `<div class="text-muted small">${t?.empty_cepas || 'No hay cepas registradas.'}</div>`;
         return;
     }
+    const lblActivo = t?.activo || 'ACTIVO';
+    const lblInactivo = t?.inactivo || 'INACTIVO';
+    const lblDeshab = t?.deshabilitar || 'Deshabilitar';
+    const lblHab = t?.habilitar || 'Habilitar';
+    const lblEditar = t?.btn_editar_cepa || 'Editar';
+    const lblEliminar = t?.btn_eliminar_cepa || 'Eliminar';
     box.innerHTML = items.map(c => {
         const hab = Number(c.Habilitado || 0) === 1;
         const next = hab ? 0 : 1;
+        const nombreEsc = (c.CepaNombreA || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         return `
-            <div class="cepas-inline-item d-flex align-items-center justify-content-between py-1 border-bottom">
-                <div class="cepas-inline-name small fw-bold">${c.CepaNombreA || ''}</div>
+            <div class="cepas-inline-item d-flex align-items-center justify-content-between py-2 border-bottom" data-idcepa="${c.idcepaA}">
+                <div class="cepas-inline-name small fw-bold">${(c.CepaNombreA || '').replace(/</g, '&lt;')}</div>
                 <div class="d-flex align-items-center gap-2">
-                    <span class="badge ${hab ? 'bg-success' : 'bg-secondary'} rounded-pill" style="font-size:10px; width: 80px;">${hab ? (t?.activo || 'ACTIVO') : (t?.inactivo || 'INACTIVO')}</span>
-                    <button class="btn btn-sm ${hab ? 'btn-outline-secondary' : 'btn-outline-success'}"
-                            style="padding: 1px 6px;"
-                            onclick="window.toggleCepaInline(${idSubespA}, ${c.idcepaA}, ${next})"
-                            title="${hab ? (t?.deshabilitar || 'Deshabilitar') : (t?.habilitar || 'Habilitar')}">
+                    <span class="badge ${hab ? 'bg-success' : 'bg-secondary'} rounded-pill" style="font-size:10px; width: 80px;">${hab ? lblActivo : lblInactivo}</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" title="${lblEditar}" onclick="window.openModalEditCepa(${c.idcepaA}, '${nombreEsc}', ${idespA})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm ${hab ? 'btn-outline-secondary' : 'btn-outline-success'} py-0 px-2" title="${hab ? lblDeshab : lblHab}" onclick="window.toggleCepaInline(${idespA}, ${c.idcepaA}, ${next})">
                         <i class="bi ${hab ? 'bi-toggle-on' : 'bi-toggle-off'}"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" title="${lblEliminar}" onclick="window.deleteCepaConfirm(${c.idcepaA}, ${idespA})">
+                        <i class="bi bi-trash"></i>
                     </button>
                 </div>
             </div>
@@ -332,19 +408,24 @@ async function saveSubespecie(e) {
 
 async function saveCepa(e) {
     e.preventDefault();
-    const idSubespA = document.getElementById('cepa-id-sub').value;
+    const elEsp = document.getElementById('cepa-id-esp');
+    const idespA = elEsp && elEsp.value ? elEsp.value : null;
     const nombre = document.getElementById('cepa-nombre').value;
     const t = window.txt?.config_especies;
+    if (!idespA) {
+        Swal.fire(t?.error || 'Error', t?.error_guardar_cepa || 'No se pudo guardar la cepa.', 'error');
+        return;
+    }
     try {
         const fd = new FormData();
-        fd.append('idsubespA', idSubespA);
+        fd.append('idespA', idespA);
         fd.append('CepaNombreA', nombre);
         const res = await API.request('/admin/config/cepas/save', 'POST', fd);
         if (res.status === 'success') {
             document.getElementById('cepa-nombre').value = '';
-            await loadCepas(idSubespA);
-            if (cepasInlineOpen[idSubespA]) {
-                await loadCepasInline(idSubespA);
+            await loadCepas(idespA);
+            if (cepasInlineOpen[idespA]) {
+                await loadCepasInline(idespA);
             }
         } else {
             Swal.fire(t?.error || 'Error', res.message || (t?.error_guardar_cepa || 'No se pudo guardar la cepa.'), 'error');
@@ -354,16 +435,44 @@ async function saveCepa(e) {
     }
 }
 
-window.toggleCepa = async (idcepaA, status) => {
-    const idSubespA = document.getElementById('cepa-id-sub').value;
+async function saveEditCepa(e) {
+    e.preventDefault();
+    const idcepaA = document.getElementById('cepa-edit-id').value;
+    const idespA = document.getElementById('cepa-edit-idesp').value;
+    const nombre = document.getElementById('cepa-edit-nombre').value?.trim();
     const t = window.txt?.config_especies;
+    if (!idcepaA || !nombre) return;
+    try {
+        const fd = new FormData();
+        fd.append('idcepaA', idcepaA);
+        fd.append('CepaNombreA', nombre);
+        const res = await API.request('/admin/config/cepas/update', 'POST', fd);
+        if (res.status === 'success') {
+            Swal.fire({ title: t?.procesado || 'Guardado', icon: 'success', timer: 1000, showConfirmButton: false });
+            bootstrap.Modal.getInstance(document.getElementById('modal-editar-cepa'))?.hide();
+            const list = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
+            if (list.status === 'success') cepasCache[idespA] = list.data || [];
+            renderCepasInline(idespA);
+        } else {
+            Swal.fire(t?.error || 'Error', res.message || '', 'error');
+        }
+    } catch (err) {
+        Swal.fire(t?.error || 'Error', t?.error_conexion || 'Error de conexión', 'error');
+    }
+}
+
+window.toggleCepa = async (idcepaA, status) => {
+    const elEsp = document.getElementById('cepa-id-esp');
+    const idespA = elEsp && elEsp.value ? elEsp.value : null;
+    const t = window.txt?.config_especies;
+    if (!idespA) return;
     try {
         const fd = new FormData();
         fd.append('idcepaA', idcepaA);
         fd.append('Habilitado', status);
         const res = await API.request('/admin/config/cepas/toggle', 'POST', fd);
         if (res.status === 'success') {
-            await loadCepas(idSubespA);
+            await loadCepas(idespA);
         } else {
             Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la cepa.'), 'error');
         }
@@ -373,7 +482,7 @@ window.toggleCepa = async (idcepaA, status) => {
     }
 };
 
-window.toggleCepaInline = async (idSubespA, idcepaA, status) => {
+window.toggleCepaInline = async (idespA, idcepaA, status) => {
     const t = window.txt?.config_especies;
     try {
         const fd = new FormData();
@@ -381,7 +490,7 @@ window.toggleCepaInline = async (idSubespA, idcepaA, status) => {
         fd.append('Habilitado', status);
         const res = await API.request('/admin/config/cepas/toggle', 'POST', fd);
         if (res.status === 'success') {
-            await loadCepasInline(idSubespA);
+            await loadCepasInline(idespA);
         } else {
             Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la cepa.'), 'error');
         }

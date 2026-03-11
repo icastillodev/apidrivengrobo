@@ -78,14 +78,7 @@ y luego los atributos donde en ( ) estan los tipos de datos
 - login_attempts
     - Tipo entidad: Maestra
     - Entidad donde mira la ip de la persona y ve cuantas veces intenta loguear para saber si te da un parate
-        - - [ip_address (primary key varchar(45)), attempts (int(11)), last_attempt (datetime) ]
-
-CREATE TABLE IF NOT EXISTS `login_attempts` (
-`ip_address` varchar(45) NOT NULL,
-`attempts` int(11) NOT NULL DEFAULT '0',
-`last_attempt` datetime NOT NULL,
-PRIMARY KEY (`ip_address`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        - - `[ip_address (primary key varchar(45)), attempts (int(11)), last_attempt (datetime) ]`
 
 ## CÓMO FUNCIONA EL SISTEMA DE ACCESO Y USUARIOS:
 
@@ -320,12 +313,12 @@ Si el usuario configura su bioterio:
 - **organismoe:**
     - Tipo entidad: Subordinada (departamentoe , institucion)
     - Entidad que sirve como dato extra para las estadisticas y detalles del departamento, muchas veces departamentos se repiten o necesitan de un tipo de institucion organismo mas grande.. este es el organismo por ejemplo: urbe  es el departamento, y Facultad de medicina seria el organismo, esto lo crea el administrador y lo anexa a los departamentos…
-        - - `*[***IdOrganismo***(int ai) ,* **NombreOrganismoSimple** *(varchar(100)),* **ContactoOrgnismo** *(varchar(100) null),* **NombreOrganismoCompleto** *(varchar(100)),* **CorreoOrganismo** *(varchar(100) null),* **DireccionOrganismo***(varchar(100) null),* **PaisOrganismo***(varchar(100) null),* **LogoOrganismo***(varchar(100) null),* **IdInstitucion** *(int foranea institucion:IdInstitucion]*`
+        - - `*[***IdOrganismo***(int ai) ,* **NombreOrganismoSimple** *(varchar(100)),* **ContactoOrgnismo** *(varchar(100) null),* **NombreOrganismoCompleto** *(varchar(100)),* **CorreoOrganismo** *(varchar(100) null),* **DireccionOrganismo***(varchar(100) null),* **PaisOrganismo***(varchar(100) null),* **LogoOrganismo***(varchar(100) null),* **IdInstitucion** *(int foranea institucion:IdInstitucion, externoorganismo(int null)]*`
 
 - **departamentoe:**
     - Tipo entidad: Maestra
     - Divisiones internas de cada institucion que luego seran anexadas a los protocolos para saber de donde es cada persona o pedido, tambien se puede anexar al principio…
-        - - `[**iddeptoA** *(int ai)*, **NombreDeptoA** *(varchar(100))*, **DetalledeptoA***(text null)*, **IdInstitucion** *(int foranea institucion:IdInstitucion)*, **organismopertenece***(int null foranea organismos:IdOrganismo)* ]`
+        - - `[**iddeptoA** *(int ai)*, **NombreDeptoA** *(varchar(100))*, **DetalledeptoA***(text null)*, **IdInstitucion** *(int foranea institucion:IdInstitucion)*, **organismopertenece***(int null foranea organismos:IdOrganismo),externodepto(int null)* ]`
 
 Deprecated entidad (a borrar):
 
@@ -362,6 +355,11 @@ Independientemente de si la institución está en un grupo o sola, su estructura
     - Tipo entidad: Maestra
     - Especies generales de instituciones , con rango de habilitado o no, es la categoria principal de animales si Habilitado esta en 1 o cualquier numero que no sea 2 esta habilitado el unico numero dehabilitado es el 2…
         - - `[**idespA** *(int ai)*, **EspeNombreA** *(varchar(100))*, **caracteristicasA** *(text null)*, **Panimal** *(deprecated)*, **PalojamientoChica***(deprecated)*, **PalojamientoGrande***(deprecated)*, **IdInstitucion** *(int foranea institucion:IdInstitucion*), Habilitado(int)]`
+
+- cepa
+    - Tipo entidad : Subordinada (especiee)
+    - UNa categoria de cepa para especiee, ademas de la categoria es como el tipo de especie del animal a a elegir… si no tiene cepa la especie osea no se le agrego no pasa nada la app te deja continuar con subespecie (categoria de especie) a hacer el pedido generalmente de animales, pero si tiene cepa para seleccionar no te deja continuar el formulario si no elegiste la cepa, tambien la cepa puede estar habilitada o no.. si tiene cepas esa especie y no tiene ninguna habilitada , no hay para hacer pedidos en esa especie. , y depende de la especie
+        - []
 
 - **subespecie**:
     - Tipo entidad: Subordinada (especiee)
@@ -451,6 +449,11 @@ Esta es la tabla más inteligente del grupo.
     - 2: Pedido de actualizacion de red (por la red grupos)…
 - - `*[***IdSolicitudProtocolo** *(int ai),* **idprotA***(int foranea protocoloexpe:idprotA),* **DetalleUsr***(text null),* **DetalleAdm***(text null) ,* **Aprobado***(int) ,* **TipoPedido** *(int null),* **IdInstitucion** *(int foranea institucion:IdInstitucion null),* **FechaAprobado** *(date null)]*`
 
+- **solicitudadjuntosprotocolos**
+    - Tipo entidad : Subordinada (solicitudprotocolo)
+    - Aca donde se guardan los adjuntos en el bucket de cloud storage b2 para tener archivos que enviar en protocolos. donde tipoadjunto es: 1:protocolo 2:aval 3: otro.  la idea es que solo se pueda enviar 3 por solicitud de protocolo. nombre_original , es el nombre que ellos tienen en el documento, file_key es el linkeo con el bucket
+        - `[**Id_adjuntos_protocolos**(id ai), **nombre_original**(varchar(100)), **file_key**(text),**IdSolicitudProtocolo**(int foranea solicitudprotocolo:IdSolicitudProtocolo),**tipoadjunto**(int)]`
+
 ## CÓMO FUNCIONAN LOS PROTOCOLOS (Lógica de Negocio):
 
 ### 1. El Doble Rol del Usuario (Científico vs. Pagador)
@@ -499,8 +502,8 @@ El protocolo no nace activo. Nace a través de `solicitudprotocolo`.
 
 - **tipoformularios:**
     - Tipo entidad: Madre
-    - Entidad donde se crea la categoria de tipos de pedidos que el usuario puede hacer de formularios que cuenta con las categorias: Animal vivo, Otros reactivos biologicos , Insumos , esas son las 3 categorias que pueden aparecer en categoriaformulario.. y estando en cualquiera de esa categoria se puede crear un tipo de formulario para pedir, con su nombre, y que tiene descuentos o exento, todo esto es por Institucion.. si exento es 1 , es que esta exento de pagar, 2 o cualquier otro numero no esta exento…
-        - - `*[***IdTipoFormulario** *(int ai),* **nombreTipo***(varchar(50)),* **exento** *(int),***descuento** *(int),* **IdInstitucion***(int foranea institucion:IdInstitucion),* **categoriaformulario***(varchar(50))]*`
+    - Entidad donde se crea la categoria de tipos de pedidos que el usuario puede hacer de formularios que cuenta con las categorias: Animal vivo, Otros reactivos biologicos , Insumos , esas son las 3 categorias que pueden aparecer en categoriaformulario.. y estando en cualquiera de esa categoria se puede crear un tipo de formulario para pedir, con su nombre, y que tiene descuentos o exento, todo esto es por Institucion.. si exento es 1 , es que esta exento de pagar, 2 o cualquier otro numero no esta exento… el color del badge es el color
+        - - `*[***IdTipoFormulario** *(int ai),* **nombreTipo***(varchar(50)),* **exento** *(int),***descuento** *(int),* **IdInstitucion***(int foranea institucion:IdInstitucion),* **categoriaformulario***(varchar(50)), color(varchar(100) null)]*`
 
 - **sexoe**:
     - Tipo entidad: Subordinada (formularioe)
@@ -595,7 +598,7 @@ Es importante documentar por qué existe esta tabla.
 - **alojamiento_caja:**
     - Tipo entidad: Subordinada (alojamiento)
     - Esta seria como la caja dentro del numero de la cantidad de alojamiento (puede ser caja como cualquier otra cosa… en este caso le pongo nombre de caja por que es mas facil y se entiende… a lo que este se desencadena en cada animal de esta caja o habitacion…
-        - - `[**IdCajaAlojamiento***(int ai)*, **FechaInicio***(date)*, **Detalle***(text null)*, **NombreCaja***(varchar(100) null)*, **IdAlojamiento***(int foranea alojamiento:IdAlojamiento)* ]`
+        - - `[**IdCajaAlojamiento***(int ai)*, **FechaInicio***(date)*, **Detalle***(text null)*, **NombreCaja***(varchar(100) null)*, **IdAlojamiento***(int foranea alojamiento:IdAlojamiento),ubicacion(varchar[100] null)* ]`
 
 - **especie_alojamiento_unidad:**
     - Tipo entidad: Subordinada (alojamiento_caja)
@@ -612,16 +615,10 @@ Es importante documentar por qué existe esta tabla.
     - Historial de movimientos de los animales en alojamiento…
         - - `[**registroalojamiento** *(int ai)*, **IdUsrA***(int foranea usuarioe:IdUsrA)*, **IdAlojamiento** *(int foranea alojamiento:IdAlojamiento)*, **TipoRegistro***(varchar(60) null)*, **FechaRegistro***(date)*]`
 
-CREATE TABLE `qralojamiento` (
-`id_qr` int(11) NOT NULL AUTO_INCREMENT,
-`codigo` varchar(6) NOT NULL,
-`historia` int(11) NOT NULL,
-`IdUsrA` int(11) NOT NULL COMMENT 'Usuario que generó el QR',
-`fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-PRIMARY KEY (`id_qr`),
-UNIQUE KEY `idx_codigo_unico` (`codigo`),
-KEY `idx_historia` (`historia`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+- qralojamiento:
+    - Tipo entidad: subordinada (historia)
+    - Sirve para crear un codigo de 6 letras y numeros de alojamiento del qr para dar acceso en las instituciones
+        - - [id_qr(int ai), codigo (varchar(6)), historia(int foranea alojamientos:historia), IdUsrA(int foranea usuarioe:IdUsrA) fecha_creacion(datetime) ]
 
 ## COMO FUNCIONAN LOS ALOJAMIENTOS:
 
@@ -710,7 +707,7 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
     - Entidad principal de reservas donde se pone la fecha tiempo , horariocomienzo, idsala y la institucion y si dura dias…
         - - `*[***idReserva***(int ai) ,* **fechaini***(date null),* **fechafin***(date null),* **tiempo***(int null),* **IdSalaReserva***( int foranea reserva_sala:IdSalaReserva),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Horacomienzo***(time) ,***Horafin***(time) ]*`
 
-- **reserva_instumento:**
+- **reserva_instrumento:**
     - Tipo entidad: Madre
     - Entidad donde se agregan instrumentos a la institucion para utilizar en la sala de la reserva, pueden tener varios e inclusive va haber una relacion que utilicen varios pero tiene que poner la cantidad de instrumentos… ya que en la reserva se van a ir consumiendo la cantidad disponibles y tambien si esta habilitado, osea pueden deshabiltiarlo si no hay mas…
         - - `*[* **IdReservaInstrumento** *(int ai) ,* **NombreInstrumento** *(varchar(100)),* **habilitado***(int),* **cantidad** *(int),* **detalleInstrumento** *(text null) ,* **IdInstitucion** *(int foranea institucion:IdInstitucion) ]*`
@@ -750,6 +747,10 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
     
     - - `*[***IdHorarioDiaSala***(int ai), IdDiaSala(int),* **HoraIni***(time),* **HoraFin***(time),* **IdSalaReserva** *(int foranea reserva_sala:IdSalaReserva)]*`
     
+- reserva_instrumento_sala_permitida:
+    - Tipo entidad: Relacion (reserva_instrumento, reserva_sala)
+    - Entidad que define en qué salas específicas está permitido usar un instrumento. Si un instrumento no tiene registros en esta tabla, significa que tiene disponibilidad global y se puede utilizar en cualquier sala libremente…
+        - `*[***IdInstrumentoSalaPermitida***(int ai),***IdReservaInstrumento**(int foranea reserva_instrumento:IdReservaInstrumento),**IdSalaReserva**(int foranea reserva_sala:IdSalaReserva)]`
 
 va a tener los dias de la semana
 

@@ -165,6 +165,7 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <input type="hidden" id="cepa-id-esp" value="">
                     <input type="hidden" id="cepa-id-sub" value="">
 
                     <form id="form-cepa" class="mb-3">
@@ -176,6 +177,28 @@
                     </form>
 
                     <div id="cepas-list" class="border rounded p-2" style="max-height: 260px; overflow:auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-editar-cepa" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_especies.modal_editar_cepa_titulo">Editar cepa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-editar-cepa">
+                        <input type="hidden" id="cepa-edit-id" value="">
+                        <input type="hidden" id="cepa-edit-idesp" value="">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold" for="cepa-edit-nombre" data-i18n="config_especies.label_nombre_cepa"></label>
+                            <input type="text" id="cepa-edit-nombre" class="form-control fw-bold" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold" data-i18n="config_especies.btn_guardar_cambios">Guardar</button>
+                    </form>
                 </div>
             </div>
         </div>

@@ -71,18 +71,42 @@ class AnimalModel {
     }
 
     public function getCepasBySubespecie($instId, $idSubespA) {
+        // IMPORTANTE:
+        // La tabla cepa ahora es subordinada a especiee (idespA), no a subespecie.
+        // A partir de la subespecie (idsubespA) resolvemos su especie y traemos
+        // todas las cepas habilitadas de ESA especie.
         $sql = "
-            SELECT c.idcepaA, c.CepaNombreA
+            SELECT 
+                c.idcepaA, 
+                c.CepaNombreA
             FROM cepa c
-            INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
-            INNER JOIN especiee e ON s.idespA = e.idespA
+            INNER JOIN especiee e ON c.idespA = e.idespA
+            INNER JOIN subespecie s ON s.idespA = e.idespA
             WHERE c.Habilitado = 1
-              AND c.idsubespA = ?
+              AND s.idsubespA = ?
               AND e.IdInstitucion = ?
             ORDER BY c.CepaNombreA ASC
         ";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$idSubespA, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Cepas habilitadas por especie (idespA) para formularios. */
+    public function getCepasByEspecie($instId, $idespA) {
+        $sql = "
+            SELECT 
+                c.idcepaA, 
+                c.CepaNombreA
+            FROM cepa c
+            INNER JOIN especiee e ON c.idespA = e.idespA
+            WHERE c.Habilitado = 1
+              AND c.idespA = ?
+              AND e.IdInstitucion = ?
+            ORDER BY c.CepaNombreA ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idespA, $instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     // api/src/Models/Animal/AnimalModel.php
@@ -223,9 +247,11 @@ public function updateStatus($data) {
                 $stmtCount = $this->db->prepare("
                     SELECT COUNT(*) 
                     FROM cepa c
-                    INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
-                    INNER JOIN especiee e ON s.idespA = e.idespA
-                    WHERE c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                    INNER JOIN especiee e ON c.idespA = e.idespA
+                    INNER JOIN subespecie s ON s.idespA = e.idespA
+                    WHERE s.idsubespA = ? 
+                      AND c.Habilitado = 1 
+                      AND e.IdInstitucion = ?
                 ");
                 $stmtCount->execute([$idSubesp, $instId]);
                 $hasEnabledCepas = ((int)$stmtCount->fetchColumn()) > 0;
@@ -235,12 +261,16 @@ public function updateStatus($data) {
                 }
 
                 if (!empty($idCepa)) {
+                    // Validamos que la cepa pertenezca a la ESPECIE de esta subespecie
                     $stmtCepa = $this->db->prepare("
                         SELECT c.idcepaA
                         FROM cepa c
-                        INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
-                        INNER JOIN especiee e ON s.idespA = e.idespA
-                        WHERE c.idcepaA = ? AND c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                        INNER JOIN especiee e ON c.idespA = e.idespA
+                        INNER JOIN subespecie s ON s.idespA = e.idespA
+                        WHERE c.idcepaA = ? 
+                          AND s.idsubespA = ? 
+                          AND c.Habilitado = 1 
+                          AND e.IdInstitucion = ?
                     ");
                     $stmtCepa->execute([$idCepa, $idSubesp, $instId]);
                     if (!$stmtCepa->fetchColumn()) {
@@ -301,14 +331,15 @@ public function updateStatus($data) {
     public function getSpeciesByProtocol($protId) {
         $sql = "SELECT 
                     se.idsubespA, 
+                    se.idespA,
                     se.SubEspeNombreA, 
                     e.EspeNombreA, 
                     se.Psubanimal, 
-                    se.existe
+                    se.Existe as existe
                 FROM protesper pe
                 INNER JOIN subespecie se ON pe.idespA = se.idespA
                 INNER JOIN especiee e ON se.idespA = e.idespA
-                WHERE pe.idprotA = ? AND se.existe != 2";
+                WHERE pe.idprotA = ? AND se.Existe != 2";
                 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$protId]);
@@ -537,18 +568,59 @@ public function saveOrder($data) {
             $idCepa = $data['idcepaA'] ?? null;
             if ($idCepa === '' || $idCepa === 0 || $idCepa === '0') $idCepa = null;
 
-            // Validación: si mandan una cepa, debe pertenecer a la categoría y a la institución
-            if (!empty($idCepa)) {
-                $stmtCepa = $this->db->prepare("
-                    SELECT c.idcepaA
+            // REGLA CEPAS POR ESPECIE:
+            //  - Si la especie (de esta subespecie) tiene cepas habilitadas → idcepaA obligatorio
+            //  - Si la especie tiene cepas pero TODAS deshabilitadas → no se puede hacer el formulario
+            //  - Si la especie no tiene cepas → se permite seguir solo con subespecie
+            $stmtInst = $this->db->prepare("
+                SELECT e.IdInstitucion
+                FROM subespecie s
+                INNER JOIN especiee e ON s.idespA = e.idespA
+                WHERE s.idsubespA = ?
+            ");
+            $stmtInst->execute([$data['idsubespA']]);
+            $instId = $stmtInst->fetchColumn();
+
+            if ($instId) {
+                // Contamos todas las cepas de la especie y las habilitadas
+                $stmtAll = $this->db->prepare("
+                    SELECT 
+                        COUNT(*)                                  AS total_cepas,
+                        SUM(CASE WHEN c.Habilitado = 1 THEN 1 ELSE 0 END) AS cepas_hab
                     FROM cepa c
-                    INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
-                    INNER JOIN especiee e ON s.idespA = e.idespA
-                    WHERE c.idcepaA = ? AND c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                    INNER JOIN especiee e ON c.idespA = e.idespA
+                    INNER JOIN subespecie s ON s.idespA = e.idespA
+                    WHERE s.idsubespA = ? AND e.IdInstitucion = ?
                 ");
-                $stmtCepa->execute([$idCepa, $data['idsubespA'], $data['instId']]);
-                if (!$stmtCepa->fetchColumn()) {
-                    throw new \Exception("Error: La cepa seleccionada no es válida.");
+                $stmtAll->execute([$data['idsubespA'], $instId]);
+                $row = $stmtAll->fetch(\PDO::FETCH_ASSOC) ?: ['total_cepas' => 0, 'cepas_hab' => 0];
+                $totalCepas = (int)$row['total_cepas'];
+                $cepasHab   = (int)$row['cepas_hab'];
+
+                if ($totalCepas > 0 && $cepasHab === 0) {
+                    throw new \Exception("No hay cepas habilitadas para esta especie. No se pueden hacer pedidos.");
+                }
+
+                if ($cepasHab > 0 && empty($idCepa)) {
+                    throw new \Exception("Debe seleccionar una cepa para esta especie.");
+                }
+
+                // Si mandan una cepa, validamos que pertenezca a la especie de la subespecie e institución
+                if (!empty($idCepa)) {
+                    $stmtCepa = $this->db->prepare("
+                        SELECT c.idcepaA
+                        FROM cepa c
+                        INNER JOIN especiee e ON c.idespA = e.idespA
+                        INNER JOIN subespecie s ON s.idespA = e.idespA
+                        WHERE c.idcepaA = ? 
+                          AND s.idsubespA = ? 
+                          AND c.Habilitado = 1 
+                          AND e.IdInstitucion = ?
+                    ");
+                    $stmtCepa->execute([$idCepa, $data['idsubespA'], $data['instId']]);
+                    if (!$stmtCepa->fetchColumn()) {
+                        throw new \Exception("Error: La cepa seleccionada no es válida.");
+                    }
                 }
             }
 
