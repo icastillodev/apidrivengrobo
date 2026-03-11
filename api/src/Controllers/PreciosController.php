@@ -17,7 +17,8 @@ class PreciosController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
+            // Respetar la institución objetivo (para red / contexto de formulario)
+            $instId = $_GET['inst'] ?? $sesion['instId'];
 
             $data = [
                 'institucion'      => $this->model->getInstData($instId),

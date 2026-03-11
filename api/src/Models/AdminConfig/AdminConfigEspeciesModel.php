@@ -143,4 +143,69 @@ class AdminConfigEspeciesModel {
 
         return $res;
     }
+
+    public function getCepasBySubespecieAdmin($instId, $idSubespA) {
+        $sql = "
+            SELECT c.idcepaA, c.idsubespA, c.CepaNombreA, c.Habilitado
+            FROM cepa c
+            INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE c.idsubespA = ?
+              AND e.IdInstitucion = ?
+            ORDER BY c.CepaNombreA ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idSubespA, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function saveCepa($instId, $idSubespA, $nombre) {
+        $nombre = trim((string)$nombre);
+        if ($nombre === '') {
+            throw new \Exception("Nombre de cepa inv?lido.");
+        }
+
+        // Validar que la subespecie pertenezca a la instituci?n
+        $stmt = $this->db->prepare("
+            SELECT s.idsubespA
+            FROM subespecie s
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE s.idsubespA = ? AND e.IdInstitucion = ?
+        ");
+        $stmt->execute([$idSubespA, $instId]);
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            throw new \Exception("La categor?a no pertenece a esta instituci?n.");
+        }
+
+        $sql = "INSERT INTO cepa (idsubespA, CepaNombreA, Habilitado) VALUES (?, ?, 1)";
+        $res = $this->db->prepare($sql)->execute([$idSubespA, $nombre]);
+        Auditoria::log($this->db, 'INSERT', 'cepa', "Agreg? cepa: $nombre (idsubespA=$idSubespA)");
+        return $res;
+    }
+
+    public function toggleCepa($instId, $idCepa, $status) {
+        $status = (int)$status;
+        if (!in_array($status, [0, 1, 2], true)) {
+            // Aceptamos 0/1 (y 2 si quisieran un estado legacy)
+            $status = $status ? 1 : 0;
+        }
+
+        // Validar pertenencia a la instituci?n via JOIN
+        $stmt = $this->db->prepare("
+            SELECT c.idcepaA
+            FROM cepa c
+            INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE c.idcepaA = ? AND e.IdInstitucion = ?
+        ");
+        $stmt->execute([$idCepa, $instId]);
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            throw new \Exception("Cepa no encontrada o no pertenece a esta instituci?n.");
+        }
+
+        $sql = "UPDATE cepa SET Habilitado = ? WHERE idcepaA = ?";
+        $res = $this->db->prepare($sql)->execute([$status, $idCepa]);
+        Auditoria::log($this->db, 'UPDATE', 'cepa', "Cambi? Habilitado=$status de cepa ID: $idCepa");
+        return $res;
+    }
 }

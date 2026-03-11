@@ -11,6 +11,17 @@ let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedAnimalFromUrl = false;
 
+function getI18nValue(path) {
+    if (!path) return '';
+    const parts = String(path).split('.');
+    let cur = window.txt;
+    for (const p of parts) {
+        if (!cur || typeof cur !== 'object') return '';
+        cur = cur[p];
+    }
+    return (typeof cur === 'string') ? cur : '';
+}
+
 /**
  * INICIALIZACIÓN DE LA PÁGINA
  */
@@ -104,7 +115,11 @@ async function syncAllData() {
 function setupSortHeaders() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         th.style.cursor = 'pointer';
-        th.setAttribute('data-label', th.innerText.trim());
+        let label = th.innerText.trim();
+        if (!label) {
+            label = getI18nValue(th.getAttribute('data-i18n')) || th.getAttribute('data-key') || '';
+        }
+        th.setAttribute('data-label', label);
         th.onclick = () => {
             const key = th.getAttribute('data-key');
             if (sortConfig.key === key) {
@@ -143,7 +158,7 @@ function renderTable() {
             <td class="py-2 px-2 small">${a.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${a.NProtocolo || '---'}</td>
             <td class="py-2 px-2 small">${a.CatEspecie}</td>
-            <td class="py-2 px-2 small text-muted">${a.raza || '---'}</td>
+            <td class="py-2 px-2 small text-muted">${a.CepaNombre || '-'}</td>
             <td class="py-2 px-2 small text-muted">${a.Edad || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Peso || '---'}</td>
             <td class="py-2 px-2 text-center fw-bold">${a.CantAnimal}</td>
@@ -243,6 +258,8 @@ window.openAnimalModal = async (a) => {
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
     if (a.idprotA) window.loadSpeciesForProtocol(a.idprotA, a.idsubespA);
+    // Inicializar cepas (nuevo) con valor actual si existe
+    window.loadCepasForSubespecieModal(a.idsubespA, a.idcepaA);
     
     new bootstrap.Modal(document.getElementById('modal-animal')).show();
 };
@@ -382,8 +399,14 @@ function renderOrderModificationSection(a, sex, cache) {
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa</label>
-                <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
+                <select id="select-cepa-modal" name="idcepaA" class="form-select form-select-sm fw-bold"></select>
+                <div id="cepa-modal-help" class="small text-muted mt-1" style="font-size: 10px;"></div>
             </div>
+            ${a.raza ? `
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa / Línea (legacy)</label>
+                <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
+            </div>` : `<input type="hidden" name="razaA" value="">`}
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Edad</label>
                 <input type="text" name="edadA" class="form-control form-control-sm" value="${a.Edad || ''}">
@@ -548,6 +571,43 @@ window.updateSpeciesPrice = (select) => {
     if (selected) {
         document.getElementById('price-unit-modal').value = selected.dataset.price || 0;
         window.calculateAnimalTotals();
+        window.loadCepasForSubespecieModal(selected.value);
+    }
+};
+
+window.loadCepasForSubespecieModal = async (idSubespA, currentIdCepa = null) => {
+    const instId = localStorage.getItem('instId');
+    const sel = document.getElementById('select-cepa-modal');
+    const help = document.getElementById('cepa-modal-help');
+    if (!sel) return;
+    sel.innerHTML = `<option value="0">-</option>`;
+    sel.disabled = true;
+    if (help) help.textContent = 'Cargando...';
+    try {
+        const res = await API.request(`/animals/cepas?inst=${instId}&idsubespA=${encodeURIComponent(idSubespA)}`);
+        const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
+        sel.innerHTML = '';
+        if (list.length > 0) {
+            sel.disabled = false;
+            sel.innerHTML = `<option value="0">Seleccione...</option>`;
+            list.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.idcepaA;
+                opt.text = c.CepaNombreA;
+                sel.appendChild(opt);
+            });
+            if (currentIdCepa) sel.value = String(currentIdCepa);
+            if (help) help.textContent = 'Si existen cepas habilitadas para esta categoría, debe seleccionar una.';
+        } else {
+            sel.disabled = true;
+            sel.innerHTML = `<option value="0">-</option>`;
+            if (help) help.textContent = 'No hay cepa a seleccionar.';
+        }
+    } catch (e) {
+        console.error(e);
+        sel.disabled = true;
+        sel.innerHTML = `<option value="0">-</option>`;
+        if (help) help.textContent = 'No hay cepa a seleccionar.';
     }
 };
 
@@ -585,6 +645,13 @@ window.saveFullAnimalForm = async (e) => {
     const instId = localStorage.getItem('instId');
 
     try {
+        const cepaSel = document.getElementById('select-cepa-modal');
+        const cepaHelp = document.getElementById('cepa-modal-help');
+        const hasCepas = cepaHelp && (cepaHelp.textContent || '').toLowerCase().includes('debe seleccionar');
+        if (hasCepas && cepaSel && String(cepaSel.value || '0') === '0') {
+            window.Swal.fire('Falta información', 'Debe seleccionar una cepa.', 'warning');
+            return;
+        }
         const res = await API.request(`/animals/update-full?inst=${instId}`, 'POST', fd);
         if (res.status === 'success') {
             window.Swal.fire({ 
@@ -868,7 +935,7 @@ window.processExcelExport = () => {
             a.Investigador,
             a.NProtocolo || '---',
             a.CatEspecie || '---',
-            a.raza || '---',  // NUEVO
+            a.CepaNombre || '-',
             a.Edad || '---',  // NUEVO
             a.Peso || '---',  // NUEVO
             a.CantAnimal,

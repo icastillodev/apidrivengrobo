@@ -82,8 +82,15 @@ export function renderSideMenuStructure(container, menuIds, templates) {
     
     const dashboardLabel = window.txt?.menu?.panel_inicio || 'Dashboard';
     const brandBlock = logoUrl
-        ? `<a href="${dashboardPath}" class="d-flex align-items-center text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 48px; width: auto; object-fit: contain;"></a><span class="text-success fw-black text-uppercase mt-1" style="font-size: 13px;">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>`
-        : `<a href="${dashboardPath}" class="d-flex flex-column pe-2 text-decoration-none text-body" style="line-height: 1.2; word-break: break-word;"><span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span></a>`;
+        ? `<a href="${dashboardPath}" class="d-flex flex-column text-decoration-none" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}" aria-label="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}">
+                <div class="d-flex align-items-center">
+                    <img src="${logoUrl}" alt="${instName}" class="gecko-sidebar-logo gecko-sidebar-logo-mobile" style="max-height: 48px; width: auto; object-fit: contain;">
+                </div>
+                <span class="text-success fw-black text-uppercase mt-1" style="font-size: 13px;">${instName}</span>
+                <span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span>
+                <span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span>
+           </a>`
+        : `<a href="${dashboardPath}" class="d-flex flex-column pe-2 text-decoration-none text-body" style="line-height: 1.2; word-break: break-word;" title="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}" aria-label="${window.txt?.menu?.ir_dashboard || 'Ir al inicio'}"><span class="fs-5 fw-black text-success text-uppercase lh-1">${instName}</span><span class="text-success fw-bold mt-1" style="font-size: 11px;">— ${dashboardLabel}</span><span class="text-muted mt-2" style="font-size: 11px; font-weight: 600;">${userText}</span></a>`;
     
     sidebar.innerHTML = `
         <div class="gecko-sidebar-top-section">
@@ -120,6 +127,17 @@ export function renderSideMenuStructure(container, menuIds, templates) {
     document.body.prepend(mobileToggle);
 
     const ul = document.getElementById('side-menu-ul');
+    // Acceso rápido al Dashboard (además del logo)
+    ul.insertAdjacentHTML('beforeend', `
+        <li class="nav-item">
+            <a href="${dashboardPath}" class="nav-link d-flex align-items-center gap-2">
+                <span class="menu-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                </span>
+                <span class="menu-text">${window.txt?.menu?.panel_inicio || 'Panel de inicio'}</span>
+            </a>
+        </li>
+    `);
     menuIds.forEach(id => { ul.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'side', templates)); });
     
     const controlsUl = document.getElementById('side-controls-ul');
@@ -199,6 +217,18 @@ export function renderTopMenuStructure(container, menuIds, templates) {
     const ulDesktop = document.getElementById('main-menu-ul');
     const ulMobile = document.getElementById('mobile-menu-ul');
     const mobileControls = document.getElementById('mobile-controls-ul');
+
+    // Acceso rápido al Dashboard en menú móvil lateral
+    ulMobile.insertAdjacentHTML('beforeend', `
+        <li class="nav-item">
+            <a href="${dashboardPath}" class="nav-link d-flex align-items-center gap-2">
+                <span class="menu-icon">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                </span>
+                <span class="menu-text">${window.txt?.menu?.panel_inicio || 'Panel de inicio'}</span>
+            </a>
+        </li>
+    `);
     
     menuIds.forEach(id => {
         ulDesktop.insertAdjacentHTML('beforeend', buildMenuItemHTML(id, 'top', templates));

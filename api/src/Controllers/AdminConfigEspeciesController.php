@@ -119,4 +119,57 @@ class AdminConfigEspeciesController {
         }
         exit;
     }
+
+    public function getCepas() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idSub = $_GET['idsubespA'] ?? null;
+            if (!$idSub) {
+                throw new \Exception("Falta idsubespA.");
+            }
+            $data = $this->model->getCepasBySubespecieAdmin($sesion['instId'], $idSub);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function saveCepa() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idSub = $_POST['idsubespA'] ?? null;
+            $nombre = $_POST['CepaNombreA'] ?? null;
+            if (!$idSub || !$nombre) {
+                throw new \Exception("Parámetros incompletos para guardar cepa.");
+            }
+            $this->model->saveCepa($sesion['instId'], $idSub, $nombre);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function toggleCepa() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idCepa = $_POST['idcepaA'] ?? null;
+            $status = $_POST['Habilitado'] ?? $_POST['status'] ?? null;
+            if (!$idCepa || $status === null) {
+                throw new \Exception("Parámetros incompletos para cambiar estado de cepa.");
+            }
+            $this->model->toggleCepa($sesion['instId'], $idCepa, $status);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

@@ -5,6 +5,7 @@
 import { API } from '../../api.js';
 import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
+import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 
 let allReactivos = [];
 let currentPage = 1;
@@ -12,6 +13,17 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedReactivoFromUrl = false;
+
+function getI18nValue(path) {
+    if (!path) return '';
+    const parts = String(path).split('.');
+    let cur = window.txt;
+    for (const p of parts) {
+        if (!cur || typeof cur !== 'object') return '';
+        cur = cur[p];
+    }
+    return (typeof cur === 'string') ? cur : '';
+}
 
 /**
  * 1. INICIALIZACIÓN DE PÁGINA DE REACTIVOS
@@ -584,9 +596,12 @@ function renderTable() {
         const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
         const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
         const ambitoBadge = isExt ? `<span class="badge bg-danger text-white" style="font-size:8px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:8px;">${labelInt}</span>`;
+        const tipoBadgeStyle = getTipoFormBadgeStyle(r.colorTipo);
+        const tipoBadgeHtml = `<span class="${tipoBadgeStyle.className}" style="${tipoBadgeStyle.style} font-size: 9px; padding: 3px 6px;">${(r.TipoNombre || 'Reactivo').replace(/</g, '&lt;')}</span>`;
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${r.idformA}</td>
+            <td class="py-2 px-2 text-center">${tipoBadgeHtml}</td>
             <td class="py-2 px-2 small fw-bold">${r.Investigador}</td>
             <td class="py-2 px-2 small fw-bold text-success">${r.NProtocolo || '---'}</td>
             <td class="py-2 px-2 text-center">${ambitoBadge}</td>
@@ -671,7 +686,11 @@ function updateHeaderIcons() {
 function setupSortHeaders() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         th.style.cursor = 'pointer';
-        th.setAttribute('data-label', th.innerText.trim());
+        let label = th.innerText.trim();
+        if (!label) {
+            label = getI18nValue(th.getAttribute('data-i18n')) || th.getAttribute('data-key') || '';
+        }
+        th.setAttribute('data-label', label);
         th.onclick = () => {
             const key = th.getAttribute('data-key');
             if (sortConfig.key === key) {

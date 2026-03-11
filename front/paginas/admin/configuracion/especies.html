@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Especies y Subespecies - GROBO</title>
+    <title data-i18n="config_especies.pagina_titulo">Especies y Categorías de especie - GROBO</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -45,6 +45,8 @@
                     // Inicialización de la lógica de gestión de especies (Maestro biológico)
                     initConfigEspecies();
                     translatePage();
+                    const tituloPagina = window.txt?.config_especies?.pagina_titulo;
+                    if (tituloPagina) document.title = tituloPagina;
                     
                     console.log("✅ Configuración de Especies inicializada correctamente.");
                 } else {
@@ -85,10 +87,10 @@
                 <p class="text-muted small mb-0 mt-1" data-i18n="config_especies.subtitulo"></p>
             </div>
             <div class="d-flex gap-2">
-                <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3">
+                <a href="config" class="btn btn-outline-secondary btn-sm fw-bold d-flex align-items-center px-3" title="Volver" aria-label="Volver">
                     <i class="bi bi-arrow-left me-2"></i> <span data-i18n="config_especies.btn_volver"></span>
                 </a>
-                <button class="btn btn-success fw-bold shadow-sm" onclick="window.openModalEspecie()">
+                <button class="btn btn-success fw-bold shadow-sm" onclick="window.openModalEspecie()" title="Nueva especie" aria-label="Nueva especie">
                     <i class="bi bi-plus-circle me-2"></i> <span data-i18n="config_especies.btn_nueva_especie"></span>
                 </button>
             </div>
@@ -102,16 +104,16 @@
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-dark text-white">
                     <h5 class="modal-title fw-bold fs-6" data-i18n="config_especies.modal_especie_titulo"></h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-especie">
                         <input type="hidden" name="idespA" id="esp-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_especies.label_nombre_especie"></label>
+                            <label class="form-label small fw-bold" for="esp-nombre" data-i18n="config_especies.label_nombre_especie"></label>
                             <input type="text" name="EspeNombreA" id="esp-nombre" class="form-control fw-bold" data-i18n="config_especies.ph_especie" placeholder="Ej: Ratón, Rata, Conejo" required>
                         </div>
-                        <button type="submit" class="btn btn-dark w-100 fw-bold" data-i18n="config_especies.btn_guardar_especie"></button>
+                        <button type="submit" class="btn btn-dark w-100 fw-bold" data-i18n="config_especies.btn_guardar_especie" title="Guardar" aria-label="Guardar"></button>
                     </form>
                 </div>
             </div>
@@ -123,7 +125,7 @@
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title fw-bold fs-6" data-i18n="config_especies.modal_subespecie_titulo"></h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="form-subespecie">
@@ -131,25 +133,49 @@
                         <input type="hidden" name="idsubespA" id="sub-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_especies.label_nombre_subespecie"></label>
+                            <label class="form-label small fw-bold" for="sub-nombre" data-i18n="config_especies.label_nombre_subespecie"></label>
                             <input type="text" name="SubEspeNombreA" id="sub-nombre" class="form-control fw-bold" data-i18n="config_especies.ph_subespecie" placeholder="Ej: C57BL/6, Wistar" required>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-8">
-                                <label class="form-label small fw-bold" data-i18n="config_especies.label_unidad_medida"></label>
+                                <label class="form-label small fw-bold" for="sub-tipo" data-i18n="config_especies.label_unidad_medida"></label>
                                 <input type="text" name="SubEspTipo" id="sub-tipo" class="form-control" data-i18n="config_especies.ph_unidad" placeholder="Ej: Unidad, Kg, Jaula">
                             </div>
                             <div class="col-4">
-                                <label class="form-label small fw-bold" data-i18n="config_especies.label_cant_base"></label>
-                                <input type="number" name="SubEspCantidad" id="sub-cantidad" class="form-control text-center fw-bold" step="0.01" value="1">
+                                <label class="form-label small fw-bold" for="sub-cantidad" data-i18n="config_especies.label_cant_base"></label>
+                                <input type="number" name="SubEspCantidad" id="sub-cantidad" class="form-control text-center fw-bold" step="0.01" value="1" aria-label="Cantidad base">
                             </div>
                         </div>
 
                         <div class="mb-3" id="sub-status-container"></div> 
                         
-                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm" data-i18n="config_especies.btn_guardar_cambios"></button>
+                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm" data-i18n="config_especies.btn_guardar_cambios" title="Guardar" aria-label="Guardar"></button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-cepas" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="config_especies.modal_cepas_titulo">Gestión de cepas</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cepa-id-sub" value="">
+
+                    <form id="form-cepa" class="mb-3">
+                        <label class="form-label small fw-bold" for="cepa-nombre" data-i18n="config_especies.label_nombre_cepa"></label>
+                        <div class="input-group">
+                            <input type="text" id="cepa-nombre" class="form-control fw-bold" data-i18n="config_especies.ph_cepa" placeholder="Ej: C57BL/6J" required>
+                            <button class="btn btn-primary fw-bold" type="submit" data-i18n="config_especies.btn_agregar_cepa" title="Agregar" aria-label="Agregar"></button>
+                        </div>
+                    </form>
+
+                    <div id="cepas-list" class="border rounded p-2" style="max-height: 260px; overflow:auto;"></div>
                 </div>
             </div>
         </div>

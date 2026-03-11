@@ -5,6 +5,7 @@ let speciesData = [];
 let dataFull = null;
 let currentUserEmail = "No disponible";
 let protocolHelpConfig = { has_network: false, has_approved_vigent: false };
+let cepasState = { hasCepas: false };
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 /* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
 function getContextInstId() {
@@ -32,6 +33,7 @@ export async function initAnimalForm() {
         if(form) form.reset();
         document.getElementById('select-subespecie').innerHTML = '<option value="">' + (window.txt?.form_animales?.primero_especie || 'Primero seleccione especie...') + '</option>';
         document.getElementById('select-subespecie').disabled = true;
+        resetCepaSelect();
         document.getElementById('qty-total').value = 0;
     };
 
@@ -270,6 +272,93 @@ function setupSearch() {
     });
 }
 
+function getCepaControls() {
+    const controls = [];
+    const c1 = document.getElementById('cepa-container');
+    const s1 = document.getElementById('select-cepa');
+    if (c1 && s1) controls.push({ container: c1, select: s1 });
+    const c2 = document.getElementById('cepa-container-2');
+    const s2 = document.getElementById('select-cepa-2');
+    if (c2 && s2) controls.push({ container: c2, select: s2 });
+    return controls;
+}
+
+function resetCepaSelect() {
+    cepasState.hasCepas = false;
+    const t = window.txt?.form_animales;
+    getCepaControls().forEach(({ container, select }) => {
+        container.style.display = 'none';
+        select.disabled = true;
+        select.required = false;
+        select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin cepa / no aplica'}</option>`;
+    });
+}
+
+async function loadCepasForSubespecie(idsubespA) {
+    const t = window.txt?.form_animales;
+    const instId = getContextInstId();
+    const controls = getCepaControls();
+    if (!controls.length) return;
+
+    if (!idsubespA) {
+        resetCepaSelect();
+        return;
+    }
+
+    // Estado de carga
+    controls.forEach(({ container, select }) => {
+        container.style.display = 'block';
+        select.disabled = true;
+        select.required = false;
+        select.innerHTML = `<option value="0">${t?.cargando_cepas || 'Cargando cepas...'}</option>`;
+    });
+
+    try {
+        const res = await API.request(`/animals/cepas?inst=${instId}&idsubespA=${encodeURIComponent(idsubespA)}`);
+        const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
+        cepasState.hasCepas = list.length > 0;
+
+        controls.forEach(({ container, select }) => {
+            container.style.display = 'block';
+            select.innerHTML = '';
+
+            if (list.length > 0) {
+                select.required = true;
+                select.disabled = false;
+                select.innerHTML = `<option value="0">${t?.seleccione || 'Seleccione...'}<\/option>`;
+                list.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.idcepaA;
+                    opt.text = c.CepaNombreA;
+                    select.appendChild(opt);
+                });
+                // Mensaje: debe seleccionar
+                const help = container.querySelector('small');
+                if (help) help.innerText = t?.cepa_help || 'Si existen cepas configuradas para esta categoría, debe seleccionar una.';
+            } else {
+                select.required = false;
+                select.disabled = true;
+                select.innerHTML = `<option value="0">-<\/option>`;
+                // Mensaje: no hay cepa
+                const help = container.querySelector('small');
+                if (help) help.innerText = t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+            }
+        });
+    } catch (e) {
+        console.error(e);
+        // Fallo: no bloqueamos, dejamos "Sin cepa"
+        cepasState.hasCepas = false;
+        controls.forEach(({ container, select }) => {
+            container.style.display = 'block';
+            select.required = false;
+            select.disabled = false;
+            select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin cepa / no aplica'}</option>`;
+            const help = container.querySelector('small');
+            if (help) help.innerText = t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+        });
+    }
+}
+
 async function selectProtocol(p) {
     document.getElementById('step-1').classList.add('hidden-section');
     document.getElementById('step-2').classList.remove('hidden-section');
@@ -318,6 +407,7 @@ function populateSpeciesSelect() {
     subSel.innerHTML = '<option value="">Primero seleccione especie...</option>';
     sel.disabled = false;
     subSel.disabled = true;
+    resetCepaSelect();
 
     if (!speciesData || speciesData.length === 0) {
         sel.innerHTML = `<option value="">Sin especie asignada, hablar con admin ${instName}</option>`;
@@ -336,8 +426,9 @@ function populateSpeciesSelect() {
     });
 
     sel.onchange = (e) => {
-        subSel.innerHTML = '<option value="">Seleccione Subespecie...</option>';
+        subSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.seleccione_categoria || 'Seleccione categoría...') + '</option>';
         subSel.disabled = true;
+        resetCepaSelect();
 
         if (e.target.value) {
             const subs = JSON.parse(e.target.value);
@@ -352,8 +443,13 @@ function populateSpeciesSelect() {
                 subSel.selectedIndex = 1;
                 subSel.style.backgroundColor = "#e8f5e9"; 
                 setTimeout(() => subSel.style.backgroundColor = "", 500);
+                loadCepasForSubespecie(subSel.value);
             }
         }
+    };
+
+    subSel.onchange = () => {
+        loadCepasForSubespecie(subSel.value);
     };
 
     if (speciesData.length === 1) {
@@ -382,6 +478,18 @@ async function handleReview(e) {
     if (!typeSel.value) return Swal.fire('Falta Información', 'Debe seleccionar el Tipo de Solicitud.', 'warning');
     const typeText = typeSel.options[typeSel.selectedIndex].text;
 
+    // Cepa obligatoria si existen cepas configuradas para la categoría
+    const cepaSel = document.getElementById('select-cepa') || document.getElementById('select-cepa-2');
+    const cepaVal = cepaSel ? String(cepaSel.value || '0') : '0';
+    if (cepasState.hasCepas && (!cepaVal || cepaVal === '0')) {
+        const t = window.txt?.form_animales;
+        return Swal.fire(
+            t?.debe_seleccionar_cepa_titulo || 'Falta información',
+            t?.debe_seleccionar_cepa_texto || 'Debe seleccionar una cepa.',
+            'warning'
+        );
+    }
+
     const isExt = document.getElementById('is-otros-ceuas').value === "1";
     if (!isExt) {
         const saldoEl = document.getElementById('info-saldo');
@@ -397,12 +505,19 @@ async function handleReview(e) {
     const selSub = document.getElementById('select-subespecie');
     const txtSub = selSub.options[selSub.selectedIndex].text;
 
-    const raza = document.getElementById('input-raza').value;
     const peso = document.getElementById('input-peso').value;
     const edad = document.getElementById('input-edad').value;
 
     const protocoloTxt = document.getElementById('info-nprot').innerText;
     const tituloProt = document.getElementById('info-titulo').innerText;
+
+    const cepaSelTxt = (() => {
+        const sel = document.getElementById('select-cepa') || document.getElementById('select-cepa-2');
+        if (!sel) return '-';
+        if (!cepasState.hasCepas) return t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+        const opt = sel.options[sel.selectedIndex];
+        return (opt && opt.value !== '0') ? opt.text : '-';
+    })();
 
     const resumenHtml = `
         <div class="text-start bg-light p-3 rounded" style="font-size: 0.9rem;">
@@ -415,8 +530,8 @@ async function handleReview(e) {
             <table class="table table-sm table-bordered mb-2 bg-white small">
                 <tbody>
                     <tr><td class="bg-light fw-bold text-muted" width="30%">Especie</td><td>${txtEspecie}</td></tr>
-                    <tr><td class="bg-light fw-bold text-muted">Cepa</td><td>${txtSub}</td></tr>
-                    <tr><td class="bg-light fw-bold text-muted">Cepa/Línea</td><td>${raza}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">${window.txt?.form_animales?.label_categoria || 'Categoría'}</td><td>${txtSub}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">${t?.cepa || 'Cepa'}</td><td>${cepaSelTxt}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Peso</td><td>${peso}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Edad</td><td>${edad}</td></tr>
                 </tbody>
@@ -475,7 +590,8 @@ async function submitOrder() {
         idprotA: document.getElementById('selected-prot-id').value,
         is_external: document.getElementById('is-otros-ceuas').value,
         idsubespA: document.getElementById('select-subespecie').value,
-        raza: document.getElementById('input-raza').value,
+        idcepaA: (document.getElementById('select-cepa') || document.getElementById('select-cepa-2'))?.value || 0,
+        raza: '',
         peso: document.getElementById('input-peso').value,
         edad: document.getElementById('input-edad').value,
         fecha_retiro: document.getElementById('input-fecha').value,

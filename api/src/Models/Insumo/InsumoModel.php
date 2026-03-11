@@ -14,6 +14,8 @@ class InsumoModel {
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
                     d.NombreDeptoA as Departamento,
                     o.NombreOrganismoSimple as Organizacion,
+                    t.nombreTipo as TipoNombre,
+                    t.color as colorTipo,
                     pif.idPrecioinsumosformulario,
                     prot.idprotA AS IdProtocolo,
                     prot.nprotA AS NProtocolo,

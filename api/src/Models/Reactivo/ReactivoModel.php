@@ -32,6 +32,8 @@ class ReactivoModel {
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as Departamento,
                     COALESCE(f.depto, pd.iddeptoA) as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
+                    t.nombreTipo as TipoNombre,
+                    t.color as colorTipo,
                     ins.NombreInsumo as Reactivo, 
                     ins.TipoInsumo as Medida,       /* 🚀 FIX: ml, gr, un... */
                     ins.CantidadInsumo as Presentacion, /* 🚀 FIX: 50, 100, 200... */

@@ -23,7 +23,7 @@ export const PreciosService = {
      * Genera y descarga el PDF del tarifario oficial desde cualquier lugar.
      */
     async downloadUniversalPDF() {
-        const instId = localStorage.getItem('instId');
+        const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
         const instNombre = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         const fechaActual = new Date().toLocaleDateString();
 
@@ -76,12 +76,23 @@ export const PreciosService = {
                     <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${i.PrecioInsumo}</td>
                 </tr>`).join('');
 
-            const renderServiciosRow = () => (data.servicios || []).filter(s => parseFloat(s.Precio) > 0).map(s => `
-                <tr>
-                    <td style="padding: 6px; border: 1px solid #ddd; color: #000;">${s.NombreServicioInst || ''}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #000;">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'U'}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${s.Precio}</td>
-                </tr>`).join('');
+            const renderServiciosRow = () => {
+                const list = Array.isArray(data.servicios) ? data.servicios : [];
+                if (list.length === 0) {
+                    return `<tr><td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align:center; color:#000;">Sin servicios institucionales configurados.</td></tr>`;
+                }
+                return list.map(s => {
+                    const cant = (s.CantidadPorMedidaInst == null || s.CantidadPorMedidaInst === '') ? 1 : s.CantidadPorMedidaInst;
+                    const med = (s.MedidaServicioInst && String(s.MedidaServicioInst).trim()) ? s.MedidaServicioInst : 'U';
+                    const precio = (s.Precio == null || s.Precio === '') ? 0 : s.Precio;
+                    return `
+                        <tr>
+                            <td style="padding: 6px; border: 1px solid #ddd; color: #000;">${s.NombreServicioInst || ''}</td>
+                            <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #000;">${cant} ${med}</td>
+                            <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${precio}</td>
+                        </tr>`;
+                }).join('');
+            };
 
             const logoHeader = getPdfLogoHeaderHtml(data.institucion?.LogoEnPdf, data.institucion?.Logo || '');
 

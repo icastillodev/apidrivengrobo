@@ -723,6 +723,13 @@ function getDarkModeStyles() {
             overflow: hidden !important;
         }
 
+        /* Ocultar todo el contenido del body hasta que cargue (solo loader visible) */
+        body:not(.gecko-loaded) > *:not(#global-loader) {
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
         /* 1. El telón que tapa el HTML crudo (Modo Claro por defecto) */
         body:not(.gecko-loaded)::before {
             content: "";

@@ -324,7 +324,6 @@ async function handleReview(e) {
             
             <div class="mb-2">
                 <strong>Detalles Muestra:</strong><br>
-                Raza: <b>${document.getElementById('input-raza').value || '-'}</b> | 
                 Peso: <b>${document.getElementById('input-peso').value || '-'}</b> | 
                 Edad: <b>${document.getElementById('input-edad').value || '-'}</b>
             </div>
@@ -365,7 +364,7 @@ async function submitOrder() {
         idInsumoExp: document.getElementById('select-insumo').value,
         cantidad: document.getElementById('input-cantidad').value,
         
-        raza: document.getElementById('input-raza').value,
+        raza: '',
         peso: document.getElementById('input-peso').value,
         edad: document.getElementById('input-edad').value,
 

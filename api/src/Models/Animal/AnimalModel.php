@@ -20,6 +20,7 @@ class AnimalModel {
                     f.edadA as Edad, f.pesoA as Peso, f.aclaracionadm as AclaracionAdm,
                     f.raza,
                     f.IdUsrA as IdInvestigador, f.idsubespA,
+                    f.idcepaA,
                     CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
                     pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
                     tf.nombreTipo as TipoNombre,
@@ -29,7 +30,8 @@ class AnimalModel {
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
                     COALESCE(f.depto, pd.iddeptoA) as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
-                    CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie, 
+                    CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie,
+                    COALESCE(c.CepaNombreA, '') as CepaNombre,
                     COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
                     se.Psubanimal as PrecioUnit,
@@ -52,6 +54,7 @@ class AnimalModel {
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
                 LEFT JOIN especiee e ON se.idespA = e.idespA
+                LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
@@ -64,6 +67,22 @@ class AnimalModel {
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getCepasBySubespecie($instId, $idSubespA) {
+        $sql = "
+            SELECT c.idcepaA, c.CepaNombreA
+            FROM cepa c
+            INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE c.Habilitado = 1
+              AND c.idsubespA = ?
+              AND e.IdInstitucion = ?
+            ORDER BY c.CepaNombreA ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idSubespA, $instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     // api/src/Models/Animal/AnimalModel.php
@@ -177,6 +196,8 @@ public function updateStatus($data) {
         $newTotal = (int)($data['totalA'] ?? 0);
         $newProt = $data['idprotA'] ?? null;
         $idSubesp = $data['idsubespA'] ?? null;
+        $idCepa = $data['idcepaA'] ?? null;
+        if ($idCepa === '' || $idCepa === '0' || $idCepa === 0) $idCepa = null;
 
         $stmtOld = $this->db->prepare("SELECT (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal, (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt FROM formularioe f WHERE f.idformA = ?");
         $stmtOld->execute([$id]);
@@ -187,10 +208,52 @@ public function updateStatus($data) {
 
         $this->db->beginTransaction();
         try {
-            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?";
+            // Validación cepa: si existen cepas habilitadas para la categoría, debe seleccionar una
+            // (nota: instId no viene en este POST, lo deducimos por el formulario y la institución de la categoría)
+            $stmtInst = $this->db->prepare("
+                SELECT e.IdInstitucion
+                FROM subespecie s
+                INNER JOIN especiee e ON s.idespA = e.idespA
+                WHERE s.idsubespA = ?
+            ");
+            $stmtInst->execute([$idSubesp]);
+            $instId = $stmtInst->fetchColumn();
+
+            if ($instId) {
+                $stmtCount = $this->db->prepare("
+                    SELECT COUNT(*) 
+                    FROM cepa c
+                    INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+                    INNER JOIN especiee e ON s.idespA = e.idespA
+                    WHERE c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                ");
+                $stmtCount->execute([$idSubesp, $instId]);
+                $hasEnabledCepas = ((int)$stmtCount->fetchColumn()) > 0;
+
+                if ($hasEnabledCepas && empty($idCepa)) {
+                    throw new \Exception("Debe seleccionar una cepa.");
+                }
+
+                if (!empty($idCepa)) {
+                    $stmtCepa = $this->db->prepare("
+                        SELECT c.idcepaA
+                        FROM cepa c
+                        INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+                        INNER JOIN especiee e ON s.idespA = e.idespA
+                        WHERE c.idcepaA = ? AND c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                    ");
+                    $stmtCepa->execute([$idCepa, $idSubesp, $instId]);
+                    if (!$stmtCepa->fetchColumn()) {
+                        throw new \Exception("La cepa seleccionada no es válida.");
+                    }
+                }
+            }
+
+            $sqlForm = "UPDATE formularioe SET tipoA = ?, idsubespA = ?, idcepaA = ?, raza = ?, edadA = ?, pesoA = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?";
             $this->db->prepare($sqlForm)->execute([
                 $data['tipoA'] ?? null, 
                 $idSubesp, 
+                $idCepa,
                 $data['razaA'] ?? '', 
                 $data['edadA'] ?? '', 
                 $data['pesoA'] ?? '', 
@@ -471,8 +534,38 @@ public function saveOrder($data) {
                 if (is_numeric($lab)) $finalDepto = $lab;
             }
 
-            $sqlForm = "INSERT INTO formularioe (tipoA, idsubespA, edadA, pesoA, fechainicioA, fecRetiroA, aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?, 0, ?)";
-            $this->db->prepare($sqlForm)->execute([$data['idTipoFormulario'], $data['idsubespA'], $data['edad'], $data['peso'], $data['fecha_retiro'], $data['aclaracion'], $data['userId'], $data['instId'], $data['raza'], $finalDepto]);
+            $idCepa = $data['idcepaA'] ?? null;
+            if ($idCepa === '' || $idCepa === 0 || $idCepa === '0') $idCepa = null;
+
+            // Validación: si mandan una cepa, debe pertenecer a la categoría y a la institución
+            if (!empty($idCepa)) {
+                $stmtCepa = $this->db->prepare("
+                    SELECT c.idcepaA
+                    FROM cepa c
+                    INNER JOIN subespecie s ON c.idsubespA = s.idsubespA
+                    INNER JOIN especiee e ON s.idespA = e.idespA
+                    WHERE c.idcepaA = ? AND c.idsubespA = ? AND c.Habilitado = 1 AND e.IdInstitucion = ?
+                ");
+                $stmtCepa->execute([$idCepa, $data['idsubespA'], $data['instId']]);
+                if (!$stmtCepa->fetchColumn()) {
+                    throw new \Exception("Error: La cepa seleccionada no es válida.");
+                }
+            }
+
+            $sqlForm = "INSERT INTO formularioe (tipoA, idsubespA, idcepaA, edadA, pesoA, fechainicioA, fecRetiroA, aclaraA, IdUsrA, IdInstitucion, estado, raza, visto, depto) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Sin estado', ?, 0, ?)";
+            $this->db->prepare($sqlForm)->execute([
+                $data['idTipoFormulario'],
+                $data['idsubespA'],
+                $idCepa,
+                $data['edad'],
+                $data['peso'],
+                $data['fecha_retiro'],
+                $data['aclaracion'],
+                $data['userId'],
+                $data['instId'],
+                $data['raza'],
+                $finalDepto
+            ]);
             $idForm = $this->db->lastInsertId();
 
             $this->db->prepare("INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA) VALUES (?, ?, ?, ?, ?)")->execute([$idForm, $data['macho'], $data['hembra'], $data['indistinto'], $data['total']]);
@@ -550,8 +643,8 @@ $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_
     }
 
     // Recupera nombres de Especie, Subespecie y Protocolo
-    public function getNamesForMail($idSub, $idProt) {
-        // 1. Especie y Sub
+    public function getNamesForMail($idSub, $idProt, $idCepa = null) {
+        // 1. Especie y Categoría
         $sqlEsp = "SELECT e.EspeNombreA, s.SubEspeNombreA 
                    FROM subespecie s 
                    JOIN especiee e ON s.idespA = e.idespA 
@@ -559,6 +652,14 @@ $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_
         $stmt = $this->db->prepare($sqlEsp);
         $stmt->execute([$idSub]);
         $esp = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        // 1.1 Cepa (si aplica)
+        $cepaNombre = 'N/A';
+        if (!empty($idCepa)) {
+            $stmtC = $this->db->prepare("SELECT CepaNombreA FROM cepa WHERE idcepaA = ? LIMIT 1");
+            $stmtC->execute([$idCepa]);
+            $cepaNombre = $stmtC->fetchColumn() ?: 'N/A';
+        }
 
         // 2. Protocolo (Si existe)
         $nprot = "Sin Protocolo";
@@ -576,7 +677,8 @@ $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_
 
         return [
             'especie' => $esp['EspeNombreA'] ?? 'N/A',
-            'subespecie' => $esp['SubEspeNombreA'] ?? 'N/A',
+            'categoria' => $esp['SubEspeNombreA'] ?? 'N/A',
+            'cepa' => $cepaNombre,
             'nprot' => $nprot,
             'titulo' => $titulo
         ];

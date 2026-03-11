@@ -185,9 +185,12 @@
                             </select>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_linea">Cepa / Línea</label>
-                            <input type="text" id="input-raza" class="form-control" required>
+                        <div class="col-12" id="cepa-container" style="display:none;">
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa</label>
+                            <select id="select-cepa" class="form-select fw-bold text-primary" disabled>
+                                <option value="0" data-i18n="form_animales.sin_cepa">Sin cepa / no aplica</option>
+                            </select>
+                            <small id="cepa-help" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen cepas configuradas para esta categoría, debe seleccionar una.</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.peso">Peso (g/kg)</label>
@@ -297,16 +300,20 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Cepa / Subespecie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Categoría de especie</label>
                             <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
-                                <option value="">Primero seleccione especie...</option>
+                                <option value="" data-i18n="form_animales.primero_especie">Primero seleccione especie...</option>
                             </select>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Raza / Línea</label>
-                            <input type="text" id="input-raza" class="form-control" required>
+                        <div class="col-12" id="cepa-container-2" style="display:none;">
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa</label>
+                            <select id="select-cepa-2" class="form-select fw-bold text-primary" disabled>
+                                <option value="0" data-i18n="form_animales.sin_cepa">Sin cepa / no aplica</option>
+                            </select>
+                            <small id="cepa-help-2" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen cepas configuradas para esta categoría, debe seleccionar una.</small>
                         </div>
+
                         <div class="col-md-4">
                             <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
                             <input type="text" id="input-peso" class="form-control" required>
@@ -361,7 +368,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-light">
                     <h5 class="modal-title fw-bold text-dark" data-i18n="form_animales.ayuda_titulo">Ayuda con Protocolos</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4">
                     <p id="protocol-help-intro" class="text-muted small mb-3" data-i18n="form_animales.ayuda_intro">Si tu protocolo no aparece, verifica que esté vigente y con saldo disponible.</p>

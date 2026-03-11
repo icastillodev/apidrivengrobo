@@ -5,7 +5,7 @@ import { getPdfLogoHeaderHtml } from '../../utils/pdfLogoHeader.js';
 let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {} };
 
 export async function initPreciosPage() {
-    const instId = localStorage.getItem('instId');
+    const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
     try {
         showLoader();
         
@@ -99,7 +99,7 @@ window.renderAllPriceTables = () => {
     // 3. RENDER SERVICIOS
     const tbodyServ = document.getElementById('tbody-servicios');
     let htmlServ = '';
-    dataFull.servicios.filter(s => s.NombreServicioInst.toLowerCase().includes(term)).forEach(s => {
+    (dataFull.servicios || []).filter(s => (s?.NombreServicioInst || '').toLowerCase().includes(term)).forEach(s => {
         htmlServ += `
             <tr data-id="${s.IdServicioInst}" data-type="servicio">
                 <td class="fw-bold text-dark">${s.NombreServicioInst}</td>
@@ -182,7 +182,7 @@ window.exportPreciosPDF = () => {
             <td style="padding: 4px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: #000;">$ ${i.PrecioInsumo}</td>
         </tr>`).join('');
 
-    const renderServiciosPDF = () => dataFull.servicios.filter(s => parseFloat(s.Precio) > 0).map(s => `
+    const renderServiciosPDF = () => (dataFull.servicios || []).map(s => `
         <tr>
             <td style="padding: 4px; border: 1px solid #ddd; color: #000; font-weight: bold;">${s.NombreServicioInst}</td>
             <td style="padding: 4px; border: 1px solid #ddd; text-align: center; color: #000;">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'U'}</td>

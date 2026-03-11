@@ -7,7 +7,14 @@ body:not(.gecko-loaded) {
     overflow: hidden !important;
 }
 
-/* 2. Pantalla de fondo que tapa todo el HTML crudo */
+/* 2. Ocultar TODO el contenido del body hasta que cargue (solo se ve loader/overlay) */
+body:not(.gecko-loaded) > *:not(#global-loader) {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* 3. Pantalla de fondo que tapa todo el HTML crudo */
 body:not(.gecko-loaded)::before {
     content: "";
     position: fixed;
@@ -16,7 +23,7 @@ body:not(.gecko-loaded)::before {
     z-index: 999998;
 }
 
-/* 3. Spinner CSS Puro en el centro (Verde GROBO) */
+/* 4. Spinner CSS Puro en el centro (Verde GROBO) */
 body:not(.gecko-loaded)::after {
     content: "";
     position: fixed;
@@ -37,6 +44,27 @@ body:not(.gecko-loaded)::after {
 
 [data-bs-theme="dark"] .clickable-row:hover .table > :not(caption) > * > *{
     background-color:white !important;
+}
+
+/* ========================================================================== */
+/* Config Especies: listado inline de cepas (contraste en hover)               */
+/* ========================================================================== */
+.cepas-inline-item {
+    border-radius: 6px;
+    padding-left: 8px;
+    padding-right: 6px;
+}
+
+.cepas-inline-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+[data-bs-theme="dark"] .cepas-inline-item:hover {
+    background-color: rgba(74, 222, 128, 0.18) !important;
+}
+
+[data-bs-theme="dark"] .cepas-inline-item:hover .cepas-inline-name {
+    color: #ffffff !important;
 }
 
 /* 4. Animación del giro */
@@ -232,6 +260,7 @@ html,
   line-height: 1.5;
   /* 1 */
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* 2 */
   -moz-tab-size: 4;
   /* 3 */

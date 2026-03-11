@@ -143,6 +143,7 @@ $router->post('/animals/send-notification', 'AnimalController@sendNotification')
 $router->get('/animals/pdf-data', 'AnimalController@getPDFData'); // Nuevo para el Tarifario
 $router->get('/animals/search-protocols', 'AnimalController@searchProtocols');
 $router->get('/animals/protocol-details', 'AnimalController@getProtocolDetails');
+$router->get('/animals/cepas', 'AnimalController@getCepasBySubespecie');
 $router->post('/animals/create-order', 'AnimalController@createOrder');
 
 
@@ -349,6 +350,9 @@ $router->post('/admin/config/especies/delete', 'AdminConfigEspeciesController@de
 $router->post('/admin/config/subespecies/save', 'AdminConfigEspeciesController@saveSubespecie');
 $router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController@toggleSubespecie');
 $router->post('/admin/config/subespecies/delete', 'AdminConfigEspeciesController@deleteSubespecie');
+$router->get('/admin/config/cepas/all', 'AdminConfigEspeciesController@getCepas');
+$router->post('/admin/config/cepas/save', 'AdminConfigEspeciesController@saveCepa');
+$router->post('/admin/config/cepas/toggle', 'AdminConfigEspeciesController@toggleCepa');
 
 
 // ============================================================

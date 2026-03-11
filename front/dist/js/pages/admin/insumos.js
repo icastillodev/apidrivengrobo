@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 
 let allInsumos = [];
 let currentPage = 1;
@@ -119,6 +120,12 @@ function renderTable() {
                     const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
                     const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
                     return isExt ? `<span class="badge bg-danger text-white" style="font-size:8px;">${labelExt}</span>` : `<span class="badge bg-success text-white" style="font-size:8px;">${labelInt}</span>`;
+                })()}
+            </td>
+            <td class="py-2 px-2 text-center">
+                ${(() => {
+                    const badgeStyle = getTipoFormBadgeStyle(f.colorTipo);
+                    return `<span class="${badgeStyle.className}" style="${badgeStyle.style} font-size: 9px; padding: 3px 6px;">${(f.TipoNombre || 'Insumo').replace(/</g, '&lt;')}</span>`;
                 })()}
             </td>
             <td class="py-2 px-2" style="font-size: 13px;">${f.ResumenInsumos || '---'}</td>
