@@ -3,8 +3,81 @@ import { fetchSpeciesDetails, loadData } from './api_service.js';
 import { API } from '../../../api.js';
 import { Auth } from '../../../auth.js';
 
-// ... (saveProtocol IGUAL AL ANTERIOR, NO CAMBIA) ...
-export async function saveProtocol(e) { e.preventDefault(); const fd = new FormData(e.target); const userId = Auth.getVal('userId'); if (!userId) { window.Swal.fire('Error de Sesión', 'No se pudo identificar al usuario. Intente recargar.', 'error'); return; } fd.append('currentUserId', userId); if(!fd.get('IdInstitucion')) { fd.append('IdInstitucion', Auth.getVal('instId')); } const isUpdate = fd.get('idprotA') ? true : false; const url = isUpdate ? '/user/protocols/update-internal' : '/user/protocols/create-internal'; try { const res = await API.request(url, 'POST', fd); if(res.status==='success') { bootstrap.Modal.getInstance(document.getElementById('modal-new-prot')).hide(); window.Swal.fire('Éxito', 'Solicitud procesada correctamente.', 'success'); loadData(); } else { window.Swal.fire('Error', res.message, 'error'); } } catch(e) { console.error(e); } }
+export async function saveProtocol(e) {
+    e.preventDefault();
+
+    const form = e.target;
+
+    const files = [
+        form.querySelector('#adj-adjunto1')?.files?.[0],
+        form.querySelector('#adj-adjunto2')?.files?.[0],
+        form.querySelector('#adj-adjunto3')?.files?.[0],
+    ].filter(Boolean);
+
+    const maxSize = 2 * 1024 * 1024;
+    for (const f of files) {
+        const name = f.name || '';
+        const size = f.size || 0;
+        const ext = name.split('.').pop().toLowerCase();
+
+        if (ext !== 'pdf') {
+            window.Swal.fire('Formato no permitido', 'Solo se aceptan archivos PDF en los adjuntos.', 'warning');
+            return;
+        }
+        if (size > maxSize) {
+            window.Swal.fire('Archivo demasiado grande', 'Cada archivo adjunto debe pesar como máximo 2 MB.', 'warning');
+            return;
+        }
+    }
+
+    const fd = new FormData(form);
+    const userId = Auth.getVal('userId');
+
+    if (!userId) {
+        window.Swal.fire('Error de Sesión', 'No se pudo identificar al usuario. Intente recargar.', 'error');
+        return;
+    }
+
+    fd.append('currentUserId', userId);
+    if (!fd.get('IdInstitucion')) {
+        fd.append('IdInstitucion', Auth.getVal('instId'));
+    }
+
+    const isUpdate = fd.get('idprotA') ? true : false;
+    const url = isUpdate ? '/user/protocols/update-internal' : '/user/protocols/create-internal';
+
+    const t = window.txt?.misprotocolos || {};
+    window.Swal.fire({
+        title: t.enviando_solicitud || t.enviar_solicitud || 'Enviando solicitud',
+        html: t.subiendo_adjuntos || 'Subiendo archivos (si existen)...',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+            window.Swal.showLoading();
+        }
+    });
+
+    try {
+        const res = await API.request(url, 'POST', fd);
+        window.Swal.close();
+
+        if (res.status === 'success') {
+            const modalEl = document.getElementById('modal-new-prot');
+            if (modalEl) {
+                const instance = bootstrap.Modal.getInstance(modalEl);
+                if (instance) instance.hide();
+            }
+
+            window.Swal.fire('Éxito', 'Solicitud procesada correctamente.', 'success');
+            loadData();
+        } else {
+            window.Swal.fire('Error', res.message || 'No se pudo procesar la solicitud.', 'error');
+        }
+    } catch (err) {
+        console.error(err);
+        window.Swal.fire('Error', 'Error de red o del servidor al procesar la solicitud.', 'error');
+    }
+}
 
 export function openNewProtocolModal() {
     prepareModal('NUEVA SOLICITUD INTERNA', false);

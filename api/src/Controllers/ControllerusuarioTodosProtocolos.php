@@ -62,8 +62,8 @@ class ControllerusuarioTodosProtocolos {
             $sesion = Auditoria::getDatosSesion();
             $_POST['IdInstitucion'] = $sesion['instId']; // Inyectamos Inst Real
             
-            $this->model->createInternal($_POST, $sesion['userId']);
-            echo json_encode(['status' => 'success']);
+            $idSolicitud = $this->model->createInternal($_POST, $sesion['userId'], $_FILES ?? null);
+            echo json_encode(['status' => 'success', 'idSolicitudProtocolo' => $idSolicitud]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -99,6 +99,61 @@ class ControllerusuarioTodosProtocolos {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
+    }
+
+    public function getMyAttachments() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $solId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getUserAttachmentsBySolicitud($solId, $sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getMyAttachmentsByProtocol() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $idprot = isset($_GET['idprot']) ? (int)$_GET['idprot'] : 0;
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getUserAttachmentsByProtocol($idprot, $sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function downloadMyAttachment() {
+        if (ob_get_length()) ob_clean();
+
+        $attId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $att = $this->model->getUserAttachmentById($attId, $sesion['userId']);
+            if (!$att) {
+                http_response_code(404);
+                echo 'Adjunto no encontrado o no autorizado.';
+                exit;
+            }
+
+            $b2 = new \App\Utils\BackblazeB2();
+            $b2->streamDownload($att['file_key'], $att['nombre_original']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo 'Error al descargar el archivo: ' . $e->getMessage();
+            exit;
+        }
     }
 
     public function getNetworkTargets() {

@@ -340,12 +340,20 @@ function buildModalHtml(opts) {
     html += '<button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(' + (u.IdUsrA || '') + ')">' + (t && t.btn_guardar_cambios ? t.btn_guardar_cambios : 'Guardar Cambios') + '</button>';
     html += '<button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(' + (u.IdUsrA || '') + ')">' + (t && t.btn_resetear_clave ? t.btn_resetear_clave : 'Resetear Clave') + '</button>';
     if (t && t.reset_leyenda) html += '<span class="small text-muted align-middle ms-1" title="' + (t.reset_leyenda || '').replace(/"/g, '&quot;') + '"><i class="bi bi-info-circle"></i></span>';
-    html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')"' + (puedeEliminar ? '' : ' disabled') + ' title="' + (t && t.eliminar_leyenda ? t.eliminar_leyenda.replace(/"/g, '&quot;') : 'Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos') + '"><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
     var tieneDatosEliminar = (protocolos ? protocolos.length : 0) + (formularios ? formularios.length : 0) + (alojamientos ? alojamientos.length : 0) > 0;
-    html += '<button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="abrirModalEliminacionTotalAdmin(' + (u.IdUsrA || '') + ')"' + (tieneDatosEliminar ? '' : ' disabled') + ' title="' + (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda.replace(/"/g, '&quot;') : 'Elimina el perfil y todo lo asociado; requiere contraseña y código') + '"><i class="bi bi-trash"></i> ' + (t && t.btn_eliminacion_total ? t.btn_eliminacion_total : 'Eliminación total') + '</button>';
+    if (puedeEliminar) {
+    html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')" title="' + (t && t.eliminar_leyenda ? t.eliminar_leyenda.replace(/"/g, '&quot;') : 'Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos') + '"><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
+    }
+    if (tieneDatosEliminar) {
+    html += '<button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="abrirModalEliminacionTotalAdmin(' + (u.IdUsrA || '') + ')" title="' + (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda.replace(/"/g, '&quot;') : 'Elimina el perfil y todo lo asociado; requiere contraseña y código') + '"><i class="bi bi-trash"></i> ' + (t && t.btn_eliminacion_total ? t.btn_eliminacion_total : 'Eliminación total') + '</button>';
+    }
     html += '<button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3 uppercase" onclick="openBillingForUser(' + (u.IdUsrA || '') + ')"' + (puedeFacturar ? '' : ' disabled title="Sin protocolos ni pedidos de insumos"') + '><i class="bi bi-receipt"></i> ' + (t && t.btn_ver_facturacion ? t.btn_ver_facturacion : 'Ver Facturación') + '</button></div>';
     html += (facturacionLegend || '') + (disableLegend || '') + '</form>';
-    html += '<div class="small text-muted mt-2 border-top pt-2">' + (t && t.leyenda_acciones ? t.leyenda_acciones : (t && t.eliminar_leyenda ? t.eliminar_leyenda + ' ' + (t.eliminacion_total_leyenda || '') : 'Eliminar: solo si no tiene datos asociados. Eliminación total: borra perfil y todo lo asociado (protocolos, formularios, alojamientos).')) + '</div>';
+    var leyendaAcciones = '';
+    if (puedeEliminar) leyendaAcciones = (t && t.eliminar_leyenda ? t.eliminar_leyenda : 'Eliminar: solo si no tiene datos asociados.');
+    else if (tieneDatosEliminar) leyendaAcciones = (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda : 'Eliminación total: borra perfil y todo lo asociado (protocolos, formularios, alojamientos).');
+    else leyendaAcciones = (t && t.leyenda_acciones ? t.leyenda_acciones : '');
+    html += '<div class="small text-muted mt-2 border-top pt-2">' + leyendaAcciones + '</div>';
     html += '<hr class="my-4 border-2 border-secondary"><div class="row g-3 mb-4">';
     html += '<div class="col-3"><div class="border rounded p-3 text-center bg-light h-100"><div class="text-secondary small fw-bold text-uppercase mb-1">' + (t && t.ficha_protocolos_cargo ? t.ficha_protocolos_cargo : 'Protocolos a su cargo') + '</div><div class="fs-3 fw-bold text-secondary">' + (protocolos ? protocolos.length : 0) + '</div><div class="small text-muted">' + (t && t.ficha_protocolos_total ? t.ficha_protocolos_total : 'total') + '</div></div></div>';
     var totalAnimales = 0;

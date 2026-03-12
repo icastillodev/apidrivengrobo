@@ -87,6 +87,9 @@ $router->get('/user/protocols/all-lists', 'ControllerusuarioTodosProtocolos@getA
 $router->post('/user/protocols/create-internal', 'ControllerusuarioTodosProtocolos@createInternal');
 $router->get('/user/protocols/network-targets', 'ControllerusuarioTodosProtocolos@getNetworkTargets');
 $router->post('/user/protocols/create-network-request', 'ControllerusuarioTodosProtocolos@createNetworkRequest');
+$router->get('/user/protocols/attachments', 'ControllerusuarioTodosProtocolos@getMyAttachments');
+$router->get('/user/protocols/attachments-by-protocol', 'ControllerusuarioTodosProtocolos@getMyAttachmentsByProtocol');
+$router->get('/user/protocols/attachments/download', 'ControllerusuarioTodosProtocolos@downloadMyAttachment');
 
 
 // ============================================================
@@ -110,6 +113,7 @@ $router->get('/protocols/institution', 'ProtocolController@getByInstitution');
 $router->get('/protocols/form-data', 'ProtocolController@getFormData'); 
 $router->post('/protocols/save', 'ProtocolController@save');           
 $router->get('/protocols/current-species', 'ProtocolController@getSpeciesByProtocol');
+$router->get('/protocols/attachments-by-protocol', 'ProtocolController@getAttachmentsByProtocol');
 $router->get('/protocolos/search-alojamiento', 'ProtocolController@searchForAlojamiento');
 $router->get('/protocolos/search', 'ProtocolController@search');
 $router->get('/protocols/requests/count', 'ProtocolController@getPendingCount');
@@ -121,6 +125,8 @@ $router->post('/user/protocols/update-internal', 'ControllerusuarioTodosProtocol
 // ============================================================
 $router->get('/admin/requests/list', 'ControllerAdminSolicitudes@getList');
 $router->post('/admin/requests/process', 'ControllerAdminSolicitudes@process');
+$router->get('/admin/requests/attachments', 'ControllerAdminSolicitudes@getAttachments');
+$router->get('/admin/requests/attachments/download', 'ControllerAdminSolicitudes@downloadAttachment');
 
 // ============================================================
 // SECCIÓN: Animales (Pedidos)

@@ -24,7 +24,7 @@ class ProtocolController {
             $data = $this->model->getByInstitution($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -70,6 +70,26 @@ class ProtocolController {
             $data = $this->model->getProtocolSpecies($_GET['id'] ?? null);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getAttachmentsByProtocol() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idprotA = isset($_GET['idprot']) ? (int)$_GET['idprot'] : 0;
+            if ($idprotA <= 0) {
+                throw new \Exception('ID de protocolo inválido');
+            }
+
+            $data = $this->model->getAttachmentsByProtocol($idprotA, $sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

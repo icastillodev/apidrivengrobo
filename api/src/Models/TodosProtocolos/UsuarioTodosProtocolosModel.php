@@ -3,6 +3,8 @@ namespace App\Models\TodosProtocolos;
 
 use PDO;
 use Exception;
+use App\Utils\BackblazeB2;
+use App\Utils\Auditoria;
 
 class UsuarioTodosProtocolosModel {
     private $db;
@@ -48,8 +50,8 @@ class UsuarioTodosProtocolosModel {
 
     // --- QUERY BASE ---
     private function getCommonFields() {
-        return "p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, p.FechaFinProtA as Vencimiento, 
-                p.variasInst, p.protocoloexpe as IsExterno, p.CantidadAniA, p.IdUsrA,
+        return "p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, p.FechaIniProtA as FechaInicio, p.FechaFinProtA as Vencimiento, 
+                p.variasInst, p.protocoloexpe as IsExterno, p.CantidadAniA, p.IdUsrA, p.departamento as IdDepto,
                 t.NombreTipoprotocolo as TipoNombre,
                 COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA, CONCAT('ID: ', p.IdUsrA)) as ResponsableName,
                 i_orig.NombreCompletoInst as Origen, i_orig.NombreInst as InstitucionOrigen,
@@ -64,7 +66,7 @@ class UsuarioTodosProtocolosModel {
                 (SELECT CONCAT(d.NombreDeptoA, IF(o.NombreOrganismoSimple IS NOT NULL, CONCAT(' - [', o.NombreOrganismoSimple, ']'), '')) FROM protdeptor pd JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo WHERE pd.idprotA = p.idprotA LIMIT 1) as DeptoFormat";
     }
 
-    // 1. MIS PROTOCOLOS (CORREGIDO: Muestra todo lo del usuario)
+    // 1. MIS PROTOCOLOS (muestra todos los protocolos del usuario, sin filtrar por estado)
     public function getMyProtocols($instId, $userId) {
         $fields = $this->getCommonFields();
         $sql = "SELECT $fields, 
@@ -75,6 +77,7 @@ class UsuarioTodosProtocolosModel {
                        END as Aprobado,
                        
                        sp.DetalleAdm,
+                       sp.idSolicitudProtocolo as IdSolicitudProtocoloLocal,
                        sr.Aprobado as AprobadoRed,
                        
                        CASE 
@@ -93,8 +96,7 @@ class UsuarioTodosProtocolosModel {
                 -- JOIN Solicitud Red
                 LEFT JOIN solicitudprotocolo sr ON p.idprotA = sr.idprotA AND sr.TipoPedido = 2
                 
-                -- CORRECCIÓN: FILTRAR SOLO POR USUARIO (Quitar filtro de institución)
-                WHERE p.IdUsrA = ? 
+                WHERE p.IdUsrA = ?
                 ORDER BY p.idprotA DESC";
         
         $stmt = $this->db->prepare($sql);
@@ -183,7 +185,7 @@ class UsuarioTodosProtocolosModel {
         return [$ini, $fin];
     }
 
-    public function createInternal($d, $u) {
+    public function createInternal($d, $u, $files = null) {
         $this->db->beginTransaction();
         try {
             [$ini, $fin] = $this->normalizeProtocolDates($d);
@@ -196,10 +198,53 @@ class UsuarioTodosProtocolosModel {
                 foreach($d['especies'] as $esp) if($esp) $e->execute([$p,$esp]);
             }
             
-            $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,1)")->execute([$p]);
+            $stmtSol = $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA,Aprobado,TipoPedido) VALUES (?,3,1)");
+            $stmtSol->execute([$p]);
+            $idSolicitud = (int)$this->db->lastInsertId();
+
+            if ($files && is_array($files)) {
+                $b2 = new BackblazeB2();
+                $stmtAdj = $this->db->prepare("INSERT INTO solicitudadjuntosprotocolos (nombre_original,file_key,IdSolicitudProtocolo,tipoadjunto) VALUES (?,?,?,?)");
+
+                for ($i = 1; $i <= 3; $i++) {
+                    $field = 'adjunto' . $i;
+                    if (!isset($files[$field])) continue;
+                    $f = $files[$field];
+                    if (!is_array($f) || !isset($f['error']) || $f['error'] !== UPLOAD_ERR_OK) continue;
+                    if (empty($f['tmp_name']) || !is_uploaded_file($f['tmp_name'])) continue;
+
+                    $original = $f['name'] ?? ('archivo_' . $i);
+                    $mime     = !empty($f['type']) ? $f['type'] : 'application/octet-stream';
+                    $size     = isset($f['size']) ? (int)$f['size'] : 0;
+                    $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+
+                    if ($ext !== 'pdf') {
+                        throw new Exception('Solo se aceptan archivos PDF como adjuntos de protocolo.');
+                    }
+                    if ($size <= 0 || $size > (2 * 1024 * 1024)) {
+                        throw new Exception('Cada archivo adjunto debe pesar como máximo 2 MB.');
+                    }
+                    $safeName = preg_replace('/[^\w\.\-]+/u', '_', $original);
+                    if ($safeName === '' || $safeName === null) {
+                        $safeName = 'adjunto_' . $i;
+                    }
+
+                    $fileKey = 'solicitudes_protocolo/' . $idSolicitud . '/' . $i . '_' . $safeName;
+
+                    $b2->uploadFile($f['tmp_name'], $fileKey, $mime);
+
+                    $stmtAdj->execute([
+                        $original,
+                        $fileKey,
+                        $idSolicitud,
+                        $i
+                    ]);
+                }
+            }
             
             Auditoria::log($this->db, 'INSERT', 'protocoloexpe', "Usuario solicitó nuevo protocolo: " . $d['nprotA']);
             $this->db->commit();
+            return $idSolicitud;
         } catch(Exception $e) {
             $this->db->rollBack();
             throw $e;
@@ -252,4 +297,41 @@ class UsuarioTodosProtocolosModel {
             throw $e;
         }
     }
+
+    public function getUserAttachmentsBySolicitud($solId, $userId) {
+        $sql = "SELECT a.Id_adjuntos_protocolos, a.nombre_original, a.file_key, a.tipoadjunto
+                FROM solicitudadjuntosprotocolos a
+                JOIN solicitudprotocolo s ON a.IdSolicitudProtocolo = s.IdSolicitudProtocolo
+                JOIN protocoloexpe p ON s.idprotA = p.idprotA
+                WHERE s.IdSolicitudProtocolo = ? AND p.IdUsrA = ?
+                ORDER BY a.tipoadjunto ASC, a.Id_adjuntos_protocolos ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$solId, $userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getUserAttachmentsByProtocol($idprotA, $userId) {
+        $sql = "SELECT a.Id_adjuntos_protocolos, a.nombre_original, a.file_key, a.tipoadjunto
+                FROM solicitudadjuntosprotocolos a
+                JOIN solicitudprotocolo s ON a.IdSolicitudProtocolo = s.IdSolicitudProtocolo
+                JOIN protocoloexpe p ON s.idprotA = p.idprotA
+                WHERE p.idprotA = ?
+                  AND p.IdUsrA = ?
+                  AND s.TipoPedido = 1
+                ORDER BY s.IdSolicitudProtocolo DESC, a.tipoadjunto ASC, a.Id_adjuntos_protocolos ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idprotA, $userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getUserAttachmentById($attId, $userId) {
+        $sql = "SELECT a.Id_adjuntos_protocolos, a.nombre_original, a.file_key, a.tipoadjunto
+                FROM solicitudadjuntosprotocolos a
+                JOIN solicitudprotocolo s ON a.IdSolicitudProtocolo = s.IdSolicitudProtocolo
+                JOIN protocoloexpe p ON s.idprotA = p.idprotA
+                WHERE a.Id_adjuntos_protocolos = ? AND p.IdUsrA = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$attId, $userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+}

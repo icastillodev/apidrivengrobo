@@ -7,6 +7,25 @@ let sortConfig = { key: 'idprotA', direction: 'desc' };
 let formDataCache = null; // Cache para configuración y listas (Usuarios, Deptos, etc.)
 let openedFromUrl = false;
 
+function isRedProtocol(p) {
+    return String(p?.TipoAprobacion || '').toUpperCase() === 'RED';
+}
+
+function getScopeType(p) {
+    if (isRedProtocol(p)) return 'red';
+    const extFlag = Number(p?.DeptoExternoFlag || 1);
+    return extFlag === 2 ? 'externo' : 'interno';
+}
+
+function escapeHtml(v) {
+    return String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 export async function initProtocolosPage() {
     const instId = localStorage.getItem('instId');
     const instName = localStorage.getItem('NombreInst') || 'Institución';
@@ -21,11 +40,10 @@ export async function initProtocolosPage() {
         const conf = await API.request(`/protocols/form-data?inst=${instId}`);
         formDataCache = conf.data;
         
-        // 2. Configurar visibilidad/valores del filtro de ámbito (Interno / Externo / Red)
+        // 2. Configurar visibilidad del filtro de origen (Propios / Red)
         const filterOrigin = document.getElementById('filter-origin');
         const labelOrigin = document.getElementById('label-origin');
         if (filterOrigin && labelOrigin) {
-            // Mostrar siempre el filtro para Interno/Externo
             filterOrigin.classList.remove('d-none');
             labelOrigin.classList.remove('d-none');
 
@@ -61,6 +79,10 @@ export async function initProtocolosPage() {
     
     // Cambio en el tipo de filtro (Para cambiar Input por Select)
     document.getElementById('filter-type-prot').addEventListener('change', updateSearchInputType);
+    document.getElementById('filter-origin')?.addEventListener('change', () => {
+        currentPage = 1;
+        renderTable();
+    });
 
     // Exportar Excel
     document.getElementById('btn-excel-prot').onclick = exportToExcel;
@@ -114,6 +136,15 @@ function updateSearchInputType() {
                     <option value="">-- ${t?.todos ?? 'Todos'} --</option>
                     <option value="vigente">${t?.vigentes ?? 'Vigentes'}</option>
                     <option value="vencido">${t?.vencidos ?? 'Vencidos'}</option>
+                </select>`;
+    }
+    else if (type === 'AmbitoAdmin') {
+        const txt = window.txt?.admin_protocolos;
+        html = `<select id="search-input-prot" class="form-select form-select-sm border-start-0 fw-bold">
+                    <option value="">-- ${(window.txt?.generales?.todos ?? 'Todos')} --</option>
+                    <option value="interno">${txt?.filter_internos ?? 'INTERNOS'}</option>
+                    <option value="externo">${txt?.filter_externos ?? 'EXTERNOS'}</option>
+                    ${(formDataCache?.has_network ? `<option value="red">${txt?.filter_red ?? 'RED'}</option>` : '')}
                 </select>`;
     }
     // Default -> Input Texto
@@ -211,11 +242,13 @@ function renderTable() {
         // Columna Tipo: solo nombre del tipo
         const tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '---'}</span>`;
 
-        // Columna Ámbito (Interno / Externo) según depto/organismo local
-        const extFlag = Number(p.DeptoExternoFlag || 1);
-        const isExternoLocal = (extFlag === 2);
+        // Columna Ámbito (RED / Interno / Externo)
+        const scopeType = getScopeType(p);
         let ambitoHtml = '';
-        if (isExternoLocal) {
+        if (scopeType === 'red') {
+            const labelRed = window.txt?.admin_protocolos?.filter_red || 'RED';
+            ambitoHtml = `<span class="badge bg-info text-white" style="font-size:9px;">${labelRed}</span>`;
+        } else if (scopeType === 'externo') {
             const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
             ambitoHtml = `<span class="badge bg-danger text-white" style="font-size:9px;">${labelExt}</span>`;
         } else {
@@ -227,7 +260,7 @@ function renderTable() {
         let origenTd = '';
         if (formDataCache && formDataCache.has_network) {
             let origenText = `<span class="badge bg-light text-secondary border">PROPIA</span>`;
-            if (p.InstitucionOrigen && p.InstitucionOrigen !== formDataCache.NombreCompletoInst) {
+            if (isRedProtocol(p)) {
                 origenText = `<span class="badge bg-info text-white" title="Protocolo de Red">RED</span><br><span class="small text-muted" style="font-size:9px">Creada en: ${p.InstitucionOrigen}</span>`;
             }
             origenTd = `<td class="text-center px-2 align-middle">${origenText}</td>`;
@@ -262,6 +295,7 @@ function renderTable() {
 
 function getFilteredAndSortedData() {
     const filterType = document.getElementById('filter-type-prot').value;
+    const filterOrigin = document.getElementById('filter-origin')?.value || 'all';
     
     // Obtenemos el valor sea input o select dinámico
     let inputEl = document.getElementById('search-input-prot');
@@ -270,6 +304,10 @@ function getFilteredAndSortedData() {
     const today = new Date().toISOString().split('T')[0];
 
     let data = allProtocols.filter(p => {
+        // Filtro de origen (Propios / Red)
+        if (filterOrigin === 'propio' && isRedProtocol(p)) return false;
+        if (filterOrigin === 'red' && !isRedProtocol(p)) return false;
+
         // Filtro de Búsqueda
         if (!term) return true;
 
@@ -279,7 +317,20 @@ function getFilteredAndSortedData() {
             return true;
         }
 
-        if (filterType === 'all') return JSON.stringify(p).toLowerCase().includes(term);
+        if (filterType === 'AmbitoAdmin') {
+            return getScopeType(p).includes(term);
+        }
+
+        if (filterType === 'all') {
+            const raw = JSON.stringify(p).toLowerCase();
+            if (raw.includes(term)) return true;
+            const scope = getScopeType(p);
+            const scopeWords = scope === 'interno'
+                ? 'interno internos'
+                : (scope === 'externo' ? 'externo externos' : 'red');
+            const originWords = isRedProtocol(p) ? 'red' : 'propio propia propios propias';
+            return `${scopeWords} ${originWords}`.includes(term);
+        }
         
         // Búsqueda en columna específica (Funciona para ID, Titulo, etc.)
         // Al convertir a String, el ID numérico se vuelve texto y el includes funciona perfecto.
@@ -357,9 +408,15 @@ window.openProtocolModal = async (p = null) => {
     }
 
     let currentSpeciesIds = [];
+    let protocolAttachments = [];
     if (p) {
         const resSpec = await API.request(`/protocols/current-species?id=${p.idprotA}`);
         if (resSpec.status === 'success') currentSpeciesIds = resSpec.data;
+
+        const resAtt = await API.request(`/protocols/attachments-by-protocol?idprot=${p.idprotA}`);
+        if (resAtt && resAtt.status === 'success' && Array.isArray(resAtt.data)) {
+            protocolAttachments = resAtt.data;
+        }
     }
 
     const showOtrosCeuas = false; // Funcionalidad Otros CEUAS retirada
@@ -370,6 +427,24 @@ window.openProtocolModal = async (p = null) => {
 
     const extFlag = p ? Number(p.DeptoExternoFlag || 1) : 1;
     const isExtLocal = (extFlag === 2);
+    const txtProt = window.txt?.admin_protocolos || {};
+    const attachmentsBlock = p ? `
+            <div class="col-12 mt-2 mb-2 p-2 border rounded bg-light">
+                <label class="form-label small fw-bold text-muted mb-2">${txtProt.label_adjuntos || 'Adjuntos'}</label>
+                <div class="d-flex flex-wrap gap-2">
+                    ${protocolAttachments.length > 0
+                        ? protocolAttachments.map(att => `
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    onclick="window.downloadAdminProtocolAttachment(${Number(att.Id_adjuntos_protocolos)})">
+                                <i class="bi bi-paperclip me-1"></i>${escapeHtml(att.nombre_original || `Adjunto ${att.tipoadjunto || ''}`)}
+                            </button>
+                          `).join('')
+                        : `<span class="small text-muted">${txtProt.sin_adjuntos || 'Sin adjuntos'}</span>`
+                    }
+                </div>
+            </div>
+    ` : '';
 
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
@@ -476,6 +551,8 @@ window.openProtocolModal = async (p = null) => {
                     <label class="form-label small fw-bold text-muted">FECHA VENCIMIENTO</label>
                     <input type="date" name="FechaFinProtA" class="form-control" value="${p?.FechaFinProtA || ''}">
                 </div>
+
+                ${attachmentsBlock}
                 
                 <div class="col-12 mt-3 bg-light p-2 border rounded">
                     <label class="form-label small fw-bold text-muted uppercase">Especies Asociadas</label>
@@ -597,12 +674,45 @@ window.downloadProtocolPDF = async (id) => {
     await html2pdf().set(opt).from(cloned).save();
 };
 
+window.downloadAdminProtocolAttachment = async (attId) => {
+    const txtProt = window.txt?.admin_protocolos || {};
+    try {
+        window.Swal?.fire({
+            title: txtProt.descargando_archivo || 'Descargando archivo...',
+            html: txtProt.espere_momento || 'Espere un momento',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => window.Swal.showLoading()
+        });
+
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch(`${API.urlBase}/admin/requests/attachments/download?id=${attId}`, { headers });
+        if (!res.ok) {
+            const text = await res.text();
+            console.error('Error descargando adjunto en modal de protocolos:', text);
+            window.Swal?.close();
+            window.Swal?.fire('Error', txtProt.error_descarga || 'No se pudo descargar el archivo.', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        window.Swal?.close();
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+        console.error('Error de red al descargar adjunto en modal de protocolos:', err);
+        window.Swal?.close();
+        window.Swal?.fire('Error', txtProt.error_descarga || 'Error de red al descargar el archivo.', 'error');
+    }
+};
+
 function exportToExcel() {
     const data = getFilteredAndSortedData();
     const exportData = data.map(p => ({
         ID: p.idprotA, Nro: p.nprotA, Titulo: p.tituloA, Inv: p.InvestigadorACargA,
         Resp: p.ResponsableFormat, Depto: p.DeptoFormat, Tipo: p.TipoNombre,
-        Vence: p.Vencimiento, Origen: p.InstitucionOrigen || 'PROPIA'
+        Vence: p.Vencimiento, Origen: (String(p.TipoAprobacion || '').toUpperCase() === 'RED' ? 'RED' : 'PROPIA')
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();

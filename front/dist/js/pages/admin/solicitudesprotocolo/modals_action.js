@@ -1,4 +1,5 @@
 import { sendDecision, loadRequests } from './api_service.js';
+import { API } from '../../../api.js';
 
 // --- CONFIGURACIÓN DEL FORMULARIO (SUBMIT) ---
 export function setupModal() {
@@ -56,7 +57,7 @@ export function setupModal() {
 }
 
 // --- FUNCIÓN PARA ABRIR EL MODAL (Desde la tabla) ---
-export function openRequestDetails(row) {
+export async function openRequestDetails(row) {
     // Helper seguro para asignar texto sin romper si el ID no existe
     const setVal = (id, text) => {
         const el = document.getElementById(id);
@@ -116,10 +117,73 @@ export function openRequestDetails(row) {
     const helpText = (txt.ayuda_mensaje || "Se enviará a: {email}").replace('{email}', emailUser);
     setVal('msg-help-text', helpText);
 
-    // 5. Asegurar que los botones estén habilitados
+    // 5. Adjuntos (si existen)
+    const attachmentsBlock = document.getElementById('attachments-block');
+    const attachmentsList = document.getElementById('view-attachments');
+    if (attachmentsBlock && attachmentsList) {
+        attachmentsList.innerHTML = '';
+        attachmentsBlock.classList.add('d-none');
+
+        try {
+            const res = await API.request(`/admin/requests/attachments?id=${row.idSolicitudProtocolo}`);
+            if (res.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+                const m = window.txt?.solicitudprotocolo?.modal || {};
+                res.data.forEach(att => {
+                    const li = document.createElement('li');
+                    let label;
+                    if (att.tipoadjunto == 1) label = m.adjunto_protocolo || 'Protocolo';
+                    else if (att.tipoadjunto == 2) label = m.adjunto_aval || 'Aval';
+                    else label = m.adjunto_otro || 'Otro';
+
+                    const base = API.urlBase || '';
+                    const url = `${base}/admin/requests/attachments/download?id=${att.Id_adjuntos_protocolos}`;
+                    li.innerHTML = `<button type="button" class="btn btn-link p-0 text-decoration-none">
+                        <i class="bi bi-paperclip me-1"></i><strong>${label}:</strong> <span class="text-decoration-underline">${att.nombre_original}</span>
+                    </button>`;
+                    const btn = li.querySelector('button');
+                    btn.onclick = async () => {
+                        try {
+                            window.Swal?.fire({
+                                title: 'Descargando archivo...',
+                                html: 'Espere un momento',
+                                allowOutsideClick: false,
+                                allowEscapeKey: false,
+                                didOpen: () => window.Swal.showLoading()
+                            });
+                            const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+                            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                            const res = await fetch(url, { headers });
+                            if (!res.ok) {
+                                const text = await res.text();
+                                console.error('Error descargando adjunto admin:', text);
+                                window.Swal?.close();
+                                window.Swal?.fire('Error', 'No se pudo descargar el archivo.', 'error');
+                                return;
+                            }
+                            const blob = await res.blob();
+                            window.Swal?.close();
+                            const blobUrl = URL.createObjectURL(blob);
+                            window.open(blobUrl, '_blank');
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+                        } catch (err) {
+                            console.error('Error de red al descargar adjunto admin:', err);
+                            window.Swal?.close();
+                            window.Swal?.fire('Error', 'Error de red al descargar el archivo.', 'error');
+                        }
+                    };
+                    attachmentsList.appendChild(li);
+                });
+                attachmentsBlock.classList.remove('d-none');
+            }
+        } catch (e) {
+            console.error('Error cargando adjuntos de solicitud:', e);
+        }
+    }
+
+    // 6. Asegurar que los botones estén habilitados
     const btns = document.querySelectorAll('#form-decision button');
     btns.forEach(b => b.disabled = false);
 
-    // 6. Mostrar Modal
+    // 7. Mostrar Modal
     new bootstrap.Modal(document.getElementById('modal-details')).show();
 }

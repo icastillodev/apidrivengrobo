@@ -127,4 +127,23 @@ class AdminSolicitudesModel {
         $stmt->execute([$solId]);
         return $stmt->fetchColumn() ?: 'Institución';
     }
+
+    public function getAttachmentsBySolicitud($solId) {
+        $sql = "SELECT Id_adjuntos_protocolos, nombre_original, file_key, tipoadjunto
+                FROM solicitudadjuntosprotocolos
+                WHERE IdSolicitudProtocolo = ?
+                ORDER BY tipoadjunto ASC, Id_adjuntos_protocolos ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$solId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAttachmentById($id) {
+        $sql = "SELECT Id_adjuntos_protocolos, nombre_original, file_key, tipoadjunto
+                FROM solicitudadjuntosprotocolos
+                WHERE Id_adjuntos_protocolos = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 }

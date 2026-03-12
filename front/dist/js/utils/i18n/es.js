@@ -244,6 +244,7 @@ export const es = {
             label_especies: "Especies",
             label_vencimiento: "Vencimiento",
             label_origen: "Institución de Origen",
+            label_adjuntos: "Archivos adjuntos",
             label_mensaje: "MENSAJE / OBSERVACIONES",
             placeholder: "Escriba el motivo, correcciones necesarias o comentarios...",
             ayuda_mensaje: "Se enviará una notificación a: {email}",
@@ -261,7 +262,10 @@ export const es = {
             no_especificado: "No especificado",
             estandar: "Estándar",
             no_registradas: "No registradas",
-            interno: "Interno"
+            interno: "Interno",
+            adjunto_protocolo: "Protocolo",
+            adjunto_aval: "Aval",
+            adjunto_otro: "Otro"
         },
         alertas: {
             error: "Error al procesar la solicitud."
@@ -1228,6 +1232,10 @@ export const es = {
         especies_asociadas: "ESPECIES ASOCIADAS",
         agregar_especie: "Agregar Especie",
         enviar_solicitud: "ENVIAR SOLICITUD",
+        label_adjuntos: "ADJUNTOS (OPCIONAL)",
+        adjunto_protocolo: "Protocolo (PDF/Doc)",
+        adjunto_aval: "Aval / Carta",
+        adjunto_otro: "Otro documento",
         como_funciona_titulo: "¿Cómo funciona?",
         compartir_red: "COMPARTIR EN RED",
         red_solo_propios: "Solo puede enviar a la red sus propios protocolos vigentes y aprobados localmente.",
@@ -1419,6 +1427,7 @@ export const es = {
         bread_gestion: "Gestión Protocolos",
         label_origen: "Ámbito:",
         filter_todos: "TODOS",
+        filter_propios: "PROPIOS",
         filter_internos: "INTERNOS",
         filter_externos: "EXTERNOS",
         filter_red: "De red",
@@ -1431,12 +1440,18 @@ export const es = {
         filter_resp_proyecto: "Resp. Proyecto",
         filter_resp_protocolo: "Resp. Protocolo",
         filter_tipo: "Tipo",
+        filter_ambito: "Ámbito",
         filter_depto: "Departamento",
         filter_vencimiento: "Estado Vencimiento",
         ph_buscar: "Escribe para buscar...",
         btn_solicitudes: "Solicitudes",
         btn_nuevo: "Nuevo",
-        btn_excel: "Excel"
+        btn_excel: "Excel",
+        label_adjuntos: "Adjuntos",
+        sin_adjuntos: "Sin adjuntos",
+        descargando_archivo: "Descargando archivo...",
+        espere_momento: "Espere un momento",
+        error_descarga: "No se pudo descargar el archivo."
     },
     admin_animales: {
         bread_grobo: "GROBO",
