@@ -32,7 +32,7 @@ export function renderTable() {
     const today = new Date().toISOString().split('T')[0];
 
     tbody.innerHTML = '';
-    if (pageData.length === 0) { tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-muted fst-italic">No se encontraron protocolos.</td></tr>'; renderPagination(0); return; }
+    if (pageData.length === 0) { tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted fst-italic">No se encontraron protocolos.</td></tr>'; renderPagination(0); return; }
 
     pageData.forEach(p => {
         let dateClass = "text-muted";
@@ -43,12 +43,6 @@ export function renderTable() {
         }
 
         let tipoHtml = `<span class="fw-bold text-dark">${p.TipoNombre || '-'}</span>`;
-
-        let origenHtml = `<span class="badge bg-light text-dark border">PROPIA</span>`;
-        if (p.OrigenCalculado === 'RED' || (p.Origen && p.Origen !== store.formDataCache.NombreCompletoInst)) {
-            const inst = p.InstitucionOrigen || p.Origen || '';
-            origenHtml = `<span class="badge bg-info text-white">RED</span><br><span class="small text-muted" style="font-size:9px">${inst}</span>`;
-        }
 
         let estadoHtml = '-';
         if(store.currentTab === 'my') {
@@ -68,13 +62,15 @@ export function renderTable() {
             if(!e.target.closest('button') && !e.target.closest('.badge')) viewProtocol(p.idprotA); 
         };
 
-        let actions = `<button class="btn btn-sm btn-outline-secondary" onclick="window.viewProtocol(${p.idprotA})" title="Ver Detalle"><i class="bi bi-eye"></i></button>`;
+        const t = window.txt?.misprotocolos || {};
+        let actions = `<button class="btn btn-sm btn-outline-secondary" onclick="window.viewProtocol(${p.idprotA})" title="${t.accion_ver_detalle || 'Ver Detalle'}"><i class="bi bi-eye"></i></button>`;
+        actions += `<button class="btn btn-sm btn-outline-danger ms-1" onclick="window.downloadProtocolPDF(${p.idprotA})" title="${t.accion_pdf_ficha || 'Descargar ficha PDF'}"><i class="bi bi-file-earmark-pdf-fill"></i></button>`;
         
         if (store.currentTab === 'my') {
             if (p.Aprobado == 2 || p.Aprobado == 4) {
                 actions += `<button class="btn btn-sm btn-warning ms-1" onclick="window.openEditProtocolModal(${p.idprotA})" title="Corregir"><i class="bi bi-pencil-square"></i></button>`;
             } 
-            else if ((p.Aprobado == 1 || p.Aprobado == 1) && p.variasInst != 2 && (!p.Vencimiento || p.Vencimiento >= today)) {
+            else if ((p.Aprobado == 1 || p.Aprobado == 1) && (!p.Vencimiento || p.Vencimiento >= today)) {
                 if(store.formDataCache.has_network) {
                     actions += `<button class="btn btn-sm btn-info text-white ms-1" onclick="window.openNetworkRequestModal(${p.idprotA})" title="Solicitar en Red"><i class="bi bi-share-fill"></i></button>`;
                 }
@@ -88,7 +84,6 @@ export function renderTable() {
             <td class="small px-2 fw-bold text-dark"><i class="bi bi-person-fill text-muted"></i> ${p.ResponsableName || 'Sin Asignar'}</td>
             <td class="small px-2 text-muted">${p.InvestigadorACargA || '-'}</td>
             <td class="px-2 text-center small">${tipoHtml}</td>
-            <td class="px-2 text-center">${origenHtml}</td>
             <td class="px-2 text-center">${estadoHtml}</td>
             <td class="px-2 small ${dateClass}">${dateText}</td>
             <td class="px-2 text-end">${actions}</td>

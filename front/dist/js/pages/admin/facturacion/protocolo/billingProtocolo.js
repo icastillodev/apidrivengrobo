@@ -337,6 +337,14 @@ function renderDashboardProtocolo(totales) {
     if (document.getElementById(ids.pagado)) document.getElementById(ids.pagado).innerText = f(totales.totalPagado);
 }
 
+function getSelectedDateRangeLabelProt() {
+    const desde = document.getElementById('f-desde')?.value || '';
+    const hasta = document.getElementById('f-hasta')?.value || '';
+    if (!desde && !hasta) return '-';
+    if (desde && hasta) return `${desde} a ${hasta}`;
+    return desde || hasta;
+}
+
 // =====================================
 // EXPORTADOR PDF
 // =====================================
@@ -361,6 +369,7 @@ window.downloadProtocoloPDF = async (idProt) => {
         const right = pageW - M;
         const inst = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
         const verdeGecko = [25, 135, 84];
+        const rangoFechas = getSelectedDateRangeLabelProt();
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
         doc.text(`${inst}`, 105, M, { align: "center" });
@@ -378,8 +387,10 @@ window.downloadProtocoloPDF = async (idProt) => {
         doc.setFont("helvetica", "normal"); doc.text(`${info.Departamento}`, 50, M + 32);
         doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, M, M + 38);
         doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, M + 38);
+        doc.setFont("helvetica", "bold"); doc.text(`RANGO FILTRADO:`, M, M + 44);
+        doc.setFont("helvetica", "normal"); doc.text(`${rangoFechas}`, 50, M + 44);
 
-        let currentY = M + 45;
+        let currentY = M + 51;
 
         if (data.formularios?.length > 0) {
             const bodyForms = data.formularios.map(f => {

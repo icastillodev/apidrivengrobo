@@ -196,6 +196,104 @@ class BackblazeB2
         exit;
     }
 
+    /**
+     * Borra un archivo por su key/path (file_key guardado en BD).
+     * Si no existe en B2, no lanza error.
+     */
+    public function deleteFileByKey(string $fileKey): void
+    {
+        $this->authorize();
+
+        $lookupUrl = self::$apiUrl . '/b2api/v2/b2_list_file_names';
+        $lookupPayload = json_encode([
+            'bucketId'      => $this->bucketId,
+            'prefix'        => $fileKey,
+            'maxFileCount'  => 1,
+        ]);
+
+        $ch = curl_init($lookupUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: ' . self::$authToken,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_POSTFIELDS     => $lookupPayload,
+        ]);
+
+        $res  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($res === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Error de conexión con Backblaze B2 (list_file_names): ' . $err);
+        }
+        curl_close($ch);
+
+        $data = json_decode($res, true);
+        if ($code !== 200 || !is_array($data)) {
+            throw new Exception('Respuesta inválida de Backblaze B2 (list_file_names): ' . $res);
+        }
+
+        $files = $data['files'] ?? [];
+        if (empty($files) || !is_array($files)) {
+            return;
+        }
+
+        $target = null;
+        foreach ($files as $f) {
+            if (($f['fileName'] ?? '') === $fileKey) {
+                $target = $f;
+                break;
+            }
+        }
+        if ($target === null) {
+            return;
+        }
+
+        $fileName = $target['fileName'] ?? '';
+        $fileId   = $target['fileId'] ?? '';
+        if ($fileName === '' || $fileId === '') {
+            return;
+        }
+
+        $deleteUrl = self::$apiUrl . '/b2api/v2/b2_delete_file_version';
+        $deletePayload = json_encode([
+            'fileName' => $fileName,
+            'fileId'   => $fileId,
+        ]);
+
+        $ch = curl_init($deleteUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: ' . self::$authToken,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_POSTFIELDS     => $deletePayload,
+        ]);
+
+        $res  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($res === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            throw new Exception('Error de conexión con Backblaze B2 (delete_file_version): ' . $err);
+        }
+        curl_close($ch);
+
+        $data = json_decode($res, true);
+        if ($code !== 200) {
+            $apiCode = is_array($data) ? ($data['code'] ?? '') : '';
+            if ($apiCode === 'file_not_present' || $apiCode === 'no_such_file') {
+                return;
+            }
+            throw new Exception('Error al borrar archivo en Backblaze B2: ' . $res);
+        }
+    }
+
     private function sanitizeFileName(string $name): string
     {
         $name = preg_replace('/[^\w\.\-]+/u', '_', $name);

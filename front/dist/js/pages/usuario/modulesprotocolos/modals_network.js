@@ -6,10 +6,11 @@ export function openNetworkRequestModal(id = null) {
     const select = document.getElementById('select-my-prot');
     select.innerHTML = '';
     const today = new Date().toISOString().split('T')[0];
+    const t = window.txt?.misprotocolos || {};
     
-    const candidates = store.allData.my.filter(p => p.variasInst != 2 && (!p.Vencimiento || p.Vencimiento >= today) && p.Aprobado == 1);
+    const candidates = store.allData.my.filter(p => (!p.Vencimiento || p.Vencimiento >= today) && p.Aprobado == 1);
     
-    if (candidates.length === 0) return window.Swal.fire('Atención', 'No tiene protocolos APROBADOS vigentes para compartir.', 'warning');
+    if (candidates.length === 0) return window.Swal.fire('Atención', t.red_no_candidatos || 'No tiene protocolos APROBADOS vigentes para compartir.', 'warning');
 
     candidates.forEach(p => {
         const opt = document.createElement('option');
@@ -17,6 +18,7 @@ export function openNetworkRequestModal(id = null) {
         opt.text = `[${p.nprotA}] ${p.tituloA}`;
         opt.dataset.title = p.tituloA;
         opt.dataset.id = p.idprotA;
+        opt.dataset.nprot = p.nprotA || '-';
         opt.dataset.date = p.Vencimiento || '-';
         select.appendChild(opt);
     });
@@ -25,6 +27,8 @@ export function openNetworkRequestModal(id = null) {
     
     document.getElementById('prot-details-preview').classList.add('d-none');
     document.getElementById('step-3-network').classList.add('d-none');
+    document.getElementById('network-status-block').classList.add('d-none');
+    document.getElementById('network-status-list').innerHTML = '';
     document.getElementById('btn-send-net').disabled = true;
     
     new bootstrap.Modal(document.getElementById('modal-network-req')).show();
@@ -43,6 +47,7 @@ export function showProtDetails() {
     if(!opt) return;
     
     document.getElementById('preview-title').innerText = opt.dataset.title;
+    document.getElementById('preview-nprot').innerText = opt.dataset.nprot || '-';
     document.getElementById('preview-id').innerText = opt.dataset.id;
     document.getElementById('preview-date').innerText = opt.dataset.date;
     
@@ -50,6 +55,7 @@ export function showProtDetails() {
     document.getElementById('step-3-network').classList.remove('d-none');
     
     loadNetworkInstitutions();
+    loadNetworkStatusByProtocol(opt.value);
 }
 
 async function loadNetworkInstitutions() {
@@ -79,6 +85,44 @@ async function loadNetworkInstitutions() {
     }
 }
 
+function getStatusBadgeHtml(status) {
+    const t = window.txt?.misprotocolos || {};
+    const code = Number(status);
+    if (code === 1) return `<span class="badge bg-success">${t.red_estado_aprobada || 'APROBADA'}</span>`;
+    if (code === 2 || code === 4) return `<span class="badge bg-danger">${t.red_estado_rechazada || 'RECHAZADA'}</span>`;
+    if (code === 3) return `<span class="badge bg-warning text-dark">${t.red_estado_revision || 'EN REVISIÓN'}</span>`;
+    return `<span class="badge bg-secondary">${t.red_estado_no_enviada || 'NO ENVIADA'}</span>`;
+}
+
+async function loadNetworkStatusByProtocol(idprot) {
+    const block = document.getElementById('network-status-block');
+    const list = document.getElementById('network-status-list');
+    const t = window.txt?.misprotocolos || {};
+    if (!block || !list || !idprot) return;
+
+    block.classList.remove('d-none');
+    list.innerHTML = `<div class="text-muted"><span class="spinner-border spinner-border-sm me-2"></span>${t.red_estado_cargando || 'Cargando estados...'}</div>`;
+
+    try {
+        const res = await API.request(`/user/protocols/network-status?idprot=${idprot}`);
+        if (res.status !== 'success' || !Array.isArray(res.data) || res.data.length === 0) {
+            list.innerHTML = `<div class="text-muted">${t.red_estado_sin_datos || 'Sin datos de estado para mostrar.'}</div>`;
+            return;
+        }
+
+        list.innerHTML = res.data.map(r => {
+            const ownBadge = Number(r.esPropia) === 1 ? `<span class="badge bg-primary ms-2">${t.red_institucion_propia || 'PROPIA'}</span>` : '';
+            return `<div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                        <div class="fw-bold">${r.NombreInst || '-'}${ownBadge}</div>
+                        <div>${getStatusBadgeHtml(r.estado)}</div>
+                    </div>`;
+        }).join('');
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = `<div class="text-danger">${t.red_estado_error || 'Error al cargar estados.'}</div>`;
+    }
+}
+
 // CORRECCIÓN SELECCIÓN DE INSTITUCIÓN
 export function checkNetBtn(element) {
     // Si se pasa el elemento (div clickeado), invertir el check
@@ -96,18 +140,19 @@ export function checkNetBtn(element) {
 
 export async function sendNetworkRequest() {
     const pid = document.getElementById('select-my-prot').value;
+    const t = window.txt?.misprotocolos || {};
     
     // Obtener array de IDs seleccionados
     const checkboxes = document.querySelectorAll('#network-inst-list input[type="checkbox"]:checked');
     const tgts = Array.from(checkboxes).map(cb => cb.value);
     
-    if (tgts.length === 0) return window.Swal.fire('Error', 'Seleccione al menos una institución destino.', 'warning');
+    if (tgts.length === 0) return window.Swal.fire('Error', t.red_select_destino_req || 'Seleccione al menos una institución destino.', 'warning');
 
     try {
         const res = await API.request('/user/protocols/create-network-request', 'POST', { idprotA: pid, targets: tgts });
         if(res.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('modal-network-req')).hide();
-            window.Swal.fire('Enviado', 'Solicitud enviada a la red.', 'success');
+            window.Swal.fire(t.red_enviado_title || 'Enviado', t.red_enviado_msg || 'Solicitud enviada a la red.', 'success');
             loadData();
         } else { window.Swal.fire('Error', res.message, 'error'); }
     } catch(e) { console.error(e); }

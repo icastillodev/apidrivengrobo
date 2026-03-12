@@ -413,18 +413,54 @@ public function updateStatus($data) {
         $config = $stmtConfig->fetch(\PDO::FETCH_ASSOC);
 
         // B. Protocolos
-        $sql = "SELECT 
-                    p.idprotA, p.nprotA, p.tituloA, 
-                    p.IdUsrA as IdInvestigador,
-                    CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable
+        $sql = "SELECT DISTINCT
+                    p.idprotA, p.nprotA, p.tituloA,
+                    p.IdInstitucion as OwnerInstId,
+                    CASE
+                        WHEN p.IdInstitucion = ? THEN 1
+                        WHEN pr.IdProtocoloExpRed IS NULL THEN 0
+                        WHEN pr.IdUsrA IS NULL OR pr.iddeptoA IS NULL OR pr.idtipoprotocolo IS NULL OR pr.IdSeveridadTipo IS NULL THEN 0
+                        WHEN (SELECT COUNT(*) FROM protocoloexpered_especies prs WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed) <= 0 THEN 0
+                        ELSE 1
+                    END as RedConfigCompleta,
+                    COALESCE(pr.IdUsrA, p.IdUsrA) as IdInvestigador,
+                    COALESCE(CONCAT(per.NombreA, ' ', per.ApellidoA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable
                 FROM protocoloexpe p
-                INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
-                WHERE p.IdInstitucion = ? 
-                AND p.FechaFinProtA >= CURDATE() 
-                AND p.CantidadAniA > 0 
+                LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+                LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
+                WHERE p.FechaFinProtA >= CURDATE()
+                  AND p.CantidadAniA > 0
+                  AND (
+                    (
+                        p.IdInstitucion = ?
+                        AND (
+                            NOT EXISTS (
+                                SELECT 1 FROM solicitudprotocolo s0
+                                WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
+                            )
+                            OR EXISTS (
+                                SELECT 1 FROM solicitudprotocolo s1
+                                WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
+                            )
+                        )
+                    )
+                    OR
+                    (
+                        pi.IdInstitucion = ?
+                        AND p.IdInstitucion <> ?
+                        AND EXISTS (
+                            SELECT 1 FROM solicitudprotocolo sr
+                            WHERE sr.idprotA = p.idprotA
+                              AND sr.TipoPedido = 2
+                              AND sr.IdInstitucion = ?
+                              AND sr.Aprobado = 1
+                        )
+                    )
+                  )
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
         
         // C. Email Usuario
         $stmtUser = $this->db->prepare("SELECT EmailA FROM personae WHERE IdUsrA = ?");
@@ -458,40 +494,71 @@ public function updateStatus($data) {
     /**
      * Obtiene info detallada de un protocolo y sus especies permitidas.
      */
-public function getDetailsAndSpecies($protId) {
+public function getDetailsAndSpecies($protId, $instId = null) {
+        $instId = (int)$instId;
         // A. Info General (Igual que antes)
         $stmtInfo = $this->db->prepare("
             SELECT 
                 p.idprotA, p.tituloA, p.nprotA, p.CantidadAniA as saldo, p.FechaFinProtA,
-                CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable,
+                p.IdInstitucion as OwnerInstId,
+                CASE
+                    WHEN p.IdInstitucion = ? THEN 1
+                    WHEN pr.IdProtocoloExpRed IS NULL THEN 0
+                    WHEN pr.IdUsrA IS NULL OR pr.iddeptoA IS NULL OR pr.idtipoprotocolo IS NULL OR pr.IdSeveridadTipo IS NULL THEN 0
+                    WHEN (SELECT COUNT(*) FROM protocoloexpered_especies prs WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed) <= 0 THEN 0
+                    ELSE 1
+                END as RedConfigCompleta,
+                COALESCE(CONCAT(per.NombreA, ' ', per.ApellidoA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable,
                 COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto,
                 (SELECT COALESCE(SUM(s.totalA), 0) FROM protformr pf JOIN sexoe s ON pf.idformA = s.idformA WHERE pf.idprotA = p.idprotA) as usados
             FROM protocoloexpe p
-            INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
+            LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+            LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
             LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
-            LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
+            LEFT JOIN departamentoe d ON d.iddeptoA = COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento)
             WHERE p.idprotA = ?
         ");
-        $stmtInfo->execute([$protId]);
+        $stmtInfo->execute([$instId, $instId, $protId]);
         $info = $stmtInfo->fetch(PDO::FETCH_ASSOC);
 
-        // B. Especies y Subespecies (CORREGIDO)
-        // Solo trae lo que está en 'protesper' Y tiene subespecies activas (Existe != 2)
-        $sqlEsp = "SELECT 
-                    e.idespA, 
-                    e.EspeNombreA,
-                    s.idsubespA, 
-                    s.SubEspeNombreA
-                   FROM protesper pe
-                   INNER JOIN especiee e ON pe.idespA = e.idespA
-                   INNER JOIN subespecie s ON e.idespA = s.idespA
-                   WHERE pe.idprotA = ? 
-                   AND s.Existe != 2  -- Regla de Oro: Solo activas
-                   ORDER BY e.EspeNombreA ASC, s.SubEspeNombreA ASC";
-        
-        $stmtEsp = $this->db->prepare($sqlEsp);
-        $stmtEsp->execute([$protId]);
-        $rows = $stmtEsp->fetchAll(PDO::FETCH_ASSOC);
+        // B. Especies y Subespecies (primero configuración local de red; si no hay, origen)
+        $rows = [];
+        $isRedContext = !empty($info) && (int)($info['OwnerInstId'] ?? 0) !== $instId;
+        if ($instId > 0 && $isRedContext) {
+            $sqlEspRed = "SELECT 
+                            e.idespA,
+                            e.EspeNombreA,
+                            s.idsubespA,
+                            s.SubEspeNombreA
+                          FROM protocoloexpered pr
+                          JOIN protocoloexpered_especies pre ON pre.IdProtocoloExpRed = pr.IdProtocoloExpRed
+                          JOIN especiee e ON pre.idespA = e.idespA
+                          JOIN subespecie s ON e.idespA = s.idespA
+                          WHERE pr.idprotA = ?
+                            AND pr.IdInstitucion = ?
+                            AND s.Existe != 2
+                          ORDER BY e.EspeNombreA ASC, s.SubEspeNombreA ASC";
+            $stmtEspRed = $this->db->prepare($sqlEspRed);
+            $stmtEspRed->execute([$protId, $instId]);
+            $rows = $stmtEspRed->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        if (empty($rows) && !$isRedContext) {
+            $sqlEsp = "SELECT 
+                        e.idespA, 
+                        e.EspeNombreA,
+                        s.idsubespA, 
+                        s.SubEspeNombreA
+                       FROM protesper pe
+                       INNER JOIN especiee e ON pe.idespA = e.idespA
+                       INNER JOIN subespecie s ON e.idespA = s.idespA
+                       WHERE pe.idprotA = ? 
+                       AND s.Existe != 2
+                       ORDER BY e.EspeNombreA ASC, s.SubEspeNombreA ASC";
+            $stmtEsp = $this->db->prepare($sqlEsp);
+            $stmtEsp->execute([$protId]);
+            $rows = $stmtEsp->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         return ['info' => $info, 'species' => $this->buildSpeciesTree($rows)];
     }
@@ -554,8 +621,13 @@ public function saveOrder($data) {
 
             $finalDepto = 0;
             if (!empty($data['idprotA'])) {
-                $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
-                $stmtDepto->execute([$data['idprotA']]);
+                $stmtDepto = $this->db->prepare("SELECT COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento) as iddeptoA
+                                                 FROM protocoloexpe p
+                                                 LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                                 LEFT JOIN protdeptor pd ON pd.idprotA = p.idprotA
+                                                 WHERE p.idprotA = ?
+                                                 LIMIT 1");
+                $stmtDepto->execute([$data['instId'], $data['idprotA']]);
                 $finalDepto = $stmtDepto->fetchColumn() ?: 0;
             }
             if ($finalDepto == 0) {

@@ -5,6 +5,7 @@ let speciesData = [];
 let dataFull = null;
 let currentUserEmail = "No disponible";
 let protocolHelpConfig = { has_network: false, has_approved_vigent: false };
+let selectedProtocolMeta = { redIncomplete: false };
 let cepasState = { hasCepas: false };
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 /* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
@@ -216,6 +217,7 @@ function setupSearch() {
         }
 
         items.forEach(p => {
+            const isRedIncomplete = Number(p?.OwnerInstId || 0) !== Number(getContextInstId()) && Number(p?.RedConfigCompleta || 0) !== 1;
             const item = document.createElement('div');
             item.className = "list-group-item list-group-item-action protocol-result-item p-3";
             item.style.cursor = "pointer";
@@ -229,6 +231,9 @@ function setupSearch() {
                         ${p.tituloA}
                     </span>
                 </div>`;
+            if (isRedIncomplete) {
+                item.innerHTML += `<div class="mt-1"><span class="badge bg-danger">${window.txt?.form_animales?.protocolo_no_habilitado_badge || 'NO HABILITADO'}</span></div>`;
+            }
             
             item.onmousedown = (e) => { 
                 e.preventDefault();
@@ -290,7 +295,7 @@ function resetCepaSelect() {
         container.style.display = 'none';
         select.disabled = true;
         select.required = false;
-        select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin cepa / no aplica'}</option>`;
+        select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin Cepa/Stock/Raza / no aplica'}</option>`;
     });
 }
 
@@ -341,7 +346,7 @@ async function loadCepasForEspecie(idespA) {
                 select.innerHTML = `<option value="0">-<\/option>`;
                 // Mensaje: no hay cepa
                 const help = container.querySelector('small');
-                if (help) help.innerText = t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+                if (help) help.innerText = t?.no_cepa_disponible || 'No hay Cepa/Stock/Raza a seleccionar.';
             }
         });
     } catch (e) {
@@ -352,23 +357,45 @@ async function loadCepasForEspecie(idespA) {
             container.style.display = 'block';
             select.required = false;
             select.disabled = false;
-            select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin cepa / no aplica'}</option>`;
+            select.innerHTML = `<option value="0">${t?.sin_cepa || 'Sin Cepa/Stock/Raza / no aplica'}</option>`;
             const help = container.querySelector('small');
-            if (help) help.innerText = t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+            if (help) help.innerText = t?.no_cepa_disponible || 'No hay Cepa/Stock/Raza a seleccionar.';
         });
     }
 }
 
 async function selectProtocol(p) {
+    const isRedIncomplete = Number(p?.OwnerInstId || 0) !== Number(getContextInstId()) && Number(p?.RedConfigCompleta || 0) !== 1;
+    if (isRedIncomplete) {
+        selectedProtocolMeta.redIncomplete = true;
+        return Swal.fire(
+            window.txt?.form_animales?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+            window.txt?.form_animales?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+            'warning'
+        );
+    }
+    selectedProtocolMeta.redIncomplete = false;
+
     document.getElementById('step-1').classList.add('hidden-section');
     document.getElementById('step-2').classList.remove('hidden-section');
     document.getElementById('selected-prot-id').value = p.idprotA;
     document.getElementById('is-otros-ceuas').value = "0";
 
     try {
-        const res = await API.request(`/animals/protocol-details?id=${p.idprotA}`);
+        const instId = getContextInstId();
+        const res = await API.request(`/animals/protocol-details?id=${p.idprotA}&inst=${instId}`);
         if (res.status === 'success') {
             const { info, species } = res.data;
+            if (Number(info?.RedConfigCompleta || 1) !== 1 && Number(info?.OwnerInstId || 0) !== Number(instId)) {
+                selectedProtocolMeta.redIncomplete = true;
+                document.getElementById('step-2').classList.add('hidden-section');
+                document.getElementById('step-1').classList.remove('hidden-section');
+                return Swal.fire(
+                    window.txt?.form_animales?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+                    window.txt?.form_animales?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+                    'warning'
+                );
+            }
             speciesData = species;
 
             document.getElementById('info-titulo').innerText = info.tituloA;
@@ -410,7 +437,10 @@ function populateSpeciesSelect() {
     resetCepaSelect();
 
     if (!speciesData || speciesData.length === 0) {
-        sel.innerHTML = `<option value="">Sin especie asignada, hablar con admin ${instName}</option>`;
+        const msg = selectedProtocolMeta.redIncomplete
+            ? (window.txt?.form_animales?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.')
+            : `Sin especie asignada, hablar con admin ${instName}`;
+        sel.innerHTML = `<option value="">${msg}</option>`;
         sel.classList.add('text-danger', 'fw-bold');
         sel.disabled = true;
         return;
@@ -485,7 +515,7 @@ async function handleReview(e) {
     if (cepasState.hasCepas && (!cepaVal || cepaVal === '0')) {
         return Swal.fire(
             t?.debe_seleccionar_cepa_titulo || 'Falta información',
-            t?.debe_seleccionar_cepa_texto || 'Debe seleccionar una cepa.',
+            t?.debe_seleccionar_cepa_texto || 'Debe seleccionar una Cepa/Stock/Raza.',
             'warning'
         );
     }
@@ -514,7 +544,7 @@ async function handleReview(e) {
     const cepaSelTxt = (() => {
         const sel = document.getElementById('select-cepa') || document.getElementById('select-cepa-2');
         if (!sel) return '-';
-        if (!cepasState.hasCepas) return t?.no_cepa_disponible || 'No hay cepa a seleccionar.';
+        if (!cepasState.hasCepas) return t?.no_cepa_disponible || 'No hay Cepa/Stock/Raza a seleccionar.';
         const opt = sel.options[sel.selectedIndex];
         return (opt && opt.value !== '0') ? opt.text : '-';
     })();
@@ -531,7 +561,7 @@ async function handleReview(e) {
                 <tbody>
                     <tr><td class="bg-light fw-bold text-muted" width="30%">Especie</td><td>${txtEspecie}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">${window.txt?.form_animales?.label_categoria || 'Categoría'}</td><td>${txtSub}</td></tr>
-                    <tr><td class="bg-light fw-bold text-muted">${t?.cepa || 'Cepa'}</td><td>${cepaSelTxt}</td></tr>
+                    <tr><td class="bg-light fw-bold text-muted">${t?.cepa || 'Cepa/Stock/Raza'}</td><td>${cepaSelTxt}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Peso</td><td>${peso}</td></tr>
                     <tr><td class="bg-light fw-bold text-muted">Edad</td><td>${edad}</td></tr>
                 </tbody>

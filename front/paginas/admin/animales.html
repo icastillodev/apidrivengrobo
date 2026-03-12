@@ -27,7 +27,7 @@
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
-        // Lógica administrativa de animales (Gestión de cepas, especies y stock maestro)
+        // Lógica administrativa de animales (Gestión de Cepa/Stock/Raza, especies y stock maestro)
         import { initAnimalesPage } from '../../dist/js/pages/admin/animales.js?v=20260311';
         
         showLoader();
@@ -55,7 +55,7 @@
                     throw new Error("El objeto de idioma window.txt no se generó.");
                 }
 
-                // 4. ROUTER (Delay de estabilidad para abrir fichas de cepas específicas desde la URL)
+                // 4. ROUTER (Delay de estabilidad para abrir fichas de Cepa/Stock/Raza específicas desde la URL)
                 setTimeout(() => {
                     checkUrlParamsAndOpen();
                 }, 300);
@@ -137,7 +137,7 @@
                 <th data-key="Investigador" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_investigador">Investigador</th>
                 <th data-key="NProtocolo" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_n_protocolo">N Protocolo</th>
                 <th data-key="CatEspecie" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_especie">Especie</th>
-                <th data-key="CepaNombre" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_cepa">Cepa</th> <th data-key="Edad" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_edad">Edad</th>
+                <th data-key="CepaNombre" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_cepa">Cepa/Stock/Raza</th> <th data-key="Edad" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_edad">Edad</th>
                 <th data-key="Peso" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_peso">Peso</th> <th data-key="CantAnimal" data-sortable="true" class="py-3 px-2 text-center" data-i18n="admin_animales.col_cant">Cant</th>
                 <th data-key="DeptoExternoFlag" data-sortable="true" class="py-3 px-2 text-center" data-i18n="admin_animales.col_ambito">Ámbito</th>
                 <th data-key="Inicio" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_inicio">Inicio</th>

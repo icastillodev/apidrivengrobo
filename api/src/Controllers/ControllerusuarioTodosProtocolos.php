@@ -76,7 +76,7 @@ class ControllerusuarioTodosProtocolos {
         
         try {
             Auditoria::getDatosSesion(); // Valida Token
-            $this->model->updateInternal($_POST);
+            $this->model->updateInternal($_POST, $_FILES ?? null);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { 
             http_response_code(500);
@@ -180,6 +180,22 @@ class ControllerusuarioTodosProtocolos {
             Auditoria::getDatosSesion();
             $this->model->createNetworkRequest($input);
             echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getNetworkStatus() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        $idprot = isset($_GET['idprot']) ? (int)$_GET['idprot'] : 0;
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getNetworkStatusByProtocol($idprot, $sesion['instId'], $sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

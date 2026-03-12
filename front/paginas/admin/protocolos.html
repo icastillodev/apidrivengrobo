@@ -90,9 +90,18 @@
                 <div class="col-lg-7">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase d-none" id="label-origin" style="font-size: 10px;" data-i18n="admin_protocolos.label_origen">Origen:</span>
+                        <span id="origin-alert-badge" class="badge bg-danger text-white d-none align-self-center ms-1 me-1" style="font-size:10px;">0</span>
                         <select id="filter-origin" class="form-select form-select-sm fw-bold border-start-0 d-none" style="max-width: 130px;" aria-label="Filtro de origen" title="Filtro de origen">
                             <option value="all" data-i18n="admin_protocolos.filter_todos">TODOS</option>
                             <option value="propio" data-i18n="admin_protocolos.filter_propios">PROPIOS</option>
+                            <option value="red" data-i18n="admin_protocolos.filter_red">RED</option>
+                        </select>
+
+                        <span class="input-group-text bg-white text-muted fw-bold small uppercase d-none" id="label-scope" style="font-size: 10px;" data-i18n="admin_protocolos.label_ambito">Ámbito:</span>
+                        <select id="filter-scope" class="form-select form-select-sm fw-bold border-start-0 d-none" style="max-width: 130px;" aria-label="Filtro de ámbito" title="Filtro de ámbito">
+                            <option value="all" data-i18n="admin_protocolos.filter_todos">TODOS</option>
+                            <option value="interno" data-i18n="admin_protocolos.filter_internos">INTERNOS</option>
+                            <option value="externo" data-i18n="admin_protocolos.filter_externos">EXTERNOS</option>
                             <option value="red" data-i18n="admin_protocolos.filter_red">RED</option>
                         </select>
 
@@ -106,7 +115,6 @@
                             <option value="InvestigadorACargA" data-i18n="admin_protocolos.filter_resp_proyecto">Resp. Proyecto</option>
                             <option value="ResponsableFormat" data-i18n="admin_protocolos.filter_resp_protocolo">Resp. Protocolo</option>
                             <option value="TipoNombre" data-i18n="admin_protocolos.filter_tipo">Tipo</option>
-                            <option value="AmbitoAdmin" data-i18n="admin_protocolos.filter_ambito">Ámbito</option>
                             <option value="DeptoFormat" data-i18n="admin_protocolos.filter_depto">Departamento</option>
                             <option value="Vencimiento" data-i18n="admin_protocolos.filter_vencimiento">Estado Vencimiento</option>
                         </select>

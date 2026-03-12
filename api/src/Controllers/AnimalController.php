@@ -241,7 +241,7 @@ public function getProtocolDetails() {
             if ($isOtrosCeuas == 1) {
                 $data = $this->model->getAllSpeciesForInst($targetInst);
             } else {
-                $data = $this->model->getDetailsAndSpecies($protId);
+                $data = $this->model->getDetailsAndSpecies($protId, $targetInst);
             }
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {

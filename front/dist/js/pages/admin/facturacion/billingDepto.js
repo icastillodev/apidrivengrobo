@@ -655,6 +655,14 @@ function aplicarEstilosTablas() {
     document.head.appendChild(style);
 }
 
+function getSelectedDateRangeLabel() {
+    const desde = document.getElementById('f-desde')?.value || '';
+    const hasta = document.getElementById('f-hasta')?.value || '';
+    if (!desde && !hasta) return '-';
+    if (desde && hasta) return `${desde} a ${hasta}`;
+    return desde || hasta;
+}
+
 window.downloadProtocoloPDF = async (idProt) => {
     if (!window.currentReportData || !window.currentReportData.protocolos || window.currentReportData.protocolos.length === 0) {
         return Swal.fire('Aviso', 'Primero debe realizar una consulta para exportar los datos.', 'info');
@@ -673,6 +681,7 @@ window.downloadProtocoloPDF = async (idProt) => {
         const right = pageW - M;
         const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         const verdeGecko = [25, 135, 84];
+        const rangoFechas = getSelectedDateRangeLabel();
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
         doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
@@ -689,8 +698,10 @@ window.downloadProtocoloPDF = async (idProt) => {
         doc.setFont("helvetica", "normal"); doc.text(`${prot.investigador} (ID: ${prot.idUsr})`, 50, M + 26);
         doc.setFont("helvetica", "bold"); doc.text(`FECHA REPORTE:`, M, M + 32);
         doc.setFont("helvetica", "normal"); doc.text(`${new Date().toLocaleString()}`, 50, M + 32);
+        doc.setFont("helvetica", "bold"); doc.text(`RANGO FILTRADO:`, M, M + 38);
+        doc.setFont("helvetica", "normal"); doc.text(`${rangoFechas}`, 50, M + 38);
 
-        let currentY = M + 40;
+        let currentY = M + 46;
 
         if (prot.formularios && prot.formularios.length > 0) {
             const bodyForms = prot.formularios.map(f => {
@@ -780,12 +791,14 @@ window.downloadInsumosPDF = async () => {
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
     const azulInsumos = [13, 110, 253];
+    const rangoFechas = getSelectedDateRangeLabel();
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(azulInsumos[0], azulInsumos[1], azulInsumos[2]);
     doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
     doc.setFontSize(11); doc.setTextColor(100); doc.text("REPORTE DE INSUMOS GENERALES", 105, M + 7, { align: "center" });
     doc.setFontSize(9); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 105, M + 12, { align: "center" });
-    doc.line(M, M + 15, right, M + 15);
+    doc.setFontSize(9); doc.text(`RANGO FILTRADO: ${rangoFechas}`, 105, M + 16, { align: "center" });
+    doc.line(M, M + 19, right, M + 19);
 
     const body = insumos.map(i => [
         i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'),
@@ -793,7 +806,7 @@ window.downloadInsumosPDF = async () => {
     ]);
 
     doc.autoTable({
-        startY: M + 20, margin: { left: M, right: M }, head: [['ID', 'Solicitante', 'Detalle de Productos / Cantidades', 'Total', 'Pagado', 'Debe']],
+        startY: M + 24, margin: { left: M, right: M }, head: [['ID', 'Solicitante', 'Detalle de Productos / Cantidades', 'Total', 'Pagado', 'Debe']],
         body: body, theme: 'striped', headStyles: { fillColor: azulInsumos },
         styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
         columnStyles: { 2: { cellWidth: 70 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
@@ -821,15 +834,17 @@ window.downloadGlobalPDF = async () => {
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
     const verdeGrobo = [26, 93, 59];
+    const rangoFechas = getSelectedDateRangeLabel();
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]);
     doc.text("REPORTE DE FACTURACIÓN", 148, M, { align: "center" });
     doc.setFontSize(12); doc.setTextColor(100); doc.text(`DEPARTAMENTO: ${deptoNombre.toUpperCase()}`, 148, M + 7, { align: "center" });
-    doc.setDrawColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]); doc.line(M, M + 10, right, M + 10);
+    doc.setFontSize(10); doc.text(`RANGO FILTRADO: ${rangoFechas}`, 148, M + 12, { align: "center" });
+    doc.setDrawColor(verdeGrobo[0], verdeGrobo[1], verdeGrobo[2]); doc.line(M, M + 15, right, M + 15);
 
     const t = window.currentReportData.totales;
     doc.autoTable({
-        startY: M + 17, margin: { left: M, right: M }, head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'PAGADO GLOBAL', 'DEUDA GLOBAL']],
+        startY: M + 22, margin: { left: M, right: M }, head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'PAGADO GLOBAL', 'DEUDA GLOBAL']],
         body: [[
             `$ ${t.deudaAnimales.toFixed(2)}`, `$ ${t.deudaReactivos.toFixed(2)}`, `$ ${t.deudaAlojamiento.toFixed(2)}`, 
             `$ ${t.deudaInsumos.toFixed(2)}`, `$ ${t.totalPagado.toFixed(2)}`,

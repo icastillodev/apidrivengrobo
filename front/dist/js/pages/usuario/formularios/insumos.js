@@ -20,6 +20,10 @@ function getContextInstId() {
     return instId;
 }
 
+function isProtocolRedIncomplete(protocol) {
+    return Number(protocol?.OwnerInstId || 0) !== Number(getContextInstId()) && Number(protocol?.RedConfigCompleta || 0) !== 1;
+}
+
 export async function initInsumosForm() {
     // 1. Usamos el ID correcto
     const instId = getContextInstId();
@@ -117,6 +121,7 @@ function setupProtocolSearch() {
         }
 
         items.forEach(p => {
+            const redIncomplete = isProtocolRedIncomplete(p);
             const item = document.createElement('div');
             item.className = "list-group-item list-group-item-action result-item p-3";
             const numero = p.nprotA ? `#${p.nprotA} - ` : '';
@@ -132,8 +137,18 @@ function setupProtocolSearch() {
                         ${depto ? `<span class="ms-2">· ${depto}</span>` : ''}
                     </div>
                 </div>`;
+            if (redIncomplete) {
+                item.innerHTML += `<div class="mt-1"><span class="badge bg-danger">${window.txt?.form_insumos?.protocolo_no_habilitado_badge || 'NO HABILITADO'}</span></div>`;
+            }
 
             item.onclick = () => {
+                if (redIncomplete) {
+                    return Swal.fire(
+                        window.txt?.form_insumos?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+                        window.txt?.form_insumos?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+                        'warning'
+                    );
+                }
                 const step1 = document.getElementById('step-1');
                 const step2 = document.getElementById('step-2');
                 if (step1 && step2) {
@@ -339,6 +354,14 @@ async function handleSubmit(e) {
     if(!idProt) {
         const msg = (window.txt?.form_insumos?.seleccione_prot_msg) || 'Debe seleccionar un protocolo para asociar este pedido.';
         return Swal.fire('Atención', msg, 'warning');
+    }
+    const selectedProtocol = protocolosList.find(p => String(p.idprotA) === String(idProt));
+    if (selectedProtocol && isProtocolRedIncomplete(selectedProtocol)) {
+        return Swal.fire(
+            window.txt?.form_insumos?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+            window.txt?.form_insumos?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+            'warning'
+        );
     }
 
     const confirm = await Swal.fire({

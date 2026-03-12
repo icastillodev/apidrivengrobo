@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Protocol\ProtocolModel;
 use App\Utils\Auditoria; // <-- Seguridad
+use App\Models\Services\MailService;
 
 class ProtocolController {
     private $db;
@@ -66,8 +67,8 @@ class ProtocolController {
         header('Content-Type: application/json');
         
         try {
-            Auditoria::getDatosSesion();
-            $data = $this->model->getProtocolSpecies($_GET['id'] ?? null);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getProtocolSpecies($_GET['id'] ?? null, (int)$sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -95,6 +96,76 @@ class ProtocolController {
         exit;
     }
 
+    public function downloadManualAttachment() {
+        if (ob_get_length()) ob_clean();
+
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($id <= 0) {
+            http_response_code(400);
+            echo 'ID inválido';
+            exit;
+        }
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $att = $this->model->getManualAttachmentById($id, (int)$sesion['instId']);
+            if (!$att) {
+                http_response_code(404);
+                echo 'Adjunto manual no encontrado';
+                exit;
+            }
+
+            $b2 = new \App\Utils\BackblazeB2();
+            $b2->streamDownload($att['file_key'], $att['nombre_original']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo 'Error al descargar el archivo: ' . $e->getMessage();
+            exit;
+        }
+    }
+
+    public function deleteManualAttachment() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+            $id = isset($input['id']) ? (int)$input['id'] : 0;
+            if ($id <= 0) {
+                throw new \Exception('ID de adjunto inválido.');
+            }
+
+            $this->model->deleteManualAttachment($id, (int)$sesion['instId']);
+            Auditoria::logManual($this->db, (int)$sesion['userId'], 'DELETE', 'protocoloexpeadjuntos', "Borró adjunto manual ID: {$id}");
+            echo json_encode(['status' => 'success', 'message' => 'Adjunto eliminado correctamente.']);
+        } catch (\Exception $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getNetworkStatusByProtocol() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idprotA = isset($_GET['idprot']) ? (int)$_GET['idprot'] : 0;
+            if ($idprotA <= 0) {
+                throw new \Exception('ID de protocolo inválido');
+            }
+
+            $data = $this->model->getNetworkStatusByProtocol($idprotA, (int)$sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function save() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -105,7 +176,26 @@ class ProtocolController {
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad
             $instId = $sesion['instId'];
-            
+            $targetId = $id ? (int)$id : 0;
+
+            if ($targetId > 0) {
+                $stmtOwner = $this->db->prepare("SELECT IdInstitucion FROM protocoloexpe WHERE idprotA = ? LIMIT 1");
+                $stmtOwner->execute([$targetId]);
+                $ownerInstId = (int)$stmtOwner->fetchColumn();
+                if ($ownerInstId <= 0) {
+                    throw new \Exception("Protocolo no encontrado.");
+                }
+
+                // Si es protocolo de otra institución (red), se guarda configuración local en protocoloexpered.
+                if ($ownerInstId !== (int)$instId) {
+                    $this->db->beginTransaction();
+                    $this->model->saveRedInstitutionConfig($targetId, (int)$instId, $data);
+                    $this->db->commit();
+                    echo json_encode(['status' => 'success', 'message' => 'Configuración local de red guardada con éxito']);
+                    exit;
+                }
+            }
+
             $this->db->beginTransaction();
 
             $stmtUser = $this->db->prepare("SELECT NombreA, ApellidoA FROM personae WHERE IdUsrA = ?");
@@ -191,6 +281,11 @@ class ProtocolController {
                 }
             }
 
+            // Adjuntos manuales (solo protocolos manuales sin solicitud local).
+            if (!empty($_FILES)) {
+                $this->model->saveManualAttachments((int)$currentId, (int)$instId, $_FILES);
+            }
+
             $this->db->commit();
             echo json_encode(['status' => 'success', 'message' => 'Protocolo guardado con éxito']);
 
@@ -230,6 +325,76 @@ class ProtocolController {
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => 'DB_QUERY_FAILURE: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function deleteManual() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+            $idprotA = isset($input['idprot']) ? (int)$input['idprot'] : 0;
+            $password = (string)($input['password'] ?? '');
+            if ($idprotA <= 0) {
+                throw new \Exception('ID de protocolo inválido.');
+            }
+
+            $result = $this->model->deleteManualProtocol($idprotA, (int)$sesion['instId'], (int)$sesion['userId'], $password, (int)$sesion['role']);
+            Auditoria::logManual($this->db, (int)$sesion['userId'], 'DELETE', 'protocoloexpe', "Borró protocolo manual ID: {$idprotA}");
+
+            echo json_encode(['status' => 'success', 'message' => 'Protocolo borrado correctamente.', 'data' => $result]);
+        } catch (\Exception $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function rejectApprovedRequest() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if (!in_array((int)$sesion['role'], [1, 2, 4], true)) {
+                throw new \Exception('No tienes permisos para rechazar solicitudes.');
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+            $idprotA = isset($input['idprot']) ? (int)$input['idprot'] : 0;
+            $motivo = trim((string)($input['motivo'] ?? ''));
+            if ($idprotA <= 0) {
+                throw new \Exception('ID de protocolo inválido.');
+            }
+            if ($motivo === '') {
+                throw new \Exception('Debes escribir el motivo del rechazo.');
+            }
+
+            $info = $this->model->rejectApprovedSolicitudProtocol($idprotA, (int)$sesion['instId'], $motivo);
+            Auditoria::logManual($this->db, (int)$sesion['userId'], 'UPDATE_SOLICITUD', 'solicitudprotocolo', "Rechazó solicitud aprobada de protocolo ID: {$idprotA}");
+
+            if (!empty($info['Email'])) {
+                $mailer = new MailService();
+                $mailer->sendProtocolDecision(
+                    $info['Email'],
+                    $info['NombreUser'] ?: 'Usuario',
+                    $info['tituloA'] ?: ('Protocolo #' . $idprotA),
+                    2,
+                    $motivo,
+                    $info['InstName'] ?: 'Institución',
+                    null,
+                    $info['lang'] ?? 'es'
+                );
+            }
+
+            echo json_encode(['status' => 'success', 'message' => 'Solicitud rechazada y notificada al usuario.']);
+        } catch (\Exception $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }

@@ -18,6 +18,20 @@
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
         .breadcrumb-item + .breadcrumb-item::before { content: "/"; color: #dee2e6; }
         .table-hover tbody tr:hover { background-color: #f2f2f2 !important; cursor: pointer; }
+        /* Contraste fijo para evitar columnas "invisibles" en modo oscuro */
+        #tabla-usuarios, #tabla-usuarios th, #tabla-usuarios td {
+            color: #212529 !important;
+        }
+        #tabla-usuarios thead th {
+            background-color: #f8f9fa !important;
+        }
+        #tabla-usuarios tbody td {
+            background-color: #ffffff !important;
+        }
+        #tabla-usuarios .text-muted,
+        #tabla-usuarios .text-secondary {
+            color: #495057 !important;
+        }
         .modal-backdrop { z-index: 1040 !important; }
         .modal { z-index: 1050 !important; }
         /* SweetAlert2 por encima del modal y input clickeable */
@@ -127,7 +141,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover align-middle border" style="font-size: 12px;">
+                <table id="tabla-usuarios" class="table table-hover align-middle border" style="font-size: 12px;">
                     <thead class="table-light">
                         <tr class="text-uppercase" style="font-size: 11px;">
                             <th data-key="IdUsrA" data-sortable="true" class="py-3 px-3" data-i18n="admin_usuarios.col_id">ID -</th>

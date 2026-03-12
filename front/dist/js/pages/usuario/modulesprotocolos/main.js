@@ -1,7 +1,7 @@
 import { store } from './store.js';
 import { loadConfig, loadData } from './api_service.js';
 import { applyFilters, updateSearchInputType, switchView } from './ui_render.js';
-import { viewProtocol, viewAdminFeedback } from './modals_view.js';
+import { viewProtocol, viewAdminFeedback, downloadProtocolPDF } from './modals_view.js';
 import { openNewProtocolModal, openEditProtocolModal, openCreateExternalModal, loadExternalConfig, addNewSpeciesRow, saveProtocol } from './modals_form.js';
 import { openNetworkRequestModal, filterMyProtocols, showProtDetails, checkNetBtn, sendNetworkRequest } from './modals_network.js';
 // IMPORTAMOS TU AUTH
@@ -84,6 +84,7 @@ window.initUserProtocols = initUserProtocols;
 window.switchView = switchView;
 window.viewProtocol = viewProtocol;
 window.viewAdminFeedback = viewAdminFeedback;
+window.downloadProtocolPDF = downloadProtocolPDF;
 window.openNewProtocolModal = openNewProtocolModal;
 window.openEditProtocolModal = openEditProtocolModal;
 window.openCreateExternalModal = openCreateExternalModal;

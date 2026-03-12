@@ -30,21 +30,58 @@ class InsumoFormularioModel {
 
         // 4. Protocolos vigentes (para flujo nuevo por protocolo)
         $stmtProt = $this->db->prepare("
-            SELECT 
+            SELECT DISTINCT
                 p.idprotA,
                 p.nprotA,
                 p.tituloA,
-                CONCAT(per.ApellidoA, ', ', per.NombreA) as Responsable,
+                p.IdInstitucion as OwnerInstId,
+                CASE
+                    WHEN p.IdInstitucion = ? THEN 1
+                    WHEN pr.IdProtocoloExpRed IS NULL THEN 0
+                    WHEN pr.IdUsrA IS NULL OR pr.iddeptoA IS NULL OR pr.idtipoprotocolo IS NULL OR pr.IdSeveridadTipo IS NULL THEN 0
+                    WHEN (SELECT COUNT(*) FROM protocoloexpered_especies prs WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed) <= 0 THEN 0
+                    ELSE 1
+                END as RedConfigCompleta,
+                COALESCE(CONCAT(per.ApellidoA, ', ', per.NombreA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable,
                 COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoNombre,
-                pd.iddeptoA as IdDepto
+                COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento) as IdDepto
             FROM protocoloexpe p
-            INNER JOIN personae per ON p.IdUsrA = per.IdUsrA
+            LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+            LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+            LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
             LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
-            LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA
-            WHERE p.IdInstitucion = ? AND p.FechaFinProtA >= CURDATE()
+            LEFT JOIN departamentoe d ON d.iddeptoA = COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento)
+            WHERE p.FechaFinProtA >= CURDATE()
+              AND (
+                (
+                    p.IdInstitucion = ?
+                    AND (
+                        NOT EXISTS (
+                            SELECT 1 FROM solicitudprotocolo s0
+                            WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM solicitudprotocolo s1
+                            WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
+                        )
+                    )
+                )
+                OR
+                (
+                    pi.IdInstitucion = ?
+                    AND p.IdInstitucion <> ?
+                    AND EXISTS (
+                        SELECT 1 FROM solicitudprotocolo sr
+                        WHERE sr.idprotA = p.idprotA
+                          AND sr.TipoPedido = 2
+                          AND sr.IdInstitucion = ?
+                          AND sr.Aprobado = 1
+                    )
+                )
+              )
             ORDER BY p.nprotA DESC
         ");
-        $stmtProt->execute([$instId]);
+        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
 
         // 5. Tipo de Formulario (Busca el ID correspondiente a la categoría 'Insumos')
         $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario = 'Insumos' AND IdInstitucion = ? LIMIT 1");
@@ -68,8 +105,13 @@ class InsumoFormularioModel {
             // Determinar departamento final: si viene protocolo, lo usamos como fuente
             $finalDepto = 0;
             if (!empty($data['idProt'])) {
-                $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
-                $stmtDepto->execute([$data['idProt']]);
+                $stmtDepto = $this->db->prepare("SELECT COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento) as iddeptoA
+                                                 FROM protocoloexpe p
+                                                 LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                                 LEFT JOIN protdeptor pd ON pd.idprotA = p.idprotA
+                                                 WHERE p.idprotA = ?
+                                                 LIMIT 1");
+                $stmtDepto->execute([$data['instId'], $data['idProt']]);
                 $finalDepto = $stmtDepto->fetchColumn() ?: 0;
             } elseif (!empty($data['idDepto'])) {
                 $finalDepto = $data['idDepto'];

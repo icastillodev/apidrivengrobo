@@ -58,6 +58,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../../dist/style/css/tailwind.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         body { font-family: 'Lato', sans-serif; background-color: #f4f7f6; }
@@ -150,7 +151,6 @@
                                 <option value="tituloA" data-i18n="misprotocolos.filter_titulo">Título</option>
                                 <option value="InvestigadorACargA" data-i18n="misprotocolos.filter_resp_proyecto">Responsable de proyecto</option>
                                 <option value="TipoNombre" data-i18n="misprotocolos.filter_tipo">Tipo</option>
-                                <option value="Origen" data-i18n="misprotocolos.filter_origen">Origen</option>
                                 <option value="Estado" id="opt-filter-estado" class="d-none" data-i18n="misprotocolos.filter_estado">Estado</option>
                             </select>
                         <div id="dynamic-search-container" class="flex-grow-1 min-width-0">
@@ -172,7 +172,6 @@
                             <th class="py-3 px-2 text-primary" data-i18n="misprotocolos.col_resp_protocolo">Responsable protocolo</th>
                             <th class="py-3 px-2" data-i18n="misprotocolos.col_resp_proyecto">Responsable de proyecto</th>
                             <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_tipo">Tipo</th>
-                            <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_origen">Origen</th>
                             <th class="py-3 px-2 text-center" data-i18n="misprotocolos.col_estado">Estado</th> 
                             <th class="py-3 px-2" data-i18n="misprotocolos.col_vence">Vence</th>
                             <th class="py-3 px-2 text-end" data-i18n="misprotocolos.col_acciones">Acciones</th>
@@ -298,11 +297,19 @@
                     </div>
                     <div id="prot-details-preview" class="bg-light p-3 rounded border mb-4 d-none">
                         <h6 class="fw-bold text-dark mb-1" id="preview-title"></h6>
-                        <span class="small text-muted">ID: <strong id="preview-id"></strong> | Vence: <strong id="preview-date"></strong></span>
+                        <span class="small text-muted">
+                            <span data-i18n="misprotocolos.label_nro_protocolo">N° Protocolo</span>: <strong id="preview-nprot"></strong>
+                            | ID: <strong id="preview-id"></strong>
+                            | <span data-i18n="misprotocolos.label_vence">Vence</span>: <strong id="preview-date"></strong>
+                        </span>
                     </div>
                     <div id="step-3-network" class="d-none">
                         <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_paso2">2. DESTINOS</label>
                         <div id="network-inst-list" class="d-flex flex-wrap gap-2"></div>
+                    </div>
+                    <div id="network-status-block" class="mt-3 d-none">
+                        <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_estado_solicitudes">ESTADO DE SOLICITUDES POR INSTITUCIÓN</label>
+                        <div id="network-status-list" class="border rounded p-2 bg-light small"></div>
                     </div>
                     <div class="mt-4 text-end"><button type="button" class="btn btn-info text-white px-5 fw-bold" onclick="window.sendNetworkRequest()" id="btn-send-net" disabled data-i18n="misprotocolos.enviar">ENVIAR</button></div>
                 </div>

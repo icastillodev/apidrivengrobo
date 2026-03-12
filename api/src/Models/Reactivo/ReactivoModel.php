@@ -70,14 +70,40 @@ class ReactivoModel {
     }
 
     public function getAvailableProtocols($instId) {
-        $sql = "SELECT p.idprotA, p.nprotA, p.tituloA 
+        $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA
                 FROM protocoloexpe p
-                LEFT JOIN solicitudprotocolo s ON p.idprotA = s.idprotA
-                WHERE p.IdInstitucion = ? 
-                AND (s.Aprobado = 1 OR s.idprotA IS NULL)
+                LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+                WHERE p.FechaFinProtA >= CURDATE()
+                  AND (
+                    (
+                        p.IdInstitucion = ?
+                        AND (
+                            NOT EXISTS (
+                                SELECT 1 FROM solicitudprotocolo s0
+                                WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
+                            )
+                            OR EXISTS (
+                                SELECT 1 FROM solicitudprotocolo s1
+                                WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
+                            )
+                        )
+                    )
+                    OR
+                    (
+                        pi.IdInstitucion = ?
+                        AND p.IdInstitucion <> ?
+                        AND EXISTS (
+                            SELECT 1 FROM solicitudprotocolo sr
+                            WHERE sr.idprotA = p.idprotA
+                              AND sr.TipoPedido = 2
+                              AND sr.IdInstitucion = ?
+                              AND sr.Aprobado = 1
+                        )
+                    )
+                  )
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute([$instId, $instId, $instId, $instId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -237,8 +263,52 @@ class ReactivoModel {
         $stmtUser->execute([$userId]);
         $userEmail = $stmtUser->fetchColumn();
 
-        $stmtProt = $this->db->prepare("SELECT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA as IdInvestigador, CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable FROM protocoloexpe p INNER JOIN personae per ON p.IdUsrA = per.IdUsrA WHERE p.IdInstitucion = ? AND p.FechaFinProtA >= CURDATE() ORDER BY p.nprotA DESC");
-        $stmtProt->execute([$instId]);
+        $stmtProt = $this->db->prepare("SELECT DISTINCT
+                                            p.idprotA, p.nprotA, p.tituloA,
+                                            p.IdInstitucion as OwnerInstId,
+                                            CASE
+                                                WHEN p.IdInstitucion = ? THEN 1
+                                                WHEN pr.IdProtocoloExpRed IS NULL THEN 0
+                                                WHEN pr.IdUsrA IS NULL OR pr.iddeptoA IS NULL OR pr.idtipoprotocolo IS NULL OR pr.IdSeveridadTipo IS NULL THEN 0
+                                                WHEN (SELECT COUNT(*) FROM protocoloexpered_especies prs WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed) <= 0 THEN 0
+                                                ELSE 1
+                                            END as RedConfigCompleta,
+                                            COALESCE(pr.IdUsrA, p.IdUsrA) as IdInvestigador,
+                                            COALESCE(CONCAT(per.NombreA, ' ', per.ApellidoA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable
+                                        FROM protocoloexpe p
+                                        LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+                                        LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                        LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
+                                        WHERE p.FechaFinProtA >= CURDATE()
+                                          AND (
+                                            (
+                                                p.IdInstitucion = ?
+                                                AND (
+                                                    NOT EXISTS (
+                                                        SELECT 1 FROM solicitudprotocolo s0
+                                                        WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
+                                                    )
+                                                    OR EXISTS (
+                                                        SELECT 1 FROM solicitudprotocolo s1
+                                                        WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
+                                                    )
+                                                )
+                                            )
+                                            OR
+                                            (
+                                                pi.IdInstitucion = ?
+                                                AND p.IdInstitucion <> ?
+                                                AND EXISTS (
+                                                    SELECT 1 FROM solicitudprotocolo sr
+                                                    WHERE sr.idprotA = p.idprotA
+                                                      AND sr.TipoPedido = 2
+                                                      AND sr.IdInstitucion = ?
+                                                      AND sr.Aprobado = 1
+                                                )
+                                            )
+                                          )
+                                        ORDER BY p.nprotA DESC");
+        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
 
         $stmtIns = $this->db->prepare("SELECT IdInsumoexp, NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);
@@ -256,9 +326,27 @@ class ReactivoModel {
         ];
     }
 
-    public function getProtocolDetails($protId) {
-        $stmt = $this->db->prepare("SELECT p.idprotA, p.tituloA, p.nprotA, p.FechaFinProtA, CONCAT(per.NombreA, ' ', per.ApellidoA) as Responsable, COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto FROM protocoloexpe p INNER JOIN personae per ON p.IdUsrA = per.IdUsrA LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA LEFT JOIN departamentoe d ON pd.iddeptoA = d.iddeptoA WHERE p.idprotA = ?");
-        $stmt->execute([$protId]);
+    public function getProtocolDetails($protId, $instId = null) {
+        $instId = (int)$instId;
+        $stmt = $this->db->prepare("SELECT
+                                        p.idprotA, p.tituloA, p.nprotA, p.FechaFinProtA,
+                                        p.IdInstitucion as OwnerInstId,
+                                        CASE
+                                            WHEN p.IdInstitucion = ? THEN 1
+                                            WHEN pr.IdProtocoloExpRed IS NULL THEN 0
+                                            WHEN pr.IdUsrA IS NULL OR pr.iddeptoA IS NULL OR pr.idtipoprotocolo IS NULL OR pr.IdSeveridadTipo IS NULL THEN 0
+                                            WHEN (SELECT COUNT(*) FROM protocoloexpered_especies prs WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed) <= 0 THEN 0
+                                            ELSE 1
+                                        END as RedConfigCompleta,
+                                        COALESCE(CONCAT(per.NombreA, ' ', per.ApellidoA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable,
+                                        COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto
+                                    FROM protocoloexpe p
+                                    LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                    LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
+                                    LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
+                                    LEFT JOIN departamentoe d ON d.iddeptoA = COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento)
+                                    WHERE p.idprotA = ?");
+        $stmt->execute([$instId, $instId, $protId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
@@ -276,8 +364,13 @@ class ReactivoModel {
 
             $finalDepto = 0;
             if (!empty($data['idprotA'])) {
-                $stmtDepto = $this->db->prepare("SELECT iddeptoA FROM protdeptor WHERE idprotA = ? LIMIT 1");
-                $stmtDepto->execute([$data['idprotA']]);
+                $stmtDepto = $this->db->prepare("SELECT COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento) as iddeptoA
+                                                 FROM protocoloexpe p
+                                                 LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                                 LEFT JOIN protdeptor pd ON pd.idprotA = p.idprotA
+                                                 WHERE p.idprotA = ?
+                                                 LIMIT 1");
+                $stmtDepto->execute([$data['instId'], $data['idprotA']]);
                 $finalDepto = $stmtDepto->fetchColumn() ?: 0;
             }
 

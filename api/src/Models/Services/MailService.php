@@ -330,9 +330,6 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
 
             $subject = $t['protocol_subject'] . " $statusText - " . strtoupper($instName);
 
-            $base = $this->getBaseUrl();
-            $link = $base . "/paginas/usuario/mis_protocolos.html" . ($slug ? "?inst=" . urlencode($slug) : "");
-
             $htmlContent = "
                 " . $t['protocol_hello'] . " <b>" . htmlspecialchars($nombre) . "</b>,<br><br>
                 " . $t['protocol_processed'] . " <b>" . htmlspecialchars($instName) . "</b>:<br>
@@ -361,7 +358,7 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
                 $htmlContent .= "<p style='color: #777; font-size: 13px;'><i>" . $t['protocol_sin_comentarios'] . "</i></p>";
             }
 
-            $body = $this->getTemplate($t['protocol_title'], $htmlContent, $link, $t['protocol_btn'], $instName, $lang);
+            $body = $this->getTemplate($t['protocol_title'], $htmlContent, '', '', $instName, $lang);
 
             return $this->executeSend($to, $subject, $body);
         }

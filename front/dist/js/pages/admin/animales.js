@@ -156,7 +156,7 @@ function renderTable() {
         const isValidCepaText = (v) => !!v && v !== '0' && v !== '-' && v.toLowerCase() !== 'null';
         const cepaDisplay = isValidCepaText(cepaNueva)
             ? cepaNueva
-            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (cepa anterior)` : '-');
+            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (Cepa/Stock/Raza anterior)` : '-');
 
         tr.innerHTML = `
             <td class="py-2 px-2 text-muted small">${a.idformA}</td>
@@ -408,13 +408,13 @@ function renderOrderModificationSection(a, sex, cache) {
                 <select id="select-species-modal" name="idsubespA" class="form-select form-select-sm" onchange="window.updateSpeciesPrice(this)"></select>
             </div>
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa/Stock/Raza</label>
                 <select id="select-cepa-modal" name="idcepaA" class="form-select form-select-sm fw-bold"></select>
                 <div id="cepa-modal-help" class="small text-muted mt-1" style="font-size: 10px;"></div>
             </div>
             ${a.raza ? `
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa / Línea (legacy)</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa/Stock/Raza / Línea (legacy)</label>
                 <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
             </div>` : `<input type="hidden" name="razaA" value="">`}
             <div class="col-md-3">
@@ -610,17 +610,17 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
                 sel.appendChild(opt);
             });
             if (currentIdCepa) sel.value = String(currentIdCepa);
-            if (help) help.textContent = 'Si existen cepas habilitadas para esta especie, debe seleccionar una.';
+            if (help) help.textContent = 'Si existen Cepa/Stock/Raza habilitadas para esta especie, debe seleccionar una.';
         } else {
             sel.disabled = true;
             sel.innerHTML = `<option value="0">-</option>`;
-            if (help) help.textContent = 'No hay cepa a seleccionar.';
+            if (help) help.textContent = 'No hay Cepa/Stock/Raza a seleccionar.';
         }
     } catch (e) {
         console.error(e);
         sel.disabled = true;
         sel.innerHTML = `<option value="0">-</option>`;
-        if (help) help.textContent = 'No hay cepa a seleccionar.';
+        if (help) help.textContent = 'No hay Cepa/Stock/Raza a seleccionar.';
     }
 };
 
@@ -662,7 +662,7 @@ window.saveFullAnimalForm = async (e) => {
         const cepaHelp = document.getElementById('cepa-modal-help');
         const hasCepas = cepaHelp && (cepaHelp.textContent || '').toLowerCase().includes('debe seleccionar');
         if (hasCepas && cepaSel && String(cepaSel.value || '0') === '0') {
-            window.Swal.fire('Falta información', 'Debe seleccionar una cepa.', 'warning');
+            window.Swal.fire('Falta información', 'Debe seleccionar una Cepa/Stock/Raza.', 'warning');
             return;
         }
         const res = await API.request(`/animals/update-full?inst=${instId}`, 'POST', fd);
@@ -851,7 +851,7 @@ window.downloadAnimalPDF = async (id) => {
             <tr>
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría Especie:</strong><br>${especie}</td>
                     <td style="padding: 10px; border: 1px solid #ddd;">
-                        <strong>Cepa:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
+                        <strong>Cepa/Stock/Raza:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
                     </td>
                 </tr>
             </table>
@@ -938,7 +938,7 @@ window.processExcelExport = () => {
     }
 
     // Encabezados con punto y coma
-    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Cepa", "Edad", "Peso", "Total", "Inicio", "Retiro", "Estado"];
+    const headers = ["ID", "Tipo", "Investigador", "Protocolo", "Especie", "Cepa/Stock/Raza", "Edad", "Peso", "Total", "Inicio", "Retiro", "Estado"];
     const csvRows = [headers.join(";")];
 
     data.forEach(a => {
@@ -947,7 +947,7 @@ window.processExcelExport = () => {
         const isValidCepaText = (v) => !!v && v !== '0' && v !== '-' && v.toLowerCase() !== 'null';
         const cepaDisplay = isValidCepaText(cepaNueva)
             ? cepaNueva
-            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (cepa anterior)` : '-');
+            : (isValidCepaText(cepaLegacy) ? `${cepaLegacy} (Cepa/Stock/Raza anterior)` : '-');
         const row = [
             a.idformA,
             a.TipoNombre,

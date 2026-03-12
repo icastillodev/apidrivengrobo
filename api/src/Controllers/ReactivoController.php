@@ -195,8 +195,9 @@ class ReactivoController {
         header('Content-Type: application/json');
         $id = $_GET['id'] ?? 0;
         try {
-            Auditoria::getDatosSesion();
-            echo json_encode(['status' => 'success', 'data' => $this->model->getProtocolDetails($id)]);
+            $sesion = Auditoria::getDatosSesion();
+            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            echo json_encode(['status' => 'success', 'data' => $this->model->getProtocolDetails($id, $targetInst)]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -220,7 +221,7 @@ class ReactivoController {
             $idForm = $res['id'];
             
             $userInfo = $this->model->getUserAndInstInfo($data['userId'], $data['instId']);
-            $protInfo = $this->model->getProtocolDetails($data['idprotA']);
+            $protInfo = $this->model->getProtocolDetails($data['idprotA'], $data['instId']);
 
             $mailData = [
                 'id' => $idForm,

@@ -18,13 +18,59 @@ class NotificationController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $sesion['instId'];
 
-            $sqlProt = "SELECT COUNT(s.IdSolicitudProtocolo) as total 
+            $sqlProt = "SELECT COUNT(DISTINCT s.IdSolicitudProtocolo) as total
                         FROM solicitudprotocolo s
                         INNER JOIN protocoloexpe p ON s.idprotA = p.idprotA
-                        WHERE p.IdInstitucion = ? AND s.Aprobado = 3";
+                        LEFT JOIN protinstr pi ON p.idprotA = pi.idprotA
+                        WHERE s.Aprobado = 3
+                          AND (
+                            (s.TipoPedido = 1 AND p.IdInstitucion = ?)
+                            OR
+                            (s.TipoPedido = 2 AND (
+                                s.IdInstitucion = ?
+                                OR (s.IdInstitucion IS NULL AND pi.IdInstitucion = ?)
+                            ))
+                          )";
             $stmtProt = $this->db->prepare($sqlProt);
-            $stmtProt->execute([$instId]);
-            $countProt = $stmtProt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+            $stmtProt->execute([$instId, $instId, $instId]);
+            $countProtSolicitudes = (int)($stmtProt->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+
+            $sqlProtRedIncomplete = "SELECT COUNT(DISTINCT p.idprotA) as total
+                                     FROM protocoloexpe p
+                                     JOIN protinstr pi ON pi.idprotA = p.idprotA
+                                     LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                                     WHERE pi.IdInstitucion = ?
+                                       AND p.IdInstitucion <> ?
+                                       AND (
+                                            NOT EXISTS (
+                                                SELECT 1 FROM solicitudprotocolo sRedAny
+                                                WHERE sRedAny.idprotA = p.idprotA
+                                                  AND sRedAny.TipoPedido = 2
+                                            )
+                                            OR EXISTS (
+                                                SELECT 1 FROM solicitudprotocolo sRedOk
+                                                WHERE sRedOk.idprotA = p.idprotA
+                                                  AND sRedOk.TipoPedido = 2
+                                                  AND sRedOk.IdInstitucion = ?
+                                                  AND sRedOk.Aprobado = 1
+                                            )
+                                       )
+                                       AND (
+                                            pr.IdProtocoloExpRed IS NULL
+                                            OR pr.IdUsrA IS NULL
+                                            OR pr.iddeptoA IS NULL
+                                            OR pr.idtipoprotocolo IS NULL
+                                            OR pr.IdSeveridadTipo IS NULL
+                                            OR (
+                                                SELECT COUNT(*)
+                                                FROM protocoloexpered_especies prs
+                                                WHERE prs.IdProtocoloExpRed = pr.IdProtocoloExpRed
+                                            ) <= 0
+                                       )";
+            $stmtProtRedIncomplete = $this->db->prepare($sqlProtRedIncomplete);
+            $stmtProtRedIncomplete->execute([$instId, $instId, $instId, $instId]);
+            $countProtRedIncomplete = (int)($stmtProtRedIncomplete->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+            $countProt = $countProtSolicitudes + $countProtRedIncomplete;
 
             $sqlAni = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
@@ -57,6 +103,8 @@ class NotificationController {
                 'status' => 'success',
                 'data' => [
                     'protocolos' => (int)$countProt,
+                    'protocolos_solicitudes' => (int)$countProtSolicitudes,
+                    'protocolos_red_incompletos' => (int)$countProtRedIncomplete,
                     'animales'   => (int)$countAni,
                     'reactivos'  => (int)$countRea,
                     'insumos'    => (int)$countIns

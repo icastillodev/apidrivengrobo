@@ -431,6 +431,14 @@ function aplicarEstilosTablas() {
     document.head.appendChild(style);
 }
 
+function getSelectedDateRangeLabelInv() {
+    const desde = document.getElementById('f-desde')?.value || '';
+    const hasta = document.getElementById('f-hasta')?.value || '';
+    if (!desde && !hasta) return '-';
+    if (desde && hasta) return `${desde} a ${hasta}`;
+    return desde || hasta;
+}
+
 window.abrirAyudaBilling = () => { new bootstrap.Modal(document.getElementById('modal-billing-help')).show(); };
 
 // =====================================
@@ -448,6 +456,7 @@ window.downloadGlobalPDF = async () => {
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const invNombre = window.currentReportData.perfil?.NombreCompleto || 'INVESTIGADOR';
     const azulGecko = [13, 110, 253];
+    const rangoFechas = getSelectedDateRangeLabelInv();
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
@@ -456,11 +465,13 @@ window.downloadGlobalPDF = async () => {
     doc.setFontSize(12);
     doc.setTextColor(100);
     doc.text(`INVESTIGADOR: ${invNombre.toUpperCase()}`, 148, M + 7, { align: "center" });
-    doc.line(M, M + 10, right, M + 10);
+    doc.setFontSize(10);
+    doc.text(`RANGO FILTRADO: ${rangoFechas}`, 148, M + 12, { align: "center" });
+    doc.line(M, M + 15, right, M + 15);
 
     const t = window.currentReportData.totales;
     doc.autoTable({
-        startY: M + 15, margin: { left: M, right: M },
+        startY: M + 20, margin: { left: M, right: M },
         head: [['DEUDA ANIMALES', 'DEUDA REACTIVOS', 'DEUDA ALOJAMIENTO', 'DEUDA INSUMOS', 'TOTAL PAGADO (+EX)', 'DEUDA TOTAL']],
         body: [[
             `$ ${t.deudaAnimales.toFixed(2)}`, `$ ${t.deudaReactivos.toFixed(2)}`, 
@@ -553,6 +564,7 @@ window.downloadProtocoloPDF = async (idProt) => {
     const right = pageW - M;
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const invNombre = window.currentReportData.perfil?.NombreCompleto || 'INVESTIGADOR';
+    const rangoFechas = getSelectedDateRangeLabelInv();
 
     doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(26, 93, 59);
     doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
@@ -564,6 +576,7 @@ window.downloadProtocoloPDF = async (idProt) => {
     doc.setFontSize(9); doc.setTextColor(0);
     doc.text(`Protocolo: ${prot.tituloA}`, M, M + 20);
     doc.text(`Investigador: ${invNombre}`, M, M + 26);
+    doc.text(`Rango filtrado: ${rangoFechas}`, M, M + 32);
 
     const bodyAll = [
         ...(prot.formularios || []).map(f => {
@@ -582,7 +595,7 @@ window.downloadProtocoloPDF = async (idProt) => {
     ];
 
     doc.autoTable({
-        startY: M + 32, margin: { left: M, right: M }, head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
+        startY: M + 38, margin: { left: M, right: M }, head: [['ID', 'Especie', 'Concepto', 'Total', 'Pagado', 'Debe']],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
         styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
     });

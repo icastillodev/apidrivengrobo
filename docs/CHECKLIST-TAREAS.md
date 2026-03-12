@@ -327,6 +327,9 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
   **Instrucciones:** En Configuración > Especies, cambiar la etiqueta y textos de "Subespecie" a "Categoría de especie" en ES/EN/PT. Mantener la estructura actual para categorías, y planificar la capa siguiente de "Cepa" que dependa de esa categoría: en la próxima implementación, desde esta pantalla se deberán poder definir también las cepas asociadas a cada categoría de especie.
   **Hecho:** Renombrado en toda la app: config_especies (titulo, modal, labels, confirmaciones, botón "+ Categoría de especie", columna tabla, mensaje vacío); form_animales (cepa_subespecie → "Categoría de especie", seleccione_categoria, label_categoria); admin_animales help_3_desc; precios badge_var; menu y seccion_especies; campo_subespecie en formulario registro. i18n ES/EN/PT. Estructura actual de categorías se mantiene; la capa "Cepa" (dropdown obligatorio en formulario animales) queda para el ítem siguiente con cambios en BD.
 
+- [ ] **Correos sin botones de acción (revisión global).**  
+  **Instrucciones:** Revisar todos los correos HTML y eliminar botones clickeables ("CTA"), reemplazándolos por texto informativo cuando corresponda. Priorizar primero los correos de protocolos (ya aplicado: se quitó "Ver protocolos"), y luego completar registro, reseteo de contraseña e insumos evaluando el flujo alternativo sin botones.
+
 ### Módulos grandes (a futuro)
 
 - [ ] Reservas (módulo completo).

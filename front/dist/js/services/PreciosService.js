@@ -24,7 +24,6 @@ export const PreciosService = {
      */
     async downloadUniversalPDF() {
         const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
-        const instNombre = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         const fechaActual = new Date().toLocaleDateString();
 
         try {
@@ -35,6 +34,17 @@ export const PreciosService = {
             if (!res || res.status !== 'success') throw new Error("No se pudo obtener el tarifario");
 
             const data = res.data;
+            const instNombreRaw = data?.institucion?.NombreInst || localStorage.getItem('NombreInst') || 'URBE';
+            const instNombre = String(instNombreRaw).toUpperCase();
+            const fileSafeInst = String(instNombreRaw)
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^\w\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '_')
+                .replace(/_+/g, '_')
+                .toUpperCase() || 'URBE';
+            const fechaFile = new Date().toISOString().slice(0, 10);
 
             // 2. Procesar Filas de Animales (Jerárquico) - texto siempre oscuro para PDF (dark mode)
             let animalRows = '';
@@ -98,19 +108,19 @@ export const PreciosService = {
 
             // 4. Template del PDF: fondo blanco y TODO el texto color oscuro para que se vea bien en dark mode
             const template = `
-                <div style="font-family: Arial, sans-serif; padding: 30px; color: #000; background: #fff;">
+                <div style="font-family: Arial, sans-serif; padding: 26px; color: #000; background: #fff;">
                     ${logoHeader}
-                    <div style="text-align: center; border-bottom: 3px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
+                    <div class="pdf-section avoid-break" style="text-align: center; border-bottom: 3px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                         <h2 style="color: #1a5d3b; margin: 0;">GROBO - ${instNombre}</h2>
                         <h4 style="margin: 5px 0; color: #000;">TARIFARIO OFICIAL VIGENTE</h4>
                         <p style="font-size: 11px; color: #000;">Emisión: ${fechaActual}</p>
                     </div>
 
-                    <div style="margin-bottom: 10px; font-weight: bold; color: #1a5d3b; text-transform: uppercase; font-size: 14px;">
+                    <div class="pdf-section avoid-break" style="margin-bottom: 10px; font-weight: bold; color: #1a5d3b; text-transform: uppercase; font-size: 14px;">
                         ALOJAMIENTO: CAJA CHICA Y CAJA GRANDE
                     </div>
 
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px;">
+                    <table class="avoid-break" style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px;">
                         <thead>
                             <tr style="background: #1a5d3b; color: #fff;">
                                 <th style="padding: 10px; border: 1px solid #ddd; text-align: left; color: #fff;">ESPECIE / VARIEDAD</th>
@@ -120,33 +130,33 @@ export const PreciosService = {
                         <tbody>${animalRows}</tbody>
                     </table>
 
-                    <div style="display: flex; gap: 20px; margin-bottom: 30px;">
-                        <div style="flex: 1;">
+                    <div class="pdf-section avoid-break" style="display: flex; gap: 20px; margin-bottom: 30px;">
+                        <div class="avoid-break" style="flex: 1;">
                             <h4 style="color: #000; border-bottom: 1px solid #eee; font-size: 13px;">INSUMOS EXPERIMENTALES</h4>
-                            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <table class="avoid-break" style="width: 100%; border-collapse: collapse; font-size: 10px;">
                                 <tr style="background: #f8f9fa;"><th style="color: #000;">Insumo</th><th style="color: #000;">Cant/Tipo</th><th style="color: #000;">Precio</th></tr>
                                 ${renderInsumoRow(data.insumosExp)}
                             </table>
                         </div>
-                        <div style="flex: 1;">
+                        <div class="avoid-break" style="flex: 1;">
                             <h4 style="color: #000; border-bottom: 1px solid #eee; font-size: 13px;">INSUMOS COMUNES</h4>
-                            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                            <table class="avoid-break" style="width: 100%; border-collapse: collapse; font-size: 10px;">
                                 <tr style="background: #f8f9fa;"><th style="color: #000;">Insumo</th><th style="color: #000;">Cant/Tipo</th><th style="color: #000;">Precio</th></tr>
                                 ${renderInsumoRow(data.insumos)}
                             </table>
                         </div>
                     </div>
 
-                    <div style="padding: 15px; background: #f0f2f5; border: 1px solid #dee2e6; border-radius: 4px;">
+                    <div class="pdf-section avoid-break" style="padding: 15px; background: #f0f2f5; border: 1px solid #dee2e6; border-radius: 4px;">
                         <span style="font-size: 14px; font-weight: bold; color: #000;">JORNAL DE TRABAJO EXPERIMENTAL:</span>
                         <span style="float: right; color: #000; font-weight: bold; font-size: 16px;">
                             $ ${data.institucion.PrecioJornadaTrabajoExp || 0}
                         </span>
                     </div>
 
-                    <div style="margin-top: 25px;">
+                    <div class="pdf-section avoid-break" style="margin-top: 25px;">
                         <h4 style="color: #000; border-bottom: 1px solid #eee; font-size: 13px;">SERVICIOS INSTITUCIONALES</h4>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                        <table class="avoid-break" style="width: 100%; border-collapse: collapse; font-size: 10px;">
                             <tr style="background: #f8f9fa;"><th style="color: #000;">Servicio</th><th style="color: #000;">Medida</th><th style="color: #000;">Precio</th></tr>
                             ${renderServiciosRow()}
                         </table>
@@ -155,11 +165,12 @@ export const PreciosService = {
 
             // 5. Generar PDF (filename con timestamp para evitar cache del navegador)
             const opt = {
-                margin: [18, 18, 18, 18],
-                filename: `Tarifario_${instNombre}_${fechaActual.replace(/\//g, '-')}_${Date.now()}.pdf`,
+                margin: [16, 12, 16, 12],
+                filename: `Tarifario_${fileSafeInst}_${fechaFile}_${Date.now()}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2, logging: false, backgroundColor: '#ffffff', useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy', 'avoid-all'], avoid: ['.avoid-break', 'table', 'tr'] }
             };
 
             window.html2pdf().set(opt).from(template).save();

@@ -50,7 +50,7 @@
                     initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica del formulario (Carga de cepas, cálculo de costos, etc.)
+                    // Inicialización de la lógica del formulario (Carga de Cepa/Stock/Raza, cálculo de costos, etc.)
                     initAnimalForm();
                     
                     console.log("✅ Formulario de Pedido de Animales inicializado.");
@@ -179,18 +179,18 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Cepa / Subespecie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Cepa/Stock/Raza / Subespecie</label>
                             <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
                                 <option value="" data-i18n="form_animales.primero_especie">Primero seleccione especie...</option>
                             </select>
                         </div>
 
                         <div class="col-12" id="cepa-container" style="display:none;">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa/Stock/Raza</label>
                             <select id="select-cepa" class="form-select fw-bold text-primary" disabled>
-                                <option value="0" data-i18n="form_animales.sin_cepa">Sin cepa / no aplica</option>
+                                <option value="0" data-i18n="form_animales.sin_cepa">Sin Cepa/Stock/Raza / no aplica</option>
                             </select>
-                            <small id="cepa-help" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen cepas configuradas para esta categoría, debe seleccionar una.</small>
+                            <small id="cepa-help" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.peso">Peso (g/kg)</label>
@@ -307,11 +307,11 @@
                         </div>
 
                         <div class="col-12" id="cepa-container-2" style="display:none;">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa/Stock/Raza</label>
                             <select id="select-cepa-2" class="form-select fw-bold text-primary" disabled>
-                                <option value="0" data-i18n="form_animales.sin_cepa">Sin cepa / no aplica</option>
+                                <option value="0" data-i18n="form_animales.sin_cepa">Sin Cepa/Stock/Raza / no aplica</option>
                             </select>
-                            <small id="cepa-help-2" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen cepas configuradas para esta categoría, debe seleccionar una.</small>
+                            <small id="cepa-help-2" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.</small>
                         </div>
 
                         <div class="col-md-4">

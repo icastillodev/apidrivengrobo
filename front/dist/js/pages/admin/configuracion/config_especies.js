@@ -85,7 +85,7 @@ function renderTree() {
         // Bloque de cepas siempre visible, con "Agregar" arriba y lista debajo
         const cepasBoxId = `cepas-inline-esp-${esp.idespA}`;
         const t = window.txt?.config_especies;
-        const btnCepas = (t?.btn_cepas) || 'Cepas';
+    const btnCepas = (t?.btn_cepas) || 'Cepa/Stock/Raza';
         const btnAgregar = (t?.btn_agregar_cepa) || 'Agregar';
         const phCepa = (t?.ph_cepa) || 'Ej: C57BL/6J';
         const labelNombreCepa = (t?.label_nombre_cepa) || 'Nombre';
@@ -225,8 +225,8 @@ window.openModalEditCepa = (idcepaA, nombreActual, idespA) => {
 window.deleteCepaConfirm = async (idcepaA, idespA) => {
     const t = window.txt?.config_especies;
     const result = await Swal.fire({
-        title: t?.confirm_eliminar_cepa_titulo || '¿Eliminar cepa?',
-        text: t?.confirm_eliminar_cepa_texto || 'No se podrá eliminar si ya hay formularios con esta cepa asignada.',
+        title: t?.confirm_eliminar_cepa_titulo || '¿Eliminar Cepa/Stock/Raza?',
+        text: t?.confirm_eliminar_cepa_texto || 'No se podrá eliminar si ya hay formularios con esta Cepa/Stock/Raza asignada.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -238,7 +238,7 @@ window.deleteCepaConfirm = async (idcepaA, idespA) => {
         fd.append('idcepaA', idcepaA);
         const res = await API.request('/admin/config/cepas/delete', 'POST', fd);
         if (res.status === 'success') {
-            Swal.fire({ title: t?.procesado || 'Procesado', text: t?.cepa_eliminada || 'Cepa eliminada.', icon: 'success', timer: 1500, showConfirmButton: false });
+            Swal.fire({ title: t?.procesado || 'Procesado', text: t?.cepa_eliminada || 'Cepa/Stock/Raza eliminada.', icon: 'success', timer: 1500, showConfirmButton: false });
             cepasCache[idespA] = (cepasCache[idespA] || []).filter(c => c.idcepaA != idcepaA);
             renderCepasInline(idespA);
         } else {
@@ -274,7 +274,7 @@ function renderCepasList(idespA) {
     if (!listEl) return;
     const items = Array.isArray(cepasCache[idespA]) ? cepasCache[idespA] : [];
     if (!items.length) {
-        listEl.innerHTML = `<div class="text-center text-muted small py-3">${t?.empty_cepas || 'No hay cepas registradas.'}</div>`;
+        listEl.innerHTML = `<div class="text-center text-muted small py-3">${t?.empty_cepas || 'No hay Cepa/Stock/Raza registradas.'}</div>`;
         return;
     }
     listEl.innerHTML = items.map(c => {
@@ -338,7 +338,7 @@ function renderCepasInline(idespA) {
     if (!box) return;
     const items = Array.isArray(cepasCache[idespA]) ? cepasCache[idespA] : [];
     if (!items.length) {
-        box.innerHTML = `<div class="text-muted small">${t?.empty_cepas || 'No hay cepas registradas.'}</div>`;
+        box.innerHTML = `<div class="text-muted small">${t?.empty_cepas || 'No hay Cepa/Stock/Raza registradas.'}</div>`;
         return;
     }
     const lblActivo = t?.activo || 'ACTIVO';
@@ -413,7 +413,7 @@ async function saveCepa(e) {
     const nombre = document.getElementById('cepa-nombre').value;
     const t = window.txt?.config_especies;
     if (!idespA) {
-        Swal.fire(t?.error || 'Error', t?.error_guardar_cepa || 'No se pudo guardar la cepa.', 'error');
+        Swal.fire(t?.error || 'Error', t?.error_guardar_cepa || 'No se pudo guardar la Cepa/Stock/Raza.', 'error');
         return;
     }
     try {
@@ -428,7 +428,7 @@ async function saveCepa(e) {
                 await loadCepasInline(idespA);
             }
         } else {
-            Swal.fire(t?.error || 'Error', res.message || (t?.error_guardar_cepa || 'No se pudo guardar la cepa.'), 'error');
+            Swal.fire(t?.error || 'Error', res.message || (t?.error_guardar_cepa || 'No se pudo guardar la Cepa/Stock/Raza.'), 'error');
         }
     } catch (err) {
         Swal.fire(t?.error || 'Error', t?.error_conexion || 'Error de conexión', 'error');
@@ -474,7 +474,7 @@ window.toggleCepa = async (idcepaA, status) => {
         if (res.status === 'success') {
             await loadCepas(idespA);
         } else {
-            Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la cepa.'), 'error');
+            Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la Cepa/Stock/Raza.'), 'error');
         }
     } catch (e) {
         console.error(e);
@@ -492,7 +492,7 @@ window.toggleCepaInline = async (idespA, idcepaA, status) => {
         if (res.status === 'success') {
             await loadCepasInline(idespA);
         } else {
-            Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la cepa.'), 'error');
+            Swal.fire(t?.error || 'Error', res.message || (t?.error_toggle_cepa || 'No se pudo cambiar el estado de la Cepa/Stock/Raza.'), 'error');
         }
     } catch (e) {
         console.error(e);

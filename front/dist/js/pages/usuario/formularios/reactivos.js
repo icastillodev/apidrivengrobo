@@ -150,6 +150,7 @@ function setupSearch() {
         list.innerHTML = '';
         if (items.length === 0) { list.classList.add('d-none'); return; }
         items.forEach(p => {
+            const isRedIncomplete = Number(p?.OwnerInstId || 0) !== Number(getContextInstId()) && Number(p?.RedConfigCompleta || 0) !== 1;
             const item = document.createElement('div');
             item.className = "list-group-item list-group-item-action protocol-result-item p-3";
             item.innerHTML = `
@@ -160,6 +161,9 @@ function setupSearch() {
                     </div>
                     <span class="small text-truncate" style="max-width: 200px;">${p.tituloA}</span>
                 </div>`;
+            if (isRedIncomplete) {
+                item.innerHTML += `<div class="mt-1"><span class="badge bg-danger">${window.txt?.form_reactivos?.protocolo_no_habilitado_badge || 'NO HABILITADO'}</span></div>`;
+            }
             item.onclick = () => selectProtocol(p);
             list.appendChild(item);
         });
@@ -191,14 +195,34 @@ function setupSearch() {
 }
 
 async function selectProtocol(p) {
+    const instId = getContextInstId();
+    const isRedIncomplete = Number(p?.OwnerInstId || 0) !== Number(instId) && Number(p?.RedConfigCompleta || 0) !== 1;
+    if (isRedIncomplete) {
+        return Swal.fire(
+            window.txt?.form_reactivos?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+            window.txt?.form_reactivos?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+            'warning'
+        );
+    }
+
     document.getElementById('step-1').classList.add('hidden-section');
     document.getElementById('step-2').classList.remove('hidden-section');
     document.getElementById('selected-prot-id').value = p.idprotA;
 
     try {
-        const res = await API.request(`/reactivos/protocol-info?id=${p.idprotA}`);
+        const res = await API.request(`/reactivos/protocol-info?id=${p.idprotA}&inst=${instId}`);
         if(res.status === 'success') {
             const info = res.data;
+            if (Number(info?.RedConfigCompleta || 1) !== 1 && Number(info?.OwnerInstId || 0) !== Number(instId)) {
+                document.getElementById('step-2').classList.add('hidden-section');
+                document.getElementById('step-1').classList.remove('hidden-section');
+                document.getElementById('selected-prot-id').value = '';
+                return Swal.fire(
+                    window.txt?.form_reactivos?.protocolo_red_no_habilitado_titulo || 'Protocolo no habilitado',
+                    window.txt?.form_reactivos?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.',
+                    'warning'
+                );
+            }
             document.getElementById('info-titulo').innerText = info.tituloA;
             document.getElementById('info-nprot').innerText = `N° ${info.nprotA}`;
             document.getElementById('info-investigador').innerText = info.Responsable;
@@ -349,6 +373,11 @@ async function handleReview(e) {
 }
 
 async function submitOrder() {
+    const selectedProtId = document.getElementById('selected-prot-id').value;
+    if (!selectedProtId) {
+        return Swal.fire('Error', window.txt?.form_reactivos?.protocolo_red_no_habilitado || 'Este protocolo de red no está configurado en esta institución.', 'warning');
+    }
+
     Swal.fire({ title: 'Enviando...', didOpen: () => Swal.showLoading() });
     
     // 3. Obtenemos el targetInst correcto para el envío
