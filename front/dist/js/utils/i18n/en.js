@@ -2351,6 +2351,7 @@ alojamientos: {
         btn_reset: "RESET PASSWORD",
         btn_cerrar: "CLOSE",
         btn_guardar: "SAVE",
+        rol_superadmin: "Superadmin",
         rol_administrador: "Admin",
         rol_investigador: "Researcher",
         rol_secadmin: "Admin",

@@ -2352,6 +2352,7 @@ alojamientos: {
         btn_reset: "REDEFINIR SENHA",
         btn_cerrar: "FECHAR",
         btn_guardar: "GUARDAR",
+        rol_superadmin: "Superadmin",
         rol_administrador: "Admin",
         rol_investigador: "Investigador",
         rol_secadmin: "Admin",

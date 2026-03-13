@@ -2357,6 +2357,7 @@ export const es = {
         btn_reset: "RESET CLAVE",
         btn_cerrar: "CERRAR",
         btn_guardar: "GUARDAR",
+        rol_superadmin: "Superadmin",
         rol_administrador: "Admin",
         rol_investigador: "Investigador",
         rol_secadmin: "Admin",

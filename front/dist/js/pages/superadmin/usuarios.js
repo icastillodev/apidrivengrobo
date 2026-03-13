@@ -10,8 +10,8 @@ let deletePreviewData = null;
 
 function getRolesMap() {
     const t = window.txt?.superadmin_usuarios_global;
-    if (t) return { 2: t.rol_administrador, 3: t.rol_investigador, 4: t.rol_secadmin, 5: t.rol_tecnico, 6: t.rol_laboratorio };
-    return { 2: 'Administrador Sede', 3: 'Investigador', 4: 'SecAdmin', 5: 'Técnico', 6: 'Laboratorio' };
+    if (t) return { 2: t.rol_superadmin, 3: t.rol_investigador, 4: t.rol_administrador, 5: t.rol_tecnico, 6: t.rol_laboratorio };
+    return { 2: 'Superadmin', 3: 'Investigador', 4: 'Admin', 5: 'Técnico', 6: 'Laboratorio' };
 }
 
 export async function initSuperUsuarios() {
@@ -52,7 +52,8 @@ async function cargarUsuarios() {
 function poblarSelectRoles() {
     const rolesMap = getRolesMap();
     const select = document.getElementById('IdTipoUsrA');
-    select.innerHTML = Object.entries(rolesMap).map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('');
+    const soloRoles = { 2: rolesMap[2], 4: rolesMap[4] };
+    select.innerHTML = Object.entries(soloRoles).map(([id, nombre]) => `<option value="${id}">${nombre}</option>`).join('');
 }
 
 // --- RENDERIZADO Y BÚSQUEDA ---
