@@ -272,7 +272,7 @@ async function abrirModalEliminacionTotal() {
             fl.forEach(function(f) {
                 const li = document.createElement('li');
                 li.className = 'list-group-item small ps-4';
-                li.textContent = '#' + (f.idformA || '') + ' ' + (f.tipo_nombre || f.tipoA || '') + (f.categoria ? ' (' + f.categoria + ')') + '' + (f.nprot ? ' — Protocolo ' + f.nprot : '');
+                li.textContent = '#' + (f.idformA || '') + ' ' + (f.tipo_nombre || f.tipoA || '') + (f.categoria ? ' (' + f.categoria + ')' : '') + (f.nprot ? ' — Protocolo ' + f.nprot : '');
                 listEl.appendChild(li);
             });
         }
