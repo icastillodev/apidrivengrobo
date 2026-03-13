@@ -707,6 +707,8 @@ export const es = {
         estado_cobro_anulado: "ANULADO",
         col_formulario: "Formulario",
         sin_datos_institucion: "No hay facturación derivada para los filtros seleccionados.",
+        inst_solicitante: "Institución:",
+        inst_todas: "TODAS",
         
         // Dashboard
         resumen_fin: "Resumen Financiero",
@@ -738,6 +740,7 @@ export const es = {
         volver_seleccion: "VOLVER A SELECCIÓN",
         link_ver_detalle: "Ver detalle",
         selecc_pagar: "Seleccionado para pagar:",
+        seleccionado_lbl: "Seleccionado",
         saldo_actual: "Saldo Actual:",
         
         // Alertas
@@ -1070,6 +1073,7 @@ export const es = {
         seleccione: "Seleccione...",
         seleccione_tipo: "Seleccione tipo...",
         primero_especie: "Primero seleccione especie...",
+        seleccione_especie_cepa: "Seleccione especie.",
         cepa_linea: "Cepa/Stock/Raza / Línea",
         label_categoria: "Categoría",
         peso: "Peso (g/kg)",
@@ -1220,6 +1224,7 @@ export const es = {
         derivar_ok: "Formulario derivado correctamente.",
         derivar_sin_destinos: "No hay instituciones disponibles para derivar",
         historial_derivacion_titulo: "Historial de derivación",
+        historial_derivacion_formulario: "Historial de derivación del formulario",
         historial_derivacion_vacio: "Sin movimientos de derivación.",
         historial_derivacion_error: "Error al cargar historial.",
         retirar_derivacion_btn: "Retirar derivación",
@@ -1232,7 +1237,27 @@ export const es = {
         estado_derivacion_devuelta: "Devuelta",
         estado_derivacion_rechazada: "Rechazada",
         estado_derivacion_cancelada: "Cancelada",
-        cancelar: "Cancelar"
+        estado_por: "por",
+        derivacion_espera_aceptacion: "Debe aceptar la derivación para comenzar a trabajar.",
+        derivacion_protocolo_bloqueado: "Protocolo fijo: no se puede cambiar en formulario derivado.",
+        derivacion_datos_origen: "Datos del formulario original (derivado)",
+        derivacion_datos_origen_desc: "Estos son los datos que vinieron con la derivación. Abajo modifique con las opciones de su institución.",
+        derivacion_modificar_con_mi_inst: "Modificar con opciones de mi institución",
+        derivacion_resumen_nuevo: "Resumen del nuevo formulario (lo que modifiqué)",
+        derivacion_resumen_desc: "Vista previa de cómo quedará el pedido al guardar.",
+        derivacion_resumen_placeholder: "Seleccione especie y categoría arriba.",
+        derivacion_seleccione_especie: "— Seleccione especie —",
+        derivacion_especie_requerida: "Debe seleccionar Especie y Categoría para el formulario derivado.",
+        cancelar: "Cancelar",
+        label_origen: "Origen",
+        label_tipo: "Tipo",
+        label_categoria: "Categoría",
+        label_solicitado: "Solicitado",
+        label_retiro: "Retiro",
+        label_protocolo: "Protocolo",
+        label_organizacion: "Organización",
+        label_instituciones: "Instituciones",
+        label_aclaracion: "Aclaración"
     },
     misprotocolos: {
         bread_investigador: "Investigador",

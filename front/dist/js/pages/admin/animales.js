@@ -295,14 +295,20 @@ window.openAnimalModal = async (a) => {
 
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
-    if (a.idprotA) {
+    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
+    const useAllLocalSpecies = isDerivedActive && !isOriginInst;
+    if (useAllLocalSpecies) {
+        await window.loadSpeciesForProtocol(a.idprotA, a.idsubespA, { allLocal: true });
+    } else if (a.idprotA) {
         await window.loadSpeciesForProtocol(a.idprotA, a.idsubespA);
-        const selSp = document.getElementById('select-species-modal');
-        const optSp = selSp && selSp.options[selSp.selectedIndex];
-        const idespA = optSp && (optSp.dataset.idespA || optSp.getAttribute('data-idesp-a'));
-        if (idespA) window.loadCepasForEspecieModal(idespA, a.idcepaA);
     }
-    
+    const selEsp = document.getElementById('select-especie-modal');
+    const idespA = selEsp && selEsp.value ? selEsp.value : null;
+    if (idespA) await window.loadCepasForEspecieModal(idespA, useAllLocalSpecies ? null : a.idcepaA);
+    window.calculateAnimalTotals?.();
+    window.updateResumenNuevoFormulario?.();
     new bootstrap.Modal(document.getElementById('modal-animal')).show();
 };
 
@@ -313,6 +319,11 @@ function renderModalHeader(a) {
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const wf = (a.EstadoWorkflow || '').toString().toUpperCase();
+    const isPendingAtDestination = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    const originName = (a.InstitucionOrigenNombre || '').trim();
+    const currentName = (a.InstitucionActualNombre || '').trim();
+    const routeText = [originName, currentName].filter(Boolean).join(' → ');
     const lblDerivado = tx.workflow_derivado || 'Derivado';
     const lblAceptar = tx.estado_derivacion_aceptada || 'Aceptar';
     const lblDevolver = tx.estado_derivacion_devuelta || 'Devolver';
@@ -320,17 +331,20 @@ function renderModalHeader(a) {
     const lblRetirar = tx.retirar_derivacion_btn || 'Retirar derivación';
     const lblHistorial = tx.historial_derivacion_titulo || 'Historial';
     const lblDerivar = tx.derivar_btn || 'Derivar';
+    const lblWaitAccept = tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.';
+    const lblProtocolLocked = tx.derivacion_protocolo_bloqueado || 'Protocolo fijo: no se puede cambiar en formulario derivado.';
     const derivBox = isDerivedActive
         ? `
         <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-primary">${lblDerivado}</span>
-            <span class="small text-muted">${a.InstitucionOrigenNombre ? `Origen: ${a.InstitucionOrigenNombre}` : ''}</span>
+            <span class="badge bg-primary">${lblDerivado}${routeText ? ` · ${routeText}` : ''}</span>
             ${isOriginInst
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionAnimal('cancel', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblRetirar}</button>`
-                : `
+                : isPendingAtDestination
+                    ? `
             <button type="button" class="btn btn-sm btn-outline-success" onclick="window.resolveDerivacionAnimal('accept', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblAceptar}</button>
             <button type="button" class="btn btn-sm btn-outline-warning" onclick="window.resolveDerivacionAnimal('return', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblDevolver}</button>
             <button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionAnimal('reject', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblRechazar}</button>`
+                    : ''
             }
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryAnimal(${a.idformA})">${lblHistorial}</button>
         </div>`
@@ -339,6 +353,12 @@ function renderModalHeader(a) {
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.deriveFromAdminAnimal(${a.idformA})">${lblDerivar}</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryAnimal(${a.idformA})">${lblHistorial}</button>
         </div>`;
+    const derivInfoPanel = isDerivedActive
+        ? `<div class="alert alert-info mt-2 py-2 px-3 small mb-0">
+            <div><strong>${lblProtocolLocked}</strong></div>
+            ${isPendingAtDestination ? `<div>${lblWaitAccept}</div>` : ''}
+        </div>`
+        : '';
 
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
@@ -346,6 +366,7 @@ function renderModalHeader(a) {
             <h5 class="fw-bold mb-0">Detalle Animal</h5>
             <span class="small text-muted">ID: <strong>${a.idformA}</strong> | Investigador: ${a.Investigador}</span>
             ${derivBox}
+            ${derivInfoPanel}
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
@@ -382,7 +403,7 @@ function renderAdminSection(a, identity) {
                         <option value="Suspendido" ${a.estado === 'Suspendido' ? 'selected' : ''}>Suspendido</option>
                         <option value="Reservado" ${a.estado === 'Reservado' ? 'selected' : ''}>Reservado</option>
                     </select>
-                    <div id="modal-status-badge-container">${getStatusBadge(a.estado)}</div>
+                    <div id="modal-status-badge-container">${getStatusBadge(a.estado, (Number(a.DerivadoActivo || 0) === 1 && (a.InstitucionActualNombre || '').trim()) ? a.InstitucionActualNombre.trim() : undefined)}</div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -412,11 +433,19 @@ function renderNotificationSection(lastNotify, idformA) {
 }
 
 function renderOrderModificationSection(a, sex, cache) {
+    const tx = window.txt?.misformularios || {};
     const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
+    const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockImmutable = isDerivedActive && !isOriginInst;
+    const lockTipo = lockImmutable;
+    const emptyEditable = lockImmutable;
     const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
     const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
     const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
-    const idDepto = a.idDepto != null ? a.idDepto : '';
+    const idDepto = emptyEditable ? '' : (a.idDepto != null ? a.idDepto : '');
     const orgActual = (a.Organizacion && String(a.Organizacion).trim()) ? a.Organizacion : sinOrg;
     const extFlag = Number(a.DeptoExternoFlag || 1);
     const isExt = extFlag === 2;
@@ -427,30 +456,58 @@ function renderOrderModificationSection(a, sex, cache) {
         const sel = (d.iddeptoA == idDepto) ? ' selected' : '';
         return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
     }).join('');
+    const protLabel = (a.NProtocolo || '') + (a.TituloProtocolo ? ` - ${a.TituloProtocolo}` : '') || '—';
+    const panelOrigen = lockImmutable ? `
+    <div class="alert alert-info border-info mb-3 py-3">
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text me-2"></i>1. ${tx.derivacion_datos_origen || 'Datos del formulario original (derivado)'}</h6>
+        <p class="small text-muted mb-2">${tx.derivacion_datos_origen_desc || 'Estos son los datos que vinieron con la derivación.'}</p>
+        <div class="row g-2 small">
+            <div class="col-6"><strong>Tipo:</strong> ${a.TipoNombre || '—'}</div>
+            <div class="col-6"><strong>Protocolo:</strong> ${protLabel}</div>
+            <div class="col-6"><strong>Departamento:</strong> ${a.DeptoProtocolo || '—'}</div>
+            <div class="col-6"><strong>${window.txt?.form_animales?.especie || 'Especie'}:</strong> ${a.EspeNombreA || '—'}</div>
+            <div class="col-6"><strong>${window.txt?.form_animales?.label_categoria || 'Categoría'}:</strong> ${a.SubEspeNombreA || '—'}</div>
+            <div class="col-6"><strong>Cepa:</strong> ${a.CepaNombre || '—'}</div>
+            <div class="col-6"><strong>Cantidades:</strong> M:${sex.machoA} H:${sex.hembraA} I:${sex.indistintoA} Total:${sex.totalA}</div>
+            <div class="col-6"><strong>Edad/Peso:</strong> ${a.Edad || '—'} / ${a.Peso || '—'}</div>
+            <div class="col-6"><strong>Inicio/Retiro:</strong> ${a.Inicio || '—'} / ${a.Retiro || '—'}</div>
+        </div>
+    </div>` : '';
+
+    const tituloModificar = lockImmutable ? (tx.derivacion_modificar_con_mi_inst || '2. Modificar con opciones de mi institución') : (tx.derivacion_modificar_con_mi_inst || 'Modificar formulario');
+    const panelResumen = lockImmutable ? `
+    <div class="alert alert-success border-success mb-3 py-3" id="resumen-nuevo-formulario-animal">
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-check2-square me-2"></i>3. ${tx.derivacion_resumen_nuevo || 'Resumen del nuevo formulario (lo que modifiqué)'}</h6>
+        <p class="small text-muted mb-2">${tx.derivacion_resumen_desc || 'Vista previa de cómo quedará el pedido al guardar.'}</p>
+        <div id="resumen-nuevo-formulario-content" class="row g-2 small text-dark">— ${tx.derivacion_resumen_placeholder || 'Seleccione especie y categoría arriba.'} —</div>
+    </div>` : '';
 
     return `
-    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">MODIFICACIÓN DEL FORMULARIO (DATOS DEL PEDIDO)</h6>
-    
+    <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">${lockImmutable ? '2. ' : ''}${tituloModificar}</h6>
+    ${panelOrigen}
     <form id="form-animal-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${a.idformA}">
         <div class="row g-3">
             
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Tipo de Pedido</label>
-                <select name="tipoA" id="select-type-modal" class="form-select form-select-sm" onchange="window.calculateAnimalTotals()">
+                <select name="tipoA" id="select-type-modal" class="form-select form-select-sm" onchange="window.calculateAnimalTotals()" ${lockTipo ? 'disabled' : ''}>
                     ${cache.types.map(t => `<option value="${t.IdTipoFormulario}" data-exento="${t.exento}" data-desc="${t.descuento}" ${a.TipoNombre === t.nombreTipo ? 'selected' : ''}>${t.nombreTipo}</option>`).join('')}
                 </select>
+                ${lockTipo ? `<input type="hidden" name="tipoA" value="${a.tipoA || ''}">` : ''}
             </div>
             <div class="col-md-12">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">N° Protocolo (Buscar)</label>
-                <input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="Filtrar protocolo..." onkeyup="window.filterProtocolList(this)">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">N° Protocolo</label>
+                ${lockProtocol
+                    ? `<div class="form-control form-control-sm bg-light">${protLabel}</div><input type="hidden" name="idprotA" value="${a.idprotA || ''}">`
+                    : `<input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="Filtrar protocolo..." onkeyup="window.filterProtocolList(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" onchange="window.handleProtocolChange(this)">
                     ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${p.nprotA} - ${p.tituloA}</option>`).join('')}
-                </select>
+                </select>`}
             </div>
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Departamento</label>
-                <select name="depto" id="modal-depto-animal" class="form-select form-select-sm fw-bold">
+                <select name="depto" id="modal-depto-animal" class="form-select form-select-sm fw-bold" onchange="window.updateResumenNuevoFormulario?.()">
                     <option value="">— Sin departamento —</option>
                     ${optionsDepto}
                 </select>
@@ -469,12 +526,16 @@ function renderOrderModificationSection(a, sex, cache) {
             </div>
             
             <div class="col-md-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Especie</label>
-                <select id="select-species-modal" name="idsubespA" class="form-select form-select-sm" onchange="window.updateSpeciesPrice(this)"></select>
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.form_animales?.especie || 'Especie'}</label>
+                <select id="select-especie-modal" class="form-select form-select-sm" onchange="window.onEspecieModalChange(this); window.updateResumenNuevoFormulario?.();"></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.form_animales?.label_categoria || 'Categoría'}</label>
+                <select id="select-categoria-modal" name="idsubespA" class="form-select form-select-sm" onchange="window.updateSpeciesPrice(this)"></select>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa/Stock/Raza</label>
-                <select id="select-cepa-modal" name="idcepaA" class="form-select form-select-sm fw-bold"></select>
+                <select id="select-cepa-modal" name="idcepaA" class="form-select form-select-sm fw-bold" onchange="window.updateResumenNuevoFormulario?.()"></select>
                 <div id="cepa-modal-help" class="small text-muted mt-1" style="font-size: 10px;"></div>
             </div>
             ${a.raza ? `
@@ -484,11 +545,11 @@ function renderOrderModificationSection(a, sex, cache) {
             </div>` : `<input type="hidden" name="razaA" value="">`}
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Edad</label>
-                <input type="text" name="edadA" class="form-control form-control-sm" value="${a.Edad || ''}">
+                <input type="text" name="edadA" class="form-control form-control-sm" value="${a.Edad || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Peso</label>
-                <input type="text" name="pesoA" class="form-control form-control-sm" value="${a.Peso || ''}">
+                <input type="text" name="pesoA" class="form-control form-control-sm" value="${a.Peso || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
 
             <div class="col-12 mt-4">
@@ -497,15 +558,15 @@ function renderOrderModificationSection(a, sex, cache) {
 
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Machos</label>
-                <input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()">
+                <input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Hembras</label>
-                <input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()">
+                <input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Indistintos</label>
-                <input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()">
+                <input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Total</label>
@@ -516,7 +577,7 @@ function renderOrderModificationSection(a, sex, cache) {
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Precio Unitario (BD)</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light fw-bold">$</span>
-                    <input type="text" id="price-unit-modal" class="form-control bg-light text-end" value="${a.PrecioUnit || 0}" readonly>
+                    <input type="text" id="price-unit-modal" class="form-control bg-light text-end" value="${emptyEditable ? 0 : (a.PrecioUnit || 0)}" readonly>
                 </div>
             </div>
             <div class="col-md-6 mt-3">
@@ -534,17 +595,19 @@ function renderOrderModificationSection(a, sex, cache) {
 
             <div class="col-md-6">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Fecha de Inicio</label>
-                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${a.Inicio || ''}">
+                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${a.Inicio || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             <div class="col-md-6">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Fecha de Retiro</label>
-                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${a.Retiro || ''}">
+                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${a.Retiro || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
 
             <div class="col-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Aclaración Usuario (Lectura)</label>
                 <div class="p-2 border rounded bg-light small" style="min-height: 40px;">${a.Aclaracion || '<span class="text-muted fst-italic">Sin aclaración adicional enviada por el usuario.</span>'}</div>
             </div>
+
+            ${panelResumen}
 
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
                 <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadAnimalPDF(${a.idformA})">
@@ -558,6 +621,17 @@ function renderOrderModificationSection(a, sex, cache) {
 // --- ACTUALIZACIÓN DINÁMICA ---
 window.updateAnimalStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
+    const row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
     const statusSelect = document.getElementById('modal-status');
     const aclara = document.getElementById('modal-aclaracionadm').value;
     const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
@@ -575,7 +649,8 @@ window.updateAnimalStatusQuick = async () => {
             if (inputVisor) {
                 inputVisor.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : (isSinEstado ? 'Falta revisar' : '');
             }
-            document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value);
+            const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
+            document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value, porInst);
             syncAllData();
         }
     } catch (e) { console.error(e); }
@@ -615,38 +690,121 @@ window.calculateAnimalTotals = () => {
     }
 
     document.getElementById('price-total-modal').value = finalPrice.toFixed(2);
+    window.updateResumenNuevoFormulario?.();
 };
 
-window.loadSpeciesForProtocol = async (protId, selectedSubId = null) => {
-    const select = document.getElementById('select-species-modal');
-    if (!select) return;
+window.updateResumenNuevoFormulario = () => {
+    const content = document.getElementById('resumen-nuevo-formulario-content');
+    if (!content) return;
+    const selEsp = document.getElementById('select-especie-modal');
+    const selCat = document.getElementById('select-categoria-modal');
+    const selCepa = document.getElementById('select-cepa-modal');
+    const priceUnit = document.getElementById('price-unit-modal');
+    const priceTotal = document.getElementById('price-total-modal');
+    const depto = document.getElementById('modal-depto-animal');
+    const lblEsp = window.txt?.form_animales?.especie || 'Especie';
+    const lblCat = window.txt?.form_animales?.label_categoria || 'Categoría';
+    const espText = selEsp?.options[selEsp?.selectedIndex]?.text || '—';
+    const catText = selCat?.options[selCat?.selectedIndex]?.text || '—';
+    const cepaText = selCepa?.options[selCepa?.selectedIndex]?.text || '—';
+    const deptoText = depto?.options[depto?.selectedIndex]?.text || '—';
+    const unit = (priceUnit?.value || 0);
+    const total = (priceTotal?.value || '0');
+    const totalA = document.querySelector('input[name="totalA"]')?.value || '0';
+    const ph = window.txt?.misformularios?.derivacion_resumen_placeholder || 'Seleccione especie y categoría arriba.';
+    const hasEsp = (selEsp?.value || '').trim();
+    const hasCat = (selCat?.value || '').trim();
+    if (!hasEsp && !hasCat) {
+        content.innerHTML = `<div class="col-12 text-muted fst-italic">— ${ph} —</div>`;
+        return;
+    }
+    content.innerHTML = `
+        <div class="col-6"><strong>${lblEsp}:</strong> ${espText}</div>
+        <div class="col-6"><strong>${lblCat}:</strong> ${catText}</div>
+        <div class="col-6"><strong>Cepa:</strong> ${cepaText}</div>
+        <div class="col-6"><strong>Departamento:</strong> ${deptoText}</div>
+        <div class="col-6"><strong>Cantidad:</strong> ${totalA}</div>
+        <div class="col-6"><strong>Precio unit.:</strong> $${unit}</div>
+        <div class="col-6"><strong>Total:</strong> $${total}</div>
+    `;
+};
+
+window._speciesModalCache = null;
+
+window.loadSpeciesForProtocol = async (protId, selectedSubId = null, opts = {}) => {
+    const selEsp = document.getElementById('select-especie-modal');
+    const selCat = document.getElementById('select-categoria-modal');
+    if (!selEsp || !selCat) return;
 
     try {
-        const res = await API.request(`/animals/protocol-species?id=${protId}`);
+        const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const allLocal = !!opts.allLocal;
+        const url = allLocal
+            ? `/animals/protocol-species?all=1&inst=${encodeURIComponent(instId)}`
+            : `/animals/protocol-species?id=${protId}`;
+        const res = await API.request(url);
         if (res.status === 'success' && res.data) {
-            // Filtro: No inactivos (existe=2)
             const filtered = res.data.filter(s => s.existe != 2);
+            window._speciesModalCache = filtered;
             if (filtered.length > 0) {
-                select.innerHTML = filtered.map(s => `
-                    <option value="${s.idsubespA}" data-price="${s.Psubanimal || 0}" data-idesp-a="${s.idespA ?? ''}" ${selectedSubId == s.idsubespA ? 'selected' : ''}>
-                        ${s.EspeNombreA} - ${s.SubEspeNombreA}
-                    </option>`).join('');
-                window.updateSpeciesPrice(select);
+                const especiesUnicas = [...new Map(filtered.map(s => [s.idespA, { idespA: s.idespA, EspeNombreA: s.EspeNombreA }])).values()];
+                const item = selectedSubId ? filtered.find(s => s.idsubespA == selectedSubId) : null;
+                const needsSelectPrompt = allLocal && !item && selectedSubId != null;
+                const emptyOpt = (allLocal && selectedSubId == null) || needsSelectPrompt
+                    ? `<option value="">${window.txt?.misformularios?.derivacion_seleccione_especie || '— Seleccione especie —'}</option>` : '';
+                selEsp.innerHTML = emptyOpt + especiesUnicas.map(e => `<option value="${e.idespA}">${e.EspeNombreA}</option>`).join('');
+                selCat.innerHTML = `<option value="">${window.txt?.form_animales?.primero_especie || 'Primero seleccione especie...'}</option>`;
+                selCat.disabled = true;
+                if (item) {
+                    selEsp.value = item.idespA;
+                    window.onEspecieModalChange(selEsp, selectedSubId);
+                } else if (!allLocal && filtered.length > 0) {
+                    selEsp.value = filtered[0].idespA;
+                    window.onEspecieModalChange(selEsp, filtered[0].idsubespA);
+                }
+                window.updateSpeciesPrice(selCat);
             } else {
-                select.innerHTML = '<option value="">Sin especies aprobadas</option>';
+                selEsp.innerHTML = '<option value="">Sin especies aprobadas</option>';
+                selCat.innerHTML = '<option value="">—</option>';
             }
         }
     } catch (e) { console.error(e); }
 };
 
-window.updateSpeciesPrice = (select) => {
-    const selected = select.options[select.selectedIndex];
-    if (selected) {
-        document.getElementById('price-unit-modal').value = selected.dataset.price || 0;
-        window.calculateAnimalTotals();
-        const idespA = selected.dataset.idespA || selected.getAttribute('data-idesp-a');
-        if (idespA) window.loadCepasForEspecieModal(idespA);
+window.onEspecieModalChange = (selEsp, selectedSubId = null) => {
+    const idespA = selEsp && selEsp.value ? selEsp.value : null;
+    const selCat = document.getElementById('select-categoria-modal');
+    if (!selCat) return;
+    selCat.innerHTML = '<option value="">—</option>';
+    selCat.disabled = true;
+    if (!idespA) {
+        window.loadCepasForEspecieModal(null);
+        window.updateResumenNuevoFormulario?.();
+        return;
     }
+    const cache = window._speciesModalCache || [];
+    const categorias = cache.filter(s => s.idespA == idespA);
+    if (categorias.length > 0) {
+        selCat.disabled = false;
+        selCat.innerHTML = categorias.map(s => `
+            <option value="${s.idsubespA}" data-price="${s.Psubanimal || 0}" ${selectedSubId == s.idsubespA ? 'selected' : ''}>${s.SubEspeNombreA}</option>
+        `).join('');
+        if (selectedSubId) selCat.value = selectedSubId;
+    }
+    window.updateSpeciesPrice(selCat);
+    window.loadCepasForEspecieModal(idespA);
+};
+
+window.updateSpeciesPrice = (select) => {
+    const sel = select || document.getElementById('select-categoria-modal');
+    const selected = sel && sel.options[sel.selectedIndex];
+    const priceUnit = document.getElementById('price-unit-modal');
+    if (priceUnit) priceUnit.value = (selected && selected.value && (selected.dataset.price || 0)) || 0;
+    window.calculateAnimalTotals();
+    const idespA = document.getElementById('select-especie-modal');
+    const idespVal = idespA && idespA.value ? idespA.value : null;
+    if (idespVal) window.loadCepasForEspecieModal(idespVal); else if (document.getElementById('select-cepa-modal')) window.loadCepasForEspecieModal(null);
+    window.updateResumenNuevoFormulario?.();
 };
 
 window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
@@ -658,7 +816,7 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
     sel.disabled = true;
     if (help) help.textContent = 'Cargando...';
     if (!idespA) {
-        if (help) help.textContent = 'Seleccione especie/categoría.';
+        if (help) help.textContent = window.txt?.form_animales?.seleccione_especie_cepa || 'Seleccione especie.';
         return;
     }
     try {
@@ -721,17 +879,37 @@ window.saveFullAnimalForm = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const instId = localStorage.getItem('instId');
+    const id = fd.get('idformA');
+    const row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
 
     try {
+        const catSel = document.getElementById('select-categoria-modal');
         const cepaSel = document.getElementById('select-cepa-modal');
         const cepaHelp = document.getElementById('cepa-modal-help');
         const hasCepas = cepaHelp && (cepaHelp.textContent || '').toLowerCase().includes('debe seleccionar');
+        if (isDerivedActive && !isOriginInst && catSel && !(catSel.value || '').trim()) {
+            const msg = window.txt?.misformularios?.derivacion_especie_requerida || 'Debe seleccionar Especie y Categoría para el formulario derivado.';
+            window.Swal.fire('Falta información', msg, 'warning');
+            return;
+        }
         if (hasCepas && cepaSel && String(cepaSel.value || '0') === '0') {
             window.Swal.fire('Falta información', 'Debe seleccionar una Cepa/Stock/Raza.', 'warning');
             return;
         }
-        const res = await API.request(`/animals/update-full?inst=${instId}`, 'POST', fd);
+        const instParam = instId || sessionStorage.getItem('instId') || '';
+        const res = await API.request(`/animals/update-full?inst=${instParam}`, 'POST', fd);
         if (res.status === 'success') {
+            sessionStorage.setItem('reopenAnimalId', String(id));
             window.Swal.fire({ 
                 title: '¡Guardado!', 
                 text: 'Los datos del pedido se han actualizado.', 
@@ -739,8 +917,13 @@ window.saveFullAnimalForm = async (e) => {
                 confirmButtonText: 'Aceptar',
                 confirmButtonColor: '#1a5d3b'
             }).then(() => { location.reload(); });
+        } else {
+            window.Swal.fire('Error al guardar', res.message || 'No se pudieron guardar los cambios.', 'error');
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error(err);
+        window.Swal.fire('Error', err?.message || 'Error al guardar. Revise la consola.', 'error');
+    }
 };
 
 window.resolveDerivacionAnimal = async (action, idDerivacion, idformA) => {
@@ -968,7 +1151,8 @@ window.openNotifyPopup = async (idformA) => {
 };
 /* --- AUXILIARES --- */
 
-function getStatusBadge(estado) {
+function getStatusBadge(estado, porInstitucion) {
+    const tx = window.txt?.misformularios || {};
     const e = (estado || "Sin estado").toString().toLowerCase().trim();
     const states = {
         'entregado':          { label: 'Entregado',          class: 'bg-success text-white' },
@@ -979,14 +1163,20 @@ function getStatusBadge(estado) {
         'sin estado':         { label: 'Sin estado',         class: 'bg-secondary text-white' }
     };
     const s = states[e] || states['sin estado'];
-    return `<span class="badge ${s.class} shadow-sm" style="font-size: 9px; font-weight: 700; padding: 5px 10px; min-width: 90px; display: inline-block;">${s.label}</span>`;
+    const lbl = porInstitucion ? `${s.label} ${tx.estado_por || 'por'} ${porInstitucion}` : s.label;
+    return `<span class="badge ${s.class} shadow-sm mt-1" style="font-size: 9px; font-weight: 700; padding: 5px 10px; min-width: 90px; display: inline-block;">${lbl}</span>`;
 }
 
 function getWorkflowBadgeRow(item) {
     const tx = window.txt?.misformularios || {};
     const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
-    if (isDerived) return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}</span>`;
+    if (isDerived) {
+        const originName = (item.InstitucionOrigenNombre || '').trim();
+        const currentName = (item.InstitucionActualNombre || '').trim();
+        const routeText = [originName, currentName].filter(Boolean).join(' → ');
+        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+    }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
     if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark mt-1">${tx.estado_derivacion_devuelta || 'Devuelta'}</span>`;
@@ -996,7 +1186,14 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    return `<div class="d-inline-flex flex-column align-items-center">${getStatusBadge(item.estado)}${getWorkflowBadgeRow(item)}</div>`;
+    const isDerived = Number(item.DerivadoActivo || 0) === 1;
+    const derivBadge = getWorkflowBadgeRow(item);
+    const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
+    const estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    if (isDerived) {
+        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+    }
+    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }
 
 function renderPagination(t, c, r) {
@@ -1033,7 +1230,8 @@ window.downloadAnimalPDF = async (id) => {
     const contacto = document.querySelector('#modal-content-animal .row.g-2.mb-3')?.innerText || '---';
     const tipoPedido = getSel('select-type-modal');
     const nProtocolo = getSel('select-protocol-modal');
-    const especie = getSel('select-species-modal');
+    const especie = getSel('select-especie-modal');
+    const categoria = getSel('select-categoria-modal');
     const estado = getSel('modal-status');
     
     // Corrección Edad y Peso
@@ -1081,9 +1279,12 @@ window.downloadAnimalPDF = async (id) => {
                     <td style="padding: 10px; border: 1px solid #ddd;"><strong>N° Protocolo:</strong><br>${nProtocolo}</td>
                 </tr>
             <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría Especie:</strong><br>${especie}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">
-                        <strong>Cepa/Stock/Raza:</strong> ${raza} <br> <strong>Edad:</strong> ${edad} <br> <strong>Peso:</strong> ${peso}
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Especie:</strong><br>${especie}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría:</strong><br>${categoria}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;" colspan="2">
+                        <strong>Cepa/Stock/Raza:</strong> ${raza} &nbsp;|&nbsp; <strong>Edad:</strong> ${edad} &nbsp;|&nbsp; <strong>Peso:</strong> ${peso}
                     </td>
                 </tr>
             </table>

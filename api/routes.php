@@ -271,6 +271,7 @@ $router->get('/alojamiento/public-export', 'AlojamientoExportController@publicEx
 // Reportes
 $router->post('/billing/depto-report', 'BillingController@getDeptoReport');
 $router->post('/billing/org-report', 'BillingController@getOrgReport');
+$router->get('/billing/instituciones-derivadas', 'BillingController@getInstitutionsWithDerived');
 $router->post('/billing/institucion-report', 'BillingController@getInstitutionReport');
 $router->post('/billing/investigador-report', 'BillingController@getInvestigadorReport');
 $router->post('/billing/protocol-report', 'BillingController@getProtocolReport');
@@ -282,6 +283,7 @@ $router->post('/billing/ajustar-saldo', 'BillingController@ajustarSaldo'); // Aj
 
 // Procesamiento de Pagos
 $router->post('/billing/process-payment', 'BillingController@processPayment'); // Pago masivo
+$router->post('/billing/process-payment-institucion', 'BillingController@processPaymentInstitucion'); // Pago fact. institución
 $router->post('/billing/pagar-items-saldo', 'BillingController@pagarConSaldo'); // Pagar ítems específicos
 
 // Modales de Edición Fina (Billing Dashboard)

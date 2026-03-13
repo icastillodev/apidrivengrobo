@@ -62,7 +62,10 @@ function renderTable() {
     const filtered = allForms.filter(f => {
         const matchText = Object.values(f).join(' ').toLowerCase().includes(term);
         const matchStatus = statusFilter === 'all' || f.estado === statusFilter;
-        const matchInst = instFilter === 'all' || f.NombreInstitucion === instFilter;
+        const instNames = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
+            ? f.institucionesParticipantes.map(i => i.NombreInst)
+            : [f.NombreInstitucion].filter(Boolean);
+        const matchInst = instFilter === 'all' || instNames.includes(instFilter);
         const isDerived = Number(f.DerivadoActivo || 0) === 1;
         const matchDeriv = derivationFilter === 'all'
             || (derivationFilter === 'derived' && isDerived)
@@ -91,17 +94,19 @@ function renderTable() {
         `;
 
         const actions = buildActionButtons(f);
+        const instParticipantes = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
+            ? f.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
+            : (f.NombreInstitucion || '—');
         tr.innerHTML = `
             <td class="ps-3 fw-bold text-muted small">#${f.idformA}</td>
-            <td><span class="inst-badge">${f.NombreInstitucion}</span></td>
+            <td><span class="inst-badge" title="${instParticipantes}">${instParticipantes}</span></td>
             <td>${categoryHtml}</td>
             <td class="small">${f.Inicio || '-'}</td>
             <td class="small">${f.Retiro || '-'}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Protocolo}">${f.Protocolo}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Departamento}">${f.Departamento}</td>
             <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
-            <td class="text-center">${getWorkflowBadge(f)}</td>
-            <td class="text-center">${getStatusBadge(f.estado)}</td>
+            <td class="text-center">${getStatusWithWorkflow(f)}</td>
             <td class="text-end pe-3">
                 ${actions}
             </td>
@@ -189,7 +194,9 @@ window.openDetailModal = async (id) => {
                 </div>
             `;
 
-            // Cabecera del Modal
+            const porInst = (Number(h.DerivadoActivo || 0) === 1 && (h.InstitucionActualNombre || '').trim()) ? h.InstitucionActualNombre.trim() : undefined;
+            const derivBadge = (Number(h.DerivadoActivo || 0) === 1) ? getWorkflowBadgeRow(h) : '';
+            const estadoBadge = getStatusBadge(h.estado, porInst);
             let contentHtml = `
                 <div class="row g-3 mb-4 border-bottom pb-3">
                     <div class="col-md-6">
@@ -198,13 +205,20 @@ window.openDetailModal = async (id) => {
                     </div>
                     <div class="col-md-6 text-end">
                         <small class="text-muted text-uppercase fw-bold">Estado Actual</small><br>
-                        ${getStatusBadge(h.estado)}
+                        <div class="d-inline-flex flex-column align-items-end">${derivBadge}${estadoBadge}</div>
                     </div>
                 </div>
                 <div class="row g-3">
-                     <div class="col-md-6"><strong class="text-muted">Tipo:</strong> ${h.nombreTipo}</div>
-                     <div class="col-md-6"><strong class="text-muted">Solicitado:</strong> ${h.fechainicioA}</div>
-                     <div class="col-12"><strong class="text-muted">Aclaración:</strong> <span class="fst-italic">${h.aclaraA || 'Ninguna'}</span></div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_origen || 'Origen'}:</strong> ${h.NombreInstitucionOrigen || h.NombreInstitucion || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_tipo || 'Tipo'}:</strong> ${h.nombreTipo || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_categoria || 'Categoría'}:</strong> ${h.Categoria || h.categoriaformulario || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_solicitado || 'Solicitado'}:</strong> ${h.fechainicioA || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_retiro || 'Retiro'}:</strong> ${h.fecRetiroA || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_protocolo || 'Protocolo'}:</strong> ${(h.nprotA ? h.nprotA + (h.TituloProtocolo ? ' - ' + h.TituloProtocolo : '') : '—')}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.generales?.departamento || 'Departamento'}:</strong> ${h.NombreDeptoA || '—'}</div>
+                     <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_organizacion || 'Organización'}:</strong> ${h.NombreOrganismoSimple || '—'}</div>
+                     <div class="col-12"><strong class="text-muted">${window.txt?.misformularios?.label_instituciones || 'Instituciones'}:</strong> ${Array.isArray(h.institucionesParticipantes) && h.institucionesParticipantes.length ? h.institucionesParticipantes.map(inst => inst.NombreInst).join(' → ') : (h.NombreInstitucion || '—')}</div>
+                     <div class="col-12"><strong class="text-muted">${window.txt?.misformularios?.label_aclaracion || 'Aclaración'}:</strong> <span class="fst-italic">${h.aclaraA || 'Ninguna'}</span></div>
                 </div>
                 <hr>
                 <h6 class="fw-bold text-success text-uppercase mb-3">Detalle Técnico</h6>
@@ -280,6 +294,20 @@ window.openDetailModal = async (id) => {
             }
 
             body.innerHTML = contentHtml;
+
+            try {
+                const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+                const resHist = await API.request(`/forms/derivation/history?idformA=${id}&inst=${encodeURIComponent(instActiva)}`);
+                if (resHist.status === 'success' && Array.isArray(resHist.data) && resHist.data.length) {
+                    const lblHist = window.txt?.misformularios?.historial_derivacion_formulario || 'Historial de derivación del formulario';
+                    const histHtml = resHist.data.map(d => {
+                        const estado = Number(d.estado_derivacion || 0);
+                        const badge = estado === 1 ? 'bg-primary' : (estado === 2 ? 'bg-success' : (estado === 3 ? 'bg-warning text-dark' : (estado === 4 ? 'bg-danger' : 'bg-secondary')));
+                        return `<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between"><div class="small fw-bold">#${d.IdFormularioDerivacion}</div><span class="badge ${badge}">${estadoText(estado)}</span></div><div class="small text-muted mt-1">${d.InstitucionOrigenNombre || '-'} → ${d.InstitucionDestinoNombre || '-'}</div><div class="small mt-1">${d.mensaje_origen || d.mensaje_destino || d.motivo_rechazo || ''}</div></div>`;
+                    }).join('');
+                    body.insertAdjacentHTML('beforeend', `<hr class="my-4"><h6 class="fw-bold text-dark text-uppercase mb-3"><i class="bi bi-clock-history me-2"></i>${lblHist}</h6><div class="small">${histHtml}</div>`);
+                }
+            } catch (e) { /* no mostrar error si falla */ }
         }
     } catch (e) {
         body.innerHTML = `<div class="alert alert-danger">Error cargando detalles del pedido.</div>`;
@@ -457,7 +485,11 @@ window.downloadPDF = async (id) => {
 
 // ... (Funciones de filtro de inst, updateCounter, excel, etc. se mantienen igual) ...
 function setupInstitutionFilter() {
-    const insts = [...new Set(allForms.map(f => f.NombreInstitucion))];
+    const insts = [...new Set(allForms.flatMap(f =>
+        Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
+            ? f.institucionesParticipantes.map(i => i.NombreInst)
+            : [f.NombreInstitucion].filter(Boolean)
+    ))];
     const container = document.getElementById('container-filter-inst');
     const select = document.getElementById('filter-inst');
     if (insts.length > 1) {
@@ -493,7 +525,11 @@ function setupOriginInstitutionFilter() {
 }
 
 function updateCounter(filteredData) {
-    const uniqueInst = [...new Set(filteredData.map(f => f.NombreInstitucion))];
+    const uniqueInst = [...new Set(filteredData.flatMap(f =>
+        Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
+            ? f.institucionesParticipantes.map(i => i.NombreInst)
+            : [f.NombreInstitucion].filter(Boolean)
+    ))];
     const countInst = uniqueInst.length;
     const countRec = filteredData.length;
     let text = `${countRec} Registros`;
@@ -503,33 +539,42 @@ function updateCounter(filteredData) {
     document.getElementById('dynamic-counter').innerHTML = text;
 }
 
-function getStatusBadge(estado) {
+function getStatusBadge(estado, porInstitucion) {
+    const tx = window.txt?.misformularios || {};
     const map = {
         'Sin estado': 'bg-secondary', 'Proceso': 'bg-primary', 'Listo para entrega': 'bg-info text-dark',
-        'Entregado': 'bg-success', 'Suspendido': 'bg-warning text-dark', 'Rechazado': 'bg-danger'
+        'Entregado': 'bg-success', 'Suspendido': 'bg-warning text-dark', 'Rechazado': 'bg-danger', 'Reservado': 'bg-info text-dark'
     };
-    return `<span class="badge ${map[estado] || 'bg-light text-dark border'} shadow-sm badge-status">${estado || 'Sin estado'}</span>`;
+    const lbl = porInstitucion ? `${estado || 'Sin estado'} ${tx.estado_por || 'por'} ${porInstitucion}` : (estado || 'Sin estado');
+    return `<span class="badge ${map[estado] || 'bg-light text-dark border'} shadow-sm badge-status mt-1">${lbl}</span>`;
 }
 
-function getWorkflowBadge(f) {
-    const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
+function getWorkflowBadgeRow(f) {
+    const tx = window.txt?.misformularios || {};
     const isDerived = Number(f.DerivadoActivo || 0) === 1;
-    if (!isDerived && !wf) {
-        return `<span class="badge bg-light text-dark border">${window.txt?.misformularios?.workflow_local || 'Local'}</span>`;
-    }
     if (isDerived) {
-        return `<span class="badge bg-primary">${window.txt?.misformularios?.workflow_derivado || 'Derivado'}</span>`;
+        const originName = (f.NombreInstitucionOrigen || '').trim();
+        const currentName = (f.InstitucionActualNombre || '').trim();
+        const routeText = [originName, currentName].filter(Boolean).join(' → ');
+        return `<span class="badge bg-primary">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
     }
-    if (wf.includes('RECHAZ')) {
-        return `<span class="badge bg-danger">${window.txt?.misformularios?.workflow_rechazado || 'Rechazado'}</span>`;
-    }
-    if (wf.includes('DEVUEL')) {
-        return `<span class="badge bg-warning text-dark">${window.txt?.misformularios?.workflow_devuelto || 'Devuelto'}</span>`;
-    }
-    if (wf.includes('CANCEL')) {
-        return `<span class="badge bg-secondary">${window.txt?.misformularios?.workflow_cancelado || 'Cancelado'}</span>`;
-    }
+    const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
+    if (!wf) return `<span class="badge bg-light text-dark border">${tx.workflow_local || 'Local'}</span>`;
+    if (wf.includes('RECHAZ')) return `<span class="badge bg-danger">${tx.workflow_rechazado || 'Rechazado'}</span>`;
+    if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark">${tx.workflow_devuelto || 'Devuelto'}</span>`;
+    if (wf.includes('CANCEL')) return `<span class="badge bg-secondary">${tx.workflow_cancelado || 'Cancelado'}</span>`;
     return `<span class="badge bg-info text-dark">${wf}</span>`;
+}
+
+function getStatusWithWorkflow(f) {
+    const isDerived = Number(f.DerivadoActivo || 0) === 1;
+    const derivBadge = getWorkflowBadgeRow(f);
+    const porInst = isDerived ? (f.InstitucionActualNombre || '').trim() : '';
+    const estadoBadge = getStatusBadge(f.estado, porInst || undefined);
+    if (isDerived) {
+        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+    }
+    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }
 
 function buildActionButtons(f) {
@@ -616,7 +661,6 @@ window.openDerivationHistory = async (idformA) => {
                     </div>
                     <div class="small text-muted mt-1">${d.InstitucionOrigenNombre || '-'} → ${d.InstitucionDestinoNombre || '-'}</div>
                     <div class="small mt-1">${d.mensaje_origen || d.mensaje_destino || d.motivo_rechazo || ''}</div>
-                    <div class="small text-muted mt-1">${d.FechaCreado || ''}</div>
                 </div>
             `;
         }).join('');
@@ -856,7 +900,10 @@ window.processExcelExport = () => {
     const headers = ["ID", "Institución", "Categoría", "Tipo", "Inicio", "Retiro", "Protocolo", "Departamento", "Organización", "Estado"];
     const rows = [headers.join(";")];
     data.forEach(r => {
-        const row = [r.idformA, r.NombreInstitucion, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', r.estado];
+        const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
+            ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
+            : (r.NombreInstitucion || '');
+        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', r.estado];
         rows.push(row.map(v => String(v).replace(/;/g, ',')).join(";"));
     });
     const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });

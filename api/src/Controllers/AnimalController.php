@@ -119,7 +119,8 @@ class AnimalController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $_POST['instId'] = $sesion['instId'];
+            $instFromUrl = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
+            $_POST['instId'] = ($instFromUrl > 0) ? $instFromUrl : (int)($sesion['instId'] ?? 0);
             $this->model->updateFull($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -132,8 +133,22 @@ class AnimalController {
     public function getSpeciesByProtocol() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        Auditoria::getDatosSesion();
+        $sesion = Auditoria::getDatosSesion();
         $protId = $_GET['id'] ?? null;
+        $allLocal = (int)($_GET['all'] ?? 0) === 1;
+        $targetInst = (int)($_GET['inst'] ?? $sesion['instId']);
+
+        if ($allLocal && $targetInst > 0) {
+            try {
+                $data = $this->model->getAllSpeciesFlatForInstitution($targetInst);
+                echo json_encode(['status' => 'success', 'data' => $data]);
+            } catch (\Exception $e) {
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            }
+            exit;
+        }
+
         if (!$protId) {
             echo json_encode(['status' => 'error', 'message' => 'Falta el ID']);
             exit;
@@ -194,7 +209,7 @@ class AnimalController {
             ";
 
             // Envolvemos en el template oficial
-            $linkSistema = "http://app.groboapp.com/"; // URL genérica
+            $linkSistema = "https://app.groboapp.com/"; // URL genérica
             $body = $mailService->getTemplate("Actualización de Pedido", $message, $linkSistema, "VER EN SISTEMA");
             
             $success = $mailService->executeSend($info['email_inv'], $subject, $body);

@@ -28,27 +28,37 @@ class UserFormsController {
         exit;
     }
 
-    public function getFormDetail() {
+    public function getFormDetail($id = null) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        $uriParts = explode('/', $_SERVER['REQUEST_URI']);
-        $id = end($uriParts); 
+        if (empty($id)) {
+            $uriParts = explode('/', trim(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/'));
+            $id = end($uriParts);
+            if (strpos((string)$id, '?') !== false) $id = strstr((string)$id, '?', true);
+        }
         
         if (!is_numeric($id)) {
+            http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => 'ID inválido']);
             exit;
         }
 
         try {
-            // Seguridad Base
-            Auditoria::getDatosSesion();
-            
-            $detail = $this->model->getDetail($id);
+            $sesion = Auditoria::getDatosSesion();
+            $detail = $this->model->getDetail((int)$id, $sesion['userId']);
             echo json_encode(['status' => 'success', 'data' => $detail]);
         } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            $msg = $e->getMessage();
+            if ($msg === 'Formulario no encontrado' || strpos($msg, 'no encontrado') !== false) {
+                http_response_code(404);
+            } elseif (strpos($msg, 'token') !== false || strpos($msg, 'credencial') !== false || strpos($msg, 'expirado') !== false) {
+                http_response_code(401);
+            } else {
+                http_response_code(500);
+                error_log("UserFormsController getFormDetail error: " . $e->getMessage() . " | " . $e->getTraceAsString());
+            }
+            echo json_encode(['status' => 'error', 'message' => $msg]);
         }
         exit;
     }

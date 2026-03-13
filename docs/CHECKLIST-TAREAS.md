@@ -212,6 +212,14 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 - [x] **(PRIORITARIO)** En facturación por departamento: mostrar formato viejo (depto sin protocolo) y por protocolo.
   Si un pedido tiene departamento pero no protocolo (formato viejo), debe seguir apareciendo en la vista por departamento. Los asociados a protocolo se muestran como el resto de formularios. Compatibilidad con ambos formatos.
 
+- [x] **Facturación por Institución: vista tipo departamento, estado de cuenta, pago y PDFs (total + por fila).**
+  **Instrucciones:** La facturación por institución debe funcionar como la de departamento: selector de institución (no estado de cobro), vista tipo estado de cuenta (Total, Pagado, Debe), checkboxes para seleccionar formularios y botón "Pagar Selección". Incluir **PDF total** (todas las instituciones), **PDF por institución** (cada card) y **PDF por fila** (cada formulario derivado).
+  **Hecho:** `institucion.html` + `billingInstitucion.js`. Selector institución, fechas, stats cards, tabla con checkboxes y footer "Pagar Selección". API `POST /billing/process-payment-institucion` registra pagos en `facturacion_formulario_derivado`. PDFs: `downloadInstGlobalPDF()` (total), `downloadInstItemPDF(idInstSol)` (por institución), `downloadInstFilaPDF(idformA, idInstSol)` (por fila). Excel global. i18n ES/EN/PT.
+
+- [x] **Derivación: crear NUEVO formulario (copia) en destino; el original NO se modifica.**
+  **Instrucciones:** Al derivar, no debe cambiar nada del formulario de origen. Se crean nuevas entidades: un nuevo formulario (copia) para la institución destino. El original permanece intacto en la institución origen.
+  **Hecho:** Migración `docs/migrations/add_idformAOrigen_formulario_derivacion.sql` añade `idformAOrigen` a `formulario_derivacion`. `FormDerivacionModel::derive()` crea copia del formulario (formularioe, sexoe, protformr, precioformulario, precioinsumosformulario, forminsumo, formespe) en destino; `formulario_derivacion` guarda `idformA` = copia derivada, `idformAOrigen` = original. Al devolver/rechazar/cancelar, se elimina la copia derivada; el original nunca se toca. UserFormsModel, getHistory, assertCanSeeForm actualizados para `idformAOrigen`. **Ejecutar la migración** antes de usar.
+
 ---
 
 ## Protocolos – Filtro internos / externos / red

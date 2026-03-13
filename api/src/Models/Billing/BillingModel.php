@@ -484,9 +484,29 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     }
 
     /**
-     * Facturacion de formularios derivados agrupada por institucion solicitante.
+     * Lista instituciones que han enviado formularios derivados (para selector).
      */
-    public function getInstitutionDerivedReport($instId, $desde = null, $hasta = null, $estadoCobro = 'all') {
+    public function getInstitutionsWithDerivedForms($instId) {
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            return [];
+        }
+        $sql = "SELECT DISTINCT ffd.IdInstitucionSolicitante as id,
+                COALESCE(i.NombreInst, CONCAT('Institución #', ffd.IdInstitucionSolicitante)) as nombre
+                FROM facturacion_formulario_derivado ffd
+                LEFT JOIN formularioe f ON f.idformA = ffd.idformA
+                LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
+                WHERE ffd.IdInstitucionCobradora = ?
+                ORDER BY nombre ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([(int)$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Facturacion de formularios derivados agrupada por institucion solicitante.
+     * @param int|null $idInstitucionSolicitante Si se pasa, filtra solo esa institución.
+     */
+    public function getInstitutionDerivedReport($instId, $desde = null, $hasta = null, $estadoCobro = 'all', $idInstitucionSolicitante = null) {
         if (!$this->tableExists('facturacion_formulario_derivado')) {
             return ['totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0], 'instituciones' => []];
         }
@@ -508,7 +528,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 FROM facturacion_formulario_derivado ffd
                 LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
                 LEFT JOIN formularioe f ON f.idformA = ffd.idformA
-                LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA
+                LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA AND tf.IdInstitucion = COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)
                 LEFT JOIN personae p ON p.IdUsrA = f.IdUsrA
                 WHERE ffd.IdInstitucionCobradora = ?";
         $params = [(int)$instId];
@@ -521,6 +541,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         if ($estadoCobro !== 'all' && $estadoCobro !== '' && is_numeric($estadoCobro)) {
             $sql .= " AND ffd.estado_cobro = ?";
             $params[] = (int)$estadoCobro;
+        }
+        if ($idInstitucionSolicitante !== null && $idInstitucionSolicitante !== '' && is_numeric($idInstitucionSolicitante)) {
+            $sql .= " AND ffd.IdInstitucionSolicitante = ?";
+            $params[] = (int)$idInstitucionSolicitante;
         }
 
         $sql .= " ORDER BY institucion_solicitante ASC, ffd.FechaCreado DESC, ffd.IdFacturacionFormularioDerivado DESC";
@@ -577,6 +601,43 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
 
         $out['instituciones'] = array_values($out['instituciones']);
         return $out;
+    }
+
+    /**
+     * Registra pago de ítems de facturacion_formulario_derivado.
+     * @param array $items [{idFacturacionDerivada, monto_pago}, ...]
+     * @param int $instCobradora IdInstitucion de quien cobra
+     * @param int $adminId Usuario admin que registra
+     */
+    public function processPaymentInstitucionDerivada(array $items, $instCobradora, $adminId) {
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            throw new \Exception('Tabla facturacion_formulario_derivado no existe.');
+        }
+        $this->db->beginTransaction();
+        try {
+            foreach ($items as $item) {
+                $id = (int)($item['idFacturacionDerivada'] ?? 0);
+                $monto = (float)($item['monto_pago'] ?? 0);
+                if ($id <= 0 || $monto <= 0) continue;
+
+                $stmt = $this->db->prepare("SELECT monto_total, monto_pagado, IdInstitucionCobradora FROM facturacion_formulario_derivado WHERE IdFacturacionFormularioDerivado = ?");
+                $stmt->execute([$id]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$row || (int)$row['IdInstitucionCobradora'] !== (int)$instCobradora) continue;
+
+                $nuevoPagado = (float)$row['monto_pagado'] + $monto;
+                $total = (float)$row['monto_total'];
+                $estadoCobro = ($nuevoPagado >= $total) ? 3 : (($nuevoPagado > 0) ? 2 : 1);
+
+                $this->db->prepare("UPDATE facturacion_formulario_derivado SET monto_pagado = ?, estado_cobro = ? WHERE IdFacturacionFormularioDerivado = ?")
+                    ->execute([$nuevoPagado, $estadoCobro, $id]);
+            }
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     private function tableExists($tableName) {

@@ -160,7 +160,7 @@ class ReactivoController {
                 <p style='font-size: 12px; color: #666;'>Protocolo: {$info['nprotA']} | Reactivo: {$info['reactivo']}</p>
             ";
 
-            $body = $mailService->getTemplate("Actualización de Pedido", $message, "http://app.groboapp.com/", "VER SOLICITUD");
+            $body = $mailService->getTemplate("Actualización de Pedido", $message, "https://app.groboapp.com/", "VER SOLICITUD");
             $success = $mailService->executeSend($info['email_inv'], $subject, $body);
 
             echo json_encode(['status' => $success ? 'success' : 'error']);

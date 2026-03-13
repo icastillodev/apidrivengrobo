@@ -35,6 +35,23 @@ class FormDerivacionModel
         if ((int)$instId !== $actual) {
             throw new Exception("El formulario está derivado y no pertenece a la institución actual.");
         }
+
+        // Si la derivación está pendiente, la institución destino aún no puede editar:
+        // primero debe aceptar la derivación.
+        if (self::tableExists($db, 'formulario_derivacion')) {
+            $sqlPend = "SELECT 1
+                        FROM formulario_derivacion
+                        WHERE idformA = ?
+                          AND Activo = 1
+                          AND estado_derivacion = 1
+                          AND IdInstitucionDestino = ?
+                        LIMIT 1";
+            $stmtPend = $db->prepare($sqlPend);
+            $stmtPend->execute([(int)$idformA, (int)$instId]);
+            if ($stmtPend->fetchColumn()) {
+                throw new Exception("Debe aceptar la derivación antes de comenzar a trabajar este formulario.");
+            }
+        }
     }
 
     private static function tableExists($db, string $tableName): bool
@@ -86,39 +103,41 @@ class FormDerivacionModel
                 throw new Exception("El formulario ya tiene una derivación activa.");
             }
 
-            $sqlDeriv = "INSERT INTO formulario_derivacion
-                        (idformA, IdFormularioDerivacionPadre, IdInstitucionOrigen, IdInstitucionDestino, IdUsrOrigen, IdUsrDestinoResponsable,
-                         estado_derivacion, mensaje_origen, FechaCreado, Activo)
-                         VALUES (?, NULL, ?, ?, ?, ?, 1, ?, NOW(), 1)";
-            $stmtDeriv = $this->db->prepare($sqlDeriv);
-            $stmtDeriv->execute([$idformA, $instOrigen, $instDestino, $usrOrigen, $usrDestino, $mensaje !== '' ? $mensaje : null]);
+            $snapshotData = $this->getFormDataForSnapshot($idformA, $form['categoriaformulario'] ?? '');
+
+            // Crear NUEVO formulario (copia) en destino. El original NO se modifica.
+            $idformADerivado = $this->copyFormularioToInstitution($idformA, $instDestino, $instOrigen, $form['categoriaformulario'] ?? '');
+
+            $hasIdformAOrigen = $this->columnExists('formulario_derivacion', 'idformAOrigen');
+            if ($hasIdformAOrigen) {
+                $sqlDeriv = "INSERT INTO formulario_derivacion
+                            (idformA, idformAOrigen, IdFormularioDerivacionPadre, IdInstitucionOrigen, IdInstitucionDestino, IdUsrOrigen, IdUsrDestinoResponsable,
+                             estado_derivacion, mensaje_origen, FechaCreado, Activo)
+                             VALUES (?, ?, NULL, ?, ?, ?, ?, 1, ?, NOW(), 1)";
+                $stmtDeriv = $this->db->prepare($sqlDeriv);
+                $stmtDeriv->execute([$idformADerivado, $idformA, $instOrigen, $instDestino, $usrOrigen, $usrDestino, $mensaje !== '' ? $mensaje : null]);
+            } else {
+                $sqlDeriv = "INSERT INTO formulario_derivacion
+                            (idformA, IdFormularioDerivacionPadre, IdInstitucionOrigen, IdInstitucionDestino, IdUsrOrigen, IdUsrDestinoResponsable,
+                             estado_derivacion, mensaje_origen, FechaCreado, Activo)
+                             VALUES (?, NULL, ?, ?, ?, ?, 1, ?, NOW(), 1)";
+                $stmtDeriv = $this->db->prepare($sqlDeriv);
+                $stmtDeriv->execute([$idformADerivado, $instOrigen, $instDestino, $usrOrigen, $usrDestino, $mensaje !== '' ? $mensaje : null]);
+            }
             $idDeriv = (int)$this->db->lastInsertId();
 
-            $newOwnerUser = $usrDestino ?: $usrOrigen;
-            $this->upsertOwner($idformA, $instDestino, $newOwnerUser, $idDeriv, 1);
+            if ($snapshotData && self::tableExists($this->db, 'formulario_datos_originales')) {
+                $json = json_encode($snapshotData);
+                $this->db->prepare("INSERT INTO formulario_datos_originales (idformA, IdFormularioDerivacion, datos_json) VALUES (?, ?, ?)")
+                    ->execute([$idformA, $idDeriv, $json]);
+            }
 
-            $setParts = ["IdInstitucion = ?"];
-            $paramsForm = [$instDestino];
-            if ($this->columnExists('formularioe', 'EstadoWorkflow')) {
-                $setParts[] = "EstadoWorkflow = 'DERIVADO_PENDIENTE'";
-            }
-            if ($this->columnExists('formularioe', 'DerivadoActivo')) {
-                $setParts[] = "DerivadoActivo = 1";
-            }
-            if ($this->columnExists('formularioe', 'FechaDerivado')) {
-                $setParts[] = "FechaDerivado = NOW()";
-            }
-            if ($this->columnExists('formularioe', 'IdInstitucionOrigen')) {
-                $setParts[] = "IdInstitucionOrigen = COALESCE(IdInstitucionOrigen, ?)";
-                $paramsForm[] = $instOrigen;
-            }
-            $paramsForm[] = $idformA;
-            $stmtForm = $this->db->prepare("UPDATE formularioe SET " . implode(', ', $setParts) . " WHERE idformA = ?");
-            $stmtForm->execute($paramsForm);
+            $newOwnerUser = $usrDestino ?: $usrOrigen;
+            $this->upsertOwner($idformADerivado, $instDestino, $newOwnerUser, $idDeriv, 1);
 
             $this->insertHistorial(
-                $idformA,
-                $form['estado'] ?? null,
+                $idformADerivado,
+                'Sin estado',
                 'DERIVADO_PENDIENTE',
                 'Derivado desde institución ' . $instOrigen . ' a institución ' . $instDestino,
                 $usrOrigen,
@@ -132,10 +151,10 @@ class FormDerivacionModel
                                               (idformA, IdFormularioDerivacion, IdInstitucionCobradora, IdInstitucionSolicitante,
                                                IdUsrSolicitante, tipo_formulario, monto_total, monto_pagado, estado_cobro)
                                                VALUES (?, ?, ?, ?, ?, ?, 0, 0, 1)");
-                $stmtFac->execute([$idformA, $idDeriv, $instDestino, $instOrigen, $usrOrigen, $tipo]);
+                $stmtFac->execute([$idformADerivado, $idDeriv, $instDestino, $instOrigen, $usrOrigen, $tipo]);
             }
 
-            Auditoria::logManual($this->db, $usrOrigen, 'FORM_DERIVE', 'formulario_derivacion', "Formulario #{$idformA} derivado a institución #{$instDestino}");
+            Auditoria::logManual($this->db, $usrOrigen, 'FORM_DERIVE', 'formulario_derivacion', "Formulario #{$idformA} derivado a institución #{$instDestino} (copia #{$idformADerivado})");
 
             $this->db->commit();
             return ['idDerivacion' => $idDeriv];
@@ -195,10 +214,10 @@ class FormDerivacionModel
                 FROM formulario_derivacion d
                 LEFT JOIN institucion io ON io.IdInstitucion = d.IdInstitucionOrigen
                 LEFT JOIN institucion idst ON idst.IdInstitucion = d.IdInstitucionDestino
-                WHERE d.idformA = ?
+                WHERE d.idformA = ?" . ($this->columnExists('formulario_derivacion', 'idformAOrigen') ? " OR d.idformAOrigen = ?" : "") . "
                 ORDER BY d.IdFormularioDerivacion DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idformA]);
+        $stmt->execute($this->columnExists('formulario_derivacion', 'idformAOrigen') ? [$idformA, $idformA] : [$idformA]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -315,16 +334,18 @@ class FormDerivacionModel
                 throw new Exception("La derivación ya está cerrada.");
             }
 
-            $idformA = (int)$deriv['idformA'];
+            $idformADerivado = (int)$deriv['idformA'];
+            $idformAOrigen = isset($deriv['idformAOrigen']) && $deriv['idformAOrigen'] !== null && $deriv['idformAOrigen'] !== '' ? (int)$deriv['idformAOrigen'] : null;
             $instOrigen = (int)$deriv['IdInstitucionOrigen'];
             $instDestino = (int)$deriv['IdInstitucionDestino'];
+            $esNuevaDerivacion = $idformAOrigen !== null && $idformAOrigen > 0;
 
-            $owner = $this->ensureOwnerRow($idformA);
+            $owner = $this->ensureOwnerRow($idformADerivado);
             if ((int)$owner['IdFormularioDerivacionActiva'] !== $idDeriv) {
                 throw new Exception("La derivación no coincide con el owner actual del formulario.");
             }
 
-            $form = $this->getFormBase($idformA);
+            $form = $this->getFormBase($idformADerivado);
 
             if ($action === 'accept') {
                 if ($instAccion !== $instDestino) {
@@ -339,7 +360,7 @@ class FormDerivacionModel
                                     WHERE IdFormularioDerivacion = ?")
                          ->execute([$mensaje !== '' ? $mensaje : null, $idDeriv]);
 
-                $this->upsertOwner($idformA, $instDestino, $usrAccion, $idDeriv, 1);
+                $this->upsertOwner($idformADerivado, $instDestino, $usrAccion, $idDeriv, 1);
                 $setParts = [];
                 if ($this->columnExists('formularioe', 'EstadoWorkflow')) {
                     $setParts[] = "EstadoWorkflow = 'DERIVADO_ACEPTADO'";
@@ -349,9 +370,9 @@ class FormDerivacionModel
                 }
                 if (!empty($setParts)) {
                     $this->db->prepare("UPDATE formularioe SET " . implode(', ', $setParts) . " WHERE idformA = ?")
-                             ->execute([$idformA]);
+                             ->execute([$idformADerivado]);
                 }
-                $this->insertHistorial($idformA, $form['estado'] ?? null, 'DERIVADO_ACEPTADO', 'Derivación aceptada por institución destino', $usrAccion, $instAccion, $idDeriv);
+                $this->insertHistorial($idformADerivado, $form['estado'] ?? null, 'DERIVADO_ACEPTADO', 'Derivación aceptada por institución destino', $usrAccion, $instAccion, $idDeriv);
                 Auditoria::logManual($this->db, $usrAccion, 'FORM_DERIVE_ACCEPT', 'formulario_derivacion', "Derivación #{$idDeriv} aceptada");
             } elseif ($action === 'return' || $action === 'reject' || $action === 'cancel') {
                 if ($action === 'cancel') {
@@ -395,22 +416,26 @@ class FormDerivacionModel
                 $this->db->prepare("UPDATE formulario_derivacion SET {$set} WHERE IdFormularioDerivacion = ?")
                          ->execute($params);
 
-                $this->upsertOwner($idformA, $instOrigen, (int)$deriv['IdUsrOrigen'], null, 0);
-                $setParts = ["IdInstitucion = ?"];
-                $paramsForm = [$instOrigen];
-                if ($this->columnExists('formularioe', 'EstadoWorkflow')) {
-                    $setParts[] = "EstadoWorkflow = ?";
-                    $paramsForm[] = $workflow;
+                if ($esNuevaDerivacion) {
+                    $this->deleteFormularioAndRelated($idformADerivado);
+                } else {
+                    $this->upsertOwner($idformADerivado, $instOrigen, (int)$deriv['IdUsrOrigen'], null, 0);
+                    $setParts = ["IdInstitucion = ?"];
+                    $paramsForm = [$instOrigen];
+                    if ($this->columnExists('formularioe', 'EstadoWorkflow')) {
+                        $setParts[] = "EstadoWorkflow = ?";
+                        $paramsForm[] = $workflow;
+                    }
+                    if ($this->columnExists('formularioe', 'DerivadoActivo')) {
+                        $setParts[] = "DerivadoActivo = 0";
+                    }
+                    $paramsForm[] = $idformADerivado;
+                    $this->db->prepare("UPDATE formularioe SET " . implode(', ', $setParts) . " WHERE idformA = ?")
+                             ->execute($paramsForm);
+                    $this->insertHistorial($idformADerivado, $form['estado'] ?? null, $workflow, $detalle, $usrAccion, $instAccion, $idDeriv);
                 }
-                if ($this->columnExists('formularioe', 'DerivadoActivo')) {
-                    $setParts[] = "DerivadoActivo = 0";
-                }
-                $paramsForm[] = $idformA;
-                $this->db->prepare("UPDATE formularioe SET " . implode(', ', $setParts) . " WHERE idformA = ?")
-                         ->execute($paramsForm);
-                $this->insertHistorial($idformA, $form['estado'] ?? null, $workflow, $detalle, $usrAccion, $instAccion, $idDeriv);
 
-                if (self::tableExists($this->db, 'facturacion_formulario_derivado')) {
+                if (self::tableExists($this->db, 'facturacion_formulario_derivado') && $action !== 'return') {
                     $this->db->prepare("UPDATE facturacion_formulario_derivado
                                         SET estado_cobro = 4
                                         WHERE IdFormularioDerivacion = ?")
@@ -449,10 +474,221 @@ class FormDerivacionModel
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Obtiene los datos del formulario para guardar como snapshot al derivar (datos originales).
+     * Incluye header completo y details para mostrar siempre el pedido original en mis formularios.
+     */
+    private function getFormDataForSnapshot($idformA, $categoria): array
+    {
+        $header = [];
+        $stmtHead = $this->db->prepare("SELECT f.fechainicioA, f.fecRetiroA, f.aclaraA, f.estado,
+            COALESCE(tf.nombreTipo, '') as nombreTipo,
+            COALESCE(tf.categoriaformulario, '') as categoria,
+            i.NombreInst as NombreInstitucion,
+            i.InstCorreo, i.InstContacto,
+            COALESCE(px.nprotA, '') as nprotA,
+            COALESCE(px.tituloA, '') as TituloProtocolo,
+            COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '') as NombreDeptoA,
+            COALESCE(o.NombreOrganismoSimple, '') as NombreOrganismoSimple
+            FROM formularioe f
+            LEFT JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+            LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario AND tf.IdInstitucion = f.IdInstitucion
+            LEFT JOIN protformr pf ON f.idformA = pf.idformA
+            LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+            LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+            LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
+            LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
+            LEFT JOIN organismoe o ON COALESCE(d.organismopertenece, dp.organismopertenece) = o.IdOrganismo
+            WHERE f.idformA = ? LIMIT 1");
+        $stmtHead->execute([$idformA]);
+        $header = $stmtHead->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        $nombreTipo = (string)($header['nombreTipo'] ?? '');
+        $headerCategoria = (string)($header['categoria'] ?? $categoria);
+
+        $details = [];
+        if ($categoria === 'Insumos') {
+            $stmt = $this->db->prepare("SELECT i.NombreInsumo, i.CantidadInsumo as PresentacionCant, i.TipoInsumo as PresentacionTipo, fi.cantidad
+                FROM forminsumo fi JOIN insumo i ON fi.IdInsumo = i.idInsumo
+                JOIN precioinsumosformulario pif ON fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario
+                WHERE pif.idformA = ?");
+            $stmt->execute([$idformA]);
+            $details = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } elseif ($categoria === 'Animal') {
+            $stmt = $this->db->prepare("SELECT s.machoA, s.hembraA, s.indistintoA, s.totalA, e.EspeNombreA, sub.SubEspeNombreA
+                FROM sexoe s LEFT JOIN formularioe f ON s.idformA = f.idformA
+                LEFT JOIN subespecie sub ON f.idsubespA = sub.idsubespA
+                LEFT JOIN especiee e ON sub.idespA = e.idespA
+                WHERE s.idformA = ?");
+            $stmt->execute([$idformA]);
+            $details = $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['machoA' => 0, 'hembraA' => 0, 'indistintoA' => 0, 'totalA' => 0, 'EspeNombreA' => '', 'SubEspeNombreA' => ''];
+        } else {
+            $stmt = $this->db->prepare("SELECT ie.NombreInsumo, ie.CantidadInsumo as PresentacionCant, ie.TipoInsumo as PresentacionTipo, COALESCE(s.organo, 0) as Cantidad
+                FROM formularioe f LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
+                LEFT JOIN sexoe s ON f.idformA = s.idformA WHERE f.idformA = ?");
+            $stmt->execute([$idformA]);
+            $details = $stmt->fetch(\PDO::FETCH_ASSOC) ?: ['NombreInsumo' => '', 'PresentacionCant' => '', 'PresentacionTipo' => '', 'Cantidad' => 0];
+        }
+        return [
+            'categoria' => $headerCategoria ?: $categoria,
+            'nombreTipo' => $nombreTipo,
+            'header' => $header,
+            'details' => $details
+        ];
+    }
+
+    /**
+     * Copia el formulario y sus tablas relacionadas a la institución destino.
+     * El original NO se modifica. Retorna el idformA del nuevo formulario.
+     */
+    private function copyFormularioToInstitution($idformAOrigen, $instDestino, $instOrigen, $categoria): int
+    {
+        $stmt = $this->db->prepare("SELECT * FROM formularioe WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idformAOrigen]);
+        $orig = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$orig) {
+            throw new Exception("Formulario original no encontrado.");
+        }
+
+        $cols = array_keys($orig);
+        $cols = array_diff($cols, ['idformA']);
+        $placeholders = array_fill(0, count($cols), '?');
+        $values = [];
+        foreach ($cols as $c) {
+            $v = $orig[$c];
+            if ($c === 'IdInstitucion') {
+                $v = $instDestino;
+            } elseif ($c === 'estado') {
+                $v = 'Sin estado';
+            } elseif ($c === 'IdInstitucionOrigen' && $this->columnExists('formularioe', 'IdInstitucionOrigen')) {
+                $v = $instOrigen;
+            } elseif ($c === 'EstadoWorkflow' && $this->columnExists('formularioe', 'EstadoWorkflow')) {
+                $v = 'DERIVADO_PENDIENTE';
+            } elseif ($c === 'DerivadoActivo' && $this->columnExists('formularioe', 'DerivadoActivo')) {
+                $v = 1;
+            } elseif ($c === 'FechaDerivado' && $this->columnExists('formularioe', 'FechaDerivado')) {
+                $v = date('Y-m-d H:i:s');
+            } elseif ($c === 'visto') {
+                $v = 0;
+            }
+            $values[] = $v;
+        }
+        $sql = "INSERT INTO formularioe (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        $this->db->prepare($sql)->execute($values);
+        $idformADerivado = (int)$this->db->lastInsertId();
+
+        $this->copySexoe($idformAOrigen, $idformADerivado);
+        $this->copyProtformr($idformAOrigen, $idformADerivado);
+        $this->copyPrecioformulario($idformAOrigen, $idformADerivado);
+
+        $cat = strtolower(trim((string)$categoria));
+        if (in_array($cat, ['insumos', 'insumo'], true)) {
+            $this->copyPrecioInsumosFormulario($idformAOrigen, $idformADerivado);
+        }
+        if ($this->hasFormespe($idformAOrigen)) {
+            $this->copyFormespe($idformAOrigen, $idformADerivado);
+        }
+
+        return $idformADerivado;
+    }
+
+    private function copySexoe($idOrig, $idNew): void
+    {
+        $stmt = $this->db->prepare("SELECT * FROM sexoe WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idOrig]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return;
+        $this->db->prepare("INSERT INTO sexoe (idformA, machoA, hembraA, indistintoA, totalA, organo) VALUES (?, ?, ?, ?, ?, ?)")
+            ->execute([$idNew, $row['machoA'] ?? 0, $row['hembraA'] ?? 0, $row['indistintoA'] ?? 0, $row['totalA'] ?? 0, $row['organo'] ?? null]);
+    }
+
+    private function copyProtformr($idOrig, $idNew): void
+    {
+        $stmt = $this->db->prepare("SELECT idprotA FROM protformr WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idOrig]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || empty($row['idprotA'])) return;
+        $this->db->prepare("INSERT INTO protformr (idformA, idprotA) VALUES (?, ?)")->execute([$idNew, $row['idprotA']]);
+    }
+
+    private function copyPrecioformulario($idOrig, $idNew): void
+    {
+        $stmt = $this->db->prepare("SELECT precioanimalmomento, precioformulario, totalpago, fechaIniForm FROM precioformulario WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idOrig]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return;
+        $this->db->prepare("INSERT INTO precioformulario (idformA, precioanimalmomento, precioformulario, totalpago, fechaIniForm) VALUES (?, ?, ?, ?, ?)")
+            ->execute([$idNew, $row['precioanimalmomento'] ?? 0, $row['precioformulario'] ?? 0, 0, $row['fechaIniForm'] ?? date('Y-m-d')]);
+    }
+
+    private function copyPrecioInsumosFormulario($idOrig, $idNew): void
+    {
+        $stmt = $this->db->prepare("SELECT idPrecioinsumosformulario FROM precioinsumosformulario WHERE idformA = ?");
+        $stmt->execute([$idOrig]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($rows)) return;
+        foreach ($rows as $pif) {
+            $idPrecioOrig = (int)$pif['idPrecioinsumosformulario'];
+            $this->db->prepare("INSERT INTO precioinsumosformulario (idformA, totalpago) VALUES (?, 0)")->execute([$idNew]);
+            $idPrecioNew = (int)$this->db->lastInsertId();
+            $stmtFi = $this->db->prepare("SELECT IdInsumo, cantidad, PrecioMomentoInsumo FROM forminsumo WHERE idPrecioinsumosformulario = ?");
+            $stmtFi->execute([$idPrecioOrig]);
+            foreach ($stmtFi->fetchAll(PDO::FETCH_ASSOC) as $fi) {
+                $this->db->prepare("INSERT INTO forminsumo (idPrecioinsumosformulario, IdInsumo, cantidad, PrecioMomentoInsumo) VALUES (?, ?, ?, ?)")
+                    ->execute([$idPrecioNew, $fi['IdInsumo'], $fi['cantidad'], $fi['PrecioMomentoInsumo'] ?? 0]);
+            }
+        }
+    }
+
+    private function hasFormespe($idformA): bool
+    {
+        $stmt = $this->db->prepare("SELECT 1 FROM formespe WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idformA]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private function copyFormespe($idOrig, $idNew): void
+    {
+        $stmt = $this->db->prepare("SELECT idespA FROM formespe WHERE idformA = ?");
+        $stmt->execute([$idOrig]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $this->db->prepare("INSERT INTO formespe (idformA, idespA) VALUES (?, ?)")->execute([$idNew, $r['idespA']]);
+        }
+    }
+
+    private function deleteFormularioAndRelated($idformA): void
+    {
+        if (self::tableExists($this->db, 'formulario_owner_actual')) {
+            $this->db->prepare("DELETE FROM formulario_owner_actual WHERE idformA = ?")->execute([$idformA]);
+        }
+        if (self::tableExists($this->db, 'facturacion_formulario_derivado')) {
+            $this->db->prepare("DELETE FROM facturacion_formulario_derivado WHERE idformA = ?")->execute([$idformA]);
+        }
+        $this->db->prepare("DELETE FROM sexoe WHERE idformA = ?")->execute([$idformA]);
+        $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idformA]);
+        $this->db->prepare("DELETE FROM precioformulario WHERE idformA = ?")->execute([$idformA]);
+        $pifRows = $this->db->prepare("SELECT idPrecioinsumosformulario FROM precioinsumosformulario WHERE idformA = ?");
+        $pifRows->execute([$idformA]);
+        foreach ($pifRows->fetchAll(PDO::FETCH_NUM) as $r) {
+            $this->db->prepare("DELETE FROM forminsumo WHERE idPrecioinsumosformulario = ?")->execute([$r[0]]);
+        }
+        $this->db->prepare("DELETE FROM precioinsumosformulario WHERE idformA = ?")->execute([$idformA]);
+        $this->db->prepare("DELETE FROM formespe WHERE idformA = ?")->execute([$idformA]);
+        if (self::tableExists($this->db, 'formulario_estado_historial')) {
+            $this->db->prepare("DELETE FROM formulario_estado_historial WHERE idformA = ?")->execute([$idformA]);
+        }
+        $this->db->prepare("DELETE FROM formularioe WHERE idformA = ?")->execute([$idformA]);
+    }
+
     private function getActiveDerivation($idformA)
     {
-        $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
-        $stmt->execute([$idformA]);
+        if ($this->columnExists('formulario_derivacion', 'idformAOrigen')) {
+            $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE (idformA = ? OR idformAOrigen = ?) AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
+            $stmt->execute([$idformA, $idformA]);
+        } else {
+            $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
+            $stmt->execute([$idformA]);
+        }
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
@@ -505,9 +741,12 @@ class FormDerivacionModel
 
     private function assertCanSeeForm($idformA, $instId)
     {
+        $joinClause = $this->columnExists('formulario_derivacion', 'idformAOrigen')
+            ? "LEFT JOIN formulario_derivacion d ON (d.idformA = f.idformA OR d.idformAOrigen = f.idformA)"
+            : "LEFT JOIN formulario_derivacion d ON d.idformA = f.idformA";
         $stmt = $this->db->prepare("SELECT 1
                                     FROM formularioe f
-                                    LEFT JOIN formulario_derivacion d ON d.idformA = f.idformA
+                                    {$joinClause}
                                     WHERE f.idformA = ?
                                       AND (f.IdInstitucion = ? OR d.IdInstitucionOrigen = ? OR d.IdInstitucionDestino = ?)
                                     LIMIT 1");

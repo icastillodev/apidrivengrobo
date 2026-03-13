@@ -238,6 +238,11 @@ function renderModalHeader(f) {
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(f.DerivadoActivo || 0) === 1 && Number(f.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(f.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
+    const isPendingAtDestination = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    const originName = (f.InstitucionOrigenNombre || '').trim();
+    const currentName = (f.InstitucionActualNombre || '').trim();
+    const routeText = [originName, currentName].filter(Boolean).join(' → ');
     const protLabel = (f.NProtocolo && f.TituloProtocolo)
         ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
         : null;
@@ -248,17 +253,20 @@ function renderModalHeader(f) {
     const lblRetirar = tx.retirar_derivacion_btn || 'Retirar derivación';
     const lblHistorial = tx.historial_derivacion_titulo || 'Historial';
     const lblDerivar = tx.derivar_btn || 'Derivar';
+    const lblWaitAccept = tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.';
+    const lblProtocolLocked = tx.derivacion_protocolo_bloqueado || 'Protocolo fijo: no se puede cambiar en formulario derivado.';
     const derivBox = isDerivedActive
         ? `
         <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-primary">${lblDerivado}</span>
-            <span class="small text-muted">${f.InstitucionOrigenNombre ? `Origen: ${f.InstitucionOrigenNombre}` : ''}</span>
+            <span class="badge bg-primary">${lblDerivado}${routeText ? ` · ${routeText}` : ''}</span>
             ${isOriginInst
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionInsumo('cancel', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblRetirar}</button>`
-                : `
+                : isPendingAtDestination
+                    ? `
             <button type="button" class="btn btn-sm btn-outline-success" onclick="window.resolveDerivacionInsumo('accept', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblAceptar}</button>
             <button type="button" class="btn btn-sm btn-outline-warning" onclick="window.resolveDerivacionInsumo('return', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblDevolver}</button>
             <button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionInsumo('reject', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblRechazar}</button>`
+                    : ''
             }
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryInsumo(${f.idformA})">${lblHistorial}</button>
         </div>`
@@ -267,6 +275,12 @@ function renderModalHeader(f) {
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.deriveFromAdminInsumo(${f.idformA})">${lblDerivar}</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryInsumo(${f.idformA})">${lblHistorial}</button>
         </div>`;
+    const derivInfoPanel = isDerivedActive
+        ? `<div class="alert alert-info mt-2 py-2 px-3 small mb-0">
+            <div><strong>${lblProtocolLocked}</strong></div>
+            ${isPendingAtDestination ? `<div>${lblWaitAccept}</div>` : ''}
+        </div>`
+        : '';
 
     return `<div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
         <div>
@@ -274,6 +288,7 @@ function renderModalHeader(f) {
             <span class="small text-muted d-block">ID: <strong>#${f.idformA}</strong></span>
             ${protLabel ? `<span class="small text-muted d-block">Protocolo: <strong>${protLabel}</strong></span>` : ''}
             ${derivBox}
+            ${derivInfoPanel}
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
@@ -305,7 +320,7 @@ function renderAdminSection(f, identity) {
                         <option value="Entregado" ${f.estado === 'Entregado' ? 'selected' : ''}>Entregado</option>
                         <option value="Suspendido" ${f.estado === 'Suspendido' ? 'selected' : ''}>Suspendido</option>
                     </select>
-                    <div id="insumo-status-badge-container">${getStatusBadge(f.estado)}</div>
+                    <div id="insumo-status-badge-container">${getStatusBadge(f.estado, (Number(f.DerivadoActivo || 0) === 1 && (f.InstitucionActualNombre || '').trim()) ? f.InstitucionActualNombre.trim() : undefined)}</div>
                 </div>
             </div>
             <div class="col-md-6 text-start">
@@ -358,6 +373,11 @@ function renderNotificationSection(lastNotify, idformA) {
 }
 
 function renderOrderModificationSection(f, items, deptos, protocolos) {
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isDerivedActive = Number(f.DerivadoActivo || 0) === 1 && Number(f.IdFormularioDerivacionActiva || 0) > 0;
+    const isOriginInst = Number(f.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockImmutable = isDerivedActive && !isOriginInst;
     const listaDeptos = Array.isArray(deptos) ? deptos : [];
     const listaProt = Array.isArray(protocolos) ? protocolos : [];
 
@@ -411,12 +431,13 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
                         <span>${labelProt}</span>
                         <input type="text" id="insumo-prot-search" class="form-control form-control-sm ms-2 bg-light border-0" style="max-width: 260px;" placeholder="${phBuscarProt}">
                     </label>
-                    <select name="idProt" id="insumo-prot-select" class="form-select form-select-sm fw-bold border-secondary text-primary" required>
+                    <select name="idProt" id="insumo-prot-select" class="form-select form-select-sm fw-bold border-secondary text-primary" required ${lockProtocol ? 'disabled' : ''}>
                         ${listaProtFinal.map(p => {
                             const isSelected = currentProtId && String(currentProtId) === String(p.idprotA) ? 'selected' : '';
                             return `<option value="${p.idprotA}" ${isSelected}>#${p.nprotA} - ${p.tituloA} (${p.Investigador})</option>`;
                         }).join('')}
                     </select>
+                    ${lockProtocol ? `<input type="hidden" name="idProt" value="${currentProtId || ''}">` : ''}
                     <p class="small text-muted mt-1 mb-0"><strong>Actual:</strong> ${currentProtLabel}</p>
                 </div>
                 <div class="col-md-12">
@@ -436,11 +457,11 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
                 </div>
                 <div class="col-md-6">
                     <label class="small fw-bold uppercase text-muted mb-1">Fecha Inicio</label>
-                    <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${f.Inicio || ''}">
+                    <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${f.Inicio || ''}" ${lockImmutable ? 'readonly' : ''}>
                 </div>
                 <div class="col-md-6">
                     <label class="small fw-bold uppercase text-muted mb-1">Fecha Retiro</label>
-                    <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${f.Retiro || ''}">
+                    <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${f.Retiro || ''}" ${lockImmutable ? 'readonly' : ''}>
                 </div>
             </div>
 
@@ -449,10 +470,10 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
                     <tr><th>Producto / Insumo</th><th style="width: 130px;" class="text-center">Cantidad</th><th style="width: 50px;"></th></tr>
                 </thead>
                 <tbody id="tbody-items-edit">
-                    ${items.map((item, index) => renderItemRow(item, index)).join('')}
+                    ${items.map((item, index) => renderItemRow(item, index, lockImmutable)).join('')}
                 </tbody>
             </table>
-            <button type="button" class="btn btn-sm btn-outline-success fw-bold w-100 mb-4" onclick="window.addItemRow()">+ AGREGAR PRODUCTO</button>
+            ${lockImmutable ? '' : `<button type="button" class="btn btn-sm btn-outline-success fw-bold w-100 mb-4" onclick="window.addItemRow()">+ AGREGAR PRODUCTO</button>`}
 
             <div class="alert alert-secondary py-2 mb-4 border-0 text-start">
                 <label class="small fw-bold uppercase text-muted d-block" style="font-size: 9px;">Aclaración del Investigador</label>
@@ -485,7 +506,7 @@ window.updateDeptoOrgAmbito = window.updateDeptoOrgAmbito || function(selectEl, 
     }
 };
 
-function renderItemRow(item = {}, index) {
+function renderItemRow(item = {}, index, lockImmutable = false) {
     return `
         <tr class="item-row">
             <td>
@@ -497,9 +518,9 @@ function renderItemRow(item = {}, index) {
                         </option>`).join('')}
                 </select>
             </td>
-            <td><input type="number" name="items[${index}][cantidad]" class="form-control form-control-sm fw-bold text-center" value="${item.cantidad || 1}"></td>
+            <td><input type="number" name="items[${index}][cantidad]" class="form-control form-control-sm fw-bold text-center" value="${item.cantidad || 1}" ${lockImmutable ? 'readonly' : ''}></td>
             <td class="text-center">
-                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="window.removeItemRow(this)">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="window.removeItemRow(this)" ${lockImmutable ? 'disabled' : ''}>
                     <i class="bi bi-trash fs-5"></i>
                 </button>
             </td>
@@ -522,6 +543,17 @@ window.removeItemRow = (btn) => {
 };
 
 window.updateInsumoStatusQuick = async (id) => {
+    const row = allInsumos.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
     const status = document.getElementById('insumo-status').value;
     const badgeContainer = document.getElementById('insumo-status-badge-container');
     const aclara = document.getElementById('insumo-admin-note').value;
@@ -540,7 +572,8 @@ window.updateInsumoStatusQuick = async (id) => {
             if (inputVisor) {
                 inputVisor.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : (isSinEstado ? 'Falta revisar' : '');
             }
-            if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status);
+            const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
+            if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status, porInst);
             const r = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
             allInsumos = r.data;
             setupOriginInstitutionFilterInsumo();
@@ -552,6 +585,18 @@ window.updateInsumoStatusQuick = async (id) => {
 window.saveFullInsumoForm = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const id = fd.get('idformA');
+    const row = allInsumos.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
     try {
         const res = await API.request(`/insumos/update-full`, 'POST', fd);
         if (res.status === 'success') {
@@ -796,7 +841,8 @@ window.openNotifyPopupInsumo = (id) => { console.log("Abriendo popup notificaci�
 /**
  * 4. COMPONENTES VISUALES (BADGES Y PAGINADOR)
  */
-function getStatusBadge(estado) {
+function getStatusBadge(estado, porInstitucion) {
+    const tx = window.txt?.misformularios || {};
     const e = (estado || "Sin estado").toString().toLowerCase().trim();
     const states = {
         'entregado': { label: 'Entregado', class: 'bg-success text-white' },
@@ -807,14 +853,20 @@ function getStatusBadge(estado) {
         'sin estado': { label: 'Sin estado', class: 'bg-secondary text-white' }
     };
     const s = states[e] || states['sin estado'];
-    return `<span class="badge ${s.class} shadow-sm" style="font-size: 8px; font-weight: 700; padding: 4px 8px; min-width: 90px; display: inline-block;">${s.label}</span>`;
+    const lbl = porInstitucion ? `${s.label} ${tx.estado_por || 'por'} ${porInstitucion}` : s.label;
+    return `<span class="badge ${s.class} shadow-sm mt-1" style="font-size: 8px; font-weight: 700; padding: 4px 8px; min-width: 90px; display: inline-block;">${lbl}</span>`;
 }
 
 function getWorkflowBadgeRow(item) {
     const tx = window.txt?.misformularios || {};
     const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
-    if (isDerived) return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}</span>`;
+    if (isDerived) {
+        const originName = (item.InstitucionOrigenNombre || '').trim();
+        const currentName = (item.InstitucionActualNombre || '').trim();
+        const routeText = [originName, currentName].filter(Boolean).join(' → ');
+        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+    }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
     if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark mt-1">${tx.estado_derivacion_devuelta || 'Devuelta'}</span>`;
@@ -824,7 +876,14 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    return `<div class="d-inline-flex flex-column align-items-center">${getStatusBadge(item.estado)}${getWorkflowBadgeRow(item)}</div>`;
+    const isDerived = Number(item.DerivadoActivo || 0) === 1;
+    const derivBadge = getWorkflowBadgeRow(item);
+    const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
+    const estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    if (isDerived) {
+        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+    }
+    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }
 
 function renderPagination(totalItems, containerId, refreshCallback) {

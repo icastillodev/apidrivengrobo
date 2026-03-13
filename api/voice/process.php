@@ -23,8 +23,8 @@ if (empty($command)) {
 $vps_ip = '104.251.216.78'; 
 $model_name = 'gecko-brain';
 
-// URL LIMPIA (Sin puertos raros, usa HTTP estándar)
-$apiUrl = "http://$vps_ip/api/generate";
+// URL segura (HTTPS obligatorio)
+$apiUrl = "https://$vps_ip/api/generate";
 
 // 4. PREPARAR PAYLOAD
 // Prompt de sistema estricto para forzar JSON

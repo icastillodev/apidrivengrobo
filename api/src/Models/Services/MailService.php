@@ -19,7 +19,7 @@ class MailService {
      */
     private function getBaseUrl($slug = null) {
         $isLocal = (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false);
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
         $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
         if ($isLocal) {
             $base = $protocol . '://' . $host . '/URBE-API-DRIVEN/front';
@@ -35,7 +35,7 @@ class MailService {
     /** URL base del front (público para uso en controladores). */
     public static function getFrontBaseUrl() {
         $isLocal = (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false);
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
         $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
         if ($isLocal) {
             return $protocol . '://' . $host . '/URBE-API-DRIVEN/front';

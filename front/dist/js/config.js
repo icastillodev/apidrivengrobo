@@ -5,9 +5,9 @@ export const ENV = {
         ? "/URBE-API-DRIVEN/front/" 
         : "/",
     
-    // Dominio principal de la app
+    // Dominio principal de la app (solo HTTPS en producción)
     ROOT_SITE: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
-        ? "http://localhost/URBE-API-DRIVEN/" 
+        ? (window.location.protocol + "//" + window.location.host + "/URBE-API-DRIVEN/")
         : "https://app.groboapp.com/",
     
     // El Backend (API)

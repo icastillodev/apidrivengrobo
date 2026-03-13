@@ -20,13 +20,16 @@ class InsumoModel {
             ? "io.NombreInst as InstitucionOrigenNombre,"
             : "NULL as InstitucionOrigenNombre,";
         $ownerSelect = $hasOwnerTable
-            ? "foa.IdFormularioDerivacionActiva,"
-            : "NULL as IdFormularioDerivacionActiva,";
+            ? "foa.IdFormularioDerivacionActiva, COALESCE(foa.IdInstitucionActual, f.IdInstitucion) as IdInstitucionActual, ia.NombreInst as InstitucionActualNombre,"
+            : "NULL as IdFormularioDerivacionActiva, f.IdInstitucion as IdInstitucionActual, NULL as InstitucionActualNombre,";
         $originJoin = $hasWorkflowCols
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
             : "";
         $ownerJoin = $hasOwnerTable
             ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+        $currentInstJoin = $hasOwnerTable
+            ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)"
             : "";
 
         $whereInst = "f.IdInstitucion = ?";
@@ -77,6 +80,7 @@ class InsumoModel {
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
                 {$ownerJoin}
+                {$currentInstJoin}
                 {$originJoin}
                 WHERE {$whereInst} AND t.categoriaformulario = 'insumos'
                 ORDER BY f.idformA DESC";
@@ -103,6 +107,21 @@ class InsumoModel {
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function isDestinationWithActiveDerivation(int $idformA, int $instId): bool {
+        if ($idformA <= 0 || $instId <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $sql = "SELECT 1
+                FROM formulario_derivacion
+                WHERE idformA = ?
+                  AND Activo = 1
+                  AND IdInstitucionDestino = ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA, $instId]);
+        return (bool)$stmt->fetchColumn();
     }
 
         public function getInsumosDetails($idPrecioInsumo) {
@@ -151,27 +170,54 @@ public function updateFullInsumo($data) {
         }
         $this->db->beginTransaction(); 
         try {
+            $idForm = (int)$data['idformA'];
+            $instIdRequest = (int)($data['instId'] ?? 0);
+            $oldProtStmt = $this->db->prepare("SELECT idprotA FROM protformr WHERE idformA = ? LIMIT 1");
+            $oldProtStmt->execute([$idForm]);
+            $oldProt = $oldProtStmt->fetchColumn();
+            $oldFormStmt = $this->db->prepare("SELECT fechainicioA, fecRetiroA FROM formularioe WHERE idformA = ? LIMIT 1");
+            $oldFormStmt->execute([$idForm]);
+            $oldForm = $oldFormStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $isDerivedDestination = ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation($idForm, $instIdRequest));
+            $oldItemRows = [];
+            if ($isDerivedDestination) {
+                $oldItemsStmt = $this->db->prepare("SELECT IdForminsumo, cantidad FROM forminsumo WHERE idPrecioinsumosformulario = ? ORDER BY IdForminsumo ASC");
+                $oldItemsStmt->execute([$data['idPrecioinsumosformulario']]);
+                $oldItemRows = $oldItemsStmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
+
             $sqlF = "UPDATE formularioe SET depto = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
             $this->db->prepare($sqlF)->execute([
-                $data['depto'], $data['fechainicioA'], $data['fecRetiroA'], $data['idformA']
+                $data['depto'],
+                $isDerivedDestination ? ($oldForm['fechainicioA'] ?? $data['fechainicioA']) : $data['fechainicioA'],
+                $isDerivedDestination ? ($oldForm['fecRetiroA'] ?? $data['fecRetiroA']) : $data['fecRetiroA'],
+                $data['idformA']
             ]);
 
             $idPrecio = $data['idPrecioinsumosformulario'];
             $items = $data['items'] ?? [];
             $nuevoTotal = 0;
+            if ($isDerivedDestination && !empty($oldItemRows) && count($items) !== count($oldItemRows)) {
+                throw new \Exception("En un formulario derivado no se puede cambiar la cantidad de líneas de insumos.");
+            }
 
             $this->db->prepare("DELETE FROM forminsumo WHERE idPrecioinsumosformulario = ?")->execute([$idPrecio]);
 
-            foreach ($items as $item) {
+            foreach ($items as $idx => $item) {
+                $cantidadItem = $item['cantidad'];
+                if ($isDerivedDestination && isset($oldItemRows[$idx]['cantidad'])) {
+                    // En derivado destino, las cantidades quedan fijas.
+                    $cantidadItem = (float)$oldItemRows[$idx]['cantidad'];
+                }
                 $stmtP = $this->db->prepare("SELECT PrecioInsumo FROM insumo WHERE idInsumo = ?");
                 $stmtP->execute([$item['idInsumo']]);
                 $precioCatalogo = $stmtP->fetchColumn() ?: 0;
 
-                $subtotal = $precioCatalogo * $item['cantidad'];
+                $subtotal = $precioCatalogo * $cantidadItem;
                 $nuevoTotal += $subtotal;
 
                 $sqlI = "INSERT INTO forminsumo (idPrecioinsumosformulario, idInsumo, cantidad, PrecioMomentoInsumo) VALUES (?, ?, ?, ?)";
-                $this->db->prepare($sqlI)->execute([$idPrecio, $item['idInsumo'], $item['cantidad'], $precioCatalogo]);
+                $this->db->prepare($sqlI)->execute([$idPrecio, $item['idInsumo'], $cantidadItem, $precioCatalogo]);
             }
 
             $sqlP = "UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?";
@@ -180,7 +226,13 @@ public function updateFullInsumo($data) {
             // Asociar / actualizar protocolo si se envió idProt (solo para insumos por protocolo)
             if (!empty($data['idProt'])) {
                 $idProt = (int)$data['idProt'];
-                $idForm = (int)$data['idformA'];
+                if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation($idForm, $instIdRequest)) {
+                    $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
+                    if ($oldProtNorm !== null && $idProt !== $oldProtNorm) {
+                        throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");
+                    }
+                    $idProt = $oldProtNorm ?? $idProt;
+                }
 
                 // Eliminamos vínculos previos y dejamos uno único
                 $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idForm]);

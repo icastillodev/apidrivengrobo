@@ -197,6 +197,11 @@ function renderModalHeader(r) {
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(r.DerivadoActivo || 0) === 1 && Number(r.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(r.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const wf = (r.EstadoWorkflow || '').toString().toUpperCase();
+    const isPendingAtDestination = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    const originName = (r.InstitucionOrigenNombre || '').trim();
+    const currentName = (r.InstitucionActualNombre || '').trim();
+    const routeText = [originName, currentName].filter(Boolean).join(' → ');
     const lblDerivado = tx.workflow_derivado || 'Derivado';
     const lblAceptar = tx.estado_derivacion_aceptada || 'Aceptar';
     const lblDevolver = tx.estado_derivacion_devuelta || 'Devolver';
@@ -204,17 +209,20 @@ function renderModalHeader(r) {
     const lblRetirar = tx.retirar_derivacion_btn || 'Retirar derivación';
     const lblHistorial = tx.historial_derivacion_titulo || 'Historial';
     const lblDerivar = tx.derivar_btn || 'Derivar';
+    const lblWaitAccept = tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.';
+    const lblProtocolLocked = tx.derivacion_protocolo_bloqueado || 'Protocolo fijo: no se puede cambiar en formulario derivado.';
     const derivBox = isDerivedActive
         ? `
         <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-primary">${lblDerivado}</span>
-            <span class="small text-muted">${r.InstitucionOrigenNombre ? `Origen: ${r.InstitucionOrigenNombre}` : ''}</span>
+            <span class="badge bg-primary">${lblDerivado}${routeText ? ` · ${routeText}` : ''}</span>
             ${isOriginInst
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionReactivo('cancel', ${r.IdFormularioDerivacionActiva}, ${r.idformA})">${lblRetirar}</button>`
-                : `
+                : isPendingAtDestination
+                    ? `
             <button type="button" class="btn btn-sm btn-outline-success" onclick="window.resolveDerivacionReactivo('accept', ${r.IdFormularioDerivacionActiva}, ${r.idformA})">${lblAceptar}</button>
             <button type="button" class="btn btn-sm btn-outline-warning" onclick="window.resolveDerivacionReactivo('return', ${r.IdFormularioDerivacionActiva}, ${r.idformA})">${lblDevolver}</button>
             <button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionReactivo('reject', ${r.IdFormularioDerivacionActiva}, ${r.idformA})">${lblRechazar}</button>`
+                    : ''
             }
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryReactivo(${r.idformA})">${lblHistorial}</button>
         </div>`
@@ -223,12 +231,19 @@ function renderModalHeader(r) {
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.deriveFromAdminReactivo(${r.idformA})">${lblDerivar}</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryReactivo(${r.idformA})">${lblHistorial}</button>
         </div>`;
+    const derivInfoPanel = isDerivedActive
+        ? `<div class="alert alert-info mt-2 py-2 px-3 small mb-0">
+            <div><strong>${lblProtocolLocked}</strong></div>
+            ${isPendingAtDestination ? `<div>${lblWaitAccept}</div>` : ''}
+        </div>`
+        : '';
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div>
             <h5 class="fw-bold mb-0">${t.detail_title}</h5>
             <span class="small text-muted">ID: <strong>${r.idformA}</strong> | Investigador: ${r.Investigador}</span>
             ${derivBox}
+            ${derivInfoPanel}
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
@@ -264,7 +279,7 @@ function renderAdminSection(r, identity) {
                         <option value="Suspendido" ${estado === 'Suspendido' ? 'selected' : ''}>${t.status.suspended}</option>
                         <option value="Reservado" ${estado === 'Reservado' ? 'selected' : ''}>${t.status.reserved}</option>
                     </select>
-                    <div id="modal-status-badge-container">${getStatusBadge(estado)}</div>
+                    <div id="modal-status-badge-container">${getStatusBadge(estado, (Number(r.DerivadoActivo || 0) === 1 && (r.InstitucionActualNombre || '').trim()) ? r.InstitucionActualNombre.trim() : undefined)}</div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -305,6 +320,11 @@ function renderNotificationSection(lastNotify, idformA) {
 }
 function renderOrderModificationSection(r, usage, cache) {
     const t = window.txt.reactivos.modal;
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isDerivedActive = Number(r.DerivadoActivo || 0) === 1 && Number(r.IdFormularioDerivacionActiva || 0) > 0;
+    const isOriginInst = Number(r.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockImmutable = isDerivedActive && !isOriginInst;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
     const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
@@ -343,13 +363,14 @@ function renderOrderModificationSection(r, usage, cache) {
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">${t.protocol_label}</label>
                 <input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="${t.filter_placeholder}" onkeyup="window.filterProtocolListReactivo(this)">
-                <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm">
+                <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" ${lockProtocol ? 'disabled' : ''}>
                     <option value="">${t.select_proto}</option>
                     ${protocolos.map(p => {
                         const isSelected = (p.idprotA == r.idprotA) ? 'selected' : '';
                         return `<option value="${p.idprotA}" ${isSelected}>${p.nprotA} - ${p.tituloA}</option>`;
                     }).join('')}
                 </select>
+                ${lockProtocol ? `<input type="hidden" name="idprotA" value="${r.idprotA || ''}">` : ''}
             </div>
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">${window.txt?.admin_insumos?.col_departamento ?? 'Departamento'}</label>
@@ -377,22 +398,22 @@ function renderOrderModificationSection(r, usage, cache) {
             
             <div class="col-md-3">
                 <label id="lbl-medida-dinamica" class="form-label small fw-bold uppercase">(${unidadMedida} ${presentacionInicial}) - ${t.qty_req}</label>
-                <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${r.CantidadReactivo || usage.organo || 0}">
+                <input type="number" step="any" name="organo" class="form-control form-control-sm fw-bold text-primary" value="${r.CantidadReactivo || usage.organo || 0}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase">${t.animals_used}</label>
-                <input type="number" name="totalA" class="form-control form-control-sm fw-bold text-danger" value="${usage.totalA || 0}">
+                <input type="number" name="totalA" class="form-control form-control-sm fw-bold text-danger" value="${usage.totalA || 0}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             
             <div class="col-md-6">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">${t.start_date}</label>
-                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}">
+                <input type="date" name="fechainicioA" class="form-control form-control-sm" value="${r.Inicio || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             
             <div class="col-md-6">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">${t.end_date}</label>
-                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}">
+                <input type="date" name="fecRetiroA" class="form-control form-control-sm" value="${r.Retiro || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>
             
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
@@ -442,6 +463,17 @@ window.cambiarMedidaReactivo = (selectElement) => {
 // 🚀 FIX LÓGICA DE TIEMPO REAL: Actualiza "Quien Visto" al toque sin Nulls
 window.updateReactivoStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
+    const row = allReactivos.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
     const statusSelect = document.getElementById('modal-status');
     const badgeContainer = document.getElementById('modal-status-badge-container');
     const aclara = document.getElementById('modal-aclaracionadm').value;
@@ -463,7 +495,8 @@ window.updateReactivoStatusQuick = async () => {
     try {
         const res = await API.request(`/reactivos/update-status`, 'POST', fd);
         if (res.status === 'success') {
-            if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(statusSelect.value);
+            const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
+            if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(statusSelect.value, porInst);
             
             const inputQuienVisto = document.getElementById('modal-quienvisto');
             if (inputQuienVisto) inputQuienVisto.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : quienVistoTarget;
@@ -512,6 +545,18 @@ window.saveFullReactivoForm = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const instId = localStorage.getItem('instId');
+    const id = fd.get('idformA');
+    const row = allReactivos.find(x => Number(x.idformA) === Number(id));
+    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
+    const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
+    const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
+    if (lockByPending) {
+        const tx = window.txt?.misformularios || {};
+        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        return;
+    }
 
     try {
         const res = await API.request(`/reactivos/update-full?inst=${instId}`, 'POST', fd);
@@ -835,7 +880,8 @@ function renderTable() {
 }
 // ... (getStatusBadge, setupSortHeaders, getFilteredAndSortedData, updateHeaderIcons se mantienen iguales al patrón de animales)
 
-function getStatusBadge(estado) {
+function getStatusBadge(estado, porInstitucion) {
+    const tx = window.txt?.misformularios || {};
     const e = (estado || "Sin estado").toString().toLowerCase().trim();
     const states = {
         'entregado': { label: 'Entregado', class: 'bg-success text-white' },
@@ -846,14 +892,20 @@ function getStatusBadge(estado) {
         'sin estado': { label: 'Sin estado', class: 'bg-secondary text-white' }
     };
     const s = states[e] || states['sin estado'];
-    return `<span class="badge ${s.class} shadow-sm" style="font-size: 8px; font-weight: 700; padding: 4px 8px; min-width: 90px; display: inline-block;">${s.label}</span>`;
+    const lbl = porInstitucion ? `${s.label} ${tx.estado_por || 'por'} ${porInstitucion}` : s.label;
+    return `<span class="badge ${s.class} shadow-sm mt-1" style="font-size: 8px; font-weight: 700; padding: 4px 8px; min-width: 90px; display: inline-block;">${lbl}</span>`;
 }
 
 function getWorkflowBadgeRow(item) {
     const tx = window.txt?.misformularios || {};
     const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
-    if (isDerived) return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}</span>`;
+    if (isDerived) {
+        const originName = (item.InstitucionOrigenNombre || '').trim();
+        const currentName = (item.InstitucionActualNombre || '').trim();
+        const routeText = [originName, currentName].filter(Boolean).join(' → ');
+        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+    }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
     if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark mt-1">${tx.estado_derivacion_devuelta || 'Devuelta'}</span>`;
@@ -863,7 +915,14 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    return `<div class="d-inline-flex flex-column align-items-center">${getStatusBadge(item.estado)}${getWorkflowBadgeRow(item)}</div>`;
+    const isDerived = Number(item.DerivadoActivo || 0) === 1;
+    const derivBadge = getWorkflowBadgeRow(item);
+    const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
+    const estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    if (isDerived) {
+        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+    }
+    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }
 
 function getFilteredAndSortedData() {

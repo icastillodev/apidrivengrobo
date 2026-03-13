@@ -27,10 +27,13 @@ class AnimalModel {
             ? "io.NombreInst as InstitucionOrigenNombre,"
             : "NULL as InstitucionOrigenNombre,";
         $ownerSelect = $hasOwnerTable
-            ? "foa.IdFormularioDerivacionActiva,"
-            : "NULL as IdFormularioDerivacionActiva,";
+            ? "foa.IdFormularioDerivacionActiva, COALESCE(foa.IdInstitucionActual, f.IdInstitucion) as IdInstitucionActual, ia.NombreInst as InstitucionActualNombre,"
+            : "NULL as IdFormularioDerivacionActiva, f.IdInstitucion as IdInstitucionActual, NULL as InstitucionActualNombre,";
         $ownerJoin = $hasOwnerTable
             ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+        $currentInstJoin = $hasOwnerTable
+            ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)"
             : "";
         $originJoin = $hasWorkflowCols
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
@@ -50,6 +53,16 @@ class AnimalModel {
             $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
             $params = [(int)$instId, (int)$instId];
         }
+        // Garantizar que formularios derivados al destino SIEMPRE aparezcan (aunque falle otro JOIN)
+        $derivDestinoClause = '';
+        $derivDestinoAndClause = '';
+        if ($this->hasTable('formulario_derivacion')) {
+            $derivDestinoClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE fd.idformA = f.idformA AND fd.Activo = 1 AND fd.IdInstitucionDestino = ?)";
+            $params[] = (int)$instId;
+            $derivDestinoAndClause = " OR (tf.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA AND fd2.Activo = 1 AND fd2.IdInstitucionDestino = ?))";
+            $params[] = (int)$instId;
+        }
+        $whereInst = "(" . $whereInst . $derivDestinoClause . ")";
 
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
@@ -63,14 +76,16 @@ class AnimalModel {
                     f.idcepaA,
                     CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
                     pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
-                    tf.nombreTipo as TipoNombre,
-                    tf.color as colorTipo,
-                    px.nprotA as NProtocolo, px.idprotA,
+                    COALESCE(tf.nombreTipo, '—') as TipoNombre,
+                    COALESCE(tf.color, '') as colorTipo,
+                    px.nprotA as NProtocolo, px.tituloA as TituloProtocolo, px.idprotA,
                     px.protocoloexpe as IsExterno, 
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
                     COALESCE(f.depto, pd.iddeptoA) as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
-                    CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA) as CatEspecie,
+                    COALESCE(CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA), '—') as CatEspecie,
+                    COALESCE(e.EspeNombreA, '') as EspeNombreA,
+                    COALESCE(se.SubEspeNombreA, '') as SubEspeNombreA,
                     COALESCE(c.CepaNombreA, '') as CepaNombre,
                     COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
@@ -90,12 +105,13 @@ class AnimalModel {
                         LIMIT 1
                     ) as DeptoExternoFlag
                 FROM formularioe f
-                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
                 LEFT JOIN especiee e ON se.idespA = e.idespA
                 LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
                 {$ownerJoin}
+                {$currentInstJoin}
                 {$originJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
@@ -104,7 +120,7 @@ class AnimalModel {
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
                 WHERE {$whereInst} 
-                  AND tf.categoriaformulario IN ('Animal', 'Animal vivo')
+                  AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause})
                 ORDER BY f.idformA DESC";
         
         $stmt = $this->db->prepare($sql);
@@ -130,6 +146,21 @@ class AnimalModel {
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function isDestinationWithActiveDerivation(int $idformA, int $instId): bool {
+        if ($idformA <= 0 || $instId <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $sql = "SELECT 1
+                FROM formulario_derivacion
+                WHERE idformA = ?
+                  AND Activo = 1
+                  AND IdInstitucionDestino = ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA, $instId]);
+        return (bool)$stmt->fetchColumn();
     }
 
     public function getCepasBySubespecie($instId, $idSubespA) {
@@ -287,19 +318,50 @@ public function updateStatus($data) {
 
         $newTotal = (int)($data['totalA'] ?? 0);
         $newProt = $data['idprotA'] ?? null;
+        $instIdRequest = (int)($data['instId'] ?? 0);
         $idSubesp = $data['idsubespA'] ?? null;
         $idCepa = $data['idcepaA'] ?? null;
         if ($idCepa === '' || $idCepa === '0' || $idCepa === 0) $idCepa = null;
 
-        $stmtOld = $this->db->prepare("SELECT (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal, (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt FROM formularioe f WHERE f.idformA = ?");
+        $stmtOld = $this->db->prepare("SELECT
+                                            f.fechainicioA as oldInicio,
+                                            f.fecRetiroA as oldRetiro,
+                                            (SELECT machoA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldMacho,
+                                            (SELECT hembraA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldHembra,
+                                            (SELECT indistintoA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldIndistinto,
+                                            (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal,
+                                            (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt
+                                       FROM formularioe f
+                                       WHERE f.idformA = ?");
         $stmtOld->execute([$id]);
         $old = $stmtOld->fetch(\PDO::FETCH_ASSOC);
         
         $oldTotal = (int)($old['oldTotal'] ?? 0);
         $oldProt = $old['oldProt'];
 
+        // Formulario derivado (en destino): el protocolo queda fijo y no se puede cambiar.
+        if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+            $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
+            $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
+            if ($newProtNorm !== $oldProtNorm) {
+                throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");
+            }
+            $newProt = $oldProtNorm;
+            $data['fechainicioA'] = $old['oldInicio'] ?? ($data['fechainicioA'] ?? null);
+            $data['fecRetiroA'] = $old['oldRetiro'] ?? ($data['fecRetiroA'] ?? null);
+            $data['machoA'] = (int)($old['oldMacho'] ?? 0);
+            $data['hembraA'] = (int)($old['oldHembra'] ?? 0);
+            $data['indistintoA'] = (int)($old['oldIndistinto'] ?? 0);
+            $newTotal = (int)($old['oldTotal'] ?? $newTotal);
+        }
+
         $this->db->beginTransaction();
         try {
+            // Formulario derivado en destino: especie/categoría son obligatorios
+            if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest) && (empty($idSubesp) || $idSubesp === '0')) {
+                throw new \Exception("Debe seleccionar Especie y Categoría para el formulario derivado.");
+            }
+
             // Validación cepa: si existen cepas habilitadas para la categoría, debe seleccionar una
             // (nota: instId no viene en este POST, lo deducimos por el formulario y la institución de la categoría)
             $stmtInst = $this->db->prepare("
@@ -374,6 +436,17 @@ public function updateStatus($data) {
             $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
             $sqlPrecio = "UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?";
             $this->db->prepare($sqlPrecio)->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+
+            // 3. Si es formulario derivado en destino: actualizar facturacion_formulario_derivado (precio por institución)
+            if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+                $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
+                $stmtDeriv->execute([$id, $instIdRequest]);
+                $idDeriv = $stmtDeriv->fetchColumn();
+                if ($idDeriv && $this->hasTable('facturacion_formulario_derivado')) {
+                    $this->db->prepare("UPDATE facturacion_formulario_derivado SET monto_total = ? WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ?")
+                        ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
+                }
+            }
             // ------------------------------------------
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
@@ -411,6 +484,24 @@ public function updateStatus($data) {
                 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$protId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getAllSpeciesFlatForInstitution($instId) {
+        $sql = "SELECT
+                    se.idsubespA,
+                    se.idespA,
+                    se.SubEspeNombreA,
+                    e.EspeNombreA,
+                    se.Psubanimal,
+                    se.Existe as existe
+                FROM subespecie se
+                INNER JOIN especiee e ON se.idespA = e.idespA
+                WHERE e.IdInstitucion = ?
+                  AND se.Existe != 2
+                ORDER BY e.EspeNombreA ASC, se.SubEspeNombreA ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([(int)$instId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 

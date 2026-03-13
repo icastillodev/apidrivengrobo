@@ -230,6 +230,20 @@ class BillingController {
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
     }
 
+    /**
+     * Lista instituciones que han enviado formularios derivados (para selector).
+     */
+    public function getInstitutionsWithDerived() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int)$sesion['instId'];
+            $list = $this->model->getInstitutionsWithDerivedForms($instId);
+            $this->sendSuccess($list);
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
     public function getInstitutionReport() {
         if (ob_get_length()) ob_clean();
         $f = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -239,8 +253,9 @@ class BillingController {
             $desde = $f['desde'] ?? null;
             $hasta = $f['hasta'] ?? null;
             $estadoCobro = $f['estadoCobro'] ?? 'all';
+            $idInstitucionSolicitante = $f['idInstitucionSolicitante'] ?? null;
 
-            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro);
+            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro, $idInstitucionSolicitante);
             $this->sendSuccess($data);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
@@ -349,6 +364,25 @@ class BillingController {
             $this->model->processPaymentTransaction($f['idUsr'], $f['monto'], $f['items'], $sesion['instId'], $sesion['userId']);
             $this->sendSuccess("Pago procesado");
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
+    }
+
+    /**
+     * Registra pago de formularios derivados (facturación por institución).
+     */
+    public function processPaymentInstitucion() {
+        $f = $this->getRequestData();
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $items = $f['items'] ?? [];
+            if (empty($items)) {
+                $this->sendError('No hay ítems seleccionados para pagar.');
+                return;
+            }
+            $this->model->processPaymentInstitucionDerivada($items, $sesion['instId'], $sesion['userId']);
+            $this->sendSuccess("Pago registrado correctamente.");
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
     }
 
     public function ajustarPagoIndividual() {

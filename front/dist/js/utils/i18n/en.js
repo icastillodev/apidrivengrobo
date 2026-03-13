@@ -701,6 +701,8 @@ alojamientos: {
         estado_cobro_anulado: "CANCELED",
         col_formulario: "Form",
         sin_datos_institucion: "No derived billing found for selected filters.",
+        inst_solicitante: "Institution:",
+        inst_todas: "ALL",
         
         // Dashboard
         resumen_fin: "Financial Summary",
@@ -732,6 +734,7 @@ alojamientos: {
         volver_seleccion: "BACK TO SELECTION",
         link_ver_detalle: "View detail",
         selecc_pagar: "Selected for payment:",
+        seleccionado_lbl: "Selected",
         saldo_actual: "Current Balance:",
         
         // Alerts
@@ -1064,6 +1067,7 @@ alojamientos: {
         seleccione: "Select...",
         seleccione_tipo: "Select type...",
         primero_especie: "First select species...",
+        seleccione_especie_cepa: "Select species.",
         cepa_linea: "Strain/Stock/Breed / Line",
         label_categoria: "Category",
         peso: "Weight (g/kg)",
@@ -1214,6 +1218,7 @@ alojamientos: {
         derivar_ok: "Form derived successfully.",
         derivar_sin_destinos: "No institutions available to derive",
         historial_derivacion_titulo: "Derivation history",
+        historial_derivacion_formulario: "Form derivation history",
         historial_derivacion_vacio: "No derivation movements.",
         historial_derivacion_error: "Error loading history.",
         retirar_derivacion_btn: "Recall derivation",
@@ -1226,7 +1231,27 @@ alojamientos: {
         estado_derivacion_devuelta: "Returned",
         estado_derivacion_rechazada: "Rejected",
         estado_derivacion_cancelada: "Cancelled",
-        cancelar: "Cancel"
+        estado_por: "by",
+        derivacion_espera_aceptacion: "You must accept the derivation before starting work.",
+        derivacion_protocolo_bloqueado: "Fixed protocol: it cannot be changed in a derived form.",
+        derivacion_datos_origen: "Original form data (derived)",
+        derivacion_datos_origen_desc: "This is the data that came with the derivation. Below, modify with your institution's options.",
+        derivacion_modificar_con_mi_inst: "Modify with my institution's options",
+        derivacion_resumen_nuevo: "Summary of new form (what I modified)",
+        derivacion_resumen_desc: "Preview of how the order will look when saved.",
+        derivacion_resumen_placeholder: "Select species and category above.",
+        derivacion_seleccione_especie: "— Select species —",
+        derivacion_especie_requerida: "You must select Species and Category for the derived form.",
+        cancelar: "Cancel",
+        label_origen: "Origin",
+        label_tipo: "Type",
+        label_categoria: "Category",
+        label_solicitado: "Requested",
+        label_retiro: "Withdrawal",
+        label_protocolo: "Protocol",
+        label_organizacion: "Organization",
+        label_instituciones: "Institutions",
+        label_aclaracion: "Clarification"
     },
     misprotocolos: {
         bread_investigador: "Researcher",

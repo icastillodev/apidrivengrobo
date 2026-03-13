@@ -27,10 +27,13 @@ class ReactivoModel {
             ? "io.NombreInst as InstitucionOrigenNombre,"
             : "NULL as InstitucionOrigenNombre,";
         $ownerSelect = $hasOwnerTable
-            ? "foa.IdFormularioDerivacionActiva,"
-            : "NULL as IdFormularioDerivacionActiva,";
+            ? "foa.IdFormularioDerivacionActiva, COALESCE(foa.IdInstitucionActual, f.IdInstitucion) as IdInstitucionActual, ia.NombreInst as InstitucionActualNombre,"
+            : "NULL as IdFormularioDerivacionActiva, f.IdInstitucion as IdInstitucionActual, NULL as InstitucionActualNombre,";
         $ownerJoin = $hasOwnerTable
             ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+        $currentInstJoin = $hasOwnerTable
+            ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)"
             : "";
         $originJoin = $hasWorkflowCols
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
@@ -86,6 +89,7 @@ class ReactivoModel {
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 {$ownerJoin}
+                {$currentInstJoin}
                 {$originJoin}
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
@@ -121,6 +125,21 @@ class ReactivoModel {
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function isDestinationWithActiveDerivation(int $idformA, int $instId): bool {
+        if ($idformA <= 0 || $instId <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $sql = "SELECT 1
+                FROM formulario_derivacion
+                WHERE idformA = ?
+                  AND Activo = 1
+                  AND IdInstitucionDestino = ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA, $instId]);
+        return (bool)$stmt->fetchColumn();
     }
     public function getAvailableInsumos($instId) {
         $sql = "SELECT IdInsumoexp as idInsumo, NombreInsumo, TipoInsumo, CantidadInsumo, PrecioInsumo 
@@ -220,6 +239,7 @@ class ReactivoModel {
 
         $newTotal = (int)($data['totalA'] ?? 0); // Animales descontados
         $newProt = $data['idprotA'] ?? null;
+        $instIdRequest = (int)($data['instId'] ?? 0);
         
         // 🚀 FIX ESCUDO: Buscamos el ID del reactivo en las keys que suele mandar JS
         $idInsumoReactivo = $data['reactivo'] ?? $data['idinsumoA'] ?? $data['IdInsumoexp'] ?? null; 
@@ -233,6 +253,9 @@ class ReactivoModel {
 
         $stmtOld = $this->db->prepare("
             SELECT 
+                f.fechainicioA as oldInicio,
+                f.fecRetiroA as oldRetiro,
+                (SELECT organo FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldOrgano,
                 (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal,
                 (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt
             FROM formularioe f WHERE f.idformA = ?");
@@ -241,6 +264,20 @@ class ReactivoModel {
         
         $oldTotal = (int)($old['oldTotal'] ?? 0);
         $oldProt = $old['oldProt'];
+
+        // En destino derivado, el protocolo del formulario queda congelado.
+        if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+            $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
+            $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
+            if ($newProtNorm !== $oldProtNorm) {
+                throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");
+            }
+            $newProt = $oldProtNorm;
+            $data['fechainicioA'] = $old['oldInicio'] ?? ($data['fechainicioA'] ?? null);
+            $data['fecRetiroA'] = $old['oldRetiro'] ?? ($data['fecRetiroA'] ?? null);
+            $nuevaCantidadReactivo = (float)($old['oldOrgano'] ?? $nuevaCantidadReactivo);
+            $newTotal = (int)($old['oldTotal'] ?? $newTotal);
+        }
 
         $this->db->beginTransaction();
         try {
