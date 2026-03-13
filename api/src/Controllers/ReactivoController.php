@@ -26,7 +26,7 @@ class ReactivoController {
             $data = $this->model->getAllByInstitution($sesion['instId'], "Otros reactivos biologicos");
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -72,6 +72,7 @@ class ReactivoController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $estado = $data['estado'] ?? 'Sin estado';
+            $data['instId'] = $sesion['instId'];
             
             // Visor = quien cambia el estado. Siempre nombre + apellido + ID desde BD.
             if (strtolower(trim($estado)) === 'sin estado') {
@@ -80,7 +81,7 @@ class ReactivoController {
                 $quienvisto = VisorHelper::getNombreApellidoYId($this->db, $sesion['userId']);
             }
 
-            $this->model->updateQuickStatus($data['idformA'], $estado, $data['aclaracionadm'] ?? '', $quienvisto);
+            $this->model->updateQuickStatus($data['idformA'], $estado, $data['aclaracionadm'] ?? '', $quienvisto, $data['instId']);
             
             echo json_encode(['status' => 'success', 'quienvisto' => $quienvisto]);
         } catch (\Exception $e) {
@@ -97,7 +98,8 @@ class ReactivoController {
         $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
         
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $data['instId'] = $sesion['instId'];
             $this->model->updateFull($data);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

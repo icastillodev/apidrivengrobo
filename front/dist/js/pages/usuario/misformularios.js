@@ -5,6 +5,7 @@ let allForms = [];
 let currentPage = 1;
 let protocolsUsedCache = [];
 const rowsPerPage = 12;
+let derivationTargets = [];
 
 export async function initMisFormularios() {
     const userId = localStorage.getItem('userId');
@@ -18,6 +19,8 @@ export async function initMisFormularios() {
     if (btnInsumosPedidos) btnInsumosPedidos.onclick = openInsumosPedidosModal;
     const btnInsumosExpPedidos = document.getElementById('btn-insumos-exp-pedidos');
     if (btnInsumosExpPedidos) btnInsumosExpPedidos.onclick = openInsumosExpPedidosModal;
+    const btnConfirmDerive = document.getElementById('btn-confirm-derive');
+    if (btnConfirmDerive) btnConfirmDerive.onclick = confirmDeriveForm;
 
     try {
         const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
@@ -25,13 +28,24 @@ export async function initMisFormularios() {
             allForms = res.data.list;
             // Ya no configuramos contacto global aquí
             setupInstitutionFilter();
+            setupOriginInstitutionFilter();
             renderTable();
         }
     } catch (e) { console.error("Error:", e); }
 
+    try {
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const resTargets = await API.request(`/forms/derivation/targets?inst=${encodeURIComponent(instActiva)}&instId=${encodeURIComponent(instActiva)}`);
+        if (resTargets.status === 'success' && Array.isArray(resTargets.data)) {
+            derivationTargets = resTargets.data;
+        }
+    } catch (e) { console.error('Error cargando instituciones destino de derivación', e); }
+
     document.getElementById('search-input').addEventListener('keyup', () => { currentPage = 1; renderTable(); });
     document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; renderTable(); });
     document.getElementById('filter-inst').addEventListener('change', () => { currentPage = 1; renderTable(); });
+    document.getElementById('filter-derivation')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
+    document.getElementById('filter-origin-inst')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
 }
 
 /* --- RENDERIZADO DE TABLA --- */
@@ -42,12 +56,20 @@ function renderTable() {
     const term = document.getElementById('search-input').value.toLowerCase();
     const statusFilter = document.getElementById('filter-status').value;
     const instFilter = document.getElementById('filter-inst').value;
+    const derivationFilter = document.getElementById('filter-derivation')?.value || 'all';
+    const originInstFilter = document.getElementById('filter-origin-inst')?.value || 'all';
 
     const filtered = allForms.filter(f => {
         const matchText = Object.values(f).join(' ').toLowerCase().includes(term);
         const matchStatus = statusFilter === 'all' || f.estado === statusFilter;
         const matchInst = instFilter === 'all' || f.NombreInstitucion === instFilter;
-        return matchText && matchStatus && matchInst;
+        const isDerived = Number(f.DerivadoActivo || 0) === 1;
+        const matchDeriv = derivationFilter === 'all'
+            || (derivationFilter === 'derived' && isDerived)
+            || (derivationFilter === 'local' && !isDerived);
+        const matchOrigin = originInstFilter === 'all'
+            || (f.NombreInstitucionOrigen || '') === originInstFilter;
+        return matchText && matchStatus && matchInst && matchDeriv && matchOrigin;
     });
 
     updateCounter(filtered);
@@ -68,6 +90,7 @@ function renderTable() {
             </div>
         `;
 
+        const actions = buildActionButtons(f);
         tr.innerHTML = `
             <td class="ps-3 fw-bold text-muted small">#${f.idformA}</td>
             <td><span class="inst-badge">${f.NombreInstitucion}</span></td>
@@ -77,11 +100,10 @@ function renderTable() {
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Protocolo}">${f.Protocolo}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Departamento}">${f.Departamento}</td>
             <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
+            <td class="text-center">${getWorkflowBadge(f)}</td>
             <td class="text-center">${getStatusBadge(f.estado)}</td>
             <td class="text-end pe-3">
-                <button class="btn btn-sm btn-light border shadow-sm text-danger" onclick="window.downloadPDF(${f.idformA})" title="Descargar PDF">
-                    <i class="bi bi-file-earmark-pdf"></i>
-                </button>
+                ${actions}
             </td>
         `;
         tbody.appendChild(tr);
@@ -447,6 +469,29 @@ function setupInstitutionFilter() {
     } else { container.classList.add('d-none'); }
 }
 
+function setupOriginInstitutionFilter() {
+    const origins = [...new Set(
+        allForms
+            .map(f => (f.NombreInstitucionOrigen || '').trim())
+            .filter(Boolean)
+    )];
+    const container = document.getElementById('container-filter-origin-inst');
+    const select = document.getElementById('filter-origin-inst');
+    if (!container || !select) return;
+    select.innerHTML = `<option value="all">${window.txt?.misformularios?.filter_origen_todos || 'Todas las instituciones origen'}</option>`;
+    if (origins.length > 0) {
+        container.classList.remove('d-none');
+        origins.sort().forEach(inst => {
+            const option = document.createElement('option');
+            option.value = inst;
+            option.text = inst;
+            select.appendChild(option);
+        });
+    } else {
+        container.classList.add('d-none');
+    }
+}
+
 function updateCounter(filteredData) {
     const uniqueInst = [...new Set(filteredData.map(f => f.NombreInstitucion))];
     const countInst = uniqueInst.length;
@@ -464,6 +509,166 @@ function getStatusBadge(estado) {
         'Entregado': 'bg-success', 'Suspendido': 'bg-warning text-dark', 'Rechazado': 'bg-danger'
     };
     return `<span class="badge ${map[estado] || 'bg-light text-dark border'} shadow-sm badge-status">${estado || 'Sin estado'}</span>`;
+}
+
+function getWorkflowBadge(f) {
+    const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
+    const isDerived = Number(f.DerivadoActivo || 0) === 1;
+    if (!isDerived && !wf) {
+        return `<span class="badge bg-light text-dark border">${window.txt?.misformularios?.workflow_local || 'Local'}</span>`;
+    }
+    if (isDerived) {
+        return `<span class="badge bg-primary">${window.txt?.misformularios?.workflow_derivado || 'Derivado'}</span>`;
+    }
+    if (wf.includes('RECHAZ')) {
+        return `<span class="badge bg-danger">${window.txt?.misformularios?.workflow_rechazado || 'Rechazado'}</span>`;
+    }
+    if (wf.includes('DEVUEL')) {
+        return `<span class="badge bg-warning text-dark">${window.txt?.misformularios?.workflow_devuelto || 'Devuelto'}</span>`;
+    }
+    if (wf.includes('CANCEL')) {
+        return `<span class="badge bg-secondary">${window.txt?.misformularios?.workflow_cancelado || 'Cancelado'}</span>`;
+    }
+    return `<span class="badge bg-info text-dark">${wf}</span>`;
+}
+
+function buildActionButtons(f) {
+    const instId = Number(localStorage.getItem('instId') || 0);
+    const isDerived = Number(f.DerivadoActivo || 0) === 1;
+    const canDerive = !isDerived;
+    const canCancel = isDerived && Number(f.IdInstitucionOrigen || 0) === instId && Number(f.IdFormularioDerivacionActiva || 0) > 0;
+
+    const btnPdf = `<button class="btn btn-sm btn-light border shadow-sm text-danger" onclick="window.downloadPDF(${f.idformA})" title="Descargar PDF"><i class="bi bi-file-earmark-pdf"></i></button>`;
+    const btnHistory = `<button class="btn btn-sm btn-outline-dark border shadow-sm" onclick="window.openDerivationHistory(${f.idformA})" title="${window.txt?.misformularios?.historial_derivacion_titulo || 'Historial de derivación'}"><i class="bi bi-clock-history"></i></button>`;
+    const btnDerive = canDerive
+        ? `<button class="btn btn-sm btn-outline-primary border shadow-sm" onclick="window.openDeriveModal(${f.idformA})" title="${window.txt?.misformularios?.derivar_btn || 'Derivar'}"><i class="bi bi-arrow-left-right"></i></button>`
+        : '';
+    const btnCancel = canCancel
+        ? `<button class="btn btn-sm btn-outline-warning border shadow-sm" onclick="window.cancelDerivation(${f.IdFormularioDerivacionActiva})" title="${window.txt?.misformularios?.retirar_derivacion_btn || 'Retirar derivación'}"><i class="bi bi-arrow-counterclockwise"></i></button>`
+        : '';
+
+    return `<div class="d-flex justify-content-end gap-1">${btnPdf}${btnHistory}${btnDerive}${btnCancel}</div>`;
+}
+
+window.openDeriveModal = (idformA) => {
+    const select = document.getElementById('derive-target-inst');
+    const hidden = document.getElementById('derive-form-id');
+    const msg = document.getElementById('derive-message');
+    if (!select || !hidden || !msg) return;
+    hidden.value = String(idformA);
+    msg.value = '';
+    select.innerHTML = '';
+    if (!derivationTargets.length) {
+        select.innerHTML = `<option value="">${window.txt?.misformularios?.derivar_sin_destinos || 'No hay instituciones disponibles para derivar'}</option>`;
+    } else {
+        select.innerHTML = derivationTargets.map(t => `<option value="${t.IdInstitucion}">${t.NombreInst}</option>`).join('');
+    }
+    new bootstrap.Modal(document.getElementById('modal-derivar-form')).show();
+};
+
+async function confirmDeriveForm() {
+    const idformA = Number(document.getElementById('derive-form-id')?.value || 0);
+    const instDestino = Number(document.getElementById('derive-target-inst')?.value || 0);
+    const mensaje = (document.getElementById('derive-message')?.value || '').trim();
+    if (!idformA || !instDestino) {
+        Swal.fire('Atención', window.txt?.misformularios?.derivar_error_destino || 'Seleccione una institución destino.', 'warning');
+        return;
+    }
+
+    try {
+        Swal.fire({ title: window.txt?.misformularios?.derivar_procesando || 'Derivando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request('/forms/derivation/derive', 'POST', { idformA, instDestino, mensaje, instId: Number(instActiva || 0) });
+        if (res.status === 'success') {
+            Swal.fire('OK', window.txt?.misformularios?.derivar_ok || 'Formulario derivado correctamente.', 'success');
+            const modalEl = document.getElementById('modal-derivar-form');
+            bootstrap.Modal.getInstance(modalEl)?.hide();
+            await reloadMyForms();
+        } else {
+            Swal.fire('Error', res.message || 'No se pudo derivar.', 'error');
+        }
+    } catch (e) {
+        Swal.fire('Error', e?.message || 'No se pudo derivar.', 'error');
+    }
+}
+
+window.openDerivationHistory = async (idformA) => {
+    const listEl = document.getElementById('derivation-history-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-dark"></div></div>';
+    new bootstrap.Modal(document.getElementById('modal-derivacion-history')).show();
+
+    try {
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request(`/forms/derivation/history?idformA=${idformA}&inst=${encodeURIComponent(instActiva)}`);
+        if (res.status !== 'success' || !Array.isArray(res.data) || !res.data.length) {
+            listEl.innerHTML = `<div class="p-3 text-muted">${window.txt?.misformularios?.historial_derivacion_vacio || 'Sin movimientos de derivación.'}</div>`;
+            return;
+        }
+        listEl.innerHTML = res.data.map(d => {
+            const estado = Number(d.estado_derivacion || 0);
+            const badge = estado === 1 ? 'bg-primary' : (estado === 2 ? 'bg-success' : (estado === 3 ? 'bg-warning text-dark' : (estado === 4 ? 'bg-danger' : 'bg-secondary')));
+            return `
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between">
+                        <div class="small fw-bold">#${d.IdFormularioDerivacion}</div>
+                        <span class="badge ${badge}">${estadoText(estado)}</span>
+                    </div>
+                    <div class="small text-muted mt-1">${d.InstitucionOrigenNombre || '-'} → ${d.InstitucionDestinoNombre || '-'}</div>
+                    <div class="small mt-1">${d.mensaje_origen || d.mensaje_destino || d.motivo_rechazo || ''}</div>
+                    <div class="small text-muted mt-1">${d.FechaCreado || ''}</div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        listEl.innerHTML = `<div class="p-3 text-danger">${window.txt?.misformularios?.historial_derivacion_error || 'Error al cargar historial.'}</div>`;
+    }
+};
+
+window.cancelDerivation = async (idDerivacion) => {
+    const confirm = await Swal.fire({
+        title: window.txt?.misformularios?.retirar_derivacion_titulo || 'Retirar derivación',
+        text: window.txt?.misformularios?.retirar_derivacion_confirm || '¿Desea retirar esta derivación y devolver el formulario a origen?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: window.txt?.misformularios?.retirar_derivacion_btn || 'Retirar'
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+        Swal.fire({ title: window.txt?.misformularios?.retirar_derivacion_procesando || 'Procesando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request('/forms/derivation/cancel', 'POST', { idDerivacion, instId: Number(instActiva || 0) });
+        if (res.status === 'success') {
+            Swal.fire('OK', window.txt?.misformularios?.retirar_derivacion_ok || 'Derivación retirada.', 'success');
+            await reloadMyForms();
+        } else {
+            Swal.fire('Error', res.message || 'No se pudo retirar.', 'error');
+        }
+    } catch (e) {
+        Swal.fire('Error', e?.message || 'No se pudo retirar.', 'error');
+    }
+};
+
+function estadoText(v) {
+    if (v === 1) return window.txt?.misformularios?.estado_derivacion_pendiente || 'Pendiente';
+    if (v === 2) return window.txt?.misformularios?.estado_derivacion_aceptada || 'Aceptada';
+    if (v === 3) return window.txt?.misformularios?.estado_derivacion_devuelta || 'Devuelta';
+    if (v === 4) return window.txt?.misformularios?.estado_derivacion_rechazada || 'Rechazada';
+    if (v === 5) return window.txt?.misformularios?.estado_derivacion_cancelada || 'Cancelada';
+    return '-';
+}
+
+async function reloadMyForms() {
+    const userId = localStorage.getItem('userId');
+    const instId = localStorage.getItem('instId');
+    const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
+    if (res.status === 'success') {
+        allForms = res.data.list || [];
+        setupInstitutionFilter();
+        setupOriginInstitutionFilter();
+        renderTable();
+    }
 }
 
 function openExcelModal() { new bootstrap.Modal(document.getElementById('modal-excel')).show(); }

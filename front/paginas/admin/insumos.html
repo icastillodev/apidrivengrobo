@@ -79,7 +79,7 @@
             <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="input-group shadow-sm" style="max-width: 950px;">
                     <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_insumos.estado">Estado:</span>
-                    <select id="filter-status-insumo" class="form-select form-select-sm fw-bold" onchange="currentPage = 1; renderTable();">
+                    <select id="filter-status-insumo" class="form-select form-select-sm fw-bold" onchange="currentPage = 1; renderTable();" title="Filtrar por estado" aria-label="Filtrar por estado">
                         <option value="all" data-i18n="admin_insumos.filter_todos_estados">TODOS LOS ESTADOS</option>
                         <option value="Sin estado" data-i18n="admin_insumos.filter_sin_estado">Sin estado</option>
                         <option value="Proceso" data-i18n="admin_insumos.filter_proceso">Proceso</option>
@@ -88,24 +88,30 @@
                         <option value="Entregado" data-i18n="admin_insumos.filter_entregado">Entregado</option>
                         <option value="Suspendido" data-i18n="admin_insumos.filter_suspendido">Suspendido</option>
                     </select>
+                    <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="misformularios.col_workflow">Workflow</span>
+                    <select id="filter-deriv-insumo" class="form-select form-select-sm fw-bold" style="max-width: 170px;" onchange="currentPage = 1; renderTable();" title="Filtrar por derivación" aria-label="Filtro derivación">
+                        <option value="all" data-i18n="misformularios.filter_derivacion_todos">Todas las derivaciones</option>
+                        <option value="derived" data-i18n="misformularios.filter_derivacion_si">Solo derivados</option>
+                        <option value="local" data-i18n="misformularios.filter_derivacion_no">Solo no derivados</option>
+                    </select>
                     <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_insumos.filtrar_por">Filtrar por:</span>
-                    <select id="filter-column-insumo" class="form-select form-select-sm fw-bold" style="max-width: 160px;" onchange="currentPage = 1; renderTable();">
+                    <select id="filter-column-insumo" class="form-select form-select-sm fw-bold" style="max-width: 160px;" onchange="currentPage = 1; renderTable();" title="Filtrar por columna" aria-label="Filtrar por columna">
                         <option value="all" data-i18n="admin_insumos.filter_todos_campos">TODOS LOS CAMPOS</option>
                         <option value="idformA" data-i18n="admin_insumos.filter_id">ID</option>
                         <option value="IdInvestigador" data-i18n="admin_insumos.filter_id_investigador">ID INVESTIGADOR</option>
                         <option value="Investigador" data-i18n="admin_insumos.filter_investigador">INVESTIGADOR</option>
                         <option value="Departamento" data-i18n="admin_insumos.filter_departamento">DEPARTAMENTO</option>
                     </select>
-                    <input type="text" id="search-input-insumo" class="form-control form-control-sm" data-i18n="admin_insumos.ph_buscar" placeholder="Escribe para buscar..." onkeyup="if(event.key === 'Enter') { currentPage = 1; renderTable(); }">
+                    <input type="text" id="search-input-insumo" class="form-control form-control-sm" data-i18n="admin_insumos.ph_buscar" placeholder="Escribe para buscar..." onkeyup="if(event.key === 'Enter') { currentPage = 1; renderTable(); }" title="Buscar" aria-label="Buscar">
                     <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_insumos.filter_fecha_retiro">Fecha retiro:</span>
-                    <input type="date" id="filter-retiro-insumo" class="form-control form-control-sm" style="max-width: 150px;">
-                    <button id="btn-search-insumo" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" onclick="currentPage = 1; renderTable();" data-i18n="admin_insumos.btn_buscar">BUSCAR</button>
+                    <input type="date" id="filter-retiro-insumo" class="form-control form-control-sm" style="max-width: 150px;" title="Filtrar por fecha de retiro" aria-label="Filtrar por fecha de retiro">
+                    <button id="btn-search-insumo" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" onclick="currentPage = 1; renderTable();" data-i18n="admin_insumos.btn_buscar" title="Buscar" aria-label="Buscar">BUSCAR</button>
                 </div>
                 <div class="ms-auto col-md-2 d-flex gap-2 justify-content-end">
-                    <button id="btn-excel-insumo" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm">
+                    <button id="btn-excel-insumo" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" title="Exportar Excel" aria-label="Exportar Excel">
                         <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="admin_insumos.btn_excel">EXCEL</span>
                     </button>
-                    <button id="btn-ayuda-insumo" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm">
+                    <button id="btn-ayuda-insumo" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" title="Abrir ayuda" aria-label="Abrir ayuda">
                         <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_insumos.btn_ayuda">AYUDA</span>
                     </button>
                 </div>

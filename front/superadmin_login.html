@@ -17,15 +17,8 @@
     
     <script type="module">
         import { SuperAuth } from './dist/js/superAuth.js';
-        import { loadLanguage, translatePage } from './dist/js/utils/i18n.js';
         document.addEventListener('DOMContentLoaded', async () => {
-            const lang = localStorage.getItem('lang') || null;
-            try {
-                await loadLanguage(lang);
-                if (window.txt) translatePage();
-            } catch (e) { console.warn('i18n:', e); }
             SuperAuth.init();
-            if (window.setSuperadminLang) window.setSuperadminLang(localStorage.getItem('lang') || 'es');
         });
     </script>
 </head>
@@ -57,41 +50,10 @@
             </div>
 
             <button type="submit" 
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95" data-i18n="superadmin_login.entrar">
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95">
                 Entrar al Sistema
             </button>
         </form>
-        <p class="text-center mt-4 text-[10px] text-gray-400">
-            <span class="font-bold uppercase" data-i18n="login.idioma_label">Idioma</span>
-            <span class="inline-flex ml-2 rounded-lg overflow-hidden border border-green-600/50 shadow-sm">
-                <button type="button" id="btn-sa-lang-es" class="px-3 py-1.5 text-xs font-bold bg-green-600 text-white hover:bg-green-700 transition-colors" onclick="window.setSuperadminLang('es')">ES</button>
-                <button type="button" id="btn-sa-lang-en" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-green-100 transition-colors" onclick="window.setSuperadminLang('en')">EN</button>
-                <button type="button" id="btn-sa-lang-pt" class="px-3 py-1.5 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-green-100 transition-colors" onclick="window.setSuperadminLang('pt')">PT</button>
-            </span>
-        </p>
-        <script>
-            window.setSuperadminLang = function(lang) {
-                localStorage.setItem('lang', lang);
-                localStorage.setItem('idioma', lang);
-                document.querySelectorAll('[id^="btn-sa-lang-"]').forEach(function(btn) {
-                    var isActive = btn.id === 'btn-sa-lang-' + lang;
-                    btn.className = 'px-3 py-1.5 text-xs font-bold transition-colors ' + (isActive ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-700 hover:bg-green-100');
-                });
-                window.location.reload();
-            };
-            document.addEventListener('DOMContentLoaded', function() {
-                var current = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
-                document.querySelectorAll('[id^="btn-sa-lang-"]').forEach(function(btn) {
-                    var isActive = btn.id === 'btn-sa-lang-' + current;
-                    btn.className = 'px-3 py-1.5 text-xs font-bold transition-colors ' + (isActive ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-100 text-gray-700 hover:bg-green-100');
-                });
-            });
-        </script>
-        <div class="mt-6 text-center">
-            <a href="index.html" class="text-gray-400 text-sm hover:text-green-600 transition-colors italic" data-i18n="superadmin_login.volver">
-                ← Volver al acceso institucional
-            </a>
-        </div>
     </div>
 </body>
 </html>

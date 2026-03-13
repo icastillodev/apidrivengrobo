@@ -73,16 +73,21 @@ export const UserPreferences = {
     },
 
     init: async () => {
+        const roleId = parseInt(getSession('userLevel') || '0', 10);
+        const instId = parseInt(getSession('instId') || '0', 10);
         try {
-            const res = await API.request('/user/config/get', 'GET');
-            
-            if (res && res.status === 'success' && res.data) {
-                const dbConfig = res.data;
-                if (dbConfig.tema_preferido) localStorage.setItem('theme', dbConfig.tema_preferido);
-                if (dbConfig.idioma_preferido) localStorage.setItem('lang', dbConfig.idioma_preferido);
-                if (dbConfig.letra_preferida) localStorage.setItem('fontSize', dbConfig.letra_preferida);
-                if (dbConfig.menu_preferido) localStorage.setItem('menuLayout', dbConfig.menu_preferido);
-                if (dbConfig.gecko_ok !== null && dbConfig.gecko_ok !== "") localStorage.setItem('gecko_ok', dbConfig.gecko_ok);
+            // Tipo 1 / contexto sin institución no debe depender de este endpoint.
+            if (!(roleId === 1 || instId === 0)) {
+                const res = await API.request('/user/config/get', 'GET');
+                
+                if (res && res.status === 'success' && res.data) {
+                    const dbConfig = res.data;
+                    if (dbConfig.tema_preferido) localStorage.setItem('theme', dbConfig.tema_preferido);
+                    if (dbConfig.idioma_preferido) localStorage.setItem('lang', dbConfig.idioma_preferido);
+                    if (dbConfig.letra_preferida) localStorage.setItem('fontSize', dbConfig.letra_preferida);
+                    if (dbConfig.menu_preferido) localStorage.setItem('menuLayout', dbConfig.menu_preferido);
+                    if (dbConfig.gecko_ok !== null && dbConfig.gecko_ok !== "") localStorage.setItem('gecko_ok', dbConfig.gecko_ok);
+                }
             }
         } catch (e) {
             console.warn("No se pudo cargar la config de BD, usando local.", e);

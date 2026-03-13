@@ -1,18 +1,59 @@
 <?php
 namespace App\Models\Insumo;
 
+use App\Models\FormDerivacion\FormDerivacionModel;
+
 class InsumoModel {
     private $db;
     public function __construct($db) { $this->db = $db; }
 
     public function getAllByInstitution($instId) {
+        $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasOwnerTable = $this->hasTable('formulario_owner_actual');
+
+        $workflowSelect = $hasWorkflowCols
+            ? "f.EstadoWorkflow, f.DerivadoActivo, f.IdInstitucionOrigen,"
+            : "NULL as EstadoWorkflow, 0 as DerivadoActivo, NULL as IdInstitucionOrigen,";
+        $originNameSelect = $hasWorkflowCols
+            ? "io.NombreInst as InstitucionOrigenNombre,"
+            : "NULL as InstitucionOrigenNombre,";
+        $ownerSelect = $hasOwnerTable
+            ? "foa.IdFormularioDerivacionActiva,"
+            : "NULL as IdFormularioDerivacionActiva,";
+        $originJoin = $hasWorkflowCols
+            ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
+            : "";
+        $ownerJoin = $hasOwnerTable
+            ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+
+        $whereInst = "f.IdInstitucion = ?";
+        $params = [(int)$instId];
+        if ($hasOwnerTable) {
+            $whereInst = "(COALESCE(foa.IdInstitucionActual, f.IdInstitucion) = ?)";
+            $params = [(int)$instId];
+            if ($hasWorkflowCols) {
+                $whereInst .= " OR (f.IdInstitucionOrigen = ?)";
+                $params[] = (int)$instId;
+            }
+            $whereInst = "(" . $whereInst . ")";
+        } elseif ($hasWorkflowCols) {
+            $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
+            $params = [(int)$instId, (int)$instId];
+        }
+
         $sql = "SELECT 
                     f.idformA, f.estado, f.fechainicioA as Inicio, f.fecRetiroA as Retiro,
                     f.aclaracionadm, f.aclaraA as AclaracionUsuario, f.quienvisto, f.depto as idDepto,
+                    {$workflowSelect}
+                    {$originNameSelect}
+                    {$ownerSelect}
                     f.IdUsrA as IdInvestigador,
                     p.EmailA as EmailInvestigador, p.CelularA as CelularInvestigador,
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
-                    d.NombreDeptoA as Departamento,
+                    COALESCE(d.NombreDeptoA, pdpto.NombreDeptoA, 'Sin departamento') as Departamento,
                     o.NombreOrganismoSimple as Organizacion,
                     t.nombreTipo as TipoNombre,
                     t.color as colorTipo,
@@ -28,16 +69,40 @@ class InsumoModel {
                 FROM formularioe f
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                INNER JOIN departamentoe d ON f.depto = d.iddeptoA 
-                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
-                LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
+                LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
-                WHERE f.IdInstitucion = ? AND t.categoriaformulario = 'insumos'
+                LEFT JOIN protdeptor pd ON prot.idprotA = pd.idprotA
+                LEFT JOIN departamentoe pdpto ON pd.iddeptoA = pdpto.iddeptoA
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
+                LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
+                {$ownerJoin}
+                {$originJoin}
+                WHERE {$whereInst} AND t.categoriaformulario = 'insumos'
                 ORDER BY f.idformA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    private function hasTable(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
         public function getInsumosDetails($idPrecioInsumo) {
@@ -51,6 +116,9 @@ class InsumoModel {
         }
 
 public function updateStatus($data) {
+        if (!empty($data['instId']) && !empty($data['idformA'])) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$data['idformA'], (int)$data['instId']);
+        }
         $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
         $res = $this->db->prepare($sql)->execute([
             $data['estado'], $data['aclaracionadm'], $data['userName'], $data['idformA']
@@ -78,6 +146,9 @@ public function getDepartments($instId) {
     return $stmt->fetchAll(\PDO::FETCH_ASSOC);
 }
 public function updateFullInsumo($data) {
+        if (!empty($data['instId']) && !empty($data['idformA'])) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$data['idformA'], (int)$data['instId']);
+        }
         $this->db->beginTransaction(); 
         try {
             $sqlF = "UPDATE formularioe SET depto = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";

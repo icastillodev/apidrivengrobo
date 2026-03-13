@@ -36,6 +36,7 @@
 
     <script type="module">
         import { Auth } from '../../../dist/js/auth.js';
+        import { API } from '../../../dist/js/api.js';
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260311';
         import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
@@ -48,6 +49,24 @@
             const base = isLocal ? '/URBE-API-DRIVEN/front/admin/facturacion/' : '/admin/facturacion/';
             window.location.href = base + modulo;
         };
+
+        async function toggleInstitutionBillingCardByNetwork() {
+            const cardCol = document.getElementById('billing-card-institucion-col');
+            if (!cardCol) return;
+            cardCol.classList.add('d-none');
+
+            try {
+                const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+                if (!instActiva) return;
+                const res = await API.request(`/forms/derivation/targets?inst=${encodeURIComponent(instActiva)}&instId=${encodeURIComponent(instActiva)}`);
+                const hasNetworkTargets = res?.status === 'success' && Array.isArray(res.data) && res.data.length > 0;
+                if (hasNetworkTargets) {
+                    cardCol.classList.remove('d-none');
+                }
+            } catch (e) {
+                console.warn('No se pudo verificar red para facturación por institución:', e);
+            }
+        }
         
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -60,6 +79,7 @@
                     initMenu();
                     NotificationManager.init();
                 }
+                await toggleInstitutionBillingCardByNetwork();
 
                 setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
             } catch (error) {
@@ -92,7 +112,7 @@
 
             <div class="row g-4 justify-content-center mb-4">
                 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-4">
                     <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-success" onclick="irFacturacion('depto')">
                         <div class="icon-circle ic-depto shadow-sm">
                             <i class="bi bi-building-gear"></i>
@@ -102,7 +122,7 @@
                     </div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-4">
                     <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-info" onclick="irFacturacion('org')">
                         <div class="icon-circle shadow-sm" style="background-color: #e0f7fa; color: #0891b2;">
                             <i class="bi bi-diagram-3"></i>
@@ -112,7 +132,7 @@
                     </div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-4">
                     <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-primary" onclick="irFacturacion('investigador')">
                         <div class="icon-circle ic-persona shadow-sm">
                             <i class="bi bi-person-vcard"></i>
@@ -122,13 +142,23 @@
                     </div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-4">
                     <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-dark" onclick="irFacturacion('protocolo')">
                         <div class="icon-circle ic-proto shadow-sm">
                             <i class="bi bi-file-earmark-medical"></i>
                         </div>
                         <h6 class="fw-bold uppercase mb-2" data-i18n="facturacion.por_protocolo">Por Protocolo</h6>
                         <p class="text-muted" style="font-size: 12px; line-height: 1.4;" data-i18n="facturacion.desc_protocolo"></p>
+                    </div>
+                </div>
+
+                <div id="billing-card-institucion-col" class="col-lg-3 col-md-4 d-none">
+                    <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-primary" onclick="irFacturacion('institucion')">
+                        <div class="icon-circle shadow-sm" style="background-color: #efe7ff; color: #6f42c1;">
+                            <i class="bi bi-buildings-fill"></i>
+                        </div>
+                        <h6 class="fw-bold uppercase mb-2" data-i18n="facturacion.por_institucion">Por Institución</h6>
+                        <p class="text-muted" style="font-size: 12px; line-height: 1.4;" data-i18n="facturacion.desc_institucion"></p>
                     </div>
                 </div>
 

@@ -94,6 +94,19 @@ $router->get('/user/protocols/attachments/download', 'ControllerusuarioTodosProt
 
 
 // ============================================================
+// SECCIÓN: Derivación de Formularios (Red)
+// ============================================================
+$router->post('/forms/derivation/derive', 'FormDerivacionController@derive');
+$router->post('/forms/derivation/accept', 'FormDerivacionController@accept');
+$router->post('/forms/derivation/return', 'FormDerivacionController@returnToOrigin');
+$router->post('/forms/derivation/reject', 'FormDerivacionController@reject');
+$router->post('/forms/derivation/cancel', 'FormDerivacionController@cancel');
+$router->get('/forms/derivation/history', 'FormDerivacionController@history');
+$router->get('/forms/derivation/pending', 'FormDerivacionController@pending');
+$router->get('/forms/derivation/targets', 'FormDerivacionController@targets');
+
+
+// ============================================================
 // SECCIÓN: Perfil de Usuario (Mi Cuenta)
 // ============================================================
 $router->get('/user/profile', 'UserProfileController@getProfile');
@@ -258,6 +271,7 @@ $router->get('/alojamiento/public-export', 'AlojamientoExportController@publicEx
 // Reportes
 $router->post('/billing/depto-report', 'BillingController@getDeptoReport');
 $router->post('/billing/org-report', 'BillingController@getOrgReport');
+$router->post('/billing/institucion-report', 'BillingController@getInstitutionReport');
 $router->post('/billing/investigador-report', 'BillingController@getInvestigadorReport');
 $router->post('/billing/protocol-report', 'BillingController@getProtocolReport');
 

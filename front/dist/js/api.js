@@ -7,6 +7,10 @@ export const API = {
     async request(endpoint, method = 'GET', data = null) {
         const url = `${this.urlBase}${endpoint}`;
         const isFormData = data instanceof FormData;
+        const isSuperadminPath = window.location.pathname.toLowerCase().includes('superadmin');
+        const isUserConfigEndpoint = endpoint.includes('/user/config/get');
+        const currentUserLevel = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const isRoleOne = currentUserLevel === 1;
         
         const headers = {};
         if (!isFormData) {
@@ -31,11 +35,8 @@ export const API = {
             // --- 2. MANEJO DE EXPULSIÓN HTTP (401 / 403) ---
             if (response.status === 401 || response.status === 403) {
                 console.warn("🔐 Seguridad: Sesión expirada o token inválido detectado por HTTP Status.");
-                // En página de perfil no expulsar: puede ser SuperAdmin (instId 0) y el endpoint /user/config/get fallar
-                if (!window.location.pathname.toLowerCase().includes('perfil')) {
-                    this.forceLogout();
-                }
-                return { status: 'error', message: 'Sesión expirada' };
+                // No expulsar automáticamente por código HTTP; algunos endpoints lo usan para errores de negocio.
+                return { status: 'error', message: 'Sesión expirada', http_status: response.status };
             }
             
             const text = await response.text();
@@ -45,18 +46,21 @@ export const API = {
 
                 // --- 3. MANEJO DE EXPULSIÓN LÓGICA (JSON Custom Error) ---
                 // Si el backend devuelve status unauthorized, o un error específico del JWT
+                const msg = String(resData?.message || '');
                 if (resData.status === 'unauthorized' || 
                    (resData.status === 'error' && (
-                       resData.message.includes('token') || 
-                       resData.message.includes('expirado') || 
-                       resData.message.includes('Denegado')
+                       msg.includes('token') || 
+                       msg.includes('expirado') || 
+                       msg.includes('credencial de seguridad') ||
+                       msg.includes('formato de token') ||
+                       msg.includes('adulterado')
                    ))
                 ) {
                     // Evitamos que salte en el propio login
                     if (!endpoint.includes('/login') && !endpoint.includes('/validate-inst')) {
                         console.warn(`🔐 Seguridad: Token rechazado por la API: ${resData.message}`);
                         // En página de perfil no expulsar: SuperAdmin u otros roles pueden tener respuestas distintas
-                        if (!window.location.pathname.toLowerCase().includes('perfil')) {
+                        if (!window.location.pathname.toLowerCase().includes('perfil') && !(isSuperadminPath && isUserConfigEndpoint) && !isRoleOne) {
                             this.forceLogout();
                         }
                         return resData;
@@ -112,6 +116,10 @@ export const API = {
         const frontIndex = pathParts.indexOf('front');
         if (frontIndex !== -1 && pathParts[frontIndex + 1] && pathParts[frontIndex + 1] !== 'paginas') {
             slugDestino = pathParts[frontIndex + 1];
+        }
+        const reserved = ['admin', 'usuario', 'panel', 'superadmin', 'dist', 'api', 'paginas'];
+        if (reserved.includes((slugDestino || '').toLowerCase())) {
+            slugDestino = '';
         }
 
         if (slugDestino && slugDestino !== 'superadmin' && slugDestino !== 'master') {

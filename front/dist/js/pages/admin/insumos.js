@@ -27,6 +27,7 @@ export async function initInsumosPage() {
     // FILTROS AUTOMÁTICOS: Se activan al cambiar la selección
     const filterStatus = document.getElementById('filter-status-insumo');
     const filterColumn = document.getElementById('filter-column-insumo');
+    const filterDeriv = document.getElementById('filter-deriv-insumo');
 
     if(filterStatus) {
         filterStatus.onchange = () => { 
@@ -39,6 +40,12 @@ export async function initInsumosPage() {
         filterColumn.onchange = () => { 
             currentPage = 1; 
             renderTable(); // Opcional: También filtra automático al cambiar la columna
+        };
+    }
+    if (filterDeriv) {
+        filterDeriv.onchange = () => {
+            currentPage = 1;
+            renderTable();
         };
     }
 
@@ -54,6 +61,7 @@ export async function initInsumosPage() {
         const res = await API.request(`/insumos/all?inst=${instId}`);
         if (res && res.status === 'success') {
             allInsumos = res.data;
+            setupOriginInstitutionFilterInsumo();
             renderTable();
             openInsumoFromUrlIfNeeded();
         }
@@ -73,6 +81,25 @@ export async function initInsumosPage() {
     
     const btnExcel = document.getElementById('btn-excel-insumo');
     if(btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
+}
+
+function setupOriginInstitutionFilterInsumo() {
+    const columnSelect = document.getElementById('filter-column-insumo');
+    if (!columnSelect) return;
+    const values = [...new Set(allInsumos.map(a => (a.InstitucionOrigenNombre || '').trim()).filter(Boolean))].sort();
+
+    Array.from(columnSelect.options)
+        .filter(opt => String(opt.value || '').startsWith('origin::'))
+        .forEach(opt => opt.remove());
+
+    if (!values.length) return;
+
+    values.forEach(v => {
+        const o = document.createElement('option');
+        o.value = `origin::${v}`;
+        o.textContent = v;
+        columnSelect.appendChild(o);
+    });
 }
 
 function openInsumoFromUrlIfNeeded() {
@@ -132,7 +159,7 @@ function renderTable() {
             <td class="py-2 px-2 small">${f.Inicio || '---'}</td>
             <td class="py-2 px-2 small">${f.Retiro || '---'}</td>
             <td class="py-2 px-2 small text-muted text-truncate" style="max-width: 150px;">${f.aclaracionadm || '---'}</td>
-            <td class="py-2 px-2 text-center">${getStatusBadge(f.estado)}</td>
+            <td class="py-2 px-2 text-center">${getStatusWithWorkflow(f)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -207,15 +234,46 @@ window.openInsumoModal = async (f) => {
 /* --- FUNCIONES DE APOYO (DEFINICIONES FALTANTES) --- */
 
 function renderModalHeader(f) {
+    const tx = window.txt?.misformularios || {};
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isDerivedActive = Number(f.DerivadoActivo || 0) === 1 && Number(f.IdFormularioDerivacionActiva || 0) > 0;
+    const isOriginInst = Number(f.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const protLabel = (f.NProtocolo && f.TituloProtocolo)
         ? `#${f.NProtocolo} - ${f.TituloProtocolo}`
         : null;
+    const lblDerivado = tx.workflow_derivado || 'Derivado';
+    const lblAceptar = tx.estado_derivacion_aceptada || 'Aceptar';
+    const lblDevolver = tx.estado_derivacion_devuelta || 'Devolver';
+    const lblRechazar = tx.estado_derivacion_rechazada || 'Rechazar';
+    const lblRetirar = tx.retirar_derivacion_btn || 'Retirar derivación';
+    const lblHistorial = tx.historial_derivacion_titulo || 'Historial';
+    const lblDerivar = tx.derivar_btn || 'Derivar';
+    const derivBox = isDerivedActive
+        ? `
+        <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge bg-primary">${lblDerivado}</span>
+            <span class="small text-muted">${f.InstitucionOrigenNombre ? `Origen: ${f.InstitucionOrigenNombre}` : ''}</span>
+            ${isOriginInst
+                ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionInsumo('cancel', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblRetirar}</button>`
+                : `
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="window.resolveDerivacionInsumo('accept', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblAceptar}</button>
+            <button type="button" class="btn btn-sm btn-outline-warning" onclick="window.resolveDerivacionInsumo('return', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblDevolver}</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionInsumo('reject', ${f.IdFormularioDerivacionActiva}, ${f.idformA})">${lblRechazar}</button>`
+            }
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryInsumo(${f.idformA})">${lblHistorial}</button>
+        </div>`
+        : `
+        <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.deriveFromAdminInsumo(${f.idformA})">${lblDerivar}</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryInsumo(${f.idformA})">${lblHistorial}</button>
+        </div>`;
 
     return `<div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
         <div>
             <h5 class="fw-bold mb-0 text-success">Ficha de Pedido de Insumos</h5>
             <span class="small text-muted d-block">ID: <strong>#${f.idformA}</strong></span>
             ${protLabel ? `<span class="small text-muted d-block">Protocolo: <strong>${protLabel}</strong></span>` : ''}
+            ${derivBox}
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
@@ -485,6 +543,7 @@ window.updateInsumoStatusQuick = async (id) => {
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status);
             const r = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
             allInsumos = r.data;
+            setupOriginInstitutionFilterInsumo();
             renderTable();
         }
     } catch (e) { console.error(e); }
@@ -501,6 +560,161 @@ window.saveFullInsumoForm = async (e) => {
     } catch (err) { console.error(err); }
 };
 
+window.resolveDerivacionInsumo = async (action, idDerivacion, idformA) => {
+    const tx = window.txt?.misformularios || {};
+    const actionMap = {
+        accept: '/forms/derivation/accept',
+        return: '/forms/derivation/return',
+        reject: '/forms/derivation/reject',
+        cancel: '/forms/derivation/cancel'
+    };
+    const endpoint = actionMap[action];
+    if (!endpoint) return;
+
+    let mensaje = '';
+    if (action !== 'accept') {
+        const resMsg = await window.Swal.fire({
+            title: tx.derivar_label_mensaje || 'Mensaje',
+            input: 'textarea',
+            inputPlaceholder: 'Motivo / observación',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!resMsg.isConfirmed) return;
+        mensaje = (resMsg.value || '').trim();
+    } else {
+        const c = await window.Swal.fire({ title: 'Confirmar', text: tx.estado_derivacion_aceptada ? `¿${tx.estado_derivacion_aceptada}?` : '¿Aceptar derivación?', icon: 'question', showCancelButton: true, confirmButtonColor: '#1a5d3b' });
+        if (!c.isConfirmed) return;
+    }
+
+    try {
+        window.Swal.fire({ title: tx.derivar_procesando || 'Procesando...', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request(endpoint, 'POST', { idDerivacion, mensaje, instId: Number(instActiva || 0) });
+        if (res.status === 'success') {
+            window.Swal.fire('OK', tx.derivar_ok || 'Acción aplicada.', 'success');
+            const rr = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
+            allInsumos = rr.data || [];
+            setupOriginInstitutionFilterInsumo();
+            renderTable();
+            const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
+            if (f) window.openInsumoModal(f);
+        } else {
+            window.Swal.fire('Error', res.message || 'No se pudo procesar.', 'error');
+        }
+    } catch (e) {
+        window.Swal.fire('Error', 'No se pudo procesar la derivación.', 'error');
+    }
+};
+
+window.deriveFromAdminInsumo = async (idformA) => {
+    const tx = window.txt?.misformularios || {};
+    try {
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const resTargets = await API.request(`/forms/derivation/targets?inst=${encodeURIComponent(instActiva)}&instId=${encodeURIComponent(instActiva)}`);
+        const targets = Array.isArray(resTargets?.data) ? resTargets.data : [];
+        if (!targets.length) {
+            window.Swal.fire(tx.derivar_titulo || 'Derivar formulario', tx.derivar_sin_destinos || 'No hay instituciones destino disponibles en la red.', 'info');
+            return;
+        }
+        const options = {};
+        targets.forEach(t => { options[String(t.IdInstitucion)] = t.NombreInst; });
+        const pick = await window.Swal.fire({
+            title: tx.derivar_titulo || 'Derivar formulario',
+            input: 'select',
+            inputOptions: options,
+            inputPlaceholder: tx.derivar_label_destino || 'Seleccione institución destino',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b',
+            inputValidator: (v) => (!v ? (tx.derivar_error_destino || 'Debe seleccionar una institución destino.') : null),
+            didOpen: () => {
+                const sel = window.Swal.getInput();
+                if (!sel) return;
+                sel.style.border = '2px solid #0d6efd';
+                sel.style.backgroundColor = '#ffffff';
+                sel.style.fontWeight = '700';
+                sel.style.color = '#0d3b66';
+                sel.style.minHeight = '42px';
+            }
+        });
+        if (!pick.isConfirmed) return;
+        const msg = await window.Swal.fire({
+            title: tx.derivar_label_mensaje || 'Mensaje',
+            input: 'textarea',
+            inputPlaceholder: 'Motivo / observación',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!msg.isConfirmed) return;
+        const targetName = (targets.find(t => Number(t.IdInstitucion) === Number(pick.value)) || {}).NombreInst || '';
+        const confirmDerive = await window.Swal.fire({
+            title: tx.derivar_confirm_titulo || 'Confirmar derivación',
+            text: `${tx.derivar_confirm_text || 'Al derivar, el formulario quedará bloqueado en la institución actual hasta que se resuelva en destino.'}${targetName ? ' ' + targetName : ''}`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!confirmDerive.isConfirmed) return;
+        window.Swal.fire({ title: tx.derivar_procesando || 'Procesando...', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const res = await API.request('/forms/derivation/derive', 'POST', {
+            idformA,
+            instDestino: Number(pick.value),
+            mensaje: (msg.value || '').trim(),
+            instId: Number(instActiva || 0)
+        });
+        if (res.status === 'success') {
+            window.Swal.fire('OK', tx.derivar_ok || 'Formulario derivado correctamente.', 'success');
+            const rr = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
+            allInsumos = rr.data || [];
+            setupOriginInstitutionFilterInsumo();
+            renderTable();
+            const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
+            if (f) window.openInsumoModal(f);
+        } else {
+            window.Swal.fire('Error', res.message || 'No se pudo derivar.', 'error');
+        }
+    } catch (e) {
+        window.Swal.fire('Error', tx.historial_derivacion_error || 'No se pudo procesar la derivación.', 'error');
+    }
+};
+
+window.showDerivHistoryInsumo = async (idformA) => {
+    const tx = window.txt?.misformularios || {};
+    try {
+        window.Swal.fire({ title: tx.historial_derivacion_titulo || 'Historial de derivación', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request(`/forms/derivation/history?idformA=${idformA}&inst=${encodeURIComponent(instActiva)}`);
+        if (res.status !== 'success' || !Array.isArray(res.data) || !res.data.length) {
+            window.Swal.fire(tx.historial_derivacion_titulo || 'Historial', tx.historial_derivacion_vacio || 'Sin movimientos de derivación.', 'info');
+            return;
+        }
+        const html = res.data.map(d => {
+            const e = Number(d.estado_derivacion || 0);
+            const est = e === 1 ? (tx.estado_derivacion_pendiente || 'Pendiente')
+                : e === 2 ? (tx.estado_derivacion_aceptada || 'Aceptada')
+                : e === 3 ? (tx.estado_derivacion_devuelta || 'Devuelta')
+                : e === 4 ? (tx.estado_derivacion_rechazada || 'Rechazada')
+                : (tx.estado_derivacion_cancelada || 'Cancelada');
+            return `<div style="text-align:left;border:1px solid #ddd;border-radius:6px;padding:8px;margin-bottom:8px;">
+                <div><strong>#${d.IdFormularioDerivacion}</strong> - ${est}</div>
+                <div style="font-size:12px;color:#666;">${d.InstitucionOrigenNombre || '-'} → ${d.InstitucionDestinoNombre || '-'}</div>
+                <div style="font-size:12px;">${d.mensaje_origen || d.mensaje_destino || d.motivo_rechazo || ''}</div>
+            </div>`;
+        }).join('');
+        window.Swal.fire({
+            title: tx.historial_derivacion_titulo || 'Historial de derivación',
+            html: `<div style="max-height:380px;overflow:auto;">${html}</div>`,
+            width: 760
+        });
+    } catch (e) {
+        window.Swal.fire('Error', tx.historial_derivacion_error || 'Error al cargar historial.', 'error');
+    }
+};
+
 
 
 /**
@@ -512,6 +726,7 @@ function getFilteredAndSortedData() {
     const statusFilter = document.getElementById('filter-status-insumo').value.toLowerCase().trim();
     const term = document.getElementById('search-input-insumo').value.toLowerCase().trim();
     const filterType = document.getElementById('filter-column-insumo').value;
+    const derivFilter = document.getElementById('filter-deriv-insumo')?.value || 'all';
     const retiroEl = document.getElementById('filter-retiro-insumo');
     const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
 
@@ -520,6 +735,14 @@ function getFilteredAndSortedData() {
         const estadoFila = (f.estado || "sin estado").toString().toLowerCase().trim();
         const matchStatus = statusFilter === 'all' || estadoFila === statusFilter;
         if (!matchStatus) return false;
+        const isDerived = Number(f.DerivadoActivo || 0) === 1;
+        if (derivFilter === 'derived' && !isDerived) return false;
+        if (derivFilter === 'local' && isDerived) return false;
+        const originName = (f.InstitucionOrigenNombre || '').trim();
+        if (String(filterType).startsWith('origin::')) {
+            const originSelected = String(filterType).slice('origin::'.length);
+            if (originName !== originSelected) return false;
+        }
         // Filtro por fecha de retiro
         if (retiroVal) {
             const fRetiro = (f.Retiro || '').toString().substring(0, 10);
@@ -529,7 +752,7 @@ function getFilteredAndSortedData() {
         // B. Validación de Búsqueda (Texto en tiempo real)
         let matchSearch = true;
         if (term) {
-            if (filterType === 'all') {
+            if (filterType === 'all' || String(filterType).startsWith('origin::')) {
                 // Búsqueda global robusta (ID, Investigador, Depto e Insumos)
                 matchSearch = String(f.idformA || '').includes(term) || 
                               String(f.Investigador || '').toLowerCase().includes(term) || 
@@ -585,6 +808,23 @@ function getStatusBadge(estado) {
     };
     const s = states[e] || states['sin estado'];
     return `<span class="badge ${s.class} shadow-sm" style="font-size: 8px; font-weight: 700; padding: 4px 8px; min-width: 90px; display: inline-block;">${s.label}</span>`;
+}
+
+function getWorkflowBadgeRow(item) {
+    const tx = window.txt?.misformularios || {};
+    const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
+    const isDerived = Number(item.DerivadoActivo || 0) === 1;
+    if (isDerived) return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}</span>`;
+    if (!wf) return '';
+    if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
+    if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark mt-1">${tx.estado_derivacion_devuelta || 'Devuelta'}</span>`;
+    if (wf.includes('RECHAZ')) return `<span class="badge bg-danger mt-1">${tx.estado_derivacion_rechazada || 'Rechazada'}</span>`;
+    if (wf.includes('CANCEL')) return `<span class="badge bg-secondary mt-1">${tx.estado_derivacion_cancelada || 'Cancelada'}</span>`;
+    return `<span class="badge bg-info text-dark mt-1">${wf}</span>`;
+}
+
+function getStatusWithWorkflow(item) {
+    return `<div class="d-inline-flex flex-column align-items-center">${getStatusBadge(item.estado)}${getWorkflowBadgeRow(item)}</div>`;
 }
 
 function renderPagination(totalItems, containerId, refreshCallback) {

@@ -3,6 +3,7 @@ namespace App\Models\Animal;
 
 use PDO;
 use App\Utils\Auditoria;
+use App\Models\FormDerivacion\FormDerivacionModel;
 
 class AnimalModel {
     private $db;
@@ -14,11 +15,50 @@ class AnimalModel {
 // api/src/Models/Animal/AnimalModel.php
 
     public function getByInstitution($instId) {
+        $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasOwnerTable = $this->hasTable('formulario_owner_actual');
+
+        $workflowSelect = $hasWorkflowCols
+            ? "f.EstadoWorkflow, f.DerivadoActivo, f.IdInstitucionOrigen,"
+            : "NULL as EstadoWorkflow, 0 as DerivadoActivo, NULL as IdInstitucionOrigen,";
+        $originNameSelect = $hasWorkflowCols
+            ? "io.NombreInst as InstitucionOrigenNombre,"
+            : "NULL as InstitucionOrigenNombre,";
+        $ownerSelect = $hasOwnerTable
+            ? "foa.IdFormularioDerivacionActiva,"
+            : "NULL as IdFormularioDerivacionActiva,";
+        $ownerJoin = $hasOwnerTable
+            ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+        $originJoin = $hasWorkflowCols
+            ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
+            : "";
+
+        $whereInst = "f.IdInstitucion = ?";
+        $params = [(int)$instId];
+        if ($hasOwnerTable) {
+            $whereInst = "(COALESCE(foa.IdInstitucionActual, f.IdInstitucion) = ?)";
+            $params = [(int)$instId];
+            if ($hasWorkflowCols) {
+                $whereInst .= " OR (f.IdInstitucionOrigen = ?)";
+                $params[] = (int)$instId;
+            }
+            $whereInst = "(" . $whereInst . ")";
+        } elseif ($hasWorkflowCols) {
+            $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
+            $params = [(int)$instId, (int)$instId];
+        }
+
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
                     f.aclaraA as Aclaracion, f.estado, f.quienvisto as QuienVio, 
                     f.edadA as Edad, f.pesoA as Peso, f.aclaracionadm as AclaracionAdm,
                     f.raza,
+                    {$workflowSelect}
+                    {$originNameSelect}
+                    {$ownerSelect}
                     f.IdUsrA as IdInvestigador, f.idsubespA,
                     f.idcepaA,
                     CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
@@ -55,19 +95,41 @@ class AnimalModel {
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
                 LEFT JOIN especiee e ON se.idespA = e.idespA
                 LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+                {$ownerJoin}
+                {$originJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
                 LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
-                WHERE f.IdInstitucion = ? 
+                WHERE {$whereInst} 
                   AND tf.categoriaformulario IN ('Animal', 'Animal vivo')
                 ORDER BY f.idformA DESC";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function hasTable(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function getCepasBySubespecie($instId, $idSubespA) {
@@ -125,6 +187,9 @@ class AnimalModel {
 public function updateStatus($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) return false;
+        if (!empty($data['instId'])) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, (int)$data['instId']);
+        }
 
         $nuevoEstado = $data['estado'] ?? 'Sin estado';
         $aclaracion = $data['aclaracionadm'] ?? ''; 
@@ -216,6 +281,9 @@ public function updateStatus($data) {
     public function updateFull($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) return false;
+        if (!empty($data['instId'])) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, (int)$data['instId']);
+        }
 
         $newTotal = (int)($data['totalA'] ?? 0);
         $newProt = $data['idprotA'] ?? null;

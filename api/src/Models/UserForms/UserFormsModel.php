@@ -10,14 +10,60 @@ class UserFormsModel {
         $this->db = $db;
     }
 
-    // ... (El método getAllForms queda IGUAL) ...
     public function getAllForms($userId, $currentInstId) {
-        // (Copia el código anterior de getAllForms aquí)
         $stmtInst = $this->db->prepare("SELECT NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion = ?");
         $stmtInst->execute([$currentInstId]);
         $institucion = $stmtInst->fetch(PDO::FETCH_ASSOC);
 
-        $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, f.estado, i.NombreInst as NombreInstitucion, tf.nombreTipo as TipoPedido, tf.categoriaformulario as Categoria, tf.color as colorTipo, COALESCE(px.nprotA, 'N/A') as Protocolo, COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento, COALESCE(o.NombreOrganismoSimple, '') as Organizacion FROM formularioe f INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr pf ON f.idformA = pf.idformA LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA LEFT JOIN departamentoe d ON f.depto = d.iddeptoA LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo WHERE f.IdUsrA = ? ORDER BY f.idformA DESC";
+        $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasOwnerTable = $this->hasTable('formulario_owner_actual');
+
+        $workflowSelect = $hasWorkflowCols
+            ? "f.EstadoWorkflow, f.DerivadoActivo, f.IdInstitucionOrigen,"
+            : "NULL as EstadoWorkflow, 0 as DerivadoActivo, NULL as IdInstitucionOrigen,";
+        $ownerSelect = $hasOwnerTable
+            ? "COALESCE(foa.IdInstitucionActual, f.IdInstitucion) as IdInstitucionActual, foa.IdFormularioDerivacionActiva"
+            : "f.IdInstitucion as IdInstitucionActual, NULL as IdFormularioDerivacionActiva";
+        $ownerJoin = $hasOwnerTable
+            ? "LEFT JOIN formulario_owner_actual foa ON f.idformA = foa.idformA"
+            : "";
+        $originJoin = $hasWorkflowCols
+            ? "LEFT JOIN institucion io ON io.IdInstitucion = COALESCE(f.IdInstitucionOrigen, NULL)"
+            : "";
+        $originNameSelect = $hasWorkflowCols
+            ? "io.NombreInst as NombreInstitucionOrigen,"
+            : "NULL as NombreInstitucionOrigen,";
+
+        $sql = "SELECT
+                    f.idformA,
+                    f.fechainicioA as Inicio,
+                    f.fecRetiroA as Retiro,
+                    f.estado,
+                    {$workflowSelect}
+                    i.NombreInst as NombreInstitucion,
+                    {$originNameSelect}
+                    tf.nombreTipo as TipoPedido,
+                    tf.categoriaformulario as Categoria,
+                    tf.color as colorTipo,
+                    COALESCE(px.nprotA, 'N/A') as Protocolo,
+                    COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento,
+                    COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
+                    {$ownerSelect}
+                FROM formularioe f
+                INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                {$ownerJoin}
+                {$originJoin}
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+                LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
+                LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
+                WHERE f.IdUsrA = ?
+                ORDER BY f.idformA DESC";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
@@ -164,5 +210,25 @@ class UserFormsModel {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function hasTable(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return (bool)$stmt->fetch(PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM {$tableName} LIKE ?");
+            $stmt->execute([$columnName]);
+            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

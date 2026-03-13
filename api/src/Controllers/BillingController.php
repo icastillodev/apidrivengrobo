@@ -230,6 +230,23 @@ class BillingController {
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
     }
 
+    public function getInstitutionReport() {
+        if (ob_get_length()) ob_clean();
+        $f = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int)$sesion['instId'];
+            $desde = $f['desde'] ?? null;
+            $hasta = $f['hasta'] ?? null;
+            $estadoCobro = $f['estadoCobro'] ?? 'all';
+
+            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro);
+            $this->sendSuccess($data);
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
     public function getInvestigadorReport() {
         if (ob_get_length()) ob_clean();
         $input = $this->getRequestData();

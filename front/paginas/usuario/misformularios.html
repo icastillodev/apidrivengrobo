@@ -80,6 +80,18 @@
         .page-link:hover { background-color: #e9ecef; color: #1a5d3b; }
         .page-item.active .page-link { background-color: #1a5d3b; color: white; }
         .page-item.disabled .page-link { color: #ccc; background: transparent; }
+
+        /* Dropdown de derivación más visible */
+        .derive-target-select {
+            border: 2px solid #0d6efd !important;
+            background-color: #ffffff !important;
+            font-weight: 700;
+            color: #0d3b66;
+        }
+        .derive-target-select:focus {
+            border-color: #0b5ed7 !important;
+            box-shadow: 0 0 0 .2rem rgba(13,110,253,.25) !important;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -109,12 +121,12 @@
         <div class="card shadow-sm border-0 p-3 mb-4">
             <div class="row g-2">
                 <div class="col-md-3 d-none" id="container-filter-inst">
-                    <select id="filter-inst" class="form-select form-select-sm fw-bold text-primary border-primary">
+                    <select id="filter-inst" class="form-select form-select-sm fw-bold text-primary border-primary" title="Filtrar por institución" aria-label="Filtrar por institución">
                         <option value="all" data-i18n="misformularios.filter_todas_inst">TODAS LAS INSTITUCIONES</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select id="filter-status" class="form-select form-select-sm fw-bold">
+                    <select id="filter-status" class="form-select form-select-sm fw-bold" title="Filtrar por estado" aria-label="Filtrar por estado">
                         <option value="all" data-i18n="misformularios.filter_todos_estados">TODOS LOS ESTADOS</option>
                         <option value="Sin estado" data-i18n="misformularios.filter_sin_estado">Sin estado</option>
                         <option value="Proceso" data-i18n="misformularios.filter_proceso">En Proceso</option>
@@ -122,6 +134,18 @@
                         <option value="Entregado" data-i18n="misformularios.filter_entregado">Entregado</option>
                         <option value="Suspendido" data-i18n="misformularios.filter_suspendido">Suspendido</option>
                         <option value="Rechazado" data-i18n="misformularios.filter_rechazado">Rechazado</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="filter-derivation" class="form-select form-select-sm fw-bold" title="Filtrar por derivación" aria-label="Filtrar por derivación">
+                        <option value="all" data-i18n="misformularios.filter_derivacion_todos">Todas las derivaciones</option>
+                        <option value="derived" data-i18n="misformularios.filter_derivacion_si">Solo derivados</option>
+                        <option value="local" data-i18n="misformularios.filter_derivacion_no">Solo no derivados</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-none" id="container-filter-origin-inst">
+                    <select id="filter-origin-inst" class="form-select form-select-sm fw-bold text-secondary border-secondary" title="Filtrar por institución origen" aria-label="Filtrar por institución origen">
+                        <option value="all" data-i18n="misformularios.filter_origen_todos">Todas las instituciones origen</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -146,6 +170,7 @@
                             <th data-i18n="misformularios.col_protocolo">Protocolo</th>
                             <th data-i18n="misformularios.col_departamento">Departamento</th>
                             <th data-i18n="misformularios.col_organizacion">Organización</th>
+                            <th class="text-center" data-i18n="misformularios.col_workflow">Workflow</th>
                             <th class="text-center" data-i18n="misformularios.col_estado">Estado</th>
                             <th class="text-end pe-3" data-i18n="misformularios.col_acciones">Acciones</th>
                         </tr>
@@ -258,6 +283,46 @@
                 </div>
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-success btn-sm fw-bold w-100" onclick="window.processExcelExport()" data-i18n="misformularios.descargar_archivo">DESCARGAR ARCHIVO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-derivar-form" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h5 class="modal-title fw-bold fs-6"><i class="bi bi-arrow-left-right me-2"></i><span data-i18n="misformularios.derivar_titulo">Derivar formulario</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="derive-form-id" value="">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold" for="derive-target-inst" data-i18n="misformularios.derivar_label_destino">Institución destino</label>
+                        <select id="derive-target-inst" class="form-select form-select-sm derive-target-select"></select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label small fw-bold" for="derive-message" data-i18n="misformularios.derivar_label_mensaje">Mensaje (opcional)</label>
+                        <textarea id="derive-message" class="form-control form-control-sm" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal" data-i18n="misformularios.cancelar">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold" id="btn-confirm-derive" data-i18n="misformularios.derivar_btn_confirmar">Derivar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-derivacion-history" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h5 class="modal-title fw-bold fs-6"><i class="bi bi-clock-history me-2"></i><span data-i18n="misformularios.historial_derivacion_titulo">Historial de derivación</span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="derivation-history-list" class="p-3"></div>
                 </div>
             </div>
         </div>

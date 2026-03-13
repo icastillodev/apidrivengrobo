@@ -87,7 +87,7 @@
         <div class="row align-items-end mb-4 pb-3 border-bottom">
             <div class="input-group shadow-sm" style="max-width: 950px;">
                 <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="estadosformularios.estado"></span>
-                <select id="filter-status-reactivo" class="form-select form-select-sm fw-bold">
+                <select id="filter-status-reactivo" class="form-select form-select-sm fw-bold" title="Filtrar por estado" aria-label="Filtrar por estado">
                     <option value="all" data-i18n="estadosformularios.todosestados"></option>
                     <option value="Sin estado" data-i18n="estadosformularios.sinestado"></option>
                     <option value="Proceso" data-i18n="estadosformularios.proceso"></option>
@@ -96,9 +96,14 @@
                     <option value="Entregado" data-i18n="estadosformularios.entregado"></option>
                     <option value="Suspendido" data-i18n="estadosformularios.suspendido"></option>
                 </select>
-
+                <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="misformularios.col_workflow"></span>
+                <select id="filter-deriv-reactivo" class="form-select form-select-sm fw-bold" style="max-width: 170px;" title="Filtrar por derivación" aria-label="Filtro derivación">
+                    <option value="all" data-i18n="misformularios.filter_derivacion_todos"></option>
+                    <option value="derived" data-i18n="misformularios.filter_derivacion_si"></option>
+                    <option value="local" data-i18n="misformularios.filter_derivacion_no"></option>
+                </select>
                 <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.filtrarpor"></span>
-                <select id="filter-column-reactivo" class="form-select form-select-sm fw-bold" style="max-width: 160px;">
+                <select id="filter-column-reactivo" class="form-select form-select-sm fw-bold" style="max-width: 160px;" title="Filtrar por columna" aria-label="Filtrar por columna">
                     <option value="all" data-i18n="generales.todosloscampos"></option>
                     <option value="idformA" data-i18n="generales.id"></option>
                     <option value="IdInvestigador">ID INVESTIGADOR</option>
@@ -108,17 +113,17 @@
                     <option value="quienvisto" data-i18n="generales.quienvio"></option>
                 </select>
                 
-                <input type="text" id="search-input-reactivo" class="form-control form-control-sm" data-i18n="generales.escribebuscar">
+                <input type="text" id="search-input-reactivo" class="form-control form-control-sm" data-i18n="generales.escribebuscar" title="Buscar" aria-label="Buscar">
                 <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="generales.fecha_retiro">Fecha retiro:</span>
-                <input type="date" id="filter-retiro-reactivo" class="form-control form-control-sm" style="max-width: 150px;">
-                <button id="btn-search-reactivo" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" data-i18n="generales.buscar"></button>
+                <input type="date" id="filter-retiro-reactivo" class="form-control form-control-sm" style="max-width: 150px;" title="Filtrar por fecha de retiro" aria-label="Filtrar por fecha de retiro">
+                <button id="btn-search-reactivo" class="btn btn-success fw-bold px-4" style="background-color: #1a5d3b;" data-i18n="generales.buscar" title="Buscar" aria-label="Buscar"></button>
             </div>
 
             <div class="ms-auto col-md-2 d-flex gap-2 justify-content-end">
-                <button id="btn-excel-reactivo" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm">
+                <button id="btn-excel-reactivo" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" title="Exportar Excel" aria-label="Exportar Excel">
                     <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="generales.excel"></span>
                 </button>
-                <button id="btn-ayuda-reactivo" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm">
+                <button id="btn-ayuda-reactivo" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" title="Abrir ayuda" aria-label="Abrir ayuda">
                     <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda"></span>
                 </button>
             </div>

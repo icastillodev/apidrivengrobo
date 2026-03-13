@@ -40,6 +40,7 @@ export async function initAnimalesPage() {
         const res = await API.request(`/animals/all?inst=${instId}`);
         if (res && res.status === 'success') {
             allAnimals = res.data;
+            setupOriginInstitutionFilterAnimal();
             setupSortHeaders();
             renderTable();
             openAnimalFromUrlIfNeeded();
@@ -78,9 +79,31 @@ document.addEventListener('focusin', (e) => {
 }, true);
     document.getElementById('btn-search-animal').onclick = () => { currentPage = 1; renderTable(); };
     document.getElementById('filter-status-animal').onchange = () => { currentPage = 1; renderTable(); };
+    const filterDeriv = document.getElementById('filter-deriv-animal');
+    if (filterDeriv) filterDeriv.onchange = () => { currentPage = 1; renderTable(); };
     const filterRetiroAnimal = document.getElementById('filter-retiro-animal');
     if (filterRetiroAnimal) filterRetiroAnimal.onchange = () => { currentPage = 1; renderTable(); };
     document.getElementById('search-input-animal').onkeyup = (e) => { if (e.key === 'Enter') { currentPage = 1; renderTable(); } };
+}
+
+function setupOriginInstitutionFilterAnimal() {
+    const columnSelect = document.getElementById('filter-column-animal');
+    if (!columnSelect) return;
+    const values = [...new Set(allAnimals.map(a => (a.InstitucionOrigenNombre || '').trim()).filter(Boolean))].sort();
+
+    // Limpiar opciones previas de origen para no duplicar al recargar.
+    Array.from(columnSelect.options)
+        .filter(opt => String(opt.value || '').startsWith('origin::'))
+        .forEach(opt => opt.remove());
+
+    if (!values.length) return;
+
+    values.forEach(v => {
+        const o = document.createElement('option');
+        o.value = `origin::${v}`;
+        o.textContent = v;
+        columnSelect.appendChild(o);
+    });
 }
 
 function openAnimalFromUrlIfNeeded() {
@@ -104,6 +127,7 @@ async function syncAllData() {
     const res = await API.request(`/animals/all?inst=${instId}`);
     if (res && res.status === 'success') {
         allAnimals = res.data;
+        setupOriginInstitutionFilterAnimal();
         renderTable(); 
         refreshMenuNotifications(); 
     }
@@ -182,7 +206,7 @@ function renderTable() {
             </td>
             <td class="py-2 px-2 small text-muted">${a.Inicio || '---'}</td>
             <td class="py-2 px-2 small text-muted">${a.Retiro || '---'}</td>
-            <td class="py-2 px-2 text-center">${getStatusBadge(a.estado)}</td>
+            <td class="py-2 px-2 text-center">${getStatusWithWorkflow(a)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -196,18 +220,27 @@ function getFilteredAndSortedData() {
     const statusFilter = document.getElementById('filter-status-animal').value.toLowerCase();
     const term = document.getElementById('search-input-animal').value.toLowerCase().trim();
     const filterType = document.getElementById('filter-column-animal').value;
+    const derivFilter = document.getElementById('filter-deriv-animal')?.value || 'all';
     const retiroDate = document.getElementById('filter-retiro-animal');
     const retiroVal = retiroDate ? (retiroDate.value || '').trim() : '';
 
     let data = allAnimals.filter(a => {
         const estadoFila = (a.estado || "sin estado").toString().toLowerCase().trim();
         if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
+        const isDerived = Number(a.DerivadoActivo || 0) === 1;
+        if (derivFilter === 'derived' && !isDerived) return false;
+        if (derivFilter === 'local' && isDerived) return false;
+        const originName = (a.InstitucionOrigenNombre || '').trim();
+        if (String(filterType).startsWith('origin::')) {
+            const originSelected = String(filterType).slice('origin::'.length);
+            if (originName !== originSelected) return false;
+        }
         if (retiroVal) {
             const aRetiro = (a.Retiro || '').toString().substring(0, 10);
             if (aRetiro !== retiroVal) return false;
         }
         if (!term) return true;
-        if (filterType === 'all') return JSON.stringify(a).toLowerCase().includes(term);
+        if (filterType === 'all' || String(filterType).startsWith('origin::')) return JSON.stringify(a).toLowerCase().includes(term);
         return String(a[filterType] || '').toLowerCase().includes(term);
     });
 
@@ -276,11 +309,43 @@ window.openAnimalModal = async (a) => {
 /* --- FUNCIONES DE RENDERIZADO (MODULOS) --- */
 
 function renderModalHeader(a) {
+    const tx = window.txt?.misformularios || {};
+    const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
+    const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
+    const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const lblDerivado = tx.workflow_derivado || 'Derivado';
+    const lblAceptar = tx.estado_derivacion_aceptada || 'Aceptar';
+    const lblDevolver = tx.estado_derivacion_devuelta || 'Devolver';
+    const lblRechazar = tx.estado_derivacion_rechazada || 'Rechazar';
+    const lblRetirar = tx.retirar_derivacion_btn || 'Retirar derivación';
+    const lblHistorial = tx.historial_derivacion_titulo || 'Historial';
+    const lblDerivar = tx.derivar_btn || 'Derivar';
+    const derivBox = isDerivedActive
+        ? `
+        <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge bg-primary">${lblDerivado}</span>
+            <span class="small text-muted">${a.InstitucionOrigenNombre ? `Origen: ${a.InstitucionOrigenNombre}` : ''}</span>
+            ${isOriginInst
+                ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionAnimal('cancel', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblRetirar}</button>`
+                : `
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="window.resolveDerivacionAnimal('accept', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblAceptar}</button>
+            <button type="button" class="btn btn-sm btn-outline-warning" onclick="window.resolveDerivacionAnimal('return', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblDevolver}</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionAnimal('reject', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblRechazar}</button>`
+            }
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryAnimal(${a.idformA})">${lblHistorial}</button>
+        </div>`
+        : `
+        <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="window.deriveFromAdminAnimal(${a.idformA})">${lblDerivar}</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="window.showDerivHistoryAnimal(${a.idformA})">${lblHistorial}</button>
+        </div>`;
+
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div>
             <h5 class="fw-bold mb-0">Detalle Animal</h5>
             <span class="small text-muted">ID: <strong>${a.idformA}</strong> | Investigador: ${a.Investigador}</span>
+            ${derivBox}
         </div>
         <button class="btn-close" data-bs-dismiss="modal"></button>
     </div>`;
@@ -678,6 +743,156 @@ window.saveFullAnimalForm = async (e) => {
     } catch (err) { console.error(err); }
 };
 
+window.resolveDerivacionAnimal = async (action, idDerivacion, idformA) => {
+    const tx = window.txt?.misformularios || {};
+    const actionMap = {
+        accept: '/forms/derivation/accept',
+        return: '/forms/derivation/return',
+        reject: '/forms/derivation/reject',
+        cancel: '/forms/derivation/cancel'
+    };
+    const endpoint = actionMap[action];
+    if (!endpoint) return;
+
+    let mensaje = '';
+    if (action !== 'accept') {
+        const resMsg = await window.Swal.fire({
+            title: tx.derivar_label_mensaje || 'Mensaje',
+            input: 'textarea',
+            inputPlaceholder: 'Motivo / observación',
+            showCancelButton: true,
+            confirmButtonText: 'Continuar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!resMsg.isConfirmed) return;
+        mensaje = (resMsg.value || '').trim();
+    } else {
+        const c = await window.Swal.fire({ title: 'Confirmar', text: tx.estado_derivacion_aceptada ? `¿${tx.estado_derivacion_aceptada}?` : '¿Aceptar derivación?', icon: 'question', showCancelButton: true, confirmButtonColor: '#1a5d3b' });
+        if (!c.isConfirmed) return;
+    }
+
+    try {
+        window.Swal.fire({ title: tx.derivar_procesando || 'Procesando...', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const payload = { idDerivacion, mensaje, instId: Number(instActiva || 0) };
+        const res = await API.request(endpoint, 'POST', payload);
+        if (res.status === 'success') {
+            window.Swal.fire('OK', tx.derivar_ok || 'Acción aplicada.', 'success');
+            await syncAllData();
+            const a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            if (a) window.openAnimalModal(a);
+        } else {
+            window.Swal.fire('Error', res.message || 'No se pudo procesar.', 'error');
+        }
+    } catch (e) {
+        window.Swal.fire('Error', 'No se pudo procesar la derivación.', 'error');
+    }
+};
+
+window.deriveFromAdminAnimal = async (idformA) => {
+    const tx = window.txt?.misformularios || {};
+    try {
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const resTargets = await API.request(`/forms/derivation/targets?inst=${encodeURIComponent(instActiva)}&instId=${encodeURIComponent(instActiva)}`);
+        const targets = Array.isArray(resTargets?.data) ? resTargets.data : [];
+        if (!targets.length) {
+            window.Swal.fire(tx.derivar_titulo || 'Derivar formulario', tx.derivar_sin_destinos || 'No hay instituciones destino disponibles en la red.', 'info');
+            return;
+        }
+        const options = {};
+        targets.forEach(t => { options[String(t.IdInstitucion)] = t.NombreInst; });
+        const pick = await window.Swal.fire({
+            title: tx.derivar_titulo || 'Derivar formulario',
+            input: 'select',
+            inputOptions: options,
+            inputPlaceholder: tx.derivar_label_destino || 'Seleccione institución destino',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b',
+            inputValidator: (v) => (!v ? (tx.derivar_error_destino || 'Debe seleccionar una institución destino.') : null),
+            didOpen: () => {
+                const sel = window.Swal.getInput();
+                if (!sel) return;
+                sel.style.border = '2px solid #0d6efd';
+                sel.style.backgroundColor = '#ffffff';
+                sel.style.fontWeight = '700';
+                sel.style.color = '#0d3b66';
+                sel.style.minHeight = '42px';
+            }
+        });
+        if (!pick.isConfirmed) return;
+        const msg = await window.Swal.fire({
+            title: tx.derivar_label_mensaje || 'Mensaje',
+            input: 'textarea',
+            inputPlaceholder: 'Motivo / observación',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!msg.isConfirmed) return;
+        const targetName = (targets.find(t => Number(t.IdInstitucion) === Number(pick.value)) || {}).NombreInst || '';
+        const confirmDerive = await window.Swal.fire({
+            title: tx.derivar_confirm_titulo || 'Confirmar derivación',
+            text: `${tx.derivar_confirm_text || 'Al derivar, el formulario quedará bloqueado en la institución actual hasta que se resuelva en destino.'}${targetName ? ' ' + targetName : ''}`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: tx.derivar_btn_confirmar || 'Derivar',
+            confirmButtonColor: '#1a5d3b'
+        });
+        if (!confirmDerive.isConfirmed) return;
+        window.Swal.fire({ title: tx.derivar_procesando || 'Procesando...', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const res = await API.request('/forms/derivation/derive', 'POST', {
+            idformA,
+            instDestino: Number(pick.value),
+            mensaje: (msg.value || '').trim(),
+            instId: Number(instActiva || 0)
+        });
+        if (res.status === 'success') {
+            window.Swal.fire('OK', tx.derivar_ok || 'Formulario derivado correctamente.', 'success');
+            await syncAllData();
+            const a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            if (a) window.openAnimalModal(a);
+        } else {
+            window.Swal.fire('Error', res.message || 'No se pudo derivar.', 'error');
+        }
+    } catch (e) {
+        window.Swal.fire('Error', tx.historial_derivacion_error || 'No se pudo procesar la derivación.', 'error');
+    }
+};
+
+window.showDerivHistoryAnimal = async (idformA) => {
+    const tx = window.txt?.misformularios || {};
+    try {
+        window.Swal.fire({ title: tx.historial_derivacion_titulo || 'Historial de derivación', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+        const res = await API.request(`/forms/derivation/history?idformA=${idformA}&inst=${encodeURIComponent(instActiva)}`);
+        if (res.status !== 'success' || !Array.isArray(res.data) || !res.data.length) {
+            window.Swal.fire(tx.historial_derivacion_titulo || 'Historial', tx.historial_derivacion_vacio || 'Sin movimientos de derivación.', 'info');
+            return;
+        }
+        const html = res.data.map(d => {
+            const e = Number(d.estado_derivacion || 0);
+            const est = e === 1 ? (tx.estado_derivacion_pendiente || 'Pendiente')
+                : e === 2 ? (tx.estado_derivacion_aceptada || 'Aceptada')
+                : e === 3 ? (tx.estado_derivacion_devuelta || 'Devuelta')
+                : e === 4 ? (tx.estado_derivacion_rechazada || 'Rechazada')
+                : (tx.estado_derivacion_cancelada || 'Cancelada');
+            return `<div style="text-align:left;border:1px solid #ddd;border-radius:6px;padding:8px;margin-bottom:8px;">
+                <div><strong>#${d.IdFormularioDerivacion}</strong> - ${est}</div>
+                <div style="font-size:12px;color:#666;">${d.InstitucionOrigenNombre || '-'} → ${d.InstitucionDestinoNombre || '-'}</div>
+                <div style="font-size:12px;">${d.mensaje_origen || d.mensaje_destino || d.motivo_rechazo || ''}</div>
+            </div>`;
+        }).join('');
+        window.Swal.fire({
+            title: tx.historial_derivacion_titulo || 'Historial de derivación',
+            html: `<div style="max-height:380px;overflow:auto;">${html}</div>`,
+            width: 760
+        });
+    } catch (e) {
+        window.Swal.fire('Error', tx.historial_derivacion_error || 'Error al cargar historial.', 'error');
+    }
+};
+
 /**
  * NOTIFICACIÓN POR CORREO - GROBO (CON LOADER DE CARGA)
  */
@@ -765,6 +980,23 @@ function getStatusBadge(estado) {
     };
     const s = states[e] || states['sin estado'];
     return `<span class="badge ${s.class} shadow-sm" style="font-size: 9px; font-weight: 700; padding: 5px 10px; min-width: 90px; display: inline-block;">${s.label}</span>`;
+}
+
+function getWorkflowBadgeRow(item) {
+    const tx = window.txt?.misformularios || {};
+    const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
+    const isDerived = Number(item.DerivadoActivo || 0) === 1;
+    if (isDerived) return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}</span>`;
+    if (!wf) return '';
+    if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
+    if (wf.includes('DEVUEL')) return `<span class="badge bg-warning text-dark mt-1">${tx.estado_derivacion_devuelta || 'Devuelta'}</span>`;
+    if (wf.includes('RECHAZ')) return `<span class="badge bg-danger mt-1">${tx.estado_derivacion_rechazada || 'Rechazada'}</span>`;
+    if (wf.includes('CANCEL')) return `<span class="badge bg-secondary mt-1">${tx.estado_derivacion_cancelada || 'Cancelada'}</span>`;
+    return `<span class="badge bg-info text-dark mt-1">${wf}</span>`;
+}
+
+function getStatusWithWorkflow(item) {
+    return `<div class="d-inline-flex flex-column align-items-center">${getStatusBadge(item.estado)}${getWorkflowBadgeRow(item)}</div>`;
 }
 
 function renderPagination(t, c, r) {

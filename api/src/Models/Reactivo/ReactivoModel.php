@@ -2,6 +2,7 @@
 namespace App\Models\Reactivo;
 use PDO;
 use App\Utils\Auditoria; 
+use App\Models\FormDerivacion\FormDerivacionModel;
 
 class ReactivoModel {
     private $db;
@@ -14,11 +15,50 @@ class ReactivoModel {
     // LÓGICA DE ADMINISTRADOR (BANDEJA DE ENTRADA)
     // ============================================================
     public function getAllByInstitution($instId, $categoryName) {
+        $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasOwnerTable = $this->hasTable('formulario_owner_actual');
+
+        $workflowSelect = $hasWorkflowCols
+            ? "f.EstadoWorkflow, f.DerivadoActivo, f.IdInstitucionOrigen,"
+            : "NULL as EstadoWorkflow, 0 as DerivadoActivo, NULL as IdInstitucionOrigen,";
+        $originNameSelect = $hasWorkflowCols
+            ? "io.NombreInst as InstitucionOrigenNombre,"
+            : "NULL as InstitucionOrigenNombre,";
+        $ownerSelect = $hasOwnerTable
+            ? "foa.IdFormularioDerivacionActiva,"
+            : "NULL as IdFormularioDerivacionActiva,";
+        $ownerJoin = $hasOwnerTable
+            ? "LEFT JOIN formulario_owner_actual foa ON foa.idformA = f.idformA"
+            : "";
+        $originJoin = $hasWorkflowCols
+            ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
+            : "";
+
+        $whereInst = "f.IdInstitucion = ?";
+        $params = [(int)$instId];
+        if ($hasOwnerTable) {
+            $whereInst = "(COALESCE(foa.IdInstitucionActual, f.IdInstitucion) = ?)";
+            $params = [(int)$instId];
+            if ($hasWorkflowCols) {
+                $whereInst .= " OR (f.IdInstitucionOrigen = ?)";
+                $params[] = (int)$instId;
+            }
+            $whereInst = "(" . $whereInst . ")";
+        } elseif ($hasWorkflowCols) {
+            $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
+            $params = [(int)$instId, (int)$instId];
+        }
+
         $sql = "SELECT 
                     f.idformA, 
                     f.IdUsrA as IdInvestigador,
                     pf.idprotA, 
                     f.estado, 
+                    {$workflowSelect}
+                    {$originNameSelect}
+                    {$ownerSelect}
                     f.fechainicioA as Inicio, 
                     f.fecRetiroA as Retiro, 
                     f.aclaracionadm as Aclaracion, 
@@ -45,19 +85,42 @@ class ReactivoModel {
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                {$ownerJoin}
+                {$originJoin}
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
                 LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
-                WHERE f.IdInstitucion = ? 
+                WHERE {$whereInst} 
                 AND t.categoriaformulario = ?
                 ORDER BY f.idformA DESC";
 
+        $params[] = $categoryName;
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $categoryName]);
+        $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    private function hasTable(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
     public function getAvailableInsumos($instId) {
         $sql = "SELECT IdInsumoexp as idInsumo, NombreInsumo, TipoInsumo, CantidadInsumo, PrecioInsumo 
@@ -118,6 +181,10 @@ class ReactivoModel {
     }
 
     public function updateQuickStatus($id, $nuevoEstado, $aclaracion, $user) {
+        $instId = func_num_args() >= 5 ? (int)func_get_arg(4) : 0;
+        if ($instId > 0) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, $instId);
+        }
         $stmt = $this->db->prepare("SELECT f.estado, s.totalA, pf.idprotA FROM formularioe f LEFT JOIN sexoe s ON f.idformA = s.idformA LEFT JOIN protformr pf ON f.idformA = pf.idformA WHERE f.idformA = ?");
         $stmt->execute([$id]);
         $current = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -147,6 +214,9 @@ class ReactivoModel {
     public function updateFull($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) throw new \Exception("ID de formulario no especificado.");
+        if (!empty($data['instId'])) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, (int)$data['instId']);
+        }
 
         $newTotal = (int)($data['totalA'] ?? 0); // Animales descontados
         $newProt = $data['idprotA'] ?? null;

@@ -482,4 +482,106 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Facturacion de formularios derivados agrupada por institucion solicitante.
+     */
+    public function getInstitutionDerivedReport($instId, $desde = null, $hasta = null, $estadoCobro = 'all') {
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            return ['totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0], 'instituciones' => []];
+        }
+
+        $sql = "SELECT
+                    ffd.IdFacturacionFormularioDerivado,
+                    ffd.idformA,
+                    ffd.IdInstitucionSolicitante,
+                    COALESCE(i.NombreInst, CONCAT('Institución #', ffd.IdInstitucionSolicitante)) as institucion_solicitante,
+                    ffd.tipo_formulario,
+                    ffd.monto_total,
+                    ffd.monto_pagado,
+                    ffd.estado_cobro,
+                    ffd.FechaCreado,
+                    f.estado as estado_formulario,
+                    COALESCE(tf.nombreTipo, '-') as nombre_tipo,
+                    COALESCE(tf.categoriaformulario, '-') as categoria,
+                    CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador
+                FROM facturacion_formulario_derivado ffd
+                LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
+                LEFT JOIN formularioe f ON f.idformA = ffd.idformA
+                LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA
+                LEFT JOIN personae p ON p.IdUsrA = f.IdUsrA
+                WHERE ffd.IdInstitucionCobradora = ?";
+        $params = [(int)$instId];
+
+        if (!empty($desde) && !empty($hasta)) {
+            $sql .= " AND DATE(ffd.FechaCreado) BETWEEN ? AND ?";
+            $params[] = $desde;
+            $params[] = $hasta;
+        }
+        if ($estadoCobro !== 'all' && $estadoCobro !== '' && is_numeric($estadoCobro)) {
+            $sql .= " AND ffd.estado_cobro = ?";
+            $params[] = (int)$estadoCobro;
+        }
+
+        $sql .= " ORDER BY institucion_solicitante ASC, ffd.FechaCreado DESC, ffd.IdFacturacionFormularioDerivado DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $out = [
+            'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
+            'instituciones' => []
+        ];
+
+        foreach ($rows as $r) {
+            $idInstSol = (int)$r['IdInstitucionSolicitante'];
+            if (!isset($out['instituciones'][$idInstSol])) {
+                $out['instituciones'][$idInstSol] = [
+                    'idInstitucionSolicitante' => $idInstSol,
+                    'institucion' => $r['institucion_solicitante'],
+                    'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
+                    'items' => []
+                ];
+            }
+
+            $mTotal = (float)$r['monto_total'];
+            $mPagado = (float)$r['monto_pagado'];
+            $mDebe = max(0, $mTotal - $mPagado);
+
+            $item = [
+                'idFacturacionDerivada' => (int)$r['IdFacturacionFormularioDerivado'],
+                'idformA' => (int)$r['idformA'],
+                'tipoFormulario' => $r['tipo_formulario'],
+                'montoTotal' => $mTotal,
+                'montoPagado' => $mPagado,
+                'montoDebe' => $mDebe,
+                'estadoCobro' => (int)$r['estado_cobro'],
+                'fechaCreado' => $r['FechaCreado'],
+                'estadoFormulario' => $r['estado_formulario'],
+                'nombreTipo' => $r['nombre_tipo'],
+                'categoria' => $r['categoria'],
+                'investigador' => trim((string)$r['investigador']) !== '' ? trim((string)$r['investigador']) : '-'
+            ];
+
+            $out['instituciones'][$idInstSol]['items'][] = $item;
+            $out['instituciones'][$idInstSol]['totales']['montoTotal'] += $mTotal;
+            $out['instituciones'][$idInstSol]['totales']['montoPagado'] += $mPagado;
+            $out['instituciones'][$idInstSol]['totales']['montoDebe'] += $mDebe;
+            $out['instituciones'][$idInstSol]['totales']['cantidad'] += 1;
+
+            $out['totales']['montoTotal'] += $mTotal;
+            $out['totales']['montoPagado'] += $mPagado;
+            $out['totales']['montoDebe'] += $mDebe;
+            $out['totales']['cantidad'] += 1;
+        }
+
+        $out['instituciones'] = array_values($out['instituciones']);
+        return $out;
+    }
+
+    private function tableExists($tableName) {
+        $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+        $stmt->execute([$tableName]);
+        return (bool)$stmt->fetchColumn();
+    }
 }

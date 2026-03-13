@@ -97,7 +97,12 @@
             <option value="Entregado" data-i18n="admin_animales.filter_entregado">Entregado</option>
             <option value="Suspendido" data-i18n="admin_animales.filter_suspendido">Suspendido</option>
         </select>
-
+        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="misformularios.col_workflow">Workflow</span>
+        <select id="filter-deriv-animal" class="form-select form-select-sm fw-bold" style="max-width: 170px;" aria-label="Filtro derivación">
+            <option value="all" data-i18n="misformularios.filter_derivacion_todos">Todas las derivaciones</option>
+            <option value="derived" data-i18n="misformularios.filter_derivacion_si">Solo derivados</option>
+            <option value="local" data-i18n="misformularios.filter_derivacion_no">Solo no derivados</option>
+        </select>
         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_animales.filtrar_por">Filtrar por:</span>
         <select id="filter-column-animal" class="form-select form-select-sm fw-bold" style="max-width: 160px;" aria-label="Filtrar por">
             <option value="all" data-i18n="admin_animales.filter_todos_campos">TODOS LOS CAMPOS</option>

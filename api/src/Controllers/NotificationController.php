@@ -15,8 +15,14 @@ class NotificationController {
         header('Content-Type: application/json');
 
         try {
-            $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
+            try {
+                $sesion = Auditoria::getDatosSesion();
+                $instId = $sesion['instId'];
+            } catch (\Throwable $authError) {
+                http_response_code(401);
+                echo json_encode(['status' => 'error', 'message' => 'Sesión inválida o expirada']);
+                exit;
+            }
 
             $sqlProt = "SELECT COUNT(DISTINCT s.IdSolicitudProtocolo) as total
                         FROM solicitudprotocolo s
@@ -80,6 +86,19 @@ class NotificationController {
             $stmtAni = $this->db->prepare($sqlAni);
             $stmtAni->execute([$instId]);
             $countAni = $stmtAni->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+            if ($this->tableExists('formulario_derivacion')) {
+                $sqlAniDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
+                                FROM formulario_derivacion d
+                                INNER JOIN formularioe f ON f.idformA = d.idformA
+                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                WHERE d.IdInstitucionDestino = ?
+                                  AND d.estado_derivacion = 1
+                                  AND d.Activo = 1
+                                  AND t.categoriaformulario = 'Animal'";
+                $stmtAniDeriv = $this->db->prepare($sqlAniDeriv);
+                $stmtAniDeriv->execute([$instId]);
+                $countAni += (int)($stmtAniDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+            }
 
             $sqlRea = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
@@ -89,6 +108,19 @@ class NotificationController {
             $stmtRea = $this->db->prepare($sqlRea);
             $stmtRea->execute([$instId]);
             $countRea = $stmtRea->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+            if ($this->tableExists('formulario_derivacion')) {
+                $sqlReaDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
+                                FROM formulario_derivacion d
+                                INNER JOIN formularioe f ON f.idformA = d.idformA
+                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                WHERE d.IdInstitucionDestino = ?
+                                  AND d.estado_derivacion = 1
+                                  AND d.Activo = 1
+                                  AND t.categoriaformulario = 'Otros reactivos biologicos'";
+                $stmtReaDeriv = $this->db->prepare($sqlReaDeriv);
+                $stmtReaDeriv->execute([$instId]);
+                $countRea += (int)($stmtReaDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+            }
 
             $sqlIns = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
@@ -98,6 +130,19 @@ class NotificationController {
             $stmtIns = $this->db->prepare($sqlIns);
             $stmtIns->execute([$instId]);
             $countIns = $stmtIns->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
+            if ($this->tableExists('formulario_derivacion')) {
+                $sqlInsDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
+                                FROM formulario_derivacion d
+                                INNER JOIN formularioe f ON f.idformA = d.idformA
+                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                WHERE d.IdInstitucionDestino = ?
+                                  AND d.estado_derivacion = 1
+                                  AND d.Activo = 1
+                                  AND t.categoriaformulario = 'Insumos'";
+                $stmtInsDeriv = $this->db->prepare($sqlInsDeriv);
+                $stmtInsDeriv->execute([$instId]);
+                $countIns += (int)($stmtInsDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
+            }
 
             echo json_encode([
                 'status' => 'success',
@@ -111,10 +156,32 @@ class NotificationController {
                 ]
             ]);
 
-        } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            // No expulsar sesión por errores de consulta de badges/menu.
+            http_response_code(200);
+            echo json_encode([
+                'status' => 'success',
+                'data' => [
+                    'protocolos' => 0,
+                    'protocolos_solicitudes' => 0,
+                    'protocolos_red_incompletos' => 0,
+                    'animales' => 0,
+                    'reactivos' => 0,
+                    'insumos' => 0
+                ],
+                'warning' => 'No se pudieron calcular notificaciones'
+            ]);
         }
         exit;
+    }
+
+    private function tableExists(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+            return (bool)$stmt->fetch(\PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

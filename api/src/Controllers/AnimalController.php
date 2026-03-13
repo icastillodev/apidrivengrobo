@@ -26,7 +26,7 @@ class AnimalController {
             header('Content-Type: application/json');
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -51,6 +51,7 @@ class AnimalController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $estado = $data['estado'] ?? 'Sin estado';
+            $data['instId'] = $sesion['instId'];
 
             // Visor = quien cambia el estado. Siempre nombre + apellido + ID desde BD.
             if (strtolower(trim($estado)) === 'sin estado') {
@@ -117,7 +118,8 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $_POST['instId'] = $sesion['instId'];
             $this->model->updateFull($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

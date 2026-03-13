@@ -7,6 +7,11 @@ async function getLangFromBackendIfLogged() {
     try {
         const token = sessionStorage.getItem('token') || localStorage.getItem('token');
         if (!token) return null;
+        const userLevel = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const instId = parseInt(sessionStorage.getItem('instId') || localStorage.getItem('instId') || '0', 10);
+        const isSuperadminContext = userLevel === 1 || window.location.pathname.toLowerCase().includes('superadmin');
+        // Superadmin (nivel 1 / inst 0) no usa /user/config/get para idioma.
+        if (isSuperadminContext || instId === 0) return null;
         const { API } = await import('../api.js');
         const res = await API.request('/user/config/get', 'GET');
         if (res?.status === 'success' && res?.data?.idioma_preferido) {
