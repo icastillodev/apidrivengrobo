@@ -139,13 +139,14 @@ function renderResultadosInstitucion(data) {
                                     <th style="width:3%"><input type="checkbox" class="check-all-inst" data-inst="${inst.idInstitucionSolicitante}"></th>
                                     <th style="width:5%">ID</th>
                                     <th style="width:8%">${t.facturacion?.filtro_estado_cobro || 'ESTADO'}</th>
-                                    <th style="width:14%">${t.generales?.investigador || 'SOLICITANTE'}</th>
-                                    <th style="width:14%">${t.generales?.especie || 'TIPO'}</th>
-                                    <th style="width:20%">${t.facturacion?.col_formulario || 'DETALLE'}</th>
-                                    <th style="width:10%">${t.facturacion?.total || 'TOTAL'}</th>
-                                    <th style="width:10%">${t.facturacion?.total_pagado || 'PAGADO'}</th>
-                                    <th style="width:10%">${t.facturacion?.falta || 'DEBE'}</th>
-                                    <th style="width:6%">PDF</th>
+                                    <th style="width:12%">${t.generales?.investigador || 'SOLICITANTE'}</th>
+                                    <th style="width:14%">${t.facturacion?.col_instituciones_derivado || 'INSTITUCIONES'}</th>
+                                    <th style="width:10%">${t.generales?.especie || 'TIPO'}</th>
+                                    <th style="width:14%">${t.facturacion?.col_formulario || 'DETALLE'}</th>
+                                    <th style="width:8%">${t.facturacion?.total || 'TOTAL'}</th>
+                                    <th style="width:8%">${t.facturacion?.total_pagado || 'PAGADO'}</th>
+                                    <th style="width:8%">${t.facturacion?.falta || 'DEBE'}</th>
+                                    <th style="width:5%">PDF</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -163,6 +164,7 @@ function renderResultadosInstitucion(data) {
                                             <td class="small text-muted fw-bold">#${item.idformA}</td>
                                             <td>${estadoBadge}</td>
                                             <td class="small fw-bold text-start ps-2">${escapeHtml(item.investigador || '-')}</td>
+                                            <td class="small text-start ps-2" title="${escapeHtml((item.institucionOrigen || '') + ' → ' + (item.institucionDestino || ''))}">${escapeHtml((item.institucionOrigen || '-') + ' → ' + (item.institucionDestino || '-'))}</td>
                                             <td class="small text-secondary">${escapeHtml(item.nombreTipo || item.categoria || '-')}</td>
                                             <td class="text-start ps-3 small">${escapeHtml(item.categoria || item.nombreTipo || '-')}</td>
                                             <td class="text-end fw-bold text-dark">${fmt(item.montoTotal)}</td>

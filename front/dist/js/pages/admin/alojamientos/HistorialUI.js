@@ -44,7 +44,10 @@ export const HistorialUI = {
                 this.renderTable();
                 this.renderFooter(historiaId);
                 
-                new bootstrap.Modal(document.getElementById('modal-historial')).show();
+                const modalEl = document.getElementById('modal-historial');
+                const modal = new bootstrap.Modal(modalEl);
+                modalEl.addEventListener('hidden.bs.modal', () => loadAlojamientos(), { once: true });
+                modal.show();
             }
         } catch (e) { console.error(e); } finally { hideLoader(); }
     },

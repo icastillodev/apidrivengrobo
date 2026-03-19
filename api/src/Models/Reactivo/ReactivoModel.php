@@ -38,6 +38,11 @@ class ReactivoModel {
         $originJoin = $hasWorkflowCols
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
             : "";
+        $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
+        $derivEstadoSelect = $hasDerivEstadoCols
+            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
+               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
+            : "";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -84,6 +89,7 @@ class ReactivoModel {
                     sex.totalA as AnimalesUsados,
                     f.quienvisto as QuienVio,       /* 🚀 FIX: El nombre del admin */
                     f.reactivo as idinsumoA         /* 🚀 FIX: El ID real para seleccionar en el modal */
+                    {$derivEstadoSelect}
                 FROM formularioe f
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
@@ -213,14 +219,43 @@ class ReactivoModel {
         $cantidad = (int)($current['totalA'] ?? 0);
         $idProt = $current['idprotA'];
 
+        $formDerivModel = new FormDerivacionModel($this->db);
+        $deriv = $instId > 0 ? $formDerivModel->getDerivationByFormAndInst($id, $instId) : null;
+        $isDerived = $deriv !== null;
+        $isNewEntregado = ($targetStatus === 'entregado');
+
+        if ($isDerived && !empty($deriv['is_destination'])) {
+            $cfg = $formDerivModel->checkDestinoConfigCompleta($id, $instId, 'Otros reactivos biologicos');
+            if (!$cfg['completa']) {
+                throw new \Exception('Actualizar formulario para la aplicación: faltan ' . implode(', ', $cfg['faltantes']) . '. Complete los datos antes de cambiar el estado.');
+            }
+        }
+
         $this->db->beginTransaction();
         try {
             if ($targetStatus === 'suspendido' && $oldStatus !== 'suspendido' && $idProt) {
                 $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
             } elseif ($oldStatus === 'suspendido' && $targetStatus !== 'suspendido' && $idProt) {
-                $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
+                $skipDeduct = $isDerived && $isNewEntregado;
+                if (!$skipDeduct) {
+                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
+                }
             }
             $this->db->prepare("UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?")->execute([$nuevoEstado, $aclaracion, $user, $id]);
+
+            // For derived forms: update estado_origen or estado_destino in formulario_derivacion
+            if ($isDerived && $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen')) {
+                $idDeriv = (int)($deriv['IdFormularioDerivacion'] ?? 0);
+                if ($idDeriv > 0) {
+                    if (!empty($deriv['is_origin'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_origen = ? WHERE IdFormularioDerivacion = ?")->execute([$nuevoEstado, $idDeriv]);
+                    }
+                    if (!empty($deriv['is_destination'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_destino = ? WHERE IdFormularioDerivacion = ?")->execute([$nuevoEstado, $idDeriv]);
+                    }
+                }
+            }
+
             Auditoria::log($this->db, 'UPDATE', 'formularioe', "Cambió estado a $nuevoEstado en Reactivo #$id");
             $this->db->commit();
             return true;
@@ -291,10 +326,23 @@ class ReactivoModel {
             $stmtPrecio = $this->db->prepare("SELECT PrecioInsumo FROM insumoexperimental WHERE IdInsumoexp = ?");
             $stmtPrecio->execute([$idInsumoReactivo]);
             $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
-
             $nuevoCostoTotal = $nuevoPrecioUnitario * $nuevaCantidadReactivo;
-            $sqlPrecio = "UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?";
-            $this->db->prepare($sqlPrecio)->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+
+            $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
+            if ($esDerivadoEnDestino) {
+                // Formulario derivado en destino: NO sobrescribir precioformulario (original del cliente).
+                // Solo actualizar facturacion_formulario_derivado (factura proveedor→cliente).
+                $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
+                $stmtDeriv->execute([$id, $instIdRequest]);
+                $idDeriv = $stmtDeriv->fetchColumn();
+                if ($idDeriv && $this->hasTable('facturacion_formulario_derivado')) {
+                    $this->db->prepare("UPDATE facturacion_formulario_derivado SET monto_total = ? WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ?")
+                        ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
+                }
+            } else {
+                $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?")
+                    ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+            }
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")
                     ->execute([$newProt, $id]);

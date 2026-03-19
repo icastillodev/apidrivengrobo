@@ -4,6 +4,7 @@ namespace App\Models\Protocol;
 use PDO;
 use Exception;
 use App\Utils\BackblazeB2;
+use App\Utils\Auditoria;
 
 class ProtocolModel {
     private $db;
@@ -848,5 +849,57 @@ class ProtocolModel {
             'InstName'    => $row['InstName'] ?? 'Institución',
             'lang'        => $row['lang'] ?? 'es'
         ];
+    }
+
+    /**
+     * Transmite un protocolo a instituciones de la red (admin origen).
+     * Crea solicitudprotocolo TipoPedido=2, Aprobado=3 (pendiente) y registra en protinstr.
+     */
+    public function transmitToNetwork($idprotA, $instOrigen, array $targets)
+    {
+        $idprotA = (int)$idprotA;
+        $instOrigen = (int)$instOrigen;
+        if ($idprotA <= 0 || $instOrigen <= 0) {
+            throw new Exception('Parámetros inválidos para transmisión.');
+        }
+
+        $stmt = $this->db->prepare("SELECT idprotA FROM protocoloexpe WHERE idprotA = ? AND IdInstitucion = ? LIMIT 1");
+        $stmt->execute([$idprotA, $instOrigen]);
+        if (!$stmt->fetchColumn()) {
+            throw new Exception('El protocolo no pertenece a su institución o no existe.');
+        }
+
+        $targets = array_unique(array_filter(array_map('intval', $targets)));
+        $targets = array_filter($targets, fn($t) => $t > 0 && $t !== $instOrigen);
+        if (empty($targets)) {
+            throw new Exception('Debe seleccionar al menos una institución destino distinta a la actual.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare("UPDATE protocoloexpe SET variasInst = 2 WHERE idprotA = ?")->execute([$idprotA]);
+
+            $insTarget = $this->db->prepare("INSERT INTO protinstr (idprotA, IdInstitucion) VALUES (?, ?)");
+            $chkTarget = $this->db->prepare("SELECT COUNT(*) FROM protinstr WHERE idprotA = ? AND IdInstitucion = ?");
+            $insReq = $this->db->prepare("INSERT INTO solicitudprotocolo (idprotA, Aprobado, TipoPedido, IdInstitucion) VALUES (?, 3, 2, ?)");
+            $chkPending = $this->db->prepare("SELECT COUNT(*) FROM solicitudprotocolo WHERE idprotA = ? AND TipoPedido = 2 AND IdInstitucion = ? AND Aprobado = 3");
+
+            foreach ($targets as $t) {
+                $chkTarget->execute([$idprotA, $t]);
+                if ((int)$chkTarget->fetchColumn() === 0) {
+                    $insTarget->execute([$idprotA, $t]);
+                }
+                $chkPending->execute([$idprotA, $t]);
+                if ((int)$chkPending->fetchColumn() === 0) {
+                    $insReq->execute([$idprotA, $t]);
+                }
+            }
+
+            Auditoria::log($this->db, 'NETWORK_TRANSMIT', 'protinstr', "Admin transmitió protocolo ID: {$idprotA} a instituciones de red");
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 }

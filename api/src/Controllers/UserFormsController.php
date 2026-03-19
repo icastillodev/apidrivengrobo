@@ -46,7 +46,7 @@ class UserFormsController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $detail = $this->model->getDetail((int)$id, $sesion['userId']);
+            $detail = $this->model->getDetail((int)$id, $sesion['userId'], (int)($sesion['instId'] ?? 0));
             echo json_encode(['status' => 'success', 'data' => $detail]);
         } catch (\Exception $e) {
             $msg = $e->getMessage();

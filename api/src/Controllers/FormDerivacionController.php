@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\FormDerivacion\FormDerivacionModel;
 use App\Utils\Auditoria;
+use App\Utils\VisorHelper;
 
 class FormDerivacionController
 {
@@ -111,6 +112,48 @@ class FormDerivacionController
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Throwable $e) {
             echo json_encode(['status' => 'success', 'data' => [], 'warning' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getDestinoConfig()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idformA = (int)($_GET['idformA'] ?? 0);
+            $categoria = $_GET['categoria'] ?? '';
+            $instCtx = $this->resolveInstId($sesion, $_GET);
+            if ($idformA <= 0) {
+                echo json_encode(['status' => 'success', 'data' => ['completa' => true, 'faltantes' => [], 'enviadoPor' => null]]);
+                exit;
+            }
+            $data = $this->model->checkDestinoConfigCompleta($idformA, $instCtx, $categoria);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Throwable $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function markViewed()
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+            $idformA = (int)($input['idformA'] ?? 0);
+            if ($idformA <= 0) {
+                echo json_encode(['status' => 'error', 'message' => 'ID de formulario inválido']);
+                exit;
+            }
+            $quienvisto = VisorHelper::getNombreApellidoYId($this->db, $sesion['userId']);
+            $this->model->markFormAsViewed($idformA, $quienvisto);
+            echo json_encode(['status' => 'success', 'quienvisto' => $quienvisto]);
+        } catch (\Throwable $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
     }

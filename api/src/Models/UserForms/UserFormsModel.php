@@ -45,6 +45,11 @@ class UserFormsModel {
             ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)"
             : "LEFT JOIN institucion ia ON ia.IdInstitucion = f.IdInstitucion";
         $actualInstSelect = "ia.NombreInst as InstitucionActualNombre,";
+        $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
+        $derivEstadoSelect = $hasDerivEstadoCols
+            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
+               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
+            : "";
 
         $sql = "SELECT
                     f.idformA,
@@ -62,6 +67,7 @@ class UserFormsModel {
                     COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     {$ownerSelect}
+                    {$derivEstadoSelect}
                 FROM formularioe f
                 INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
                 LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario AND {$tipoInstFilter}
@@ -74,11 +80,12 @@ class UserFormsModel {
                 LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
                 LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
-                WHERE f.IdUsrA = ?
+                WHERE " . $this->buildGetAllFormsWhereClause() . "
                 ORDER BY f.idformA DESC";
 
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userId]);
+        $params = $this->hasTable('formulario_derivacion') ? [$userId, $userId, (int)$currentInstId] : [$userId];
+        $stmt->execute($params);
         $list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $derivedIds = [];
@@ -107,7 +114,7 @@ class UserFormsModel {
         return ['info_inst' => $institucion, 'list' => $list];
     }
 
-    public function getDetail($id, $userId = null) {
+    public function getDetail($id, $userId = null, $currentInstId = 0) {
         $hasWorkflow = $this->hasColumn('formularioe', 'EstadoWorkflow') && $this->hasColumn('formularioe', 'DerivadoActivo');
         $hasOwner = $this->hasTable('formulario_owner_actual');
         $wfCols = $hasWorkflow ? "f.EstadoWorkflow, f.DerivadoActivo, f.IdInstitucionOrigen," : "NULL as EstadoWorkflow, 0 as DerivadoActivo, NULL as IdInstitucionOrigen,";
@@ -116,6 +123,11 @@ class UserFormsModel {
         $ownerJoin = $hasOwner ? "LEFT JOIN formulario_owner_actual foa ON f.idformA = foa.idformA" : "";
         $actualJoin = $hasOwner ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)" : "LEFT JOIN institucion ia ON ia.IdInstitucion = f.IdInstitucion";
         $actualSelect = "ia.NombreInst as InstitucionActualNombre";
+        $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
+        $derivEstadoSelect = $hasDerivEstadoCols
+            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
+               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
+            : "";
 
         $idInstOrigen = $hasWorkflow ? "COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)" : "f.IdInstitucion";
         $instOrigenJoin = "LEFT JOIN institucion iorig ON iorig.IdInstitucion = ({$idInstOrigen})";
@@ -131,6 +143,7 @@ class UserFormsModel {
                     COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '') as NombreDeptoA,
                     COALESCE(o.NombreOrganismoSimple, '') as NombreOrganismoSimple,
                     {$wfCols} {$originSelect} {$actualSelect}
+                    {$derivEstadoSelect}
                     FROM formularioe f
                     LEFT JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
                     {$instOrigenJoin}
@@ -150,8 +163,13 @@ class UserFormsModel {
         $head = $stmtHead->fetch(PDO::FETCH_ASSOC);
 
         if (!$head) throw new \Exception("Formulario no encontrado");
-        if ($userId !== null && (int)($head['IdUsrA'] ?? 0) !== (int)$userId) {
-            throw new \Exception("Formulario no encontrado");
+        if ($userId !== null) {
+            $esCreador = (int)($head['IdUsrA'] ?? 0) === (int)$userId;
+            $esDestinoDerivacion = $this->isUsuarioDestinoEnDerivacionActiva($id, $userId)
+                || $this->isUsuarioDestinoEnCualquierDerivacion($id, (int)$userId, (int)$currentInstId);
+            if (!$esCreador && !$esDestinoDerivacion) {
+                throw new \Exception("Formulario no encontrado");
+            }
         }
 
         // Instituciones que participan (origen + todas las del historial de derivación)
@@ -237,6 +255,26 @@ class UserFormsModel {
             'header' => $head,
             'details' => $details
         ];
+    }
+
+    /**
+     * Construye el WHERE para getAllForms.
+     * Solo muestra formularios con ID canónico: excluye copias (modelo antiguo con idformA != idformAOrigen).
+     * El destino ve el formulario original (COALESCE(idformAOrigen, idformA)), no la copia.
+     */
+    private function buildGetAllFormsWhereClause(): string {
+        if (!$this->hasTable('formulario_derivacion')) {
+            return "f.IdUsrA = ?";
+        }
+        $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $idSelect = $hasIdformAOrigen
+            ? "COALESCE(fd.idformAOrigen, fd.idformA)"
+            : "fd.idformA";
+        $base = "(f.IdUsrA = ? OR f.idformA IN (SELECT {$idSelect} FROM formulario_derivacion fd WHERE fd.Activo = 1 AND (fd.IdUsrDestinoResponsable = ? OR (fd.IdUsrDestinoResponsable IS NULL AND fd.IdInstitucionDestino = ?))))";
+        $excludeCopias = $hasIdformAOrigen
+            ? " AND NOT EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA AND fd2.idformAOrigen IS NOT NULL AND fd2.idformAOrigen != fd2.idformA)"
+            : "";
+        return $base . $excludeCopias;
     }
 
     /**
@@ -422,6 +460,45 @@ class UserFormsModel {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Verifica si el usuario puede ver el formulario como destino de derivación activa.
+     * (IdUsrDestinoResponsable = userId, o IdUsrDestinoResponsable IS NULL y usuario pertenece a IdInstitucionDestino)
+     */
+    private function isUsuarioDestinoEnDerivacionActiva(int $idformA, int $userId): bool {
+        if (!$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $whereForm = $hasIdformAOrigen ? "(fd.idformA = ? OR (fd.idformAOrigen = ? AND fd.idformAOrigen IS NOT NULL))" : "fd.idformA = ?";
+        $params = $hasIdformAOrigen ? [$userId, $idformA, $idformA, $userId] : [$userId, $idformA, $userId];
+        $stmt = $this->db->prepare("SELECT 1 FROM formulario_derivacion fd
+            LEFT JOIN usuarioe u ON u.IdUsrA = ? AND u.IdInstitucion = fd.IdInstitucionDestino
+            WHERE {$whereForm} AND fd.Activo = 1 AND fd.estado_derivacion IN (1, 2)
+            AND (fd.IdUsrDestinoResponsable = ? OR (fd.IdUsrDestinoResponsable IS NULL AND u.IdUsrA IS NOT NULL))
+            LIMIT 1");
+        $stmt->execute($params);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
+     * Verifica si el usuario participó como destino en cualquier derivación del formulario (activa o cerrada).
+     * Permite ver el detalle del formulario aunque la derivación ya esté entregada/cerrada.
+     * Considera idformAOrigen: si el usuario pide ver el original, y existe derivación con copia (idformA=copia, idformAOrigen=original), puede ver.
+     */
+    private function isUsuarioDestinoEnCualquierDerivacion(int $idformA, int $userId, int $currentInstId): bool {
+        if (!$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $whereForm = $hasIdformAOrigen ? "(fd.idformA = ? OR (fd.idformAOrigen = ? AND fd.idformAOrigen IS NOT NULL))" : "fd.idformA = ?";
+        $params = $hasIdformAOrigen ? [$idformA, $idformA, $userId, $currentInstId] : [$idformA, $userId, $currentInstId];
+        $stmt = $this->db->prepare("SELECT 1 FROM formulario_derivacion fd
+            WHERE {$whereForm} AND (fd.IdUsrDestinoResponsable = ? OR (fd.IdUsrDestinoResponsable IS NULL AND fd.IdInstitucionDestino = ?))
+            LIMIT 1");
+        $stmt->execute($params);
+        return (bool)$stmt->fetchColumn();
     }
 
     private function hasTable(string $tableName): bool {

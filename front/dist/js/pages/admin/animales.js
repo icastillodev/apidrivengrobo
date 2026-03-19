@@ -261,17 +261,27 @@ window.openAnimalModal = async (a) => {
     const instId = localStorage.getItem('instId');
     const container = document.getElementById('modal-content-animal');
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
-    
-    const [resMaster, resSex, resNotify, resDeptos] = await Promise.all([
+
+    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedDest = Number(a.DerivadoActivo || 0) === 1 && !isOriginInst;
+
+    const [resMaster, resSex, resNotify, resDeptos, resConfig] = await Promise.all([
         formDataCache ? Promise.resolve({status:'success', data:formDataCache}) : API.request(`/animals/form-data?inst=${instId}`),
         API.request(`/animals/get-sex-data?id=${a.idformA}`),
         API.request(`/animals/last-notification?id=${a.idformA}`),
-        API.request(`/deptos/list?inst=${instId}`)
+        API.request(`/deptos/list?inst=${instId}`),
+        isDerivedDest ? API.request(`/forms/derivation/config?idformA=${a.idformA}&categoria=Animal`) : Promise.resolve(null)
     ]);
     formDataCache = resMaster.data;
     if (resDeptos && resDeptos.status === 'success' && resDeptos.data) formDataCache.deptos = resDeptos.data;
     const sex = resSex.data || { machoA: 0, hembraA: 0, indistintoA: 0, totalA: 0 };
     const lastNotify = resNotify.data;
+    const derivConfig = (resConfig && resConfig.status === 'success' && resConfig.data) ? resConfig.data : null;
+
+    if (isDerivedDest) {
+        try { await API.request('/forms/derivation/mark-viewed', 'POST', { idformA: a.idformA }); } catch (_) {}
+    }
 
     // --- CORRECCIÓN IDENTIDAD ---
     const userFull = localStorage.getItem('userFull') || localStorage.getItem('userName') || 'Usuario';
@@ -279,11 +289,15 @@ window.openAnimalModal = async (a) => {
     const identity = `${String(userFull).trim() || 'Usuario'} (ID: ${userId})`;
 
     // ENSAMBLADO MODULAR
-    let html = renderModalHeader(a);
+    let html = renderModalHeader(a, derivConfig);
+    if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
+        html += renderEnviadoPor(derivConfig.enviadoPor);
+    }
     html += renderResearcherContact(a);
     html += `<input type="hidden" id="current-idformA" value="${a.idformA}">`;
-    // Pasamos la identidad limpia
-    html += renderAdminSection(a, identity);
+    const configIncompleta = derivConfig && !derivConfig.completa;
+    html += (configIncompleta ? renderConfigFaltaBanner(derivConfig.faltantes) : '');
+    html += renderAdminSection(a, identity, configIncompleta);
     html += renderNotificationSection(lastNotify, a.idformA);
     html += renderOrderModificationSection(a, sex, formDataCache);
 
@@ -293,10 +307,43 @@ window.openAnimalModal = async (a) => {
     const selDepto = document.getElementById('modal-depto-animal');
     if (selDepto) selDepto.onchange = function() { window.updateDeptoOrgAmbito(this, 'modal-org-animal', 'modal-ambito-animal'); };
 
+    // Habilitar el cambio de estado cuando el usuario completa lo que falta en UI
+    // (la validación final la hace el backend al intentar actualizar el estado).
+    const statusSel = document.getElementById('modal-status');
+    const updateDerivedEstadoEnablement = () => {
+        if (!statusSel) return;
+        const deptoOk = (document.getElementById('modal-depto-animal')?.value || '').trim() !== '';
+        const espOk = (document.getElementById('select-especie-modal')?.value || '').trim() !== '';
+        const catOk = (document.getElementById('select-categoria-modal')?.value || '').trim() !== '';
+        const selCepa = document.getElementById('select-cepa-modal');
+        const help = document.getElementById('cepa-modal-help');
+        const cepaRequired = help && (help.textContent || '').toLowerCase().includes('debe seleccionar');
+        const cepaOk = !cepaRequired || (selCepa && String(selCepa.value || '0') !== '0');
+
+        statusSel.disabled = !(deptoOk && espOk && catOk && cepaOk);
+        if (statusSel.disabled) {
+            statusSel.setAttribute(
+                'title',
+                window.txt?.misformularios?.derivacion_actualizar_primero || 'Actualice el formulario antes de cambiar el estado'
+            );
+        } else {
+            statusSel.removeAttribute('title');
+        }
+    };
+    if (statusSel && isDerivedDest && configIncompleta) {
+        const bind = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', updateDerivedEstadoEnablement);
+        };
+        bind('modal-depto-animal');
+        bind('select-especie-modal');
+        bind('select-categoria-modal');
+        bind('select-cepa-modal');
+    }
+
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
-    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
-    const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
     const useAllLocalSpecies = isDerivedActive && !isOriginInst;
     if (useAllLocalSpecies) {
@@ -309,12 +356,35 @@ window.openAnimalModal = async (a) => {
     if (idespA) await window.loadCepasForEspecieModal(idespA, useAllLocalSpecies ? null : a.idcepaA);
     window.calculateAnimalTotals?.();
     window.updateResumenNuevoFormulario?.();
+    if (statusSel && isDerivedDest && configIncompleta) updateDerivedEstadoEnablement();
     new bootstrap.Modal(document.getElementById('modal-animal')).show();
 };
 
 /* --- FUNCIONES DE RENDERIZADO (MODULOS) --- */
 
-function renderModalHeader(a) {
+function renderEnviadoPor(ep) {
+    const t = window.txt?.misformularios || {};
+    const lbl = t.derivacion_enviado_por || 'Enviado por';
+    const parts = [ep.nombre, ep.institucion].filter(Boolean);
+    if (parts.length === 0) return '';
+    let html = `<div class="alert alert-secondary py-2 px-3 small mb-2"><strong>${lbl}:</strong> ${parts.join(', ')}`;
+    if (ep.correo || ep.telefono) html += ` | ${ep.correo || ''} ${ep.telefono ? (ep.correo ? '· ' : '') + ep.telefono : ''}`;
+    html += '</div>';
+    return html;
+}
+
+function renderConfigFaltaBanner(faltantes) {
+    const t = window.txt?.misformularios || {};
+    const msg = t.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+    const desc = t.derivacion_faltan_datos || 'Complete los datos antes de cambiar el estado.';
+    const faltantesTxt = Array.isArray(faltantes) ? faltantes.join(', ') : '';
+    return `<div class="alert alert-warning py-2 px-3 mb-2 small">
+        <strong><i class="bi bi-exclamation-triangle me-1"></i>${msg}</strong>
+        <div class="mt-1">${desc} ${faltantesTxt ? `(${faltantesTxt})` : ''}</div>
+    </div>`;
+}
+
+function renderModalHeader(a, derivConfig) {
     const tx = window.txt?.misformularios || {};
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
@@ -383,11 +453,12 @@ function renderResearcherContact(a) {
 }
 
 // --- CORRECCIÓN VISUALIZACIÓN "REVISADO POR" ---
-function renderAdminSection(a, identity) {
+function renderAdminSection(a, identity, disableEstado = false) {
     // Mostrar nombre + ID como en Reactivos; si no hay visor → "Falta revisar"
     const visorTexto = (a.QuienVio && String(a.QuienVio).trim() && a.QuienVio.toLowerCase() !== 'null') ? a.QuienVio : 'Falta revisar';
     const t = window.txt?.admin_animales?.modal || {};
     const lblRevisado = t.reviewed_by || "Revisado por";
+    const disAttr = disableEstado ? ' disabled title="' + (window.txt?.misformularios?.derivacion_actualizar_primero || 'Actualice el formulario antes de cambiar el estado') + '"' : '';
 
     return `
     <div class="bg-light p-3 rounded border shadow-sm mb-3">
@@ -395,7 +466,7 @@ function renderAdminSection(a, identity) {
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted uppercase">Estado Pedido</label>
                 <div class="d-flex align-items-center gap-2">
-                    <select id="modal-status" class="form-select form-select-sm fw-bold" onchange="window.updateAnimalStatusQuick()">
+                    <select id="modal-status" class="form-select form-select-sm fw-bold" onchange="window.updateAnimalStatusQuick()"${disAttr}>
                         <option value="Sin estado" ${a.estado === 'Sin estado' ? 'selected' : ''}>Sin estado</option>
                         <option value="Proceso" ${a.estado === 'Proceso' ? 'selected' : ''}>Proceso</option>
                         <option value="Listo para entrega" ${a.estado === 'Listo para entrega' ? 'selected' : ''}>Listo para entrega</option>
@@ -438,9 +509,12 @@ function renderOrderModificationSection(a, sex, cache) {
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const wf = (a.EstadoWorkflow || '').toString().toUpperCase();
     const lockProtocol = isDerivedActive && !isOriginInst;
     const lockImmutable = isDerivedActive && !isOriginInst;
-    const lockTipo = lockImmutable;
+    // En derivación destino queremos que el usuario pueda ajustar el tipo/formulario,
+    // aunque otros elementos del formulario puedan quedar bloqueados.
+    const lockTipo = false;
     const emptyEditable = lockImmutable;
     const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
     const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
@@ -613,7 +687,7 @@ function renderOrderModificationSection(a, sex, cache) {
                 <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadAnimalPDF(${a.idformA})">
                     <i class="bi bi-file-pdf"></i> DESCARGAR PDF
                 </button>
-                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;">GUARDAR CAMBIOS</button>
+                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;" ${(isDerivedActive && (isOriginInst || (wf || '').includes('PENDIENTE'))) ? 'disabled title="' + (tx.derivacion_guardar_bloqueado || 'No se puede guardar: el formulario está en derivación.') + '"' : ''}>GUARDAR CAMBIOS</button>
             </div>
         </div>
     </form>`;
@@ -652,8 +726,15 @@ window.updateAnimalStatusQuick = async () => {
             const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
             document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value, porInst);
             syncAllData();
+        } else {
+            const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+            window.Swal.fire(title, res.message || 'No se pudo cambiar el estado.', 'warning');
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+        window.Swal.fire(title, e?.message || 'No se pudo cambiar el estado.', 'error');
+    }
 };
 
 /**
@@ -758,6 +839,11 @@ window.loadSpeciesForProtocol = async (protId, selectedSubId = null, opts = {}) 
                 if (item) {
                     selEsp.value = item.idespA;
                     window.onEspecieModalChange(selEsp, selectedSubId);
+                } else if (allLocal && especiesUnicas.length > 0) {
+                    // En derivación destino puede que la subespecie original no exista en la institución destino.
+                    // Aun así habilitamos una especie local para que categoría/cepa se puedan completar.
+                    selEsp.value = especiesUnicas[0].idespA;
+                    window.onEspecieModalChange(selEsp, null);
                 } else if (!allLocal && filtered.length > 0) {
                     selEsp.value = filtered[0].idespA;
                     window.onEspecieModalChange(selEsp, filtered[0].idsubespA);
@@ -886,9 +972,10 @@ window.saveFullAnimalForm = async (e) => {
     const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
     const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
     const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
-    if (lockByPending) {
+    const lockSaveByDerivacion = isDerivedActive && (isOriginInst || lockByPending);
+    if (lockSaveByDerivacion) {
         const tx = window.txt?.misformularios || {};
-        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        window.Swal.fire('No se puede guardar', lockByPending ? (tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.') : (tx.derivacion_guardar_bloqueado || 'El formulario está en derivación.'), 'warning');
         return;
     }
 
@@ -1186,10 +1273,21 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
+    const tx = window.txt?.misformularios || {};
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     const derivBadge = getWorkflowBadgeRow(item);
-    const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
-    const estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
+    let estadoBadge;
+    if (hasDualEstados) {
+        const lblOrigen = tx.estado_origen_label || 'Origen';
+        const lblDestino = tx.estado_destino_label || 'Destino';
+        const bOrigen = item.estado_origen ? getStatusBadge(item.estado_origen) : '';
+        const bDestino = item.estado_destino ? getStatusBadge(item.estado_destino) : '';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+    } else {
+        const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
+        estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    }
     if (isDerived) {
         return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
     }

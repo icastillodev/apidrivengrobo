@@ -1,5 +1,7 @@
 # Checklist de tareas – Instrucciones por ítem
 
+**Archivado.** Para tareas activas, ver `docs/CHECKLIST-ACTIVO.md`.
+
 Cada ítem tiene instrucciones para poder ir rellenando los checks.  
 `[x]` = hecho · `[ ]` = pendiente
 

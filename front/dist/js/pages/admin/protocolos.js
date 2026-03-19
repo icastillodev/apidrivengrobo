@@ -576,6 +576,7 @@ window.openProtocolModal = async (p = null) => {
     const hasSolicitudLocal = p ? Number(p.TieneSolicitudLocal || 0) === 1 : false;
     const canDeleteManual = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && !hasSolicitudLocal);
     const canRejectSolicitud = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && Number(p.IdSolicitudLocalAprobada || 0) > 0);
+    const canTransmitToNetwork = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && formDataCache?.has_network);
     const canManageManualAttachments = Boolean(isPrivilegedAdmin() && (!p || (isLocalProtocol && !hasSolicitudLocal)));
     const usersForSelect = [...(formDataCache.users || [])];
     if (p && effectiveUserId && !usersForSelect.some(u => String(u.IdUsrA) === String(effectiveUserId))) {
@@ -638,6 +639,7 @@ window.openProtocolModal = async (p = null) => {
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
             <div class="d-flex gap-2">
+                ${canTransmitToNetwork ? `<button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="window.openTransmitModal(${p.idprotA})"><i class="bi bi-share-fill me-1"></i>${txtProt.btn_transmitir_red || ''}</button>` : ''}
                 ${canRejectSolicitud ? `<button type="button" class="btn btn-outline-warning btn-sm fw-bold" onclick="window.rejectProtocolRequest(${p.idprotA})"><i class="bi bi-x-octagon me-1"></i>${txtProt.btn_rechazar_solicitud || 'Rechazar solicitud'}</button>` : ''}
                 ${canDeleteManual ? `<button type="button" class="btn btn-outline-danger btn-sm fw-bold" onclick="window.deleteManualProtocol(${p.idprotA})"><i class="bi bi-trash me-1"></i>${txtProt.btn_borrar_manual || 'Borrar protocolo'}</button>` : ''}
                 ${p ? `<button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.downloadProtocolPDF(${p.idprotA})"><i class="bi bi-file-pdf"></i> FICHA PDF</button>` : ''}
@@ -1073,6 +1075,79 @@ window.deleteManualProtocol = async (idprot) => {
         await initProtocolosPage();
     } else {
         window.Swal.fire('Error', res?.message || (txt.error_accion || 'No se pudo completar la accion.'), 'error');
+    }
+};
+
+window.openTransmitModal = async (idprotA) => {
+    const txt = window.txt?.admin_protocolos || {};
+    const listEl = document.getElementById('transmit-targets-list');
+    const btnEnviar = document.getElementById('btn-transmitir-enviar');
+    if (!listEl || !btnEnviar) return;
+
+    // Aseguramos que el modal no rompa si SweetAlert2 no cargó (window.Swal podría ser undefined)
+    const fireSwal = (title, message, icon) => {
+        try {
+            if (window.Swal && typeof window.Swal.fire === 'function') {
+                return window.Swal.fire(title, message, icon);
+            }
+        } catch (_) {}
+        // Fallback mínimo para evitar crash
+        const msg = [title, message].filter(Boolean).join(' - ');
+        alert(msg);
+    };
+
+    listEl.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-info"></div></div>';
+    btnEnviar.disabled = true;
+
+    const modalTransmit = new bootstrap.Modal(document.getElementById('modal-transmitir-protocolo'));
+    modalTransmit.show();
+
+    try {
+        const res = await API.request('/protocols/transmission-targets');
+        if (res?.status !== 'success' || !Array.isArray(res.data)) {
+            listEl.innerHTML = `<p class="text-muted small mb-0">${txt.transmitir_sin_destinos || ''}</p>`;
+            return;
+        }
+        const targets = res.data;
+        if (targets.length === 0) {
+            listEl.innerHTML = `<p class="text-muted small mb-0">${txt.transmitir_sin_destinos || ''}</p>`;
+            return;
+        }
+
+        listEl.innerHTML = targets.map(t => `
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" value="${Number(t.IdInstitucion)}" id="transmit-chk-${t.IdInstitucion}">
+                <label class="form-check-label small" for="transmit-chk-${t.IdInstitucion}">${escapeHtml(t.NombreInst || '')}</label>
+            </div>
+        `).join('');
+
+        btnEnviar.disabled = false;
+        btnEnviar.onclick = async () => {
+            const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
+            const selected = Array.from(checked).map(c => Number(c.value)).filter(v => v > 0);
+            if (selected.length === 0) {
+                fireSwal('', txt.transmitir_seleccione || '', 'warning');
+                return;
+            }
+            btnEnviar.disabled = true;
+            try {
+                const r = await API.request('/protocols/transmit', 'POST', { idprot: idprotA, targets: selected });
+                if (r?.status === 'success') {
+                    fireSwal('OK', txt.transmitir_ok || '', 'success');
+                    modalTransmit.hide();
+                    bootstrap.Modal.getInstance(document.getElementById('modal-protocol'))?.hide();
+                    await initProtocolosPage();
+                } else {
+                    fireSwal('Error', r?.message || (txt.transmitir_error || ''), 'error');
+                }
+            } catch (err) {
+                fireSwal('Error', txt.transmitir_error || '', 'error');
+            } finally {
+                btnEnviar.disabled = false;
+            }
+        };
+    } catch (err) {
+        listEl.innerHTML = `<p class="text-danger small mb-0">${txt.transmitir_error || ''}</p>`;
     }
 };
 

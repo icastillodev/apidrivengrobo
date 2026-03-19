@@ -26,7 +26,21 @@ async function getLangFromBackendIfLogged() {
     return null;
 }
 
+/** Aplica tema y tamaño de letra desde localStorage al cargar (evita flash) */
+function applyStoredThemeAndFont() {
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark' || theme === 'light') {
+        document.documentElement.setAttribute('data-bs-theme', theme);
+    }
+    const fontSize = localStorage.getItem('fontSize');
+    if (['chica', 'mediana', 'grande'].includes(fontSize)) {
+        document.documentElement.setAttribute('data-font-size', fontSize);
+    }
+}
+
 export async function loadLanguage(lang = null) {
+    // Aplicar tema y fontSize guardados lo antes posible (persistencia visual)
+    applyStoredThemeAndFont();
     // Si no se pasó idioma y hay sesión, usar el guardado en BD
     if (lang == null) {
         const fromBackend = await getLangFromBackendIfLogged();
@@ -49,6 +63,7 @@ export async function loadLanguage(lang = null) {
         // 4. Asignamos a la variable global
         window.txt = module[selectedLang];
         localStorage.setItem('lang', selectedLang);
+        localStorage.setItem('idioma', selectedLang);
 
         console.log(`✅ Idioma cargado correctamente: ${selectedLang}`);
         return true;

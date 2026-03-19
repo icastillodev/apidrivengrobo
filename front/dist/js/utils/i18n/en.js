@@ -700,6 +700,7 @@ alojamientos: {
         estado_cobro_pagado: "PAID",
         estado_cobro_anulado: "CANCELED",
         col_formulario: "Form",
+        col_instituciones_derivado: "Institutions (Origin → Destination)",
         sin_datos_institucion: "No derived billing found for selected filters.",
         inst_solicitante: "Institution:",
         inst_todas: "ALL",
@@ -1232,6 +1233,9 @@ alojamientos: {
         estado_derivacion_rechazada: "Rejected",
         estado_derivacion_cancelada: "Cancelled",
         estado_por: "by",
+        estado_origen_label: "Origin",
+        estado_destino_label: "Destination",
+        derivacion_guardar_bloqueado: "Cannot save: the form is in derivation.",
         derivacion_espera_aceptacion: "You must accept the derivation before starting work.",
         derivacion_protocolo_bloqueado: "Fixed protocol: it cannot be changed in a derived form.",
         derivacion_datos_origen: "Original form data (derived)",
@@ -1242,6 +1246,10 @@ alojamientos: {
         derivacion_resumen_placeholder: "Select species and category above.",
         derivacion_seleccione_especie: "— Select species —",
         derivacion_especie_requerida: "You must select Species and Category for the derived form.",
+        derivacion_enviado_por: "Sent by",
+        derivacion_actualizar_formulario: "Update form for application",
+        derivacion_faltan_datos: "Complete the data before changing the status.",
+        derivacion_actualizar_primero: "Update the form before changing the status",
         cancelar: "Cancel",
         label_origen: "Origin",
         label_tipo: "Type",
@@ -1342,7 +1350,10 @@ alojamientos: {
         red_no_candidatos: "You have no valid APPROVED protocols to share.",
         red_select_destino_req: "Select at least one destination institution.",
         red_enviado_title: "Sent",
-        red_enviado_msg: "Request sent to the network."
+        red_enviado_msg: "Request sent to the network.",
+        red_faltan_envios_title: "Network sending pending",
+        red_faltan_envios_msg: "Some network institutions still have not received the request.",
+        red_btn_enviar_desde_detalle: "Send to network"
     },
     misalojamientos: {
         titulo: "MY ACCOMMODATIONS",
@@ -1607,7 +1618,16 @@ alojamientos: {
         rechazar_confirmar: "Reject and notify",
         rechazar_motivo_req: "Reason is required",
         rechazar_ok: "Request rejected and user notified.",
-        error_accion: "Could not complete the action."
+        error_accion: "Could not complete the action.",
+        btn_transmitir_red: "Send to network",
+        transmitir_modal_titulo: "Send protocol to network institution",
+        transmitir_modal_desc: "Select the destination institutions to send this protocol to. They will appear as pending approval in their request center.",
+        transmitir_label_destinos: "Destination institutions",
+        transmitir_btn_enviar: "Send protocol",
+        transmitir_ok: "Protocol sent to the network successfully.",
+        transmitir_error: "Could not send the protocol to the network.",
+        transmitir_sin_destinos: "No network institutions available.",
+        transmitir_seleccione: "Select at least one institution."
     },
     admin_animales: {
         bread_grobo: "GROBO",

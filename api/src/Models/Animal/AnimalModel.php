@@ -38,6 +38,11 @@ class AnimalModel {
         $originJoin = $hasWorkflowCols
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
             : "";
+        $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
+        $derivEstadoSelect = $hasDerivEstadoCols
+            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
+               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
+            : "";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -56,13 +61,30 @@ class AnimalModel {
         // Garantizar que formularios derivados al destino SIEMPRE aparezcan (aunque falle otro JOIN)
         $derivDestinoClause = '';
         $derivDestinoAndClause = '';
+        $derivOrigenClause = '';
+        $derivOrigenAndClause = '';
         if ($this->hasTable('formulario_derivacion')) {
             $derivDestinoClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE fd.idformA = f.idformA AND fd.Activo = 1 AND fd.IdInstitucionDestino = ?)";
             $params[] = (int)$instId;
             $derivDestinoAndClause = " OR (tf.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA AND fd2.Activo = 1 AND fd2.IdInstitucionDestino = ?))";
             $params[] = (int)$instId;
+
+            $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+            $fdFormMatch = $hasIdformAOrigen
+                ? "(fd.idformA = f.idformA OR fd.idformAOrigen = f.idformA)"
+                : "fd.idformA = f.idformA";
+            $fd2FormMatch = $hasIdformAOrigen
+                ? "(fd2.idformA = f.idformA OR fd2.idformAOrigen = f.idformA)"
+                : "fd2.idformA = f.idformA";
+
+            // También garantizamos que el origen vea los derivados (según formulario_derivacion),
+            // incluso si el owner actual se movió al destino.
+            $derivOrigenClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE {$fdFormMatch} AND fd.Activo = 1 AND fd.IdInstitucionOrigen = ?)";
+            $params[] = (int)$instId;
+            $derivOrigenAndClause = " OR (tf.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE {$fd2FormMatch} AND fd2.Activo = 1 AND fd2.IdInstitucionOrigen = ?))";
+            $params[] = (int)$instId;
         }
-        $whereInst = "(" . $whereInst . $derivDestinoClause . ")";
+        $whereInst = "(" . $whereInst . $derivDestinoClause . $derivOrigenClause . ")";
 
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
@@ -104,6 +126,7 @@ class AnimalModel {
                         WHERE pf2.idformA = f.idformA
                         LIMIT 1
                     ) as DeptoExternoFlag
+                    {$derivEstadoSelect}
                 FROM formularioe f
                 LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
@@ -120,12 +143,81 @@ class AnimalModel {
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
                 WHERE {$whereInst} 
-                  AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause})
+                  AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause} {$derivOrigenAndClause})
                 ORDER BY f.idformA DESC";
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Modelo sin copia: origen y destino ven el mismo formularioe.
+        // Para que en la institución ORIGEN se vean columnas con el "formulario original",
+        // sobreescribimos campos que pueden cambiar (tipo/especie/depto/organismo/cepa)
+        // usando el snapshot preservado en `formulario_datos_originales`.
+        if ($this->hasTable('formulario_datos_originales') && !empty($rows)) {
+            $instIdInt = (int)$instId;
+            $originDerivedIds = [];
+            foreach ($rows as $r) {
+                $isDerived = (int)($r['DerivadoActivo'] ?? 0) === 1;
+                $idInstOrigen = (int)($r['IdInstitucionOrigen'] ?? 0);
+                if ($isDerived && $idInstOrigen === $instIdInt) {
+                    $originDerivedIds[] = (int)($r['idformA'] ?? 0);
+                }
+            }
+            $originDerivedIds = array_values(array_unique(array_filter($originDerivedIds)));
+            if (!empty($originDerivedIds)) {
+                $placeholders = implode(',', array_fill(0, count($originDerivedIds), '?'));
+                // En modelo sin copia, los snapshots guardan idformA = idformA del formulario original.
+                $sqlSnap = "SELECT idformA, datos_json
+                             FROM formulario_datos_originales
+                             WHERE idformA IN ($placeholders)
+                             ORDER BY IdFormularioDerivacion DESC";
+                $stmtSnap = $this->db->prepare($sqlSnap);
+                $stmtSnap->execute($originDerivedIds);
+                $snapById = [];
+                while ($sr = $stmtSnap->fetch(PDO::FETCH_ASSOC)) {
+                    $sid = (int)($sr['idformA'] ?? 0);
+                    if ($sid <= 0 || isset($snapById[$sid])) continue;
+                    $snapById[$sid] = $sr['datos_json'] ?? null;
+                }
+
+                foreach ($rows as &$row) {
+                    $rid = (int)($row['idformA'] ?? 0);
+                    if ($rid <= 0 || empty($snapById[$rid])) continue;
+                    $decoded = json_decode((string)$snapById[$rid], true);
+                    if (!is_array($decoded)) continue;
+
+                    $header = $decoded['header'] ?? [];
+                    $details = $decoded['details'] ?? [];
+
+                    if (!empty($decoded['nombreTipo'])) {
+                        $row['TipoNombre'] = (string)$decoded['nombreTipo'];
+                    }
+                    if (!empty($header['fechainicioA'])) $row['Inicio'] = $header['fechainicioA'];
+                    if (!empty($header['fecRetiroA'])) $row['Retiro'] = $header['fecRetiroA'];
+
+                    if (!empty($header['nprotA'])) $row['NProtocolo'] = $header['nprotA'];
+                    if (!empty($header['TituloProtocolo'])) $row['TituloProtocolo'] = $header['TituloProtocolo'];
+
+                    if (!empty($header['NombreDeptoA'])) $row['DeptoProtocolo'] = $header['NombreDeptoA'];
+                    if (!empty($header['NombreOrganismoSimple'])) $row['Organizacion'] = $header['NombreOrganismoSimple'];
+
+                    if (is_array($details) && !empty($details)) {
+                        $espe = (string)($details['EspeNombreA'] ?? '');
+                        $subespe = (string)($details['SubEspeNombreA'] ?? '');
+                        $cepa = (string)($details['CepaNombreA'] ?? '');
+
+                        if ($espe !== '') $row['EspeNombreA'] = $espe;
+                        if ($subespe !== '') $row['SubEspeNombreA'] = $subespe;
+
+                        if ($espe !== '' && $subespe !== '') $row['CatEspecie'] = $espe . ' - ' . $subespe;
+                        if ($cepa !== '') $row['CepaNombre'] = $cepa;
+                    }
+                }
+            }
+        }
+
+        return $rows;
     }
 
     private function hasTable(string $tableName): bool {
@@ -218,8 +310,9 @@ class AnimalModel {
 public function updateStatus($data) {
         $id = $data['idformA'] ?? null;
         if (!$id) return false;
-        if (!empty($data['instId'])) {
-            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, (int)$data['instId']);
+        $instId = (int)($data['instId'] ?? 0);
+        if ($instId > 0) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$id, $instId);
         }
 
         $nuevoEstado = $data['estado'] ?? 'Sin estado';
@@ -236,11 +329,24 @@ public function updateStatus($data) {
         $cantidad = (int)($oldRow['cant'] ?? 0);
         $idProt = $oldRow['idprot'];
 
+        $formDerivModel = new FormDerivacionModel($this->db);
+        $deriv = $instId > 0 ? $formDerivModel->getDerivationByFormAndInst($id, $instId) : null;
+        $isDerived = $deriv !== null;
+
+        if ($isDerived && !empty($deriv['is_destination'])) {
+            $cfg = $formDerivModel->checkDestinoConfigCompleta($id, $instId, 'Animal');
+            if (!$cfg['completa']) {
+                throw new \Exception('Actualizar formulario para la aplicación: faltan ' . implode(', ', $cfg['faltantes']) . '. Complete los datos antes de cambiar el estado.');
+            }
+        }
+
         $this->db->beginTransaction();
         try {
             $isNewSuspended = (strtolower(trim($nuevoEstado)) === 'suspendido');
             $isOldSuspended = (strtolower(trim($oldStatus)) === 'suspendido');
 
+            // Protocol: animals deducted ONCE at creation. Suspendido only: add back when suspending, subtract when un-suspending.
+            // When both origin and destination mark Entregado, each just updates estado; no double deduction.
             if ($isNewSuspended && !$isOldSuspended && $idProt) {
                 $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$cantidad, $idProt]);
             } elseif (!$isNewSuspended && $isOldSuspended && $idProt) {
@@ -249,6 +355,19 @@ public function updateStatus($data) {
 
             $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
             $this->db->prepare($sql)->execute([$nuevoEstado, $aclaracion, $quien, $id]);
+
+            // For derived forms: update estado_origen or estado_destino in formulario_derivacion
+            if ($isDerived && $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen')) {
+                $idDeriv = (int)($deriv['IdFormularioDerivacion'] ?? 0);
+                if ($idDeriv > 0) {
+                    if (!empty($deriv['is_origin'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_origen = ? WHERE IdFormularioDerivacion = ?")->execute([$nuevoEstado, $idDeriv]);
+                    }
+                    if (!empty($deriv['is_destination'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_destino = ? WHERE IdFormularioDerivacion = ?")->execute([$nuevoEstado, $idDeriv]);
+                    }
+                }
+            }
 
             Auditoria::log($this->db, 'UPDATE', 'formularioe', "Cambió estado de Pedido de Animales #$id a: $nuevoEstado");
             
@@ -426,19 +545,16 @@ public function updateStatus($data) {
             $sqlSexo = "UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?";
             $this->db->prepare($sqlSexo)->execute([$data['machoA'] ?? 0, $data['hembraA'] ?? 0, $data['indistintoA'] ?? 0, $newTotal, $id]);
 
-            // 🚀 NUEVO: RECALCULAR FACTURACIÓN
-            // 1. Buscamos el precio de la subespecie (por si la cambiaron)
+            // 🚀 RECALCULAR FACTURACIÓN
             $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
             $stmtPrecio->execute([$idSubesp]);
             $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
-
-            // 2. Calculamos nuevo total y actualizamos precioformulario
             $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
-            $sqlPrecio = "UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?";
-            $this->db->prepare($sqlPrecio)->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
 
-            // 3. Si es formulario derivado en destino: actualizar facturacion_formulario_derivado (precio por institución)
-            if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+            $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
+            if ($esDerivadoEnDestino) {
+                // Formulario derivado en destino: NO sobrescribir precioformulario (es el original del cliente).
+                // Crear/actualizar solo facturacion_formulario_derivado = factura proveedor→cliente.
                 $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
                 $stmtDeriv->execute([$id, $instIdRequest]);
                 $idDeriv = $stmtDeriv->fetchColumn();
@@ -446,8 +562,11 @@ public function updateStatus($data) {
                     $this->db->prepare("UPDATE facturacion_formulario_derivado SET monto_total = ? WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ?")
                         ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
                 }
+            } else {
+                // Formulario normal: actualizar precioformulario
+                $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?")
+                    ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
             }
-            // ------------------------------------------
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
 

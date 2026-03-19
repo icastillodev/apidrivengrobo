@@ -209,6 +209,7 @@ export async function downloadProtocolPDF(id) {
 export async function viewProtocol(id) {
     const p = store.allData[store.currentTab].find(x => x.idprotA == id);
     if (!p) return;
+    const isRedProt = String(p?.TipoAprobacion || '').toUpperCase() === 'RED';
 
     const modalEl = document.getElementById('modal-detail');
     const content = document.getElementById('detail-content');
@@ -239,6 +240,7 @@ export async function viewProtocol(id) {
     const species = await fetchSpeciesDetails(id);
     let attachmentsHtml = '';
     let networkStatusHtml = '';
+    let networkMissingBannerHtml = '';
     try {
         const resAtt = await API.request(`/user/protocols/attachments-by-protocol?idprot=${id}`);
         if (resAtt.status === 'success' && Array.isArray(resAtt.data) && resAtt.data.length > 0) {
@@ -310,6 +312,29 @@ export async function viewProtocol(id) {
         const t = window.txt?.misprotocolos || {};
         const resNet = await API.request(`/user/protocols/network-status?idprot=${id}`);
         if (resNet.status === 'success' && Array.isArray(resNet.data) && resNet.data.length > 0) {
+            const networkRows = resNet.data;
+            if (isRedProt) {
+                const missing = networkRows.filter(r => Number(r.estado) === 0);
+                if (missing.length > 0) {
+                    const names = missing.map(r => r.NombreInst || '-').filter(Boolean).slice(0, 4).join(', ');
+                    const more = missing.length > 4 ? ` +${missing.length - 4}` : '';
+                    networkMissingBannerHtml = `
+                        <div class="alert alert-info mt-3 mb-2">
+                            <div class="fw-bold">${t.red_faltan_envios_title || 'Envío a la red pendiente'}</div>
+                            <div class="small text-muted mt-1">
+                                ${t.red_faltan_envios_msg || 'Faltan instituciones de red por recibir la solicitud.'} 
+                                <strong>${names}${more}</strong>.
+                            </div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-info text-white btn-sm fw-bold" onclick="window.openNetworkRequestModal(${p.idprotA})">
+                                    ${t.red_btn_enviar_desde_detalle || 'Enviar a la red'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
             networkStatusHtml = `
                 <div class="mt-3">
                     <label class="small text-muted fw-bold d-block mb-2">${t.red_estado_solicitudes || 'Estado de solicitudes por institución'}</label>
@@ -322,7 +347,7 @@ export async function viewProtocol(id) {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${resNet.data.map(r => `
+                                ${networkRows.map(r => `
                                     <tr>
                                         <td class="small">
                                             ${r.NombreInst || '-'}
@@ -404,6 +429,7 @@ export async function viewProtocol(id) {
                         </div>
                     </div>
                     ${attachmentsHtml}
+                    ${networkMissingBannerHtml}
                     ${networkStatusHtml}
                 </div>
             </div>

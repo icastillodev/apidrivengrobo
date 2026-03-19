@@ -515,7 +515,9 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     ffd.IdFacturacionFormularioDerivado,
                     ffd.idformA,
                     ffd.IdInstitucionSolicitante,
+                    ffd.IdInstitucionCobradora,
                     COALESCE(i.NombreInst, CONCAT('Institución #', ffd.IdInstitucionSolicitante)) as institucion_solicitante,
+                    COALESCE(ic.NombreInst, CONCAT('Institución #', ffd.IdInstitucionCobradora)) as institucion_cobradora,
                     ffd.tipo_formulario,
                     ffd.monto_total,
                     ffd.monto_pagado,
@@ -527,9 +529,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador
                 FROM facturacion_formulario_derivado ffd
                 LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
+                LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
                 LEFT JOIN formularioe f ON f.idformA = ffd.idformA
                 LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA AND tf.IdInstitucion = COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)
-                LEFT JOIN personae p ON p.IdUsrA = f.IdUsrA
+                LEFT JOIN personae p ON p.IdUsrA = ffd.IdUsrSolicitante
                 WHERE ffd.IdInstitucionCobradora = ?";
         $params = [(int)$instId];
 
@@ -584,7 +587,9 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 'estadoFormulario' => $r['estado_formulario'],
                 'nombreTipo' => $r['nombre_tipo'],
                 'categoria' => $r['categoria'],
-                'investigador' => trim((string)$r['investigador']) !== '' ? trim((string)$r['investigador']) : '-'
+                'investigador' => trim((string)$r['investigador']) !== '' ? trim((string)$r['investigador']) : '-',
+                'institucionOrigen' => trim((string)($r['institucion_solicitante'] ?? '')) !== '' ? trim((string)$r['institucion_solicitante']) : '-',
+                'institucionDestino' => trim((string)($r['institucion_cobradora'] ?? '')) !== '' ? trim((string)$r['institucion_cobradora']) : '-'
             ];
 
             $out['instituciones'][$idInstSol]['items'][] = $item;

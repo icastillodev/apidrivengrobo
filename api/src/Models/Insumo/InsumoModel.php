@@ -31,6 +31,11 @@ class InsumoModel {
         $currentInstJoin = $hasOwnerTable
             ? "LEFT JOIN institucion ia ON ia.IdInstitucion = COALESCE(foa.IdInstitucionActual, f.IdInstitucion)"
             : "";
+        $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
+        $derivEstadoSelect = $hasDerivEstadoCols
+            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
+               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
+            : "";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -69,6 +74,7 @@ class InsumoModel {
                     FROM forminsumo fi
                     INNER JOIN insumo i ON fi.idInsumo = i.idInsumo
                     WHERE fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario) as ResumenInsumos
+                    {$derivEstadoSelect}
                 FROM formularioe f
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
@@ -135,16 +141,51 @@ class InsumoModel {
         }
 
 public function updateStatus($data) {
-        if (!empty($data['instId']) && !empty($data['idformA'])) {
-            FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$data['idformA'], (int)$data['instId']);
+        $id = (int)($data['idformA'] ?? 0);
+        if (!$id) return false;
+        $instId = (int)($data['instId'] ?? 0);
+        if ($instId > 0) {
+            FormDerivacionModel::assertInstitutionCanMutate($this->db, $id, $instId);
         }
-        $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
-        $res = $this->db->prepare($sql)->execute([
-            $data['estado'], $data['aclaracionadm'], $data['userName'], $data['idformA']
-        ]);
-        
-        \App\Utils\Auditoria::log($this->db, 'UPDATE_STATUS', 'formularioe', "Cambió estado de Pedido de Insumos #{$data['idformA']} a: {$data['estado']}");
-        return $res;
+
+        $formDerivModel = new \App\Models\FormDerivacion\FormDerivacionModel($this->db);
+        $deriv = $instId > 0 ? $formDerivModel->getDerivationByFormAndInst($id, $instId) : null;
+        $isDerived = $deriv !== null;
+
+        if ($isDerived && !empty($deriv['is_destination'])) {
+            $cfg = $formDerivModel->checkDestinoConfigCompleta($id, $instId, 'Insumos');
+            if (!$cfg['completa']) {
+                throw new \Exception('Actualizar formulario para la aplicación: faltan ' . implode(', ', $cfg['faltantes']) . '. Complete los datos antes de cambiar el estado.');
+            }
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $sql = "UPDATE formularioe SET estado = ?, aclaracionadm = ?, quienvisto = ? WHERE idformA = ?";
+            $this->db->prepare($sql)->execute([
+                $data['estado'], $data['aclaracionadm'], $data['userName'], $id
+            ]);
+
+            // For derived forms: update estado_origen or estado_destino in formulario_derivacion
+            if ($isDerived && $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen')) {
+                $idDeriv = (int)($deriv['IdFormularioDerivacion'] ?? 0);
+                if ($idDeriv > 0) {
+                    if (!empty($deriv['is_origin'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_origen = ? WHERE IdFormularioDerivacion = ?")->execute([$data['estado'], $idDeriv]);
+                    }
+                    if (!empty($deriv['is_destination'])) {
+                        $this->db->prepare("UPDATE formulario_derivacion SET estado_destino = ? WHERE IdFormularioDerivacion = ?")->execute([$data['estado'], $idDeriv]);
+                    }
+                }
+            }
+
+            \App\Utils\Auditoria::log($this->db, 'UPDATE_STATUS', 'formularioe', "Cambió estado de Pedido de Insumos #{$id} a: {$data['estado']}");
+            $this->db->commit();
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
         public function getInsumosCatalog($instId) {
             $sql = "SELECT idInsumo, NombreInsumo, TipoInsumo 
@@ -220,8 +261,20 @@ public function updateFullInsumo($data) {
                 $this->db->prepare($sqlI)->execute([$idPrecio, $item['idInsumo'], $cantidadItem, $precioCatalogo]);
             }
 
-            $sqlP = "UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?";
-            $this->db->prepare($sqlP)->execute([$nuevoTotal, $idPrecio]);
+            if ($isDerivedDestination) {
+                // Formulario derivado en destino: NO sobrescribir precioinsumosformulario (original del cliente).
+                // Solo actualizar facturacion_formulario_derivado (factura proveedor→cliente).
+                $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
+                $stmtDeriv->execute([$idForm, $instIdRequest]);
+                $idDeriv = $stmtDeriv->fetchColumn();
+                if ($idDeriv && $this->hasTable('facturacion_formulario_derivado')) {
+                    $this->db->prepare("UPDATE facturacion_formulario_derivado SET monto_total = ? WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ?")
+                        ->execute([$nuevoTotal, $idDeriv, $instIdRequest]);
+                }
+            } else {
+                $this->db->prepare("UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?")
+                    ->execute([$nuevoTotal, $idPrecio]);
+            }
 
             // Asociar / actualizar protocolo si se envió idProt (solo para insumos por protocolo)
             if (!empty($data['idProt'])) {

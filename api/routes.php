@@ -104,6 +104,8 @@ $router->post('/forms/derivation/cancel', 'FormDerivacionController@cancel');
 $router->get('/forms/derivation/history', 'FormDerivacionController@history');
 $router->get('/forms/derivation/pending', 'FormDerivacionController@pending');
 $router->get('/forms/derivation/targets', 'FormDerivacionController@targets');
+$router->get('/forms/derivation/config', 'FormDerivacionController@getDestinoConfig');
+$router->post('/forms/derivation/mark-viewed', 'FormDerivacionController@markViewed');
 
 
 // ============================================================
@@ -133,6 +135,8 @@ $router->get('/protocols/current-species', 'ProtocolController@getSpeciesByProto
 $router->get('/protocols/attachments-by-protocol', 'ProtocolController@getAttachmentsByProtocol');
 $router->get('/protocols/manual-attachments/download', 'ProtocolController@downloadManualAttachment');
 $router->get('/protocols/network-status', 'ProtocolController@getNetworkStatusByProtocol');
+$router->get('/protocols/transmission-targets', 'ProtocolController@getTransmissionTargets');
+$router->post('/protocols/transmit', 'ProtocolController@transmitToNetwork');
 $router->get('/protocolos/search-alojamiento', 'ProtocolController@searchForAlojamiento');
 $router->get('/protocolos/search', 'ProtocolController@search');
 $router->get('/protocols/requests/count', 'ProtocolController@getPendingCount');

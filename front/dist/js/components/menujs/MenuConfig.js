@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
+import { loadLanguage, translatePage } from '../../utils/i18n.js';
 
 // --- HELPERS ---
 export const getSession = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -105,6 +106,9 @@ export const UserPreferences = {
         UserPreferences.applyLanguageVisuals(UserPreferences.config.lang);
         UserPreferences.applyFontSize(UserPreferences.config.fontSize);
         UserPreferences.applyVoiceVisuals(UserPreferences.config.gecko_ok);
+        // Recargar idioma y traducir si la config de BD difiere del inicial (persistencia)
+        await loadLanguage(UserPreferences.config.lang);
+        if (typeof translatePage === 'function') translatePage();
         
         return UserPreferences.config.menu;
     },

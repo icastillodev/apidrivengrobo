@@ -139,16 +139,26 @@ function openReactivoFromUrlIfNeeded() {
 window.openReactivoModal = async (r) => {
     const instId = Auth.getVal('instId');
     const container = document.getElementById('modal-content-reactivo');
-    
+
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
-    
+
+    const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
+    const isOriginInst = Number(r.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const isDerivedDest = Number(r.DerivadoActivo || 0) === 1 && !isOriginInst;
+
     try {
-        const [resMaster, resUsage, resNotify, resDeptos] = await Promise.all([
+        const [resMaster, resUsage, resNotify, resDeptos, resConfig] = await Promise.all([
             API.request(`/reactivos/form-data?inst=${instId}`),
-            API.request(`/reactivos/usage?id=${r.idformA}`), 
+            API.request(`/reactivos/usage?id=${r.idformA}`),
             API.request(`/reactivos/last-notification?id=${r.idformA}`),
-            API.request(`/deptos/list?inst=${instId}`)
+            API.request(`/deptos/list?inst=${instId}`),
+            isDerivedDest ? API.request(`/forms/derivation/config?idformA=${r.idformA}&categoria=Otros reactivos biologicos`) : Promise.resolve(null)
         ]);
+
+        const derivConfig = (resConfig && resConfig.status === 'success' && resConfig.data) ? resConfig.data : null;
+        if (isDerivedDest) {
+            try { await API.request('/forms/derivation/mark-viewed', 'POST', { idformA: r.idformA }); } catch (_) {}
+        }
 
         const cache = resMaster.data || {};
         const protocols = cache.protocols || cache.protocolos || [];
@@ -164,9 +174,14 @@ window.openReactivoModal = async (r) => {
         const identity = `${userFull} (ID: ${userId})`;
 
         let html = renderModalHeader(r);
+        if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
+            html += renderEnviadoPor(derivConfig.enviadoPor);
+        }
         html += renderResearcherContact(r);
         html += `<input type="hidden" id="current-idformA" value="${r.idformA}">`;
-        html += renderAdminSection(r, identity);
+        const configIncompleta = derivConfig && !derivConfig.completa;
+        html += (configIncompleta ? renderConfigFaltaBanner(derivConfig.faltantes) : '');
+        html += renderAdminSection(r, identity, configIncompleta);
         html += renderNotificationSection(lastNotify, r.idformA);
         
         // Pasamos usage y cache (con protocols, insumos y deptos)
@@ -262,16 +277,34 @@ function renderResearcherContact(r) {
     </div>`;
 }
 
-function renderAdminSection(r, identity) {
+function renderEnviadoPor(ep) {
+    const t = window.txt?.misformularios || {};
+    const lbl = t.derivacion_enviado_por || 'Enviado por';
+    const parts = [ep.nombre, ep.institucion].filter(Boolean);
+    if (parts.length === 0) return '';
+    let html = `<div class="alert alert-secondary py-2 px-3 small mb-2"><strong>${lbl}:</strong> ${parts.join(', ')}`;
+    if (ep.correo || ep.telefono) html += ` | ${ep.correo || ''} ${ep.telefono ? (ep.correo ? '· ' : '') + ep.telefono : ''}`;
+    html += '</div>';
+    return html;
+}
+function renderConfigFaltaBanner(faltantes) {
+    const t = window.txt?.misformularios || {};
+    const msg = t.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+    const desc = t.derivacion_faltan_datos || 'Complete los datos antes de cambiar el estado.';
+    const faltantesTxt = Array.isArray(faltantes) ? faltantes.join(', ') : '';
+    return `<div class="alert alert-warning py-2 px-3 mb-2 small"><strong><i class="bi bi-exclamation-triangle me-1"></i>${msg}</strong><div class="mt-1">${desc} ${faltantesTxt ? `(${faltantesTxt})` : ''}</div></div>`;
+}
+function renderAdminSection(r, identity, disableEstado = false) {
     const t = window.txt.reactivos;
     const estado = (r.estado || "Sin estado").trim();
+    const disAttr = disableEstado ? ' disabled title="' + (window.txt?.misformularios?.derivacion_actualizar_primero || 'Actualice el formulario antes de cambiar el estado') + '"' : '';
     return `
     <div class="bg-light p-3 rounded border shadow-sm mb-3">
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="form-label small fw-bold text-muted uppercase">${t.modal.order_status}</label>
                 <div class="d-flex align-items-center gap-2">
-                    <select id="modal-status" class="form-select form-select-sm fw-bold" onchange="window.updateReactivoStatusQuick()">
+                    <select id="modal-status" class="form-select form-select-sm fw-bold" onchange="window.updateReactivoStatusQuick()"${disAttr}>
                         <option value="Sin estado" ${estado === 'Sin estado' ? 'selected' : ''}>${t.status.none}</option>
                         <option value="Proceso" ${estado === 'Proceso' ? 'selected' : ''}>${t.status.process}</option>
                         <option value="Listo para entrega" ${estado === 'Listo para entrega' ? 'selected' : ''}>${t.status.ready}</option>
@@ -323,7 +356,9 @@ function renderOrderModificationSection(r, usage, cache) {
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isDerivedActive = Number(r.DerivadoActivo || 0) === 1 && Number(r.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(r.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
+    const wf = (r.EstadoWorkflow || '').toString().toUpperCase();
     const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockSaveBtn = isDerivedActive && (isOriginInst || (!isOriginInst && wf.includes('PENDIENTE')));
     const lockImmutable = isDerivedActive && !isOriginInst;
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
@@ -418,7 +453,7 @@ function renderOrderModificationSection(r, usage, cache) {
             
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
                 <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadReactivoPDF(${r.idformA})"><i class="bi bi-file-pdf"></i> PDF</button>
-                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;">${t.save_btn}</button>
+                <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;" ${lockSaveBtn ? 'disabled title="' + (window.txt?.misformularios?.derivacion_guardar_bloqueado || 'No se puede guardar: el formulario está en derivación.') + '"' : ''}>${t.save_btn}</button>
             </div>
         </div>
     </form>`;
@@ -502,9 +537,14 @@ window.updateReactivoStatusQuick = async () => {
             if (inputQuienVisto) inputQuienVisto.value = (res.quienvisto != null && res.quienvisto !== '') ? res.quienvisto : quienVistoTarget;
             
             syncAllData(); 
+        } else {
+            const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+            window.Swal.fire(title, res.message || 'No se pudo cambiar el estado.', 'warning');
         }
     } catch (e) { 
         console.error("❌ Error 500 en servidor al actualizar estado");
+        const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+        window.Swal.fire(title, e?.message || 'No se pudo cambiar el estado.', 'error');
     }
 };
 
@@ -552,9 +592,10 @@ window.saveFullReactivoForm = async (e) => {
     const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
     const wf = (row?.EstadoWorkflow || '').toString().toUpperCase();
     const lockByPending = isDerivedActive && !isOriginInst && wf.includes('PENDIENTE');
-    if (lockByPending) {
+    const lockSaveByDerivacion = isDerivedActive && (isOriginInst || lockByPending);
+    if (lockSaveByDerivacion) {
         const tx = window.txt?.misformularios || {};
-        window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
+        window.Swal.fire('No se puede guardar', lockByPending ? (tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.') : (tx.derivacion_guardar_bloqueado || 'El formulario está en derivación.'), 'warning');
         return;
     }
 
@@ -915,10 +956,21 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
+    const tx = window.txt?.misformularios || {};
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     const derivBadge = getWorkflowBadgeRow(item);
-    const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
-    const estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
+    let estadoBadge;
+    if (hasDualEstados) {
+        const lblOrigen = tx.estado_origen_label || 'Origen';
+        const lblDestino = tx.estado_destino_label || 'Destino';
+        const bOrigen = item.estado_origen ? getStatusBadge(item.estado_origen) : '';
+        const bDestino = item.estado_destino ? getStatusBadge(item.estado_destino) : '';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+    } else {
+        const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
+        estadoBadge = getStatusBadge(item.estado, porInst || undefined);
+    }
     if (isDerived) {
         return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
     }

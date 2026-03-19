@@ -61,7 +61,10 @@ function renderTable() {
 
     const filtered = allForms.filter(f => {
         const matchText = Object.values(f).join(' ').toLowerCase().includes(term);
-        const matchStatus = statusFilter === 'all' || f.estado === statusFilter;
+        const matchStatus = statusFilter === 'all'
+            || f.estado === statusFilter
+            || (f.estado_origen != null && f.estado_origen === statusFilter)
+            || (f.estado_destino != null && f.estado_destino === statusFilter);
         const instNames = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
             ? f.institucionesParticipantes.map(i => i.NombreInst)
             : [f.NombreInstitucion].filter(Boolean);
@@ -567,14 +570,28 @@ function getWorkflowBadgeRow(f) {
 }
 
 function getStatusWithWorkflow(f) {
+    const tx = window.txt?.misformularios || {};
     const isDerived = Number(f.DerivadoActivo || 0) === 1;
-    const derivBadge = getWorkflowBadgeRow(f);
-    const porInst = isDerived ? (f.InstitucionActualNombre || '').trim() : '';
-    const estadoBadge = getStatusBadge(f.estado, porInst || undefined);
-    if (isDerived) {
-        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+    // Queremos que en investigador, los derivados muestren SIEMPRE 2 estados (Origen/Destino).
+    // A veces el backend no manda las keys con valor, pero el objeto incluye los campos; por eso usamos hasOwnProperty.
+    const hasEstadoOrigenKey = Object.prototype.hasOwnProperty.call(f, 'estado_origen');
+    const hasEstadoDestinoKey = Object.prototype.hasOwnProperty.call(f, 'estado_destino');
+    const hasDualEstados = isDerived && (hasEstadoOrigenKey || hasEstadoDestinoKey || f.estado_origen != null || f.estado_destino != null);
+    let estadoBadge;
+    if (hasDualEstados) {
+        const lblOrigen = tx.estado_origen_label || 'Origen';
+        const lblDestino = tx.estado_destino_label || 'Destino';
+        const bOrigen = f.estado_origen ? getStatusBadge(f.estado_origen) : '';
+        const bDestino = f.estado_destino ? getStatusBadge(f.estado_destino) : '';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+    } else {
+        const porInst = isDerived ? (f.InstitucionActualNombre || '').trim() : '';
+        estadoBadge = getStatusBadge(f.estado, porInst || undefined);
     }
-    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
+    // En la vista de investigador queremos mostrar solo el estado principal:
+    // - si deriva: solo Origen/Destino (2 estados)
+    // - si es local: solo el estado principal (sin badge "Local/Workflow")
+    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}</div>`;
 }
 
 function buildActionButtons(f) {

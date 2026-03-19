@@ -179,8 +179,10 @@ function renderRedStatsContent() {
     const deptRows = (redRawData.por_departamento || []).map(d => `
         <tr><td>${d.departamento || ''}</td><td class="text-center">${(parseInt(d.total_animales, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.total_reactivos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.total_insumos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(d.protocolos_aprobados, 10) || 0).toLocaleString()}</td><td class="text-center">–</td></tr>
     `).join('');
+    const suffixSinOrg = ' – ' + labelSinOrg;
     const orgRows = (redRawData.por_organizacion || []).map(o => {
-        const orgLabel = (o.organizacion === '(Sin organización)' || (o.organizacion && o.organizacion.endsWith(' – (Sin organización)')) ? (o.institucion ? o.institucion + ' – ' + labelSinOrg : labelSinOrg) : (o.organizacion || '–');
+        const isSinOrg = o.organizacion === labelSinOrg || (o.organizacion && String(o.organizacion).endsWith(suffixSinOrg));
+        const orgLabel = isSinOrg ? (o.institucion ? o.institucion + suffixSinOrg : labelSinOrg) : (o.organizacion || '–');
         return `<tr><td>${orgLabel}</td><td class="text-center">${(parseInt(o.total_animales, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.total_reactivos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.total_insumos, 10) || 0).toLocaleString()}</td><td class="text-center">${(parseInt(o.protocolos_aprobados, 10) || 0).toLocaleString()}</td></tr>`;
     }).join('');
     container.innerHTML = `

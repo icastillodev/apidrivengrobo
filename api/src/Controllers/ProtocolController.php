@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Protocol\ProtocolModel;
+use App\Models\FormDerivacion\FormDerivacionModel;
 use App\Utils\Auditoria; // <-- Seguridad
 use App\Models\Services\MailService;
 
@@ -392,6 +393,49 @@ class ProtocolController {
             }
 
             echo json_encode(['status' => 'success', 'message' => 'Solicitud rechazada y notificada al usuario.']);
+        } catch (\Exception $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function getTransmissionTargets() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int)$sesion['instId'];
+            $formDeriv = new FormDerivacionModel($this->db);
+            $data = $formDeriv->getTargetsForInstitution($instId);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function transmitToNetwork() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if (!in_array((int)$sesion['role'], [1, 2, 4], true)) {
+                throw new \Exception('No tienes permisos para transmitir protocolos a la red.');
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true) ?: [];
+            $idprotA = isset($input['idprot']) ? (int)$input['idprot'] : 0;
+            $targets = isset($input['targets']) && is_array($input['targets']) ? $input['targets'] : [];
+            if ($idprotA <= 0) {
+                throw new \Exception('ID de protocolo inválido.');
+            }
+
+            $this->model->transmitToNetwork($idprotA, (int)$sesion['instId'], $targets);
+            echo json_encode(['status' => 'success', 'message' => 'Protocolo transmitido correctamente a la red.']);
         } catch (\Exception $e) {
             http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

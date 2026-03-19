@@ -701,6 +701,7 @@ alojamientos: {
         estado_cobro_pagado: "PAGO",
         estado_cobro_anulado: "ANULADO",
         col_formulario: "Formulário",
+        col_instituciones_derivado: "Instituições (Origem → Destino)",
         sin_datos_institucion: "Não há faturamento derivado para os filtros selecionados.",
         inst_solicitante: "Instituição:",
         inst_todas: "TODAS",
@@ -1233,6 +1234,9 @@ alojamientos: {
         estado_derivacion_rechazada: "Rejeitada",
         estado_derivacion_cancelada: "Cancelada",
         estado_por: "por",
+        estado_origen_label: "Origem",
+        estado_destino_label: "Destino",
+        derivacion_guardar_bloqueado: "Não é possível salvar: o formulário está em derivação.",
         derivacion_espera_aceptacion: "Voce deve aceitar a derivacao antes de comecar a trabalhar.",
         derivacion_protocolo_bloqueado: "Protocolo fixo: nao pode ser alterado em formulario derivado.",
         derivacion_datos_origen: "Dados do formulário original (derivado)",
@@ -1243,6 +1247,10 @@ alojamientos: {
         derivacion_resumen_placeholder: "Selecione espécie e categoria acima.",
         derivacion_seleccione_especie: "— Selecione espécie —",
         derivacion_especie_requerida: "Deve selecionar Espécie e Categoria para o formulário derivado.",
+        derivacion_enviado_por: "Enviado por",
+        derivacion_actualizar_formulario: "Atualizar formulário para a aplicação",
+        derivacion_faltan_datos: "Preencha os dados antes de alterar o estado.",
+        derivacion_actualizar_primero: "Atualize o formulário antes de alterar o estado",
         cancelar: "Cancelar",
         label_origen: "Origem",
         label_tipo: "Tipo",
@@ -1343,7 +1351,10 @@ alojamientos: {
         red_no_candidatos: "Você não tem protocolos APROVADOS vigentes para compartilhar.",
         red_select_destino_req: "Selecione ao menos uma instituição de destino.",
         red_enviado_title: "Enviado",
-        red_enviado_msg: "Solicitação enviada para a rede."
+        red_enviado_msg: "Solicitação enviada para a rede.",
+        red_faltan_envios_title: "Envio para a rede pendente",
+        red_faltan_envios_msg: "Ainda há instituições da rede que não receberam a solicitação.",
+        red_btn_enviar_desde_detalle: "Enviar para a rede"
     },
     misalojamientos: {
         titulo: "MEUS ALOJAMENTOS",
@@ -1608,7 +1619,16 @@ alojamientos: {
         rechazar_confirmar: "Rejeitar e notificar",
         rechazar_motivo_req: "O motivo e obrigatorio",
         rechazar_ok: "Solicitacao rejeitada e usuario notificado.",
-        error_accion: "Nao foi possivel completar a acao."
+        error_accion: "Nao foi possivel completar a acao.",
+        btn_transmitir_red: "Enviar para rede",
+        transmitir_modal_titulo: "Enviar protocolo para instituição de rede",
+        transmitir_modal_desc: "Selecione as instituições de destino para enviar este protocolo. Elas aparecerão como pendentes de aprovação no centro de solicitações.",
+        transmitir_label_destinos: "Instituições destino",
+        transmitir_btn_enviar: "Enviar protocolo",
+        transmitir_ok: "Protocolo enviado para a rede com sucesso.",
+        transmitir_error: "Não foi possível enviar o protocolo para a rede.",
+        transmitir_sin_destinos: "Não há instituições de rede disponíveis.",
+        transmitir_seleccione: "Selecione pelo menos uma instituição."
     },
     admin_animales: {
         bread_grobo: "GROBO",
