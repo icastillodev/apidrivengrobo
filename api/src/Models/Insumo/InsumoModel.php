@@ -59,6 +59,31 @@ class InsumoModel {
             $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
             $params = [(int)$instId, (int)$instId];
         }
+        $derivDestinoClause = '';
+        $derivDestinoAndClause = '';
+        $derivOrigenClause = '';
+        $derivOrigenAndClause = '';
+        if ($this->hasTable('formulario_derivacion')) {
+            $derivDestinoClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE fd.idformA = f.idformA AND fd.Activo = 1 AND fd.IdInstitucionDestino = ?)";
+            $params[] = (int)$instId;
+            $derivDestinoAndClause = " OR (t.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA AND fd2.Activo = 1 AND fd2.IdInstitucionDestino = ?))";
+            $params[] = (int)$instId;
+
+            $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+            $fdFormMatch = $hasIdformAOrigen
+                ? "(fd.idformA = f.idformA OR fd.idformAOrigen = f.idformA)"
+                : "fd.idformA = f.idformA";
+            $fd2FormMatch = $hasIdformAOrigen
+                ? "(fd2.idformA = f.idformA OR fd2.idformAOrigen = f.idformA)"
+                : "fd2.idformA = f.idformA";
+
+            $derivOrigenClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE {$fdFormMatch} AND fd.Activo = 1 AND fd.IdInstitucionOrigen = ?)";
+            $params[] = (int)$instId;
+            $derivOrigenAndClause = " OR (t.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE {$fd2FormMatch} AND fd2.Activo = 1 AND fd2.IdInstitucionOrigen = ?))";
+            $params[] = (int)$instId;
+        }
+        $whereInst = "(" . $whereInst . $derivDestinoClause . $derivOrigenClause . ")";
+
         $legacyCopyExclusion = '';
         if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
             $legacyCopyExclusion = " AND NOT EXISTS (
@@ -81,9 +106,9 @@ class InsumoModel {
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
                     COALESCE(d.NombreDeptoA, pdpto.NombreDeptoA, 'Sin departamento') as Departamento,
                     o.NombreOrganismoSimple as Organizacion,
-                    t.nombreTipo as TipoNombre,
+                    COALESCE(t.nombreTipo, '—') as TipoNombre,
                     {$tipoExpr} as tipoAId,
-                    t.color as colorTipo,
+                    COALESCE(t.color, '') as colorTipo,
                     pif.idPrecioinsumosformulario,
                     prot.idprotA AS IdProtocolo,
                     prot.nprotA AS NProtocolo,
@@ -97,7 +122,7 @@ class InsumoModel {
                 FROM formularioe f
                 {$redCfgJoin}
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
-                INNER JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
+                LEFT JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
                 LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
@@ -108,7 +133,7 @@ class InsumoModel {
                 {$ownerJoin}
                 {$currentInstJoin}
                 {$originJoin}
-                WHERE {$whereInst} {$legacyCopyExclusion} AND t.categoriaformulario = 'insumos'
+                WHERE {$whereInst} {$legacyCopyExclusion} AND (t.categoriaformulario = 'insumos' {$derivDestinoAndClause} {$derivOrigenAndClause})
                 ORDER BY f.idformA DESC";
         $stmt = $this->db->prepare($sql);
         $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;

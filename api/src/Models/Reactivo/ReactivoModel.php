@@ -66,6 +66,32 @@ class ReactivoModel {
             $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
             $params = [(int)$instId, (int)$instId];
         }
+        // RED: origen y destino deben ver la misma fila (formulario_derivacion), igual que AnimalModel
+        $derivDestinoClause = '';
+        $derivDestinoAndClause = '';
+        $derivOrigenClause = '';
+        $derivOrigenAndClause = '';
+        if ($this->hasTable('formulario_derivacion')) {
+            $derivDestinoClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE fd.idformA = f.idformA AND fd.Activo = 1 AND fd.IdInstitucionDestino = ?)";
+            $params[] = (int)$instId;
+            $derivDestinoAndClause = " OR (t.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA AND fd2.Activo = 1 AND fd2.IdInstitucionDestino = ?))";
+            $params[] = (int)$instId;
+
+            $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+            $fdFormMatch = $hasIdformAOrigen
+                ? "(fd.idformA = f.idformA OR fd.idformAOrigen = f.idformA)"
+                : "fd.idformA = f.idformA";
+            $fd2FormMatch = $hasIdformAOrigen
+                ? "(fd2.idformA = f.idformA OR fd2.idformAOrigen = f.idformA)"
+                : "fd2.idformA = f.idformA";
+
+            $derivOrigenClause = " OR EXISTS (SELECT 1 FROM formulario_derivacion fd WHERE {$fdFormMatch} AND fd.Activo = 1 AND fd.IdInstitucionOrigen = ?)";
+            $params[] = (int)$instId;
+            $derivOrigenAndClause = " OR (t.IdTipoFormulario IS NULL AND EXISTS (SELECT 1 FROM formulario_derivacion fd2 WHERE {$fd2FormMatch} AND fd2.Activo = 1 AND fd2.IdInstitucionOrigen = ?))";
+            $params[] = (int)$instId;
+        }
+        $whereInst = "(" . $whereInst . $derivDestinoClause . $derivOrigenClause . ")";
+
         $legacyCopyExclusion = '';
         if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
             $legacyCopyExclusion = " AND NOT EXISTS (
@@ -98,9 +124,9 @@ class ReactivoModel {
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as Departamento,
                     {$deptoExpr} as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
-                    t.nombreTipo as TipoNombre,
+                    COALESCE(t.nombreTipo, '—') as TipoNombre,
                     {$tipoExpr} as tipoAId,
-                    t.color as colorTipo,
+                    COALESCE(t.color, '') as colorTipo,
                     ins.NombreInsumo as Reactivo, 
                     ins.TipoInsumo as Medida,       /* 🚀 FIX: ml, gr, un... */
                     ins.CantidadInsumo as Presentacion, /* 🚀 FIX: 50, 100, 200... */
@@ -112,7 +138,7 @@ class ReactivoModel {
                 FROM formularioe f
                 {$redCfgJoin}
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
-                INNER JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
+                LEFT JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 {$ownerJoin}
                 {$currentInstJoin}
@@ -125,7 +151,7 @@ class ReactivoModel {
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
                 WHERE {$whereInst} 
                 {$legacyCopyExclusion}
-                AND t.categoriaformulario = ?
+                AND (t.categoriaformulario = ? {$derivDestinoAndClause} {$derivOrigenAndClause})
                 ORDER BY f.idformA DESC";
 
         $params[] = $categoryName;

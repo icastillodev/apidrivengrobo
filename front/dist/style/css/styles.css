@@ -1146,6 +1146,28 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Login (index): con tema oscuro global, panel e inputs no heredan texto claro del body */
+body.gecko-login-page {
+    background-color: #f2f2f2 !important;
+    color: #1f2937 !important;
+}
+
+body.gecko-login-page .gecko-login-light {
+    color: #111827;
+}
+
+body.gecko-login-page .gecko-login-light input:not([type="checkbox"]):not([type="hidden"]),
+body.gecko-login-page .gecko-login-light textarea,
+body.gecko-login-page .gecko-login-light select {
+    color: #111827 !important;
+}
+
+body.gecko-login-page .gecko-login-light input::placeholder,
+body.gecko-login-page .gecko-login-light textarea::placeholder {
+    color: #6b7280 !important;
+    opacity: 1;
+}
+
 /* --- ESTILOS MENU LATERAL (Bootstrap-ified) --- */
 .gecko-sidebar {
     position: fixed;
