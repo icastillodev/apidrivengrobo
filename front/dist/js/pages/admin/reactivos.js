@@ -6,6 +6,7 @@ import { API } from '../../api.js';
 import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
+import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 
 let allReactivos = [];
 let currentPage = 1;
@@ -177,6 +178,7 @@ window.openReactivoModal = async (r) => {
         if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
             html += renderEnviadoPor(derivConfig.enviadoPor);
         }
+        html += renderDerivacionTarifariosToolbar(r);
         html += renderResearcherContact(r);
         html += `<input type="hidden" id="current-idformA" value="${r.idformA}">`;
         const configIncompleta = derivConfig && !derivConfig.completa;
@@ -360,8 +362,10 @@ function renderOrderModificationSection(r, usage, cache) {
     const lockProtocol = isDerivedActive && !isOriginInst;
     const lockSaveBtn = isDerivedActive && (isOriginInst || (!isOriginInst && wf.includes('PENDIENTE')));
     const lockImmutable = isDerivedActive && !isOriginInst;
+    const canEditTipo = isDerivedActive && !isOriginInst && !wf.includes('PENDIENTE');
     const protocolos = cache.protocols || cache.protocolos || [];
     const reactivos = cache.insumos || [];
+    const tipos = Array.isArray(cache.types) ? cache.types : [];
     const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
     const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
     const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
@@ -388,6 +392,10 @@ function renderOrderModificationSection(r, usage, cache) {
         
         return `<option value="${iterId}" data-medida="${i.TipoInsumo || 'un.'}" data-presentacion="${i.CantidadInsumo || 0}" ${isSelected}>${i.NombreInsumo}${pres}</option>`;
     }).join('');
+    const optionsTipos = tipos.map(tp => {
+        const sel = Number(r.tipoAId || 0) === Number(tp.IdTipoFormulario) ? ' selected' : '';
+        return `<option value="${tp.IdTipoFormulario}"${sel}>${tp.nombreTipo || ''}</option>`;
+    }).join('');
 
     return `
     <h6 class="fw-bold text-success uppercase mb-3" style="font-size: 13px;">${t.tech_mod}</h6>
@@ -395,6 +403,13 @@ function renderOrderModificationSection(r, usage, cache) {
     <form id="form-reactivo-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${r.idformA}">
         <div class="row g-3">
+            <div class="col-md-12">
+                <label class="form-label small fw-bold uppercase text-muted mb-1">Tipo de Pedido</label>
+                <select name="tipoA" class="form-select form-select-sm" ${canEditTipo ? '' : 'disabled'}>
+                    ${optionsTipos}
+                </select>
+                ${canEditTipo ? '' : `<input type="hidden" name="tipoA" value="${r.tipoAId || ''}">`}
+            </div>
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">${t.protocol_label}</label>
                 <input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="${t.filter_placeholder}" onkeyup="window.filterProtocolListReactivo(this)">
@@ -944,8 +959,11 @@ function getWorkflowBadgeRow(item) {
     if (isDerived) {
         const originName = (item.InstitucionOrigenNombre || '').trim();
         const currentName = (item.InstitucionActualNombre || '').trim();
-        const routeText = [originName, currentName].filter(Boolean).join(' → ');
-        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const routeText = [originName, currentName].filter(Boolean).map(esc).join(' → ');
+        const base = tx.workflow_derivado || 'Derivado';
+        const label = routeText ? `${base} · ${routeText}` : base;
+        return `<span class="badge bg-primary mt-1">${label}</span>`;
     }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
@@ -956,17 +974,16 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    const tx = window.txt?.misformularios || {};
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     const derivBadge = getWorkflowBadgeRow(item);
     const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        const lblOrigen = tx.estado_origen_label || 'Origen';
-        const lblDestino = tx.estado_destino_label || 'Destino';
-        const bOrigen = item.estado_origen ? getStatusBadge(item.estado_origen) : '';
-        const bDestino = item.estado_destino ? getStatusBadge(item.estado_destino) : '';
-        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+        const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
+            ? item.estado_destino
+            : item.estado_origen;
+        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
         estadoBadge = getStatusBadge(item.estado, porInst || undefined);

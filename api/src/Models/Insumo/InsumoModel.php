@@ -36,6 +36,14 @@ class InsumoModel {
             ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
                (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
             : "";
+        $hasRedCfgCols = $this->hasTable('formulario_derivacion')
+            && $this->hasColumn('formulario_derivacion', 'depto_destino')
+            && $this->hasColumn('formulario_derivacion', 'tipoA_destino');
+        $redCfgJoin = $hasRedCfgCols
+            ? "LEFT JOIN formulario_derivacion fdcfg ON fdcfg.idformA = f.idformA AND fdcfg.Activo = 1 AND fdcfg.IdInstitucionDestino = ?"
+            : "";
+        $deptoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.depto_destino, f.depto)" : "f.depto";
+        $tipoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.tipoA_destino, f.tipoA)" : "f.tipoA";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -51,10 +59,20 @@ class InsumoModel {
             $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
             $params = [(int)$instId, (int)$instId];
         }
+        $legacyCopyExclusion = '';
+        if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
+            $legacyCopyExclusion = " AND NOT EXISTS (
+                SELECT 1
+                FROM formulario_derivacion fd_legacy
+                WHERE fd_legacy.idformA = f.idformA
+                  AND fd_legacy.idformAOrigen IS NOT NULL
+                  AND fd_legacy.idformAOrigen <> fd_legacy.idformA
+            )";
+        }
 
         $sql = "SELECT 
                     f.idformA, f.estado, f.fechainicioA as Inicio, f.fecRetiroA as Retiro,
-                    f.aclaracionadm, f.aclaraA as AclaracionUsuario, f.quienvisto, f.depto as idDepto,
+                    f.aclaracionadm, f.aclaraA as AclaracionUsuario, f.quienvisto, {$deptoExpr} as idDepto,
                     {$workflowSelect}
                     {$originNameSelect}
                     {$ownerSelect}
@@ -64,6 +82,7 @@ class InsumoModel {
                     COALESCE(d.NombreDeptoA, pdpto.NombreDeptoA, 'Sin departamento') as Departamento,
                     o.NombreOrganismoSimple as Organizacion,
                     t.nombreTipo as TipoNombre,
+                    {$tipoExpr} as tipoAId,
                     t.color as colorTipo,
                     pif.idPrecioinsumosformulario,
                     prot.idprotA AS IdProtocolo,
@@ -76,9 +95,10 @@ class InsumoModel {
                     WHERE fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario) as ResumenInsumos
                     {$derivEstadoSelect}
                 FROM formularioe f
+                {$redCfgJoin}
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
-                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
+                INNER JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
+                LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
                 LEFT JOIN protdeptor pd ON prot.idprotA = pd.idprotA
@@ -88,10 +108,11 @@ class InsumoModel {
                 {$ownerJoin}
                 {$currentInstJoin}
                 {$originJoin}
-                WHERE {$whereInst} AND t.categoriaformulario = 'insumos'
+                WHERE {$whereInst} {$legacyCopyExclusion} AND t.categoriaformulario = 'insumos'
                 ORDER BY f.idformA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
+        $stmt->execute($execParams);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -205,6 +226,17 @@ public function getDepartments($instId) {
     $stmt->execute([$instId]);
     return $stmt->fetchAll(\PDO::FETCH_ASSOC);
 }
+
+public function getAvailableTypes($instId) {
+    $sql = "SELECT IdTipoFormulario, nombreTipo, color
+            FROM tipoformularios
+            WHERE IdInstitucion = ?
+              AND categoriaformulario = 'insumos'
+            ORDER BY nombreTipo ASC";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute([(int)$instId]);
+    return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+}
 public function updateFullInsumo($data) {
         if (!empty($data['instId']) && !empty($data['idformA'])) {
             FormDerivacionModel::assertInstitutionCanMutate($this->db, (int)$data['idformA'], (int)$data['instId']);
@@ -227,13 +259,51 @@ public function updateFullInsumo($data) {
                 $oldItemRows = $oldItemsStmt->fetchAll(\PDO::FETCH_ASSOC);
             }
 
-            $sqlF = "UPDATE formularioe SET depto = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
-            $this->db->prepare($sqlF)->execute([
-                $data['depto'],
-                $isDerivedDestination ? ($oldForm['fechainicioA'] ?? $data['fechainicioA']) : $data['fechainicioA'],
-                $isDerivedDestination ? ($oldForm['fecRetiroA'] ?? $data['fecRetiroA']) : $data['fecRetiroA'],
-                $data['idformA']
-            ]);
+            if ($isDerivedDestination
+                && $this->hasTable('formulario_derivacion')
+                && $this->hasColumn('formulario_derivacion', 'depto_destino')
+                && $this->hasColumn('formulario_derivacion', 'tipoA_destino')) {
+                $stmtDerivCfg = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
+                $stmtDerivCfg->execute([$idForm, $instIdRequest]);
+                $idDerivCfg = (int)($stmtDerivCfg->fetchColumn() ?: 0);
+                if ($idDerivCfg <= 0) {
+                    throw new \Exception("No se encontró derivación activa para guardar configuración de red.");
+                }
+                $tipoDestino = !empty($data['tipoA']) ? (int)$data['tipoA'] : null;
+                if (!$tipoDestino) {
+                    throw new \Exception("Debe seleccionar tipo de pedido para la institución destino.");
+                }
+                $stTipo = $this->db->prepare("SELECT 1 FROM tipoformularios WHERE IdTipoFormulario = ? AND IdInstitucion = ? AND categoriaformulario = 'insumos' LIMIT 1");
+                $stTipo->execute([$tipoDestino, $instIdRequest]);
+                if (!$stTipo->fetchColumn()) {
+                    throw new \Exception("El tipo seleccionado no pertenece a la institución destino.");
+                }
+                $deptoDestino = !empty($data['depto']) ? (int)$data['depto'] : null;
+                if ($deptoDestino !== null && $this->hasColumn('departamentoe', 'IdInstitucion')) {
+                    $stDepto = $this->db->prepare("SELECT 1 FROM departamentoe WHERE iddeptoA = ? AND IdInstitucion = ? LIMIT 1");
+                    $stDepto->execute([$deptoDestino, $instIdRequest]);
+                    if (!$stDepto->fetchColumn()) {
+                        throw new \Exception("El departamento seleccionado no pertenece a la institución destino.");
+                    }
+                }
+                $this->db->prepare("UPDATE formulario_derivacion
+                                    SET tipoA_destino = ?, depto_destino = ?, FechaConfigDestino = NOW(), IdUsrConfigDestino = ?
+                                    WHERE IdFormularioDerivacion = ?")
+                    ->execute([
+                        $tipoDestino,
+                        $deptoDestino,
+                        !empty($data['userId']) ? (int)$data['userId'] : null,
+                        $idDerivCfg
+                    ]);
+            } else {
+                $sqlF = "UPDATE formularioe SET depto = ?, fechainicioA = ?, fecRetiroA = ? WHERE idformA = ?";
+                $this->db->prepare($sqlF)->execute([
+                    $data['depto'],
+                    $isDerivedDestination ? ($oldForm['fechainicioA'] ?? $data['fechainicioA']) : $data['fechainicioA'],
+                    $isDerivedDestination ? ($oldForm['fecRetiroA'] ?? $data['fecRetiroA']) : $data['fecRetiroA'],
+                    $data['idformA']
+                ]);
+            }
 
             $idPrecio = $data['idPrecioinsumosformulario'];
             $items = $data['items'] ?? [];

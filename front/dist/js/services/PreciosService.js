@@ -22,8 +22,13 @@ export const PreciosService = {
     /**
      * Genera y descarga el PDF del tarifario oficial desde cualquier lugar.
      */
-    async downloadUniversalPDF() {
-        const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
+    /**
+     * @param {string|number} [overrideInstId] Si se indica, tarifario de esa institución (p. ej. origen en derivación).
+     */
+    async downloadUniversalPDF(overrideInstId) {
+        const instId = (overrideInstId != null && String(overrideInstId).trim() !== '')
+            ? String(overrideInstId).trim()
+            : (sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId'));
         const fechaActual = new Date().toLocaleDateString();
 
         try {
@@ -182,4 +187,4 @@ export const PreciosService = {
 };
 
 // Hacerlo disponible globalmente para botones simples
-window.downloadTarifarioGeneral = PreciosService.downloadUniversalPDF;
+window.downloadTarifarioGeneral = () => PreciosService.downloadUniversalPDF();

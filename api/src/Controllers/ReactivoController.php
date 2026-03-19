@@ -39,7 +39,8 @@ class ReactivoController {
             $sesion = Auditoria::getDatosSesion();
             $data = [
                 'insumos' => $this->model->getAvailableInsumos($sesion['instId']),
-                'protocols' => $this->model->getAvailableProtocols($sesion['instId'])
+                'protocols' => $this->model->getAvailableProtocols($sesion['instId']),
+                'types' => $this->model->getAvailableTypes($sesion['instId'])
             ];
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -100,6 +101,7 @@ class ReactivoController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $data['instId'] = $sesion['instId'];
+            $data['userId'] = (int)($sesion['userId'] ?? 0);
             $this->model->updateFull($data);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

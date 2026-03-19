@@ -101,14 +101,15 @@ class UserFormsModel {
             $id = (int)$row['idformA'];
             if (isset($originalMap[$id])) {
                 $orig = $originalMap[$id];
+                // Columna instituciones (participantes + ruta) y estado: no tocar; el resto = pedido original del investigador.
                 if (!empty($orig['nombreTipo'])) $row['TipoPedido'] = $orig['nombreTipo'];
                 if (!empty($orig['categoria'])) $row['Categoria'] = $orig['categoria'];
+                if (!empty($orig['colorTipo'])) $row['colorTipo'] = $orig['colorTipo'];
                 if (isset($orig['Inicio']) && $orig['Inicio'] !== null && $orig['Inicio'] !== '') $row['Inicio'] = $orig['Inicio'];
                 if (isset($orig['Retiro']) && $orig['Retiro'] !== null && $orig['Retiro'] !== '') $row['Retiro'] = $orig['Retiro'];
                 if (!empty($orig['Protocolo'])) $row['Protocolo'] = $orig['Protocolo'];
                 if (!empty($orig['Departamento'])) $row['Departamento'] = $orig['Departamento'];
                 if (isset($orig['Organizacion']) && $orig['Organizacion'] !== null && $orig['Organizacion'] !== '') $row['Organizacion'] = $orig['Organizacion'];
-                if (!empty($orig['NombreInstitucion'])) $row['NombreInstitucion'] = $orig['NombreInstitucion'];
             }
         }
         return ['info_inst' => $institucion, 'list' => $list];
@@ -190,13 +191,11 @@ class UserFormsModel {
             }
             if (!empty($snapshot['header']) && is_array($snapshot['header'])) {
                 $orig = $snapshot['header'];
-                foreach (['fechainicioA', 'fecRetiroA', 'aclaraA', 'NombreInstitucion', 'InstCorreo', 'InstContacto', 'nprotA', 'TituloProtocolo', 'NombreDeptoA', 'NombreOrganismoSimple'] as $k) {
+                // Institución / contacto: vienen del JOIN de cabecera (origen actual + participantes). Solo datos del pedido original.
+                foreach (['fechainicioA', 'fecRetiroA', 'aclaraA', 'nprotA', 'TituloProtocolo', 'NombreDeptoA', 'NombreOrganismoSimple'] as $k) {
                     if (array_key_exists($k, $orig) && ($orig[$k] !== null && $orig[$k] !== '')) {
                         $head[$k] = $orig[$k];
                     }
-                }
-                if (!empty($orig['NombreInstitucion'])) {
-                    $head['NombreInstitucionOrigen'] = $orig['NombreInstitucion'];
                 }
             }
         }
@@ -290,7 +289,8 @@ class UserFormsModel {
         if ($hasIdformAOrigen) {
             $stmt = $this->db->prepare("SELECT fd.idformA, fdo.datos_json FROM formulario_derivacion fd
                 JOIN formulario_datos_originales fdo ON fdo.IdFormularioDerivacion = fd.IdFormularioDerivacion
-                WHERE fd.idformA IN ($placeholders) AND fd.idformAOrigen IS NOT NULL AND fdo.idformA = fd.idformAOrigen
+                    AND fdo.idformA = COALESCE(fd.idformAOrigen, fd.idformA)
+                WHERE fd.idformA IN ($placeholders)
                 ORDER BY fd.IdFormularioDerivacion DESC");
         } else {
             $stmt = $this->db->prepare("SELECT idformA, datos_json FROM formulario_datos_originales 
@@ -311,12 +311,12 @@ class UserFormsModel {
             $map[$id] = [
                 'nombreTipo' => $decoded['nombreTipo'] ?? '',
                 'categoria' => $decoded['categoria'] ?? '',
+                'colorTipo' => $header['colorTipo'] ?? '',
                 'Inicio' => $header['fechainicioA'] ?? null,
                 'Retiro' => $header['fecRetiroA'] ?? null,
                 'Protocolo' => trim($protocolo) ?: null,
                 'Departamento' => $header['NombreDeptoA'] ?? null,
-                'Organizacion' => $header['NombreOrganismoSimple'] ?? null,
-                'NombreInstitucion' => $header['NombreInstitucion'] ?? null
+                'Organizacion' => $header['NombreOrganismoSimple'] ?? null
             ];
         }
         return $map;
@@ -332,7 +332,8 @@ class UserFormsModel {
         $hasIdformAOrigen = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen');
         if ($hasIdformAOrigen) {
             $stmt = $this->db->prepare("SELECT fdo.datos_json FROM formulario_derivacion fd
-                JOIN formulario_datos_originales fdo ON fdo.IdFormularioDerivacion = fd.IdFormularioDerivacion AND fdo.idformA = fd.idformAOrigen
+                JOIN formulario_datos_originales fdo ON fdo.IdFormularioDerivacion = fd.IdFormularioDerivacion
+                    AND fdo.idformA = COALESCE(fd.idformAOrigen, fd.idformA)
                 WHERE fd.idformA = ? ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1");
         } else {
             $stmt = $this->db->prepare("SELECT datos_json FROM formulario_datos_originales WHERE idformA = ? ORDER BY IdFormularioDerivacion DESC LIMIT 1");
@@ -351,10 +352,15 @@ class UserFormsModel {
      */
     private function getInstitucionesParticipantes($idformA): array {
         if (!$this->hasTable('formulario_derivacion')) {
-            $stmt = $this->db->prepare("SELECT i.IdInstitucion, i.NombreInst FROM formularioe f JOIN institucion i ON f.IdInstitucion = i.IdInstitucion WHERE f.idformA = ?");
+            $stmt = $this->db->prepare("SELECT i.IdInstitucion, i.NombreInst, i.InstCorreo, i.InstContacto FROM formularioe f JOIN institucion i ON f.IdInstitucion = i.IdInstitucion WHERE f.idformA = ?");
             $stmt->execute([(int)$idformA]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $row ? [['IdInstitucion' => $row['IdInstitucion'], 'NombreInst' => $row['NombreInst']]] : [];
+            return $row ? [[
+                'IdInstitucion' => $row['IdInstitucion'],
+                'NombreInst' => $row['NombreInst'],
+                'InstCorreo' => $row['InstCorreo'] ?? '',
+                'InstContacto' => $row['InstContacto'] ?? '',
+            ]] : [];
         }
         $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
         $whereClause = $hasIdformAOrigen ? "(idformA = ? OR idformAOrigen = ?)" : "idformA = ?";
@@ -380,10 +386,17 @@ class UserFormsModel {
         if (empty($ids)) return [];
         $byId = [];
         foreach ($ids as $idInst) {
-            $st = $this->db->prepare("SELECT IdInstitucion, NombreInst FROM institucion WHERE IdInstitucion = ?");
+            $st = $this->db->prepare("SELECT IdInstitucion, NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion = ?");
             $st->execute([$idInst]);
             $r = $st->fetch(PDO::FETCH_ASSOC);
-            if ($r) $byId[] = $r;
+            if ($r) {
+                $byId[] = [
+                    'IdInstitucion' => $r['IdInstitucion'],
+                    'NombreInst' => $r['NombreInst'],
+                    'InstCorreo' => $r['InstCorreo'] ?? '',
+                    'InstContacto' => $r['InstContacto'] ?? '',
+                ];
+            }
         }
         return $byId;
     }

@@ -43,6 +43,18 @@ class AnimalModel {
             ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
                (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
             : "";
+        $hasRedCfgCols = $this->hasTable('formulario_derivacion')
+            && $this->hasColumn('formulario_derivacion', 'tipoA_destino')
+            && $this->hasColumn('formulario_derivacion', 'depto_destino')
+            && $this->hasColumn('formulario_derivacion', 'idsubespA_destino')
+            && $this->hasColumn('formulario_derivacion', 'idcepaA_destino');
+        $redCfgJoin = $hasRedCfgCols
+            ? "LEFT JOIN formulario_derivacion fdcfg ON fdcfg.idformA = f.idformA AND fdcfg.Activo = 1 AND fdcfg.IdInstitucionDestino = ?"
+            : "";
+        $tipoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.tipoA_destino, f.tipoA)" : "f.tipoA";
+        $deptoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.depto_destino, f.depto)" : "f.depto";
+        $subespExpr = $hasRedCfgCols ? "COALESCE(fdcfg.idsubespA_destino, f.idsubespA)" : "f.idsubespA";
+        $cepaExpr = $hasRedCfgCols ? "COALESCE(fdcfg.idcepaA_destino, f.idcepaA)" : "f.idcepaA";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -85,6 +97,16 @@ class AnimalModel {
             $params[] = (int)$instId;
         }
         $whereInst = "(" . $whereInst . $derivDestinoClause . $derivOrigenClause . ")";
+        $legacyCopyExclusion = '';
+        if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
+            $legacyCopyExclusion = " AND NOT EXISTS (
+                SELECT 1
+                FROM formulario_derivacion fd_legacy
+                WHERE fd_legacy.idformA = f.idformA
+                  AND fd_legacy.idformAOrigen IS NOT NULL
+                  AND fd_legacy.idformAOrigen <> fd_legacy.idformA
+            )";
+        }
 
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
@@ -94,16 +116,17 @@ class AnimalModel {
                     {$workflowSelect}
                     {$originNameSelect}
                     {$ownerSelect}
-                    f.IdUsrA as IdInvestigador, f.idsubespA,
-                    f.idcepaA,
+                    f.IdUsrA as IdInvestigador, {$subespExpr} as idsubespA,
+                    {$cepaExpr} as idcepaA,
                     CONCAT(pe.ApellidoA, ' ', pe.NombreA) as Investigador,
                     pe.EmailA as EmailInvestigador, pe.CelularA as CelularInvestigador,
                     COALESCE(tf.nombreTipo, '—') as TipoNombre,
+                    {$tipoExpr} as tipoAId,
                     COALESCE(tf.color, '') as colorTipo,
                     px.nprotA as NProtocolo, px.tituloA as TituloProtocolo, px.idprotA,
                     px.protocoloexpe as IsExterno, 
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
-                    COALESCE(f.depto, pd.iddeptoA) as idDepto,
+                    COALESCE({$deptoExpr}, pd.iddeptoA) as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     COALESCE(CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA), '—') as CatEspecie,
                     COALESCE(e.EspeNombreA, '') as EspeNombreA,
@@ -128,26 +151,29 @@ class AnimalModel {
                     ) as DeptoExternoFlag
                     {$derivEstadoSelect}
                 FROM formularioe f
-                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                {$redCfgJoin}
+                LEFT JOIN tipoformularios tf ON {$tipoExpr} = tf.IdTipoFormulario
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
-                LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA 
+                LEFT JOIN subespecie se ON {$subespExpr} = se.idsubespA 
                 LEFT JOIN especiee e ON se.idespA = e.idespA
-                LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+                LEFT JOIN cepa c ON {$cepaExpr} = c.idcepaA
                 {$ownerJoin}
                 {$currentInstJoin}
                 {$originJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
+                LEFT JOIN departamentoe d ON COALESCE({$deptoExpr}, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
                 WHERE {$whereInst} 
+                  {$legacyCopyExclusion}
                   AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause} {$derivOrigenAndClause})
                 ORDER BY f.idformA DESC";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
+        $stmt->execute($execParams);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Modelo sin copia: origen y destino ven el mismo formularioe.
@@ -192,6 +218,18 @@ class AnimalModel {
 
                     if (!empty($decoded['nombreTipo'])) {
                         $row['TipoNombre'] = (string)$decoded['nombreTipo'];
+                    }
+                    if (!empty($header['idTipoFormulario'])) {
+                        $row['tipoAId'] = (int)$header['idTipoFormulario'];
+                    }
+                    if (isset($header['idDepto']) && $header['idDepto'] !== '') {
+                        $row['idDepto'] = (int)$header['idDepto'];
+                    }
+                    if (isset($header['idsubespA']) && $header['idsubespA'] !== '') {
+                        $row['idsubespA'] = (int)$header['idsubespA'];
+                    }
+                    if (isset($header['idcepaA']) && $header['idcepaA'] !== '') {
+                        $row['idcepaA'] = (int)$header['idcepaA'];
                     }
                     if (!empty($header['fechainicioA'])) $row['Inicio'] = $header['fechainicioA'];
                     if (!empty($header['fecRetiroA'])) $row['Retiro'] = $header['fecRetiroA'];
@@ -457,9 +495,10 @@ public function updateStatus($data) {
         
         $oldTotal = (int)($old['oldTotal'] ?? 0);
         $oldProt = $old['oldProt'];
+        $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
 
         // Formulario derivado (en destino): el protocolo queda fijo y no se puede cambiar.
-        if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+        if ($esDerivadoEnDestino) {
             $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
             $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
             if ($newProtNorm !== $oldProtNorm) {
@@ -476,8 +515,127 @@ public function updateStatus($data) {
 
         $this->db->beginTransaction();
         try {
+            // En RED (institución destino), la configuración local se guarda en formulario_derivacion
+            // para no modificar datos base del formulario original.
+            if ($esDerivadoEnDestino
+                && $this->hasTable('formulario_derivacion')
+                && $this->hasColumn('formulario_derivacion', 'tipoA_destino')
+                && $this->hasColumn('formulario_derivacion', 'depto_destino')
+                && $this->hasColumn('formulario_derivacion', 'idsubespA_destino')
+                && $this->hasColumn('formulario_derivacion', 'idcepaA_destino')) {
+
+                $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion
+                                                 FROM formulario_derivacion
+                                                 WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ?
+                                                 LIMIT 1");
+                $stmtDeriv->execute([$id, $instIdRequest]);
+                $idDeriv = (int)($stmtDeriv->fetchColumn() ?: 0);
+                if ($idDeriv <= 0) {
+                    throw new \Exception("No se encontró derivación activa para guardar configuración de red.");
+                }
+
+                // Conserva valores ya configurados en RED si este POST los trae vacíos.
+                $stmtCfg = $this->db->prepare("SELECT tipoA_destino, depto_destino, idsubespA_destino, idcepaA_destino
+                                               FROM formulario_derivacion
+                                               WHERE IdFormularioDerivacion = ?
+                                               LIMIT 1");
+                $stmtCfg->execute([$idDeriv]);
+                $cfgActual = $stmtCfg->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+                $tipoDestino = !empty($data['tipoA']) ? (int)$data['tipoA'] : (int)($cfgActual['tipoA_destino'] ?? 0);
+                $subespDestino = !empty($idSubesp) ? (int)$idSubesp : (int)($cfgActual['idsubespA_destino'] ?? 0);
+                $cepaDestino = !empty($idCepa) ? (int)$idCepa : (int)($cfgActual['idcepaA_destino'] ?? 0);
+                $deptoDestino = !empty($data['depto']) ? (int)$data['depto'] : (!empty($cfgActual['depto_destino']) ? (int)$cfgActual['depto_destino'] : null);
+
+                if ($subespDestino <= 0) {
+                    throw new \Exception("Debe seleccionar Especie y Categoría para el formulario derivado.");
+                }
+                if ($tipoDestino <= 0) {
+                    throw new \Exception("Debe seleccionar un tipo de formulario válido.");
+                }
+
+                // Tipo local válido en la institución destino
+                $stmtTipo = $this->db->prepare("SELECT 1 FROM tipoformularios WHERE IdTipoFormulario = ? AND IdInstitucion = ? LIMIT 1");
+                $stmtTipo->execute([$tipoDestino, $instIdRequest]);
+                if (!$stmtTipo->fetchColumn()) {
+                    throw new \Exception("El tipo de formulario seleccionado no pertenece a la institución destino.");
+                }
+
+                // Depto local válido en destino (si fue seleccionado)
+                if ($deptoDestino !== null) {
+                    $stmtDepto = $this->db->prepare("SELECT 1 FROM departamentoe WHERE iddeptoA = ? AND IdInstitucion = ? LIMIT 1");
+                    $stmtDepto->execute([$deptoDestino, $instIdRequest]);
+                    if (!$stmtDepto->fetchColumn()) {
+                        throw new \Exception("El departamento seleccionado no pertenece a la institución destino.");
+                    }
+                }
+
+                // Validación de cepa para la subespecie local
+                $stmtCount = $this->db->prepare("
+                    SELECT COUNT(*)
+                    FROM cepa c
+                    INNER JOIN especiee e ON c.idespA = e.idespA
+                    INNER JOIN subespecie s ON s.idespA = e.idespA
+                    WHERE s.idsubespA = ?
+                      AND c.Habilitado = 1
+                      AND e.IdInstitucion = ?
+                ");
+                $stmtCount->execute([$subespDestino, $instIdRequest]);
+                $hasEnabledCepas = ((int)$stmtCount->fetchColumn()) > 0;
+                if ($hasEnabledCepas && $cepaDestino <= 0) {
+                    throw new \Exception("Debe seleccionar una cepa.");
+                }
+                if ($cepaDestino > 0) {
+                    $stmtCepa = $this->db->prepare("
+                        SELECT c.idcepaA
+                        FROM cepa c
+                        INNER JOIN especiee e ON c.idespA = e.idespA
+                        INNER JOIN subespecie s ON s.idespA = e.idespA
+                        WHERE c.idcepaA = ?
+                          AND s.idsubespA = ?
+                          AND c.Habilitado = 1
+                          AND e.IdInstitucion = ?
+                        LIMIT 1
+                    ");
+                    $stmtCepa->execute([$cepaDestino, $subespDestino, $instIdRequest]);
+                    if (!$stmtCepa->fetchColumn()) {
+                        throw new \Exception("La cepa seleccionada no es válida.");
+                    }
+                }
+
+                $this->db->prepare("UPDATE formulario_derivacion
+                                    SET tipoA_destino = ?, depto_destino = ?, idsubespA_destino = ?, idcepaA_destino = ?,
+                                        FechaConfigDestino = NOW(),
+                                        IdUsrConfigDestino = ?
+                                    WHERE IdFormularioDerivacion = ?")
+                    ->execute([
+                        $tipoDestino,
+                        $deptoDestino,
+                        $subespDestino,
+                        $cepaDestino > 0 ? $cepaDestino : null,
+                        !empty($data['userId']) ? (int)$data['userId'] : null,
+                        $idDeriv
+                    ]);
+
+                // Recalcular facturación derivada (proveedor→cliente) sin tocar precioformulario original.
+                $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+                $stmtPrecio->execute([$subespDestino]);
+                $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+                $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                if ($this->hasTable('facturacion_formulario_derivado')) {
+                    $this->db->prepare("UPDATE facturacion_formulario_derivado
+                                        SET monto_total = ?
+                                        WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ?")
+                        ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
+                }
+
+                Auditoria::log($this->db, 'UPDATE_FULL', 'formulario_derivacion', "Configuración RED de Animales #$id actualizada");
+                $this->db->commit();
+                return true;
+            }
+
             // Formulario derivado en destino: especie/categoría son obligatorios
-            if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest) && (empty($idSubesp) || $idSubesp === '0')) {
+            if ($esDerivadoEnDestino && (empty($idSubesp) || $idSubesp === '0')) {
                 throw new \Exception("Debe seleccionar Especie y Categoría para el formulario derivado.");
             }
 
@@ -551,7 +709,6 @@ public function updateStatus($data) {
             $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
             $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
 
-            $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
             if ($esDerivadoEnDestino) {
                 // Formulario derivado en destino: NO sobrescribir precioformulario (es el original del cliente).
                 // Crear/actualizar solo facturacion_formulario_derivado = factura proveedor→cliente.

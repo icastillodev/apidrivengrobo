@@ -1,6 +1,7 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
+import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 
 let allInsumos = [];
 let currentPage = 1;
@@ -202,6 +203,9 @@ window.openInsumoModal = async (f) => {
         let deptos = [];
         if (resDeptos && resDeptos.status === 'success' && Array.isArray(resDeptos.data)) deptos = resDeptos.data;
         else if (resFormData.data && resFormData.data.deptos) deptos = resFormData.data.deptos;
+        window.__insumosTiposCache = (resFormData && resFormData.status === 'success' && Array.isArray(resFormData.data?.types))
+            ? resFormData.data.types
+            : [];
         const protocolos = (resProt && resProt.status === 'success' && Array.isArray(resProt.data)) ? resProt.data : [];
         
         const userFull = localStorage.getItem('userFull') || localStorage.getItem('userName') || 'Usuario';
@@ -212,6 +216,7 @@ window.openInsumoModal = async (f) => {
         if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
             html += renderEnviadoPor(derivConfig.enviadoPor);
         }
+        html += renderDerivacionTarifariosToolbar(f);
         html += renderResearcherContact(f);
         const configIncompleta = derivConfig && !derivConfig.completa;
         html += (configIncompleta ? renderConfigFaltaBanner(derivConfig.faltantes) : '');
@@ -411,8 +416,10 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
     const lockProtocol = isDerivedActive && !isOriginInst;
     const lockImmutable = isDerivedActive && !isOriginInst;
     const lockSaveBtn = isDerivedActive && (isOriginInst || (!isOriginInst && wf.includes('PENDIENTE')));
+    const canEditTipo = isDerivedActive && !isOriginInst && !wf.includes('PENDIENTE');
     const listaDeptos = Array.isArray(deptos) ? deptos : [];
     const listaProt = Array.isArray(protocolos) ? protocolos : [];
+    const listaTipos = Array.isArray(window.__insumosTiposCache) ? window.__insumosTiposCache : [];
 
     const tIns = window.txt?.admin_insumos || {};
     const labelProt = tIns.label_protocolo || 'Protocolo';
@@ -437,6 +444,10 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
         const sel = (d.iddeptoA == idDepto) ? ' selected' : '';
         return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
     }).join('');
+    const optionsTipo = listaTipos.map(tp => {
+        const sel = Number(f.tipoAId || 0) === Number(tp.IdTipoFormulario) ? ' selected' : '';
+        return `<option value="${tp.IdTipoFormulario}"${sel}>${tp.nombreTipo || ''}</option>`;
+    }).join('');
 
     // Aseguramos que el protocolo actual siempre esté en la lista (aunque ya no esté activo)
     let listaProtFinal = Array.isArray(listaProt) ? [...listaProt] : [];
@@ -459,6 +470,13 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
             <input type="hidden" name="idPrecioinsumosformulario" value="${f.idPrecioinsumosformulario}">
             
             <div class="row g-3 mb-4 text-start">
+                <div class="col-md-12">
+                    <label class="small fw-bold uppercase text-muted mb-1">Tipo de Pedido</label>
+                    <select name="tipoA" class="form-select form-select-sm" ${canEditTipo ? '' : 'disabled'}>
+                        ${optionsTipo}
+                    </select>
+                    ${canEditTipo ? '' : `<input type="hidden" name="tipoA" value="${f.tipoAId || ''}">`}
+                </div>
                 <div class="col-md-12">
                     <label class="small fw-bold uppercase text-muted d-flex justify-content-between align-items-center mb-1">
                         <span>${labelProt}</span>
@@ -905,8 +923,11 @@ function getWorkflowBadgeRow(item) {
     if (isDerived) {
         const originName = (item.InstitucionOrigenNombre || '').trim();
         const currentName = (item.InstitucionActualNombre || '').trim();
-        const routeText = [originName, currentName].filter(Boolean).join(' → ');
-        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const routeText = [originName, currentName].filter(Boolean).map(esc).join(' → ');
+        const base = tx.workflow_derivado || 'Derivado';
+        const label = routeText ? `${base} · ${routeText}` : base;
+        return `<span class="badge bg-primary mt-1">${label}</span>`;
     }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
@@ -917,17 +938,16 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    const tx = window.txt?.misformularios || {};
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     const derivBadge = getWorkflowBadgeRow(item);
     const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        const lblOrigen = tx.estado_origen_label || 'Origen';
-        const lblDestino = tx.estado_destino_label || 'Destino';
-        const bOrigen = item.estado_origen ? getStatusBadge(item.estado_origen) : '';
-        const bDestino = item.estado_destino ? getStatusBadge(item.estado_destino) : '';
-        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+        const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
+            ? item.estado_destino
+            : item.estado_origen;
+        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
         estadoBadge = getStatusBadge(item.estado, porInst || undefined);

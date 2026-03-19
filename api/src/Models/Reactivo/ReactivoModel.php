@@ -43,6 +43,14 @@ class ReactivoModel {
             ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
                (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
             : "";
+        $hasRedCfgCols = $this->hasTable('formulario_derivacion')
+            && $this->hasColumn('formulario_derivacion', 'depto_destino')
+            && $this->hasColumn('formulario_derivacion', 'tipoA_destino');
+        $redCfgJoin = $hasRedCfgCols
+            ? "LEFT JOIN formulario_derivacion fdcfg ON fdcfg.idformA = f.idformA AND fdcfg.Activo = 1 AND fdcfg.IdInstitucionDestino = ?"
+            : "";
+        $deptoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.depto_destino, f.depto, pd.iddeptoA)" : "COALESCE(f.depto, pd.iddeptoA)";
+        $tipoExpr = $hasRedCfgCols ? "COALESCE(fdcfg.tipoA_destino, f.tipoA)" : "f.tipoA";
 
         $whereInst = "f.IdInstitucion = ?";
         $params = [(int)$instId];
@@ -57,6 +65,16 @@ class ReactivoModel {
         } elseif ($hasWorkflowCols) {
             $whereInst = "(f.IdInstitucion = ? OR f.IdInstitucionOrigen = ?)";
             $params = [(int)$instId, (int)$instId];
+        }
+        $legacyCopyExclusion = '';
+        if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
+            $legacyCopyExclusion = " AND NOT EXISTS (
+                SELECT 1
+                FROM formulario_derivacion fd_legacy
+                WHERE fd_legacy.idformA = f.idformA
+                  AND fd_legacy.idformAOrigen IS NOT NULL
+                  AND fd_legacy.idformAOrigen <> fd_legacy.idformA
+            )";
         }
 
         $sql = "SELECT 
@@ -78,9 +96,10 @@ class ReactivoModel {
                     px.protocoloexpe as EsOtrosCeuas,
                     (CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END) as DeptoExternoFlag,
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as Departamento,
-                    COALESCE(f.depto, pd.iddeptoA) as idDepto,
+                    {$deptoExpr} as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     t.nombreTipo as TipoNombre,
+                    {$tipoExpr} as tipoAId,
                     t.color as colorTipo,
                     ins.NombreInsumo as Reactivo, 
                     ins.TipoInsumo as Medida,       /* 🚀 FIX: ml, gr, un... */
@@ -91,25 +110,28 @@ class ReactivoModel {
                     f.reactivo as idinsumoA         /* 🚀 FIX: El ID real para seleccionar en el modal */
                     {$derivEstadoSelect}
                 FROM formularioe f
+                {$redCfgJoin}
                 INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
-                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                INNER JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 {$ownerJoin}
                 {$currentInstJoin}
                 {$originJoin}
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe d ON COALESCE(f.depto, pd.iddeptoA) = d.iddeptoA
+                LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
                 WHERE {$whereInst} 
+                {$legacyCopyExclusion}
                 AND t.categoriaformulario = ?
                 ORDER BY f.idformA DESC";
 
         $params[] = $categoryName;
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
+        $stmt->execute($execParams);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -192,6 +214,17 @@ class ReactivoModel {
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId, $instId, $instId, $instId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function getAvailableTypes($instId) {
+        $sql = "SELECT IdTipoFormulario, nombreTipo, color
+                FROM tipoformularios
+                WHERE IdInstitucion = ?
+                  AND categoriaformulario = 'Otros reactivos biologicos'
+                ORDER BY nombreTipo ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([(int)$instId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -300,8 +333,9 @@ class ReactivoModel {
         $oldTotal = (int)($old['oldTotal'] ?? 0);
         $oldProt = $old['oldProt'];
 
+        $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
         // En destino derivado, el protocolo del formulario queda congelado.
-        if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest)) {
+        if ($esDerivadoEnDestino) {
             $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
             $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
             if ($newProtNorm !== $oldProtNorm) {
@@ -316,8 +350,46 @@ class ReactivoModel {
 
         $this->db->beginTransaction();
         try {
-            $this->db->prepare("UPDATE formularioe SET reactivo = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?")
-                    ->execute([$idInsumoReactivo, $data['fechainicioA'], $data['fecRetiroA'], !empty($data['depto']) ? $data['depto'] : null, $id]);
+            if ($esDerivadoEnDestino
+                && $this->hasTable('formulario_derivacion')
+                && $this->hasColumn('formulario_derivacion', 'depto_destino')
+                && $this->hasColumn('formulario_derivacion', 'tipoA_destino')) {
+                $stmtDeriv = $this->db->prepare("SELECT IdFormularioDerivacion FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 AND IdInstitucionDestino = ? LIMIT 1");
+                $stmtDeriv->execute([$id, $instIdRequest]);
+                $idDeriv = (int)($stmtDeriv->fetchColumn() ?: 0);
+                if ($idDeriv <= 0) {
+                    throw new \Exception("No se encontró derivación activa para guardar configuración de red.");
+                }
+                $tipoDestino = !empty($data['tipoA']) ? (int)$data['tipoA'] : null;
+                if (!$tipoDestino) {
+                    throw new \Exception("Debe seleccionar tipo de pedido para la institución destino.");
+                }
+                $stTipo = $this->db->prepare("SELECT 1 FROM tipoformularios WHERE IdTipoFormulario = ? AND IdInstitucion = ? AND categoriaformulario = 'Otros reactivos biologicos' LIMIT 1");
+                $stTipo->execute([$tipoDestino, $instIdRequest]);
+                if (!$stTipo->fetchColumn()) {
+                    throw new \Exception("El tipo seleccionado no pertenece a la institución destino.");
+                }
+                $deptoDestino = !empty($data['depto']) ? (int)$data['depto'] : null;
+                if ($deptoDestino !== null && $this->hasColumn('departamentoe', 'IdInstitucion')) {
+                    $stDepto = $this->db->prepare("SELECT 1 FROM departamentoe WHERE iddeptoA = ? AND IdInstitucion = ? LIMIT 1");
+                    $stDepto->execute([$deptoDestino, $instIdRequest]);
+                    if (!$stDepto->fetchColumn()) {
+                        throw new \Exception("El departamento seleccionado no pertenece a la institución destino.");
+                    }
+                }
+                $this->db->prepare("UPDATE formulario_derivacion
+                                    SET tipoA_destino = ?, depto_destino = ?, FechaConfigDestino = NOW(), IdUsrConfigDestino = ?
+                                    WHERE IdFormularioDerivacion = ?")
+                    ->execute([
+                        $tipoDestino,
+                        $deptoDestino,
+                        !empty($data['userId']) ? (int)$data['userId'] : null,
+                        $idDeriv
+                    ]);
+            } else {
+                $this->db->prepare("UPDATE formularioe SET reactivo = ?, fechainicioA = ?, fecRetiroA = ?, depto = ? WHERE idformA = ?")
+                        ->execute([$idInsumoReactivo, $data['fechainicioA'], $data['fecRetiroA'], !empty($data['depto']) ? $data['depto'] : null, $id]);
+            }
             
             $this->db->prepare("UPDATE sexoe SET organo = ?, totalA = ? WHERE idformA = ?")
                     ->execute([$nuevaCantidadReactivo, $newTotal, $id]);
@@ -328,7 +400,6 @@ class ReactivoModel {
             $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
             $nuevoCostoTotal = $nuevoPrecioUnitario * $nuevaCantidadReactivo;
 
-            $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
             if ($esDerivadoEnDestino) {
                 // Formulario derivado en destino: NO sobrescribir precioformulario (original del cliente).
                 // Solo actualizar facturacion_formulario_derivado (factura proveedor→cliente).

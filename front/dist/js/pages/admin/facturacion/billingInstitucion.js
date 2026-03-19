@@ -1,5 +1,10 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
+import { openAnimalModal } from './modals/animalModal.js';
+import { openReactiveModal } from './modals/reactiveModal.js';
+import { openInsumoModal } from './modals/insumoModal.js';
+import './billingPayments.js';
+import './modals/manager.js';
 
 let currentReportDataInst = null;
 
@@ -41,7 +46,7 @@ async function cargarFacturacionInstitucion() {
         });
         if (res.status === 'success' && res.data) {
             window.currentReportDataInst = res.data;
-            renderResultadosInstitucion(res.data);
+            await renderResultadosInstitucion(res.data);
         } else {
             if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || 'No se obtuvieron datos.', 'error');
         }
@@ -53,7 +58,9 @@ async function cargarFacturacionInstitucion() {
     }
 }
 
-function renderResultadosInstitucion(data) {
+window.cargarFacturacionInstitucion = cargarFacturacionInstitucion;
+
+async function renderResultadosInstitucion(data) {
     const container = document.getElementById('billing-results-inst');
     const dashboardArea = document.getElementById('dashboard-area-inst');
     if (!container) return;
@@ -114,6 +121,18 @@ function renderResultadosInstitucion(data) {
         const ti = inst.totales || {};
         const instNombre = escapeHtml(inst.institucion || '-');
 
+        const grouped = {
+            animal: [],
+            reactivo: [],
+            insumo: [],
+            otros: []
+        };
+        items.forEach((item) => {
+            const tipoKey = normalizeTipoFormulario(item.tipoFormulario || item.categoria || item.nombreTipo || '');
+            if (grouped[tipoKey]) grouped[tipoKey].push(item);
+            else grouped.otros.push(item);
+        });
+
         html += `
             <div class="card card-inst shadow-sm border-0 mb-5" id="card-inst-${inst.idInstitucionSolicitante}">
                 <div class="card-header bg-white py-3 border-bottom">
@@ -132,6 +151,11 @@ function renderResultadosInstitucion(data) {
                     </div>
                 </div>
                 <div class="card-body p-3">
+                    <div class="mb-3 border-bottom pb-3">
+                        <h6 class="small fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.5px;">${t.facturacion?.inst_investigadores_billetera || 'Investigadores (billetera en esta institución)'}</h6>
+                        <p class="small text-muted mb-2">${t.facturacion?.inst_investigadores_ayuda || 'Cargue saldo aquí; luego use la fila del formulario para abrir el modal y pagar con el saldo disponible (PAGAR / QUITAR).'}</p>
+                        <div class="row g-2" id="inv-saldos-inst-${inst.idInstitucionSolicitante}"><div class="col-12 small text-muted">${window.txt?.misformularios?.cargando || '...'}</div></div>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-bordered table-billing mb-0 tabla-finanzas-inst">
                             <thead class="table-light text-center">
@@ -149,35 +173,7 @@ function renderResultadosInstitucion(data) {
                                     <th style="width:5%">PDF</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                ${items.map(item => {
-                                    const debe = parseFloat(item.montoDebe || 0);
-                                    const total = parseFloat(item.montoTotal || 0);
-                                    const pagado = parseFloat(item.montoPagado || 0);
-                                    const estadoBadge = estadoCobroBadge(item.estadoCobro);
-                                    const rowStyle = debe <= 0 ? 'background-color: #f8fff9 !important;' : '';
-                                    const idFact = item.idFacturacionDerivada || item.IdFacturacionFormularioDerivado || 0;
-                                    const chkDisabled = debe <= 0 ? 'disabled' : '';
-                                    return `
-                                        <tr class="text-center align-middle pointer" style="${rowStyle}">
-                                            <td><input type="checkbox" class="check-item-inst" data-inst="${inst.idInstitucionSolicitante}" data-id="${idFact}" data-monto="${debe}" ${chkDisabled}></td>
-                                            <td class="small text-muted fw-bold">#${item.idformA}</td>
-                                            <td>${estadoBadge}</td>
-                                            <td class="small fw-bold text-start ps-2">${escapeHtml(item.investigador || '-')}</td>
-                                            <td class="small text-start ps-2" title="${escapeHtml((item.institucionOrigen || '') + ' → ' + (item.institucionDestino || ''))}">${escapeHtml((item.institucionOrigen || '-') + ' → ' + (item.institucionDestino || '-'))}</td>
-                                            <td class="small text-secondary">${escapeHtml(item.nombreTipo || item.categoria || '-')}</td>
-                                            <td class="text-start ps-3 small">${escapeHtml(item.categoria || item.nombreTipo || '-')}</td>
-                                            <td class="text-end fw-bold text-dark">${fmt(item.montoTotal)}</td>
-                                            <td class="text-end text-success fw-bold">${fmt(item.montoPagado)}</td>
-                                            <td class="text-end text-danger fw-bold">${fmt(item.montoDebe)}</td>
-                                            <td>
-                                                <button class="btn btn-link btn-sm text-danger p-0" onclick="event.stopPropagation(); window.downloadInstFilaPDF(${item.idformA}, ${inst.idInstitucionSolicitante})" title="PDF">
-                                                    <i class="bi bi-file-earmark-pdf"></i>
-                                                </button>
-                                            </td>
-                                        </tr>`;
-                                }).join('')}
-                            </tbody>
+                            <tbody>${renderTipoSectionRows(grouped, fmt, inst, t)}</tbody>
                         </table>
                     </div>
                 </div>
@@ -212,6 +208,121 @@ function renderResultadosInstitucion(data) {
 
     container.innerHTML = html;
     vincularCheckboxesInst();
+    await hydrateInvestigadoresSaldosInst(instituciones);
+}
+
+/**
+ * Bloques por investigador: saldo + cargar/quitar (misma lógica que facturación por investigador).
+ */
+async function hydrateInvestigadoresSaldosInst(instituciones) {
+    const t = window.txt?.facturacion || {};
+    for (const inst of instituciones) {
+        const host = document.getElementById(`inv-saldos-inst-${inst.idInstitucionSolicitante}`);
+        if (!host) continue;
+        const map = new Map();
+        (inst.items || []).forEach((it) => {
+            const id = it.idInvestigador;
+            if (!id) return;
+            if (!map.has(id)) map.set(id, { id, name: it.investigador || `#${id}` });
+        });
+        if (!map.size) {
+            host.innerHTML = `<div class="col-12 small text-muted">${t.inst_sin_investigadores || 'Sin investigadores en este resumen.'}</div>`;
+            continue;
+        }
+        const rows = [...map.values()].map((v) => `
+            <div class="col-md-6 col-lg-4">
+                <div class="border rounded p-2 bg-white shadow-sm small">
+                    <div class="fw-bold text-truncate" title="${escapeHtml(v.name)}">${escapeHtml(v.name)}</div>
+                    <div class="text-muted mb-1">ID: ${v.id}</div>
+                    <div class="mb-2"><span class="badge bg-success inv-saldo-badge-inst" data-idusr="${v.id}">${t.cargando_saldos || '...'}</span></div>
+                    <div class="input-group input-group-sm">
+                        <input type="number" step="0.01" class="form-control" id="inp-saldo-${v.id}" placeholder="${window.txt?.facturacion?.inv_placeholder_monto || 'Monto'}">
+                        <button type="button" class="btn btn-success" onclick="window.updateBalance(${v.id}, 'add', false)"><i class="bi bi-plus-lg"></i></button>
+                        <button type="button" class="btn btn-danger" onclick="window.updateBalance(${v.id}, 'sub', false)"><i class="bi bi-dash-lg"></i></button>
+                    </div>
+                </div>
+            </div>`).join('');
+        host.innerHTML = rows;
+        await Promise.all([...map.values()].map(async (v) => {
+            try {
+                const res = await API.request(`/billing/get-investigator-balance/${v.id}`);
+                const saldo = res.status === 'success' ? parseFloat(res.data.SaldoDinero || 0) : 0;
+                const badge = host.querySelector(`.inv-saldo-badge-inst[data-idusr="${v.id}"]`);
+                if (badge) {
+                    badge.textContent = `$ ${saldo.toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+                }
+            } catch (e) {
+                const badge = host.querySelector(`.inv-saldo-badge-inst[data-idusr="${v.id}"]`);
+                if (badge) badge.textContent = '$ —';
+            }
+        }));
+    }
+}
+
+function renderTipoSectionRows(grouped, fmt, inst, t) {
+    const sections = [
+        { key: 'animal', label: getTipoSectionLabel('animal', t) },
+        { key: 'reactivo', label: getTipoSectionLabel('reactivo', t) },
+        { key: 'insumo', label: getTipoSectionLabel('insumo', t) },
+        { key: 'otros', label: getTipoSectionLabel('otros', t) }
+    ];
+    const rows = [];
+    sections.forEach((section) => {
+        const list = grouped[section.key] || [];
+        if (!list.length) return;
+        rows.push(`<tr class="table-secondary"><td colspan="11" class="text-start fw-bold uppercase" style="font-size:10px; letter-spacing:.5px;">${escapeHtml(section.label)}</td></tr>`);
+        list.forEach((item) => {
+            const debe = parseFloat(item.montoDebe || 0);
+            const estadoBadge = estadoWorkflowCell(item, t);
+            const rowStyle = debe <= 0 ? 'background-color: #f8fff9 !important;' : '';
+            const idFact = item.idFacturacionDerivada || item.IdFacturacionFormularioDerivado || 0;
+            const chkDisabled = debe <= 0 ? 'disabled' : '';
+            const tipoKey = normalizeTipoFormulario(item.tipoFormulario || item.categoria || item.nombreTipo || '');
+            const tipoModal = getTipoModal(tipoKey);
+            const idInv = item.idInvestigador != null && item.idInvestigador !== '' ? parseInt(item.idInvestigador, 10) : '';
+            rows.push(`
+                <tr class="text-center align-middle pointer" style="${rowStyle}" onclick="if(event.target.tagName!=='INPUT' && event.target.tagName!=='BUTTON' && !event.target.closest('button')) window.openBillingInstModal('${tipoModal}', ${item.idformA})">
+                    <td><input type="checkbox" class="check-item-inst" data-inst="${inst.idInstitucionSolicitante}" data-id="${idFact}" data-idusr="${idInv}" data-monto="${debe}" ${chkDisabled}></td>
+                    <td class="small text-muted fw-bold">#${item.idformA}</td>
+                    <td>${estadoBadge}</td>
+                    <td class="small fw-bold text-start ps-2">${escapeHtml(item.investigador || '-')}</td>
+                    <td class="small text-start ps-2" title="${escapeHtml((item.institucionOrigen || '') + ' → ' + (item.institucionDestino || ''))}">${escapeHtml((item.institucionOrigen || '-') + ' → ' + (item.institucionDestino || '-'))}</td>
+                    <td class="small text-secondary">${escapeHtml(item.nombreTipo || getTipoSectionLabel(tipoKey, t) || '-')}</td>
+                    <td class="text-start ps-3 small">${escapeHtml(item.nombreTipo || item.categoria || '-')}</td>
+                    <td class="text-end fw-bold text-dark">${fmt(item.montoTotal)}</td>
+                    <td class="text-end text-success fw-bold">${fmt(item.montoPagado)}</td>
+                    <td class="text-end text-danger fw-bold">${fmt(item.montoDebe)}</td>
+                    <td>
+                        <button class="btn btn-link btn-sm text-danger p-0" onclick="event.stopPropagation(); window.downloadInstFilaPDF(${item.idformA}, ${inst.idInstitucionSolicitante})" title="PDF">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </button>
+                    </td>
+                </tr>
+            `);
+        });
+    });
+    return rows.join('');
+}
+
+function normalizeTipoFormulario(v) {
+    const s = String(v || '').toLowerCase();
+    if (s.includes('reactiv')) return 'reactivo';
+    if (s.includes('insumo')) return 'insumo';
+    if (s.includes('animal')) return 'animal';
+    return 'otros';
+}
+
+function getTipoModal(tipoKey) {
+    if (tipoKey === 'reactivo') return 'REACTIVO';
+    if (tipoKey === 'insumo') return 'INSUMO';
+    return 'ANIMAL';
+}
+
+function getTipoSectionLabel(tipoKey, t) {
+    if (tipoKey === 'animal') return t.generales?.animales || 'ANIMALES';
+    if (tipoKey === 'reactivo') return t.generales?.reactivos || 'REACTIVOS';
+    if (tipoKey === 'insumo') return t.generales?.insumos || 'INSUMOS';
+    return t.generales?.otros || 'OTROS';
 }
 
 function vincularCheckboxesInst() {
@@ -245,24 +356,73 @@ window.procesarPagoInstitucion = async (idInstSol) => {
         if (window.Swal) window.Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_que_pagar || 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
         return;
     }
+    const t = window.txt?.facturacion || {};
+    const gen = window.txt?.generales || {};
+
     let totalAPagar = 0;
     const items = [];
-    seleccionados.forEach(chk => {
+    const porInv = new Map();
+    for (const chk of seleccionados) {
+        const idUsr = parseInt(chk.dataset.idusr || '0', 10);
         const monto = parseFloat(chk.dataset.monto || 0);
+        if (!idUsr) {
+            if (window.Swal) {
+                window.Swal.fire(gen.swal_atencion || 'Atención', t.inst_sin_id_investigador || 'Un ítem seleccionado no tiene investigador asociado. Recargue el reporte e intente de nuevo.', 'warning');
+            }
+            return;
+        }
         totalAPagar += monto;
         items.push({ idFacturacionDerivada: parseInt(chk.dataset.id, 10), monto_pago: monto });
-    });
-    const t = window.txt?.facturacion || {};
+        porInv.set(idUsr, (porInv.get(idUsr) || 0) + monto);
+    }
+
+    // Misma regla que facturación por protocolo: saldo en billetera de esta institución por investigador.
+    const insuf = [];
+    await Promise.all([...porInv.entries()].map(async ([idUsr, montoRequerido]) => {
+        try {
+            const res = await API.request(`/billing/get-investigator-balance/${idUsr}`);
+            const saldo = res.status === 'success' ? parseFloat(res.data.SaldoDinero || 0) : 0;
+            if (montoRequerido > saldo + 0.009) {
+                insuf.push({ idUsr, montoRequerido, saldo });
+            }
+        } catch (e) {
+            insuf.push({ idUsr, montoRequerido, saldo: 0 });
+        }
+    }));
+
+    if (insuf.length) {
+        const fmtM = (v) => `$ ${parseFloat(v || 0).toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+        const reqL = t.inst_requiere || 'Requiere';
+        const dispL = t.inst_disponible || 'Disponible';
+        const filas = insuf.map((r) =>
+            `<div class="small mb-2"><b>ID ${r.idUsr}</b> — ${reqL} ${fmtM(r.montoRequerido)}; ${dispL} ${fmtM(r.saldo)}</div>`
+        ).join('');
+        if (window.Swal) {
+            window.Swal.fire({
+                title: t.saldo_insuficiente || 'Saldo insuficiente',
+                html: `<div class="alert alert-danger text-start small">${t.saldo_insuficiente_inst_desc || 'No hay saldo suficiente en la billetera (esta institución) para uno o más investigadores.'}</div><div class="text-start">${filas}</div>`,
+                icon: 'error'
+            });
+        }
+        return;
+    }
+
+    const resumenInv = [...porInv.entries()].map(([idUsr, m]) => {
+        return `<div class="d-flex justify-content-between small"><span>ID ${idUsr}</span><span class="fw-bold">$ ${m.toLocaleString('es-UY', { minimumFractionDigits: 2 })}</span></div>`;
+    }).join('');
+
     const confirm = await Swal.fire({
         title: t.confirm_pago || 'Confirmar Liquidación',
         html: `
             <div class="text-start">
-                <p>Estás por registrar pago de <b>${items.length}</b> formularios derivados.</p>
-                <div class="p-3 bg-light rounded border shadow-sm">
+                <p>${t.inst_confirm_debito_desc || 'Se descontará el saldo de cada investigador en esta institución (como en las demás facturaciones).'}</p>
+                <p class="mb-2">Estás por registrar pago de <b>${items.length}</b> formularios derivados.</p>
+                <div class="p-3 bg-light rounded border shadow-sm mb-2">
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Total a registrar:</span>
+                        <span>${t.total_a_debitar || 'Total a debitar de billeteras'}:</span>
                         <span class="fw-bold">$ ${totalAPagar.toLocaleString('es-UY', { minimumFractionDigits: 2 })}</span>
                     </div>
+                    <div class="border-top pt-2 mt-2">${resumenInv}</div>
                 </div>
             </div>`,
         icon: 'question',
@@ -299,6 +459,31 @@ function estadoCobroBadge(estado) {
     if (n === 4) return `<span class="badge bg-secondary shadow-sm">${t.estado_cobro_anulado || 'ANULADO'}</span>`;
     return '<span class="badge bg-light text-dark">-</span>';
 }
+
+function estadoWorkflowCell(item, t) {
+    const origen = String(item.estadoOrigen || '').trim();
+    const destino = String(item.estadoDestino || '').trim();
+    if (origen || destino) {
+        const o = escapeHtml(origen || '-');
+        const d = escapeHtml(destino || '-');
+        return `<div class="small lh-sm text-start"><div><b>${o}</b></div><div class="text-muted"><b>${d}</b></div></div>`;
+    }
+    return estadoCobroBadge(item.estadoCobro);
+}
+
+function openBillingInstModal(tipo, id) {
+    if (tipo === 'REACTIVO') {
+        openReactiveModal(id);
+        return;
+    }
+    if (tipo === 'INSUMO') {
+        openInsumoModal(id);
+        return;
+    }
+    openAnimalModal(id);
+}
+
+window.openBillingInstModal = openBillingInstModal;
 
 function escapeHtml(s) {
     if (s == null) return '';

@@ -3,6 +3,7 @@ import { API } from '../../api.js';
 import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
+import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 
 let allAnimals = [];
 let currentPage = 1;
@@ -293,6 +294,7 @@ window.openAnimalModal = async (a) => {
     if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
         html += renderEnviadoPor(derivConfig.enviadoPor);
     }
+    html += renderDerivacionTarifariosToolbar(a);
     html += renderResearcherContact(a);
     html += `<input type="hidden" id="current-idformA" value="${a.idformA}">`;
     const configIncompleta = derivConfig && !derivConfig.completa;
@@ -353,7 +355,7 @@ window.openAnimalModal = async (a) => {
     }
     const selEsp = document.getElementById('select-especie-modal');
     const idespA = selEsp && selEsp.value ? selEsp.value : null;
-    if (idespA) await window.loadCepasForEspecieModal(idespA, useAllLocalSpecies ? null : a.idcepaA);
+    if (idespA) await window.loadCepasForEspecieModal(idespA, a.idcepaA);
     window.calculateAnimalTotals?.();
     window.updateResumenNuevoFormulario?.();
     if (statusSel && isDerivedDest && configIncompleta) updateDerivedEstadoEnablement();
@@ -515,7 +517,8 @@ function renderOrderModificationSection(a, sex, cache) {
     // En derivación destino queremos que el usuario pueda ajustar el tipo/formulario,
     // aunque otros elementos del formulario puedan quedar bloqueados.
     const lockTipo = false;
-    const emptyEditable = lockImmutable;
+    // En destino RED debemos mostrar y reutilizar lo ya configurado localmente (no limpiar depto/cepa/tipo)
+    const emptyEditable = false;
     const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
     const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
     const sinOrg = window.txt?.generales?.sin_organizacion || '– (sin organización)';
@@ -566,9 +569,14 @@ function renderOrderModificationSection(a, sex, cache) {
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Tipo de Pedido</label>
                 <select name="tipoA" id="select-type-modal" class="form-select form-select-sm" onchange="window.calculateAnimalTotals()" ${lockTipo ? 'disabled' : ''}>
-                    ${cache.types.map(t => `<option value="${t.IdTipoFormulario}" data-exento="${t.exento}" data-desc="${t.descuento}" ${a.TipoNombre === t.nombreTipo ? 'selected' : ''}>${t.nombreTipo}</option>`).join('')}
+                    ${cache.types.map(t => {
+                        const tipoIdOk = isOriginInst
+                            ? (a.TipoNombre === t.nombreTipo)
+                            : ((a.tipoAId != null && String(a.tipoAId) !== '') ? (Number(a.tipoAId) === Number(t.IdTipoFormulario)) : (a.TipoNombre === t.nombreTipo));
+                        return `<option value="${t.IdTipoFormulario}" data-exento="${t.exento}" data-desc="${t.descuento}" ${tipoIdOk ? 'selected' : ''}>${t.nombreTipo}</option>`;
+                    }).join('')}
                 </select>
-                ${lockTipo ? `<input type="hidden" name="tipoA" value="${a.tipoA || ''}">` : ''}
+                ${lockTipo ? `<input type="hidden" name="tipoA" value="${a.tipoAId || ''}">` : ''}
             </div>
             <div class="col-md-12">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">N° Protocolo</label>
@@ -615,7 +623,7 @@ function renderOrderModificationSection(a, sex, cache) {
             ${a.raza ? `
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Cepa/Stock/Raza / Línea (legacy)</label>
-                <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}">
+                <input type="text" name="razaA" class="form-control form-control-sm" value="${a.raza || ''}" ${lockImmutable ? 'readonly' : ''}>
             </div>` : `<input type="hidden" name="razaA" value="">`}
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Edad</label>
@@ -706,6 +714,31 @@ window.updateAnimalStatusQuick = async () => {
         window.Swal.fire('Derivación pendiente', tx.derivacion_espera_aceptacion || 'Debe aceptar la derivación para comenzar a trabajar.', 'warning');
         return;
     }
+
+    // En derivación destino: al cambiar estado, primero persistimos depto/cepa/tipo/categoría
+    // para que el backend valide contra BD y no contra el estado actual del UI.
+    const isDerivedDest = isDerivedActive && !isOriginInst;
+    if (isDerivedDest) {
+        const formEl = document.getElementById('form-animal-full');
+        if (formEl) {
+            const tx = window.txt?.misformularios || {};
+            const instParam = currentInst || sessionStorage.getItem('instId') || '';
+            const fdFull = new FormData(formEl);
+            try {
+                const resFull = await API.request(`/animals/update-full?inst=${instParam}`, 'POST', fdFull);
+                if (resFull?.status !== 'success') {
+                    const title = tx.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+                    window.Swal.fire(title, resFull?.message || tx.derivacion_no_pudo_guardar_datos, 'warning');
+                    return;
+                }
+            } catch (err) {
+                const title = tx.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
+                window.Swal.fire(title, err?.message || tx.derivacion_no_pudo_guardar_datos, 'error');
+                return;
+            }
+        }
+    }
+
     const statusSelect = document.getElementById('modal-status');
     const aclara = document.getElementById('modal-aclaracionadm').value;
     const isSinEstado = statusSelect.value.trim().toLowerCase() === 'sin estado';
@@ -1261,8 +1294,11 @@ function getWorkflowBadgeRow(item) {
     if (isDerived) {
         const originName = (item.InstitucionOrigenNombre || '').trim();
         const currentName = (item.InstitucionActualNombre || '').trim();
-        const routeText = [originName, currentName].filter(Boolean).join(' → ');
-        return `<span class="badge bg-primary mt-1">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const routeText = [originName, currentName].filter(Boolean).map(esc).join(' → ');
+        const base = tx.workflow_derivado || 'Derivado';
+        const label = routeText ? `${base} · ${routeText}` : base;
+        return `<span class="badge bg-primary mt-1">${label}</span>`;
     }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
@@ -1273,17 +1309,17 @@ function getWorkflowBadgeRow(item) {
 }
 
 function getStatusWithWorkflow(item) {
-    const tx = window.txt?.misformularios || {};
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     const derivBadge = getWorkflowBadgeRow(item);
     const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        const lblOrigen = tx.estado_origen_label || 'Origen';
-        const lblDestino = tx.estado_destino_label || 'Destino';
-        const bOrigen = item.estado_origen ? getStatusBadge(item.estado_origen) : '';
-        const bDestino = item.estado_destino ? getStatusBadge(item.estado_destino) : '';
-        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+        // Solo 2 badges: ruta derivación + un estado (destino; si falta, origen). Quitar el del medio.
+        const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
+            ? item.estado_destino
+            : item.estado_origen;
+        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
         estadoBadge = getStatusBadge(item.estado, porInst || undefined);

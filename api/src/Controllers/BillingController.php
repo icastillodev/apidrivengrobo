@@ -391,7 +391,7 @@ class BillingController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $res = $this->model->procesarAjustePago($input['id'], $input['monto'], $input['accion'], $sesion['userId']);
+            $res = $this->model->procesarAjustePago($input['id'], $input['monto'], $input['accion'], $sesion['userId'], $sesion['instId']);
             if ($res) $this->jsonResponse('success', 'Transacción procesada');
             else $this->jsonResponse('error', 'Error de BD');
         } catch (\Exception $e) { $this->jsonResponse('error', $e->getMessage()); }
@@ -403,10 +403,14 @@ class BillingController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $res = $this->model->procesarAjustePagoInsumo($input['id'], $input['monto'], $input['accion'], $sesion['userId']);
-            if ($res) $this->jsonResponse('success', 'Pago de insumo procesado');
-            else $this->jsonResponse('error', 'Error en base de datos');
-        } catch (\Exception $e) { $this->jsonResponse('error', $e->getMessage()); }
+            $res = $this->model->procesarAjustePagoInsumo($input['id'], $input['monto'], $input['accion'], $sesion['userId'], $sesion['instId']);
+            if ($res) {
+                $this->jsonResponse('success', 'Pago de insumo procesado');
+            }
+            $this->jsonResponse('error', 'Error en base de datos');
+        } catch (\Exception $e) {
+            $this->jsonResponse('error', $e->getMessage());
+        }
     }
 
     public function ajustarPagoAloj() {
@@ -478,8 +482,8 @@ class BillingController {
 
     public function getAnimalDetail($id) {
         try {
-            Auditoria::getDatosSesion();
-            $data = $this->model->getAnimalDetailById($id);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getAnimalDetailById($id, $sesion['instId']);
             if (!$data) {
                 $this->jsonResponse('error', 'El registro ' . $id . ' no existe en el sistema.');
                 return;
@@ -490,8 +494,8 @@ class BillingController {
 
     public function getReactiveDetail($id) {
         try {
-            Auditoria::getDatosSesion();
-            $data = $this->model->getReactiveDetailById($id);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getReactiveDetailById($id, $sesion['instId']);
             if (!$data) return $this->jsonResponse('error', 'No se encontró el reactivo solicitado.');
             return $this->jsonResponse('success', $data);
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error interno: ' . $e->getMessage()); }
@@ -499,8 +503,8 @@ class BillingController {
 
     public function getInsumoDetail($id) {
         try {
-            Auditoria::getDatosSesion();
-            $data = $this->model->getInsumoDetailById($id);
+            $sesion = Auditoria::getDatosSesion();
+            $data = $this->model->getInsumoDetailById($id, $sesion['instId']);
             if (!$data) return $this->jsonResponse('error', 'No se encontraron datos para el insumo #' . $id);
             return $this->jsonResponse('success', $data);
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error en el servidor: ' . $e->getMessage()); }
@@ -508,8 +512,8 @@ class BillingController {
 
     public function getInvestigatorBalance($id) {
         try {
-            Auditoria::getDatosSesion();
-            $saldo = $this->model->getSaldoByInvestigador($id);
+            $sesion = Auditoria::getDatosSesion();
+            $saldo = $this->model->getSaldoByInvestigador($id, $sesion['instId']);
             return $this->jsonResponse('success', ['SaldoDinero' => $saldo]);
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error al obtener saldo: ' . $e->getMessage()); }
     }

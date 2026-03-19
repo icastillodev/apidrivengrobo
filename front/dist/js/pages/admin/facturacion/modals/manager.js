@@ -20,6 +20,8 @@ window.recargarGrillaActiva = () => {
         window.cargarFacturacionInvestigador();
     } else if (document.getElementById('sel-protocolo') && typeof window.cargarFacturacionProtocolo === 'function') {
         window.cargarFacturacionProtocolo();
+    } else if (document.getElementById('billing-results-inst') && typeof window.cargarFacturacionInstitucion === 'function') {
+        window.cargarFacturacionInstitucion();
     }
 };
 
@@ -44,9 +46,22 @@ window.abrirEdicionFina = (tipo, id) => {
 };
 
 window.renderAndShowModal = (html, modalId) => {
-    const container = document.getElementById('modal-container');
+    let container = document.getElementById('modal-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'modal-container';
+        document.body.appendChild(container);
+    }
     container.innerHTML = html;
-    const myModal = new bootstrap.Modal(document.getElementById(modalId));
+    const modalEl = document.getElementById(modalId);
+    if (!modalEl) {
+        console.error('renderAndShowModal: no existe el elemento del modal', modalId);
+        if (window.Swal) {
+            window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.modal_no_encontrado || 'No se pudo abrir el modal. Recargue la página.', 'error');
+        }
+        return;
+    }
+    const myModal = new bootstrap.Modal(modalEl);
     myModal.show();
 };
 

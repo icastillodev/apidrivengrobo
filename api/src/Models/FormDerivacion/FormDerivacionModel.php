@@ -533,11 +533,16 @@ class FormDerivacionModel
         $stmtHead = $this->db->prepare("SELECT f.fechainicioA, f.fecRetiroA, f.aclaraA, f.estado,
             COALESCE(tf.nombreTipo, '') as nombreTipo,
             COALESCE(tf.categoriaformulario, '') as categoria,
+            COALESCE(tf.color, '') as colorTipo,
+            f.tipoA as idTipoFormulario,
             i.NombreInst as NombreInstitucion,
             i.InstCorreo, i.InstContacto,
             COALESCE(px.nprotA, '') as nprotA,
             COALESCE(px.tituloA, '') as TituloProtocolo,
             COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '') as NombreDeptoA,
+            COALESCE(f.depto, pd.iddeptoA) as idDepto,
+            f.idsubespA as idsubespA,
+            f.idcepaA as idcepaA,
             COALESCE(o.NombreOrganismoSimple, '') as NombreOrganismoSimple
             FROM formularioe f
             LEFT JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
@@ -939,15 +944,29 @@ class FormDerivacionModel
             return $result;
         }
 
-        $stmt = $this->db->prepare("SELECT f.depto, f.idsubespA, f.tipoA, f.idcepaA, pf.idprotA,
-            COALESCE(f.depto, pd.iddeptoA) as idDeptoEfectivo,
+        $idDeriv = (int)($deriv['IdFormularioDerivacion'] ?? 0);
+        $useRedCfg = $idDeriv > 0
+            && $this->columnExists('formulario_derivacion', 'tipoA_destino')
+            && $this->columnExists('formulario_derivacion', 'depto_destino')
+            && $this->columnExists('formulario_derivacion', 'idsubespA_destino')
+            && $this->columnExists('formulario_derivacion', 'idcepaA_destino');
+
+        $tipoExpr = $useRedCfg ? "COALESCE(fd.tipoA_destino, f.tipoA)" : "f.tipoA";
+        $subespExpr = $useRedCfg ? "COALESCE(fd.idsubespA_destino, f.idsubespA)" : "f.idsubespA";
+        $cepaExpr = $useRedCfg ? "COALESCE(fd.idcepaA_destino, f.idcepaA)" : "f.idcepaA";
+        $deptoExpr = $useRedCfg ? "COALESCE(fd.depto_destino, f.depto, pd.iddeptoA)" : "COALESCE(f.depto, pd.iddeptoA)";
+        $fdJoin = $useRedCfg ? "LEFT JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ?" : "";
+
+        $stmt = $this->db->prepare("SELECT f.depto, {$subespExpr} as idsubespA, {$tipoExpr} as tipoA, {$cepaExpr} as idcepaA, pf.idprotA,
+            {$deptoExpr} as idDeptoEfectivo,
             tf.categoriaformulario as categoria
             FROM formularioe f
             LEFT JOIN protformr pf ON f.idformA = pf.idformA
             LEFT JOIN protdeptor pd ON pf.idprotA = pd.idprotA
-            LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            {$fdJoin}
+            LEFT JOIN tipoformularios tf ON {$tipoExpr} = tf.IdTipoFormulario
             WHERE f.idformA = ? LIMIT 1");
-        $stmt->execute([$idformA]);
+        $stmt->execute($useRedCfg ? [$idDeriv, $idformA] : [$idformA]);
         $form = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$form) {
             return $result;
@@ -985,7 +1004,7 @@ class FormDerivacionModel
             }
 
             $idcepa = (int)($form['idcepaA'] ?? 0);
-            if ($idsubesp > 0 && $this->hasTable('cepa')) {
+            if ($idsubesp > 0 && self::tableExists($this->db, 'cepa')) {
                 $st = $this->db->prepare("SELECT COUNT(*) FROM cepa c JOIN especiee e ON c.idespA = e.idespA JOIN subespecie s ON s.idespA = e.idespA WHERE s.idsubespA = ? AND e.IdInstitucion = ? AND c.Habilitado = 1");
                 $st->execute([$idsubesp, $instId]);
                 if ((int)$st->fetchColumn() > 0 && $idcepa <= 0) {
@@ -1005,8 +1024,7 @@ class FormDerivacionModel
             $faltantes[] = 'categoria';
         }
 
-        if ($this->tableExists('facturacion_formulario_derivado')) {
-            $idDeriv = (int)($deriv['IdFormularioDerivacion'] ?? 0);
+        if (self::tableExists($this->db, 'facturacion_formulario_derivado')) {
             if ($idDeriv > 0) {
                 $st = $this->db->prepare("SELECT 1 FROM facturacion_formulario_derivado WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ? AND (monto_total IS NOT NULL AND monto_total > 0)");
                 $st->execute([$idDeriv, $instId]);
@@ -1014,7 +1032,7 @@ class FormDerivacionModel
                     $st2 = $this->db->prepare("SELECT 1 FROM precioformulario WHERE idformA = ?");
                     $st2->execute([$idformA]);
                     $hasPf = $st2->fetchColumn();
-                    if (!$hasPf && in_array($cat, ['insumos', 'insumo'], true) && $this->tableExists('precioinsumosformulario')) {
+                    if (!$hasPf && in_array($cat, ['insumos', 'insumo'], true) && self::tableExists($this->db, 'precioinsumosformulario')) {
                         $st3 = $this->db->prepare("SELECT 1 FROM precioinsumosformulario WHERE idformA = ?");
                         $st3->execute([$idformA]);
                         $hasPf = $st3->fetchColumn();

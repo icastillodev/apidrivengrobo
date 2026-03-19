@@ -178,22 +178,33 @@ window.openDetailModal = async (id) => {
             const h = res.data.header;
             const d = res.data.details;
             
-            // Inyectar botones (PDF + Contacto)
-            const contactInfo = {
-                NombreInst: h.NombreInstitucion,
-                InstCorreo: h.InstCorreo,
-                InstContacto: h.InstContacto
-            };
-            const contactString = encodeURIComponent(JSON.stringify(contactInfo));
+            // Inyectar botones (PDF + contacto por cada institución participante)
+            const participantesContacto = Array.isArray(h.institucionesParticipantes) && h.institucionesParticipantes.length
+                ? h.institucionesParticipantes.map((inst) => ({
+                    NombreInst: inst.NombreInst || '—',
+                    InstCorreo: inst.InstCorreo || '',
+                    InstContacto: inst.InstContacto || ''
+                }))
+                : [{
+                    NombreInst: h.NombreInstitucion || '—',
+                    InstCorreo: h.InstCorreo || '',
+                    InstContacto: h.InstContacto || ''
+                }];
+            const contactPayload = encodeURIComponent(JSON.stringify({ contactos: participantesContacto }));
+            const tmf = window.txt?.misformularios || {};
+            const contactBtns = participantesContacto.map((c) => {
+                const one = encodeURIComponent(JSON.stringify({ contactos: [c] }));
+                const label = (c.NombreInst || '').substring(0, 28) + ((c.NombreInst || '').length > 28 ? '…' : '');
+                return `<button type="button" class="btn btn-outline-dark btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${one}')"><i class="bi bi-envelope-at me-1"></i> ${tmf.btn_contactar_inst || 'Contactar'}: ${String(label).replace(/</g, '&lt;')}</button>`;
+            }).join('');
 
             actions.innerHTML = `
-                <div class="d-flex gap-2">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
                     <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="window.downloadPDF(${h.idformA})">
                         <i class="bi bi-file-earmark-pdf me-2"></i> PDF
                     </button>
-                    <button class="btn btn-outline-dark btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${contactString}')">
-                        <i class="bi bi-envelope-at me-2"></i> CONTACTAR ${h.NombreInstitucion.toUpperCase()}
-                    </button>
+                    ${participantesContacto.length > 1 ? `<button type="button" class="btn btn-outline-success btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${contactPayload}')"><i class="bi bi-buildings me-1"></i> ${tmf.btn_contactar_todas || 'Ver contactos de todas'}</button>` : ''}
+                    ${contactBtns}
                 </div>
             `;
 
@@ -317,24 +328,35 @@ window.openDetailModal = async (id) => {
     }
 };
 
-/* --- ABRIR MODAL CONTACTO --- */
+/* --- ABRIR MODAL CONTACTO (una o varias instituciones) --- */
 window.openContactModal = (encodedInfo) => {
-    const info = JSON.parse(decodeURIComponent(encodedInfo));
+    let data = JSON.parse(decodeURIComponent(encodedInfo));
+    const list = Array.isArray(data.contactos) ? data.contactos : (data.NombreInst ? [data] : []);
     const modalTitle = document.getElementById('contact-modal-title');
     const modalBody = document.getElementById('contact-modal-body');
+    const tmf = window.txt?.misformularios || {};
+    const subj = encodeURIComponent(tmf.contacto_mail_asunto || 'Consulta pedido GROBO');
 
-    modalTitle.innerText = (info.NombreInst || 'Institución').toUpperCase();
-    const mailLink = info.InstCorreo ? `mailto:${info.InstCorreo}?subject=Consulta Pedido GROBO` : '#';
-    const phone = info.InstContacto || 'No disponible';
-    
-    modalBody.innerHTML = `
-        <div class="text-center">
-            <div class="mb-4"><i class="bi bi-building fs-1 text-success"></i><h5 class="mt-2 fw-bold text-dark">${info.NombreInst}</h5></div>
-            <div class="d-grid gap-3">
-                <a href="${mailLink}" class="btn btn-outline-primary fw-bold ${!info.InstCorreo ? 'disabled' : ''}"><i class="bi bi-envelope-at me-2"></i> ${info.InstCorreo || 'Sin correo'}</a>
-                <div class="p-3 bg-light rounded border"><small class="text-muted text-uppercase fw-bold">Teléfono / Contacto</small><div class="fs-5 fw-bold text-dark mt-1"><i class="bi bi-telephone me-2"></i> ${phone}</div></div>
+    modalTitle.innerText = list.length > 1
+        ? (tmf.contacto_modal_todas || 'Contacto — instituciones').toUpperCase()
+        : (list[0]?.NombreInst || tmf.contacto_modal_una || 'Institución').toUpperCase();
+
+    const blocks = list.map((info) => {
+        const mailLink = info.InstCorreo ? `mailto:${info.InstCorreo}?subject=${subj}` : '#';
+        const phone = info.InstContacto || (tmf.contacto_no_tel || 'No disponible');
+        const sinCorreo = tmf.contacto_sin_correo || 'Sin correo';
+        const telLbl = tmf.contacto_tel_lbl || 'Teléfono / Contacto';
+        return `
+        <div class="border rounded p-3 mb-3 bg-light">
+            <div class="text-center mb-3"><i class="bi bi-building fs-3 text-success"></i><h6 class="mt-2 fw-bold text-dark mb-0">${String(info.NombreInst || '').replace(/</g, '&lt;')}</h6></div>
+            <div class="d-grid gap-2">
+                <a href="${mailLink}" class="btn btn-outline-primary fw-bold btn-sm ${!info.InstCorreo ? 'disabled' : ''}"><i class="bi bi-envelope-at me-2"></i> ${info.InstCorreo || sinCorreo}</a>
+                <div class="p-2 bg-white rounded border small"><span class="text-muted text-uppercase fw-bold">${telLbl}</span><div class="fw-bold text-dark mt-1"><i class="bi bi-telephone me-2"></i> ${String(phone).replace(/</g, '&lt;')}</div></div>
             </div>
         </div>`;
+    }).join('');
+
+    modalBody.innerHTML = `<div class="px-1">${blocks}</div>`;
     new bootstrap.Modal(document.getElementById('modal-contact')).show();
 };
 
@@ -558,8 +580,11 @@ function getWorkflowBadgeRow(f) {
     if (isDerived) {
         const originName = (f.NombreInstitucionOrigen || '').trim();
         const currentName = (f.InstitucionActualNombre || '').trim();
-        const routeText = [originName, currentName].filter(Boolean).join(' → ');
-        return `<span class="badge bg-primary">${tx.workflow_derivado || 'Derivado'}${routeText ? ` · ${routeText}` : ''}</span>`;
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const routeText = [originName, currentName].filter(Boolean).map(esc).join(' → ');
+        const base = tx.workflow_derivado || 'Derivado';
+        const label = routeText ? `${base} · ${routeText}` : base;
+        return `<span class="badge bg-primary">${label}</span>`;
     }
     const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
     if (!wf) return `<span class="badge bg-light text-dark border">${tx.workflow_local || 'Local'}</span>`;
@@ -570,7 +595,6 @@ function getWorkflowBadgeRow(f) {
 }
 
 function getStatusWithWorkflow(f) {
-    const tx = window.txt?.misformularios || {};
     const isDerived = Number(f.DerivadoActivo || 0) === 1;
     // Queremos que en investigador, los derivados muestren SIEMPRE 2 estados (Origen/Destino).
     // A veces el backend no manda las keys con valor, pero el objeto incluye los campos; por eso usamos hasOwnProperty.
@@ -579,19 +603,18 @@ function getStatusWithWorkflow(f) {
     const hasDualEstados = isDerived && (hasEstadoOrigenKey || hasEstadoDestinoKey || f.estado_origen != null || f.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        const lblOrigen = tx.estado_origen_label || 'Origen';
-        const lblDestino = tx.estado_destino_label || 'Destino';
-        const bOrigen = f.estado_origen ? getStatusBadge(f.estado_origen) : '';
-        const bDestino = f.estado_destino ? getStatusBadge(f.estado_destino) : '';
-        estadoBadge = `<div class="d-flex flex-column gap-1 small"><span class="text-muted" style="font-size:9px">${lblOrigen}:</span>${bOrigen || '<span class="badge bg-light text-muted">—</span>'}<span class="text-muted mt-1" style="font-size:9px">${lblDestino}:</span>${bDestino || '<span class="badge bg-light text-muted">—</span>'}</div>`;
+        // Solo 2 badges en columna: ruta "Derivado · …" + un estado (el del destino; fallback origen).
+        const st = (f.estado_destino != null && String(f.estado_destino).trim() !== '')
+            ? f.estado_destino
+            : f.estado_origen;
+        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+        estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (f.InstitucionActualNombre || '').trim() : '';
         estadoBadge = getStatusBadge(f.estado, porInst || undefined);
     }
-    // En la vista de investigador queremos mostrar solo el estado principal:
-    // - si deriva: solo Origen/Destino (2 estados)
-    // - si es local: solo el estado principal (sin badge "Local/Workflow")
-    return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}</div>`;
+    const derivLine = isDerived ? `<div class="mb-1">${getWorkflowBadgeRow(f)}</div>` : '';
+    return `<div class="d-inline-flex flex-column align-items-center">${derivLine}${estadoBadge}</div>`;
 }
 
 function buildActionButtons(f) {

@@ -17,14 +17,12 @@ export const openReactiveModal = async (idformA) => {
         }
 
         const d = res.data;
-
-        // 2. PETICIÓN DE SALDO INDEPENDIENTE (Al dueño del dinero)
-        const resSaldo = await API.request(`/billing/get-investigator-balance/${d.id_usr_protocolo}`);
         hideLoader();
 
+        // Saldo / totales: el API ya fusiona facturación derivada (misma institución) en totalpago, total_calculado y saldoInv.
         const total = parseFloat(d.total_calculado || 0);
         const pagado = parseFloat(d.totalpago || 0);
-        const saldo = (resSaldo.status === 'success') ? parseFloat(resSaldo.data.SaldoDinero || 0) : 0;
+        const saldo = parseFloat(d.saldoInv || 0);
         const debe = Math.max(0, total - pagado);
 
         // --- LÓGICA DE BADGES ---

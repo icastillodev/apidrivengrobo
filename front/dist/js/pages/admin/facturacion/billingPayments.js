@@ -34,6 +34,8 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                 await window.cargarFacturacionInvestigador();
             } else if (typeof window.cargarFacturacionDepto === "function") {
                 await window.cargarFacturacionDepto();
+            } else if (typeof window.cargarFacturacionInstitucion === "function") {
+                await window.cargarFacturacionInstitucion();
             }
 
             Swal.fire({

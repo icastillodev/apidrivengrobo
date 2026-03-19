@@ -87,7 +87,8 @@ class InsumoController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $deptos = $this->model->getDepartments($sesion['instId']);
-            echo json_encode(['status' => 'success', 'data' => ['deptos' => $deptos]]);
+            $types = $this->model->getAvailableTypes($sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => ['deptos' => $deptos, 'types' => $types]]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
@@ -100,6 +101,7 @@ class InsumoController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $_POST['instId'] = $sesion['instId'];
+            $_POST['userId'] = (int)($sesion['userId'] ?? 0);
             $success = $this->model->updateFullInsumo($_POST);
             echo json_encode(['status' => $success ? 'success' : 'error']);
         } catch (\Exception $e) {

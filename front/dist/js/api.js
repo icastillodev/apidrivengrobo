@@ -71,7 +71,13 @@ export const API = {
 
             } catch (e) {
                 console.error("CRITICAL API ERROR (No JSON):", text);
-                return { status: 'error', message: 'Error crítico en el servidor' };
+                const raw = String(text || '').trim();
+                const plain = raw
+                    .replace(/<[^>]*>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                const msg = (plain && plain.length > 0) ? plain.slice(0, 220) : 'Error crítico en el servidor';
+                return { status: 'error', message: msg };
             }
         } catch (error) {
             console.error("Fallo de conexión:", error);

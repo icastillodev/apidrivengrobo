@@ -121,6 +121,7 @@ class AnimalController {
             $sesion = Auditoria::getDatosSesion();
             $instFromUrl = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
             $_POST['instId'] = ($instFromUrl > 0) ? $instFromUrl : (int)($sesion['instId'] ?? 0);
+            $_POST['userId'] = (int)($sesion['userId'] ?? 0);
             $this->model->updateFull($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
