@@ -97,15 +97,37 @@ class AnimalModel {
             $params[] = (int)$instId;
         }
         $whereInst = "(" . $whereInst . $derivDestinoClause . $derivOrigenClause . ")";
+        // Ya NO excluimos filas "copia" del modelo antiguo (idformA nuevo ≠ idformAOrigen): deben verse
+        // en origen con aviso en UI para re-derivar con el flujo actual (misma idformA).
         $legacyCopyExclusion = '';
+
+        $legacyDerivSelect = '';
         if ($this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'idformAOrigen')) {
-            $legacyCopyExclusion = " AND NOT EXISTS (
-                SELECT 1
-                FROM formulario_derivacion fd_legacy
-                WHERE fd_legacy.idformA = f.idformA
-                  AND fd_legacy.idformAOrigen IS NOT NULL
-                  AND fd_legacy.idformAOrigen <> fd_legacy.idformA
-            )";
+            $legacyDerivSelect = ",
+                    CASE WHEN EXISTS (
+                        SELECT 1 FROM formulario_derivacion fdleg
+                        WHERE fdleg.idformA = f.idformA
+                          AND fdleg.idformAOrigen IS NOT NULL
+                          AND fdleg.idformAOrigen <> fdleg.idformA
+                    ) THEN 1 ELSE 0 END AS EsDerivacionCopiaLegacy,
+                    (SELECT fdleg.idformAOrigen FROM formulario_derivacion fdleg
+                     WHERE fdleg.idformA = f.idformA
+                       AND fdleg.idformAOrigen IS NOT NULL
+                       AND fdleg.idformAOrigen <> fdleg.idformA
+                     ORDER BY fdleg.IdFormularioDerivacion DESC LIMIT 1) AS IdformALegacyOrigen,
+                    CASE WHEN EXISTS (
+                        SELECT 1 FROM formulario_derivacion fdleg2
+                        WHERE fdleg2.idformAOrigen = f.idformA
+                          AND fdleg2.idformA IS NOT NULL
+                          AND fdleg2.idformAOrigen IS NOT NULL
+                          AND fdleg2.idformA <> fdleg2.idformAOrigen
+                          AND fdleg2.Activo = 1
+                    ) THEN 1 ELSE 0 END AS TieneCopiaLegacyActiva,
+                    (SELECT fdleg3.idformA FROM formulario_derivacion fdleg3
+                     WHERE fdleg3.idformAOrigen = f.idformA
+                       AND fdleg3.idformA <> fdleg3.idformAOrigen
+                       AND fdleg3.Activo = 1
+                     ORDER BY fdleg3.IdFormularioDerivacion DESC LIMIT 1) AS IdformALegacyCopiaActiva";
         }
 
         $sql = "SELECT 
@@ -149,6 +171,7 @@ class AnimalModel {
                         WHERE pf2.idformA = f.idformA
                         LIMIT 1
                     ) as DeptoExternoFlag
+                    {$legacyDerivSelect}
                     {$derivEstadoSelect}
                 FROM formularioe f
                 {$redCfgJoin}

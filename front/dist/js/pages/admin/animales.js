@@ -155,6 +155,38 @@ function setupSortHeaders() {
     });
 }
 
+/** Aviso: derivación con formulario copia (modelo antiguo); debe cancelarse y re-derivarse con el flujo actual. */
+function legacyDerivacionAnimalFlags(a) {
+    const isCopy = Number(a.EsDerivacionCopiaLegacy ?? a.esderivacioncopialegacy ?? 0) === 1;
+    const tieneCopia = Number(a.TieneCopiaLegacyActiva ?? a.tienecopialegacyactiva ?? 0) === 1;
+    const idOrig = a.IdformALegacyOrigen ?? a.idformalegacyorigen ?? '';
+    const idCopia = a.IdformALegacyCopiaActiva ?? a.idformalegacycopiaactiva ?? '';
+    return { isCopy, tieneCopia, idOrig, idCopia };
+}
+
+function renderLegacyDerivacionBannerAnimal(a, compact = false) {
+    const { isCopy, tieneCopia, idOrig, idCopia } = legacyDerivacionAnimalFlags(a);
+    if (!isCopy && !tieneCopia) return '';
+    const t = window.txt?.admin_animales || {};
+    const titulo = t.derivacion_legacy_titulo || 'Derivación antigua (copia de formulario)';
+    let cuerpo = '';
+    if (isCopy) {
+        cuerpo = t.derivacion_legacy_banner_copia
+            || 'Este pedido fue generado como formulario nuevo (flujo antiguo). Debe devolver o cancelar el trámite en la red, volver al formulario original y derivar de nuevo con el proceso actual (sin crear un formulario duplicado).';
+        if (idOrig) {
+            cuerpo += ' ' + (t.derivacion_legacy_form_original || 'Formulario original') + `: #${idOrig}.`;
+        }
+    } else {
+        cuerpo = t.derivacion_legacy_banner_origen
+            || 'Existe una copia de este pedido en la red (flujo antiguo). Coordine cerrar esa derivación y vuelva a derivar desde este formulario con el proceso actual.';
+        if (idCopia) {
+            cuerpo += ' ' + (t.derivacion_legacy_id_copia || 'ID del formulario copia') + `: #${idCopia}.`;
+        }
+    }
+    const cls = compact ? 'alert-warning py-1 px-2 mb-1' : 'alert-warning py-2 px-3 mb-2';
+    return `<div class="alert ${cls} small border border-warning mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>${titulo}</strong><div class="mt-1 mb-0">${cuerpo}</div></div>`;
+}
+
 function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
@@ -210,6 +242,13 @@ function renderTable() {
             <td class="py-2 px-2 text-center">${getStatusWithWorkflow(a)}</td>
         `;
         tbody.appendChild(tr);
+        const { isCopy, tieneCopia } = legacyDerivacionAnimalFlags(a);
+        if (isCopy || tieneCopia) {
+            const trW = document.createElement('tr');
+            trW.className = 'table-warning';
+            trW.innerHTML = `<td colspan="13" class="py-1 px-2 small border-top-0">${renderLegacyDerivacionBannerAnimal(a, true)}</td>`;
+            tbody.appendChild(trW);
+        }
     });
 
     updateHeaderIcons();
@@ -432,11 +471,13 @@ function renderModalHeader(a, derivConfig) {
         </div>`
         : '';
 
+    const legacyBanner = renderLegacyDerivacionBannerAnimal(a, false);
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-        <div>
+        <div class="flex-grow-1 pe-2">
             <h5 class="fw-bold mb-0">Detalle Animal</h5>
             <span class="small text-muted">ID: <strong>${a.idformA}</strong> | Investigador: ${a.Investigador}</span>
+            ${legacyBanner}
             ${derivBox}
             ${derivInfoPanel}
         </div>
