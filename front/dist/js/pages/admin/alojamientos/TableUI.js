@@ -101,7 +101,7 @@ export const TableUI = {
                 <td><span class="badge ${badgeStatus}">${textStatus.toUpperCase()}</span></td>
                 <td class="text-end" onclick="event.stopPropagation()">
                     <div class="btn-group shadow-sm">
-                        ${!isFinalizado ? `<button class="btn btn-xs btn-success" title="${txt?.btn_update_stay || 'Actualizar'}" onclick="window.openModalActualizar(${a.historia})"><i class="bi bi-arrow-repeat"></i></button>` : ''}
+                        ${!isFinalizado ? `<button type="button" class="btn btn-xs btn-success" title="${txt?.btn_update_stay || 'Actualizar'}" onclick="event.stopPropagation(); event.preventDefault(); window.openModalActualizar(${a.historia})"><i class="bi bi-arrow-repeat"></i></button>` : ''}
                         <button class="btn btn-xs btn-light border" title="${txt?.btn_qr || 'QR'}" onclick="window.verPaginaQR(${a.historia})"><i class="bi bi-qr-code"></i></button>
                         <button class="btn btn-xs btn-light border" title="${txt?.btn_history || 'Historial'}" onclick="window.verHistorial(${a.historia})"><i class="bi bi-clock-history"></i></button>
                     </div>

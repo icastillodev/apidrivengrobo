@@ -343,6 +343,7 @@ export const es = {
         btn_save_changes: "GUARDAR CAMBIOS",
 
         upd_title: "ACTUALIZAR ESTADÍA",
+        upd_error_no_row: "No se encontró la historia en el listado. Recargue la página o abra el historial y use «Actualizar estadía» desde allí.",
         upd_date: "Fecha del Cambio",
         upd_qty: "Cantidad de Cajas",
         upd_type: "Tipo de Aloj.",

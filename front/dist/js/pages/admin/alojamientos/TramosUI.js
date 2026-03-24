@@ -27,18 +27,50 @@ export const TramosUI = {
         };
     },
 
+    /** Misma fuente que la grilla (TableUI) + comparación numérica por si historia viene string/number distinto */
+    findRowByHistoria(historiaId) {
+        const hid = Number(historiaId);
+        if (!Number.isFinite(hid) || hid <= 0) return null;
+        const raw = (typeof window !== 'undefined' && window.__AlojamientoState && window.__AlojamientoState.dataFull)
+            ? window.__AlojamientoState.dataFull
+            : (AlojamientoState.dataFull || []);
+        return raw.find(a => Number(a.historia) === hid) || null;
+    },
+
     async openModalActualizar(historiaId, desdeHistorial = false) {
         let actual;
-        
-        // MAGIA: Si venimos del historial, extraemos estrictamente el ÚLTIMO tramo activo de la lista
+        const hid = Number(historiaId);
+
+        // Si venimos del modal de historial, usamos el último tramo cargado ahí
         if (desdeHistorial && AlojamientoState.currentHistoryData && AlojamientoState.currentHistoryData.length > 0) {
             actual = AlojamientoState.currentHistoryData[AlojamientoState.currentHistoryData.length - 1];
             bootstrap.Modal.getInstance(document.getElementById('modal-historial'))?.hide();
         } else {
-            actual = AlojamientoState.dataFull.find(a => a.historia == historiaId);
+            actual = this.findRowByHistoria(hid);
+            // Fallback: la grilla puede estar desincronizada o el find fallar por tipos → mismo endpoint que el historial
+            if (!actual) {
+                try {
+                    showLoader();
+                    const res = await API.request(`/alojamiento/history?historia=${hid}`);
+                    if (res.status === 'success' && Array.isArray(res.data) && res.data.length > 0) {
+                        actual = res.data[res.data.length - 1];
+                    }
+                } catch (e) {
+                    console.error('openModalActualizar history fallback', e);
+                } finally {
+                    hideLoader();
+                }
+            }
         }
 
-        if (!actual) return;
+        if (!actual) {
+            const t = window.txt?.alojamientos || {};
+            const gen = window.txt?.generales || {};
+            if (typeof Swal !== 'undefined') {
+                Swal.fire(gen.atencion || 'Atención', t.upd_error_no_row || 'No se encontró la historia.', 'warning');
+            }
+            return;
+        }
 
         document.getElementById('act-info-header').innerHTML = `
             <div class="d-flex justify-content-between mb-1"><span class="fw-bold text-dark">${(window.txt?.generales?.historia || 'HISTORIA')} #${actual.historia}</span><span class="badge bg-primary">${actual.EspeNombreA}</span></div>
@@ -48,13 +80,14 @@ export const TramosUI = {
         document.getElementById('reg-fecha-qr').valueAsDate = new Date();
         document.getElementById('reg-cantidad-qr').value = actual.CantidadCaja || 1;
         const tipoInput = document.getElementById('reg-tipo-nombre-qr');
-        if (tipoInput) tipoInput.value = actual.NombreTipoAlojamiento || window.txt.alojamientos.box_name;
+        if (tipoInput) tipoInput.value = actual.NombreTipoAlojamiento || window.txt?.alojamientos?.box_name || 'Caja';
         document.getElementById('reg-obs-qr').value = "";
 
         const modalEl = document.getElementById('modal-actualizar-qr');
-        modalEl.dataset.historia = historiaId;
-        modalEl.dataset.idTramoActual = actual.IdAlojamiento; 
-        new bootstrap.Modal(modalEl).show();
+        if (!modalEl) return;
+        modalEl.dataset.historia = String(actual.historia ?? hid);
+        modalEl.dataset.idTramoActual = actual.IdAlojamiento;
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
 
         // Carga el árbol físico usando el ID correcto del último tramo
         await this.loadContinuityTree(actual.IdAlojamiento, actual.TipoAnimal || actual.idespA);
@@ -117,7 +150,7 @@ async guardarNuevoTramo() {
         const modalEl = document.getElementById('modal-actualizar-qr');
         const historiaId = modalEl.dataset.historia;
         const idTramoViejo = modalEl.dataset.idTramoActual;
-        const f = AlojamientoState.dataFull.find(a => a.historia == historiaId);
+        const f = this.findRowByHistoria(historiaId);
         const txt = window.txt?.alojamientos || {};
 
         if (!f) return Swal.fire('Error', txt.tramo_error_base || 'No se pudo recuperar información base.', 'error');

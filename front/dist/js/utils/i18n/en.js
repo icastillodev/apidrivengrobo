@@ -338,6 +338,7 @@ alojamientos: {
         btn_save_changes: "SAVE CHANGES",
 
         upd_title: "UPDATE STAY",
+        upd_error_no_row: "The stay was not found in the list. Reload the page or open history and use “Update stay” from there.",
         upd_date: "Change Date",
         upd_qty: "Box Quantity",
         upd_type: "Housing Type",

@@ -338,6 +338,7 @@ alojamientos: {
         btn_save_changes: "SALVAR ALTERA�?�.ES",
 
         upd_title: "ATUALIZAR ESTADIA",
+        upd_error_no_row: "Não foi possível localizar a história na lista. Recarregue a página ou abra o histórico e use «Atualizar estadia» a partir daí.",
         upd_date: "Data da Mudança",
         upd_qty: "Quantidade de Caixas",
         upd_type: "Tipo de Aloj.",
