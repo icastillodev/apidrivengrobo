@@ -21,7 +21,7 @@ export function renderDashboard(data) {
  */
 function renderStatsCards(data) {
     const container = document.getElementById('stats-container');
-    const t = data.totales;
+    const t = data.totales || {};
     
     const configs = [
         { label: 'DEUDA TOTAL', val: t.globalDeuda, col: '#dc3545' },
@@ -68,7 +68,7 @@ export function renderInvestigadoresTable(data) {
     }
 
     // 2. Mapeamos Protocolos
-    data.protocolos.forEach(p => {
+    (data.protocolos || []).forEach(p => {
         const uid = p.idUsr; 
         if (!invMap[uid]) {
             invMap[uid] = { 

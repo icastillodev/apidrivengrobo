@@ -281,25 +281,45 @@ class BillingController {
             
             $reporteProtocolos = [];
             $deudaAniGlobal = 0; $deudaReaGlobal = 0; $deudaAlojGlobal = 0; $totalPagadoGlobal = 0;
+            $insumosProtGlobal = [];
+            $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
 
             foreach ($protocolosRaw as $p) {
                 $idProt = $p['idprotA'];
                 $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
                 $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
 
-                // Los "insumos" se muestran aparte (insumosGenerales). En esta grilla solo van animales/reactivos.
+                // Unificamos insumos del protocolo en el bloque "insumos generales" del investigador
+                foreach ($insumosProt as &$ins) {
+                    $uid = $ins['IdUsrA'] ?? ($ins['idUsrA'] ?? 0);
+                    $ins['saldoInv'] = (float)($mapaSaldos[$uid] ?? 0);
+                    $insumosProtGlobal[] = $ins;
+                }
+                unset($ins);
+
+                // Los insumos de pedido (misma consulta que getInsumosByProtocolo) van a "insumosGenerales".
+                // Excluir por id de formulario — no por texto en categoria (evita falsos positivos si "insumo" aparece en el nombre del tipo).
+                $insumoIdsProt = [];
+                foreach ($insumosProt as $rowIns) {
+                    $ik = (string)($rowIns['id'] ?? $rowIns['idformA'] ?? '');
+                    if ($ik !== '') {
+                        $insumoIdsProt[$ik] = true;
+                    }
+                }
+
                 $formulariosFiltrados = [];
                 $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoProt = 0;
 
                 foreach ($formularios as $f) {
+                    $fid = (string)($f['id'] ?? '');
+                    if ($fid !== '' && isset($insumoIdsProt[$fid])) {
+                        continue;
+                    }
+
                     $montoDebe = (float)$f['debe'];
                     $montoPagado = (float)$f['pagado'];
                     $cat = strtolower($f['categoria'] ?? '');
-
-                    // Exclusión: insumos via "insumosGenerales" (mismo formato que departamento)
-                    if (strpos($cat, 'insumo') !== false && strpos($cat, 'reactivo') === false) {
-                        continue;
-                    }
 
                     if (strpos($cat, 'reactivo') !== false) {
                         $sumDebeRea += $montoDebe;
@@ -310,7 +330,8 @@ class BillingController {
                     $formulariosFiltrados[] = $f;
                 }
 
-                if (!empty($formulariosFiltrados) || !empty($alojamientos)) {
+                // Incluir tarjeta si hay algo facturable del protocolo (incl. solo insumos de pedido, aunque la grilla de animales quede vacía).
+                if (!empty($formulariosFiltrados) || !empty($alojamientos) || !empty($insumosProt)) {
                     $sumDebeAloj = array_sum(array_column($alojamientos, 'debe'));
                     $sumPagadoAloj = array_sum(array_column($alojamientos, 'pagado'));
 
@@ -335,7 +356,20 @@ class BillingController {
                 }
             }
 
-            $insumosGenerales = $this->model->getInsumosByUser($idUsr, $instId, $desde, $hasta);
+            $insumosGeneralesDirectos = $this->model->getInsumosByUser($idUsr, $instId, $desde, $hasta);
+
+            // Fusion: directos + insumos vinculados a protocolos (evitando duplicados por idformA)
+            $insumosGenerales = [];
+            foreach ($insumosGeneralesDirectos as $i) {
+                $insumosGenerales[(string)($i['id'] ?? $i['idformA'] ?? '')] = $i;
+            }
+            foreach ($insumosProtGlobal as $i) {
+                $constId = (string)($i['id'] ?? $i['idformA'] ?? '');
+                if ($constId === '') continue;
+                $insumosGenerales[$constId] = $i;
+            }
+            $insumosGenerales = array_values($insumosGenerales);
+
             $deudaInsGlobal = array_sum(array_column($insumosGenerales, 'debe'));
             $totalPagadoGlobal += array_sum(array_column($insumosGenerales, 'pagado'));
 
@@ -457,20 +491,31 @@ class BillingController {
             $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
             $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
 
-            // Los "insumos" se muestran aparte (en $insumos) como en Facturación por Departamento.
-            // En esta grilla solo entran animales/reactivos.
+            $insumoIdsSet = [];
+            foreach ($insumos as $rowIns) {
+                $ik = (string)($rowIns['id'] ?? $rowIns['idformA'] ?? '');
+                if ($ik !== '') {
+                    $insumoIdsSet[$ik] = true;
+                }
+            }
+
+            // Los insumos de pedido van en $insumos; la grilla principal = animales/reactivos (exclusión por id, no por texto).
             $deudaAni = 0; $deudaRea = 0; $pagadoTotal = 0;
             $formulariosFiltrados = [];
 
             foreach ($formularios as $f) {
-                $cat = strtolower($f['categoria'] ?? '');
-
-                    if (strpos($cat, 'insumo') !== false && strpos($cat, 'reactivo') === false) {
-                    continue; // se excluye de la tabla de pedidos
+                $fid = (string)($f['id'] ?? '');
+                if ($fid !== '' && isset($insumoIdsSet[$fid])) {
+                    continue;
                 }
 
-                if (strpos($cat, 'reactivo') !== false) $deudaRea += (float)$f['debe'];
-                else $deudaAni += (float)$f['debe'];
+                $cat = strtolower($f['categoria'] ?? '');
+
+                if (strpos($cat, 'reactivo') !== false) {
+                    $deudaRea += (float)$f['debe'];
+                } else {
+                    $deudaAni += (float)$f['debe'];
+                }
 
                 $pagadoTotal += (float)$f['pagado'];
                 $formulariosFiltrados[] = $f;

@@ -163,7 +163,7 @@ function renderizarResultados(data) {
         html += getInsumosGeneralesTableHTML(data.insumosGenerales);
     }
 
-    data.protocolos.forEach(prot => {
+    (data.protocolos || []).forEach(prot => {
         if (showAni) {
             html += `
                 <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
@@ -187,13 +187,8 @@ function renderizarResultados(data) {
 }
 
 function getFormsTableHTML(formularios, idProt) {
-    // Seguridad extra: los ítems de tipo "insumo" deben ir en el bloque de Insumos Generales,
-    // no en la grilla de animales/reactivos.
-    const safeForms = (formularios || []).filter(f => {
-        const cat = (f?.categoria || '').toString().toLowerCase();
-        // Excluir solo los "insumos" que no sean reactivos.
-        return !(cat.includes('insumo') && !cat.includes('reactivo'));
-    });
+    // La API ya separa insumos de pedido (misma lógica que departamento); aquí solo animales/reactivos.
+    const safeForms = formularios || [];
 
     if (safeForms.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
     return `

@@ -118,13 +118,8 @@ function renderizarResultados(data) {
 }
 
 function getFormsTableHTML(formularios, idProt) {
-    // Seguridad extra: en Protocolo, los "insumos" deben mostrarse aparte (tabla insumos),
-    // no mezclarse con animales/reactivos.
-    const safeForms = (formularios || []).filter(f => {
-        const cat = (f?.categoria || '').toString().toLowerCase();
-        // Excluir solo los "insumos" que no sean reactivos.
-        return !(cat.includes('insumo') && !cat.includes('reactivo'));
-    });
+    // La API ya devuelve solo animales/reactivos; insumos de pedido van en data.insumos.
+    const safeForms = formularios || [];
 
     if (!safeForms || safeForms.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
     return `
