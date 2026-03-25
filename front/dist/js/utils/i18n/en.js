@@ -275,6 +275,8 @@ alojamientos: {
         status: "Status",
         status_active: "Active",
         status_finished: "Finished",
+        filter_species: "Species Type",
+        filter_species_all: "All species",
         ph_buscar_global: "Type to search...",
         ph_buscar_prot_reg: "Search by ID, Protocol No., Title or Investigator...",
         ph_buscar_user_reg: "Search by ID, User, First or Last Name...",

@@ -287,22 +287,30 @@ class BillingController {
                 $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
                 $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
 
-                if (!empty($formularios) || !empty($alojamientos)) {
-                    $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoProt = 0;
+                // Los "insumos" se muestran aparte (insumosGenerales). En esta grilla solo van animales/reactivos.
+                $formulariosFiltrados = [];
+                $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoProt = 0;
 
-                    foreach ($formularios as $f) {
-                        $montoDebe = (float)$f['debe'];
-                        $montoPagado = (float)$f['pagado'];
-                        $cat = strtolower($f['categoria'] ?? '');
+                foreach ($formularios as $f) {
+                    $montoDebe = (float)$f['debe'];
+                    $montoPagado = (float)$f['pagado'];
+                    $cat = strtolower($f['categoria'] ?? '');
 
-                        if (strpos($cat, 'reactivo') !== false) {
-                            $sumDebeRea += $montoDebe;
-                        } else {
-                            $sumDebeAni += $montoDebe;
-                        }
-                        $sumPagadoProt += $montoPagado;
+                    // Exclusión: insumos via "insumosGenerales" (mismo formato que departamento)
+                    if (strpos($cat, 'insumo') !== false && strpos($cat, 'reactivo') === false) {
+                        continue;
                     }
 
+                    if (strpos($cat, 'reactivo') !== false) {
+                        $sumDebeRea += $montoDebe;
+                    } else {
+                        $sumDebeAni += $montoDebe;
+                    }
+                    $sumPagadoProt += $montoPagado;
+                    $formulariosFiltrados[] = $f;
+                }
+
+                if (!empty($formulariosFiltrados) || !empty($alojamientos)) {
                     $sumDebeAloj = array_sum(array_column($alojamientos, 'debe'));
                     $sumPagadoAloj = array_sum(array_column($alojamientos, 'pagado'));
 
@@ -316,7 +324,7 @@ class BillingController {
                         'deudaAnimales'    => $sumDebeAni,
                         'deudaReactivos'   => $sumDebeRea,
                         'deudaAlojamiento' => $sumDebeAloj,
-                        'formularios'      => $formularios,
+                        'formularios'      => $formulariosFiltrados,
                         'alojamientos'     => $alojamientos
                     ];
 
@@ -449,12 +457,23 @@ class BillingController {
             $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
             $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
 
+            // Los "insumos" se muestran aparte (en $insumos) como en Facturación por Departamento.
+            // En esta grilla solo entran animales/reactivos.
             $deudaAni = 0; $deudaRea = 0; $pagadoTotal = 0;
+            $formulariosFiltrados = [];
 
             foreach ($formularios as $f) {
-                if (strpos(strtolower($f['categoria']), 'reactivo') !== false) $deudaRea += (float)$f['debe'];
+                $cat = strtolower($f['categoria'] ?? '');
+
+                    if (strpos($cat, 'insumo') !== false && strpos($cat, 'reactivo') === false) {
+                    continue; // se excluye de la tabla de pedidos
+                }
+
+                if (strpos($cat, 'reactivo') !== false) $deudaRea += (float)$f['debe'];
                 else $deudaAni += (float)$f['debe'];
+
                 $pagadoTotal += (float)$f['pagado'];
+                $formulariosFiltrados[] = $f;
             }
             
             $deudaAloj = array_sum(array_column($alojamientos, 'debe'));
@@ -465,7 +484,7 @@ class BillingController {
 
             $this->jsonResponse('success', [
                 'info' => $info,
-                'formularios' => $formularios,
+                'formularios' => $formulariosFiltrados,
                 'alojamientos' => $alojamientos,
                 'insumos' => $insumos,
                 'totales' => [

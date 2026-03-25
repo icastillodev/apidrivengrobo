@@ -118,7 +118,15 @@ function renderizarResultados(data) {
 }
 
 function getFormsTableHTML(formularios, idProt) {
-    if (!formularios || formularios.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
+    // Seguridad extra: en Protocolo, los "insumos" deben mostrarse aparte (tabla insumos),
+    // no mezclarse con animales/reactivos.
+    const safeForms = (formularios || []).filter(f => {
+        const cat = (f?.categoria || '').toString().toLowerCase();
+        // Excluir solo los "insumos" que no sean reactivos.
+        return !(cat.includes('insumo') && !cat.includes('reactivo'));
+    });
+
+    if (!safeForms || safeForms.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos de Protocolo (Formularios)</h6>
         <div class="table-responsive">
@@ -138,7 +146,7 @@ function getFormsTableHTML(formularios, idProt) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${formularios.map(f => {
+                    ${safeForms.map(f => {
                         const isExento = (f.is_exento == 1 || f.exento == 1);
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);

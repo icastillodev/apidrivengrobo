@@ -187,7 +187,15 @@ function renderizarResultados(data) {
 }
 
 function getFormsTableHTML(formularios, idProt) {
-    if (!formularios || formularios.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
+    // Seguridad extra: los ítems de tipo "insumo" deben ir en el bloque de Insumos Generales,
+    // no en la grilla de animales/reactivos.
+    const safeForms = (formularios || []).filter(f => {
+        const cat = (f?.categoria || '').toString().toLowerCase();
+        // Excluir solo los "insumos" que no sean reactivos.
+        return !(cat.includes('insumo') && !cat.includes('reactivo'));
+    });
+
+    if (safeForms.length === 0) return '<p class="text-center my-4 text-muted small">No hay pedidos vinculados a este protocolo.</p>';
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">Pedidos de Protocolo (Formularios)</h6>
         <div class="table-responsive">
@@ -207,7 +215,7 @@ function getFormsTableHTML(formularios, idProt) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${formularios.map(f => {
+                    ${safeForms.map(f => {
                         const isExento = (f.is_exento == 1 || f.exento == 1);
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
@@ -290,39 +298,87 @@ function getAlojTableHTML(alojamientos, idProt) {
 }
 
 function getInsumosGeneralesTableHTML(insumos) {
+    if (!insumos || insumos.length === 0) return '';
+
+    let sumTotal = 0, sumPagado = 0, sumDebe = 0;
+
+    const filas = insumos.map(i => {
+        const total = parseFloat(i.total_item || 0);
+        const pagado = parseFloat(i.pagado || 0);
+        const isExento = (i.is_exento == 1);
+        const debe = isExento ? 0 : Math.max(0, total - pagado);
+
+        sumTotal += total; sumPagado += pagado; sumDebe += debe;
+
+        let badge = (debe <= 0) ? '<span class="badge bg-success shadow-sm">PAGO</span>' :
+            (pagado > 0 ? '<span class="badge bg-warning text-dark shadow-sm">PARCIAL</span>' :
+                '<span class="badge bg-danger shadow-sm">PENDIENTE</span>');
+
+        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
+        const rowStyle = (debe <= 0) ? 'background-color: #f0fff4 !important;' : '';
+
+        return `
+            <tr class="text-center align-middle pointer" style="${rowStyle}"
+                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
+                <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+                <td class="small text-muted">${i.id}</td>
+                <td>${badge}</td>
+                <td>${i.solicitante || '-'}</td>
+                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
+                <td class="text-end fw-bold">$ ${total.toFixed(2)}</td>
+                <td class="text-end text-success fw-bold">$ ${pagado.toFixed(2)}</td>
+                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+            </tr>`;
+    }).join('');
+
     return `
-        <div class="card shadow-sm border-0 mb-5" style="border-left: 5px solid #0d6efd !important;">
-            <div class="card-header bg-white py-3 d-flex justify-content-between">
-                <h5 class="m-0 text-primary fw-bold"><i class="bi bi-box-seam me-2"></i>Insumos y Suministros (Directos)</h5>
+        <div class="card shadow-sm border-0 mb-5 card-insumos-generales" style="border-left: 5px solid #0d6efd !important;">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="m-0 text-primary fw-bold"><i class="bi bi-box-seam-fill me-2"></i>Insumos Generales del Investigador</h5>
+                <button class="btn btn-link btn-sm text-danger p-0" onclick="window.downloadInsumosPDF && window.downloadInsumosPDF()">
+                    <i class="bi bi-filetype-pdf fs-4"></i>
+                </button>
             </div>
-            <div class="table-responsive">
+            <div class="card-body p-0">
                 <table class="table table-bordered table-billing mb-0">
                     <thead class="table-dark text-center">
                         <tr>
                             <th style="width:3%"><input type="checkbox" id="check-all-insumos-gen"></th>
-                            <th style="width:8%">ID</th>
-                            <th>Conceptos Agrupados</th> 
+                            <th style="width:5%">ID</th>
+                            <th style="width:8%">Estado</th>
+                            <th style="width:15%">Solicitante</th>
+                            <th>Conceptos y Cantidades (Agrupados)</th>
                             <th style="width:10%">Total</th>
-                            <th style="width:10%">Pagado</th>
+                            <th style="width:10%">Pago</th>
                             <th style="width:10%">Falta</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${insumos.map(i => `
-                            <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('INSUMO', ${i.id})">
-                                <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${i.debe}" ${i.debe <= 0 ? 'disabled' : ''}></td>
-                                <td class="small text-muted">#${i.id}</td>
-                                <td class="text-start ps-3 small">${i.detalle_completo.split('|').join('<br>• ')}</td>
-                                <td class="text-end">$ ${parseFloat(i.total_item).toFixed(2)}</td>
-                                <td class="text-end text-success fw-bold">$ ${parseFloat(i.pagado || 0).toFixed(2)}</td>
-                                <td class="text-end text-danger fw-bold">$ ${parseFloat(i.debe).toFixed(2)}</td>
-                            </tr>`).join('')}
-                    </tbody>
+                    <tbody>${filas}</tbody>
                 </table>
             </div>
-            <div class="card-footer bg-light py-3 text-end">
-                <span class="fs-5 fw-bold text-primary me-3" id="total-insumos-seleccionados">$ 0.00</span>
-                <button type="button" class="btn btn-primary fw-bold px-4" onclick="window.procesarPagoInsumosGenerales()">Pagar Selección</button>
+            <div class="card-footer bg-light py-3 border-top">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex gap-5">
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Insumos</small>
+                            <b class="fs-6">$ ${sumTotal.toFixed(2)}</b>
+                        </div>
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Pago</small>
+                            <b class="fs-6 text-success">$ ${sumPagado.toFixed(2)}</b>
+                        </div>
+                        <div class="text-center">
+                            <small class="d-block text-muted uppercase" style="font-size:9px">Total Falta</small>
+                            <b class="fs-6 text-danger">$ ${sumDebe.toFixed(2)}</b>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="fs-4 fw-bold text-primary" id="total-insumos-seleccionados">$ 0.00</span>
+                        <button class="btn btn-primary btn-sm fw-bold ms-3 shadow-sm" onclick="window.procesarPagoInsumosGenerales()">
+                            <i class="bi bi-wallet2 me-1"></i> Pagar Selección
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>`;
 }

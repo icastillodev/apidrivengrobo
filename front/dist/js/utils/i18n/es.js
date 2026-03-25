@@ -279,6 +279,8 @@ export const es = {
         status: "Estado",
         status_active: "Vigentes",
         status_finished: "Finalizados",
+        filter_species: "Tipo de Especie",
+        filter_species_all: "Todas las especies",
         ph_buscar_global: "Escribe para buscar...",
         ph_buscar_prot_reg: "Buscar por ID, N° Protocolo, Título o Investigador...",
         ph_buscar_user_reg: "Buscar por ID, Usuario, Nombre o Apellido...",

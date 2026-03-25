@@ -125,11 +125,17 @@
                     <input type="text" id="search-alojamiento" class="form-control form-control-sm" data-i18n="alojamientos.ph_buscar_global" placeholder="Escribe para buscar..." oninput="window.renderAlojamientosTable()">
                 </div>
                 <div class="col-md-3">
-                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>
+                    <label for="filter-estado" class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>
                     <select id="filter-estado" class="form-select form-select-sm" onchange="window.renderAlojamientosTable()">
                         <option value="" selected data-i18n="estadosformularios.todosestados">Todos los Estados</option>
                         <option value="0" data-i18n="alojamientos.status_active">Vigentes</option>
                         <option value="1" data-i18n="alojamientos.status_finished">Finalizados</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-especie" class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.filter_species">Tipo de Especie</label>
+                    <select id="filter-especie" class="form-select form-select-sm" onchange="window.renderAlojamientosTable()">
+                        <option value="" selected data-i18n="alojamientos.filter_species_all">Todas las especies</option>
                     </select>
                 </div>
             </div>
@@ -165,7 +171,7 @@
         <div class="modal-content border-0">
             <div class="modal-header bg-dark text-white py-2">
                 <h6 class="modal-title small uppercase fw-bold" id="historial-title">Ficha de Alojamiento</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" title="×" aria-label="×"></button>
             </div>
             <div class="modal-body">
                 <div class="d-flex justify-content-end gap-2 mb-3">

@@ -60,11 +60,13 @@ export async function loadAlojamientos() {
             AlojamientoState.dataFull = [];
         }
 
+            TableUI.poblarFiltroEspecies?.();
         TableUI.render();
         if (res.status === 'success') refreshMenuNotifications();
     } catch (e) {
         console.error("Error cargando alojamientos:", e);
         AlojamientoState.dataFull = [];
+            TableUI.poblarFiltroEspecies?.();
         TableUI.render();
     } finally {
         hideLoader();

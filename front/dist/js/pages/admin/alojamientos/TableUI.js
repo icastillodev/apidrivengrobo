@@ -5,10 +5,22 @@ function getDataFull() {
     return ref ? (ref.dataFull || []) : [];
 }
 
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    }[m]));
+}
+
 export const TableUI = {
     currentPage: 1,
     rowsPerPage: 10,
     sortConfig: { key: 'historia', direction: 'desc' },
+    _lastFilterKey: null,
+    _lastSpeciesIdsKey: null,
 
     init() {
         const btnAyuda = document.getElementById('btn-ayuda-alojamiento');
@@ -26,6 +38,43 @@ export const TableUI = {
         window.renderAlojamientosTable = () => this.render();
     },
 
+    poblarFiltroEspecies() {
+        const select = document.getElementById('filter-especie');
+        if (!select) return;
+
+        const txt = window.txt?.alojamientos || {};
+        const defaultAllText = select.querySelector('option[value=""]')?.textContent || '';
+        const allText = txt.filter_species_all || defaultAllText || '';
+
+        const dataFull = getDataFull();
+        const speciesMap = new Map(); // id -> nombre
+
+        dataFull.forEach(a => {
+            const idEsp = String(a.idespA ?? a.TipoAnimal ?? '').trim();
+            if (!idEsp) return;
+            const nombre = String(a.EspeNombreA ?? '').trim();
+            if (!nombre) return;
+            speciesMap.set(idEsp, nombre);
+        });
+
+        const ids = Array.from(speciesMap.keys()).sort((idA, idB) =>
+            speciesMap.get(idA).localeCompare(speciesMap.get(idB), undefined, { sensitivity: 'base' })
+        );
+        const idsKey = ids.join('|');
+        if (this._lastSpeciesIdsKey === idsKey) return;
+
+        const prevSelected = String(select.value || '');
+
+        const options = ids.map(id => {
+            const selectedAttr = id === prevSelected ? 'selected' : '';
+            return `<option value="${escapeHtml(id)}" ${selectedAttr}>${escapeHtml(speciesMap.get(id))}</option>`;
+        }).join('');
+
+        const placeholderSelectedAttr = prevSelected === '' ? 'selected' : '';
+        select.innerHTML = `<option value="" ${placeholderSelectedAttr}>${escapeHtml(allText)}</option>${options}`;
+        this._lastSpeciesIdsKey = idsKey;
+    },
+
     handleSort(key) {
         if (this.sortConfig.key === key) {
             this.sortConfig.direction = this.sortConfig.direction === 'asc' ? 'desc' : (this.sortConfig.direction === 'desc' ? 'none' : 'asc');
@@ -41,6 +90,7 @@ export const TableUI = {
 
         const term = (document.getElementById('search-alojamiento')?.value || '').toLowerCase().trim();
         const estadoFiltro = (document.getElementById('filter-estado')?.value || '').toString();
+        const especieFiltro = (document.getElementById('filter-especie')?.value || '').toString();
         const tbody = document.getElementById('tbody-alojamientos');
 
         if (!tbody) return;
@@ -48,6 +98,12 @@ export const TableUI = {
         const txt = window.txt?.alojamientos || {};
         const gen = window.txt?.generales || {};
         const COL_COUNT = 10;
+
+        const filterKey = `${term}|${estadoFiltro}|${especieFiltro}`;
+        if (this._lastFilterKey !== filterKey) {
+            this._lastFilterKey = filterKey;
+            this.currentPage = 1;
+        }
 
         let data = dataFull.filter(a => {
             const nprot = (a.nprotA || '').toString().toLowerCase();
@@ -57,7 +113,9 @@ export const TableUI = {
             const matchesSearch = !termLower || nprot.includes(termLower) || inv.includes(termLower) || hist.includes(termLower);
             const isFinalizado = (a.finalizado == 1 || a.finalizado === "1");
             const matchesEstado = estadoFiltro === "" || (isFinalizado ? "1" : "0") === estadoFiltro;
-            return matchesSearch && matchesEstado;
+            const idEsp = String(a.idespA ?? a.TipoAnimal ?? '').toString();
+            const matchesEspecie = especieFiltro === "" || idEsp === especieFiltro;
+            return matchesSearch && matchesEstado && matchesEspecie;
         });
 
         if (this.sortConfig.direction !== 'none') {
