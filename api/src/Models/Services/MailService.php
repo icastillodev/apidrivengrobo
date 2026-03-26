@@ -9,10 +9,33 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 class MailService {
-    private $host = 'smtp.hostinger.com'; 
+    private $host = 'smtp.hostinger.com';
     private $user = 'no-reply@groboapp.com';
     private $pass = 'XHMI@3hU';
     private $port = 587;
+    private $secure = 'tls'; // tls | ssl | none
+    private $fromEmail = 'no-reply@groboapp.com';
+    private $fromName = 'GROBO';
+
+    public function __construct() {
+        // Permite configurar SMTP por entorno (ideal para localhost/Docker) sin romper producción.
+        // Si no hay variables, queda el comportamiento actual.
+        $envHost = getenv('MAIL_HOST');
+        $envPort = getenv('MAIL_PORT');
+        $envUser = getenv('MAIL_USER');
+        $envPass = getenv('MAIL_PASS');
+        $envSecure = getenv('MAIL_SECURE'); // tls | ssl | none
+        $envFrom = getenv('MAIL_FROM');
+        $envFromName = getenv('MAIL_FROM_NAME');
+
+        if ($envHost !== false && trim($envHost) !== '') $this->host = trim($envHost);
+        if ($envPort !== false && is_numeric($envPort)) $this->port = (int)$envPort;
+        if ($envUser !== false) $this->user = (string)$envUser;
+        if ($envPass !== false) $this->pass = (string)$envPass;
+        if ($envSecure !== false && trim($envSecure) !== '') $this->secure = strtolower(trim($envSecure));
+        if ($envFrom !== false && trim($envFrom) !== '') $this->fromEmail = trim($envFrom);
+        if ($envFromName !== false && trim($envFromName) !== '') $this->fromName = trim($envFromName);
+    }
 
     /**
      * Base URL del front (para enlaces en correos). Lleva a la institución cuando se pasa $slug.
@@ -81,14 +104,36 @@ public function executeSend($to, $subject, $body) {
         try {
             $mail->isSMTP();
             $mail->Host       = $this->host;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = $this->user;
-            $mail->Password   = $this->pass;
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $hasUser = (isset($this->user) && trim((string)$this->user) !== '');
+            $hasPass = (isset($this->pass) && trim((string)$this->pass) !== '');
+            $mail->SMTPAuth   = ($hasUser && $hasPass);
+            if ($mail->SMTPAuth) {
+                $mail->Username   = $this->user;
+                $mail->Password   = $this->pass;
+            }
+
+            if ($this->secure === 'ssl') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            } elseif ($this->secure === 'none') {
+                $mail->SMTPSecure = '';
+                $mail->SMTPAutoTLS = false;
+            } else {
+                // default tls (STARTTLS)
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            }
             $mail->Port       = $this->port;
             $mail->CharSet    = 'UTF-8';
 
-            $mail->setFrom($this->user, 'GROBO');
+            // Debug opcional por entorno (solo para diagnosticar en local)
+            $debug = getenv('MAIL_DEBUG');
+            if ($debug !== false && (string)$debug !== '' && (string)$debug !== '0') {
+                $mail->SMTPDebug = 2;
+                $mail->Debugoutput = function ($str, $level) {
+                    error_log("[MAIL_DEBUG:$level] " . $str);
+                };
+            }
+
+            $mail->setFrom($this->fromEmail ?: $this->user, $this->fromName ?: 'GROBO');
             $mail->addAddress($to);
             $mail->isHTML(true);
             $mail->Subject = $subject;
