@@ -317,7 +317,8 @@ async updateTramoData(event) {
                 const res = await API.request('/alojamiento/update-price', 'POST', { IdAlojamiento: idAlojamiento, precio: nuevoPrecio });
                 if (res.status === 'success') {
                     const historiaId = AlojamientoState.currentHistoryData[0].historia;
-                    window.verHistorial(historiaId);
+                    await loadAlojamientos();
+                    setTimeout(() => window.verHistorial(historiaId), 500);
                 }
             } catch (e) { console.error(e); } finally { hideLoader(); }
         }

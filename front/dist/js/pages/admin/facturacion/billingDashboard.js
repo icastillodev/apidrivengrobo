@@ -77,12 +77,12 @@ export function renderInvestigadoresTable(data) {
                 saldo: parseFloat(p.saldoInv || 0) 
             };
         }
-        invMap[uid].deuda += (parseFloat(p.deudaAnimales || 0) + parseFloat(p.deudaAlojamiento || 0) + parseFloat(p.deudaReactivos || 0));
+        invMap[uid].deuda += (parseFloat(p.deudaAnimales || 0) + parseFloat(p.deudaAlojamiento || 0) + parseFloat(p.deudaReactivos || 0) + parseFloat(p.deudaInsumos || 0));
         
-        // SUMAMOS LO PAGADO EN FORMULARIOS Y ALOJAMIENTOS
         let pagadoProt = 0;
         (p.formularios || []).forEach(f => pagadoProt += parseFloat(f.pagado || 0));
         (p.alojamientos || []).forEach(a => pagadoProt += parseFloat(a.pagado || 0));
+        (p.insumos || []).forEach(i => pagadoProt += parseFloat(i.pagado || 0));
         
         invMap[uid].pagado += pagadoProt;
     });

@@ -42,12 +42,23 @@ class AlojamientoExportModel {
             $sqlTraz = "
                 SELECT a.historia, ac.NombreCaja, eu.NombreEspecieAloj as Sujeto, 
                        o.fechaObs, c.NombreCatAlojUnidad as Metrica, 
-                       COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) as Valor
+                       COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) as Valor,
+                       TRIM(CONCAT_WS(' · ',
+                           NULLIF(TRIM(uf.Nombre), ''),
+                           NULLIF(TRIM(s.Nombre), ''),
+                           NULLIF(TRIM(r.Nombre), ''),
+                           NULLIF(TRIM(lr.Nombre), ''),
+                           NULLIF(TRIM(ac.ComentarioUbicacion), '')
+                       )) AS UbicacionCaja
                 FROM observacion_alojamiento_unidad o
                 INNER JOIN especie_alojamiento_unidad eu ON o.IdEspecieAlojUnidad = eu.IdEspecieAlojUnidad
                 INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
                 INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
                 INNER JOIN categoriadatosunidadalojamiento c ON o.IdDatosUnidadAloj = c.IdDatosUnidadAloj
+                LEFT JOIN aloj_ubicacion_fisica uf ON ac.IdUbicacionFisica = uf.IdUbicacionFisica
+                LEFT JOIN aloj_salon s ON ac.IdSalon = s.IdSalon
+                LEFT JOIN aloj_rack r ON ac.IdRack = r.IdRack
+                LEFT JOIN aloj_lugar_rack lr ON ac.IdLugarRack = lr.IdLugarRack
                 WHERE a.IdInstitucion = ? $whereHistoria
                 ORDER BY a.historia DESC, ac.NombreCaja ASC, o.fechaObs DESC
             ";

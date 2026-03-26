@@ -3,6 +3,8 @@ export function initConfigDashboard() {
     const lbl = document.getElementById('lbl-inst-name');
     if(lbl) lbl.innerText = instName;
 
+    const tHub = window.txt?.config_aloj_ubicacion || {};
+
     // Calculamos el path base dinámicamente
     const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? '/URBE-API-DRIVEN/front/admin/configuracion/' 
@@ -33,6 +35,12 @@ export function initConfigDashboard() {
             title: "Alojamientos y Clínica", desc: "Tipos de cajas/jaulas por especie y variables de Historia Clínica (HC).",
             icon: "bi-hospital", theme: "theme-orange", border: "border-warning",
             link: `${basePath}alojamientos`
+        },
+        {
+            title: tHub.hub_card_title || "Ubicación física de cajas",
+            desc: tHub.hub_card_desc || "Catálogo jerárquico de ubicación para trazabilidad.",
+            icon: "bi-geo-alt", theme: "theme-info", border: "border-info",
+            link: `${basePath}alojamientos-ubicacion`
         },
         {
             title: "Reservas y Espacios", desc: "Gestión de Salones, Instrumentos y horarios disponibles (L-V).",

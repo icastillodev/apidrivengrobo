@@ -33,3 +33,10 @@ Desktop.ini
 # Builds / Salida
 build/
 .astro/
+
+# =========================================
+# Docker y Volúmenes de Datos (Ignorar data local)
+# =========================================
+/db_data/
+/mysql_data/
+docker-compose.override.yml

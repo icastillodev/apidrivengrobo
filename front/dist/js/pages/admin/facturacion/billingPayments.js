@@ -51,21 +51,28 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
 };
 
 window.procesarPagoProtocolo = async (idProt) => {
-    const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
+    const prot = window.currentReportData.protocolos.find(p =>
+        p.idProt == idProt || p.info?.idprotA == idProt
+    );
     if (!prot) return;
 
     let totalAPagar = 0;
     const items = [];
 
-    // Recolectamos selección y EL MONTO EXACTO
-    const seleccionados = document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj)`);
+    // Recolectamos selección y EL MONTO EXACTO (incluye insumos de pedido del protocolo)
+    const seleccionados = document.querySelectorAll(
+        `input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj):not(.check-all-insumo-prot)`
+    );
     seleccionados.forEach(chk => {
         const montoItem = parseFloat(chk.dataset.monto || 0);
         totalAPagar += montoItem;
-        items.push({ 
-            tipo: chk.classList.contains('check-item-form') ? 'FORM' : 'ALOJ', 
+        let tipo = 'ALOJ';
+        if (chk.classList.contains('check-item-form')) tipo = 'FORM';
+        else if (chk.classList.contains('check-item-insumo-prot')) tipo = 'INSUMO_GRAL';
+        items.push({
+            tipo,
             id: chk.dataset.id,
-            monto_pago: montoItem // CRUCIAL: Se envía al backend
+            monto_pago: montoItem
         });
     });
 
@@ -74,7 +81,7 @@ window.procesarPagoProtocolo = async (idProt) => {
         return;
     }
 
-    const saldoActual = parseFloat(prot.saldoInv || 0);
+    const saldoActual = parseFloat(prot.saldoInv ?? prot.info?.SaldoPI ?? 0);
 
     if (totalAPagar > saldoActual) {
         Swal.fire({
@@ -115,7 +122,8 @@ window.procesarPagoProtocolo = async (idProt) => {
     });
 
     if (confirm.isConfirmed) {
-        ejecutarPagoFinal(prot.idUsr, totalAPagar, items);
+        const idUsrPago = prot.idUsr ?? prot.info?.IdUsrA;
+        ejecutarPagoFinal(idUsrPago, totalAPagar, items);
     }
 };
 /**
@@ -173,7 +181,7 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
 };
 
 window.procesarPagoInsumosGenerales = async () => {
-    const seleccionados = document.querySelectorAll('.check-item-insumo:checked');
+    const seleccionados = document.querySelectorAll('.check-item-insumo-global:checked');
     
     if (seleccionados.length === 0) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_insumo_pagar || 'Seleccione al menos un insumo para pagar.', 'info');
 

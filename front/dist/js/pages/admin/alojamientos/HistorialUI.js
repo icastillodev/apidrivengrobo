@@ -2,6 +2,7 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AlojamientoState, loadAlojamientos } from '../alojamientos.js';
+import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
 
 export const HistorialUI = {
     init() {
@@ -46,7 +47,6 @@ export const HistorialUI = {
                 
                 const modalEl = document.getElementById('modal-historial');
                 const modal = new bootstrap.Modal(modalEl);
-                modalEl.addEventListener('hidden.bs.modal', () => loadAlojamientos(), { once: true });
                 modal.show();
             }
         } catch (e) { console.error(e); } finally { hideLoader(); }
@@ -311,7 +311,7 @@ renderTable() {
             ]);
             
             if (resProt.status === 'success') this.cfgData.protocolos = resProt.data;
-            if (resUsr.status === 'success') this.cfgData.usuarios = resUsr.data;
+            if (resUsr.status === 'success') this.cfgData.usuarios = sortUsersByApellidoNombre(resUsr.data);
             if (resDepto.status === 'success') this.cfgData.deptos = resDepto.data; // AGREGADO
             
         } catch(e) { console.error(e); }
@@ -415,7 +415,7 @@ renderTable() {
         try {
             const res = await API.request(`/users/institution`);
             if (res.status === 'success') {
-                this.cfgData.usuarios = res.data;
+                this.cfgData.usuarios = sortUsersByApellidoNombre(res.data);
                 this.renderCfgUsuarios(); // Reutiliza la funcion
             }
         } catch (e) { console.error(e); }
@@ -428,8 +428,8 @@ renderTable() {
         list.innerHTML = this.cfgData.usuarios.map(u => `
             <div id="cfg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom ${u.IdUsrA == this.cfgSelections.IdUsrA ? 'active bg-success text-white border-success' : ''}" onclick="window.cfgSelectUsuario(${u.IdUsrA})">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span><b class="${u.IdUsrA == this.cfgSelections.IdUsrA ? 'text-white' : 'text-dark'}">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
-                    <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
+                    <span><b class="${u.IdUsrA == this.cfgSelections.IdUsrA ? 'text-white' : 'text-dark'}">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${escListText(formatUsuarioApellidoNombre(u))}</span></span>
+                    <small class="badge bg-light text-dark border fst-italic">@${escListText(u.Usuario || '')}</small>
                 </div>
             </div>
         `).join('');

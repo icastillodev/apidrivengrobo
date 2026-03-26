@@ -110,8 +110,21 @@ class AlojamientoModel {
                     $oldCaja = $stmtGetCaja->fetch(\PDO::FETCH_ASSOC);
 
                     if ($oldCaja) {
-                        $stmtInsertCaja = $this->db->prepare("INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento) VALUES (?, ?, ?, ?)");
-                        $stmtInsertCaja->execute([$data['fechavisado'], $oldCaja['Detalle'], $oldCaja['NombreCaja'], $idNewTramo]);
+                        $stmtInsertCaja = $this->db->prepare(
+                            "INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                        );
+                        $stmtInsertCaja->execute([
+                            $data['fechavisado'],
+                            $oldCaja['Detalle'] ?? null,
+                            $oldCaja['NombreCaja'],
+                            $idNewTramo,
+                            $oldCaja['IdUbicacionFisica'] ?? null,
+                            $oldCaja['IdSalon'] ?? null,
+                            $oldCaja['IdRack'] ?? null,
+                            $oldCaja['IdLugarRack'] ?? null,
+                            $oldCaja['ComentarioUbicacion'] ?? null,
+                        ]);
                         $newIdCaja = $this->db->lastInsertId();
 
                         $stmtGetUnits = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");

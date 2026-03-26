@@ -9,8 +9,17 @@ class TrazabilidadModel {
 
     public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
         $stmtCajas = $this->db->prepare("
-            SELECT ac.* FROM alojamiento_caja ac
+            SELECT ac.*,
+                uf.Nombre AS nombre_ubicacion_fisica,
+                s.Nombre AS nombre_salon,
+                r.Nombre AS nombre_rack,
+                lr.Nombre AS nombre_lugar_rack
+            FROM alojamiento_caja ac
             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+            LEFT JOIN aloj_ubicacion_fisica uf ON ac.IdUbicacionFisica = uf.IdUbicacionFisica
+            LEFT JOIN aloj_salon s ON ac.IdSalon = s.IdSalon
+            LEFT JOIN aloj_rack r ON ac.IdRack = r.IdRack
+            LEFT JOIN aloj_lugar_rack lr ON ac.IdLugarRack = lr.IdLugarRack
             WHERE ac.IdAlojamiento = ? AND a.IdInstitucion = ?
         ");
         $stmtCajas->execute([$idAlojamiento, $idInstitucion]);
@@ -63,12 +72,31 @@ class TrazabilidadModel {
         return ['cajas' => $cajas, 'categorias' => $categorias, 'tipoAlojamiento' => $tipoAlojamiento, 'limiteCajas' => $limiteCajas];
     }
 
-    public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidades, $idInstitucion) {
+    public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidades, $idInstitucion, array $ubicacion = null) {
         $stmtCheck = $this->db->prepare("SELECT IdAlojamiento, fechavisado, historia FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ?");
         $stmtCheck->execute([$idAlojamiento, $idInstitucion]);
         $aloj = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
 
         if (!$aloj) throw new \Exception("El alojamiento no existe o no pertenece a su institución.");
+
+        $idUf = null;
+        $idSalon = null;
+        $idRack = null;
+        $idLugarRack = null;
+        $comUbic = null;
+        if (is_array($ubicacion)) {
+            $idUf = isset($ubicacion['IdUbicacionFisica']) && $ubicacion['IdUbicacionFisica'] !== '' ? (int)$ubicacion['IdUbicacionFisica'] : null;
+            $idSalon = isset($ubicacion['IdSalon']) && $ubicacion['IdSalon'] !== '' ? (int)$ubicacion['IdSalon'] : null;
+            $idRack = isset($ubicacion['IdRack']) && $ubicacion['IdRack'] !== '' ? (int)$ubicacion['IdRack'] : null;
+            $idLugarRack = isset($ubicacion['IdLugarRack']) && $ubicacion['IdLugarRack'] !== '' ? (int)$ubicacion['IdLugarRack'] : null;
+            if (!empty($ubicacion['ComentarioUbicacion'])) {
+                $comUbic = substr(trim((string)$ubicacion['ComentarioUbicacion']), 0, 500);
+            }
+            if ($idUf !== null || $idSalon !== null || $idRack !== null || $idLugarRack !== null) {
+                $ubModel = new AlojamientoUbicacionModel($this->db);
+                $ubModel->assertUbicacionParaCaja((int)$idInstitucion, $idUf, $idSalon, $idRack, $idLugarRack);
+            }
+        }
 
         $this->db->beginTransaction();
         try {
@@ -79,8 +107,10 @@ class TrazabilidadModel {
             $prefijoCaja = "A" . $numeroSiguiente;
             $nombreFinalCaja = $prefijoCaja . " - " . ($nombreCaja ?: "Sin Etiqueta");
 
-            $stmtCaja = $this->db->prepare("INSERT INTO alojamiento_caja (FechaInicio, NombreCaja, IdAlojamiento) VALUES (?, ?, ?)");
-            $stmtCaja->execute([$aloj['fechavisado'], $nombreFinalCaja, $idAlojamiento]);
+            $stmtCaja = $this->db->prepare(
+                "INSERT INTO alojamiento_caja (FechaInicio, NombreCaja, IdAlojamiento, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmtCaja->execute([$aloj['fechavisado'], $nombreFinalCaja, $idAlojamiento, $idUf, $idSalon, $idRack, $idLugarRack, $comUbic]);
             $idNuevaCaja = $this->db->lastInsertId();
 
             $stmtMaxAnimal = $this->db->prepare("
@@ -116,6 +146,45 @@ class TrazabilidadModel {
         $res = $this->db->prepare("UPDATE alojamiento_caja SET NombreCaja = ? WHERE IdCajaAlojamiento = ?")->execute([$nombre, $id]);
         Auditoria::log($this->db, 'UPDATE', 'alojamiento_caja', "Renombró caja ID: $id");
         return $res;
+    }
+
+    /**
+     * Actualiza solo ubicación física de la caja (FKs opcionales + comentario).
+     */
+    public function updateCajaUbicacion(int $idCaja, int $idInstitucion, array $ubicacion): bool {
+        $stmt = $this->db->prepare("
+            SELECT ac.IdCajaAlojamiento FROM alojamiento_caja ac
+            INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+            WHERE ac.IdCajaAlojamiento = ? AND a.IdInstitucion = ?
+        ");
+        $stmt->execute([$idCaja, $idInstitucion]);
+        if (!$stmt->fetchColumn()) {
+            throw new \Exception('La caja no existe o no pertenece a su institución.');
+        }
+
+        $idUf = array_key_exists('IdUbicacionFisica', $ubicacion) && $ubicacion['IdUbicacionFisica'] !== '' && $ubicacion['IdUbicacionFisica'] !== null
+            ? (int)$ubicacion['IdUbicacionFisica'] : null;
+        $idSalon = array_key_exists('IdSalon', $ubicacion) && $ubicacion['IdSalon'] !== '' && $ubicacion['IdSalon'] !== null
+            ? (int)$ubicacion['IdSalon'] : null;
+        $idRack = array_key_exists('IdRack', $ubicacion) && $ubicacion['IdRack'] !== '' && $ubicacion['IdRack'] !== null
+            ? (int)$ubicacion['IdRack'] : null;
+        $idLugarRack = array_key_exists('IdLugarRack', $ubicacion) && $ubicacion['IdLugarRack'] !== '' && $ubicacion['IdLugarRack'] !== null
+            ? (int)$ubicacion['IdLugarRack'] : null;
+        $comUbic = array_key_exists('ComentarioUbicacion', $ubicacion)
+            ? substr(trim((string)$ubicacion['ComentarioUbicacion']), 0, 500) : null;
+        if ($comUbic === '') {
+            $comUbic = null;
+        }
+
+        if ($idUf !== null || $idSalon !== null || $idRack !== null || $idLugarRack !== null) {
+            $ubModel = new AlojamientoUbicacionModel($this->db);
+            $ubModel->assertUbicacionParaCaja($idInstitucion, $idUf, $idSalon, $idRack, $idLugarRack);
+        }
+
+        $sql = "UPDATE alojamiento_caja SET IdUbicacionFisica = ?, IdSalon = ?, IdRack = ?, IdLugarRack = ?, ComentarioUbicacion = ? WHERE IdCajaAlojamiento = ?";
+        $res = $this->db->prepare($sql)->execute([$idUf, $idSalon, $idRack, $idLugarRack, $comUbic, $idCaja]);
+        Auditoria::log($this->db, 'UPDATE', 'alojamiento_caja', "Ubicación caja ID: $idCaja");
+        return (bool)$res;
     }
 
     public function deleteCaja($idCaja) {
@@ -261,8 +330,20 @@ class TrazabilidadModel {
                 $oldCaja = $stmtCaja->fetch(\PDO::FETCH_ASSOC);
 
                 if ($oldCaja) {
-                    $this->db->prepare("INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento) VALUES (?, ?, ?, ?)")
-                             ->execute([$fecha, $oldCaja['Detalle'], $oldCaja['NombreCaja'], $idAlojamientoActual]);
+                    $this->db->prepare(
+                        "INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    )->execute([
+                        $fecha,
+                        $oldCaja['Detalle'] ?? null,
+                        $oldCaja['NombreCaja'],
+                        $idAlojamientoActual,
+                        $oldCaja['IdUbicacionFisica'] ?? null,
+                        $oldCaja['IdSalon'] ?? null,
+                        $oldCaja['IdRack'] ?? null,
+                        $oldCaja['IdLugarRack'] ?? null,
+                        $oldCaja['ComentarioUbicacion'] ?? null,
+                    ]);
                     $newIdCaja = $this->db->lastInsertId();
 
                     $stmtU = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");

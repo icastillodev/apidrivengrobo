@@ -65,7 +65,14 @@ class TrazabilidadController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->model->crearCajaYUnidades($data['idAlojamiento'], $data['nombreCaja'], $data['cantidadUnidades'], $sesion['instId']);
+            $ubic = (isset($data['ubicacion']) && is_array($data['ubicacion'])) ? $data['ubicacion'] : null;
+            $this->model->crearCajaYUnidades(
+                $data['idAlojamiento'],
+                $data['nombreCaja'] ?? '',
+                (int)($data['cantidadUnidades'] ?? 1),
+                $sesion['instId'],
+                $ubic
+            );
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -97,6 +104,24 @@ class TrazabilidadController {
             $this->model->renameCaja($data['idCaja'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
+        exit;
+    }
+
+    public function updateCajaUbicacion() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            if (empty($data['idCaja'])) {
+                throw new \InvalidArgumentException('Falta idCaja.');
+            }
+            $this->model->updateCajaUbicacion((int)$data['idCaja'], (int)$sesion['instId'], $data['ubicacion'] ?? []);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         exit;
     }
 

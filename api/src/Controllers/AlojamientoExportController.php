@@ -93,10 +93,12 @@ class AlojamientoExportController {
 
         if (isset($data['trazabilidad'])) {
             fputcsv($output, ['--- TRAZABILIDAD CLÍNICA ---']);
-            fputcsv($output, ['Historia', 'Caja', 'Sujeto', 'Fecha', 'Variable', 'Valor Registrado']);
+            fputcsv($output, ['Historia', 'Caja', 'Ubicacion Caja', 'Sujeto', 'Fecha', 'Variable', 'Valor Registrado']);
             foreach ($data['trazabilidad'] as $row) {
+                $ubic = $row['UbicacionCaja'] ?? $row['ubicacioncaja'] ?? '';
                 fputcsv($output, [
-                    $row['historia'], $row['NombreCaja'], $row['Sujeto'], 
+                    $row['historia'], $row['NombreCaja'], $ubic,
+                    $row['Sujeto'],
                     $row['fechaObs'], $row['Metrica'], $row['Valor']
                 ]);
             }

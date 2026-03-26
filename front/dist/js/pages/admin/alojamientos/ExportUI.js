@@ -1,6 +1,19 @@
 // dist/js/pages/admin/alojamientos/ExportUI.js
 import { API } from '../../../api.js';
-import { AlojamientoState } from '../alojamientos.js'; 
+import { AlojamientoState } from '../alojamientos.js';
+
+function formatCajaUbicacionTxt(caja) {
+    const parts = [];
+    if (caja.nombre_ubicacion_fisica) parts.push(String(caja.nombre_ubicacion_fisica).trim());
+    if (caja.nombre_salon) parts.push(String(caja.nombre_salon).trim());
+    if (caja.nombre_rack) parts.push(String(caja.nombre_rack).trim());
+    if (caja.nombre_lugar_rack) parts.push(String(caja.nombre_lugar_rack).trim());
+    if (caja.ComentarioUbicacion && String(caja.ComentarioUbicacion).trim()) {
+        parts.push(String(caja.ComentarioUbicacion).trim());
+    }
+    if (!parts.length && caja.Detalle) return String(caja.Detalle).trim();
+    return parts.filter(Boolean).join(' · ');
+}
 
 export const ExportUI = {
     init() {
@@ -97,8 +110,12 @@ export const ExportUI = {
                             <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">TRAMO #${h.IdAlojamiento} (Desde: ${new Date(h.fechavisado).toLocaleDateString()})</h5>`;
                         
                         res.data.cajas.forEach(caja => {
+                            const ubiTxt = formatCajaUbicacionTxt(caja);
                             let cajaHtml = `<div style="margin-left: 5px; margin-bottom: 10px;">
                                 <strong style="font-size: 10px; color: #444; background: #e9ecef; padding: 2px 5px; border-radius: 3px;">📦 ${caja.NombreCaja}</strong>`;
+                            if (ubiTxt) {
+                                cajaHtml += `<div style="font-size: 9px; color: #555; margin-top: 3px;">📍 ${ubiTxt.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+                            }
                             
                             let hasObsInCaja = false;
 
@@ -275,6 +292,8 @@ export const ExportUI = {
         // Aquí guardaremos todas las filas que irán a Excel
         let allRows = [];
 
+        const colUbic = t.export_col_ubicacion_caja || 'Ubicación caja';
+
         for (let r of data) {
             // Estructura base de la fila (Datos del Alojamiento)
             let baseRow = {
@@ -316,6 +335,7 @@ export const ExportUI = {
                                         u.observaciones_pivot.forEach(obs => {
                                             let clinRow = { ...baseRow }; // Copiamos los datos del alojamiento
                                             clinRow["Caja Física"] = c.NombreCaja;
+                                            clinRow[colUbic] = formatCajaUbicacionTxt(c) || '---';
                                             clinRow["Sujeto / Animal"] = u.NombreEspecieAloj;
                                             clinRow["Fecha de Medición"] = new Date(obs.fechaObs).toLocaleDateString();
 
@@ -337,6 +357,7 @@ export const ExportUI = {
                 if (!hasClinicalData) {
                     let emptyRow = { ...baseRow };
                     emptyRow["Caja Física"] = "Sin registro clínico";
+                    emptyRow[colUbic] = '---';
                     emptyRow["Sujeto / Animal"] = "---";
                     emptyRow["Fecha de Medición"] = "---";
                     allRows.push(emptyRow);

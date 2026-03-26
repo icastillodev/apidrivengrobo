@@ -457,7 +457,7 @@ function getInsumosGeneralesTableHTML(insumos) {
         return `
             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
                 <td class="small text-muted">${i.id}</td>
                 <td>${badge}</td>
                 <td>${i.solicitante}</td>
@@ -522,18 +522,18 @@ function vincularCheckboxesInsumos() {
     const master = document.getElementById('check-all-insumos-gen');
     if (!master) return;
     master.addEventListener('change', (e) => {
-        const items = document.querySelectorAll('.check-item-insumo:not(:disabled)');
+        const items = document.querySelectorAll('.check-item-insumo-global:not(:disabled)');
         items.forEach(chk => chk.checked = e.target.checked);
         actualizarSumaInsumos();
     });
-    document.querySelectorAll('.check-item-insumo').forEach(chk => {
+    document.querySelectorAll('.check-item-insumo-global').forEach(chk => {
         chk.addEventListener('change', actualizarSumaInsumos);
     });
 }
 
 function actualizarSumaInsumos() {
     let suma = 0;
-    document.querySelectorAll('.check-item-insumo:checked').forEach(chk => { suma += parseFloat(chk.dataset.monto || 0); });
+    document.querySelectorAll('.check-item-insumo-global:checked').forEach(chk => { suma += parseFloat(chk.dataset.monto || 0); });
     const display = document.getElementById('total-insumos-seleccionados');
     if (display) display.innerText = `$ ${suma.toFixed(2)}`;
 }

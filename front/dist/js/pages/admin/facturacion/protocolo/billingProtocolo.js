@@ -109,7 +109,7 @@ function renderizarResultados(data) {
             <div class="card-body p-3">
                 ${getFormsTableHTML(data.formularios, data.info.idprotA)}
                 ${data.alojamientos?.length > 0 ? getAlojTableHTML(data.alojamientos, data.info.idprotA) : ''}
-                ${getInsumosProtocoloTableHTML(data.insumos)}
+                ${getInsumosProtocoloTableHTML(data.insumos, data.info.idprotA)}
             </div>
             ${getFooterHTML(data)}
         </div>`;
@@ -217,7 +217,7 @@ function getAlojTableHTML(alojamientos, idProt) {
         </table>`;
 }
 
-function getInsumosProtocoloTableHTML(insumos) {
+function getInsumosProtocoloTableHTML(insumos, idProt) {
     if (!insumos || insumos.length === 0) return '';
     const titulo = window.txt?.facturacion?.insumos_protocolo ?? 'Insumos del protocolo';
     const filas = insumos.map(i => {
@@ -231,6 +231,7 @@ function getInsumosProtocoloTableHTML(insumos) {
         return `
             <tr class="text-center align-middle pointer" style="${rowStyle}"
                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
+                <td><input type="checkbox" class="check-item-insumo-prot" data-prot="${idProt}" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
                 <td class="small text-muted">#${i.id}</td>
                 <td>${badge}</td>
                 <td class="small">${i.solicitante}</td>
@@ -248,6 +249,7 @@ function getInsumosProtocoloTableHTML(insumos) {
                 <table class="table table-bordered table-billing mb-0">
                     <thead class="table-light text-center">
                         <tr>
+                            <th style="width:3%"><input type="checkbox" class="check-all-insumo-prot" data-prot="${idProt}"></th>
                             <th style="width:5%">ID</th>
                             <th style="width:8%">Estado</th>
                             <th style="width:12%">Solicitante</th>
@@ -278,17 +280,19 @@ function getFooterHTML(data) {
 }
 
 function vincularEventosSeleccion() {
-    document.querySelectorAll('.check-all-form, .check-all-aloj').forEach(master => {
+    document.querySelectorAll('.check-all-form, .check-all-aloj, .check-all-insumo-prot').forEach(master => {
         master.addEventListener('change', (e) => {
             const idProt = e.target.dataset.prot;
-            const clase = e.target.classList.contains('check-all-form') ? '.check-item-form' : '.check-item-aloj';
+            let clase = '.check-item-aloj';
+            if (e.target.classList.contains('check-all-form')) clase = '.check-item-form';
+            else if (e.target.classList.contains('check-all-insumo-prot')) clase = '.check-item-insumo-prot';
             document.querySelectorAll(`${clase}[data-prot="${idProt}"]:not(:disabled)`).forEach(c => c.checked = e.target.checked);
             actualizarSuma(idProt);
         });
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('.check-item-form, .check-item-aloj')) {
+        if (e.target.matches('.check-item-form, .check-item-aloj, .check-item-insumo-prot')) {
             actualizarSuma(e.target.dataset.prot);
         }
     });

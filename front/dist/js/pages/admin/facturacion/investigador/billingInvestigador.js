@@ -164,8 +164,13 @@ function renderizarResultados(data) {
     }
 
     (data.protocolos || []).forEach(prot => {
-        if (showAni) {
-            html += `
+        const tieneInsProt = (prot.insumos?.length > 0);
+        const tieneAniAloj = showAni && ((prot.formularios?.length > 0) || (prot.alojamientos?.length > 0));
+        const mostrarTarjeta = (showAni && ((prot.formularios?.length > 0) || (prot.alojamientos?.length > 0) || tieneInsProt)) || (showIns && tieneInsProt);
+
+        if (!mostrarTarjeta) return;
+
+        html += `
                 <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
                     <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                         <div>
@@ -174,12 +179,12 @@ function renderizarResultados(data) {
                         </div>
                     </div>
                     <div class="card-body p-3">
-                        ${getFormsTableHTML(prot.formularios, prot.idProt)}
-                        ${prot.alojamientos?.length > 0 ? getAlojTableHTML(prot.alojamientos, prot.idProt) : ''}
+                        ${showAni ? getFormsTableHTML(prot.formularios, prot.idProt) : ''}
+                        ${showAni && prot.alojamientos?.length > 0 ? getAlojTableHTML(prot.alojamientos, prot.idProt) : ''}
+                        ${showIns && tieneInsProt ? getInsumosProtocoloTableHTML(prot.insumos, prot.idProt) : ''}
                     </div>
                     ${getFooterHTML(prot)}
                 </div>`;
-        }
     });
 
     container.innerHTML = html || '<div class="alert alert-light text-center py-5 shadow-sm">No se encontraron movimientos.</div>';
@@ -292,6 +297,57 @@ function getAlojTableHTML(alojamientos, idProt) {
         </div>`;
 }
 
+/** Insumos de pedido vinculados al protocolo (misma grilla que Facturación por Protocolo). */
+function getInsumosProtocoloTableHTML(insumos, idProt) {
+    if (!insumos || insumos.length === 0) return '';
+    const titulo = window.txt?.facturacion?.insumos_protocolo ?? 'Insumos del protocolo';
+    const filas = insumos.map(i => {
+        const total = parseFloat(i.total_item || 0);
+        const pagado = parseFloat(i.pagado || 0);
+        const isExento = (i.is_exento == 1);
+        const debe = isExento ? 0 : Math.max(0, total - pagado);
+        const badge = (debe <= 0) ? '<span class="badge bg-success shadow-sm">PAGO</span>' :
+            (pagado > 0 ? '<span class="badge bg-warning text-dark shadow-sm">PARCIAL</span>' :
+                '<span class="badge bg-danger shadow-sm">PENDIENTE</span>');
+        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
+        const rowStyle = (debe <= 0) ? 'background-color: #f0fff4 !important;' : '';
+        return `
+            <tr class="text-center align-middle pointer" style="${rowStyle}"
+                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
+                <td><input type="checkbox" class="check-item-insumo-prot" data-prot="${idProt}" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+                <td class="small text-muted">#${i.id}</td>
+                <td>${badge}</td>
+                <td class="small">${i.solicitante || '-'}</td>
+                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
+                <td class="text-end fw-bold">$ ${total.toFixed(2)}</td>
+                <td class="text-end text-success fw-bold">$ ${pagado.toFixed(2)}</td>
+                <td class="text-end text-danger fw-bold">$ ${debe.toFixed(2)}</td>
+            </tr>`;
+    }).join('');
+
+    return `
+        <div class="mt-4 border-top pt-3">
+            <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;"><i class="bi bi-box-seam me-1"></i>${titulo}</h6>
+            <div class="table-responsive">
+                <table class="table table-bordered table-billing mb-0">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th style="width:3%"><input type="checkbox" class="check-all-insumo-prot" data-prot="${idProt}"></th>
+                            <th style="width:5%">ID</th>
+                            <th style="width:8%">Estado</th>
+                            <th style="width:12%">Solicitante</th>
+                            <th>Concepto / Detalle</th>
+                            <th style="width:10%">Total</th>
+                            <th style="width:10%">Pagado</th>
+                            <th style="width:10%">Debe</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filas}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
 function getInsumosGeneralesTableHTML(insumos) {
     if (!insumos || insumos.length === 0) return '';
 
@@ -315,7 +371,7 @@ function getInsumosGeneralesTableHTML(insumos) {
         return `
             <tr class="text-center align-middle pointer" style="${rowStyle}"
                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
                 <td class="small text-muted">${i.id}</td>
                 <td>${badge}</td>
                 <td>${i.solicitante || '-'}</td>
@@ -326,10 +382,12 @@ function getInsumosGeneralesTableHTML(insumos) {
             </tr>`;
     }).join('');
 
+    const tituloSinProt = window.txt?.facturacion?.insumos_sin_protocolo ?? 'Insumos sin protocolo (pedidos directos)';
+
     return `
         <div class="card shadow-sm border-0 mb-5 card-insumos-generales" style="border-left: 5px solid #0d6efd !important;">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="m-0 text-primary fw-bold"><i class="bi bi-box-seam-fill me-2"></i>Insumos Generales del Investigador</h5>
+                <h5 class="m-0 text-primary fw-bold"><i class="bi bi-box-seam-fill me-2"></i>${tituloSinProt}</h5>
                 <button class="btn btn-link btn-sm text-danger p-0" onclick="window.downloadInsumosPDF && window.downloadInsumosPDF()">
                     <i class="bi bi-filetype-pdf fs-4"></i>
                 </button>
@@ -382,9 +440,10 @@ function getFooterHTML(prot) {
     const totAni = (prot.formularios || []).filter(f => !f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
     const totRea = (prot.formularios || []).filter(f => f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
     const totAlo = (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
+    const totIns = (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
     
-    const sumTotal = (totAni + totRea + totAlo).toFixed(2);
-    const sumDebe = (parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0)).toFixed(2);
+    const sumTotal = (totAni + totRea + totAlo + totIns).toFixed(2);
+    const sumDebe = (parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0)).toFixed(2);
     const sumPago = (parseFloat(sumTotal) - parseFloat(sumDebe)).toFixed(2);
 
     return `
@@ -400,6 +459,7 @@ function getFooterHTML(prot) {
                         <div class="small text-muted">Alojamiento: <b>$ ${totAlo.toFixed(2)}</b></div>
                         <div class="small text-muted">Animales: <b>$ ${totAni.toFixed(2)}</b></div>
                         <div class="small text-muted">Reactivos: <b>$ ${totRea.toFixed(2)}</b></div>
+                        <div class="small text-muted">Insumos: <b>$ ${totIns.toFixed(2)}</b></div>
                         <div class="small text-success border-start ps-3">Pagado: <b>$ ${sumPago}</b></div>
                         <div class="small text-danger border-start ps-3">Falta: <b>$ ${sumDebe}</b></div>
                     </div>
@@ -419,17 +479,19 @@ function getFooterHTML(prot) {
 }
 
 function vincularEventosSeleccion() {
-    document.querySelectorAll('.check-all-form, .check-all-aloj').forEach(master => {
+    document.querySelectorAll('.check-all-form, .check-all-aloj, .check-all-insumo-prot').forEach(master => {
         master.addEventListener('change', (e) => {
             const idProt = e.target.dataset.prot;
-            const clase = e.target.classList.contains('check-all-form') ? '.check-item-form' : '.check-item-aloj';
+            let clase = '.check-item-aloj';
+            if (e.target.classList.contains('check-all-form')) clase = '.check-item-form';
+            else if (e.target.classList.contains('check-all-insumo-prot')) clase = '.check-item-insumo-prot';
             document.querySelectorAll(`${clase}[data-prot="${idProt}"]:not(:disabled)`).forEach(c => c.checked = e.target.checked);
             actualizarSuma(idProt);
         });
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('.check-item-form, .check-item-aloj')) {
+        if (e.target.matches('.check-item-form, .check-item-aloj, .check-item-insumo-prot')) {
             actualizarSuma(e.target.dataset.prot);
         }
     });
@@ -437,11 +499,11 @@ function vincularEventosSeleccion() {
     const masterIns = document.getElementById('check-all-insumos-gen');
     if (masterIns) {
         masterIns.addEventListener('change', (e) => {
-            document.querySelectorAll('.check-item-insumo:not(:disabled)').forEach(c => c.checked = e.target.checked);
+            document.querySelectorAll('.check-item-insumo-global:not(:disabled)').forEach(c => c.checked = e.target.checked);
             actualizarSumaInsumos();
         });
     }
-    document.querySelectorAll('.check-item-insumo').forEach(c => c.addEventListener('change', actualizarSumaInsumos));
+    document.querySelectorAll('.check-item-insumo-global').forEach(c => c.addEventListener('change', actualizarSumaInsumos));
 }
 
 function actualizarSuma(idProt) {
@@ -455,7 +517,7 @@ function actualizarSuma(idProt) {
 
 function actualizarSumaInsumos() {
     let suma = 0;
-    document.querySelectorAll('.check-item-insumo:checked').forEach(chk => suma += parseFloat(chk.dataset.monto || 0));
+    document.querySelectorAll('.check-item-insumo-global:checked').forEach(chk => suma += parseFloat(chk.dataset.monto || 0));
     const visor = document.getElementById('total-insumos-seleccionados');
     if (visor) visor.innerText = `$ ${suma.toFixed(2)}`;
 }
@@ -537,7 +599,7 @@ window.downloadGlobalPDF = async () => {
 
     let currentY = doc.lastAutoTable.finalY + 10;
 
-    window.currentReportData.protocolos.forEach((prot) => {
+    (window.currentReportData.protocolos || []).forEach((prot) => {
         if (currentY > 160) { doc.addPage(); currentY = M; }
 
         doc.setFillColor(245, 245, 245);
@@ -570,7 +632,14 @@ window.downloadGlobalPDF = async () => {
                 `$ ${parseFloat(a.total).toFixed(2)}`, 
                 `$ ${parseFloat(a.pagado || 0).toFixed(2)}`, 
                 `$ ${parseFloat(a.debe).toFixed(2)}`
-            ])
+            ]),
+            ...(prot.insumos || []).map(i => {
+                const total = parseFloat(i.total_item || 0);
+                const pagado = parseFloat(i.pagado || 0);
+                const debe = Math.max(0, total - pagado);
+                const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
+                return [`I-${i.id}`, '-', `Insumo: ${det}`, `$ ${total.toFixed(2)}`, `$ ${pagado.toFixed(2)}`, `$ ${debe.toFixed(2)}`];
+            })
         ];
 
         doc.autoTable({
@@ -583,8 +652,10 @@ window.downloadGlobalPDF = async () => {
             columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
         });
 
-        const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
-        const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0);
+        const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0)
+            + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
+            + (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
+        const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
         const pPago = pTotal - pDebe;
 
         currentY = doc.lastAutoTable.finalY;
@@ -604,7 +675,7 @@ window.downloadGlobalPDF = async () => {
 
 window.downloadProtocoloPDF = async (idProt) => {
     if (!window.currentReportData) return;
-    const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
+    const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt || String(p.idProt) === String(idProt));
     if (!prot) return;
 
     showLoader();
@@ -643,6 +714,13 @@ window.downloadProtocoloPDF = async (idProt) => {
             ];
         }),
         ...(prot.alojamientos || []).map(a => [`H-${a.historia}`, a.especie, `Aloj. (${a.caja || 'Estructura'})`, `$ ${parseFloat(a.total).toFixed(2)}`, `$ ${parseFloat(a.pagado || 0).toFixed(2)}`, `$ ${parseFloat(a.debe).toFixed(2)}`]),
+        ...(prot.insumos || []).map(i => {
+            const total = parseFloat(i.total_item || 0);
+            const pagado = parseFloat(i.pagado || 0);
+            const debe = Math.max(0, total - pagado);
+            const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
+            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `Insumo: ${det}`, `$ ${total.toFixed(2)}`, `$ ${pagado.toFixed(2)}`, `$ ${debe.toFixed(2)}`];
+        }),
     ];
 
     doc.autoTable({
@@ -651,8 +729,10 @@ window.downloadProtocoloPDF = async (idProt) => {
         styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
     });
 
-    const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0) + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
-    const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0);
+    const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0)
+        + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
+        + (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
+    const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
     const pPago = pTotal - pDebe;
 
     let currentY = doc.lastAutoTable.finalY + 10;

@@ -2,6 +2,7 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AlojamientoState, loadAlojamientos } from '../alojamientos.js';
+import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
 
 export const RegistroUI = {
     // Variables de estado consolidadas (¡Sin duplicados!)
@@ -102,18 +103,19 @@ export const RegistroUI = {
             list.innerHTML = '';
             
             if (res.status === 'success') {
-                this.currentData.usuarios = res.data;
-                
-                if (res.data.length === 0) {
+                const sorted = sortUsersByApellidoNombre(res.data);
+                this.currentData.usuarios = sorted;
+
+                if (sorted.length === 0) {
                     list.innerHTML = `<div class="alert alert-warning small p-2">${(window.txt?.alojamientos?.reg_no_usuarios || 'No hay usuarios activos.')}</div>`;
                     return;
                 }
 
-                list.innerHTML = res.data.map(u => `
+                list.innerHTML = sorted.map(u => `
                     <div id="reg-item-usr-${u.IdUsrA}" class="list-group-item list-group-item-action py-2 border-0 border-bottom" onclick="window.regSelectUsuario(${u.IdUsrA})">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span><b class="text-dark">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${u.NombreA || ''} ${u.ApellidoA || ''}</span></span>
-                            <small class="badge bg-light text-dark border fst-italic">@${u.Usuario}</small>
+                            <span><b class="text-dark">ID: ${u.IdUsrA}</b> | <span class="fw-bold">${escListText(formatUsuarioApellidoNombre(u))}</span></span>
+                            <small class="badge bg-light text-dark border fst-italic">@${escListText(u.Usuario || '')}</small>
                         </div>
                     </div>
                 `).join('');

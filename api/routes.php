@@ -257,6 +257,7 @@ $router->get('/protocoloexpe/list', 'ProtocolController@getByInstitution'); // O
 // SECCIÓN: Trazabilidad Biológica (Nuevas acciones CRUD)
 // ============================================================
 $router->post('/trazabilidad/rename-box', 'TrazabilidadController@renameBox');
+$router->post('/trazabilidad/update-caja-ubicacion', 'TrazabilidadController@updateCajaUbicacion');
 $router->post('/trazabilidad/delete-box', 'TrazabilidadController@deleteBox');
 $router->post('/trazabilidad/delete-subject', 'TrazabilidadController@deleteSubject');
 
@@ -427,6 +428,12 @@ $router->post('/admin/config/alojamiento/cat/save', 'AdminConfigAlojamientoContr
 $router->post('/admin/config/alojamiento/cat/delete', 'AdminConfigAlojamientoController@deleteCat');
 $router->post('/admin/config/alojamiento/type/toggle', 'AdminConfigAlojamientoController@toggleType'); // Cambiado de delete a toggle
 $router->post('/admin/config/alojamiento/cat/toggle', 'AdminConfigAlojamientoController@toggleCat');
+
+// ADMIN: Ubicación física de cajas (catálogos por institución)
+$router->get('/admin/config/alojamiento/ubicacion/bundle', 'AdminAlojamientoUbicacionController@getBundle');
+$router->post('/admin/config/alojamiento/ubicacion/labels', 'AdminAlojamientoUbicacionController@saveLabels');
+$router->post('/admin/config/alojamiento/ubicacion/catalog/save', 'AdminAlojamientoUbicacionController@saveCatalog');
+$router->post('/admin/config/alojamiento/ubicacion/catalog/toggle', 'AdminAlojamientoUbicacionController@toggleCatalog');
 
 
 // ADMIN: RESERVAS Y ESPACIOS

@@ -281,7 +281,7 @@ class BillingController {
             
             $reporteProtocolos = [];
             $deudaAniGlobal = 0; $deudaReaGlobal = 0; $deudaAlojGlobal = 0; $totalPagadoGlobal = 0;
-            $insumosProtGlobal = [];
+            $deudaInsumosProtAcum = 0;
             $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
 
             foreach ($protocolosRaw as $p) {
@@ -290,15 +290,16 @@ class BillingController {
                 $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
 
-                // Unificamos insumos del protocolo en el bloque "insumos generales" del investigador
                 foreach ($insumosProt as &$ins) {
                     $uid = $ins['IdUsrA'] ?? ($ins['idUsrA'] ?? 0);
                     $ins['saldoInv'] = (float)($mapaSaldos[$uid] ?? 0);
-                    $insumosProtGlobal[] = $ins;
                 }
                 unset($ins);
 
-                // Los insumos de pedido (misma consulta que getInsumosByProtocolo) van a "insumosGenerales".
+                $sumDebeInsProt = array_sum(array_column($insumosProt, 'debe'));
+                $sumPagadoInsProt = array_sum(array_column($insumosProt, 'pagado'));
+
+                // Los insumos de pedido (misma consulta que getInsumosByProtocolo) se listan en la tarjeta del protocolo.
                 // Excluir por id de formulario — no por texto en categoria (evita falsos positivos si "insumo" aparece en el nombre del tipo).
                 $insumoIdsProt = [];
                 foreach ($insumosProt as $rowIns) {
@@ -345,32 +346,27 @@ class BillingController {
                         'deudaAnimales'    => $sumDebeAni,
                         'deudaReactivos'   => $sumDebeRea,
                         'deudaAlojamiento' => $sumDebeAloj,
+                        'deudaInsumos'     => $sumDebeInsProt,
                         'formularios'      => $formulariosFiltrados,
-                        'alojamientos'     => $alojamientos
+                        'alojamientos'     => $alojamientos,
+                        'insumos'          => $insumosProt
                     ];
 
                     $deudaAniGlobal  += $sumDebeAni;
                     $deudaReaGlobal  += $sumDebeRea;
                     $deudaAlojGlobal += $sumDebeAloj;
-                    $totalPagadoGlobal += ($sumPagadoProt + $sumPagadoAloj);
+                    $deudaInsumosProtAcum += $sumDebeInsProt;
+                    $totalPagadoGlobal += ($sumPagadoProt + $sumPagadoAloj + $sumPagadoInsProt);
                 }
             }
 
             $insumosGeneralesDirectos = $this->model->getInsumosByUser($idUsr, $instId, $desde, $hasta);
 
-            // Fusion: directos + insumos vinculados a protocolos (evitando duplicados por idformA)
-            $insumosGenerales = [];
-            foreach ($insumosGeneralesDirectos as $i) {
-                $insumosGenerales[(string)($i['id'] ?? $i['idformA'] ?? '')] = $i;
-            }
-            foreach ($insumosProtGlobal as $i) {
-                $constId = (string)($i['id'] ?? $i['idformA'] ?? '');
-                if ($constId === '') continue;
-                $insumosGenerales[$constId] = $i;
-            }
-            $insumosGenerales = array_values($insumosGenerales);
+            // Solo pedidos de insumo sin vínculo a protocolo (depto 0 / NULL); los de protocolo van en cada tarjeta.
+            $insumosGenerales = array_values($insumosGeneralesDirectos);
 
-            $deudaInsGlobal = array_sum(array_column($insumosGenerales, 'debe'));
+            $deudaInsDirectos = array_sum(array_column($insumosGenerales, 'debe'));
+            $deudaInsGlobal = $deudaInsDirectos + $deudaInsumosProtAcum;
             $totalPagadoGlobal += array_sum(array_column($insumosGenerales, 'pagado'));
 
             $this->jsonResponse('success', [
