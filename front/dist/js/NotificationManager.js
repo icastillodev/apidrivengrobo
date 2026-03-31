@@ -19,6 +19,7 @@ export const NotificationManager = {
                 this.setNumberBadge(3, res.data.animales);   
                 this.setNumberBadge(4, res.data.reactivos);  
                 this.setNumberBadge(5, res.data.insumos);    
+                this.setNumberBadge(6, res.data.reservas);
             }
         } catch (e) {
             console.warn("NotificationManager: Error de sincronización.");
@@ -61,6 +62,7 @@ const style = document.createElement('style');
 style.innerHTML = `
     .notif-dot {
         transition: all 0.4s ease;
+        color: #fff !important;
     }
     .bg-success { background-color: #198754 !important; }
     .bg-danger { background-color: #dc3545 !important; }

@@ -104,7 +104,7 @@ export const translatePage = () => {
 const PATH_TO_TITLE_KEY = {
     'admin/dashboard': 'dashboard_admin', 'usuario/dashboard': 'dashboard_usuario', 'panel/dashboard': 'dashboard_usuario',
     'admin/usuarios': 'usuarios', 'admin/protocolos': 'protocolos', 'admin/animales': 'animales', 'admin/reactivos': 'reactivos',
-    'admin/insumos': 'insumos', 'admin/alojamientos': 'alojamientos', 'admin/estadisticas': 'estadisticas', 'admin/precios': 'precios',
+    'admin/insumos': 'insumos', 'admin/alojamientos': 'alojamientos', 'admin/reservas': 'admin_reservas', 'admin/estadisticas': 'estadisticas', 'admin/precios': 'precios',
     'admin/configuracion/config': 'config', 'admin/configuracion/institucion': 'config_institucion', 'admin/configuracion/departamentos': 'config_departamentos',
     'admin/configuracion/especies': 'config_especies', 'admin/configuracion/roles': 'config_roles', 'admin/configuracion/tipos-form': 'config_tipos_form',
     'admin/configuracion/reservas': 'config_reservas', 'admin/configuracion/insumos-exp': 'config_insumos_exp', 'admin/configuracion/insumos': 'insumos_config',
@@ -115,11 +115,11 @@ const PATH_TO_TITLE_KEY = {
     'admin/facturacion/protocolo': 'facturacion_protocolo', 'admin/historialcontable': 'historial_contable',
     'admin/solicitud_protocolo': 'solicitud_protocolo', 'usuario/formularios': 'formularios', 'usuario/formularios/animales': 'formularios_animales',
     'usuario/formularios/reactivos': 'formularios_reactivos', 'usuario/formularios/insumos': 'formularios_insumos', 'usuario/misformularios': 'mis_formularios',
-    'usuario/misprotocolos': 'mis_protocolos', 'usuario/misalojamientos': 'mis_alojamientos', 'usuario/perfil': 'perfil',
+    'usuario/misprotocolos': 'mis_protocolos', 'usuario/misalojamientos': 'mis_alojamientos', 'usuario/misreservas': 'mis_reservas', 'usuario/perfil': 'perfil',
     'superadmin/dashboard': 'superadmin_dashboard', 'superadmin/instituciones': 'superadmin_instituciones',
     'superadmin/institucionformulario': 'superadmin_formulario', 'superadmin/usuarios_global': 'superadmin_usuarios', 'superadmin/bitacora': 'superadmin_dashboard',
     'registro': 'registro', 'recuperar': 'recuperar', 'confirmar': 'confirmar', 'resetear': 'resetear', 'error404': 'error404', 'construccion': 'construccion',
-    'formulario/index': 'formulario_registro_inst', 'qr-alojamiento': 'qr_alojamiento'
+    'formulario/index': 'formulario_registro_inst', 'qr-alojamiento': 'qr_alojamiento', 'qr-sala': 'qr_sala'
 };
 
 export function applyPageTitle() {

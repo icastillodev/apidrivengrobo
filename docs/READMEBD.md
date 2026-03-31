@@ -15,7 +15,6 @@ Financieramente, el sistema opera bajo un modelo estricto de **facturación prep
 A nivel tecnológico, la plataforma implementa una arquitectura **API-Driven totalmente desacoplada**. El Backend actúa como la fuente de verdad, procesando la "lógica pura" y exponiendo recursos a través de endpoints seguros, siguiendo el patrón de diseño **MVC (Model-View-Controller)**. El Frontend consume estos datos dinámicamente, delegando la renderización y la experiencia de usuario a la capa cliente, garantizando así escalabilidad y mantenibilidad.
 
 ---
-
 ### 1. CATÁLOGO DE ENTIDADES Y ATRIBUTOS LITERALES
 
 A continuación, la definición de cada tabla con sus campos exactos:
@@ -454,6 +453,60 @@ Esta es la tabla más inteligente del grupo.
     - Aca donde se guardan los adjuntos en el bucket de cloud storage b2 para tener archivos que enviar en protocolos. donde tipoadjunto es: 1:protocolo 2:aval 3: otro.  la idea es que solo se pueda enviar 3 por solicitud de protocolo. nombre_original , es el nombre que ellos tienen en el documento, file_key es el linkeo con el bucket
         - `[**Id_adjuntos_protocolos**(id ai), **nombre_original**(varchar(100)), **file_key**(text),**IdSolicitudProtocolo**(int foranea solicitudprotocolo:IdSolicitudProtocolo),**tipoadjunto**(int)]`
 
+CREATE TABLE IF NOT EXISTS protocoloexpered (
+IdProtocoloExpRed INT AUTO_INCREMENT PRIMARY KEY,
+idprotA INT NOT NULL,
+IdInstitucion INT NOT NULL,
+IdUsrA INT NULL,
+iddeptoA INT NULL,
+idtipoprotocolo INT NULL,
+IdSeveridadTipo INT NULL,
+FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CONSTRAINT fk_protored_protocolo FOREIGN KEY (idprotA) REFERENCES protocoloexpe(idprotA) ON DELETE CASCADE,
+CONSTRAINT fk_protored_inst FOREIGN KEY (IdInstitucion) REFERENCES institucion(IdInstitucion) ON DELETE CASCADE,
+CONSTRAINT fk_protored_usr FOREIGN KEY (IdUsrA) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
+CONSTRAINT fk_protored_depto FOREIGN KEY (iddeptoA) REFERENCES departamentoe(iddeptoA) ON DELETE SET NULL,
+CONSTRAINT fk_protored_tipo FOREIGN KEY (idtipoprotocolo) REFERENCES tipoprotocolo(idtipoprotocolo) ON DELETE SET NULL,
+CONSTRAINT fk_protored_sev FOREIGN KEY (IdSeveridadTipo) REFERENCES tiposeveridad(IdSeveridadTipo) ON DELETE SET NULL,
+UNIQUE KEY uq_protored_protocol_inst (idprotA, IdInstitucion),
+INDEX idx_protored_inst (IdInstitucion),
+INDEX idx_protored_protocol (idprotA)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS protocoloexpered_especies (
+IdProtocoloExpRedEspecie INT AUTO_INCREMENT PRIMARY KEY,
+IdProtocoloExpRed INT NOT NULL,
+idespA INT NOT NULL,
+CONSTRAINT fk_protoredesp_protored FOREIGN KEY (IdProtocoloExpRed) REFERENCES protocoloexpered(IdProtocoloExpRed) ON DELETE CASCADE,
+CONSTRAINT fk_protoredesp_especie FOREIGN KEY (idespA) REFERENCES especiee(idespA) ON DELETE CASCADE,
+UNIQUE KEY uq_protoredesp_pair (IdProtocoloExpRed, idespA),
+INDEX idx_protoredesp_protored (IdProtocoloExpRed)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+```sql
+-- Adjuntos de protocolos manuales (sin solicitud local).
+-- Uso: gestión admin de protocoloexpe para protocolos creados manualmente.
+
+CREATE TABLE IF NOT EXISTS protocoloexpeadjuntos (
+    IdProtocoloAdjunto INT AUTO_INCREMENT PRIMARY KEY,
+    idprotA INT NOT NULL,
+    tipoadjunto TINYINT NOT NULL COMMENT '1=adjunto1, 2=adjunto2, 3=adjunto3',
+    nombre_original VARCHAR(255) NOT NULL,
+    file_key VARCHAR(1024) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+    size_bytes INT NOT NULL DEFAULT 0,
+    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_protadj_protocolo FOREIGN KEY (idprotA)
+        REFERENCES protocoloexpe(idprotA)
+        ON DELETE CASCADE,
+    CONSTRAINT chk_protadj_tipo CHECK (tipoadjunto IN (1,2,3)),
+    UNIQUE KEY uq_protadj_slot (idprotA, tipoadjunto),
+    INDEX idx_protadj_protocolo (idprotA)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+```
+
 ## CÓMO FUNCIONAN LOS PROTOCOLOS (Lógica de Negocio):
 
 ### 1. El Doble Rol del Usuario (Científico vs. Pagador)
@@ -519,6 +572,428 @@ El protocolo no nace activo. Nace a través de `solicitudprotocolo`.
     - Tipo entidad: Relacion(formularioe, protocoloexpe)
     - Relaciones entre formularioe y protocoloexpe… yo siento que esta relacion no deberia existir , pero como el programa esta asi hace tiempo, y ya tiene muchisimos datos no se puede cambiar… por que en realidad el formulario solo puede tener 1 protocolo , no mas. no puede tener varios protocolos… entonces el protocolo va a tener muchos formularios , pero el formulario solo 1 protocolo, tendria que ser totalidad y idprotA embebido en formularioe… pero queda asi.. va a tener uno , pero esta bien, es la unica relacion que no coincido, pero seguira asi.
         - - `****[idprotA** *(int foranea protocoloexpe:idprotA) ,***idformA** *(int foranea formularioe:idformA),* **idprotform** *(int ai)]*`
+
+```sql
+-- ============================================================
+-- DERIVACION DE FORMULARIOS EN RED (ANIMALES / REACTIVOS / INSUMOS)
+-- ============================================================
+-- Objetivo:
+-- 1) Permitir derivar formularios entre instituciones de la misma red.
+-- 2) Registrar propietario actual (usuario + institucion) del formulario.
+-- 3) Mantener historial completo de estados y movimientos.
+-- 4) Preparar facturacion por institucion derivada.
+--
+-- Nota:
+-- - Se mantiene formularioe como entidad principal del formulario ("el mismo formulario").
+-- - El protocolo asociado no cambia; la derivacion mueve la responsabilidad operativa/financiera.
+-- - Este script no borra ni altera datos existentes.
+-- ============================================================
+
+START TRANSACTION;
+
+-- ------------------------------------------------------------
+-- 1) BITACORA DE DERIVACIONES (cada envio/devolucion/rechazo)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS formulario_derivacion (
+    IdFormularioDerivacion INT AUTO_INCREMENT PRIMARY KEY,
+    idformA INT NOT NULL,
+    IdFormularioDerivacionPadre INT NULL,
+
+    IdInstitucionOrigen INT NOT NULL,
+    IdInstitucionDestino INT NOT NULL,
+
+    IdUsrOrigen INT NOT NULL COMMENT 'Usuario que deriva',
+    IdUsrDestinoResponsable INT NULL COMMENT 'Responsable asignado en destino (opcional)',
+
+    estado_derivacion TINYINT NOT NULL DEFAULT 1 COMMENT '1=PENDIENTE,2=ACEPTADA,3=DEVUELTA,4=RECHAZADA,5=CANCELADA',
+    mensaje_origen VARCHAR(1000) NULL,
+    mensaje_destino VARCHAR(1000) NULL,
+    motivo_rechazo VARCHAR(1000) NULL,
+
+    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaRespondido DATETIME NULL,
+    FechaCerrado DATETIME NULL,
+    Activo TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=derivacion vigente para ese nodo',
+
+    CONSTRAINT fk_fder_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+    CONSTRAINT fk_fder_parent FOREIGN KEY (IdFormularioDerivacionPadre) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
+    CONSTRAINT fk_fder_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+    CONSTRAINT fk_fder_inst_destino FOREIGN KEY (IdInstitucionDestino) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+    CONSTRAINT fk_fder_usr_origen FOREIGN KEY (IdUsrOrigen) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+    CONSTRAINT fk_fder_usr_destino FOREIGN KEY (IdUsrDestinoResponsable) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
+
+    INDEX idx_fder_form (idformA),
+    INDEX idx_fder_origen (IdInstitucionOrigen),
+    INDEX idx_fder_destino (IdInstitucionDestino),
+    INDEX idx_fder_estado (estado_derivacion),
+    INDEX idx_fder_activo (Activo),
+    INDEX idx_fder_form_activo (idformA, Activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 2) PROPIEDAD/POSESION ACTUAL DEL FORMULARIO
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS formulario_owner_actual (
+    idformA INT PRIMARY KEY,
+    IdInstitucionActual INT NOT NULL,
+    IdUsrPropietarioActual INT NOT NULL,
+    IdFormularioDerivacionActiva INT NULL,
+    EsDerivado TINYINT(1) NOT NULL DEFAULT 0,
+    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_fown_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+    CONSTRAINT fk_fown_inst FOREIGN KEY (IdInstitucionActual) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+    CONSTRAINT fk_fown_usr FOREIGN KEY (IdUsrPropietarioActual) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+    CONSTRAINT fk_fown_deriv FOREIGN KEY (IdFormularioDerivacionActiva) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
+
+    INDEX idx_fown_inst (IdInstitucionActual),
+    INDEX idx_fown_usr (IdUsrPropietarioActual),
+    INDEX idx_fown_deriv (EsDerivado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 3) HISTORIAL DE ESTADOS DEL FORMULARIO (auditoria funcional)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS formulario_estado_historial (
+    IdFormularioEstadoHistorial INT AUTO_INCREMENT PRIMARY KEY,
+    idformA INT NOT NULL,
+    estado_anterior VARCHAR(60) NULL,
+    estado_nuevo VARCHAR(60) NOT NULL,
+    detalle VARCHAR(1000) NULL,
+
+    IdUsrAccion INT NULL,
+    IdInstitucionAccion INT NULL,
+    IdFormularioDerivacion INT NULL,
+
+    FechaAccion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_fhist_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+    CONSTRAINT fk_fhist_usr FOREIGN KEY (IdUsrAccion) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
+    CONSTRAINT fk_fhist_inst FOREIGN KEY (IdInstitucionAccion) REFERENCES institucion(IdInstitucion) ON DELETE SET NULL,
+    CONSTRAINT fk_fhist_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
+
+    INDEX idx_fhist_form (idformA),
+    INDEX idx_fhist_estado (estado_nuevo),
+    INDEX idx_fhist_fecha (FechaAccion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 4) FACTURACION DE FORMULARIOS DERIVADOS (por institucion)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS facturacion_formulario_derivado (
+    IdFacturacionFormularioDerivado INT AUTO_INCREMENT PRIMARY KEY,
+    idformA INT NOT NULL,
+    IdFormularioDerivacion INT NOT NULL,
+
+    IdInstitucionCobradora INT NOT NULL COMMENT 'Institucion que atiende/cobra',
+    IdInstitucionSolicitante INT NOT NULL COMMENT 'Institucion que deriva/solicita',
+    IdUsrSolicitante INT NOT NULL COMMENT 'Usuario propietario que deriva',
+
+    tipo_formulario VARCHAR(40) NOT NULL COMMENT 'animal|reactivo|insumo',
+    monto_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    monto_pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    estado_cobro TINYINT NOT NULL DEFAULT 1 COMMENT '1=PENDIENTE,2=PARCIAL,3=PAGADO,4=ANULADO',
+
+    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ffd_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+    CONSTRAINT fk_ffd_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE CASCADE,
+    CONSTRAINT fk_ffd_inst_cob FOREIGN KEY (IdInstitucionCobradora) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+    CONSTRAINT fk_ffd_inst_sol FOREIGN KEY (IdInstitucionSolicitante) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+    CONSTRAINT fk_ffd_usr_sol FOREIGN KEY (IdUsrSolicitante) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+
+    UNIQUE KEY uq_ffd_deriv (IdFormularioDerivacion),
+    INDEX idx_ffd_form (idformA),
+    INDEX idx_ffd_inst_cob (IdInstitucionCobradora),
+    INDEX idx_ffd_inst_sol (IdInstitucionSolicitante),
+    INDEX idx_ffd_estado (estado_cobro)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 5) AJUSTES MINIMOS SOBRE formularioe (estado derivado + trazas)
+-- ------------------------------------------------------------
+-- Nota: si alguna columna ya existe, ajustar manualmente.
+-- Estas columnas simplifican filtros y compatibilidad con UI actual.
+
+ALTER TABLE formularioe
+    ADD COLUMN IF NOT EXISTS EstadoWorkflow VARCHAR(40) NULL AFTER estado,
+    ADD COLUMN IF NOT EXISTS IdInstitucionOrigen INT NULL AFTER EstadoWorkflow,
+    ADD COLUMN IF NOT EXISTS DerivadoActivo TINYINT(1) NOT NULL DEFAULT 0 AFTER IdInstitucionOrigen,
+    ADD COLUMN IF NOT EXISTS FechaDerivado DATETIME NULL AFTER DerivadoActivo;
+
+ALTER TABLE formularioe
+    ADD INDEX IF NOT EXISTS idx_form_estado_workflow (EstadoWorkflow),
+    ADD INDEX IF NOT EXISTS idx_form_derivado_activo (DerivadoActivo),
+    ADD INDEX IF NOT EXISTS idx_form_inst_origen (IdInstitucionOrigen);
+
+-- Opcional: FK de institucion origen (siempre que tu schema lo soporte sin datos sucios)
+-- ALTER TABLE formularioe
+--     ADD CONSTRAINT fk_form_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE SET NULL;
+
+COMMIT;
+
+```
+
+ALTER TABLE formularioe ADD COLUMN EstadoWorkflow VARCHAR(40) NULL AFTER estado;
+ALTER TABLE formularioe ADD COLUMN IdInstitucionOrigen INT NULL AFTER EstadoWorkflow;
+ALTER TABLE formularioe ADD COLUMN DerivadoActivo TINYINT(1) NOT NULL DEFAULT 0 AFTER IdInstitucionOrigen;
+ALTER TABLE formularioe ADD COLUMN FechaDerivado DATETIME NULL AFTER DerivadoActivo;
+ALTER TABLE formularioe ADD INDEX idx_form_estado_workflow (EstadoWorkflow);
+ALTER TABLE formularioe ADD INDEX idx_form_derivado_activo (DerivadoActivo);
+ALTER TABLE formularioe ADD INDEX idx_form_inst_origen (IdInstitucionOrigen);
+
+CREATE TABLE IF NOT EXISTS formulario_derivacion (
+IdFormularioDerivacion INT AUTO_INCREMENT PRIMARY KEY,
+idformA INT NOT NULL,
+IdFormularioDerivacionPadre INT NULL,
+IdInstitucionOrigen INT NOT NULL,
+IdInstitucionDestino INT NOT NULL,
+IdUsrOrigen INT NOT NULL,
+IdUsrDestinoResponsable INT NULL,
+estado_derivacion TINYINT NOT NULL DEFAULT 1,
+mensaje_origen VARCHAR(1000) NULL,
+mensaje_destino VARCHAR(1000) NULL,
+motivo_rechazo VARCHAR(1000) NULL,
+FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FechaRespondido DATETIME NULL,
+FechaCerrado DATETIME NULL,
+Activo TINYINT(1) NOT NULL DEFAULT 1,
+CONSTRAINT fk_fder_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+CONSTRAINT fk_fder_parent FOREIGN KEY (IdFormularioDerivacionPadre) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
+CONSTRAINT fk_fder_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+CONSTRAINT fk_fder_inst_destino FOREIGN KEY (IdInstitucionDestino) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+CONSTRAINT fk_fder_usr_origen FOREIGN KEY (IdUsrOrigen) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+CONSTRAINT fk_fder_usr_destino FOREIGN KEY (IdUsrDestinoResponsable) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS formulario_owner_actual (
+idformA INT PRIMARY KEY,
+IdInstitucionActual INT NOT NULL,
+IdUsrPropietarioActual INT NOT NULL,
+IdFormularioDerivacionActiva INT NULL,
+EsDerivado TINYINT(1) NOT NULL DEFAULT 0,
+FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CONSTRAINT fk_fown_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+CONSTRAINT fk_fown_inst FOREIGN KEY (IdInstitucionActual) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+CONSTRAINT fk_fown_usr FOREIGN KEY (IdUsrPropietarioActual) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+INDEX idx_fown_inst (IdInstitucionActual),
+INDEX idx_fown_usr (IdUsrPropietarioActual),
+INDEX idx_fown_deriv (EsDerivado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE formulario_owner_actual
+ADD CONSTRAINT fk_fown_deriv
+FOREIGN KEY (IdFormularioDerivacionActiva)
+REFERENCES formulario_derivacion(IdFormularioDerivacion)
+ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS formulario_estado_historial (
+IdFormularioEstadoHistorial INT AUTO_INCREMENT PRIMARY KEY,
+idformA INT NOT NULL,
+estado_anterior VARCHAR(60) NULL,
+estado_nuevo VARCHAR(60) NOT NULL,
+detalle VARCHAR(1000) NULL,
+IdUsrAccion INT NULL,
+IdInstitucionAccion INT NULL,
+IdFormularioDerivacion INT NULL,
+FechaAccion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+INDEX idx_fhist_form (idformA),
+INDEX idx_fhist_estado (estado_nuevo),
+INDEX idx_fhist_fecha (FechaAccion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS facturacion_formulario_derivado (
+IdFacturacionFormularioDerivado INT AUTO_INCREMENT PRIMARY KEY,
+idformA INT NOT NULL,
+IdFormularioDerivacion INT NOT NULL,
+IdInstitucionCobradora INT NOT NULL,
+IdInstitucionSolicitante INT NOT NULL,
+IdUsrSolicitante INT NOT NULL,
+tipo_formulario VARCHAR(40) NOT NULL,
+monto_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+monto_pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+estado_cobro TINYINT NOT NULL DEFAULT 1,
+FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CONSTRAINT fk_ffd_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
+CONSTRAINT fk_ffd_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE CASCADE,
+CONSTRAINT fk_ffd_inst_cob FOREIGN KEY (IdInstitucionCobradora) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+CONSTRAINT fk_ffd_inst_sol FOREIGN KEY (IdInstitucionSolicitante) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
+CONSTRAINT fk_ffd_usr_sol FOREIGN KEY (IdUsrSolicitante) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
+UNIQUE KEY uq_ffd_deriv (IdFormularioDerivacion),
+INDEX idx_ffd_form (idformA),
+INDEX idx_ffd_inst_cob (IdInstitucionCobradora),
+INDEX idx_ffd_inst_sol (IdInstitucionSolicitante),
+INDEX idx_ffd_estado (estado_cobro)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+- - =============================================================================
+-- MIGRACIÓN COMPLETA: Derivación con formulario original intacto
+-- Ejecutar en orden. Si alguna tabla/columna ya existe, omitir esa sentencia.
+-- =============================================================================
+
+---
+
+- - 1. Tabla formulario_datos_originales (snapshot del formulario al derivar)
+-- Solo si no existe
+
+---
+
+CREATE TABLE IF NOT EXISTS formulario_datos_originales (
+id INT AUTO_INCREMENT PRIMARY KEY,
+idformA INT NOT NULL,
+IdFormularioDerivacion INT NOT NULL,
+datos_json LONGTEXT NOT NULL COMMENT 'JSON: header + details del formulario al derivar',
+FechaCreado DATETIME DEFAULT CURRENT_TIMESTAMP,
+UNIQUE KEY uk_form_deriv (idformA, IdFormularioDerivacion),
+INDEX idx_idform (idformA)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+---
+
+- - 2. Columna idformAOrigen en formulario_derivacion
+-- Formulario original que permanece en institución origen (no se modifica)
+-- Si la columna ya existe, omitir esta línea.
+
+---
+
+ALTER TABLE formulario_derivacion
+ADD COLUMN idformAOrigen INT NULL
+COMMENT 'Formulario original en institución origen (no se modifica al derivar)'
+AFTER idformA;
+
+---
+
+- - 3. Índice para búsquedas por formulario original
+-- Si el índice ya existe, omitir esta línea.
+
+---
+
+CREATE INDEX idx_formulario_derivacion_idformAOrigen
+ON formulario_derivacion(idformAOrigen);
+
+CREATE TABLE IF NOT EXISTS formulario_datos_originales (
+id INT AUTO_INCREMENT PRIMARY KEY,
+idformA INT NOT NULL,
+IdFormularioDerivacion INT NOT NULL,
+datos_json LONGTEXT NOT NULL COMMENT 'JSON: header + details del formulario al derivar',
+FechaCreado DATETIME DEFAULT CURRENT_TIMESTAMP,
+UNIQUE KEY uk_form_deriv (idformA, IdFormularioDerivacion),
+INDEX idx_idform (idformA)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+- - Ejecutar en la base correcta
+-- USE groboapp_geckos;
+
+SET @db := DATABASE();
+
+- - 1) estado_origen
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db
+AND TABLE_NAME = 'formulario_derivacion'
+AND COLUMN_NAME = 'estado_origen'
+),
+'SELECT "estado_origen ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN estado_origen VARCHAR(60) NULL AFTER estado_derivacion'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 2) estado_destino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'estado_destino'
+),
+'SELECT "estado_destino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN estado_destino VARCHAR(60) NULL AFTER estado_origen'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 3) tipoA_destino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'tipoA_destino'
+),
+'SELECT "tipoA_destino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN tipoA_destino INT NULL AFTER estado_destino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 4) depto_destino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'depto_destino'
+),
+'SELECT "depto_destino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN depto_destino INT NULL AFTER tipoA_destino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 5) idsubespA_destino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'idsubespA_destino'
+),
+'SELECT "idsubespA_destino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN idsubespA_destino INT NULL AFTER depto_destino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 6) idcepaA_destino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'idcepaA_destino'
+),
+'SELECT "idcepaA_destino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN idcepaA_destino INT NULL AFTER idsubespA_destino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 7) FechaConfigDestino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'FechaConfigDestino'
+),
+'SELECT "FechaConfigDestino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN FechaConfigDestino DATETIME NULL AFTER idcepaA_destino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - 8) IdUsrConfigDestino
+SET @sql := (
+SELECT IF(
+EXISTS(
+SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'IdUsrConfigDestino'
+),
+'SELECT "IdUsrConfigDestino ya existe" AS msg',
+'ALTER TABLE formulario_derivacion ADD COLUMN IdUsrConfigDestino INT NULL AFTER FechaConfigDestino'
+)
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+- - Índices (si ya existen, comentá esas líneas)
+ALTER TABLE formulario_derivacion
+ADD INDEX idx_fd_tipoA_destino (tipoA_destino),
+ADD INDEX idx_fd_depto_destino (depto_destino),
+ADD INDEX idx_fd_subesp_destino (idsubespA_destino),
+ADD INDEX idx_fd_cepa_destino (idcepaA_destino),
+ADD INDEX idx_fd_usr_config_destino (IdUsrConfigDestino);
 
 ## CÓMO FUNCIONAN LOS PEDIDOS (Formularios):
 
@@ -619,6 +1094,282 @@ Es importante documentar por qué existe esta tabla.
     - Tipo entidad: subordinada (historia)
     - Sirve para crear un codigo de 6 letras y numeros de alojamiento del qr para dar acceso en las instituciones
         - - [id_qr(int ai), codigo (varchar(6)), historia(int foranea alojamientos:historia), IdUsrA(int foranea usuarioe:IdUsrA) fecha_creacion(datetime) ]
+
+- *- =============================================================================*
+- *- URBE – Ubicación física de cajas de alojamiento (por institución)*
+- *- Motor: InnoDB | Charset: utf8mb4*
+- *- Ejecutar UNA VEZ en la base de datos del proyecto (tras backup).*
+- *- Requiere existir la tabla: institucion (IdInstitucion) y alojamiento_caja (IdCajaAlojamiento)*
+- *- =============================================================================*
+
+SET NAMES utf8mb4;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+- *- -----------------------------------------------------------------------------*
+- *- 1) Etiquetas personalizables por institución (nombres distintos por sede)*
+- *- -----------------------------------------------------------------------------*
+
+CREATE TABLE IF NOT EXISTS `aloj_config_ubicacion` (
+
+`IdInstitucion` INT NOT NULL,
+
+`LabelLugarFisico`       VARCHAR(120) NOT NULL *DEFAULT* 'Lugar físico',
+
+`LabelSalon`             VARCHAR(120) NOT NULL *DEFAULT* 'Salón / sala',
+
+`LabelRack`              VARCHAR(120) NOT NULL *DEFAULT* 'Rack',
+
+`LabelLugarRack`       VARCHAR(120) NOT NULL *DEFAULT* 'Posición en rack',
+
+`LabelComentarioUbicacion` VARCHAR(120) NOT NULL *DEFAULT* 'Comentario de ubicación',
+
+*PRIMARY KEY* (`IdInstitucion`),
+
+*CONSTRAINT* `fk_aloj_cfg_inst`
+
+*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
+
+*ON DELETE CASCADE* ON UPDATE CASCADE
+
+) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci
+
+COMMENT='Etiquetas de UI para ubicación de cajas (por institución)';
+
+- *- -----------------------------------------------------------------------------*
+- *- 2) Catálogo: lugar físico (ej. interior / exterior / edificio A)*
+- *- -----------------------------------------------------------------------------*
+
+CREATE TABLE IF NOT EXISTS `aloj_ubicacion_fisica` (
+
+`IdUbicacionFisica` INT NOT NULL AUTO_INCREMENT,
+
+`IdInstitucion` INT NOT NULL,
+
+`Nombre` VARCHAR(160) NOT NULL,
+
+`Orden` INT NOT NULL *DEFAULT* 0,
+
+`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
+
+*PRIMARY KEY* (`IdUbicacionFisica`),
+
+KEY `idx_aloj_uf_inst` (`IdInstitucion`),
+
+KEY `idx_aloj_uf_inst_activo` (`IdInstitucion`, `Activo`),
+
+*CONSTRAINT* `fk_aloj_uf_inst`
+
+*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
+
+*ON DELETE CASCADE* ON UPDATE CASCADE
+
+) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
+
+- *- -----------------------------------------------------------------------------*
+- *- 3) Catálogo: salón / sala (opcionalmente ligado a un lugar físico)*
+- *- -----------------------------------------------------------------------------*
+
+CREATE TABLE IF NOT EXISTS `aloj_salon` (
+
+`IdSalon` INT NOT NULL AUTO_INCREMENT,
+
+`IdInstitucion` INT NOT NULL,
+
+`IdUbicacionFisica` INT NULL COMMENT 'NULL = mismo lugar global / no aplica',
+
+`Nombre` VARCHAR(160) NOT NULL,
+
+`Orden` INT NOT NULL *DEFAULT* 0,
+
+`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
+
+*PRIMARY KEY* (`IdSalon`),
+
+KEY `idx_aloj_salon_inst` (`IdInstitucion`),
+
+KEY `idx_aloj_salon_uf` (`IdUbicacionFisica`),
+
+*CONSTRAINT* `fk_aloj_salon_inst`
+
+*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
+
+*ON DELETE CASCADE* ON UPDATE CASCADE,
+
+*CONSTRAINT* `fk_aloj_salon_uf`
+
+*FOREIGN KEY* (`IdUbicacionFisica`) *REFERENCES* `aloj_ubicacion_fisica` (`IdUbicacionFisica`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE
+
+) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
+
+- *- -----------------------------------------------------------------------------*
+- *- 4) Catálogo: rack (opcionalmente ligado a un salón)*
+- *- -----------------------------------------------------------------------------*
+
+CREATE TABLE IF NOT EXISTS `aloj_rack` (
+
+`IdRack` INT NOT NULL AUTO_INCREMENT,
+
+`IdInstitucion` INT NOT NULL,
+
+`IdSalon` INT NULL COMMENT 'NULL = rack sin salón específico',
+
+`Nombre` VARCHAR(160) NOT NULL,
+
+`Orden` INT NOT NULL *DEFAULT* 0,
+
+`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
+
+*PRIMARY KEY* (`IdRack`),
+
+KEY `idx_aloj_rack_inst` (`IdInstitucion`),
+
+KEY `idx_aloj_rack_salon` (`IdSalon`),
+
+*CONSTRAINT* `fk_aloj_rack_inst`
+
+*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
+
+*ON DELETE CASCADE* ON UPDATE CASCADE,
+
+*CONSTRAINT* `fk_aloj_rack_salon`
+
+*FOREIGN KEY* (`IdSalon`) *REFERENCES* `aloj_salon` (`IdSalon`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE
+
+) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
+
+- *- -----------------------------------------------------------------------------*
+- *- 5) Catálogo: posición / lugar dentro del rack*
+- *- -----------------------------------------------------------------------------*
+
+CREATE TABLE IF NOT EXISTS `aloj_lugar_rack` (
+
+`IdLugarRack` INT NOT NULL AUTO_INCREMENT,
+
+`IdRack` INT NOT NULL,
+
+`Nombre` VARCHAR(160) NOT NULL,
+
+`Orden` INT NOT NULL *DEFAULT* 0,
+
+`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
+
+*PRIMARY KEY* (`IdLugarRack`),
+
+KEY `idx_aloj_lr_rack` (`IdRack`),
+
+*CONSTRAINT* `fk_aloj_lr_rack`
+
+*FOREIGN KEY* (`IdRack`) *REFERENCES* `aloj_rack` (`IdRack`)
+
+*ON DELETE CASCADE* ON UPDATE CASCADE
+
+) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+- *- -----------------------------------------------------------------------------*
+- *- 6) Extender alojamiento_caja (ubicación por caja)*
+- *- Si alguna columna ya existe, comentar solo esa línea y volver a ejecutar.*
+- *- -----------------------------------------------------------------------------*
+
+ALTER TABLE `alojamiento_caja`
+
+ADD COLUMN `IdUbicacionFisica` INT NULL *DEFAULT* NULL COMMENT 'Opcional' AFTER `Detalle`,
+
+ADD COLUMN `IdSalon` INT NULL *DEFAULT* NULL AFTER `IdUbicacionFisica`,
+
+ADD COLUMN `IdRack` INT NULL *DEFAULT* NULL AFTER `IdSalon`,
+
+ADD COLUMN `IdLugarRack` INT NULL *DEFAULT* NULL AFTER `IdRack`,
+
+ADD COLUMN `ComentarioUbicacion` VARCHAR(500) NULL *DEFAULT* NULL COMMENT 'Texto libre del lugar' AFTER `IdLugarRack`;
+
+ALTER TABLE `alojamiento_caja`
+
+ADD KEY `idx_acaja_uf` (`IdUbicacionFisica`),
+
+ADD KEY `idx_acaja_salon` (`IdSalon`),
+
+ADD KEY `idx_acaja_rack` (`IdRack`),
+
+ADD KEY `idx_acaja_lr` (`IdLugarRack`);
+
+ALTER TABLE `alojamiento_caja`
+
+ADD *CONSTRAINT* `fk_acaja_uf`
+
+*FOREIGN KEY* (`IdUbicacionFisica`) *REFERENCES* `aloj_ubicacion_fisica` (`IdUbicacionFisica`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE,
+
+ADD *CONSTRAINT* `fk_acaja_salon`
+
+*FOREIGN KEY* (`IdSalon`) *REFERENCES* `aloj_salon` (`IdSalon`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE,
+
+ADD *CONSTRAINT* `fk_acaja_rack`
+
+*FOREIGN KEY* (`IdRack`) *REFERENCES* `aloj_rack` (`IdRack`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE,
+
+ADD *CONSTRAINT* `fk_acaja_lr`
+
+*FOREIGN KEY* (`IdLugarRack`) *REFERENCES* `aloj_lugar_rack` (`IdLugarRack`)
+
+*ON DELETE* SET NULL ON UPDATE CASCADE;
+
+- *- -----------------------------------------------------------------------------*
+- *- 7) Semilla: una fila de etiquetas por cada institución existente*
+- *- -----------------------------------------------------------------------------*
+
+INSERT INTO `aloj_config_ubicacion` (
+
+`IdInstitucion`,
+
+`LabelLugarFisico`,
+
+`LabelSalon`,
+
+`LabelRack`,
+
+`LabelLugarRack`,
+
+`LabelComentarioUbicacion`
+
+)
+
+SELECT
+
+i.`IdInstitucion`,
+
+'Lugar físico',
+
+'Salón / sala',
+
+'Rack',
+
+'Posición en rack',
+
+'Comentario de ubicación'
+
+FROM `institucion` i
+
+LEFT JOIN `aloj_config_ubicacion` c ON c.`IdInstitucion` = i.`IdInstitucion`
+
+WHERE c.`IdInstitucion` IS NULL;
+
+- *- =============================================================================*
+- *- FIN. Verificar:*
+- *- SHOW CREATE TABLE alojamiento_caja;*
+- *- SELECT * FROM aloj_config_ubicacion;*
+- *- =============================================================================*
 
 ## COMO FUNCIONAN LOS ALOJAMIENTOS:
 
@@ -751,6 +1502,70 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
     - Tipo entidad: Relacion (reserva_instrumento, reserva_sala)
     - Entidad que define en qué salas específicas está permitido usar un instrumento. Si un instrumento no tiene registros en esta tabla, significa que tiene disponibilidad global y se puede utilizar en cualquier sala libremente…
         - `*[***IdInstrumentoSalaPermitida***(int ai),***IdReservaInstrumento**(int foranea reserva_instrumento:IdReservaInstrumento),**IdSalaReserva**(int foranea reserva_sala:IdSalaReserva)]`
+
+
+ALTER TABLE reserva_instrumento_sala
+ADD COLUMN IF NOT EXISTS cantidad INT NOT NULL DEFAULT 1 AFTER IdReservaInstrumento;
+
+ALTER TABLE reserva_instrumento_sala
+ADD UNIQUE KEY IF NOT EXISTS uq_reserva_inst (IdReserva, IdReservaInstrumento);
+
+ALTER TABLE reserva
+ADD COLUMN IF NOT EXISTS IdUsrA INT NULL AFTER IdInstitucion,
+ADD INDEX IF NOT EXISTS idx_reserva_usr (IdUsrA);
+
+ALTER TABLE reserva
+ADD CONSTRAINT fk_reserva_usr
+FOREIGN KEY (IdUsrA) REFERENCES usuarioe(IdUsrA)
+ON DELETE SET NULL;
+
+ALTER TABLE reserva
+ADD INDEX IF NOT EXISTS idx_reserva_sala_fecha (IdSalaReserva, fechaini, Horacomienzo, Horafin);
+
+ALTER TABLE reserva_instrumento_sala
+ADD INDEX IF NOT EXISTS idx_ris_inst (IdReservaInstrumento),
+ADD INDEX IF NOT EXISTS idx_ris_reserva (IdReserva);
+
+ALTER TABLE reserva
+ADD COLUMN IF NOT EXISTS IdUsrCreador INT NOT NULL AFTER IdInstitucion,
+ADD COLUMN IF NOT EXISTS IdUsrTitular INT NOT NULL AFTER IdUsrCreador,
+ADD INDEX IF NOT EXISTS idx_reserva_titular (IdUsrTitular),
+ADD INDEX IF NOT EXISTS idx_reserva_creador (IdUsrCreador);
+
+CREATE TABLE IF NOT EXISTS reserva_serie (
+IdReservaSerie INT AUTO_INCREMENT PRIMARY KEY,
+IdInstitucion INT NOT NULL,
+IdUsrCreador INT NOT NULL,
+IdUsrTitular INT NOT NULL,
+IdSalaReserva INT NOT NULL,
+
+HoraInicio TIME NOT NULL,
+HoraFin TIME NOT NULL,
+
+FechaInicio DATE NOT NULL,
+FechaFin DATE NOT NULL,
+
+TipoRepeat TINYINT NOT NULL COMMENT '1=semanal,2=dias_especificos',
+CadaNSemanas INT NOT NULL DEFAULT 1,
+DiasSemana VARCHAR(20) NULL COMMENT 'Ej: 1,3,5 (Lun,Mie,Vie) si semanal',
+FechasEspecificas TEXT NULL COMMENT 'JSON array de fechas YYYY-MM-DD si dias_especificos',
+
+Activa TINYINT(1) NOT NULL DEFAULT 1,
+FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+INDEX idx_serie_inst_sala (IdInstitucion, IdSalaReserva),
+INDEX idx_serie_rango (FechaInicio, FechaFin)
+);
+
+ALTER TABLE reserva
+ADD COLUMN IF NOT EXISTS IdReservaSerie INT NULL AFTER idReserva,
+ADD INDEX IF NOT EXISTS idx_reserva_serie (IdReservaSerie);
+
+ALTER TABLE reserva_sala
+ADD COLUMN IF NOT EXISTS QrToken VARCHAR(80) NULL,
+ADD UNIQUE KEY IF NOT EXISTS uq_reserva_sala_qr (QrToken);
+
+
 
 va a tener los dias de la semana
 
@@ -930,4 +1745,3 @@ El sistema financiero está diseñado para ser inmune a la inflación o cambios 
 - **Congelamiento:** En el momento en que un pedido pasa a "Entregado" o un alojamiento se cierra, el sistema copia el valor actual de los catálogos maestros (`precioanimalmomento`, `PreciomomentoInsumo`) y lo guarda en las tablas de deuda (`precioformulario`, `precioinsumosformulario`).
 - **Deuda Segregada:** Se mantienen canales de deuda separados para "Biológicos" y "Logísticos", permitiendo imputaciones de pago parciales y específicas.
 - **Auditoría de Doble Punta:** Cada transacción en `historialpago` registra obligatoriamente quién pagó (`IdUsrA`) y qué administrador ejecutó el cobro (`IdUsrAAdmin`), garantizando trazabilidad total ante arqueos de caja.
-

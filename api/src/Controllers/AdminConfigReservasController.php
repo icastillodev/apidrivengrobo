@@ -50,11 +50,23 @@ class AdminConfigReservasController {
         $this->jsonResponse($this->model->getAllInst($sesion['instId']));
     }
 
+    public function getInstSalasPermitidas() {
+        Auditoria::getDatosSesion(); // Valida Token
+        $id = $_GET['id'] ?? null;
+        $this->jsonResponse($this->model->getInstSalasPermitidas($id));
+    }
+
     public function saveInst() {
         $sesion = Auditoria::getDatosSesion();
         $_POST['IdInstitucion'] = $sesion['instId'];
         
-        $this->model->saveInst($_POST);
+        $salasPermitidas = [];
+        if (isset($_POST['salasPermitidas'])) {
+            $decoded = json_decode($_POST['salasPermitidas'], true);
+            if (is_array($decoded)) $salasPermitidas = $decoded;
+        }
+
+        $this->model->saveInst($_POST, $salasPermitidas);
         $this->jsonResponse(['status' => 'success']);
     }
 
@@ -63,6 +75,37 @@ class AdminConfigReservasController {
         $input = json_decode(file_get_contents('php://input'), true);
         $this->model->toggleInst($input['id'], $input['status']);
         $this->jsonResponse(['status' => 'success']);
+    }
+
+    public function generarQrSala() {
+        $sesion = Auditoria::getDatosSesion();
+        // Solo admins/roles altos
+        $role = (int)($sesion['role'] ?? 0);
+        if (!in_array($role, [1, 2, 4, 5, 6], true)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
+        }
+        $input = json_decode(file_get_contents('php://input'), true);
+        $idSala = $input['IdSalaReserva'] ?? null;
+        $out = $this->model->generarQrSala($sesion['instId'], $idSala);
+        $this->jsonResponse($out);
+    }
+
+    public function getModoAprobacion() {
+        $sesion = Auditoria::getDatosSesion();
+        $out = $this->model->getModoAprobacion($sesion['instId']);
+        $this->jsonResponse($out);
+    }
+
+    public function setModoAprobacion() {
+        $sesion = Auditoria::getDatosSesion();
+        $role = (int)($sesion['role'] ?? 0);
+        if (!in_array($role, [1, 2], true)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
+        }
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) $input = [];
+        $out = $this->model->setModoAprobacion($sesion['instId'], $input);
+        $this->jsonResponse($out);
     }
 
     private function jsonResponse($data) {

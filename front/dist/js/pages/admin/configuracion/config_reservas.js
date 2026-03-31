@@ -5,12 +5,56 @@ const DAYS = [
     { id: 4, name: 'Jueves' }, { id: 5, name: 'Viernes' }, { id: 6, name: 'Sábado' }, { id: 7, name: 'Domingo' }
 ];
 
+let CACHED_SALAS = [];
+
 export function initConfigReservas() {
+    loadModoAprobacion();
     loadSalas();
     loadInstrumentos();
 
     document.getElementById('form-sala').onsubmit = saveSala;
     document.getElementById('form-inst').onsubmit = saveInst;
+
+    const btnSaveAprob = document.getElementById('btn-save-aprob');
+    if (btnSaveAprob) btnSaveAprob.onclick = () => saveModoAprobacion();
+
+    const scopeGlobal = document.getElementById('inst-scope-global');
+    if (scopeGlobal) {
+        scopeGlobal.onchange = () => {
+            const wrap = document.getElementById('inst-scope-salas-wrap');
+            if (!wrap) return;
+            wrap.classList.toggle('d-none', scopeGlobal.checked);
+        };
+    }
+}
+
+async function loadModoAprobacion() {
+    try {
+        const res = await API.request(`/admin/config/reservas/aprobacion/get?t=${Date.now()}`);
+        const chk = document.getElementById('res-req-aprob');
+        if (!chk) return;
+        const v = (res?.status === 'success') ? (res.data?.requiereAprobacion ?? 0) : 0;
+        chk.checked = String(v) === '1' || v === 1 || v === true;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function saveModoAprobacion() {
+    const t = window.txt?.config_reservas || {};
+    const chk = document.getElementById('res-req-aprob');
+    if (!chk) return;
+    try {
+        Swal.fire({ title: t.procesando || 'Procesando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const res = await API.request('/admin/config/reservas/aprobacion/set', 'POST', { requiereAprobacion: chk.checked ? 1 : 0 });
+        if (res?.status === 'success') {
+            Swal.fire(t.swal_ok || 'Guardado', t.aprobacion_saved || 'Configuración actualizada.', 'success');
+            return;
+        }
+        Swal.fire(t.swal_error || 'Error', res?.message || t.msg_no_guardar || 'No se pudo guardar', 'error');
+    } catch (e) {
+        Swal.fire(t.swal_error || 'Error', t.msg_no_guardar || 'No se pudo guardar', 'error');
+    }
 }
 
 // ==========================================
@@ -24,6 +68,7 @@ async function loadSalas() {
     tbody.innerHTML = '';
 
     if (res.status === 'success' && res.data.length > 0) {
+        CACHED_SALAS = Array.isArray(res.data) ? res.data : [];
         res.data.forEach(s => {
             const isOff = (s.habilitado == 0);
             let tipoTxt = 'Personalizado';
@@ -54,6 +99,7 @@ async function loadSalas() {
             `;
         });
     } else {
+        CACHED_SALAS = [];
         tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No hay salas configuradas.</td></tr>';
     }
 }
@@ -228,6 +274,24 @@ window.openModalInst = (id='', nombre='', cant=1, det='', hab=1) => {
     } else {
         cont.classList.add('d-none');
     }
+
+    // Alcance del instrumento (global vs salas específicas)
+    (async () => {
+        if (id !== '') {
+            try {
+                const res = await API.request(`/admin/config/reservas/inst/permitidas?id=${id}&t=${Date.now()}`);
+                const ids = (res.status === 'success' && Array.isArray(res.data))
+                    ? res.data.map(x => parseInt(x.IdSalaReserva, 10)).filter(n => Number.isFinite(n))
+                    : [];
+                renderInstSalasPermitidasUI(ids);
+            } catch (e) {
+                renderInstSalasPermitidasUI([]);
+            }
+        } else {
+            renderInstSalasPermitidasUI([]);
+        }
+    })();
+
     new bootstrap.Modal(document.getElementById('modal-inst')).show();
 };
 
@@ -235,18 +299,77 @@ async function saveInst(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     fd.append('IdInstitucion', localStorage.getItem('instId'));
+
+    const isGlobal = !!document.getElementById('inst-scope-global')?.checked;
+    const selectedSalaIds = [];
+    document.querySelectorAll('#inst-scope-salas input[type="checkbox"][data-sala-id]:checked').forEach(cb => {
+        selectedSalaIds.push(parseInt(cb.dataset.salaId, 10));
+    });
+
+    if (!isGlobal && selectedSalaIds.length === 0) {
+        Swal.fire(
+            window.txt?.config_reservas?.swal_error || 'Error',
+            window.txt?.config_reservas?.inst_scope_need_one || 'Debes seleccionar al menos 1 sala (o marcar que es global).',
+            'warning'
+        );
+        return;
+    }
+
+    fd.append('salasPermitidas', JSON.stringify(isGlobal ? [] : selectedSalaIds));
     
     try {
         const res = await API.request('/admin/config/reservas/inst/save', 'POST', fd);
         if(res.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('modal-inst')).hide();
             loadInstrumentos();
-            Swal.fire('Guardado', 'Instrumento actualizado', 'success');
+            Swal.fire(
+                window.txt?.config_reservas?.swal_ok || 'Guardado',
+                window.txt?.config_reservas?.msg_inst_saved || 'Instrumento actualizado',
+                'success'
+            );
         }
-    } catch(err) { Swal.fire('Error', 'No se pudo guardar', 'error'); }
+    } catch(err) {
+        Swal.fire(
+            window.txt?.config_reservas?.swal_error || 'Error',
+            window.txt?.config_reservas?.msg_no_guardar || 'No se pudo guardar',
+            'error'
+        );
+    }
 }
 
 window.toggleInst = async (id, status) => {
     await API.request('/admin/config/reservas/inst/toggle', 'POST', { id, status: status==1?0:1 });
     loadInstrumentos();
 };
+
+function renderInstSalasPermitidasUI(selectedSalaIds = []) {
+    const scopeGlobal = document.getElementById('inst-scope-global');
+    const wrap = document.getElementById('inst-scope-salas-wrap');
+    const cont = document.getElementById('inst-scope-salas');
+    const empty = document.getElementById('inst-scope-salas-empty');
+    if (!scopeGlobal || !wrap || !cont || !empty) return;
+
+    cont.innerHTML = '';
+
+    const hasSalas = Array.isArray(CACHED_SALAS) && CACHED_SALAS.length > 0;
+    empty.classList.toggle('d-none', hasSalas);
+
+    if (hasSalas) {
+        CACHED_SALAS.forEach(s => {
+            const id = parseInt(s.IdSalaReserva, 10);
+            if (!Number.isFinite(id)) return;
+            const checked = selectedSalaIds.includes(id);
+            const label = `${s.Nombre}${s.Lugar ? ` (${s.Lugar})` : ''}`;
+            cont.insertAdjacentHTML('beforeend', `
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" data-sala-id="${id}" id="inst-sala-${id}" ${checked ? 'checked' : ''}>
+                    <label class="form-check-label" for="inst-sala-${id}">${label}</label>
+                </div>
+            `);
+        });
+    }
+
+    const isGlobal = selectedSalaIds.length === 0;
+    scopeGlobal.checked = isGlobal;
+    wrap.classList.toggle('d-none', isGlobal);
+}

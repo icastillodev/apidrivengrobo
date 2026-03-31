@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservas de Sala - GROBO</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { background-color: #f0f2f1; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; }
+        .day-cell { width: 14.2857%; min-height: 86px; cursor: pointer; border: 1px solid rgba(0,0,0,.06); background:#fff; }
+        .day-cell.disabled { cursor: not-allowed; opacity: .4; background: #fafafa; }
+        .day-cell.available { background: rgba(25,135,84,.06); }
+        .day-cell.selected { outline: 2px solid #0d6efd; outline-offset: -2px; background: rgba(13,110,253,.06); }
+        .slot-btn { font-size: 12px; }
+        .pointer { cursor: pointer; }
+        #qrcode-buffer { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container py-4" style="max-width: 980px;">
+        <div class="bg-white p-3 rounded border shadow-sm mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <div class="fw-black text-dark" id="qr-sala-title" data-i18n="qr_sala.titulo">RESERVAS DE SALA</div>
+                <div class="small text-muted" id="qr-sala-subtitle" data-i18n="qr_sala.subtitulo">Ver disponibilidad y reservar</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                <div id="auth-zone"></div>
+                <button class="btn btn-sm btn-primary fw-bold d-none" id="btn-qr-etiqueta">
+                    <i class="bi bi-qr-code"></i> <span data-i18n="qr_sala.btn_etiqueta">ETIQUETA QR</span>
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold bg-light" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-globe"></i> <span id="current-lang-lbl">ES</span>
+                    </button>
+                    <ul class="dropdown-menu shadow-sm" style="min-width: auto;">
+                        <li><a class="dropdown-item small pointer" onclick="window.cambiarIdiomaQR('es')">Español</a></li>
+                        <li><a class="dropdown-item small pointer" onclick="window.cambiarIdiomaQR('en')">English</a></li>
+                        <li><a class="dropdown-item small pointer" onclick="window.cambiarIdiomaQR('pt')">Português</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="small text-muted fw-bold" data-i18n="qr_sala.sala">SALA</div>
+                        <div class="fw-black" id="sala-nombre">—</div>
+                        <div class="small text-muted" id="sala-lugar">—</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-light fw-bold" id="btn-prev-month"><i class="bi bi-chevron-left"></i> <span data-i18n="qr_sala.anterior">Anterior</span></button>
+                        <div class="fw-black text-uppercase small align-self-center" id="calendar-title">—</div>
+                        <button class="btn btn-sm btn-light fw-bold" id="btn-next-month"><span data-i18n="qr_sala.siguiente">Siguiente</span> <i class="bi bi-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="d-flex text-muted small fw-bold">
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_lu">LU</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_ma">MA</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_mi">MI</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_ju">JU</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_vi">VI</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_sa">SA</div>
+                    <div class="text-center" style="width:14.2857%" data-i18n="qr_sala.dow_do">DO</div>
+                </div>
+                <div id="calendar-grid" class="d-flex flex-wrap mt-1"></div>
+                <div class="small text-muted mt-2" data-i18n="qr_sala.hint">En verde: hay horarios libres. Ocupado: reservado.</div>
+
+                <hr class="my-3">
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="fw-bold small text-muted mb-2" data-i18n="qr_sala.disponibles">HORARIOS DISPONIBLES</div>
+                        <div id="slots-list" class="d-flex flex-wrap gap-2"></div>
+                        <div id="slots-empty" class="small text-muted d-none" data-i18n="qr_sala.sin_slots">Sin horarios libres.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="fw-bold small text-muted mb-2" data-i18n="qr_sala.ocupado">RESERVAS DEL DÍA</div>
+                        <div id="busy-list" class="d-flex flex-column gap-2"></div>
+                        <div id="busy-empty" class="small text-muted d-none" data-i18n="qr_sala.sin_busy">Sin reservas.</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button class="btn btn-outline-secondary fw-bold" id="btn-clear"><i class="bi bi-x-circle me-1"></i><span data-i18n="qr_sala.limpiar">Limpiar</span></button>
+                    <button class="btn btn-success fw-bold" id="btn-reservar" disabled><i class="bi bi-check-circle me-1"></i><span data-i18n="qr_sala.reservar">Reservar</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="qrcode-buffer"></div>
+
+    <div class="modal fade" id="modal-personalizar-qr-sala" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title fw-bold" data-i18n="qr_sala.modal_titulo">Personalizar Etiqueta</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_titulo">TÍTULO</label>
+                            <input type="text" id="qr-custom-title" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_texto">INDICACIÓN</label>
+                            <textarea id="qr-custom-text" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_tamano">TAMAÑO</label>
+                            <select id="qr-custom-size" class="form-select">
+                                <option value="chico" data-i18n="qr_sala.size_sm">Chico (5x5 cm)</option>
+                                <option value="mediano" selected data-i18n="qr_sala.size_md">Mediano (8x8 cm)</option>
+                                <option value="grande" data-i18n="qr_sala.size_lg">Grande (10x10 cm)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer p-2">
+                    <button class="btn btn-primary w-100 fw-bold" id="btn-gen-pdf" data-i18n="qr_sala.btn_generar_pdf">GENERAR PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { loadLanguage, translatePage } from './dist/js/utils/i18n.js';
+        import { initQRSalaPage } from './dist/js/pages/qr_sala.js?v=20260331';
+
+        window.cambiarIdiomaQR = (lang) => {
+            localStorage.setItem('lang', lang);
+            localStorage.setItem('idioma', lang);
+            window.location.reload();
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+            if (window.txt) translatePage();
+            initQRSalaPage();
+        });
+    </script>
+</body>
+</html>
+

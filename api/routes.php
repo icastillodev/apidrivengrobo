@@ -315,6 +315,45 @@ $router->post('/billing/ajustar-pago-insumo', 'BillingController@ajustarPagoInsu
 // Generación de PDF
 $router->get('/billing/generate-pdf-ficha', 'BillingController@generatePdfFicha');
 
+// ============================================================
+// SECCIÓN: Reservas (Usuario)
+// ============================================================
+$router->get('/user/reservas/salas', 'UserReservasController@getSalas');
+$router->get('/user/reservas/sala/bundle', 'UserReservasController@getSalaBundle');
+$router->get('/user/reservas/instrumentos/slot', 'UserReservasController@getInstrumentosDisponiblesSlot');
+$router->get('/user/reservas/mine', 'UserReservasController@getMisReservas');
+$router->post('/user/reservas/create', 'UserReservasController@createReserva');
+$router->post('/user/reservas/series/create', 'UserReservasSeriesController@createSerie');
+
+// ============================================================
+// SECCIÓN: Reservas (QR Sala - público)
+// ============================================================
+$router->get('/reservas/sala/public-bundle', 'PublicReservasController@getSalaPublicBundle');
+
+// ============================================================
+// SECCIÓN: Admin - QR Sala
+// ============================================================
+$router->post('/admin/config/reservas/sala/generar-qr', 'AdminConfigReservasController@generarQrSala');
+
+// ============================================================
+// SECCIÓN: Admin - Reservas (Agenda + Creación)
+// ============================================================
+$router->get('/admin/reservas/salas', 'AdminReservasController@getSalas');
+$router->get('/admin/reservas/sala/agenda', 'AdminReservasController@getSalaAgenda');
+$router->get('/admin/reservas/agenda', 'AdminReservasController@getAgenda');
+$router->post('/admin/reservas/create', 'AdminReservasController@createReserva');
+$router->post('/admin/reservas/update', 'AdminReservasController@updateReserva');
+$router->post('/admin/reservas/delete', 'AdminReservasController@deleteReserva');
+$router->get('/admin/reservas/pending/count', 'AdminReservasController@getPendingCount');
+$router->get('/admin/reservas/pending/list', 'AdminReservasController@getPendingList');
+$router->post('/admin/reservas/pending/approve', 'AdminReservasController@approveReserva');
+
+// ============================================================
+// SECCIÓN: Admin - Reservas (Series / Recurrencias)
+// ============================================================
+$router->post('/admin/reservas/series/create', 'AdminReservasSeriesController@createSerie');
+$router->post('/admin/reservas/series/cancel-one', 'AdminReservasSeriesController@cancelOcurrencia');
+
 // Ruta para extraer el historial contable / financiero (Auditoría específica)
 $router->get('/billing/audit-history', 'BillingController@getAuditHistory');
 
@@ -444,8 +483,11 @@ $router->post('/admin/config/reservas/sala/toggle', 'AdminConfigReservasControll
 $router->post('/admin/config/reservas/sala/global-type', 'AdminConfigReservasController@updateGlobalTimeType');
 
 $router->get('/admin/config/reservas/inst/all', 'AdminConfigReservasController@getAllInst');
+$router->get('/admin/config/reservas/inst/permitidas', 'AdminConfigReservasController@getInstSalasPermitidas');
 $router->post('/admin/config/reservas/inst/save', 'AdminConfigReservasController@saveInst');
 $router->post('/admin/config/reservas/inst/toggle', 'AdminConfigReservasController@toggleInst');
+$router->get('/admin/config/reservas/aprobacion/get', 'AdminConfigReservasController@getModoAprobacion');
+$router->post('/admin/config/reservas/aprobacion/set', 'AdminConfigReservasController@setModoAprobacion');
 
 
 

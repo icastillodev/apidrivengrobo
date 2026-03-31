@@ -152,7 +152,8 @@ class NotificationController {
                     'protocolos_red_incompletos' => (int)$countProtRedIncomplete,
                     'animales'   => (int)$countAni,
                     'reactivos'  => (int)$countRea,
-                    'insumos'    => (int)$countIns
+                    'insumos'    => (int)$countIns,
+                    'reservas'   => (int)$this->getReservasPendientesCount($instId)
                 ]
             ]);
 
@@ -167,12 +168,23 @@ class NotificationController {
                     'protocolos_red_incompletos' => 0,
                     'animales' => 0,
                     'reactivos' => 0,
-                    'insumos' => 0
+                    'insumos' => 0,
+                    'reservas' => 0
                 ],
                 'warning' => 'No se pudieron calcular notificaciones'
             ]);
         }
         exit;
+    }
+
+    private function getReservasPendientesCount($instId): int {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) AS c FROM reserva WHERE IdInstitucion = ? AND Aprobada = 0");
+            $stmt->execute([$instId]);
+            return (int)($stmt->fetch(\PDO::FETCH_ASSOC)['c'] ?? 0);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     private function tableExists(string $tableName): bool {

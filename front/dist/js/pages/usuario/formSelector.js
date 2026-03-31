@@ -82,7 +82,7 @@ function renderSedesList(sedes, isMulti) {
                     <div class="flex-grow-1 min-w-0">
                         <h5 class="fw-bold mb-1 text-dark institution-name-selector" style="font-size: 1.1rem; line-height: 1.3;">
                             ${sede.NombreCompletoInst} 
-                            ${labelText ? `<span class="badge bg-success bg-opacity-25 text-success border border-success ms-2 align-middle" style="font-size: 0.65rem;">${labelText}</span>` : ''}
+                            ${labelText ? `<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle ms-2 align-middle" style="font-size: 0.65rem;">${labelText}</span>` : ''}
                         </h5>
                         <span class="text-success fw-semibold text-uppercase d-inline-block mt-0" style="font-size: 0.8rem; letter-spacing: 0.5px;">
                             ${sede.NombreInst}
