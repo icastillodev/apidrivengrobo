@@ -1,14 +1,10 @@
 import { API } from '../../api.js';
+import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 
 let allSedes = []; 
 let currentInstId = null;
 // Obtenemos el nivel del usuario (1=Super, 2=Admin, 3=Investigador)
 const userRole = parseInt(localStorage.getItem('userLevel') || '3');
-
-// NUEVO: Calculamos la base de la URL dinámicamente para evitar problemas de carpetas relativas
-const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
-    ? '/URBE-API-DRIVEN/front/' 
-    : '/';
 
 export async function initFormSelector() {
     // 🚀 NUEVO: Limpiamos cualquier selección anterior por seguridad al entrar aquí
@@ -201,8 +197,8 @@ function createCard(title, iconClass, bgClass, modulePath, targetId) {
     </div>`;
 }
 
-// NUEVO: Función global que guarda el ID y hace la redirección limpia
+// Redirección al mismo destino que el menú (getCorrectPath → paginas/.../formularios/....html en localhost)
 window.irAFormulario = (modulePath, targetId) => {
     sessionStorage.setItem('target_inst_secreto', targetId);
-    window.location.href = basePath + modulePath;
+    window.location.href = getCorrectPath(modulePath);
 };

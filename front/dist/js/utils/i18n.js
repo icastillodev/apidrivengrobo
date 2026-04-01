@@ -113,9 +113,14 @@ const PATH_TO_TITLE_KEY = {
     'admin/configuracion/protocolos-config': 'config_protocolos',
     'admin/facturacion/index': 'facturacion', 'admin/facturacion/depto': 'facturacion_depto', 'admin/facturacion/investigador': 'facturacion_investigador',
     'admin/facturacion/protocolo': 'facturacion_protocolo', 'admin/historialcontable': 'historial_contable',
-    'admin/solicitud_protocolo': 'solicitud_protocolo', 'usuario/formularios': 'formularios', 'usuario/formularios/animales': 'formularios_animales',
-    'usuario/formularios/reactivos': 'formularios_reactivos', 'usuario/formularios/insumos': 'formularios_insumos', 'usuario/misformularios': 'mis_formularios',
-    'usuario/misprotocolos': 'mis_protocolos', 'usuario/misalojamientos': 'mis_alojamientos', 'usuario/misreservas': 'mis_reservas', 'usuario/perfil': 'perfil',
+    'admin/solicitud_protocolo': 'solicitud_protocolo', 'usuario/formularios': 'formularios', 'panel/formularios': 'formularios', 'usuario/formularios/animales': 'formularios_animales',
+    'usuario/formularios/reactivos': 'formularios_reactivos', 'usuario/formularios/insumos': 'formularios_insumos',     'usuario/misformularios': 'mis_formularios', 'panel/misformularios': 'mis_formularios',
+    'usuario/misprotocolos': 'mis_protocolos', 'panel/misprotocolos': 'mis_protocolos',
+    'usuario/misalojamientos': 'mis_alojamientos', 'panel/misalojamientos': 'mis_alojamientos',
+    'usuario/misreservas': 'mis_reservas', 'panel/misreservas': 'mis_reservas',
+    'usuario/mensajes': 'mensajes', 'panel/mensajes': 'mensajes', 'usuario/perfil': 'perfil', 'panel/perfil': 'perfil',
+    'panel/noticias': 'noticias_portal',
+    'admin/comunicacion/noticias': 'noticias_admin',
     'superadmin/dashboard': 'superadmin_dashboard', 'superadmin/instituciones': 'superadmin_instituciones',
     'superadmin/institucionformulario': 'superadmin_formulario', 'superadmin/usuarios_global': 'superadmin_usuarios', 'superadmin/bitacora': 'superadmin_dashboard',
     'registro': 'registro', 'recuperar': 'recuperar', 'confirmar': 'confirmar', 'resetear': 'resetear', 'error404': 'error404', 'construccion': 'construccion',
@@ -141,8 +146,23 @@ export function applyPageTitle() {
 function pathnameToKey(pathname) {
     let p = pathname.replace(/\.html$/, '').replace(/^\//, '');
     const idxPaginas = p.indexOf('paginas/');
-    if (idxPaginas !== -1) p = p.substring(idxPaginas + 8);
-    else if (p.includes('admin/') || p.includes('usuario/') || p.includes('superadmin/')) p = p.replace(/^[^/]*\//, '');
+    if (idxPaginas !== -1) {
+        p = p.substring(idxPaginas + 8);
+    } else {
+        const idxPanel = p.indexOf('panel/');
+        const idxAdmin = p.indexOf('admin/');
+        const idxUsuario = p.indexOf('usuario/');
+        const idxSuper = p.indexOf('superadmin/');
+        if (idxPanel !== -1) {
+            p = p.substring(idxPanel);
+        } else if (idxAdmin !== -1) {
+            p = p.substring(idxAdmin);
+        } else if (idxUsuario !== -1) {
+            p = p.substring(idxUsuario);
+        } else if (idxSuper !== -1) {
+            p = p.substring(idxSuper);
+        }
+    }
     const parts = p.split('/').filter(Boolean);
     return parts.length ? parts.join('/') : null;
 }

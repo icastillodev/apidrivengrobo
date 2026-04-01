@@ -52,9 +52,22 @@ async init() {
             this.hydrateSession();
 
             const path = window.location.pathname;
+
+            // Si el servidor entrega index.html (login) pero la URL es /.../panel/pagina sin /paginas/,
+            // Auth.init salía antes sin renderizar y quedaba "Validando...". Forzar HTML real.
+            if (path.includes('/panel/') && !path.includes('/paginas/')) {
+                const m = path.match(/\/panel\/([^/?]+)/);
+                if (m) {
+                    const page = String(m[1] || '').replace(/\.html$/i, '');
+                    if (page) {
+                        window.location.replace(`${this.getBasePath()}paginas/panel/${page}.html`);
+                        return;
+                    }
+                }
+            }
             
-            // ¡ESTO ES CLAVE! Ignorar validación de login en páginas enmascaradas y formularios
-            if (path.includes('/paginas/') || path.includes('/panel/') || path.includes('/admin/') || path.includes('/superadmin/') || path.includes('/formulario/') || path.includes('/construccion') ||path.includes('adm/login')  || path.includes('/qr/')) return;
+            // Ignorar validación de login en páginas bajo paginas/ y módulos que no usan este index
+            if (path.includes('/paginas/') || path.includes('/admin/') || path.includes('/superadmin/') || path.includes('/formulario/') || path.includes('/construccion') ||path.includes('adm/login')  || path.includes('/qr/')) return;
 
             // SUPERADMIN
             if (path.includes('admingrobogecko') || path.includes('superadmin_login.html')) {
@@ -375,6 +388,20 @@ autoRedirectIfLogged(role) {
         
         if (isLocalhost) {
             basePath = `/URBE-API-DRIVEN/front/`;
+            // Misma regla que getCorrectPath: HTML bajo paginas/ para no depender del rewrite nginx.
+            if (role === 1) {
+                if (this.slug === 'superadmin' || this.slug === 'master' || this.getVal('NombreInst') === 'SISTEMA GLOBAL') {
+                    window.location.href = `${basePath}paginas/superadmin/dashboard.html`;
+                } else {
+                    window.location.href = `${basePath}paginas/admin/dashboard.html`;
+                }
+                return;
+            }
+            const goAdmin = (role === 2 || role === 4);
+            window.location.href = goAdmin
+                ? `${basePath}paginas/admin/dashboard.html`
+                : `${basePath}paginas/panel/dashboard.html`;
+            return;
         }
 
         if (role === 1) {
@@ -384,8 +411,8 @@ autoRedirectIfLogged(role) {
                 window.location.href = `${basePath}admin/dashboard`;
             }
         } else {
-            // Role 3 ahora va a /panel/ en vez de /usuario/
-            const folder = (role === 3) ? 'panel' : 'admin';
+            const goAdmin = (role === 2 || role === 4);
+            const folder = goAdmin ? 'admin' : 'panel';
             window.location.href = `${basePath}${folder}/dashboard`;
         }
     },

@@ -49,8 +49,9 @@ try {
         let ids = [];
 
         // Si es SUPERADMIN / ADMIN (Roles 1, 2, 4), le forzamos a ver todo, sin preguntar a la API
+        // Incluye comunicación (204 mensajes, 205 noticias admin, 206 portal noticias) — mismo criterio que API /menu para otros roles.
         if (roleId === 1 || roleId === 2 || roleId === 4) {
-            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 998, 999];
+            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 998, 999];
         } 
 
     /*    if (roleId === 4 || roleId === 5 || roleId === 6) {
@@ -63,6 +64,10 @@ try {
             const resMenu = await API.request(`/menu?role=${roleId}&inst=${instId}`);
             if (resMenu && resMenu.status === "success") {
                 ids = (resMenu.data || []).map(id => Number(id));
+            }
+            // Investigador (3): sin entrada de mensajes (204); el desplegable 55 también se filtra en plantillas.
+            if (roleId === 3) {
+                ids = ids.filter((id) => id !== 204);
             }
         }
 
@@ -81,7 +86,7 @@ try {
                 if (el) el.remove();
             });
 
-            const templates = getMenuTemplates();
+            const templates = getMenuTemplates(roleId);
 
             if (menuLayout === 'menu_lateral') {
                 renderSideMenuStructure(document.body, ids, templates);

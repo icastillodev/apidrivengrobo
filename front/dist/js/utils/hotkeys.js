@@ -1,4 +1,5 @@
 import { Auth } from '../auth.js';
+import { getPanelOrUsuarioPaginasSegment } from '../components/menujs/MenuConfig.js';
 
 const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 const getCorrectPath = (rawPath) => {
@@ -94,16 +95,24 @@ export const HotkeyManager = {
         const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel'));
         const isAdmin = roleId === 1 || roleId === 2;
 
+        const usesAdminDashboard = () => {
+            const r = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+            return r === 1 || r === 2 || r === 4;
+        };
+        const seg = getPanelOrUsuarioPaginasSegment();
+
         const actions = {
             'k': () => document.getElementById('btn-hotkeys-help')?.click(),
             'd': () => {
-                const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel'));
-                const isAdmin = roleId === 1 || roleId === 2 || roleId === 4;
-                window.location.href = getCorrectPath(isAdmin ? 'admin/dashboard.html' : 'usuario/dashboard.html');
+                window.location.href = getCorrectPath(
+                    usesAdminDashboard() ? 'admin/dashboard.html' : 'panel/dashboard.html'
+                );
             },
             'qs': () => Auth.logout(),
-            'f': () => window.location.href = getCorrectPath('usuario/formularios.html'),
-            'p': () => window.location.href = getCorrectPath('usuario/misprotocolos.html'),
+            'q': () => window.location.href = getCorrectPath(`${seg}/misformularios.html`),
+            'f': () => window.location.href = getCorrectPath(`${seg}/formularios.html`),
+            'p': () => window.location.href = getCorrectPath(`${seg}/misprotocolos.html`),
+            'a': () => window.location.href = getCorrectPath(`${seg}/misalojamientos.html`),
             'v': () => document.getElementById('btn-voice-switch')?.click(),
             
             // Admin

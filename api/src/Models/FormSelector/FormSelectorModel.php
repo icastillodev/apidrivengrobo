@@ -33,8 +33,16 @@ class FormSelectorModel {
                     
                     COALESCE(MAX(
                         CASE 
-                            WHEN app.NombreModulo LIKE '%Reactivos%' AND ma.Habilitado = 1 AND ma.ActivoInvestigador = 1 THEN 2 
-                            WHEN app.NombreModulo LIKE '%Reactivos%' AND ma.Habilitado = 1 THEN 1 
+                            WHEN (
+                                app.NombreModulo LIKE '%Reactivos%'
+                                OR LOWER(COALESCE(app.NombreModulo, '')) LIKE '%reactivo%'
+                                OR LOWER(COALESCE(app.NombreModulo, '')) LIKE '%reagent%'
+                            ) AND ma.Habilitado = 1 AND ma.ActivoInvestigador = 1 THEN 2 
+                            WHEN (
+                                app.NombreModulo LIKE '%Reactivos%'
+                                OR LOWER(COALESCE(app.NombreModulo, '')) LIKE '%reactivo%'
+                                OR LOWER(COALESCE(app.NombreModulo, '')) LIKE '%reagent%'
+                            ) AND ma.Habilitado = 1 THEN 1 
                             ELSE 0 
                         END
                     ), 0) as flag_reactivos,

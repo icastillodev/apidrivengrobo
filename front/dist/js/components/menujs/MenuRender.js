@@ -271,7 +271,13 @@ function buildMenuItemHTML(id, layout, templates) {
         const childrenHTML = item.children.map(child => {
             const isSubActive = currentPath.includes(child.path);
             const childIcon = (child.svg) ? `<span class="dropdown-child-icon me-2 d-flex align-items-center" style="width: 18px; height: 18px;">${child.svg}</span>` : '';
-            return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${childIcon}${child.label}</a></li>`;
+            const badgeMenuId = child.badgeMenuId != null ? Number(child.badgeMenuId) : null;
+            const badgeHtml = badgeMenuId
+                ? `<span class="menu-icon position-relative d-inline-flex align-items-center justify-content-center flex-shrink-0 ms-1" data-menu-id="${badgeMenuId}" style="width:26px;height:22px;">
+                    <div class="notif-dot bg-danger text-white position-absolute" style="display:none;"></div>
+                </span>`
+                : '';
+            return `<li><a href="${getCorrectPath(child.path)}" class="dropdown-item-gecko d-flex align-items-center px-3 py-2 text-decoration-none text-body small ${isSubActive ? 'active-sub-link text-success fw-bold' : ''}" style="font-weight: 600;">${childIcon}<span class="flex-grow-1 text-truncate me-1">${child.label}</span>${badgeHtml}</a></li>`;
         }).join('');
 
         // 🚀 LA MAGIA ESTÁ AQUÍ: Construimos distinto si es Lateral o Superior

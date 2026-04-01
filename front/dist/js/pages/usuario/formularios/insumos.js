@@ -1,4 +1,5 @@
 import { API } from '../../../api.js';
+import { getPanelOrUsuarioPaginasSegment } from '../../../components/menujs/MenuConfig.js';
 
 let deptosList = [];
 let catalogInsumos = [];
@@ -194,7 +195,8 @@ function setupProtocolSearch() {
 }
 
 function getMisProtocolosUrl(hash = '') {
-    const url = `${window.location.origin}${basePath}paginas/usuario/misprotocolos.html`;
+    const seg = getPanelOrUsuarioPaginasSegment();
+    const url = `${window.location.origin}${basePath}paginas/${seg}/misprotocolos.html`;
     return hash ? `${url}${hash}` : url;
 }
 
@@ -394,7 +396,7 @@ async function handleSubmit(e) {
             const res = await API.request('/insumos-form/save', 'POST', payload);
             if (res.status === 'success') {
                 await Swal.fire('¡Enviado!', `El pedido #${res.id} ha sido registrado.`, 'success');
-                window.location.href = `${basePath}paginas/usuario/misformularios.html`;
+                window.location.href = `${basePath}paginas/${getPanelOrUsuarioPaginasSegment()}/misformularios.html`;
             } else {
                  Swal.fire('Error', res.message || 'Error desconocido', 'error');
             }

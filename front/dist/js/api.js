@@ -31,46 +31,17 @@ export const API = {
 
         try {
             const response = await fetch(url, config);
-
-            // --- 2. MANEJO DE EXPULSIÓN HTTP (401 / 403) ---
-            if (response.status === 401 || response.status === 403) {
-                console.warn("🔐 Seguridad: Sesión expirada o token inválido detectado por HTTP Status.");
-                // No expulsar automáticamente por código HTTP; algunos endpoints lo usan para errores de negocio.
-                return { status: 'error', message: 'Sesión expirada', http_status: response.status };
-            }
-            
             const text = await response.text();
-            
+
+            let resData;
             try {
-                const resData = JSON.parse(text);
-
-                // --- 3. MANEJO DE EXPULSIÓN LÓGICA (JSON Custom Error) ---
-                // Si el backend devuelve status unauthorized, o un error específico del JWT
-                const msg = String(resData?.message || '');
-                if (resData.status === 'unauthorized' || 
-                   (resData.status === 'error' && (
-                       msg.includes('token') || 
-                       msg.includes('expirado') || 
-                       msg.includes('credencial de seguridad') ||
-                       msg.includes('formato de token') ||
-                       msg.includes('adulterado')
-                   ))
-                ) {
-                    // Evitamos que salte en el propio login
-                    if (!endpoint.includes('/login') && !endpoint.includes('/validate-inst')) {
-                        console.warn(`🔐 Seguridad: Token rechazado por la API: ${resData.message}`);
-                        // En página de perfil no expulsar: SuperAdmin u otros roles pueden tener respuestas distintas
-                        if (!window.location.pathname.toLowerCase().includes('perfil') && !(isSuperadminPath && isUserConfigEndpoint) && !isRoleOne) {
-                            this.forceLogout();
-                        }
-                        return resData;
-                    }
+                resData = JSON.parse(text);
+            } catch (parseErr) {
+                if (response.status === 401 || response.status === 403) {
+                    console.warn('🔐 Respuesta no JSON en', response.status, endpoint);
+                    return { status: 'error', message: 'Sesión expirada', http_status: response.status };
                 }
-
-                return resData;
-
-            } catch (e) {
-                console.error("CRITICAL API ERROR (No JSON):", text);
+                console.error('CRITICAL API ERROR (No JSON):', text);
                 const raw = String(text || '').trim();
                 const plain = raw
                     .replace(/<[^>]*>/g, ' ')
@@ -79,6 +50,55 @@ export const API = {
                 const msg = (plain && plain.length > 0) ? plain.slice(0, 220) : 'Error crítico en el servidor';
                 return { status: 'error', message: msg };
             }
+
+            const msg = String(resData?.message || '');
+
+            // 403: muchos controladores lo usan para errores de negocio (permiso, validación). Respetar el JSON.
+            if (response.status === 403) {
+                return resData;
+            }
+
+            // 401: credenciales; aplicar lógica de expulsión si el mensaje es de token
+            if (response.status === 401) {
+                if (resData.status === 'unauthorized' ||
+                    (resData.status === 'error' && (
+                        msg.includes('token') ||
+                        msg.includes('expirado') ||
+                        msg.includes('credencial de seguridad') ||
+                        msg.includes('formato de token') ||
+                        msg.includes('adulterado')
+                    ))
+                ) {
+                    if (!endpoint.includes('/login') && !endpoint.includes('/validate-inst')) {
+                        console.warn(`🔐 Seguridad: Token rechazado por la API: ${resData.message}`);
+                        if (!window.location.pathname.toLowerCase().includes('perfil') && !(isSuperadminPath && isUserConfigEndpoint) && !isRoleOne) {
+                            this.forceLogout();
+                        }
+                    }
+                }
+                return resData;
+            }
+
+            // --- Manejo de expulsión lógica en cuerpo 200/4xx con mensaje de token ---
+            if (resData.status === 'unauthorized' ||
+                (resData.status === 'error' && (
+                    msg.includes('token') ||
+                    msg.includes('expirado') ||
+                    msg.includes('credencial de seguridad') ||
+                    msg.includes('formato de token') ||
+                    msg.includes('adulterado')
+                ))
+            ) {
+                if (!endpoint.includes('/login') && !endpoint.includes('/validate-inst')) {
+                    console.warn(`🔐 Seguridad: Token rechazado por la API: ${resData.message}`);
+                    if (!window.location.pathname.toLowerCase().includes('perfil') && !(isSuperadminPath && isUserConfigEndpoint) && !isRoleOne) {
+                        this.forceLogout();
+                    }
+                    return resData;
+                }
+            }
+
+            return resData;
         } catch (error) {
             console.error("Fallo de conexión:", error);
             return { status: 'error', message: 'Error de conexión con la API' };

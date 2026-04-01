@@ -56,21 +56,21 @@ export const GeckoCommands = {
 
         // --- ROL: USUARIO / INVESTIGADOR (Nivel 3) ---
         user: {
-            // Mis Cosas (Rutas personalizadas)
-            'protocolos': 'usuario/misprotocolos.html', 'protocols': 'usuario/misprotocolos.html',
-            'mis protocolos': 'usuario/misprotocolos.html',
+            // Mis cosas (panel investigador; roles 1/2/4 suelen usar rutas admin o usuario legacy)
+            'protocolos': 'panel/misprotocolos.html', 'protocols': 'panel/misprotocolos.html',
+            'mis protocolos': 'panel/misprotocolos.html',
             
-            'formularios': 'usuario/misformularios.html', 'forms': 'usuario/misformularios.html',
-            'mis formularios': 'usuario/misformularios.html',
+            'formularios': 'panel/misformularios.html', 'forms': 'panel/misformularios.html',
+            'mis formularios': 'panel/misformularios.html',
             
-            'alojamientos': 'usuario/misalojamientos.html', 'housing': 'usuario/misalojamientos.html',
-            'mis alojamientos': 'usuario/misalojamientos.html',
-            'cajas': 'usuario/misalojamientos.html',
+            'alojamientos': 'panel/misalojamientos.html', 'housing': 'panel/misalojamientos.html',
+            'mis alojamientos': 'panel/misalojamientos.html',
+            'cajas': 'panel/misalojamientos.html',
 
-            'reservas': 'usuario/construccion.html', 'bookings': 'usuario/construccion.html',
-            'mis reservas': 'usuario/construccion.html',
+            'reservas': 'panel/misreservas.html', 'bookings': 'panel/misreservas.html',
+            'mis reservas': 'panel/misreservas.html',
 
-            'perfil': 'usuario/perfil.html', 'profile': 'usuario/perfil.html'
+            'perfil': 'panel/perfil.html', 'profile': 'panel/perfil.html'
         }
     },
 

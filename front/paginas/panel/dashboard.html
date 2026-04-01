@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GROBO - Panel de Administración</title>
+    <title>GROBO - Panel de Investigador</title>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="../../dist/style/css/styles.css">
     <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
     <style>
-        /* Checklist: hover en cuadrantes del dashboard y clic lleva al módulo */
         #dashboard-grid .card.pointer.transition-hover {
             cursor: pointer;
         }
@@ -24,17 +23,18 @@
             transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
         }
     </style>
+</head>
 
-<body class="bg-gray-50 font-sans">
+<body class="bg-gray-50 font-sans" data-page-title-key="dashboard_usuario">
 
     <main class="container mx-auto mt-6 p-6">
         <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6">
             <div class="max-w-3xl">
                 <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                    <span data-i18n="admin_dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Colega</span>, <span data-i18n="admin_dashboard.bienvenido_grobo">Bienvenido a GROBO</span>
+                    <span data-i18n="dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Investigador</span><span data-i18n="dashboard.bienvenido">, Bienvenido al Bioterio</span>
                 </h1>
-                <p class="text-gray-500 font-medium leading-relaxed mb-0" data-i18n="admin_dashboard.panel_desc">
-                    Panel de gestión institucional <strong>GROBO</strong>. Utilice el menú de navegación para gestionar protocolos, revisar solicitudes y administrar la plataforma de manera integral.
+                <p class="text-gray-500 font-medium leading-relaxed mb-0">
+                    <span data-i18n="dashboard.panel_desc">Panel de investigador</span> <strong data-i18n="dashboard.grobo">GROBO</strong><span data-i18n="dashboard.panel_uso">. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.</span>
                 </p>
             </div>
         </section>
@@ -46,7 +46,7 @@
         <div class="row g-4" id="dashboard-grid">
             <div class="col-12 text-center text-muted py-5">
                 <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-3 fw-bold tracking-widest text-uppercase text-[10px]" data-i18n="admin_dashboard.cargando_metricas">Cargando métricas...</p>
+                <p class="mt-3 fw-bold tracking-widest text-uppercase text-[10px]" data-i18n="dashboard.cargando">Cargando módulos...</p>
             </div>
         </div>
     </main>
@@ -93,27 +93,25 @@
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
-        
-        showLoader();
-
         document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
-                if (window.txt) translatePage();
+            showLoader();
 
-                Auth.checkAccess([1, 2, 4, 5, 6]); 
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
+                if (window.txt) translatePage();
+                // Investigador, técnico y laboratorio (rutas panel según menú / inicio)
+                Auth.checkAccess([3, 5, 6]); 
 
                 const userName = localStorage.getItem('userName');
-                const instId = localStorage.getItem('instId');
-
                 const welcomeSpan = document.getElementById('welcome-name');
                 if (welcomeSpan) {
-                    const primerNombre = userName ? userName.split(' ')[0] : 'Admin';
+                    const t = window.txt?.dashboard;
+                    const primerNombre = userName ? userName.split(' ')[0] : (t?.hola || 'Investigador');
                     welcomeSpan.innerText = primerNombre;
                 }
 
-                // 🚀 FIX: INYECTAMOS LA VALIDACIÓN DEL ESCUDO
                 const secRes = await API.request('/auth/security-check', 'GET');
                 if (secRes && secRes.status === 'success') {
                     if (secRes.needsPass || secRes.needsEmail) {
@@ -143,11 +141,11 @@
                         if (btnContinueDefault) {
                             btnContinueDefault.onclick = () => {
                                 modalSec.hide();
-                                const d = window.txt?.dashboard;
+                                const t = window.txt?.dashboard;
                                 Swal.fire({
                                     icon: 'info',
-                                    title: d?.swal_continuaste || 'Continuaste con clave temporal',
-                                    text: d?.swal_volvera_pedir || 'Te lo volveremos a pedir al próximo ingreso.',
+                                    title: t?.swal_continuaste || 'Continuaste con clave temporal',
+                                    text: t?.swal_volvera_pedir || 'Te lo volveremos a pedir al próximo ingreso.',
                                     timer: 2200,
                                     showConfirmButton: false
                                 });
@@ -159,12 +157,12 @@
                             const pass = document.getElementById('sec-new-pass').value;
                             const conf = document.getElementById('sec-confirm-pass').value;
                             const email = document.getElementById('sec-email-input').value;
-                            const d = window.txt?.dashboard;
+                            const t = window.txt?.dashboard;
 
-                            if (secRes.needsPass && pass !== conf) return Swal.fire(d?.swal_error || 'Error', d?.pass_no_coinciden || 'Las contraseñas no coinciden', 'error');
-                            if (secRes.needsPass && pass.length < 6) return Swal.fire(d?.swal_error || 'Error', d?.pass_min_6 || 'La contraseña debe tener al menos 6 caracteres', 'error');
+                            if (secRes.needsPass && pass !== conf) return Swal.fire(t?.swal_error || 'Error', t?.pass_no_coinciden || 'Las contraseñas no coinciden', 'error');
+                            if (secRes.needsPass && pass.length < 6) return Swal.fire(t?.swal_error || 'Error', t?.pass_min_6 || 'La contraseña debe tener al menos 6 caracteres', 'error');
 
-                            Swal.fire({ title: d?.swal_procesando || 'Procesando...', didOpen: () => Swal.showLoading() });
+                            Swal.fire({ title: t?.swal_procesando || 'Procesando...', didOpen: () => Swal.showLoading() });
 
                             const payload = {};
                             if (secRes.needsPass) payload.pass = pass;
@@ -173,26 +171,26 @@
                             const upRes = await API.request('/auth/update-security', 'POST', payload);
                             if (upRes.status === 'success') {
                                 modalSec.hide();
-                                Swal.fire(d?.swal_listo || '¡Listo!', d?.swal_cuenta_asegurada || 'Tu cuenta ha sido asegurada exitosamente.', 'success');
+                                Swal.fire(t?.swal_listo || '¡Listo!', t?.swal_cuenta_asegurada || 'Tu cuenta ha sido asegurada exitosamente.', 'success');
                             } else {
-                                Swal.fire(d?.swal_error || 'Error', d?.swal_no_actualizar || 'No se pudo actualizar', 'error');
+                                Swal.fire(t?.swal_error || 'Error', t?.swal_no_actualizar || 'No se pudo actualizar', 'error');
                             }
                         };
                     }
-                }
-
-                if (instId) {
-                    API.request(`/maintenance?instId=${instId}`, 'GET').catch(() => {}); 
                 }
 
                 if (window.txt) {
                     initMenu();
                     NotificationManager.init();
                     
-                    import(`../../dist/js/pages/admin/dashboard.js?v=${Date.now()}`)
+                    import('../../dist/js/pages/usuario/dashboard.js')
                         .then(module => module.DashboardUI.init())
-                        .catch(e => console.error("Error al arrancar el motor del Dashboard:", e));
+                        .catch(e => console.error("Error al arrancar el motor del Dashboard de Usuario:", e));
                 }
+
+                setTimeout(() => {
+                    checkUrlParamsAndOpen();
+                }, 300);
 
             } catch (error) {
                 console.error("❌ Fallo en la inicialización de la página:", error);

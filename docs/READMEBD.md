@@ -1565,7 +1565,21 @@ ALTER TABLE reserva_sala
 ADD COLUMN IF NOT EXISTS QrToken VARCHAR(80) NULL,
 ADD UNIQUE KEY IF NOT EXISTS uq_reserva_sala_qr (QrToken);
 
+- - A) columnas + índices (esto sí puede llevar IF NOT EXISTS)
+ALTER TABLE reserva
+ADD COLUMN IF NOT EXISTS Aprobada TINYINT(1) NOT NULL DEFAULT 1,
+ADD COLUMN IF NOT EXISTS IdUsrAprobador INT NULL,
+ADD COLUMN IF NOT EXISTS FechaAprobada DATETIME NULL,
+ADD INDEX IF NOT EXISTS idx_reserva_aprobada (IdInstitucion, Aprobada),
+ADD INDEX IF NOT EXISTS idx_reserva_aprobador (IdUsrAprobador);
+- - B) FK (SIN IF NOT EXISTS). Ejecutarla solo si no existe aún.
+ALTER TABLE reserva
+ADD CONSTRAINT fk_reserva_aprobador
+FOREIGN KEY (IdUsrAprobador) REFERENCES usuarioe(IdUsrA)
+ON DELETE SET NULL;
 
+ALTER TABLE institucion
+ADD COLUMN IF NOT EXISTS ReservasRequierenAprobacion TINYINT(1) NOT NULL DEFAULT 0;
 
 va a tener los dias de la semana
 
@@ -1670,6 +1684,39 @@ Las columnas `totalpago` en las tablas de precio funcionan como acumuladores.
 Esta entidad resuelve el problema de "¿Quién aceptó este pago?".
 
 - Si hay un error de caja, no solo sabes qué usuario "pagó", sino qué administrador estaba logueado y dio el clic para aceptar ese dinero. Es un mecanismo de seguridad interno muy robusto.
+
+---
+
+## **Módulo Comunicación institucional (mensajería y noticias)**
+
+- **mensaje_hilo:**
+    - Tipo entidad: Maestra (institucion, usuarioe x2)
+    - Hilo de conversación **asíncrona** (tipo correo interno) entre **dos usuarios** de la **misma** `IdInstitucion`. El **asunto** es el título del hilo. Los campos `OrigenTipo` / `OrigenId` / `OrigenEtiqueta` permiten registrar si el hilo nació desde un formulario, alojamiento, aviso de correo, etc. (la app debe validar que `IdUsrParticipanteA` ≠ `IdUsrParticipanteB`).
+        - `*[***IdMensajeHilo** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Asunto** *(varchar(255)),* **IdUsrParticipanteA** *(int foranea usuarioe:IdUsrA),* **IdUsrParticipanteB** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaUltimoMensaje** *(datetime null),* **OrigenTipo** *(varchar(50) null),* **OrigenId** *(int null),* **OrigenEtiqueta** *(varchar(255) null)]*`
+
+- **mensaje:**
+    - Tipo entidad: Subordinada (mensaje_hilo, institucion, usuarioe)
+    - Cada **mensaje** del hilo: texto plano (sin adjuntos en v1), remitente y fecha. `IdInstitucion` se repite para consultas rápidas filtradas por institución (debe coincidir con el hilo).
+        - `*[***IdMensaje** *(int ai),* **IdMensajeHilo** *(int foranea mensaje_hilo:IdMensajeHilo),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUsrRemitente** *(int foranea usuarioe:IdUsrA),* **Cuerpo** *(text),* **FechaEnvio** *(datetime)]*`
+
+- **mensaje_leido:**
+    - Tipo entidad: Subordinada (mensaje, usuarioe)
+    - Marca **qué usuario** ya leyó **qué mensaje** (para contador de no leídos y bandeja). Clave compuesta `(IdMensaje, IdUsrLector)`.
+        - `*[***IdMensaje** *(int foranea mensaje:IdMensaje),* **IdUsrLector** *(int foranea usuarioe:IdUsrA),* **LeidoEn** *(datetime)]*`
+
+- **noticia:**
+    - Tipo entidad: Maestra (institucion, usuarioe)
+    - Noticia para **dashboard** / **portal** con paginación. `Alcance`: **local** (solo la institución) o **red** (visible según reglas de red; no se mezcla en el listado con las locales). `DependenciaRed` opcional alinea con `institucion.DependenciaInstitucion` cuando hace falta filtrar el grupo de red. `Publicado` y `FechaPublicacion` controlan visibilidad.
+        - `*[***IdNoticia** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Alcance** *(varchar(20): local|red),* **DependenciaRed** *(varchar(60) null),* **Titulo** *(varchar(255)),* **Cuerpo** *(text),* **Publicado** *(tinyint),* **FechaPublicacion** *(datetime null),* **IdUsrAutor** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaActualizacion** *(datetime null)]*`
+
+- **noticia_rol_publicar:**
+    - Tipo entidad: Relación (institucion, tipousuarioe)
+    - Define qué **roles** (`tipousuarioe`) pueden **crear/editar** noticias en cada institución (`Activo=1`). Complementa al menú dinámico (`menudistr`) para la pantalla de administración de noticias.
+        - `*[***IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdTipousrA** *(int foranea tipousuarioe:IdTipousrA),* **Activo** *(tinyint)]*`
+
+**Script SQL de creación:** `docs/migrations/20260401_mensajeria_noticias.sql`
+
+**Operativa (app y menú):** El endpoint de menú (`MenuController`) puede inyectar ítems **204** (mensajes), **206** (portal de noticias) y **205** (admin de noticias) según rol e institución, cruzando con `noticia_rol_publicar` donde aplica. El contador de no leídos del menú usa la misma lógica que `MensajeriaModel::countUnreadTotal`. Migraciones opcionales: `docs/migrations/20260402_menudistr_noticias_admin_ejemplo.sql`, `docs/migrations/20260403_noticia_rol_publicar_seed_opcional.sql`.
 
 ---
 

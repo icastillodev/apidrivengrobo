@@ -116,6 +116,27 @@ $router->post('/user/profile/update', 'UserProfileController@updateProfile');
 $router->post('/user/profile/change-password', 'UserProfileController@changePassword');
 
 // ============================================================
+// SECCIÓN: Comunicación institucional (mensajería + noticias)
+// ============================================================
+$router->get('/comunicacion/mensajes/destinatarios', 'MensajeriaController@getDestinatarios');
+$router->get('/comunicacion/mensajes/hilos', 'MensajeriaController@getHilos');
+$router->get('/comunicacion/mensajes/no-leidos', 'MensajeriaController@getUnreadCount');
+$router->get('/comunicacion/mensajes/hilo/:id', 'MensajeriaController@getHilo');
+$router->post('/comunicacion/mensajes/hilo/:id/leer', 'MensajeriaController@markHiloRead');
+$router->post('/comunicacion/mensajes/enviar', 'MensajeriaController@enviar');
+
+$router->get('/comunicacion/noticias', 'ComunicacionNoticiaController@getList');
+$router->get('/comunicacion/noticias/:id', 'ComunicacionNoticiaController@getOne');
+
+$router->get('/admin/comunicacion/noticias', 'AdminNoticiaController@list');
+$router->get('/admin/comunicacion/noticias/detail', 'AdminNoticiaController@getOne');
+$router->post('/admin/comunicacion/noticias', 'AdminNoticiaController@create');
+$router->post('/admin/comunicacion/noticias/update', 'AdminNoticiaController@update');
+$router->post('/admin/comunicacion/noticias/delete', 'AdminNoticiaController@delete');
+$router->get('/admin/comunicacion/noticias/roles-publicar', 'AdminNoticiaController@getRolesPublicar');
+$router->post('/admin/comunicacion/noticias/roles-publicar', 'AdminNoticiaController@setRolesPublicar');
+
+// ============================================================
 // SECCIÓN: Mis Alojamientos (Visor Usuario)
 // ============================================================
 $router->get('/user/my-housings', 'UserHousingController@getAll');

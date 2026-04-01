@@ -12,6 +12,12 @@ export const DashboardUI = {
             };
 
             this.renderAdminDashboard(stats);
+            try {
+                const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js');
+                await injectDashboardNoticias('dashboard-noticias-mount');
+            } catch (e) {
+                console.warn('Dashboard noticias:', e);
+            }
         } catch (error) {
             console.error("Error cargando el Dashboard:", error);
             const t = window.txt?.admin_dashboard;
@@ -29,6 +35,40 @@ export const DashboardUI = {
         const t = window.txt?.admin_dashboard;
 
         grid.innerHTML = `
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='../panel/mensajes'">
+                    <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+                        <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-chat-dots fs-2"></i>
+                        </div>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_mensajes || 'Mensajes'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_mensajes_desc || ''}</span>
+                    </div>
+                    <div class="card-footer bg-light border-0 p-0">
+                        <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='../panel/mensajes';">
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./comunicacion/noticias'">
+                    <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                            <i class="bi bi-newspaper fs-2"></i>
+                        </div>
+                        <h5 class="fw-black text-dark mb-1">${t?.card_noticias_admin || 'Noticias (administración)'}</h5>
+                        <span class="small text-muted fw-semibold">${t?.card_noticias_admin_desc || ''}</span>
+                    </div>
+                    <div class="card-footer bg-light border-0 p-0">
+                        <button class="btn btn-link text-muted text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-center align-items-center" onclick="event.stopPropagation(); window.location.href='./comunicacion/noticias';">
+                            <span style="font-size: 11px;" class="tracking-widest">${t?.btn_ir_modulo || 'IR AL MÓDULO'} <i class="bi bi-arrow-right ms-1"></i></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./protocolos'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">

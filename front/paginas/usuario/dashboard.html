@@ -39,6 +39,10 @@
             </div>
         </section>
 
+        <div class="container-fluid px-0 mb-4">
+            <div class="row g-3" id="dashboard-noticias-mount"></div>
+        </div>
+
         <div class="row g-4" id="dashboard-grid">
             <div class="col-12 text-center text-muted py-5">
                 <div class="spinner-border text-primary" role="status"></div>
@@ -97,7 +101,7 @@
             try {
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 if (window.txt) translatePage();
-                Auth.checkAccess([3]); 
+                Auth.checkAccess([3, 5, 6]); 
 
                 const userName = localStorage.getItem('userName');
                 const welcomeSpan = document.getElementById('welcome-name');

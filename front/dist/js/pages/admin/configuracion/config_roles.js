@@ -30,7 +30,10 @@ const MENU_DEFINITION = [
     { id: 6, name: "Administración de Reservas" },
     { id: 7, name: "Administración de Alojamientos" },
     { id: 8, name: "Estadísticas" },
-    { id: 202, name: "Módulo Contable" }
+    { id: 202, name: "Módulo Contable" },
+    { id: 204, i18n: 'menu_204' },
+    { id: 205, i18n: 'menu_205' },
+    { id: 206, i18n: 'menu_206' }
 ];
 
 export async function initConfigRoles() {
@@ -195,15 +198,19 @@ function renderMenuPermissions() {
     const container = document.getElementById('menu-list-container');
     container.innerHTML = '';
 
+    const trCfg = window.txt?.config_roles || {};
     MENU_DEFINITION.forEach(m => {
         const config = menuConfig.find(c => c.IdTipoUsrA == roleId && c.NombreMenu == m.id);
-        const isActive = config ? config.Activo == 1 : false;
+        // 204 y 206: sin fila en menudistr el API asume activo (misma regla que MenuController).
+        const defaultOn = m.id === 204 || m.id === 206;
+        const isActive = config ? config.Activo == 1 : defaultOn;
+        const label = m.i18n ? (trCfg[m.i18n] || m.id) : m.name;
 
         const item = document.createElement('div');
         item.className = "list-group-item d-flex justify-content-between align-items-center py-3";
         item.innerHTML = `
             <div class="fw-bold small text-secondary">
-                <span class="badge bg-light text-dark border me-2" style="width:35px; font-size: 10px;">${m.id}</span> ${m.name}
+                <span class="badge bg-light text-dark border me-2" style="width:35px; font-size: 10px;">${m.id}</span> ${label}
             </div>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" role="switch" 

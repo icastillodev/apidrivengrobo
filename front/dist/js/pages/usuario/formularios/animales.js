@@ -1,4 +1,5 @@
 import { API } from '../../../api.js';
+import { getPanelOrUsuarioPaginasSegment } from '../../../components/menujs/MenuConfig.js';
 
 let protocolsList = [];
 let speciesData = [];
@@ -100,7 +101,8 @@ export async function initAnimalForm() {
 }
 
 function getMisProtocolosUrl(hash = '') {
-    const url = `${window.location.origin}${basePath}paginas/usuario/misprotocolos.html`;
+    const seg = getPanelOrUsuarioPaginasSegment();
+    const url = `${window.location.origin}${basePath}paginas/${seg}/misprotocolos.html`;
     return hash ? `${url}${hash}` : url;
 }
 
@@ -642,7 +644,7 @@ async function submitOrder() {
                 confirmButtonColor: '#1a5d3b',
                 confirmButtonText: 'IR A MIS FORMULARIOS'
             });
-            window.location.href = `${basePath}paginas/usuario/misformularios.html`;
+            window.location.href = `${basePath}paginas/${getPanelOrUsuarioPaginasSegment()}/misformularios.html`;
         } else {
             Swal.fire('Error', res.message, 'error');
         }

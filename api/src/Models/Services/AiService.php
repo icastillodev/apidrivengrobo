@@ -16,21 +16,25 @@ class AiService {
     }
 
     public function analyzeAndExecute($prompt, $idInst, $idUsr, $rol) {
-        // Determinamos el prefijo de la ruta según el rol
-        $esAdmin = in_array($rol, [1, 2, 4, 5, 6]);
-        $tipoUsuario = $esAdmin ? "Administrador" : "Investigador";
-        
-        $rutas = $esAdmin ? "
-            - Formularios / Pedidos -> 'paginas/usuario/formularios.html'
+        $rol = (int)$rol;
+        // Búsqueda global: mismo criterio histórico (investigador puro = 3 usa searchForUser)
+        $esAdmin = in_array($rol, [1, 2, 4, 5, 6], true);
+
+        $esAdminSede = in_array($rol, [1, 2, 4], true);
+        $tipoUsuario = $esAdminSede ? 'Administrador' : 'Usuario institucional (panel)';
+
+        $rutas = $esAdminSede ? "
+            - Formularios / Centro de solicitudes -> 'paginas/panel/formularios.html'
             - Protocolos -> 'paginas/admin/protocolos.html'
             - Alojamientos -> 'paginas/admin/alojamientos.html'
             - Insumos -> 'paginas/admin/insumos.html'
             - Reactivos -> 'paginas/admin/reactivos.html'
             - Animales -> 'paginas/admin/animales.html'
         " : "
-            - Formularios / Pedidos -> 'paginas/usuario/misformularios.html'
-            - Protocolos -> 'paginas/usuario/misprotocolos.html'
-            - Alojamientos -> 'paginas/usuario/misalojamientos.html'
+            - Formularios / Mis pedidos -> 'paginas/panel/misformularios.html'
+            - Protocolos -> 'paginas/panel/misprotocolos.html'
+            - Alojamientos -> 'paginas/panel/misalojamientos.html'
+            - Reservas -> 'paginas/panel/misreservas.html'
         ";
 
     $systemInstruction = "
@@ -52,9 +56,9 @@ class AiService {
                ¡SILENCIO ESTRICTO!: En tu 'mensaje_texto' responde ÚNICA Y EXCLUSIVAMENTE con la frase 'Buscando los datos...'. PROHIBIDO leer o dictar el contenido de la búsqueda.
             
             2. NAVEGACIÓN Y CREACIÓN: Si pide ir a un módulo, usa 'navegacion' con la url. 
-               - Si pide CREAR o HACER un NUEVO Protocolo, envíalo a: 'admin/protocolos.html?action=nuevo' (si es admin) o 'usuario/misprotocolos.html?action=nuevo' (si es investigador).
+               - Si pide CREAR o HACER un NUEVO Protocolo, envíalo a: 'admin/protocolos.html?action=nuevo' (si es admin sede) o 'panel/misprotocolos.html?action=nuevo' (si es usuario de panel).
                - Si pide CREAR un NUEVO Alojamiento, envíalo a: 'admin/alojamientos.html?action=nuevo'.
-               - Si pide CREAR un Formulario/Pedido de Animales o Insumos, envíalo a: 'usuario/formularios.html'.
+               - Si pide CREAR un Formulario/Pedido de Animales o Insumos, envíalo a: 'panel/formularios.html'.
             3. SOPORTE TÉCNICO: Si pregunta CÓMO funciona algo (ej: '¿Por qué no puedo pedir animales?'), usa 'respuesta_directa'. 
                OJO: Usa la 'Lógica del Negocio' para responder. Sé breve (máximo 3 oraciones), amigable y muy claro.
 

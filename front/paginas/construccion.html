@@ -30,6 +30,11 @@
             if (!Auth.checkAccess([1, 2, 3])) return;
             await initMenu();
             NotificationManager.init();
+            const home = document.getElementById('btn-inicio-construccion');
+            if (home) {
+                const r = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+                home.setAttribute('href', (r === 1 || r === 2 || r === 4) ? 'admin/dashboard.html' : 'panel/dashboard.html');
+            }
         });
     </script>
 </head>
@@ -56,7 +61,7 @@
                     <i class="bi bi-arrow-left me-2"></i> <span data-i18n="construccion.btn_atras">VOLVER ATRÁS</span>
                 </button>
                 
-                <a href="usuario/dashboard.html" class="btn btn-success fw-bold px-4 shadow-sm">
+                <a href="panel/dashboard.html" id="btn-inicio-construccion" class="btn btn-success fw-bold px-4 shadow-sm">
                     <i class="bi bi-house-door me-2"></i> <span data-i18n="construccion.btn_inicio">IR AL INICIO</span>
                 </a>
             </div>

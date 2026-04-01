@@ -1,5 +1,6 @@
 import { GeckoVoice } from './GeckoVoice.js';
 import { GeckoSearchEngine } from './GeckoSearchEngine.js';
+import { getPanelOrUsuarioPaginasSegment } from './menujs/MenuConfig.js';
 
 export const GeckoSearch = {
     overlay: null,
@@ -287,10 +288,11 @@ export const GeckoSearch = {
         // (Formularios)
         if (data.formularios?.length > 0) {
             hasResults = true;
+            const misFormSeg = getPanelOrUsuarioPaginasSegment();
             html += `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">Pedidos & Formularios</div>`;
             data.formularios.forEach(f => {
                 html += `
-                    <a href="${basePath}paginas/usuario/misformularios.html?id=${f.idformA}&action=view" tabindex="${globalIndex++}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
+                    <a href="${basePath}paginas/${misFormSeg}/misformularios.html?id=${f.idformA}&action=view" tabindex="${globalIndex++}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
                         <span class="text-primary"><i class="bi bi-ui-checks fs-5"></i></span>
                         <div class="d-flex flex-column" style="overflow:hidden;">
                             <span class="fw-bold text-truncate text-dark" style="font-size: 13px;">Pedido #${f.idformA}</span>

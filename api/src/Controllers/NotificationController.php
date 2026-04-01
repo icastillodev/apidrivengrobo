@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Models\Comunicacion\MensajeriaModel;
+use App\Models\Comunicacion\NoticiaModel;
 use App\Utils\Auditoria;
 
 class NotificationController {
@@ -144,6 +146,34 @@ class NotificationController {
                 $countIns += (int)($stmtInsDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
             }
 
+            $countMensajes = 0;
+            if ($this->tableExists('mensaje') && $this->tableExists('mensaje_hilo') && $this->tableExists('mensaje_leido')) {
+                $countMensajes = $this->getMensajesNoLeidosCount((int)$sesion['userId']);
+            }
+
+            $noticiasDesde = isset($_GET['noticias_desde']) ? trim((string)$_GET['noticias_desde']) : '';
+            $countNoticiasNuevas = 0;
+            $countBorradores = 0;
+            if ($this->tableExists('noticia')) {
+                try {
+                    $nm = new NoticiaModel($this->db);
+                    $desdeSql = $noticiasDesde !== ''
+                        ? $noticiasDesde
+                        : date('Y-m-d H:i:s', strtotime('-7 days'));
+                    $tsDesde = strtotime($desdeSql);
+                    if ($tsDesde === false) {
+                        $desdeSql = date('Y-m-d H:i:s', strtotime('-7 days'));
+                    } else {
+                        $desdeSql = date('Y-m-d H:i:s', $tsDesde);
+                    }
+                    $countNoticiasNuevas = $nm->countPublicadasDesde((int)$instId, $desdeSql);
+                    $countBorradores = $nm->countBorradores((int)$instId);
+                } catch (\Throwable $e) {
+                    $countNoticiasNuevas = 0;
+                    $countBorradores = 0;
+                }
+            }
+
             echo json_encode([
                 'status' => 'success',
                 'data' => [
@@ -153,7 +183,10 @@ class NotificationController {
                     'animales'   => (int)$countAni,
                     'reactivos'  => (int)$countRea,
                     'insumos'    => (int)$countIns,
-                    'reservas'   => (int)$this->getReservasPendientesCount($instId)
+                    'reservas'   => (int)$this->getReservasPendientesCount($instId),
+                    'mensajes'   => (int)$countMensajes,
+                    'noticias_nuevas' => (int)$countNoticiasNuevas,
+                    'noticias_borradores' => (int)$countBorradores
                 ]
             ]);
 
@@ -169,12 +202,25 @@ class NotificationController {
                     'animales' => 0,
                     'reactivos' => 0,
                     'insumos' => 0,
-                    'reservas' => 0
+                    'reservas' => 0,
+                    'mensajes' => 0,
+                    'noticias_nuevas' => 0,
+                    'noticias_borradores' => 0
                 ],
                 'warning' => 'No se pudieron calcular notificaciones'
             ]);
         }
         exit;
+    }
+
+    private function getMensajesNoLeidosCount(int $userId): int {
+        try {
+            $model = new MensajeriaModel($this->db);
+
+            return $model->countUnreadTotal($userId);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     private function getReservasPendientesCount($instId): int {

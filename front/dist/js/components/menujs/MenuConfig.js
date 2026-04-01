@@ -13,14 +13,46 @@ const getBasePath = () => (window.location.hostname === 'localhost' || window.lo
 export function getCorrectPath(rawPath) {
     if (rawPath === 'logout') return 'javascript:Auth.logout();';
 
-    // MAGIA PURA: La base de la URL ya no incluye la carpeta "paginas"
     const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const basePath = isLocalhost ? '/URBE-API-DRIVEN/front/' : '/';
 
-    // Une la base limpia con la ruta que viene de MenuTemplates (ej: admin/usuarios)
+    // Localhost: rutas limpias tipo /front/panel/dashboard sin try_files nginx caen en index (login) y queda "Validando…".
+    // Forzar archivos reales bajo paginas/.
+    if (isLocalhost) {
+        // Animales / reactivos / insumos / reservas: los HTML viven solo en paginas/usuario/formularios/
+        // (no existe paginas/panel/formularios/*.html para investigadores).
+        if (rawPath.startsWith('panel/formularios/')) {
+            const sub = rawPath.slice('panel/formularios/'.length).replace(/\.html$/i, '');
+            return `${basePath}paginas/usuario/formularios/${sub}.html`;
+        }
+        const prefixes = ['panel/', 'admin/', 'usuario/', 'superadmin/'];
+        for (const p of prefixes) {
+            if (rawPath.startsWith(p)) {
+                const rest = rawPath.slice(p.length);
+                const folder = p.slice(0, -1);
+                const pathPart = /\.html$/i.test(rest) ? rest : `${rest}.html`;
+                return `${basePath}paginas/${folder}/${pathPart}`;
+            }
+        }
+    }
+
+    // Producción: mismos formularios de pedido bajo paginas/usuario/formularios/
+    if (rawPath.startsWith('panel/formularios/')) {
+        const sub = rawPath.slice('panel/formularios/'.length).replace(/\.html$/i, '');
+        return `${basePath}paginas/usuario/formularios/${sub}.html`;
+    }
+
     return basePath + rawPath;
 }
 
+/**
+ * Carpeta bajo paginas/ para módulos “mis …” y formularios de investigador.
+ * Alineado con menú / hotkeys: roles 1, 2, 4 → usuario; resto → panel.
+ */
+export function getPanelOrUsuarioPaginasSegment() {
+    const r = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    return (r === 1 || r === 2 || r === 4) ? 'usuario' : 'panel';
+}
 
 export function getRoleName(level) {
     if (window.txt && window.txt.roles) {
@@ -251,46 +283,6 @@ export const UserPreferences = {
         }
     }
 };
-
-// --- GESTIÓN DE NOTIFICACIONES ---
-export async function refreshMenuNotifications() {
-    const instId = getSession('instId');
-    if (!instId) return;
-
-    try {
-        const res = await API.request(`/menu/notifications?inst=${instId}`);
-        
-        if (res && res.status === "success" && res.data) {
-            updateBadge(2, res.data.protocolos || 0);
-            updateBadge(3, res.data.animales || 0);
-            updateBadge(4, res.data.reactivos || 0);
-            updateBadge(5, res.data.insumos || 0);
-        }
-    } catch (e) {
-        console.warn("Fallo en notificaciones:", e);
-    }
-}
-
-// --- FUNCIÓN INTERNA PARA PINTAR PUNTITOS (AGREGADA) ---
-function updateBadge(menuId, count) {
-    const iconContainer = document.querySelector(`.menu-icon[data-menu-id="${menuId}"]`);
-    if (!iconContainer) return;
-
-    let dot = iconContainer.querySelector('.notif-dot');
-    
-    if (count > 0) {
-        if (!dot) {
-            iconContainer.insertAdjacentHTML('beforeend', 
-                `<div class="notif-dot bg-danger text-white position-absolute d-flex align-items-center justify-content-center shadow-sm" style="display:flex;">${count}</div>`
-            );
-        } else {
-            dot.innerText = count;
-            dot.style.display = 'flex';
-        }
-    } else if (dot) {
-        dot.style.display = 'none';
-    }
-}
 
 // --- OTROS HELPERS GLOBALES ---
 export async function updateBreadcrumbInstitution() {
