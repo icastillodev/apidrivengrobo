@@ -35,6 +35,19 @@ function esc(str) {
         .replace(/</g, '&lt;');
 }
 
+/** Nombre del perfil en «Pueden publicar noticias» (sin superadmin ni investigador). */
+function noticiaRolDisplayName(idt, t) {
+    const cr = t || {};
+    const map = {
+        2: cr.rol_admin,
+        4: cr.rol_subadmin,
+        5: cr.rol_asistente,
+        6: cr.rol_laboratorio,
+        7: cr.rol_laboratorio
+    };
+    return map[idt] || `${cr.rol_generico || 'Rol'} ${idt}`;
+}
+
 const MENU_DEFINITION = [
     { id: 2, name: "Administración Protocolos" },
     { id: 3, name: "Admin. Formulario Animales" },
@@ -53,7 +66,7 @@ async function loadNoticiasRolesPublicar() {
     const roleLevel = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
     const bloque = document.getElementById('bloque-noticias-roles');
     const tbody = document.getElementById('noticias-roles-tbody');
-    if (!bloque || !tbody || ![1, 2].includes(roleLevel)) {
+    if (!bloque || !tbody || ![1, 2, 4].includes(roleLevel)) {
         return;
     }
 
@@ -63,13 +76,19 @@ async function loadNoticiasRolesPublicar() {
     }
 
     bloque.classList.remove('d-none');
-    tbody.innerHTML = res.data.map((r) => {
+    const cr = window.txt?.config_roles || {};
+    tbody.innerHTML = res.data
+        .filter((r) => {
+            const idt = parseInt(r.IdTipousrA, 10);
+            return idt !== 1 && idt !== 3;
+        })
+        .map((r) => {
         const idt = parseInt(r.IdTipousrA, 10);
         const activo = parseInt(r.Activo, 10) === 1;
-        const nombre = r.NombreCompleto || `Rol ${idt}`;
+        const nombre = esc(noticiaRolDisplayName(idt, cr));
         return `
             <tr>
-                <td class="ps-3">${esc(nombre)}</td>
+                <td class="ps-3">${nombre}</td>
                 <td class="text-center">
                     <div class="form-check form-switch d-inline-block">
                         <input class="form-check-input noticia-rol-pub-switch" type="checkbox" data-id="${idt}" ${activo ? 'checked' : ''}>
@@ -78,7 +97,6 @@ async function loadNoticiasRolesPublicar() {
             </tr>`;
     }).join('');
 
-    const cr = window.txt?.config_roles || {};
     tbody.querySelectorAll('.noticia-rol-pub-switch').forEach((inp) => {
         inp.addEventListener('change', async () => {
             const idt = parseInt(inp.getAttribute('data-id'), 10);
@@ -268,8 +286,8 @@ function renderMenuPermissions() {
     const trCfg = window.txt?.config_roles || {};
     MENU_DEFINITION.forEach(m => {
         const config = menuConfig.find(c => c.IdTipoUsrA == roleId && c.NombreMenu == m.id);
-        // 204 y 206: sin fila en menudistr el API asume activo (misma regla que MenuController).
-        const defaultOn = m.id === 204 || m.id === 206;
+        // 204: sin fila en menudistr el API asume activo (MenuController). 206 (portal) solo si está explícito Activo=1.
+        const defaultOn = m.id === 204;
         const isActive = config ? config.Activo == 1 : defaultOn;
         const label = m.i18n ? (trCfg[m.i18n] || m.id) : m.name;
 

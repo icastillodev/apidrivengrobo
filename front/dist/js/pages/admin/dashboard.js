@@ -38,7 +38,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='../panel/mensajes'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-secondary-subtle text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-chat-dots fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_mensajes || 'Mensajes'}</h5>
@@ -55,7 +55,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./comunicacion/noticias'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-newspaper fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_noticias_admin || 'Noticias (administración)'}</h5>
@@ -72,7 +72,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./protocolos'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-earmark-medical fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_protocolos || 'Protocolos'}</h5>
@@ -89,7 +89,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./animales'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-bug fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_animales || 'Pedidos de Animales'}</h5>
@@ -106,7 +106,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./reactivos'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-warning-subtle text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-eyedropper fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_reactivos || 'Reactivos Biológicos'}</h5>
@@ -123,7 +123,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./insumos'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-info-subtle text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-box-seam fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_insumos || 'Insumos'}</h5>
@@ -140,7 +140,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./alojamientos'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-secondary-subtle text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-houses-fill fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_alojamientos || 'Alojamientos'}</h5>
@@ -157,7 +157,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='./precios'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-currency-dollar fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t?.card_precios || 'Precios'}</h5>
@@ -174,7 +174,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-4">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden bg-dark text-white pointer transition-hover" onclick="window.location.href='./estadisticas'">
                     <div class="card-body p-4 d-flex flex-column justify-content-center align-items-center text-center h-100">
-                        <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 65px; height: 65px;">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" style="background-color: rgba(255, 255, 255, 0.25); width: 65px; height: 65px;">
                             <i class="bi bi-bar-chart-fill fs-1"></i>
                         </div>
                         <h5 class="fw-bold mb-1 tracking-tight">${t?.card_estadisticas || 'Estadísticas'}</h5>
@@ -191,7 +191,7 @@ export const DashboardUI = {
         const t = window.txt?.admin_dashboard;
         if (cantidad > 0) {
             return `
-                <div class="card-footer bg-danger bg-opacity-10 border-0 p-0 position-relative" style="z-index: 2;">
+                <div class="card-footer bg-danger-subtle border-0 p-0 position-relative" style="z-index: 2;">
                     <button class="btn btn-link text-danger text-decoration-none w-100 rounded-0 fw-bold py-3 d-flex justify-content-between align-items-center px-4" 
                             onclick="event.stopPropagation(); window.location.href='${urlUrgente}';">
                         <span style="font-size: 11px;" class="tracking-widest">${t?.btn_pedidos_responder || 'PEDIDOS PARA RESPONDER'}</span>

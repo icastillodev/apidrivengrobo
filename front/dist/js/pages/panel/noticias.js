@@ -22,21 +22,40 @@ function noticiaCategoriaBadgeHtml(r) {
     if (!name) return '';
     let v = String(r?.CategoriaBadge ?? 'primary').toLowerCase();
     if (!NOTICIA_BADGE_VARIANTS.includes(v)) v = 'primary';
-    return `<span class="badge text-bg-${v} ms-1" style="font-size:10px;vertical-align:middle;">${escapeHtml(name)}</span>`;
+    return `<span class="badge text-bg-${v}">${escapeHtml(name)}</span>`;
+}
+
+function textoExtracto(r) {
+    const raw = String(r?.CuerpoResumen ?? r?.Cuerpo ?? '').trim();
+    return raw.replace(/\s+/g, ' ');
+}
+
+function bindLeerMas(grid, onOpen) {
+    grid.querySelectorAll('[data-noticia-id]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            const id = parseInt(el.getAttribute('data-noticia-id'), 10);
+            if (id) onOpen(id);
+        });
+    });
 }
 
 export async function initPortalNoticias() {
     const t = window.txt?.comunicacion || {};
-    const pageSize = 10;
+    const pageSize = 6;
     let alcance = 'local';
+    let sort = 'fecha_desc';
+    let search = '';
     let page = 1;
     let total = 0;
+    let searchTimeout = null;
 
-    const tbody = document.getElementById('noticias-tbody');
+    const grid = document.getElementById('noticias-grid');
     const infoEl = document.getElementById('noticias-pag-info');
-    const btnPrev = document.getElementById('noticias-prev');
-    const btnNext = document.getElementById('noticias-next');
+    const pagUl = document.getElementById('noticias-pag');
+    const sortSel = document.getElementById('noticias-sort');
     const filtro = document.getElementById('filtro-alcance');
+    const searchInput = document.getElementById('noticias-search');
 
     const modalEl = document.getElementById('modal-noticia');
     let modal = null;
@@ -44,24 +63,109 @@ export async function initPortalNoticias() {
         modal = new window.bootstrap.Modal(modalEl);
     }
 
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                search = searchInput.value.trim();
+                page = 1;
+                cargarLista();
+            }, 400);
+        });
+    }
+
+    if (sortSel) {
+        const opts = [
+            ['fecha_desc', t.portal_sort_fecha_desc || ''],
+            ['fecha_asc', t.portal_sort_fecha_asc || ''],
+            ['titulo_asc', t.portal_sort_titulo_asc || ''],
+            ['titulo_desc', t.portal_sort_titulo_desc || '']
+        ];
+        sortSel.innerHTML = opts.map(([v, l]) => `<option value="${escapeHtml(v)}">${escapeHtml(l)}</option>`).join('');
+        sortSel.value = sort;
+        sortSel.addEventListener('change', () => {
+            sort = sortSel.value || 'fecha_desc';
+            page = 1;
+            cargarLista();
+        });
+    }
+
     function totalPages() {
         return Math.max(1, Math.ceil(total / pageSize));
     }
 
-    async function cargarLista(options = {}) {
-        const silent = options.silent === true;
-        if (!tbody) return;
-        if (!silent) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-muted p-3">${escapeHtml(t.msg_cargando || '')}</td></tr>`;
+    function renderPagination() {
+        if (!pagUl) return;
+        pagUl.innerHTML = '';
+        const tp = totalPages();
+        if (tp <= 1) return;
+
+        const maxBtns = 5;
+        let startPage = Math.max(1, page - Math.floor(maxBtns / 2));
+        let endPage = Math.min(tp, startPage + maxBtns - 1);
+        if (endPage - startPage + 1 < maxBtns) {
+            startPage = Math.max(1, endPage - maxBtns + 1);
         }
 
-        const res = await API.request(
-            `/comunicacion/noticias?alcance=${encodeURIComponent(alcance)}&page=${page}&pageSize=${pageSize}`,
-            'GET'
-        );
+        const addLi = (disabled, label, htmlInner, onClick) => {
+            const li = document.createElement('li');
+            li.className = `page-item${disabled ? ' disabled' : ''}`;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'page-link';
+            b.innerHTML = htmlInner;
+            b.setAttribute('aria-label', label);
+            if (!disabled && onClick) b.addEventListener('click', onClick);
+            li.appendChild(b);
+            pagUl.appendChild(li);
+        };
+
+        addLi(page <= 1, 'prev', '&laquo;', () => {
+            page -= 1;
+            cargarLista();
+        });
+
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item${i === page ? ' active' : ''}`;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'page-link';
+            b.textContent = String(i);
+            if (i !== page) {
+                b.addEventListener('click', () => {
+                    page = i;
+                    cargarLista();
+                });
+            }
+            li.appendChild(b);
+            pagUl.appendChild(li);
+        }
+
+        addLi(page >= tp, 'next', '&raquo;', () => {
+            page += 1;
+            cargarLista();
+        });
+    }
+
+    async function cargarLista(options = {}) {
+        const silent = options.silent === true;
+        if (!grid) return;
+        if (!silent) {
+            grid.innerHTML = `<div class="col-12 text-muted small py-5 text-center">${escapeHtml(t.msg_cargando || '')}</div>`;
+        }
+
+        const q = new URLSearchParams({
+            alcance,
+            page: String(page),
+            pageSize: String(pageSize),
+            sort,
+            search
+        });
+        const res = await API.request(`/comunicacion/noticias?${q.toString()}`, 'GET');
 
         if (res.status !== 'success' || !res.data) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-danger p-3">${escapeHtml(t.err_generico || '')}</td></tr>`;
+            grid.innerHTML = `<div class="col-12 text-danger small py-4">${escapeHtml(t.err_generico || '')}</div>`;
             return;
         }
 
@@ -69,25 +173,39 @@ export async function initPortalNoticias() {
         total = parseInt(res.data.total, 10) || 0;
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="3" class="text-muted p-3">${escapeHtml(t.dash_sin_noticias || '')}</td></tr>`;
+            grid.innerHTML = `<div class="col-12"><div class="card border-0 shadow-sm"><div class="card-body text-muted text-center py-5">${escapeHtml(t.dash_sin_noticias || '')}</div></div></div>`;
         } else {
-            tbody.innerHTML = rows.map((r) => {
-                const id = parseInt(r.IdNoticia, 10);
-                const fp = r.FechaPublicacion || r.FechaCreacion || '';
-                return `
-                    <tr class="noticia-row" style="cursor:pointer" data-id="${id}">
-                        <td class="text-muted text-nowrap">${escapeHtml(String(fp).substring(0, 16))}${noticiaCategoriaBadgeHtml(r)}</td>
-                        <td class="fw-semibold">${escapeHtml(r.Titulo || '—')}</td>
-                        <td class="text-end"><span class="text-success small">${escapeHtml(t.ver_mas || '')}</span></td>
-                    </tr>`;
-            }).join('');
-
-            tbody.querySelectorAll('.noticia-row').forEach((tr) => {
-                tr.addEventListener('click', () => {
-                    const id = parseInt(tr.getAttribute('data-id'), 10);
-                    if (id) abrirDetalle(id);
-                });
-            });
+            grid.innerHTML = rows
+                .map((r) => {
+                    const id = parseInt(r.IdNoticia, 10);
+                    const fp = r.FechaPublicacion || r.FechaCreacion || '';
+                    const badge = noticiaCategoriaBadgeHtml(r);
+                    const instRed =
+                        alcance === 'red' && String(r.NombreInstitucion || '').trim()
+                            ? `<span class="text-muted">${escapeHtml(r.NombreInstitucion)}</span>`
+                            : '';
+                    const extracto = escapeHtml(textoExtracto(r));
+                    const leer = escapeHtml(t.portal_leer_mas || t.ver_mas || '');
+                    return `
+                <div class="col d-flex">
+                    <article class="noticia-tarjeta card shadow-sm w-100 h-100">
+                        <div class="card-body d-flex flex-column p-4">
+                            <div class="noticia-meta d-flex flex-wrap align-items-center gap-2 text-muted mb-2">
+                                <time datetime="${escapeHtml(String(fp))}">${escapeHtml(formatFecha(fp))}</time>
+                                ${badge ? `<span class="d-flex align-items-center">${badge}</span>` : ''}
+                                ${instRed ? `<span class="d-none d-md-inline">·</span>${instRed}` : ''}
+                            </div>
+                            <h2 class="noticia-titulo fw-bold mb-2">${escapeHtml(r.Titulo || '—')}</h2>
+                            <p class="noticia-extracto small text-muted mb-3 flex-grow-1">${extracto || '—'}</p>
+                            <button type="button" class="btn btn-outline-success btn-sm fw-bold mt-auto align-self-start" data-noticia-id="${id}">
+                                ${leer} <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+                        </div>
+                    </article>
+                </div>`;
+                })
+                .join('');
+            bindLeerMas(grid, abrirDetalle);
         }
 
         if (infoEl) {
@@ -99,13 +217,22 @@ export async function initPortalNoticias() {
                 .replace('{total}', String(total));
         }
 
-        if (btnPrev) btnPrev.disabled = page <= 1;
-        if (btnNext) btnNext.disabled = page >= totalPages();
+        renderPagination();
+
+        if (!silent) {
+            try {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (e) {
+                window.scrollTo(0, 0);
+            }
+        }
 
         try {
             localStorage.setItem('grobo_noticias_vista_hasta', new Date().toISOString());
             NotificationManager.check();
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            /* ignore */
+        }
     }
 
     async function abrirDetalle(id) {
@@ -127,7 +254,7 @@ export async function initPortalNoticias() {
             const fechaTxt = escapeHtml(formatFecha(fp));
             const instTxt = escapeHtml(inst);
             const badge = noticiaCategoriaBadgeHtml(row);
-            meta.innerHTML = `<span>${fechaTxt}</span>${badge}${inst ? `<span class="text-muted"> · ${instTxt}</span>` : ''}`;
+            meta.innerHTML = `<span>${fechaTxt}</span>${badge ? ` ${badge}` : ''}${inst ? `<span class="text-muted"> · ${instTxt}</span>` : ''}`;
         }
         if (cuerpo) cuerpo.textContent = row.Cuerpo || '';
         modal?.show();
@@ -141,20 +268,6 @@ export async function initPortalNoticias() {
             btn.classList.add('active');
             cargarLista();
         });
-    });
-
-    btnPrev?.addEventListener('click', () => {
-        if (page > 1) {
-            page -= 1;
-            cargarLista();
-        }
-    });
-
-    btnNext?.addEventListener('click', () => {
-        if (page < totalPages()) {
-            page += 1;
-            cargarLista();
-        }
     });
 
     document.addEventListener('visibilitychange', async () => {

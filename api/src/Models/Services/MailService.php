@@ -99,6 +99,44 @@ class MailService {
         return $this->executeSend($to, $subject, $body);
     }
 
+    /**
+     * @param array<int, string> $logins
+     */
+    public function sendForgotUsernameEmail($to, $nombre, array $logins, $instName, $slug, $lang = 'es') {
+        $t = MailLang::get($lang);
+        $subject = $t['forgot_user_subject'] . ' - ' . strtoupper($instName);
+        $slug = is_string($slug) ? trim($slug) : '';
+        $loginLink = $slug !== ''
+            ? rtrim($this->getBaseUrl($slug), '/') . '/'
+            : rtrim($this->getBaseUrl(), '/') . '/index.html';
+
+        $items = '';
+        foreach ($logins as $u) {
+            $u = trim((string) $u);
+            if ($u === '') {
+                continue;
+            }
+            $items .= '<li style="margin:6px 0;font-weight:600;">' . htmlspecialchars($u) . '</li>';
+        }
+        $listBlock = $items !== ''
+            ? '<p style="margin:16px 0 8px;"><b>' . htmlspecialchars($t['forgot_user_list_intro']) . '</b></p><ul style="margin:0 0 16px 20px;padding:0;">' . $items . '</ul>'
+            : '';
+
+        $body = $this->getTemplate(
+            $t['forgot_user_title'],
+            $t['forgot_user_hello'] . ' <b>' . htmlspecialchars($nombre) . '</b>,<br><br>'
+            . $t['forgot_user_intro'] . ' <b>' . htmlspecialchars($instName) . '</b>.<br><br>'
+            . $listBlock
+            . $t['forgot_user_footer'],
+            $loginLink,
+            $t['forgot_user_btn'],
+            $instName,
+            $lang
+        );
+
+        return $this->executeSend($to, $subject, $body);
+    }
+
 public function executeSend($to, $subject, $body) {
         $mail = new PHPMailer(true);
         try {

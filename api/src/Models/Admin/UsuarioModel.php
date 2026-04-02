@@ -15,7 +15,8 @@ public function getAllGlobal() {
         $sql = "SELECT u.IdUsrA, u.UsrA, u.IdInstitucion, p.NombreA, p.ApellidoA, p.EmailA, 
                     COALESCE(i.NombreInst, 'Sin Asignar') as NombreInst, 
                     t.IdTipousrA AS IdTipoUsrA,
-                    a.ActivoA AS confirmado
+                    a.ActivoA AS confirmado,
+                    (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
                 FROM usuarioe u
                 LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
@@ -86,18 +87,30 @@ public function getAllGlobal() {
         return $res;
     }
 
-    public function existsUsername($username, $excludeId = null) {
-        $sql = "SELECT COUNT(*) FROM usuarioe WHERE UsrA = ?";
-        $params = [$username];
+    /**
+     * Mismo login no puede repetirse en la misma institución (sí en otra).
+     *
+     * @param string|int|null $excludeId IdUsrA a excluir (edición)
+     */
+    public function existsUsernameInInstitution($username, int $instId, $excludeId = null): bool {
+        $username = strtolower(trim((string) $username));
+        $username = preg_replace('/\s+/', '', $username);
+        if ($username === '' || $instId <= 0) {
+            return false;
+        }
 
-        if ($excludeId && $excludeId !== "undefined" && $excludeId !== "") {
-            $sql .= " AND IdUsrA != ?";
-            $params[] = (int)$excludeId;
+        $sql = 'SELECT COUNT(*) FROM usuarioe WHERE LOWER(TRIM(UsrA)) = ? AND IdInstitucion = ?';
+        $params = [$username, $instId];
+
+        if ($excludeId !== null && $excludeId !== '' && $excludeId !== 'undefined' && (int) $excludeId > 0) {
+            $sql .= ' AND IdUsrA != ?';
+            $params[] = (int) $excludeId;
         }
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchColumn() > 0;
+
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     /**

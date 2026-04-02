@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Admin\UsuarioModel;
 use App\Models\Services\MailService;
+use App\Models\User\UserModel;
 use App\Utils\Auditoria;
 
 class UsuarioController {
@@ -45,12 +46,28 @@ public function list() {
         try {
             Auditoria::getDatosSesion(); // Valida Token
 
-            if ($this->model->existsUsername($data['UsrA'])) {
+            $instId = (int) ($data['IdInstitucion'] ?? 0);
+            $userNorm = strtolower(trim(preg_replace('/\s+/', '', (string) ($data['UsrA'] ?? ''))));
+            $userRules = new UserModel($this->db);
+            if (!$userRules->isValidUsernameFormat($userNorm)) {
                 return $this->jsonOut([
-                    'status' => 'error', 
-                    'message' => 'El nombre de usuario ya fue tomado por otro bioterio.'
+                    'status' => 'error',
+                    'message' => 'username_invalid',
                 ], 400);
             }
+            if ($instId <= 0) {
+                return $this->jsonOut([
+                    'status' => 'error',
+                    'message' => 'Institución inválida.',
+                ], 400);
+            }
+            if ($this->model->existsUsernameInInstitution($userNorm, $instId)) {
+                return $this->jsonOut([
+                    'status' => 'error', 
+                    'message' => 'username_duplicate_institution',
+                ], 400);
+            }
+            $data['UsrA'] = $userNorm;
 
             $id = $this->model->createGlobal($data);
             $this->jsonOut(['status' => 'success', 'id' => $id]);
@@ -65,6 +82,19 @@ public function list() {
         $id = $_GET['id'] ?? null;
         try {
             Auditoria::getDatosSesion(); // Valida Token
+            $userNorm = strtolower(trim(preg_replace('/\s+/', '', (string) ($data['UsrA'] ?? ''))));
+            $instId = (int) ($data['IdInstitucion'] ?? 0);
+            $userRules = new UserModel($this->db);
+            if (!$userRules->isValidUsernameFormat($userNorm)) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'username_invalid'], 400);
+            }
+            if ($instId <= 0) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Institución inválida.'], 400);
+            }
+            if ($this->model->existsUsernameInInstitution($userNorm, $instId, $id)) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'username_duplicate_institution'], 400);
+            }
+            $data['UsrA'] = $userNorm;
             $this->model->updateGlobal($id, $data);
             $this->jsonOut(['status' => 'success']);
         } catch (\Exception $e) {
@@ -87,13 +117,21 @@ public function list() {
         if (ob_get_length()) ob_clean(); 
         header('Content-Type: application/json');
 
-        $username = $_GET['user'] ?? '';
-        $excludeId = $_GET['exclude'] ?? null; 
+        $username = strtolower(trim(preg_replace('/\s+/', '', (string) ($_GET['user'] ?? ''))));
+        $excludeId = $_GET['exclude'] ?? null;
+        $instId = isset($_GET['instId']) ? (int) $_GET['instId'] : 0;
 
         try {
-            // Este método NO tiene Auditoria::getDatosSesion() porque el frontend 
-            // lo usa durante el registro PÚBLICO donde el usuario aún no tiene token.
-            $isTaken = $this->model->existsUsername($username, $excludeId);
+            if ($instId <= 0) {
+                echo json_encode(['available' => false, 'message' => 'institution_required']);
+                exit;
+            }
+            $userRules = new UserModel($this->db);
+            if ($username !== '' && !$userRules->isValidUsernameFormat($username)) {
+                echo json_encode(['available' => false, 'message' => 'username_invalid']);
+                exit;
+            }
+            $isTaken = $username !== '' && $this->model->existsUsernameInInstitution($username, $instId, $excludeId);
             echo json_encode(['available' => !$isTaken]);
         } catch (\Exception $e) {
             http_response_code(500);

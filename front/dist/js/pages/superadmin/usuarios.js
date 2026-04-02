@@ -178,16 +178,18 @@ window.abrirModalEditar = (id) => {
 };
 
 window.guardarUsuario = async () => {
+    const t = window.txt?.superadmin_usuarios_global || {};
     const userInput = document.getElementById('UsrA');
-    
-    // NUEVA SEGURIDAD: Si el valider en vivo marcó el campo como inválido, frenamos el envío
+
     if (userInput.classList.contains('is-invalid')) {
-        return alert("Por favor, elegí un nombre de usuario que no esté en uso.");
+        return (window.mostrarNotificacion || alert)(t.save_error_username || 'Corrija el nombre de usuario antes de guardar.');
     }
 
     const id = document.getElementById('IdUsrA').value;
+    const usrNorm = (userInput.value || '').replace(/\s+/g, '').trim().toLowerCase();
+    userInput.value = usrNorm;
     const data = {
-        UsrA: userInput.value.trim(),
+        UsrA: usrNorm,
         NombreA: document.getElementById('NombreA').value,
         ApellidoA: document.getElementById('ApellidoA').value,
         EmailA: document.getElementById('EmailA').value,
@@ -203,6 +205,14 @@ window.guardarUsuario = async () => {
         modalUser.hide();
         cargarUsuarios();
         (window.mostrarNotificacion || alert)(id ? "Datos actualizados" : "Usuario creado (Clave: 12345678)");
+    } else {
+        let msg = res.message || 'Error';
+        if (msg === 'username_duplicate_institution') {
+            msg = t.user_taken_same_inst || msg;
+        } else if (msg === 'username_invalid') {
+            msg = t.username_invalid || msg;
+        }
+        (window.mostrarNotificacion || alert)(msg);
     }
 };
 
@@ -349,41 +359,65 @@ async function confirmarEliminacionTotal() {
 let debounceTimer;
 
 document.getElementById('UsrA').addEventListener('input', function() {
-    const username = this.value.trim();
+    const t = window.txt?.superadmin_usuarios_global || {};
+    let username = (this.value || '').replace(/\s+/g, '').toLowerCase();
+    if (this.value !== username) {
+        this.value = username;
+    }
     const feedback = document.getElementById('user-feedback');
     const icon = document.getElementById('user-status-icon');
     const input = this;
 
-    // Limpiamos estados previos
     clearTimeout(debounceTimer);
-    feedback.innerText = "";
+    feedback.innerText = '';
     input.classList.remove('is-invalid', 'is-valid');
     icon.classList.add('d-none');
 
-    if (username.length < 3) return; // No validar nombres muy cortos
+    if (username.length < 3) return;
 
-    icon.classList.remove('d-none'); // Mostrar spinner
+    const instId = document.getElementById('IdInstitucion').value;
+    if (!instId) {
+        feedback.innerText = t.institution_required_validation || 'Seleccione una institución.';
+        feedback.className = 'form-text smaller fw-bold mt-1 text-warning';
+        return;
+    }
+
+    icon.classList.remove('d-none');
 
     debounceTimer = setTimeout(async () => {
         try {
-            // Pasamos el ID actual por si estamos editando (para que no se valide a sí mismo)
             const currentId = document.getElementById('IdUsrA').value;
-            const res = await API.request(`/superadmin/usuarios/check-username?user=${username}&exclude=${currentId}`);
-            
-            icon.classList.add('d-none'); // Ocultar spinner
+            const res = await API.request(
+                `/superadmin/usuarios/check-username?user=${encodeURIComponent(username)}&exclude=${encodeURIComponent(currentId || '')}&instId=${encodeURIComponent(instId)}`
+            );
 
+            icon.classList.add('d-none');
+
+            if (res.message === 'username_invalid') {
+                input.classList.add('is-invalid');
+                feedback.innerText = '❌ ' + (t.username_invalid || 'Formato inválido');
+                feedback.className = 'form-text smaller fw-bold mt-1 text-danger';
+                return;
+            }
             if (res.available) {
                 input.classList.add('is-valid');
-                feedback.innerText = "✅ Disponible";
-                feedback.className = "form-text smaller fw-bold mt-1 text-success";
+                feedback.innerText = '✅ ' + (t.user_available || 'Disponible');
+                feedback.className = 'form-text smaller fw-bold mt-1 text-success';
             } else {
                 input.classList.add('is-invalid');
-                feedback.innerText = "❌ Ya está en uso por otro bioterio";
-                feedback.className = "form-text smaller fw-bold mt-1 text-danger";
+                feedback.innerText = '❌ ' + (t.user_taken_same_inst || 'Ya está en uso en esa institución');
+                feedback.className = 'form-text smaller fw-bold mt-1 text-danger';
             }
         } catch (err) {
             icon.classList.add('d-none');
-            console.error("Error en validación en vivo");
+            console.error('Error en validación en vivo', err);
         }
-    }, 400); // 400ms de espera
+    }, 400);
+});
+
+document.getElementById('IdInstitucion').addEventListener('change', () => {
+    const input = document.getElementById('UsrA');
+    const feedback = document.getElementById('user-feedback');
+    input.classList.remove('is-invalid', 'is-valid');
+    if (feedback) feedback.innerText = '';
 });

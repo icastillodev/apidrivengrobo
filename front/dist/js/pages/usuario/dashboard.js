@@ -31,7 +31,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='${hrefMensajes}'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-secondary-subtle text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-chat-dots fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_mensajes || 'Mensajes'}</h5>
@@ -48,7 +48,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='${hrefForm}'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-plus-square-dotted fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_nuevo_form || 'Nuevo Formulario'}</h5>
@@ -65,7 +65,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='${hrefMisForm}'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-success-subtle text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-ui-checks fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_mis_form || 'Mis Formularios'}</h5>
@@ -82,7 +82,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='${hrefMisProt}'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-info-subtle text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-medical fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_mis_prot || 'Mis Protocolos'}</h5>
@@ -99,7 +99,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.location.href='${hrefMisAloj}'">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-warning-subtle text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-houses fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_mis_aloj || 'Mis Alojamientos'}</h5>
@@ -116,7 +116,7 @@ export const DashboardUI = {
             <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden pointer transition-hover" onclick="window.openTarifarioPDFDashboard()">
                     <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
-                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
+                        <div class="bg-danger-subtle text-danger rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 65px; height: 65px;">
                             <i class="bi bi-file-earmark-pdf fs-2"></i>
                         </div>
                         <h5 class="fw-black text-dark mb-1">${t.card_precios || 'Precios'}</h5>

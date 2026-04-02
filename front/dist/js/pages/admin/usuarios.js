@@ -21,6 +21,16 @@ function getFormPageByCategoria(categoria = '') {
 }
 
 /** Escapa texto para uso en atributos HTML (sin usar regex dentro de templates). */
+function getAdminSessionRole() {
+    return parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+}
+
+/** Eliminar usuario (simple o total): solo roles 1 y 2 en admin sede. */
+function puedeEliminarUsuariosAdminSede() {
+    const r = getAdminSessionRole();
+    return r === 1 || r === 2;
+}
+
 function escapeHtmlAttr(str) {
     const s = String(str == null ? '' : str);
     return s.split('&').join('&amp;').split('"').join('&quot;').split('<').join('&lt;');
@@ -245,7 +255,13 @@ function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
         const arrow = (sortConfig.key === key && sortConfig.direction !== 'none') ? (sortConfig.direction === 'asc' ? ' ▲' : ' ▼') : '';
-        th.innerHTML = `${th.getAttribute('data-label')}${arrow}`;
+        let iconSpan = th.querySelector('.sort-icon');
+        if (!iconSpan) {
+            iconSpan = document.createElement('span');
+            iconSpan.className = 'sort-icon ms-1';
+            th.appendChild(iconSpan);
+        }
+        iconSpan.textContent = arrow;
     });
 }
 
@@ -310,15 +326,24 @@ function buildModalHtml(opts) {
     var protocolsUsed = opts.protocolsUsed, insumosPedidos = opts.insumosPedidos, insumosExpPedidos = opts.insumosExpPedidos;
     var disableLegend = opts.disableLegend, facturacionLegend = opts.facturacionLegend, eliminarLegend = opts.eliminarLegend;
     var puedeEliminar = opts.puedeEliminar, puedeFacturar = opts.puedeFacturar;
+    var puedeGestionEliminarUsuarios = opts.puedeGestionEliminarUsuarios === true;
     var rolNombre = opts.rolNombre || '';
+    var fechaCreacionStr = '---';
+    if (u.FechaCreacion) {
+        var parts = u.FechaCreacion.substring(0, 10).split('-');
+        if (parts.length === 3) fechaCreacionStr = parts[2] + '/' + parts[1] + '/' + parts[0];
+        else fechaCreacionStr = u.FechaCreacion.substring(0, 10);
+    }
 
     var html = '<div id="ficha-print-area" class="ficha-print-area">';
     html += '<div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4 ficha-print-header">';
     html += '<div class="fw-black text-success text-uppercase small">' + (instName || '') + '</div>';
     html += '<div class="text-muted small uppercase fw-bold">' + (t && t.ficha_title ? t.ficha_title : 'Ficha de Usuario N°') + ' ' + (u.IdUsrA || '') + '</div></div>';
     html += '<form id="form-usuario-detalle" class="ficha-datos-persona"><div class="row g-3">';
-    html += '<div class="col-12 bg-light p-3 rounded border-start border-4 border-success mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_usuario_sistema ? t.ficha_usuario_sistema : 'Usuario de Sistema') + '</label>';
+    html += '<div class="col-md-6 bg-light p-3 rounded border-start border-4 border-success mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_usuario_sistema ? t.ficha_usuario_sistema : 'Usuario de Sistema') + '</label>';
     html += '<input type="text" class="form-control-plaintext fw-bold h5 mb-0" value="' + (u.Usuario || '---') + '" readonly></div>';
+    html += '<div class="col-md-6 bg-light p-3 rounded mb-2"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_fecha_creacion ? t.ficha_fecha_creacion : 'Fecha de Creación') + '</label>';
+    html += '<div class="form-control-plaintext fw-bold h5 mb-0">' + fechaCreacionStr + '</div></div>';
     html += '<div class="col-12"><label class="text-muted small fw-bold text-uppercase">' + (t && t.ficha_tipo_usuario ? t.ficha_tipo_usuario : 'Tipo de usuario') + '</label>';
     html += '<div class="form-control-plaintext fw-bold border-0 px-0"><span class="badge bg-primary">' + (rolNombre || '—') + '</span></div></div>';
     html += '<div class="col-md-6"><label class="form-label text-muted small fw-bold uppercase">' + (t && t.ficha_apellido ? t.ficha_apellido : 'Apellido') + '</label><input type="text" name="ApellidoA" class="form-control form-control-sm fw-bold" value="' + (u.ApellidoA || '') + '"></div>';
@@ -346,14 +371,15 @@ function buildModalHtml(opts) {
     if (puedeEliminar) {
     html += '<button type="button" class="btn btn-outline-dark btn-sm fw-bold px-3 uppercase" onclick="deleteUser(' + (u.IdUsrA || '') + ')" title="' + (t && t.eliminar_leyenda ? t.eliminar_leyenda.replace(/"/g, '&quot;') : 'Solo se puede eliminar si es investigador y no tiene formularios, protocolos ni alojamientos') + '"><i class="bi bi-person-x"></i> ' + (t && t.btn_eliminar ? t.btn_eliminar : 'Eliminar') + '</button>';
     }
-    if (tieneDatosEliminar) {
+    if (tieneDatosEliminar && puedeGestionEliminarUsuarios) {
     html += '<button type="button" class="btn btn-outline-danger btn-sm fw-bold px-3 uppercase" onclick="abrirModalEliminacionTotalAdmin(' + (u.IdUsrA || '') + ')" title="' + (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda.replace(/"/g, '&quot;') : 'Elimina el perfil y todo lo asociado; requiere contraseña y código') + '"><i class="bi bi-trash"></i> ' + (t && t.btn_eliminacion_total ? t.btn_eliminacion_total : 'Eliminación total') + '</button>';
     }
     html += '<button type="button" class="btn btn-outline-primary btn-sm fw-bold px-3 uppercase" onclick="openBillingForUser(' + (u.IdUsrA || '') + ')"' + (puedeFacturar ? '' : ' disabled title="Sin protocolos ni pedidos de insumos"') + '><i class="bi bi-receipt"></i> ' + (t && t.btn_ver_facturacion ? t.btn_ver_facturacion : 'Ver Facturación') + '</button></div>';
     html += (facturacionLegend || '') + (disableLegend || '') + '</form>';
     var leyendaAcciones = '';
     if (puedeEliminar) leyendaAcciones = (t && t.eliminar_leyenda ? t.eliminar_leyenda : 'Eliminar: solo si no tiene datos asociados.');
-    else if (tieneDatosEliminar) leyendaAcciones = (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda : 'Eliminación total: borra perfil y todo lo asociado (protocolos, formularios, alojamientos).');
+    else if (tieneDatosEliminar && puedeGestionEliminarUsuarios) leyendaAcciones = (t && t.eliminacion_total_leyenda ? t.eliminacion_total_leyenda : 'Eliminación total: borra perfil y todo lo asociado (protocolos, formularios, alojamientos).');
+    else if (tieneDatosEliminar) leyendaAcciones = (t && t.delete_solo_superadmin ? t.delete_solo_superadmin : 'La eliminación de usuarios solo está disponible para perfiles Superadmin (roles 1 y 2).');
     else leyendaAcciones = (t && t.leyenda_acciones ? t.leyenda_acciones : '');
     html += '<div class="small text-muted mt-2 border-top pt-2">' + leyendaAcciones + '</div>';
     html += '<hr class="my-4 border-2 border-secondary"><div class="row g-3 mb-4">';
@@ -413,7 +439,8 @@ window.openUserModal = async (u) => {
     const insumosExpPedidos = resInsumosExpPedidos.status === 'success' ? (resInsumosExpPedidos.data || []) : [];
     const tienePedidosInsumos = formularios.some(function(f) { return (String(f.CategoriaFormulario || '').toLowerCase()).includes('insumo'); });
     const puedeFacturar = protocolos.length > 0 || tienePedidosInsumos;
-    const puedeEliminar = formularios.length === 0 && protocolos.length === 0 && alojamientos.length === 0 && (u.IdTipousrA == 3 || u.IdTipousrA === '3');
+    const puedeGestionEliminarUsuarios = puedeEliminarUsuariosAdminSede();
+    const puedeEliminar = puedeGestionEliminarUsuarios && formularios.length === 0 && protocolos.length === 0 && alojamientos.length === 0 && (u.IdTipousrA == 3 || u.IdTipousrA === '3');
     const isDisabled = String(u.ActivoA) === '0';
     const disableLegend = isDisabled ? '<div class="small text-danger mt-2"><i class="bi bi-info-circle me-1"></i>Usuario deshabilitado. Motivo: baja administrativa o deshabilitación previa.</div>' : '';
     const facturacionLegend = !puedeFacturar ? '<div class="small text-warning mt-2"><i class="bi bi-receipt me-1"></i>Ver facturación solo disponible si tiene protocolos a cargo o pedidos de formularios de insumos.</div>' : '';
@@ -437,6 +464,7 @@ window.openUserModal = async (u) => {
         facturacionLegend: facturacionLegend,
         eliminarLegend: eliminarLegend,
         puedeEliminar: puedeEliminar,
+        puedeGestionEliminarUsuarios: puedeGestionEliminarUsuarios,
         puedeFacturar: puedeFacturar,
         rolNombre: rolNombre
     });
@@ -528,6 +556,15 @@ window.openBillingForUser = (idUsr) => {
 };
 
 window.deleteUser = async (id) => {
+    const tAu = window.txt?.admin_usuarios || {};
+    if (!puedeEliminarUsuariosAdminSede()) {
+        const Swal0 = window.Swal;
+        const tit = tAu.delete_sin_permiso_rol_titulo || 'Sin permiso';
+        const txt = tAu.delete_sin_permiso_rol || 'Solo perfiles Superadmin (roles 1 y 2) pueden eliminar usuarios.';
+        if (Swal0) await Swal0.fire(tit, txt, 'warning');
+        else alert(txt);
+        return;
+    }
     const Swal = window.Swal;
     const data = window._lastUserFichaData;
     const u = data && data.u && String(data.u.IdUsrA) === String(id) ? data.u : null;
@@ -612,6 +649,10 @@ let adminDeletePreviewData = null;
 window.abrirModalEliminacionTotalAdmin = async function(id) {
     if (!id) return;
     const t = window.txt?.admin_usuarios || {};
+    if (!puedeEliminarUsuariosAdminSede()) {
+        (window.mostrarNotificacion || alert)(t.delete_sin_permiso_rol || 'Solo perfiles Superadmin (roles 1 y 2) pueden eliminar usuarios.');
+        return;
+    }
     try {
         const res = await API.request('/users/delete-preview?id=' + encodeURIComponent(id));
         if (res.status !== 'success' || !res.data) {
@@ -705,6 +746,10 @@ window.abrirModalEliminacionTotalAdmin = async function(id) {
 window.confirmarEliminacionTotalAdmin = async function() {
     if (!adminDeletePreviewUserId || !adminDeletePreviewData) return;
     const t = window.txt?.admin_usuarios || {};
+    if (!puedeEliminarUsuariosAdminSede()) {
+        (window.mostrarNotificacion || alert)(t.delete_sin_permiso_rol || 'Sin permiso.');
+        return;
+    }
     const password = document.getElementById('admin-delete-password');
     const codeEl = document.getElementById('admin-delete-code');
     const passwordVal = password ? password.value.trim() : '';

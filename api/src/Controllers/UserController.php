@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Admin\UsuarioModel;
+use App\Models\Auth\AuthModel;
 use App\Models\Services\MailService;
 use App\Models\User\UserModel;
 use App\Models\UserForms\UserFormsModel;
@@ -15,6 +16,14 @@ class UserController {
     public function __construct($db) {
         $this->db = $db;
         $this->model = new UserModel($db);
+    }
+
+    /** Solo roles 1 y 2 (superadmin sistema / superadmin) pueden eliminar usuarios en admin sede. */
+    private function assertMayDeleteUsers(array $sesion): void {
+        $r = (int) ($sesion['role'] ?? 0);
+        if ($r !== 1 && $r !== 2) {
+            throw new \Exception('Sin permiso para eliminar usuarios.');
+        }
     }
 
     public function index() {
@@ -253,6 +262,7 @@ class UserController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertMayDeleteUsers($sesion);
             $input = json_decode(file_get_contents('php://input'), true);
             $id = (int)($input['id'] ?? 0);
             $password = trim($input['password'] ?? '');
@@ -357,6 +367,7 @@ class UserController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertMayDeleteUsers($sesion);
             $id = (int)($_GET['id'] ?? 0);
             if ($id <= 0) {
                 echo json_encode(['status' => 'error', 'message' => 'ID inválido.']);
@@ -412,6 +423,7 @@ class UserController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertMayDeleteUsers($sesion);
             $input = json_decode(file_get_contents('php://input'), true);
             $id = (int)($input['id'] ?? 0);
             $password = trim($input['password'] ?? '');
@@ -487,7 +499,12 @@ class UserController {
             echo json_encode(['status' => 'error', 'message' => 'Datos de registro vacíos']);
             exit;
         }
-        $data['usuario'] = isset($data['usuario']) && is_string($data['usuario']) ? strtolower(trim($data['usuario'])) : ($data['usuario'] ?? '');
+        if (isset($data['EmailA']) && is_string($data['EmailA'])) {
+            $data['EmailA'] = strtolower(trim($data['EmailA']));
+        }
+        if (isset($data['usuario']) && is_string($data['usuario'])) {
+            $data['usuario'] = strtolower(trim(preg_replace('/\s+/', '', $data['usuario'])));
+        }
 
         $res = $this->model->registerUser($data);
 
@@ -537,32 +554,120 @@ class UserController {
     public function checkUsername() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $user = isset($_GET['user']) && is_string($_GET['user']) ? strtolower(trim($_GET['user'])) : '';
-        echo json_encode(['available' => !$this->model->existsUsername($user)]);
+        $user = isset($_GET['user']) && is_string($_GET['user']) ? strtolower(trim(preg_replace('/\s+/', '', $_GET['user']))) : '';
+        $instId = isset($_GET['instId']) ? (int) $_GET['instId'] : 0;
+        if ($instId <= 0) {
+            echo json_encode(['available' => false, 'message' => 'institution_required']);
+            exit;
+        }
+        if ($user !== '' && !$this->model->isValidUsernameFormat($user)) {
+            echo json_encode(['available' => false, 'message' => 'username_invalid']);
+            exit;
+        }
+        $taken = $user !== '' && $this->model->existsUsernameInInstitution($user, $instId);
+        echo json_encode(['available' => !$taken]);
         exit;
+    }
+
+    /**
+     * Resuelve IdInstitucion y slug a partir del payload (IdInstitucion o slug de institución).
+     *
+     * @return array{0: int, 1: string, 2: ?string} [instId, slug, errorMessage]
+     */
+    private function resolveInstForRecovery(array $data): array {
+        $instId = isset($data['IdInstitucion']) ? (int) $data['IdInstitucion'] : 0;
+        $slug = isset($data['slug']) ? trim((string) $data['slug']) : '';
+        if ($instId > 0) {
+            return [$instId, $slug, null];
+        }
+        if ($slug === '') {
+            return [0, '', 'Falta institución (slug o IdInstitucion).'];
+        }
+        $auth = new AuthModel($this->db);
+        $row = $auth->getInstitucionBySlug($slug);
+        if (!$row) {
+            return [0, $slug, 'Institución no encontrada.'];
+        }
+
+        return [(int) $row['IdInstitucion'], $slug, null];
     }
 
     public function forgotPassword() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = json_decode(file_get_contents("php://input"), true) ?: [];
         if (isset($data['user']) && is_string($data['user'])) {
             $data['user'] = strtolower(trim($data['user']));
         }
-        $user = $this->model->getUserForRecovery($data['email'], $data['user'], $data['IdInstitucion']);
+        [$instId, $slug, $err] = $this->resolveInstForRecovery($data);
+        if ($err !== null) {
+            echo json_encode(['status' => 'error', 'message' => $err]);
+            exit;
+        }
+        if ($slug === '' && !empty($data['slug'])) {
+            $slug = trim((string) $data['slug']);
+        }
+
+        $user = $this->model->getUserForRecovery($data['email'] ?? '', $data['user'] ?? '', $instId);
 
         if ($user) {
             $token = bin2hex(random_bytes(32));
             $this->model->saveResetToken($user['IdUsrA'], $token);
-            $instInfo = $this->model->getInstitutionName($data['IdInstitucion']);
-            $instName = strtoupper(str_replace('APP ', '', $instInfo['NombreInst']));
+            $instInfo = $this->model->getInstitutionName($instId);
+            $instName = strtoupper(str_replace('APP ', '', $instInfo['NombreInst'] ?? ''));
 
-            $mailSent = (new MailService())->sendResetPasswordEmail($data['email'], $user['NombreA'], $token, $instName, $data['slug'], $data['lang'] ?? 'es');
+            $mailSent = (new MailService())->sendResetPasswordEmail($data['email'], $user['NombreA'], $token, $instName, $slug, $data['lang'] ?? 'es');
             Auditoria::logManual($this->db, $user['IdUsrA'], 'RECOVERY_REQ', 'usuarioe', "Solicitó recuperación de contraseña");
             echo json_encode(['status' => 'success', 'mail' => $mailSent]);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Los datos no coinciden.']);
         }
+        exit;
+    }
+
+    /**
+     * Envía por correo el/los nombre(s) de usuario asociados al email en la institución.
+     * Respuesta genérica siempre exitosa (no filtra si existe cuenta).
+     */
+    public function forgotUsername() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $email = isset($data['email']) ? trim((string) $data['email']) : '';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['status' => 'error', 'message' => 'Correo no válido.']);
+            exit;
+        }
+        [$instId, $slug, $err] = $this->resolveInstForRecovery($data);
+        if ($err !== null) {
+            echo json_encode(['status' => 'error', 'message' => $err]);
+            exit;
+        }
+        if ($slug === '' && !empty($data['slug'])) {
+            $slug = trim((string) $data['slug']);
+        }
+
+        $rows = $this->model->getLoginsByEmailAndInst($email, $instId);
+        if (!empty($rows)) {
+            $nombre = (string) ($rows[0]['NombreA'] ?? '');
+            $logins = array_values(array_unique(array_filter(array_map(static function ($r) {
+                return isset($r['UsrA']) ? trim((string) $r['UsrA']) : '';
+            }, $rows))));
+            $instInfo = $this->model->getInstitutionName($instId);
+            $instName = strtoupper(str_replace('APP ', '', $instInfo['NombreInst'] ?? ''));
+            (new MailService())->sendForgotUsernameEmail($email, $nombre, $logins, $instName, $slug, $data['lang'] ?? 'es');
+            foreach ($rows as $r) {
+                $uid = (int) ($r['IdUsrA'] ?? 0);
+                if ($uid <= 0) {
+                    continue;
+                }
+                Auditoria::logManual($this->db, $uid, 'RECOVERY_USER_REQ', 'usuarioe', 'Solicitó recordatorio de nombre de usuario por correo');
+            }
+            echo json_encode(['status' => 'success']);
+            exit;
+        }
+
+        echo json_encode(['status' => 'success']);
         exit;
     }
 

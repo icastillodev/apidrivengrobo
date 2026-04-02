@@ -10,6 +10,10 @@ class AuthModel {
     }
 
     public function getInstitucionBySlug($slug) {
+        $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
+        if ($slug === '') {
+            return false;
+        }
         $stmt = $this->db->prepare("SELECT * FROM institucion WHERE LOWER(NombreInst) = LOWER(?) LIMIT 1");
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);

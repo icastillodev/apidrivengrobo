@@ -2,6 +2,20 @@ import { getUserDisplayText, getCorrectPath } from './MenuConfig.js';
 
 const getBasePath = () => (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
+/**
+ * Indica si la URL actual corresponde a una entrada del menú (ruta relativa tipo panel/noticias).
+ * Evita falsos positivos de String.includes (ej. panel/mensajes activa también panel/mensajes_institucion).
+ */
+function pathMatchesMenuRoute(pathname, menuRelativePath) {
+    const path = String(pathname || '').split('?')[0].replace(/\\/g, '/');
+    const raw = String(menuRelativePath || '').trim().replace(/^\//, '');
+    if (!raw || raw === '#') return false;
+    const route = raw.replace(/\.html$/i, '');
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(?:^|/)${escaped}(?:\\.html)?(?:$|[?#])`, 'i');
+    return re.test(path);
+}
+
 function getDashboardPath() {
     const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0');
     return (roleId === 1 || roleId === 2 || roleId === 4) ? getCorrectPath('admin/dashboard') : getCorrectPath('panel/dashboard');
@@ -247,9 +261,8 @@ function buildMenuItemHTML(id, layout, templates) {
     const path = item.path ? getCorrectPath(item.path) : '#';
     const isSide = layout === 'side';
     
-    // Detectamos si la URL actual coincide con el enlace para pintarlo de verde
     const currentPath = window.location.pathname;
-    const isActive = (item.path !== '#' && currentPath.includes(item.path));
+    const isActive = item.path !== '#' && pathMatchesMenuRoute(currentPath, item.path);
     
     const liClass = isSide ? 'nav-item mb-1 w-100 position-relative group-gecko-item' : 'nav-item position-relative';
     
@@ -263,13 +276,13 @@ function buildMenuItemHTML(id, layout, templates) {
     const labelHTML = `<div class="position-relative d-inline-block"><span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span></div>`;
 
     if (item.isDropdown && item.children) {
-        // Auto-abrir o marcar si uno de sus hijos es la página actual
-        const isChildActive = item.children.some(c => currentPath.includes(c.path));
-        const activeDropClass = isChildActive ? 'active-gecko-link' : ''; 
+        // Auto-abrir o marcar si uno de sus hijos es la página actual.
+        // Solo resaltamos la fila hija (active-sub-link), no el padre del desplegable.
+        const activeDropClass = ''; 
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="12" height="12" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease; flex-shrink: 0;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
         
         const childrenHTML = item.children.map(child => {
-            const isSubActive = currentPath.includes(child.path);
+            const isSubActive = pathMatchesMenuRoute(currentPath, child.path);
             const childIcon = (child.svg) ? `<span class="dropdown-child-icon me-2 d-flex align-items-center" style="width: 18px; height: 18px;">${child.svg}</span>` : '';
             const badgeMenuId = child.badgeMenuId != null ? Number(child.badgeMenuId) : null;
             const badgeHtml = badgeMenuId

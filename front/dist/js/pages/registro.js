@@ -47,16 +47,16 @@ export async function initRegistro() {
     const confirmInput = document.getElementById('reg-pass-confirm');
     const btnSubmit = document.getElementById('btn-finalizar');
 
-    // Evitar pegar o escribir espacios en el usuario
+    // Sin espacios; todo en minúsculas (mismo criterio que el login)
     userInput.addEventListener('input', () => {
-        const raw = userInput.value;
-        if (/\s/.test(raw)) {
-            userInput.value = raw.replace(/\s/g, '');
+        let raw = userInput.value.replace(/\s/g, '').toLowerCase();
+        if (userInput.value !== raw) {
+            userInput.value = raw;
         }
     });
     userInput.addEventListener('paste', (e) => {
         e.preventDefault();
-        const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\s/g, '');
+        const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\s/g, '').toLowerCase();
         const start = userInput.selectionStart;
         const end = userInput.selectionEnd;
         userInput.value = userInput.value.substring(0, start) + text + userInput.value.substring(end);
@@ -68,11 +68,11 @@ export async function initRegistro() {
     userInput.addEventListener('keyup', () => {
         clearTimeout(typingTimer);
         // Quitar espacios en tiempo real
-        const raw = userInput.value;
-        if (/\s/.test(raw)) {
-            userInput.value = raw.replace(/\s/g, '');
+        let raw = userInput.value.replace(/\s/g, '').toLowerCase();
+        if (userInput.value !== raw) {
+            userInput.value = raw;
         }
-        const val = userInput.value.trim().toLowerCase();
+        const val = userInput.value.trim();
         
         if (val.length < 3) {
             hideUserFeedback();
@@ -82,13 +82,30 @@ export async function initRegistro() {
         }
 
         typingTimer = setTimeout(async () => {
-            const userLower = val.toLowerCase();
-            const res = await API.request(`/check-username?user=${encodeURIComponent(userLower)}`);
-            isUserValid = res.available;
-            
-            // Feedback visual: Verde si disponible / Rojo si existe
-            document.getElementById('user-error').classList.toggle('hidden', isUserValid);
-            document.getElementById('user-success').classList.toggle('hidden', !isUserValid);
+            const userLower = val.replace(/\s+/g, '').toLowerCase();
+            const res = await API.request(
+                `/check-username?user=${encodeURIComponent(userLower)}&instId=${encodeURIComponent(instId)}`
+            );
+            const tReg = window.txt?.registro || {};
+            const errEl = document.getElementById('user-error');
+            const okEl = document.getElementById('user-success');
+
+            if (res.message === 'username_invalid') {
+                isUserValid = false;
+                if (errEl) {
+                    errEl.textContent = tReg.username_invalid
+                        || 'Solo minúsculas, números, guión y guión bajo (3–64). Sin espacios.';
+                }
+                errEl?.classList.remove('hidden');
+                okEl?.classList.add('hidden');
+            } else {
+                isUserValid = res.available === true;
+                if (errEl) {
+                    errEl.textContent = tReg.user_error || 'Este usuario ya se encuentra registrado';
+                }
+                errEl?.classList.toggle('hidden', isUserValid);
+                okEl?.classList.toggle('hidden', !isUserValid);
+            }
             checkFormValidity();
         }, 500);
     });
@@ -145,7 +162,7 @@ export async function initRegistro() {
 
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        data.usuario = (data.usuario || '').trim().toLowerCase();
+        data.usuario = (data.usuario || '').replace(/\s+/g, '').trim().toLowerCase();
         
         // Contexto institucional desde el storage
         data.IdInstitucion = instId; // Ya lo capturamos arriba
@@ -179,9 +196,14 @@ export async function initRegistro() {
             } else {
                 btnSubmit.disabled = false;
                 const t = window.txt?.registro || {};
-                const msg = (res.message === 'email_duplicate_institution' && t.email_duplicate_institution)
-                    ? t.email_duplicate_institution
-                    : (res.message || (t.swal_error_servidor || "Error en el servidor"));
+                let msg = res.message || (t.swal_error_servidor || 'Error en el servidor');
+                if (res.message === 'email_duplicate_institution' && t.email_duplicate_institution) {
+                    msg = t.email_duplicate_institution;
+                } else if (res.message === 'username_duplicate_institution' && t.username_duplicate_institution) {
+                    msg = t.username_duplicate_institution;
+                } else if (res.message === 'username_invalid' && t.username_invalid) {
+                    msg = t.username_invalid;
+                }
                 Swal.fire(t.swal_error || "Error", msg, "error");
             }
         } catch (err) { 

@@ -1,4 +1,5 @@
 import { API } from './api.js?v1';
+import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
 
 const SESSION_KEYS = [
     'token', 
@@ -79,38 +80,24 @@ async init() {
                 return; 
             }
 
-            // EXTRACCIÓN DEL SLUG
-            let slugContext = new URLSearchParams(window.location.search).get('inst');
-
-            if (!slugContext) {
-                const pathParts = path.split('/').filter(p => p && p !== 'index.html');
-                const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-                
-                if (isLocalhost) {
-                    const frontIndex = pathParts.indexOf('front');
-                    if (frontIndex !== -1 && pathParts[frontIndex + 1]) {
-                        slugContext = pathParts[frontIndex + 1];
-                    }
-                } else {
-                    if (pathParts.length > 0) {
-                        slugContext = pathParts[0];
-                    } 
-                    else if (window.location.hostname.includes('urbe.')) {
-                        slugContext = 'urbe';
-                    }
-                }
-            }
+            // EXTRACCIÓN DEL SLUG (?inst=, /front/{slug}, con o sin barra final, etc.)
+            let slugContext = extractInstitutionSlugFromPath(path, window.location.search);
 
             if (!slugContext) slugContext = localStorage.getItem('NombreInst');
 
+            if (!slugContext && window.location.hostname.includes('urbe.')) {
+                slugContext = 'urbe';
+            }
+
             const forbiddenPaths = ['dist', 'assets', 'resources', 'paginas', 'front', 'api', 'core-backend-gem', 'panel', 'admin', 'superadmin'];
-            if (!slugContext || forbiddenPaths.includes(slugContext)) {
+            const slugLower = String(slugContext || '').toLowerCase();
+            if (!slugContext || forbiddenPaths.includes(slugLower)) {
                 console.warn("⚠️ Sede no detectada en la URL:", path);
                 this.showErrorState();
                 return;
             }
 
-            this.slug = slugContext.toLowerCase();
+            this.slug = slugLower;
             
             const storedToken = this.getVal('token');
             const storedInst = this.getVal('NombreInst');
@@ -149,6 +136,8 @@ async init() {
 
                 const regLink = document.getElementById('link-registro-dinamico');
                 if (regLink) regLink.href = `paginas/registro.html?inst=${this.slug}`;
+                const recLink = document.getElementById('link-recuperar-dinamico');
+                if (recLink) recLink.href = `paginas/recuperar.html?inst=${this.slug}`;
                 const btnVolver = document.getElementById('btn-volver-login');
                 if (btnVolver) btnVolver.href = `${this.getBasePath()}${this.slug}`;
                 const webLink = document.getElementById('inst-web-link');
@@ -197,7 +186,7 @@ async init() {
         const box = document.getElementById('msg-alert');
         if (box) box.classList.add('hidden');
 
-        const username = (document.getElementById('username').value || '').trim().toLowerCase();
+        const username = (document.getElementById('username').value || '').replace(/\s+/g, '').trim().toLowerCase();
         const password = document.getElementById('password').value;
         const remember = document.getElementById('remember-me')?.checked || false;
 
@@ -480,12 +469,7 @@ autoRedirectIfLogged(role) {
             slug = this.getVal('NombreInst') || '';
             // Fallback: intentar obtener slug de la URL actual (ej. /urbe/admin/...)
             if (!slug || slug === 'null' || slug === 'undefined') {
-                const path = (window.location.pathname || '').split('/').filter(B => B);
-                const isLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-                const idx = isLocal ? path.indexOf('front') + 1 : 0;
-                if (idx >= 0 && path[idx] && !['paginas', 'admin', 'panel', 'superadmin', 'dist'].includes(path[idx])) {
-                    slug = path[idx];
-                }
+                slug = extractInstitutionSlugFromPath(window.location.pathname, window.location.search);
             }
             if (!slug || slug === 'null' || slug === 'undefined') slug = 'urbe';
         }

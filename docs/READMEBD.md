@@ -15,6 +15,7 @@ Financieramente, el sistema opera bajo un modelo estricto de **facturación prep
 A nivel tecnológico, la plataforma implementa una arquitectura **API-Driven totalmente desacoplada**. El Backend actúa como la fuente de verdad, procesando la "lógica pura" y exponiendo recursos a través de endpoints seguros, siguiendo el patrón de diseño **MVC (Model-View-Controller)**. El Frontend consume estos datos dinámicamente, delegando la renderización y la experiencia de usuario a la capa cliente, garantizando así escalabilidad y mantenibilidad.
 
 ---
+
 ### 1. CATÁLOGO DE ENTIDADES Y ATRIBUTOS LITERALES
 
 A continuación, la definición de cada tabla con sus campos exactos:
@@ -32,7 +33,7 @@ y luego los atributos donde en ( ) estan los tipos de datos
 - **usuarioe:**
     - Tipo entidad: Maestra
     - El usuario del sistema mas sus credenciales, tambien, tiene la institucion del usuario, es importante que cada usuario se crea en una institucion.. se pueden repetir los usuarios pero solo en distinttas instituciones.. en las mismas instituciones no.. tambien tiene un token de confirmacion para el correo y factor code para administradores, el passowrd es en hasheado en password_secure, hay otro passowrd por que se migro a uno mas seguro…
-        - `*[***IdUsrA** *(int ai),* **UsrA** *(varchar(60)),* **PassA** *(deprecated),* **password_secure***(varchar(255)),***confirmado***(tinyint defualt=0) ,***hash_migrated***(tinyint default=0),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **token_confirmacion** *(varchar(100) null),* **two_factor_code** *(varchar(6) null),* **two_factor_expires** *(datetime null)]*`
+        - `*[**IdUsrA** (int ai), **UsrA** (varchar(60)), **PassA** (deprecated), **password_secure**(varchar(255)),**confirmado**(tinyint defualt=0) ,**hash_migrated**(tinyint default=0),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **token_confirmacion** *(varchar(100) null),* **two_factor_code** *(varchar(6) null),* **two_factor_expires** *(datetime null)]*`
 
 - **tipousuarioe:**
     - Tipo entidad: Maestra
@@ -292,7 +293,7 @@ Si el usuario configura su bioterio:
 - **institucion**:
     - Tipo entidad: Maestra
     - Sedes que operan en el sistema es la institucion que maneja el sistema, donde se alberga practicamente todo el sistema, por que es la dependencia donde se trabaja , ademas crea una slug donde se entra a la web con el NombreInst , otrosceuas = 1 activado, Activo=1 institucion activa ademas tiene varias entidades relaciones subordinadas que son necesarias para completar los requerimientos, pero esta seria como la MADRE, tambien tiene una Dependencia.. donde tiene un conjunto de instituciones que se ven entre si, es como una red agrupacion puede no tener dependencia y si MadreGrupo =1 es la madre del grupo que puede ver la estadistica de toda la red grupo.. puede que no haya madre en el grupo tampoco… tambien tiene varias cosas de contrato y el titulo que van a tener los precios y se van a mostrar…
-        - - `*[***IdInstitucion** *(int ai) ,* **NombreInst** *(varchar(100)),* **PrecioJornadaTrabajoExp** *(deprecated),* **DependenciaInstitucion** *(varchar(60) null),* **Web** *(varchar(60) null),* **Detalle** *(text null),* **InstDir** *(text null),* **InstContacto***(varchar(20) null),* **InstCorreo** *(varchar(20) null),* **NombreCompletoInst***(varchar(100)),* **Logo***(varchar(150) null),* **TipoApp** *(deprecated),* **Moneda** *(varchar(50)),* **Pais***(varchar(100)),* **Localidad***(varchar(100) null),* **IdOrganismo***(deprecated),* **otrosceuas** *(int),* **FechaDepuracion** *(date null),* **Activo** *(int),* **UltimoPago** *(date null),* **TipoFacturacion** *(int null),* **FechaContrato** *(date null),* **tituloprecios** *(varchar(255) null),* **MadreGrupo** *(int null),* **LogoEnPdf**  *(int null),* **tipohorasalas** *(int null)]*`
+        - - `*[**IdInstitucion** (int ai) , **NombreInst** (varchar(100)), **PrecioJornadaTrabajoExp** (deprecated), **DependenciaInstitucion** (varchar(60) null), **Web** (varchar(60) null), **Detalle** (text null), **InstDir** (text null), **InstContacto**(varchar(20) null),* **InstCorreo** *(varchar(20) null),* **NombreCompletoInst***(varchar(100)),* **Logo***(varchar(150) null),* **TipoApp** *(deprecated),* **Moneda** *(varchar(50)),* **Pais***(varchar(100)),* **Localidad***(varchar(100) null),* **IdOrganismo***(deprecated),* **otrosceuas** *(int),* **FechaDepuracion** *(date null),* **Activo** *(int),* **UltimoPago** *(date null),* **TipoFacturacion** *(int null),* **FechaContrato** *(date null),* **tituloprecios** *(varchar(255) null),* **MadreGrupo** *(int null),* **LogoEnPdf** *(int null),* **tipohorasalas** *(int null),* **ReservasRequierenAprobacion** *(tinyint(1)),* **ReservaQrTokenGeneral** *(varchar(80) null)]*`
 
 - **modulosapp:**
     - Tipo entidad: Maestra
@@ -453,59 +454,20 @@ Esta es la tabla más inteligente del grupo.
     - Aca donde se guardan los adjuntos en el bucket de cloud storage b2 para tener archivos que enviar en protocolos. donde tipoadjunto es: 1:protocolo 2:aval 3: otro.  la idea es que solo se pueda enviar 3 por solicitud de protocolo. nombre_original , es el nombre que ellos tienen en el documento, file_key es el linkeo con el bucket
         - `[**Id_adjuntos_protocolos**(id ai), **nombre_original**(varchar(100)), **file_key**(text),**IdSolicitudProtocolo**(int foranea solicitudprotocolo:IdSolicitudProtocolo),**tipoadjunto**(int)]`
 
-CREATE TABLE IF NOT EXISTS protocoloexpered (
-IdProtocoloExpRed INT AUTO_INCREMENT PRIMARY KEY,
-idprotA INT NOT NULL,
-IdInstitucion INT NOT NULL,
-IdUsrA INT NULL,
-iddeptoA INT NULL,
-idtipoprotocolo INT NULL,
-IdSeveridadTipo INT NULL,
-FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-CONSTRAINT fk_protored_protocolo FOREIGN KEY (idprotA) REFERENCES protocoloexpe(idprotA) ON DELETE CASCADE,
-CONSTRAINT fk_protored_inst FOREIGN KEY (IdInstitucion) REFERENCES institucion(IdInstitucion) ON DELETE CASCADE,
-CONSTRAINT fk_protored_usr FOREIGN KEY (IdUsrA) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
-CONSTRAINT fk_protored_depto FOREIGN KEY (iddeptoA) REFERENCES departamentoe(iddeptoA) ON DELETE SET NULL,
-CONSTRAINT fk_protored_tipo FOREIGN KEY (idtipoprotocolo) REFERENCES tipoprotocolo(idtipoprotocolo) ON DELETE SET NULL,
-CONSTRAINT fk_protored_sev FOREIGN KEY (IdSeveridadTipo) REFERENCES tiposeveridad(IdSeveridadTipo) ON DELETE SET NULL,
-UNIQUE KEY uq_protored_protocol_inst (idprotA, IdInstitucion),
-INDEX idx_protored_inst (IdInstitucion),
-INDEX idx_protored_protocol (idprotA)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE TABLE IF NOT EXISTS protocoloexpered_especies (
-IdProtocoloExpRedEspecie INT AUTO_INCREMENT PRIMARY KEY,
-IdProtocoloExpRed INT NOT NULL,
-idespA INT NOT NULL,
-CONSTRAINT fk_protoredesp_protored FOREIGN KEY (IdProtocoloExpRed) REFERENCES protocoloexpered(IdProtocoloExpRed) ON DELETE CASCADE,
-CONSTRAINT fk_protoredesp_especie FOREIGN KEY (idespA) REFERENCES especiee(idespA) ON DELETE CASCADE,
-UNIQUE KEY uq_protoredesp_pair (IdProtocoloExpRed, idespA),
-INDEX idx_protoredesp_protored (IdProtocoloExpRed)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+- **protocoloexpered:**
+- Tipo entidad: Relacion (protocoloexpe, institucion, usuarioe, departamentoe, tipoprotocolo, tiposeveridad)
+- Entidad diseñada para manejar los protocolos que se comparten entre varias instituciones de una misma red, manteniendo independencias de contexto…
+    - `[**IdProtocoloExpRed** *(int ai),* **idprotA** *(int foranea protocoloexpe:idprotA),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUsrA** *(int foranea usuarioe:IdUsrA null),* **iddeptoA** *(int foranea departamentoe:iddeptoA null),* **idtipoprotocolo** *(int foranea tipoprotocolo:idtipoprotocolo null),* **IdSeveridadTipo** *(int foranea tiposeveridad:IdSeveridadTipo null),* **FechaCreado** *(datetime),* **FechaActualizado** *(datetime)]*`
 
-```sql
--- Adjuntos de protocolos manuales (sin solicitud local).
--- Uso: gestión admin de protocoloexpe para protocolos creados manualmente.
+- **protocoloexpered_especies:** 
+- Tipo entidad: Relacion (protocoloexpered, especiee)
+- Las especies asociadas específicamente a un protocolo que funciona en modo red…
+    - `[**IdProtocoloExpRedEspecie** *(int ai),* **IdProtocoloExpRed** *(int foranea protocoloexpered:IdProtocoloExpRed),* **idespA** *(int foranea especiee:idespA)]*`
 
-CREATE TABLE IF NOT EXISTS protocoloexpeadjuntos (
-    IdProtocoloAdjunto INT AUTO_INCREMENT PRIMARY KEY,
-    idprotA INT NOT NULL,
-    tipoadjunto TINYINT NOT NULL COMMENT '1=adjunto1, 2=adjunto2, 3=adjunto3',
-    nombre_original VARCHAR(255) NOT NULL,
-    file_key VARCHAR(1024) NOT NULL,
-    mime_type VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
-    size_bytes INT NOT NULL DEFAULT 0,
-    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_protadj_protocolo FOREIGN KEY (idprotA)
-        REFERENCES protocoloexpe(idprotA)
-        ON DELETE CASCADE,
-    CONSTRAINT chk_protadj_tipo CHECK (tipoadjunto IN (1,2,3)),
-    UNIQUE KEY uq_protadj_slot (idprotA, tipoadjunto),
-    INDEX idx_protadj_protocolo (idprotA)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-```
+- **protocoloexpeadjuntos:** 
+- Tipo entidad: Subordinada (protocoloexpe)
+- Gestión administrativa para adjuntos de protocolos (PDFs, avales) subidos manualmente sin pasar por una solicitud local…
+    - `[**IdProtocoloAdjunto** *(int ai),* **idprotA** *(int foranea protocoloexpe:idprotA),* **tipoadjunto** *(tinyint),* **nombre_original** *(varchar(255)),* **file_key** *(varchar(1024)),* **mime_type** *(varchar(100)),* **size_bytes** *(int),* **FechaCreado** *(datetime),* **FechaActualizado** *(datetime)]*`
 
 ## CÓMO FUNCIONAN LOS PROTOCOLOS (Lógica de Negocio):
 
@@ -551,7 +513,7 @@ El protocolo no nace activo. Nace a través de `solicitudprotocolo`.
 - **formularioe**:
     - Tipo entidad: Maestro
     - El pedido formal del investigador. que puede tener tipo Animales , Reactivos o Insumos… donde se le pasa la id del tipo que tiene en tipoA, tiene la subespecie de pedido en idsubespA, y el departamento en depto , esas son ids… que luego en la bd se maracara.. que se relacionan a las propias… este seria el formulario principal que hacen los investigadores , donde se detallan y se crea practicamente todo menos los alojamientos. Tambien tiene varias relaciones, subordinadas (que depende del tipo es que las utiliza o no) , tambien reactivo para cuando es del tipo reactivo experimental.. el reactivo es la foranea de insumosexperimentales.. tiene todos los tipos de formularios practicamente…
-        - - `[**idformA** *(int ai)*, **tipoA** *(int foranea tipofurmularios:IdTipoFormulario)*, **edadA** *(varchar(50) null)*, **pesoA***(varchar(50) null)*, **fecRetiroA** *(date)*, **aclaraA***(text null)*, **fechainicioA** *(date)*, **IdUsrA** *(int foranea usuarioe:IdUsrA)*, **estado** *(varchar(50))*, **raza***(varchar(50) null)*, **reactivo** *(int foranea insumoexperimental:IdInsumoesp)*, **visto** *(int)*, **quienvisto** *(varchar(70) null)*, **aclaracionadm** *(text null)*, **viruta** *(deprecated)*, **alimento** *(deprecated)*, **idsubespA** *(int foranea subespecie:idsubespA)*, **nocuenta** *(deprecated)*, **depto** *(int foranea departamentoe:iddeptoA)*, **otroinsumo** *(deprecated)*, **IdInstitucion** *(int foranea institucion:IdInstitucion)*]`
+        - - `*[**idformA** (int ai), **tipoA** (int foranea tipofurmularios:IdTipoFormulario), **edadA** (varchar(50) null), **pesoA**(varchar(50) null)*, **fecRetiroA** *(date)*, **aclaraA***(text null)*, **fechainicioA** (date), **IdUsrA** (int foranea usuarioe:IdUsrA), **estado** (varchar(50)), **EstadoWorkflow** (varchar(40) null), **IdInstitucionOrigen** (int null foranea institucion:IdInstitucion), **DerivadoActivo** (tinyint(1)), **FechaDerivado** (datetime null), **raza***(varchar(50) null)*, **reactivo** *(int foranea insumoexperimental:IdInsumoesp)*, **visto** *(int)*, **quienvisto** *(varchar(70) null)*, **aclaracionadm** *(text null)*, **viruta** *(deprecated)*, **alimento** *(deprecated)*, **idsubespA** *(int foranea subespecie:idsubespA)*, **nocuenta** *(deprecated)*, **depto** *(int foranea departamentoe:iddeptoA)*, **otroinsumo** *(deprecated)*, **IdInstitucion** *(int foranea institucion:IdInstitucion)]*`
 
 - **tipoformularios:**
     - Tipo entidad: Madre
@@ -573,427 +535,25 @@ El protocolo no nace activo. Nace a través de `solicitudprotocolo`.
     - Relaciones entre formularioe y protocoloexpe… yo siento que esta relacion no deberia existir , pero como el programa esta asi hace tiempo, y ya tiene muchisimos datos no se puede cambiar… por que en realidad el formulario solo puede tener 1 protocolo , no mas. no puede tener varios protocolos… entonces el protocolo va a tener muchos formularios , pero el formulario solo 1 protocolo, tendria que ser totalidad y idprotA embebido en formularioe… pero queda asi.. va a tener uno , pero esta bien, es la unica relacion que no coincido, pero seguira asi.
         - - `****[idprotA** *(int foranea protocoloexpe:idprotA) ,***idformA** *(int foranea formularioe:idformA),* **idprotform** *(int ai)]*`
 
-```sql
--- ============================================================
--- DERIVACION DE FORMULARIOS EN RED (ANIMALES / REACTIVOS / INSUMOS)
--- ============================================================
--- Objetivo:
--- 1) Permitir derivar formularios entre instituciones de la misma red.
--- 2) Registrar propietario actual (usuario + institucion) del formulario.
--- 3) Mantener historial completo de estados y movimientos.
--- 4) Preparar facturacion por institucion derivada.
---
--- Nota:
--- - Se mantiene formularioe como entidad principal del formulario ("el mismo formulario").
--- - El protocolo asociado no cambia; la derivacion mueve la responsabilidad operativa/financiera.
--- - Este script no borra ni altera datos existentes.
--- ============================================================
+- **formulario_derivacion:**
+- Tipo entidad: Subordinada (formularioe, institucion x2, usuarioe x2)
+- Bitácora principal de las derivaciones de formularios entre instituciones de la misma red, maneja el estado de ida y vuelta…
+    - `[**IdFormularioDerivacion** *(int ai),* **idformAOrigen** *(int null),* **idformA** *(int foranea formularioe:idformA),* **IdFormularioDerivacionPadre** *(int foranea formulario_derivacion:IdFormularioDerivacion null),* **IdInstitucionOrigen** *(int foranea institucion:IdInstitucion),* **IdInstitucionDestino** *(int foranea institucion:IdInstitucion),* **IdUsrOrigen** *(int foranea usuarioe:IdUsrA),* **IdUsrDestinoResponsable** *(int foranea usuarioe:IdUsrA null),* **estado_derivacion** *(tinyint),* **estado_origen** *(varchar(60) null),* **estado_destino** *(varchar(60) null),* **tipoA_destino** *(int null),* **depto_destino** *(int null),* **idsubespA_destino** *(int null),* **idcepaA_destino** *(int null),* **FechaConfigDestino** *(datetime null),* **IdUsrConfigDestino** *(int null),* **mensaje_origen** *(varchar(1000) null),* **mensaje_destino** *(varchar(1000) null),* **motivo_rechazo** *(varchar(1000) null),* **FechaCreado** *(datetime),* **FechaRespondido** *(datetime null),* **FechaCerrado** *(datetime null),* **Activo** *(tinyint(1))]*`
 
-START TRANSACTION;
+- **formulario_owner_actual:** 
+- Tipo entidad: Subordinada (formularioe, institucion, usuarioe, formulario_derivacion)
+- Registro de propiedad en tiempo real para determinar quién tiene la posesión operativa de un formulario, derivado o no…
+    - `[**idformA** *(int pk foranea formularioe:idformA),* **IdInstitucionActual** *(int foranea institucion:IdInstitucion),* **IdUsrPropietarioActual** *(int foranea usuarioe:IdUsrA),* **IdFormularioDerivacionActiva** *(int foranea formulario_derivacion:IdFormularioDerivacion null),* **EsDerivado** *(tinyint(1)),* **FechaActualizado** *(datetime)]*`
 
--- ------------------------------------------------------------
--- 1) BITACORA DE DERIVACIONES (cada envio/devolucion/rechazo)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS formulario_derivacion (
-    IdFormularioDerivacion INT AUTO_INCREMENT PRIMARY KEY,
-    idformA INT NOT NULL,
-    IdFormularioDerivacionPadre INT NULL,
+- **formulario_estado_historial:** 
+- Tipo entidad: Subordinada (formularioe, usuarioe, institucion, formulario_derivacion)
+- Historial estricto de auditoría funcional para ver la evolución y cambios de estado de un formulario a lo largo del tiempo…
+    - `[**IdFormularioEstadoHistorial** *(int ai),* **idformA** *(int foranea formularioe:idformA),* **estado_anterior** *(varchar(60) null),* **estado_nuevo** *(varchar(60)),* **detalle** *(varchar(1000) null),* **IdUsrAccion** *(int foranea usuarioe:IdUsrA null),* **IdInstitucionAccion** *(int foranea institucion:IdInstitucion null),* **IdFormularioDerivacion** *(int foranea formulario_derivacion:IdFormularioDerivacion null),* **FechaAccion** *(datetime)]*`
 
-    IdInstitucionOrigen INT NOT NULL,
-    IdInstitucionDestino INT NOT NULL,
-
-    IdUsrOrigen INT NOT NULL COMMENT 'Usuario que deriva',
-    IdUsrDestinoResponsable INT NULL COMMENT 'Responsable asignado en destino (opcional)',
-
-    estado_derivacion TINYINT NOT NULL DEFAULT 1 COMMENT '1=PENDIENTE,2=ACEPTADA,3=DEVUELTA,4=RECHAZADA,5=CANCELADA',
-    mensaje_origen VARCHAR(1000) NULL,
-    mensaje_destino VARCHAR(1000) NULL,
-    motivo_rechazo VARCHAR(1000) NULL,
-
-    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FechaRespondido DATETIME NULL,
-    FechaCerrado DATETIME NULL,
-    Activo TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=derivacion vigente para ese nodo',
-
-    CONSTRAINT fk_fder_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-    CONSTRAINT fk_fder_parent FOREIGN KEY (IdFormularioDerivacionPadre) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
-    CONSTRAINT fk_fder_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-    CONSTRAINT fk_fder_inst_destino FOREIGN KEY (IdInstitucionDestino) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-    CONSTRAINT fk_fder_usr_origen FOREIGN KEY (IdUsrOrigen) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-    CONSTRAINT fk_fder_usr_destino FOREIGN KEY (IdUsrDestinoResponsable) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
-
-    INDEX idx_fder_form (idformA),
-    INDEX idx_fder_origen (IdInstitucionOrigen),
-    INDEX idx_fder_destino (IdInstitucionDestino),
-    INDEX idx_fder_estado (estado_derivacion),
-    INDEX idx_fder_activo (Activo),
-    INDEX idx_fder_form_activo (idformA, Activo)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ------------------------------------------------------------
--- 2) PROPIEDAD/POSESION ACTUAL DEL FORMULARIO
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS formulario_owner_actual (
-    idformA INT PRIMARY KEY,
-    IdInstitucionActual INT NOT NULL,
-    IdUsrPropietarioActual INT NOT NULL,
-    IdFormularioDerivacionActiva INT NULL,
-    EsDerivado TINYINT(1) NOT NULL DEFAULT 0,
-    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_fown_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-    CONSTRAINT fk_fown_inst FOREIGN KEY (IdInstitucionActual) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-    CONSTRAINT fk_fown_usr FOREIGN KEY (IdUsrPropietarioActual) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-    CONSTRAINT fk_fown_deriv FOREIGN KEY (IdFormularioDerivacionActiva) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
-
-    INDEX idx_fown_inst (IdInstitucionActual),
-    INDEX idx_fown_usr (IdUsrPropietarioActual),
-    INDEX idx_fown_deriv (EsDerivado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ------------------------------------------------------------
--- 3) HISTORIAL DE ESTADOS DEL FORMULARIO (auditoria funcional)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS formulario_estado_historial (
-    IdFormularioEstadoHistorial INT AUTO_INCREMENT PRIMARY KEY,
-    idformA INT NOT NULL,
-    estado_anterior VARCHAR(60) NULL,
-    estado_nuevo VARCHAR(60) NOT NULL,
-    detalle VARCHAR(1000) NULL,
-
-    IdUsrAccion INT NULL,
-    IdInstitucionAccion INT NULL,
-    IdFormularioDerivacion INT NULL,
-
-    FechaAccion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_fhist_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-    CONSTRAINT fk_fhist_usr FOREIGN KEY (IdUsrAccion) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL,
-    CONSTRAINT fk_fhist_inst FOREIGN KEY (IdInstitucionAccion) REFERENCES institucion(IdInstitucion) ON DELETE SET NULL,
-    CONSTRAINT fk_fhist_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
-
-    INDEX idx_fhist_form (idformA),
-    INDEX idx_fhist_estado (estado_nuevo),
-    INDEX idx_fhist_fecha (FechaAccion)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ------------------------------------------------------------
--- 4) FACTURACION DE FORMULARIOS DERIVADOS (por institucion)
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS facturacion_formulario_derivado (
-    IdFacturacionFormularioDerivado INT AUTO_INCREMENT PRIMARY KEY,
-    idformA INT NOT NULL,
-    IdFormularioDerivacion INT NOT NULL,
-
-    IdInstitucionCobradora INT NOT NULL COMMENT 'Institucion que atiende/cobra',
-    IdInstitucionSolicitante INT NOT NULL COMMENT 'Institucion que deriva/solicita',
-    IdUsrSolicitante INT NOT NULL COMMENT 'Usuario propietario que deriva',
-
-    tipo_formulario VARCHAR(40) NOT NULL COMMENT 'animal|reactivo|insumo',
-    monto_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-    monto_pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-    estado_cobro TINYINT NOT NULL DEFAULT 1 COMMENT '1=PENDIENTE,2=PARCIAL,3=PAGADO,4=ANULADO',
-
-    FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_ffd_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-    CONSTRAINT fk_ffd_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE CASCADE,
-    CONSTRAINT fk_ffd_inst_cob FOREIGN KEY (IdInstitucionCobradora) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-    CONSTRAINT fk_ffd_inst_sol FOREIGN KEY (IdInstitucionSolicitante) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-    CONSTRAINT fk_ffd_usr_sol FOREIGN KEY (IdUsrSolicitante) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-
-    UNIQUE KEY uq_ffd_deriv (IdFormularioDerivacion),
-    INDEX idx_ffd_form (idformA),
-    INDEX idx_ffd_inst_cob (IdInstitucionCobradora),
-    INDEX idx_ffd_inst_sol (IdInstitucionSolicitante),
-    INDEX idx_ffd_estado (estado_cobro)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ------------------------------------------------------------
--- 5) AJUSTES MINIMOS SOBRE formularioe (estado derivado + trazas)
--- ------------------------------------------------------------
--- Nota: si alguna columna ya existe, ajustar manualmente.
--- Estas columnas simplifican filtros y compatibilidad con UI actual.
-
-ALTER TABLE formularioe
-    ADD COLUMN IF NOT EXISTS EstadoWorkflow VARCHAR(40) NULL AFTER estado,
-    ADD COLUMN IF NOT EXISTS IdInstitucionOrigen INT NULL AFTER EstadoWorkflow,
-    ADD COLUMN IF NOT EXISTS DerivadoActivo TINYINT(1) NOT NULL DEFAULT 0 AFTER IdInstitucionOrigen,
-    ADD COLUMN IF NOT EXISTS FechaDerivado DATETIME NULL AFTER DerivadoActivo;
-
-ALTER TABLE formularioe
-    ADD INDEX IF NOT EXISTS idx_form_estado_workflow (EstadoWorkflow),
-    ADD INDEX IF NOT EXISTS idx_form_derivado_activo (DerivadoActivo),
-    ADD INDEX IF NOT EXISTS idx_form_inst_origen (IdInstitucionOrigen);
-
--- Opcional: FK de institucion origen (siempre que tu schema lo soporte sin datos sucios)
--- ALTER TABLE formularioe
---     ADD CONSTRAINT fk_form_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE SET NULL;
-
-COMMIT;
-
-```
-
-ALTER TABLE formularioe ADD COLUMN EstadoWorkflow VARCHAR(40) NULL AFTER estado;
-ALTER TABLE formularioe ADD COLUMN IdInstitucionOrigen INT NULL AFTER EstadoWorkflow;
-ALTER TABLE formularioe ADD COLUMN DerivadoActivo TINYINT(1) NOT NULL DEFAULT 0 AFTER IdInstitucionOrigen;
-ALTER TABLE formularioe ADD COLUMN FechaDerivado DATETIME NULL AFTER DerivadoActivo;
-ALTER TABLE formularioe ADD INDEX idx_form_estado_workflow (EstadoWorkflow);
-ALTER TABLE formularioe ADD INDEX idx_form_derivado_activo (DerivadoActivo);
-ALTER TABLE formularioe ADD INDEX idx_form_inst_origen (IdInstitucionOrigen);
-
-CREATE TABLE IF NOT EXISTS formulario_derivacion (
-IdFormularioDerivacion INT AUTO_INCREMENT PRIMARY KEY,
-idformA INT NOT NULL,
-IdFormularioDerivacionPadre INT NULL,
-IdInstitucionOrigen INT NOT NULL,
-IdInstitucionDestino INT NOT NULL,
-IdUsrOrigen INT NOT NULL,
-IdUsrDestinoResponsable INT NULL,
-estado_derivacion TINYINT NOT NULL DEFAULT 1,
-mensaje_origen VARCHAR(1000) NULL,
-mensaje_destino VARCHAR(1000) NULL,
-motivo_rechazo VARCHAR(1000) NULL,
-FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FechaRespondido DATETIME NULL,
-FechaCerrado DATETIME NULL,
-Activo TINYINT(1) NOT NULL DEFAULT 1,
-CONSTRAINT fk_fder_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-CONSTRAINT fk_fder_parent FOREIGN KEY (IdFormularioDerivacionPadre) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE SET NULL,
-CONSTRAINT fk_fder_inst_origen FOREIGN KEY (IdInstitucionOrigen) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-CONSTRAINT fk_fder_inst_destino FOREIGN KEY (IdInstitucionDestino) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-CONSTRAINT fk_fder_usr_origen FOREIGN KEY (IdUsrOrigen) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-CONSTRAINT fk_fder_usr_destino FOREIGN KEY (IdUsrDestinoResponsable) REFERENCES usuarioe(IdUsrA) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS formulario_owner_actual (
-idformA INT PRIMARY KEY,
-IdInstitucionActual INT NOT NULL,
-IdUsrPropietarioActual INT NOT NULL,
-IdFormularioDerivacionActiva INT NULL,
-EsDerivado TINYINT(1) NOT NULL DEFAULT 0,
-FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-CONSTRAINT fk_fown_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-CONSTRAINT fk_fown_inst FOREIGN KEY (IdInstitucionActual) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-CONSTRAINT fk_fown_usr FOREIGN KEY (IdUsrPropietarioActual) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-INDEX idx_fown_inst (IdInstitucionActual),
-INDEX idx_fown_usr (IdUsrPropietarioActual),
-INDEX idx_fown_deriv (EsDerivado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-ALTER TABLE formulario_owner_actual
-ADD CONSTRAINT fk_fown_deriv
-FOREIGN KEY (IdFormularioDerivacionActiva)
-REFERENCES formulario_derivacion(IdFormularioDerivacion)
-ON DELETE SET NULL;
-
-CREATE TABLE IF NOT EXISTS formulario_estado_historial (
-IdFormularioEstadoHistorial INT AUTO_INCREMENT PRIMARY KEY,
-idformA INT NOT NULL,
-estado_anterior VARCHAR(60) NULL,
-estado_nuevo VARCHAR(60) NOT NULL,
-detalle VARCHAR(1000) NULL,
-IdUsrAccion INT NULL,
-IdInstitucionAccion INT NULL,
-IdFormularioDerivacion INT NULL,
-FechaAccion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-INDEX idx_fhist_form (idformA),
-INDEX idx_fhist_estado (estado_nuevo),
-INDEX idx_fhist_fecha (FechaAccion)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS facturacion_formulario_derivado (
-IdFacturacionFormularioDerivado INT AUTO_INCREMENT PRIMARY KEY,
-idformA INT NOT NULL,
-IdFormularioDerivacion INT NOT NULL,
-IdInstitucionCobradora INT NOT NULL,
-IdInstitucionSolicitante INT NOT NULL,
-IdUsrSolicitante INT NOT NULL,
-tipo_formulario VARCHAR(40) NOT NULL,
-monto_total DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-monto_pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-estado_cobro TINYINT NOT NULL DEFAULT 1,
-FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-FechaActualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-CONSTRAINT fk_ffd_form FOREIGN KEY (idformA) REFERENCES formularioe(idformA) ON DELETE CASCADE,
-CONSTRAINT fk_ffd_deriv FOREIGN KEY (IdFormularioDerivacion) REFERENCES formulario_derivacion(IdFormularioDerivacion) ON DELETE CASCADE,
-CONSTRAINT fk_ffd_inst_cob FOREIGN KEY (IdInstitucionCobradora) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-CONSTRAINT fk_ffd_inst_sol FOREIGN KEY (IdInstitucionSolicitante) REFERENCES institucion(IdInstitucion) ON DELETE RESTRICT,
-CONSTRAINT fk_ffd_usr_sol FOREIGN KEY (IdUsrSolicitante) REFERENCES usuarioe(IdUsrA) ON DELETE RESTRICT,
-UNIQUE KEY uq_ffd_deriv (IdFormularioDerivacion),
-INDEX idx_ffd_form (idformA),
-INDEX idx_ffd_inst_cob (IdInstitucionCobradora),
-INDEX idx_ffd_inst_sol (IdInstitucionSolicitante),
-INDEX idx_ffd_estado (estado_cobro)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-- - =============================================================================
--- MIGRACIÓN COMPLETA: Derivación con formulario original intacto
--- Ejecutar en orden. Si alguna tabla/columna ya existe, omitir esa sentencia.
--- =============================================================================
-
----
-
-- - 1. Tabla formulario_datos_originales (snapshot del formulario al derivar)
--- Solo si no existe
-
----
-
-CREATE TABLE IF NOT EXISTS formulario_datos_originales (
-id INT AUTO_INCREMENT PRIMARY KEY,
-idformA INT NOT NULL,
-IdFormularioDerivacion INT NOT NULL,
-datos_json LONGTEXT NOT NULL COMMENT 'JSON: header + details del formulario al derivar',
-FechaCreado DATETIME DEFAULT CURRENT_TIMESTAMP,
-UNIQUE KEY uk_form_deriv (idformA, IdFormularioDerivacion),
-INDEX idx_idform (idformA)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
----
-
-- - 2. Columna idformAOrigen en formulario_derivacion
--- Formulario original que permanece en institución origen (no se modifica)
--- Si la columna ya existe, omitir esta línea.
-
----
-
-ALTER TABLE formulario_derivacion
-ADD COLUMN idformAOrigen INT NULL
-COMMENT 'Formulario original en institución origen (no se modifica al derivar)'
-AFTER idformA;
-
----
-
-- - 3. Índice para búsquedas por formulario original
--- Si el índice ya existe, omitir esta línea.
-
----
-
-CREATE INDEX idx_formulario_derivacion_idformAOrigen
-ON formulario_derivacion(idformAOrigen);
-
-CREATE TABLE IF NOT EXISTS formulario_datos_originales (
-id INT AUTO_INCREMENT PRIMARY KEY,
-idformA INT NOT NULL,
-IdFormularioDerivacion INT NOT NULL,
-datos_json LONGTEXT NOT NULL COMMENT 'JSON: header + details del formulario al derivar',
-FechaCreado DATETIME DEFAULT CURRENT_TIMESTAMP,
-UNIQUE KEY uk_form_deriv (idformA, IdFormularioDerivacion),
-INDEX idx_idform (idformA)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-- - Ejecutar en la base correcta
--- USE groboapp_geckos;
-
-SET @db := DATABASE();
-
-- - 1) estado_origen
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db
-AND TABLE_NAME = 'formulario_derivacion'
-AND COLUMN_NAME = 'estado_origen'
-),
-'SELECT "estado_origen ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN estado_origen VARCHAR(60) NULL AFTER estado_derivacion'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 2) estado_destino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'estado_destino'
-),
-'SELECT "estado_destino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN estado_destino VARCHAR(60) NULL AFTER estado_origen'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 3) tipoA_destino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'tipoA_destino'
-),
-'SELECT "tipoA_destino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN tipoA_destino INT NULL AFTER estado_destino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 4) depto_destino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'depto_destino'
-),
-'SELECT "depto_destino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN depto_destino INT NULL AFTER tipoA_destino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 5) idsubespA_destino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'idsubespA_destino'
-),
-'SELECT "idsubespA_destino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN idsubespA_destino INT NULL AFTER depto_destino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 6) idcepaA_destino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'idcepaA_destino'
-),
-'SELECT "idcepaA_destino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN idcepaA_destino INT NULL AFTER idsubespA_destino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 7) FechaConfigDestino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'FechaConfigDestino'
-),
-'SELECT "FechaConfigDestino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN FechaConfigDestino DATETIME NULL AFTER idcepaA_destino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - 8) IdUsrConfigDestino
-SET @sql := (
-SELECT IF(
-EXISTS(
-SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'formulario_derivacion' AND COLUMN_NAME = 'IdUsrConfigDestino'
-),
-'SELECT "IdUsrConfigDestino ya existe" AS msg',
-'ALTER TABLE formulario_derivacion ADD COLUMN IdUsrConfigDestino INT NULL AFTER FechaConfigDestino'
-)
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-- - Índices (si ya existen, comentá esas líneas)
-ALTER TABLE formulario_derivacion
-ADD INDEX idx_fd_tipoA_destino (tipoA_destino),
-ADD INDEX idx_fd_depto_destino (depto_destino),
-ADD INDEX idx_fd_subesp_destino (idsubespA_destino),
-ADD INDEX idx_fd_cepa_destino (idcepaA_destino),
-ADD INDEX idx_fd_usr_config_destino (IdUsrConfigDestino);
+- **formulario_datos_originales:** 
+- Tipo entidad: Subordinada (formularioe, formulario_derivacion)
+- Hace un "snapshot" de los datos originales del formulario guardados en un JSON puro antes de que se derive…
+    - `[**id** *(int ai),* **idformA** *(int foranea formularioe:idformA),* **IdFormularioDerivacion** *(int foranea formulario_derivacion:IdFormularioDerivacion),* **datos_json** *(longtext),* **FechaCreado** *(datetime)]*`
 
 ## CÓMO FUNCIONAN LOS PEDIDOS (Formularios):
 
@@ -1072,13 +632,13 @@ Es importante documentar por qué existe esta tabla.
 
 - **alojamiento_caja:**
     - Tipo entidad: Subordinada (alojamiento)
-    - Esta seria como la caja dentro del numero de la cantidad de alojamiento (puede ser caja como cualquier otra cosa… en este caso le pongo nombre de caja por que es mas facil y se entiende… a lo que este se desencadena en cada animal de esta caja o habitacion…
-        - - `[**IdCajaAlojamiento***(int ai)*, **FechaInicio***(date)*, **Detalle***(text null)*, **NombreCaja***(varchar(100) null)*, **IdAlojamiento***(int foranea alojamiento:IdAlojamiento),ubicacion(varchar[100] null)* ]`
+    - Esta seria como la caja dentro del numero de la cantidad de alojamiento. Se le agregaron los campos lógicos de ubicaciones físicas (Salones, racks, lugares) para vincular cualquier institucion…
+        - `*[**IdCajaAlojamiento**(int ai)*, **FechaInicio***(date)*, **Detalle***(text null)*, **NombreCaja***(varchar(100) null)*, **IdAlojamiento***(int foranea alojamiento:IdAlojamiento)*, **ubicacion***(varchar(100) null)*, **IdUbicacionFisica** *(int foranea aloj_ubicacion_fisica:IdUbicacionFisica null)*, **IdSalon** *(int foranea aloj_salon:IdSalon null)*, **IdRack** *(int foranea aloj_rack:IdRack null)*, **IdLugarRack** *(int foranea aloj_lugar_rack:IdLugarRack null)*, **ComentarioUbicacion** *(varchar(500) null)]*`
 
 - **especie_alojamiento_unidad:**
     - Tipo entidad: Subordinada (alojamiento_caja)
-    - Entidad donde se apunta a el animal en si del alojamiento que pertenece a una unidad de caja donde se le puede poner un detalle y nombre al animal (la especie se trae …
-        - - `[**IdEspecieAlojUnidad***(int ai)*, **NombreEspecieAloj***(varchar(100)*, **DetalleEspecieAloj***(text null)*, **IdCajaAlojamiento***(int foranea alojamiento_caja:IdCajaAlojamiento)*]`
+    - Entidad donde se apunta al animal en sí del alojamiento que pertenece a una unidad de caja. Se le añadieron los datos opcionales de ficha del sujeto…
+        - `*[**IdEspecieAlojUnidad**(int ai)*, **NombreEspecieAloj***(varchar(100))*, **DetalleEspecieAloj***(text null)*, **IdCajaAlojamiento***(int foranea alojamiento_caja:IdCajaAlojamiento)*, **PesoSujetoKg** *(decimal(10,3) null)*, **FechaNacimientoSujeto** *(date null)*, **SexoSujeto** *(varchar(24) null)*, **idcepaA_sujeto** *(int foranea cepa:idcepaA null)*, **CategoriaRazaSujeto** *(varchar(255) null)*, **idsubespA_sujeto** *(int foranea subespecie:idsubespA null)]*`
 
 - **observacion_alojamiento_unidad:**
     - Tipo entidad: Subordinada (especie_alojamiento_unidad, categoriadatosunidadalojamiento)
@@ -1095,281 +655,26 @@ Es importante documentar por qué existe esta tabla.
     - Sirve para crear un codigo de 6 letras y numeros de alojamiento del qr para dar acceso en las instituciones
         - - [id_qr(int ai), codigo (varchar(6)), historia(int foranea alojamientos:historia), IdUsrA(int foranea usuarioe:IdUsrA) fecha_creacion(datetime) ]
 
-- *- =============================================================================*
-- *- URBE – Ubicación física de cajas de alojamiento (por institución)*
-- *- Motor: InnoDB | Charset: utf8mb4*
-- *- Ejecutar UNA VEZ en la base de datos del proyecto (tras backup).*
-- *- Requiere existir la tabla: institucion (IdInstitucion) y alojamiento_caja (IdCajaAlojamiento)*
-- *- =============================================================================*
-
-SET NAMES utf8mb4;
-
-SET FOREIGN_KEY_CHECKS = 0;
-
-- *- -----------------------------------------------------------------------------*
-- *- 1) Etiquetas personalizables por institución (nombres distintos por sede)*
-- *- -----------------------------------------------------------------------------*
-
-CREATE TABLE IF NOT EXISTS `aloj_config_ubicacion` (
-
-`IdInstitucion` INT NOT NULL,
-
-`LabelLugarFisico`       VARCHAR(120) NOT NULL *DEFAULT* 'Lugar físico',
-
-`LabelSalon`             VARCHAR(120) NOT NULL *DEFAULT* 'Salón / sala',
-
-`LabelRack`              VARCHAR(120) NOT NULL *DEFAULT* 'Rack',
-
-`LabelLugarRack`       VARCHAR(120) NOT NULL *DEFAULT* 'Posición en rack',
-
-`LabelComentarioUbicacion` VARCHAR(120) NOT NULL *DEFAULT* 'Comentario de ubicación',
-
-*PRIMARY KEY* (`IdInstitucion`),
-
-*CONSTRAINT* `fk_aloj_cfg_inst`
-
-*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
-
-*ON DELETE CASCADE* ON UPDATE CASCADE
-
-) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci
-
-COMMENT='Etiquetas de UI para ubicación de cajas (por institución)';
-
-- *- -----------------------------------------------------------------------------*
-- *- 2) Catálogo: lugar físico (ej. interior / exterior / edificio A)*
-- *- -----------------------------------------------------------------------------*
-
-CREATE TABLE IF NOT EXISTS `aloj_ubicacion_fisica` (
-
-`IdUbicacionFisica` INT NOT NULL AUTO_INCREMENT,
-
-`IdInstitucion` INT NOT NULL,
-
-`Nombre` VARCHAR(160) NOT NULL,
-
-`Orden` INT NOT NULL *DEFAULT* 0,
-
-`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
-
-*PRIMARY KEY* (`IdUbicacionFisica`),
-
-KEY `idx_aloj_uf_inst` (`IdInstitucion`),
-
-KEY `idx_aloj_uf_inst_activo` (`IdInstitucion`, `Activo`),
-
-*CONSTRAINT* `fk_aloj_uf_inst`
-
-*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
-
-*ON DELETE CASCADE* ON UPDATE CASCADE
-
-) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
-
-- *- -----------------------------------------------------------------------------*
-- *- 3) Catálogo: salón / sala (opcionalmente ligado a un lugar físico)*
-- *- -----------------------------------------------------------------------------*
-
-CREATE TABLE IF NOT EXISTS `aloj_salon` (
-
-`IdSalon` INT NOT NULL AUTO_INCREMENT,
-
-`IdInstitucion` INT NOT NULL,
-
-`IdUbicacionFisica` INT NULL COMMENT 'NULL = mismo lugar global / no aplica',
-
-`Nombre` VARCHAR(160) NOT NULL,
-
-`Orden` INT NOT NULL *DEFAULT* 0,
-
-`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
-
-*PRIMARY KEY* (`IdSalon`),
-
-KEY `idx_aloj_salon_inst` (`IdInstitucion`),
-
-KEY `idx_aloj_salon_uf` (`IdUbicacionFisica`),
-
-*CONSTRAINT* `fk_aloj_salon_inst`
-
-*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
-
-*ON DELETE CASCADE* ON UPDATE CASCADE,
-
-*CONSTRAINT* `fk_aloj_salon_uf`
-
-*FOREIGN KEY* (`IdUbicacionFisica`) *REFERENCES* `aloj_ubicacion_fisica` (`IdUbicacionFisica`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE
-
-) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
-
-- *- -----------------------------------------------------------------------------*
-- *- 4) Catálogo: rack (opcionalmente ligado a un salón)*
-- *- -----------------------------------------------------------------------------*
-
-CREATE TABLE IF NOT EXISTS `aloj_rack` (
-
-`IdRack` INT NOT NULL AUTO_INCREMENT,
-
-`IdInstitucion` INT NOT NULL,
-
-`IdSalon` INT NULL COMMENT 'NULL = rack sin salón específico',
-
-`Nombre` VARCHAR(160) NOT NULL,
-
-`Orden` INT NOT NULL *DEFAULT* 0,
-
-`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
-
-*PRIMARY KEY* (`IdRack`),
-
-KEY `idx_aloj_rack_inst` (`IdInstitucion`),
-
-KEY `idx_aloj_rack_salon` (`IdSalon`),
-
-*CONSTRAINT* `fk_aloj_rack_inst`
-
-*FOREIGN KEY* (`IdInstitucion`) *REFERENCES* `institucion` (`IdInstitucion`)
-
-*ON DELETE CASCADE* ON UPDATE CASCADE,
-
-*CONSTRAINT* `fk_aloj_rack_salon`
-
-*FOREIGN KEY* (`IdSalon`) *REFERENCES* `aloj_salon` (`IdSalon`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE
-
-) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
-
-- *- -----------------------------------------------------------------------------*
-- *- 5) Catálogo: posición / lugar dentro del rack*
-- *- -----------------------------------------------------------------------------*
-
-CREATE TABLE IF NOT EXISTS `aloj_lugar_rack` (
-
-`IdLugarRack` INT NOT NULL AUTO_INCREMENT,
-
-`IdRack` INT NOT NULL,
-
-`Nombre` VARCHAR(160) NOT NULL,
-
-`Orden` INT NOT NULL *DEFAULT* 0,
-
-`Activo` TINYINT(1) NOT NULL *DEFAULT* 1,
-
-*PRIMARY KEY* (`IdLugarRack`),
-
-KEY `idx_aloj_lr_rack` (`IdRack`),
-
-*CONSTRAINT* `fk_aloj_lr_rack`
-
-*FOREIGN KEY* (`IdRack`) *REFERENCES* `aloj_rack` (`IdRack`)
-
-*ON DELETE CASCADE* ON UPDATE CASCADE
-
-) ENGINE=InnoDB *DEFAULT* CHARSET=utf8mb4 *COLLATE*=utf8mb4_unicode_ci;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
-- *- -----------------------------------------------------------------------------*
-- *- 6) Extender alojamiento_caja (ubicación por caja)*
-- *- Si alguna columna ya existe, comentar solo esa línea y volver a ejecutar.*
-- *- -----------------------------------------------------------------------------*
-
-ALTER TABLE `alojamiento_caja`
-
-ADD COLUMN `IdUbicacionFisica` INT NULL *DEFAULT* NULL COMMENT 'Opcional' AFTER `Detalle`,
-
-ADD COLUMN `IdSalon` INT NULL *DEFAULT* NULL AFTER `IdUbicacionFisica`,
-
-ADD COLUMN `IdRack` INT NULL *DEFAULT* NULL AFTER `IdSalon`,
-
-ADD COLUMN `IdLugarRack` INT NULL *DEFAULT* NULL AFTER `IdRack`,
-
-ADD COLUMN `ComentarioUbicacion` VARCHAR(500) NULL *DEFAULT* NULL COMMENT 'Texto libre del lugar' AFTER `IdLugarRack`;
-
-ALTER TABLE `alojamiento_caja`
-
-ADD KEY `idx_acaja_uf` (`IdUbicacionFisica`),
-
-ADD KEY `idx_acaja_salon` (`IdSalon`),
-
-ADD KEY `idx_acaja_rack` (`IdRack`),
-
-ADD KEY `idx_acaja_lr` (`IdLugarRack`);
-
-ALTER TABLE `alojamiento_caja`
-
-ADD *CONSTRAINT* `fk_acaja_uf`
-
-*FOREIGN KEY* (`IdUbicacionFisica`) *REFERENCES* `aloj_ubicacion_fisica` (`IdUbicacionFisica`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE,
-
-ADD *CONSTRAINT* `fk_acaja_salon`
-
-*FOREIGN KEY* (`IdSalon`) *REFERENCES* `aloj_salon` (`IdSalon`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE,
-
-ADD *CONSTRAINT* `fk_acaja_rack`
-
-*FOREIGN KEY* (`IdRack`) *REFERENCES* `aloj_rack` (`IdRack`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE,
-
-ADD *CONSTRAINT* `fk_acaja_lr`
-
-*FOREIGN KEY* (`IdLugarRack`) *REFERENCES* `aloj_lugar_rack` (`IdLugarRack`)
-
-*ON DELETE* SET NULL ON UPDATE CASCADE;
-
-- *- -----------------------------------------------------------------------------*
-- *- 7) Semilla: una fila de etiquetas por cada institución existente*
-- *- -----------------------------------------------------------------------------*
-
-INSERT INTO `aloj_config_ubicacion` (
-
-`IdInstitucion`,
-
-`LabelLugarFisico`,
-
-`LabelSalon`,
-
-`LabelRack`,
-
-`LabelLugarRack`,
-
-`LabelComentarioUbicacion`
-
-)
-
-SELECT
-
-i.`IdInstitucion`,
-
-'Lugar físico',
-
-'Salón / sala',
-
-'Rack',
-
-'Posición en rack',
-
-'Comentario de ubicación'
-
-FROM `institucion` i
-
-LEFT JOIN `aloj_config_ubicacion` c ON c.`IdInstitucion` = i.`IdInstitucion`
-
-WHERE c.`IdInstitucion` IS NULL;
-
-- *- =============================================================================*
-- *- FIN. Verificar:*
-- *- SHOW CREATE TABLE alojamiento_caja;*
-- *- SELECT * FROM aloj_config_ubicacion;*
-- *- =============================================================================*
+- **aloj_config_ubicacion:** 
+- Tipo entidad: Subordinada (institucion)
+- Permite a cada institución personalizar cómo se llaman los componentes de su espacio de alojamiento…
+    - `[**IdInstitucion** *(int pk foranea institucion:IdInstitucion),* **LabelLugarFisico** *(varchar(120)),* **LabelSalon** *(varchar(120)),* **LabelRack** *(varchar(120)),* **LabelLugarRack** *(varchar(120)),* **LabelComentarioUbicacion** *(varchar(120))]*`
+- **aloj_ubicacion_fisica:** 
+- Tipo entidad: Subordinada (institucion)
+- Catálogo del macro-espacio físico institucional (ej. Edificio Bioterio, Exterior, Interior)…
+    - `[**IdUbicacionFisica** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Nombre** *(varchar(160)),* **Orden** *(int),* **Activo** *(tinyint(1))]*`
+- **aloj_salon:** 
+- Tipo entidad: Subordinada (institucion, aloj_ubicacion_fisica)
+- Catálogo de los salones o salas operativas; pueden pertenecer o no a un lugar físico general…
+    - `[**IdSalon** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUbicacionFisica** *(int foranea aloj_ubicacion_fisica:IdUbicacionFisica null),* **Nombre** *(varchar(160)),* **Orden** *(int),* **Activo** *(tinyint(1))]*`
+- **aloj_rack: (Nuevo)**
+- Tipo entidad: Subordinada (institucion, aloj_salon)
+- Estructuras de almacenamiento de cajas (racks) ligadas opcionalmente a un salón específico…
+    - `[**IdRack** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdSalon** *(int foranea aloj_salon:IdSalon null),* **Nombre** *(varchar(160)),* **Orden** *(int),* **Activo** *(tinyint(1))]*`
+- **aloj_lugar_rack: (Nuevo)**
+- Tipo entidad: Subordinada (aloj_rack)
+- Posiciones o lugares individuales albergados dentro de un rack en particular…
+    - `[**IdLugarRack** *(int ai),* **IdRack** *(int foranea aloj_rack:IdRack),* **Nombre** *(varchar(160)),* **Orden** *(int),* **Activo** *(tinyint(1))]*`
 
 ## COMO FUNCIONAN LOS ALOJAMIENTOS:
 
@@ -1455,8 +760,8 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
 
 - **reserva:**
     - Tipo entidad: Madre
-    - Entidad principal de reservas donde se pone la fecha tiempo , horariocomienzo, idsala y la institucion y si dura dias…
-        - - `*[***idReserva***(int ai) ,* **fechaini***(date null),* **fechafin***(date null),* **tiempo***(int null),* **IdSalaReserva***( int foranea reserva_sala:IdSalaReserva),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Horacomienzo***(time) ,***Horafin***(time) ]*`
+    - Entidad principal de reservas donde se pone la fecha tiempo. Se le agregó trazabilidad de usuarios, relaciones con series de repetición y sistema de aprobación por admins…
+        - `*[**idReserva**(int ai) ,* **fechaini**(date null), **fechafin***(date null), **tiempo**(int null), **IdSalaReserva**(int foranea reserva_sala:IdSalaReserva), **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUsrA** *(int foranea usuarioe:IdUsrA null),* **IdUsrCreador** *(int),* **IdUsrTitular** *(int),* **IdReservaSerie** *(int foranea reserva_serie:IdReservaSerie null),* **Aprobada** *(tinyint(1)),* **IdUsrAprobador** *(int foranea usuarioe:IdUsrA null),* **FechaAprobada** *(datetime null),* **Horacomienzo**(time) ,***Horafin***(time) ]`
 
 - **reserva_instrumento:**
     - Tipo entidad: Madre
@@ -1465,13 +770,13 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
 
 - **reserva_instrumento_sala:**
     - Tipo entidad: Relacion (reserva_instrumento, IdReserva)
-    - Son la cantidad de instrumentos que van a utilizar en la reserva, es una relacion…
-        - - `*[***IdReservaInstrumentoSala** *(int ai),* **IdReservaInstrumento***( int foranea reserva_instrumento:IdReservaInstrumento),* **IdReserva***(int foranea reserva:IdReserva)]*`
+    - Son la cantidad de instrumentos que van a utilizar en la reserva. Se agregó la cantidad de items a bloquear…
+        - `*[**IdReservaInstrumentoSala** (int ai), **IdReservaInstrumento**(int foranea reserva_instrumento:IdReservaInstrumento),* **cantidad** *(int),* **IdReserva***(int foranea reserva:idReserva)]*`
 
 - **reserva_sala:**
     - Tipo entidad: Madre
-    - Las salas habilitadas por institucion , poniendo su nombre y lugar…
-        - - `*[* **IdSalaReserva** *(int ai) ,* **Nombre** *(varchar(100) null),* **Lugar** *(varchar(100 null),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **habilitado***(int),***tipohorasalas***(int null) ]*`
+    - Las salas habilitadas por institucion , poniendo su nombre y lugar. Se agregó el token para QR…
+        - `*[**IdSalaReserva** (int ai) , **Nombre** (varchar(100) null), **Lugar** (varchar(100) null), **IdInstitucion** (int foranea institucion:IdInstitucion), **habilitado**(int),**tipohorasalas**(int null),* **QrToken** *(varchar(80) null)]*`
 
 - reserva_f**echadeshabilitada**
     - Tipo entidad: Subordinada (reserva_sala, institucion)
@@ -1503,96 +808,12 @@ Tengo claro estos 3 pilares fundamentales para cuando empecemos a trabajar en el
     - Entidad que define en qué salas específicas está permitido usar un instrumento. Si un instrumento no tiene registros en esta tabla, significa que tiene disponibilidad global y se puede utilizar en cualquier sala libremente…
         - `*[***IdInstrumentoSalaPermitida***(int ai),***IdReservaInstrumento**(int foranea reserva_instrumento:IdReservaInstrumento),**IdSalaReserva**(int foranea reserva_sala:IdSalaReserva)]`
 
-
-ALTER TABLE reserva_instrumento_sala
-ADD COLUMN IF NOT EXISTS cantidad INT NOT NULL DEFAULT 1 AFTER IdReservaInstrumento;
-
-ALTER TABLE reserva_instrumento_sala
-ADD UNIQUE KEY IF NOT EXISTS uq_reserva_inst (IdReserva, IdReservaInstrumento);
-
-ALTER TABLE reserva
-ADD COLUMN IF NOT EXISTS IdUsrA INT NULL AFTER IdInstitucion,
-ADD INDEX IF NOT EXISTS idx_reserva_usr (IdUsrA);
-
-ALTER TABLE reserva
-ADD CONSTRAINT fk_reserva_usr
-FOREIGN KEY (IdUsrA) REFERENCES usuarioe(IdUsrA)
-ON DELETE SET NULL;
-
-ALTER TABLE reserva
-ADD INDEX IF NOT EXISTS idx_reserva_sala_fecha (IdSalaReserva, fechaini, Horacomienzo, Horafin);
-
-ALTER TABLE reserva_instrumento_sala
-ADD INDEX IF NOT EXISTS idx_ris_inst (IdReservaInstrumento),
-ADD INDEX IF NOT EXISTS idx_ris_reserva (IdReserva);
-
-ALTER TABLE reserva
-ADD COLUMN IF NOT EXISTS IdUsrCreador INT NOT NULL AFTER IdInstitucion,
-ADD COLUMN IF NOT EXISTS IdUsrTitular INT NOT NULL AFTER IdUsrCreador,
-ADD INDEX IF NOT EXISTS idx_reserva_titular (IdUsrTitular),
-ADD INDEX IF NOT EXISTS idx_reserva_creador (IdUsrCreador);
-
-CREATE TABLE IF NOT EXISTS reserva_serie (
-IdReservaSerie INT AUTO_INCREMENT PRIMARY KEY,
-IdInstitucion INT NOT NULL,
-IdUsrCreador INT NOT NULL,
-IdUsrTitular INT NOT NULL,
-IdSalaReserva INT NOT NULL,
-
-HoraInicio TIME NOT NULL,
-HoraFin TIME NOT NULL,
-
-FechaInicio DATE NOT NULL,
-FechaFin DATE NOT NULL,
-
-TipoRepeat TINYINT NOT NULL COMMENT '1=semanal,2=dias_especificos',
-CadaNSemanas INT NOT NULL DEFAULT 1,
-DiasSemana VARCHAR(20) NULL COMMENT 'Ej: 1,3,5 (Lun,Mie,Vie) si semanal',
-FechasEspecificas TEXT NULL COMMENT 'JSON array de fechas YYYY-MM-DD si dias_especificos',
-
-Activa TINYINT(1) NOT NULL DEFAULT 1,
-FechaCreado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-INDEX idx_serie_inst_sala (IdInstitucion, IdSalaReserva),
-INDEX idx_serie_rango (FechaInicio, FechaFin)
-);
-
-ALTER TABLE reserva
-ADD COLUMN IF NOT EXISTS IdReservaSerie INT NULL AFTER idReserva,
-ADD INDEX IF NOT EXISTS idx_reserva_serie (IdReservaSerie);
-
-ALTER TABLE reserva_sala
-ADD COLUMN IF NOT EXISTS QrToken VARCHAR(80) NULL,
-ADD UNIQUE KEY IF NOT EXISTS uq_reserva_sala_qr (QrToken);
-
-- - A) columnas + índices (esto sí puede llevar IF NOT EXISTS)
-ALTER TABLE reserva
-ADD COLUMN IF NOT EXISTS Aprobada TINYINT(1) NOT NULL DEFAULT 1,
-ADD COLUMN IF NOT EXISTS IdUsrAprobador INT NULL,
-ADD COLUMN IF NOT EXISTS FechaAprobada DATETIME NULL,
-ADD INDEX IF NOT EXISTS idx_reserva_aprobada (IdInstitucion, Aprobada),
-ADD INDEX IF NOT EXISTS idx_reserva_aprobador (IdUsrAprobador);
-- - B) FK (SIN IF NOT EXISTS). Ejecutarla solo si no existe aún.
-ALTER TABLE reserva
-ADD CONSTRAINT fk_reserva_aprobador
-FOREIGN KEY (IdUsrAprobador) REFERENCES usuarioe(IdUsrA)
-ON DELETE SET NULL;
-
-ALTER TABLE institucion
-ADD COLUMN IF NOT EXISTS ReservasRequierenAprobacion TINYINT(1) NOT NULL DEFAULT 0;
-
-va a tener los dias de la semana
-
-donde el primer numero es el Lunes , cuando se trae de la base de datos a la app.. se pasa literalmente los dias para configurar y ta…
-
-deprecated a borrar
-
-- reserva_horasala
-
-- **reserva_diasala:**
-    - Tipo entidad: Madre
-    - Los dias que se van a relacionar con reserva_horariospordiasala para que se sepa bien que horarios hace cada dia la sala para reservar…
-        - - `*[***IdDiaSala** *(id ai),* **NombreDia***(varchar(100) ]*`
+- **reserva_serie:**
+    
+    -Tipo entidad: Maestra / Subordinada (institucion, usuarioe x2, reserva_sala)
+    -Control de ciclos y recurrencias lógicas en reservas para bloquear días o semanas en batch…
+    
+    - `[**IdReservaSerie***(int ai),***IdInstitucion***(int) ,***IdUsrCreador***(int) ,***IdUsrTitular***(int) ,***IdSalaReserva***(int) ,***HoraInicio***(time),***HoraFin***(time) ,***FechaInicio***(date),***FechaFin***(date),***TipoRepeat***(tinyint),***CadaNSemanas***(int),***DiasSemana***(varchar(20) null) ,***FechasEspecificas***(text null),* **Activa***(tinyint(1)),* **FechaCreado***(datetime)]*`
 
 ## CÓMO FUNCIONA EL MOTOR DE RESERVAS:
 
@@ -1626,16 +847,45 @@ Es vital distinguir esto en la lógica de negocio:
 
 ---
 
+## Mensajeria y noticias
+
+- **mensaje_hilo:** 
+- Tipo entidad: Maestra / Subordinada (institucion, usuarioe x2)
+- Controla las conversaciones principales (asíncronas) entre 2 individuos (1:1) dentro del ecosistema de una institución específica…
+- `[**IdMensajeHilo** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Asunto** *(varchar(255)),* **IdUsrParticipanteA** *(int foranea usuarioe:IdUsrA),* **IdUsrParticipanteB** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaUltimoMensaje** *(datetime null),* **OrigenTipo** *(varchar(50) null),* **OrigenId** *(int null),* **OrigenEtiqueta** *(varchar(255) null)]*`
+
+- **mensaje:** 
+- Tipo entidad: Subordinada (mensaje_hilo, institucion, usuarioe)
+- Unidad atómica de texto que habita dentro de un hilo de conversación creado…*
+    - `[**IdMensaje** *(int ai),* **IdMensajeHilo** *(int foranea mensaje_hilo:IdMensajeHilo),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUsrRemitente** *(int foranea usuarioe:IdUsrA),* **Cuerpo** *(text),* **FechaEnvio** *(datetime)]*`
+
+- **mensaje_leido:** 
+- Tipo entidad: Subordinada (mensaje, usuarioe)
+- Entidad auxiliar que registra las fechas de lectura para gestionar notificaciones y conteos de la UI…
+    - `[**IdMensaje** *(int pk foranea mensaje:IdMensaje),* **IdUsrLector** *(int pk foranea usuarioe:IdUsrA),* **LeidoEn** *(datetime)]*`
+
+- **noticia:** 
+- Tipo entidad: Maestra (institucion, usuarioe)
+- Noticias publicables para el dashboard interno o el portal (red). Maneja estados de publicación, categorías de colores y alcance (local/red)…
+    - `[**IdNoticia** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Alcance** *(varchar(20)),* **DependenciaRed** *(varchar(60) null),* **Titulo** *(varchar(255)),* **Categoria** *(varchar(80) null),* **CategoriaBadge** *(varchar(24) null),* **Cuerpo** *(text),* **Publicado** *(tinyint(1)),* **CompartirEnRed** *(tinyint(1)),* **FechaPublicacion** *(datetime null),* **IdUsrAutor** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaActualizacion** *(datetime null)]*`
+
+- **noticia_rol_publicar: (Nuevo)**
+- Tipo entidad: Subordinada (institucion, tipousuarioe)
+- Define si un rol institucional tiene permisos explícitos para gestionar y publicar noticias…
+    - `[**IdInstitucion** *(int pk foranea institucion:IdInstitucion),* **IdTipousrA** *(int pk foranea tipousuarioe:IdTipousrA),* **Activo** *(tinyint(1))]*`
+
+---
+
 ## Contabilidad
 
 - **precioformulario:**
     - Tipo entidad: Subordinada (formularioe)
-    - El precio total para los formularios de categoria reactivos o de animales vivos , donde se guarda el precio que tenia ese subespecie o reactivo en el momento se guarda y luego del actumulable del pedido * precioanimalmomento se hace el precioformulario, y el totalpago es el total de lo que va pagando la persona del formulario
+    - El precio total para los formularios de categoria reactivos o de animales vivos , donde se guarda el precio que tenia ese subespecie o reactivo en el momento se guarda y luego del actumulable del pedido * precioanimalmomento se hace el precioformulario, y el totalpago es el total de lo que va pagando la persona del formulario…
         - - `*[***IdPrecioForm** *(int ai),* **idformA** *(int foranea formularioe:IdFormA),* **precioformulario***(int) ,***fechaIniForm***(date),* **estaba***(int null),* **precioanimalmomento***(int null),***totalpago***(int)]*`
 
 - precioinsumosformulario:
     - Tipo entidad: Subordinada(formularioe)
-    - Es la entidad donde se hace una madre relacionada con el formulario para anexar a todos los insumos y precios y cantidad , donde el valor de esa cantidad e precios de insumos multiplicados de pediso se suman y da el resultado de preciototal , y tiene totalpago que es lo que pago del fomrulario, esta entidad tiene mucho deprecated, el forminsumo es el que trae todos los insumos para este precio
+    - Es la entidad donde se hace una madre relacionada con el formulario para anexar a todos los insumos y precios y cantidad , donde el valor de esa cantidad e precios de insumos multiplicados de pediso se suman y da el resultado de preciototal , y tiene totalpago que es lo que pago del fomrulario, esta entidad tiene mucho deprecated, el forminsumo es el que trae todos los insumos para este precio…
         - - `*[***idPrecioinsumosformulario** *(int ai) ,* **idformA** *( int foranea formularioe:IdFormA) , precioformviruta(deprecated) , precioformalimento(deprecated) , fechaini (date null) ,* **estaba***(int null) , precioformotros(deprecated) , cantalimento(deprecated) , cantviruta (deprecated) , cantotros(deprecated) , preciomomentoalimento(deprecated) , preciomomentoviruta(deprecated) , preciomomentootros(deprecated) ,* **preciototal***(int null),***totalpago** *(int default=0)]*`
 
 - **forminsumo** :
@@ -1648,10 +898,10 @@ Es vital distinguir esto en la lógica de negocio:
     - Auditoría financiera y estados de pago, se registran todos los movimientos de pagos que se haga en la parte de facturacion tiene 2 veces la foranea de IdUsrA, pero es por que tiene 2 usuarios el adminsitrador y al que se lo ejecuta…
         - - `*[***IdHistoPago** *(int ai),* **IdUsrAAdmin** *(int foreanea usuarioe:IdUsrA null),* **Monto** *(int),* **IdUsrA** *(int foranea usuarioe:IdUsrA null),* **IdFormA** *(int foranea formularioe:IdFormA),* **fecha** *(date),* **TipoHistorial** *(varchar(40)),* **IdInstitucion** *(int foranea institucion:IdInstitucion)]*`
 
-deprecated para eliminar:
-
-- **pagoformulario** :
-    - idpagoform, idformA, detallepago, TotalPago, PagoCompleto
+- **facturacion_formulario_derivado:**
+    - Tipo entidad: Subordinada (formularioe, formulario_derivacion, institucion x2, usuarioe)
+    - Registra el cobro entre la institución que atiende la solicitud y la que la deriva, separando contablemente esta transacción de los saldos generales…
+        - **`[IdFacturacionFormularioDerivado***(int ai),***idformA***(int foranea formularioe:idformA),***IdFormularioDerivacion***(int foranea formulario_derivacion:IdFormularioDerivacion),***IdInstitucionCobradora***(int foranea institucion:IdInstitucion),***IdInstitucionSolicitante***(int foranea institucion:IdInstitucion),***IdUsrSolicitante***(int foranea usuarioe:IdUsrA),***tipo_formulario***(varchar(40)),***monto_total***(decimal(12,2)),***monto_pagado***(decimal(12,2)),***estado_cobro***(tinyint),***FechaCreado***(datetime),***FechaActualizado***(datetime)]*`
 
 ## CÓMO FUNCIONA EL MOTOR DE COBROS:
 
@@ -1684,39 +934,6 @@ Las columnas `totalpago` en las tablas de precio funcionan como acumuladores.
 Esta entidad resuelve el problema de "¿Quién aceptó este pago?".
 
 - Si hay un error de caja, no solo sabes qué usuario "pagó", sino qué administrador estaba logueado y dio el clic para aceptar ese dinero. Es un mecanismo de seguridad interno muy robusto.
-
----
-
-## **Módulo Comunicación institucional (mensajería y noticias)**
-
-- **mensaje_hilo:**
-    - Tipo entidad: Maestra (institucion, usuarioe x2)
-    - Hilo de conversación **asíncrona** (tipo correo interno) entre **dos usuarios** de la **misma** `IdInstitucion`. El **asunto** es el título del hilo. Los campos `OrigenTipo` / `OrigenId` / `OrigenEtiqueta` permiten registrar si el hilo nació desde un formulario, alojamiento, aviso de correo, etc. (la app debe validar que `IdUsrParticipanteA` ≠ `IdUsrParticipanteB`).
-        - `*[***IdMensajeHilo** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Asunto** *(varchar(255)),* **IdUsrParticipanteA** *(int foranea usuarioe:IdUsrA),* **IdUsrParticipanteB** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaUltimoMensaje** *(datetime null),* **OrigenTipo** *(varchar(50) null),* **OrigenId** *(int null),* **OrigenEtiqueta** *(varchar(255) null)]*`
-
-- **mensaje:**
-    - Tipo entidad: Subordinada (mensaje_hilo, institucion, usuarioe)
-    - Cada **mensaje** del hilo: texto plano (sin adjuntos en v1), remitente y fecha. `IdInstitucion` se repite para consultas rápidas filtradas por institución (debe coincidir con el hilo).
-        - `*[***IdMensaje** *(int ai),* **IdMensajeHilo** *(int foranea mensaje_hilo:IdMensajeHilo),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdUsrRemitente** *(int foranea usuarioe:IdUsrA),* **Cuerpo** *(text),* **FechaEnvio** *(datetime)]*`
-
-- **mensaje_leido:**
-    - Tipo entidad: Subordinada (mensaje, usuarioe)
-    - Marca **qué usuario** ya leyó **qué mensaje** (para contador de no leídos y bandeja). Clave compuesta `(IdMensaje, IdUsrLector)`.
-        - `*[***IdMensaje** *(int foranea mensaje:IdMensaje),* **IdUsrLector** *(int foranea usuarioe:IdUsrA),* **LeidoEn** *(datetime)]*`
-
-- **noticia:**
-    - Tipo entidad: Maestra (institucion, usuarioe)
-    - Noticia para **dashboard** / **portal** con paginación. `Alcance`: **local** (solo la institución) o **red** (visible según reglas de red; no se mezcla en el listado con las locales). `DependenciaRed` opcional alinea con `institucion.DependenciaInstitucion` cuando hace falta filtrar el grupo de red. `Publicado` y `FechaPublicacion` controlan visibilidad.
-        - `*[***IdNoticia** *(int ai),* **IdInstitucion** *(int foranea institucion:IdInstitucion),* **Alcance** *(varchar(20): local|red),* **DependenciaRed** *(varchar(60) null),* **Titulo** *(varchar(255)),* **Cuerpo** *(text),* **Publicado** *(tinyint),* **FechaPublicacion** *(datetime null),* **IdUsrAutor** *(int foranea usuarioe:IdUsrA),* **FechaCreacion** *(datetime),* **FechaActualizacion** *(datetime null)]*`
-
-- **noticia_rol_publicar:**
-    - Tipo entidad: Relación (institucion, tipousuarioe)
-    - Define qué **roles** (`tipousuarioe`) pueden **crear/editar** noticias en cada institución (`Activo=1`). Complementa al menú dinámico (`menudistr`) para la pantalla de administración de noticias.
-        - `*[***IdInstitucion** *(int foranea institucion:IdInstitucion),* **IdTipousrA** *(int foranea tipousuarioe:IdTipousrA),* **Activo** *(tinyint)]*`
-
-**Script SQL de creación:** `docs/migrations/20260401_mensajeria_noticias.sql`
-
-**Operativa (app y menú):** El endpoint de menú (`MenuController`) puede inyectar ítems **204** (mensajes), **206** (portal de noticias) y **205** (admin de noticias) según rol e institución, cruzando con `noticia_rol_publicar` donde aplica. El contador de no leídos del menú usa la misma lógica que `MensajeriaModel::countUnreadTotal`. Migraciones opcionales: `docs/migrations/20260402_menudistr_noticias_admin_ejemplo.sql`, `docs/migrations/20260403_noticia_rol_publicar_seed_opcional.sql`.
 
 ---
 
@@ -1792,3 +1009,131 @@ El sistema financiero está diseñado para ser inmune a la inflación o cambios 
 - **Congelamiento:** En el momento en que un pedido pasa a "Entregado" o un alojamiento se cierra, el sistema copia el valor actual de los catálogos maestros (`precioanimalmomento`, `PreciomomentoInsumo`) y lo guarda en las tablas de deuda (`precioformulario`, `precioinsumosformulario`).
 - **Deuda Segregada:** Se mantienen canales de deuda separados para "Biológicos" y "Logísticos", permitiendo imputaciones de pago parciales y específicas.
 - **Auditoría de Doble Punta:** Cada transacción en `historialpago` registra obligatoriamente quién pagó (`IdUsrA`) y qué administrador ejecutó el cobro (`IdUsrAAdmin`), garantizando trazabilidad total ante arqueos de caja.
+
+Aquí tienes el mapa de categorías de tu base de datos:
+
+### 1. Módulo de Usuarios, Accesos y Seguridad
+
+*Gestiona la identidad, las credenciales, los roles y la personalización de la interfaz.*
+
+- `usuarioe`
+- `tipousuarioe`
+- `tienetipor`
+- `actividade`
+- `personae`
+- `menudistr`
+- `notificacioncorreo`
+- `dinero`
+- `bitacora`
+- `login_attempts`
+
+### 2. Módulo de Onboarding y Configuración Semilla
+
+*El entorno "Staging" para construir nuevas instituciones de forma abstracta antes de su despliegue.*
+
+- `form_registro_config`
+- `form_registro_respuestas`
+
+### 3. Módulo de Estructura Institucional
+
+*La columna vertebral multi-tenant que define las sedes, su jerarquía y los servicios que tienen activos.*
+
+- `institucion`
+- `modulosapp`
+- `modulosactivosinst`
+- `serviciosinst`
+- `organismoe`
+- `departamentoe`
+
+### 4. Módulo de Catálogo Biológico y Recursos (Inventario)
+
+*El maestro de artículos, separando lo vivo de lo inerte.*
+
+- `especiee`
+- `cepa`
+- `subespecie`
+- `insumo`
+- `insumoexperimental`
+
+### 5. Módulo de Protocolos Experimentales (Legal y Ético)
+
+*El "Gatekeeper" del sistema que valida cupos biológicos, vigencias y compartición en red.*
+
+- `protocoloexpe`
+- `protinstr`
+- `tipoprotocolo`
+- `protesper`
+- `protdeptor`
+- `tiposeveridad`
+- `solicitudprotocolo`
+- `solicitudadjuntosprotocolos`
+- `protocoloexpered`
+- `protocoloexpered_especies`
+- `protocoloexpeadjuntos`
+
+### 6. Módulo de Pedidos y Formularios (Transaccional)
+
+*El motor logístico polimórfico para solicitar animales, reactivos o insumos, incluyendo ahora la derivación entre sedes.*
+
+- `formularioe`
+- `tipoformularios`
+- `sexoe`
+- `formespe`
+- `protformr`
+- `formulario_derivacion`
+- `formulario_owner_actual`
+- `formulario_estado_historial`
+- `formulario_datos_originales`
+
+### 7. Módulo de Alojamiento y Trazabilidad (URBE)
+
+*Gestión del espacio físico y seguimiento clínico individualizado de cada unidad animal en el tiempo.*
+
+- `alojamiento`
+- `tipoalojamiento`
+- `categoriadatosunidadalojamiento`
+- `alojamiento_caja`
+- `especie_alojamiento_unidad`
+- `observacion_alojamiento_unidad`
+- `registroalojamiento`
+- `qralojamiento`
+- `aloj_config_ubicacion`
+- `aloj_ubicacion_fisica`
+- `aloj_salon`
+- `aloj_rack`
+- `aloj_lugar_rack`
+
+### 8. Módulo de Reservas y Gestión de Espacios
+
+*El motor de agenda cruzada que evita solapamientos de salas e instrumentos.*
+
+- `reserva`
+- `reserva_instrumento`
+- `reserva_instrumento_sala`
+- `reserva_sala`
+- `reserva_fechadeshabilitada`
+- `reserva_horariospordiasala`
+- `reserva_instrumento_sala_permitida`
+- `reserva_diasala`
+- `reserva_serie`
+
+### 9. Módulo de Comunicación y Noticias
+
+*El ecosistema asíncrono para hilos de mensajes internos y difusión de novedades (locales o en red).*
+
+- `mensaje_hilo`
+- `mensaje`
+- `mensaje_leido`
+- `noticia`
+- `noticia_rol_publicar`
+
+### 10. Módulo de Contabilidad y Facturación
+
+*El motor financiero inmutable que "congela" los precios y gestiona deudas/pagos cruzados.*
+
+- `precioformulario`
+- `precioinsumosformulario`
+- `forminsumo`
+- `historialpago`
+- `facturacion_formulario_derivado`
+

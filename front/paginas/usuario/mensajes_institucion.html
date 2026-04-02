@@ -24,7 +24,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
-        import { initMensajes } from '../../dist/js/pages/usuario/mensajes.js?v=20260407';
+        import { initMensajes } from '../../dist/js/pages/usuario/mensajes.js?v=20260402b';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -72,7 +72,8 @@
                         <div class="fw-bold mb-2" id="hilo-asunto"></div>
                         <div class="small text-muted mb-3" id="hilo-meta"></div>
                         <div id="hilo-mensajes" class="border rounded p-2 mb-3 bg-light" style="max-height: 360px; overflow-y: auto;"></div>
-                        <div class="d-flex gap-2">
+                        <p id="hilo-solo-lectura" class="small text-muted d-none mb-2" data-i18n="comunicacion.msg_inst_solo_lectura"></p>
+                        <div id="hilo-reply-wrap" class="d-flex gap-2">
                             <textarea class="form-control form-control-sm" id="reply-text" rows="2"></textarea>
                             <button type="button" class="btn btn-primary btn-sm align-self-end" id="btn-reply" data-i18n="comunicacion.msg_responder"></button>
                         </div>
@@ -90,6 +91,11 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="msg-nuevo-inst-tipo-block" class="mb-3 d-none">
+                        <label class="form-label small fw-bold" data-i18n="comunicacion.msg_inst_tipo_label"></label>
+                        <select class="form-select form-select-sm" id="nuevo-inst-tipo"></select>
+                        <small class="text-muted d-block mt-1" data-i18n="comunicacion.msg_inst_tipo_help"></small>
+                    </div>
                     <div id="msg-nuevo-dest-block">
                         <label class="form-label small fw-bold" data-i18n="comunicacion.msg_destinatario"></label>
                         <label for="nuevo-dest-filter" class="form-label small text-muted mb-0" data-i18n="comunicacion.msg_dest_filtro"></label>

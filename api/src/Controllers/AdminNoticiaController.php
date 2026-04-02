@@ -46,10 +46,13 @@ class AdminNoticiaController {
 
     /**
      * Quién puede listar/crear/editar noticias de la institución.
-     * Misma regla que el ítem de menú 205: roles 1, 2, 4 siempre; resto según noticia_rol_publicar (IdTipousrA).
+     * Misma regla que el ítem de menú 205: roles 1, 2, 4 siempre; resto según noticia_rol_publicar. El rol 3 (investigador) nunca.
      */
     private function assertPuedePublicar(array $sesion, int $instId): void {
         $role = (int)($sesion['role'] ?? 0);
+        if ($role === 3) {
+            throw new \Exception('No tiene permiso para gestionar noticias.');
+        }
         if (in_array($role, [1, 2, 4], true)) {
             return;
         }

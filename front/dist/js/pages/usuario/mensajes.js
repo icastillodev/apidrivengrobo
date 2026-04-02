@@ -30,7 +30,9 @@ function labelOrigenTipo(ot) {
         alojamiento: t.msg_cat_alojamiento,
         lista_usuarios: t.msg_cat_lista_usuarios,
         notificacion: t.msg_cat_notificacion,
-        institucional: t.msg_cat_institucional
+        institucional: t.msg_cat_institucional,
+        institucional_comunicado: t.msg_inst_tipo_comunicado,
+        consulta_institucion: t.msg_inst_tipo_consulta
     };
     const k = String(ot || '').trim();
     return m[k] || k || '';
@@ -75,6 +77,21 @@ export async function initMensajes(opts = {}) {
     if (instMode) {
         if (destBlock) destBlock.classList.add('d-none');
         if (catBlock) catBlock.classList.add('d-none');
+        const instTipoBlock = document.getElementById('msg-nuevo-inst-tipo-block');
+        if (instTipoBlock) instTipoBlock.classList.remove('d-none');
+    }
+
+    function fillInstTipoSelect() {
+        const sel = document.getElementById('nuevo-inst-tipo');
+        if (!sel) return;
+        const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const staff = [1, 2, 4, 5, 6].includes(role);
+        const opts = [];
+        if (staff) {
+            opts.push({ v: 'institucional_comunicado', l: t.msg_inst_tipo_comunicado || '' });
+        }
+        opts.push({ v: 'consulta_institucion', l: t.msg_inst_tipo_consulta || '' });
+        sel.innerHTML = opts.map((o) => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.l)}</option>`).join('');
     }
 
     let currentHiloId = null;
@@ -88,7 +105,8 @@ export async function initMensajes(opts = {}) {
             u.ApellidoA,
             u.Usuario,
             String(u.IdUsrA ?? ''),
-            u.NombreInstitucion
+            u.NombreInstitucion,
+            u.isInstitution ? 'institucion' : ''
         ].filter(Boolean).join(' ').toLowerCase();
     }
 
@@ -168,10 +186,18 @@ export async function initMensajes(opts = {}) {
             hdr.className = 'mensajes-dest-inst-banner';
             sel.appendChild(hdr);
             g.users.forEach((u) => {
-                const opt = document.createElement('option');
-                opt.value = String(u.IdUsrA);
-                opt.textContent = `\u00A0\u00A0${formatDestinatarioLabel(u)}`;
-                sel.appendChild(opt);
+                if (u.isInstitution) {
+                    const opt = document.createElement('option');
+                    opt.value = `inst-${u.IdInstitucion}`;
+                    const pref = (t.msg_dest_inst_badge || '').trim();
+                    opt.textContent = `\u00A0\u00A0${pref ? `${pref} ` : ''}${u.NombreInstitucion || ''}`;
+                    sel.appendChild(opt);
+                } else {
+                    const opt = document.createElement('option');
+                    opt.value = String(u.IdUsrA);
+                    opt.textContent = `\u00A0\u00A0${formatDestinatarioLabel(u)}`;
+                    sel.appendChild(opt);
+                }
             });
         }
 
@@ -209,9 +235,14 @@ export async function initMensajes(opts = {}) {
             const unread = parseInt(h.NoLeidos || 0, 10) > 0;
             const badge = unread ? ' <span class="badge bg-danger rounded-pill">!</span>' : '';
             const active = currentHiloId === parseInt(h.IdMensajeHilo, 10) ? ' active' : '';
+            const ot = String(h.OrigenTipo || '').trim();
+            const tipoBadge =
+                instMode && (ot === 'institucional_comunicado' || ot === 'consulta_institucion')
+                    ? ` <span class="badge bg-secondary rounded-pill">${escapeHtml(labelOrigenTipo(ot))}</span>`
+                    : '';
             return `
                 <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start text-start${active}" data-hilo="${h.IdMensajeHilo}">
-                    <span class="text-truncate me-2 small">${escapeHtml(h.Asunto || '—')}${badge}</span>
+                    <span class="text-truncate me-2 small">${escapeHtml(h.Asunto || '—')}${tipoBadge}${badge}</span>
                     <small class="text-muted text-nowrap">${escapeHtml(formatDate(h.FechaUltimoMensaje || h.FechaCreacion))}</small>
                 </button>`;
         }).join('');
@@ -241,6 +272,11 @@ export async function initMensajes(opts = {}) {
 
         const hilo = res.data.hilo;
         const mensajes = res.data.mensajes || [];
+        const puedeResponder = res.data?.puedeResponder !== false;
+        const replyWrap = document.getElementById('hilo-reply-wrap');
+        const soloLec = document.getElementById('hilo-solo-lectura');
+        if (replyWrap) replyWrap.classList.toggle('d-none', !puedeResponder);
+        if (soloLec) soloLec.classList.toggle('d-none', puedeResponder);
 
         const asuntoEl = document.getElementById('hilo-asunto');
         if (asuntoEl) asuntoEl.textContent = hilo.Asunto || '';
@@ -285,6 +321,8 @@ export async function initMensajes(opts = {}) {
     }
 
     async function sendReply() {
+        const wrap = document.getElementById('hilo-reply-wrap');
+        if (wrap?.classList.contains('d-none')) return;
         const el = document.getElementById('reply-text');
         const txt = el?.value?.trim();
         if (!currentHiloId || !txt) return;
@@ -348,9 +386,22 @@ export async function initMensajes(opts = {}) {
     });
 
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
+        const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const avisoInv = document.getElementById('msg-investigador-aviso');
+        if (avisoInv) {
+            avisoInv.classList.toggle('d-none', instMode || roleOpen !== 3);
+        }
+        const filPh = document.getElementById('nuevo-dest-filter');
+        if (filPh && !instMode) {
+            filPh.placeholder = roleOpen === 3
+                ? (t.msg_dest_filtro_ph_inv || t.msg_dest_filtro_ph || '')
+                : (t.msg_dest_filtro_ph || '');
+        }
         if (!instMode) {
             await fillDestinatarios();
             fillCategoriaNuevo();
+        } else {
+            fillInstTipoSelect();
         }
         modal?.show();
     });
@@ -366,11 +417,12 @@ export async function initMensajes(opts = {}) {
                 }
                 return;
             }
+            const tipoInst = document.getElementById('nuevo-inst-tipo')?.value || 'consulta_institucion';
             const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
                 EsInstitucional: true,
                 Asunto: asunto,
                 Cuerpo: cuerpo,
-                OrigenTipo: 'institucional'
+                OrigenTipo: tipoInst
             });
             if (res.status === 'success') {
                 const hid = res.data?.IdMensajeHilo;
@@ -390,21 +442,31 @@ export async function initMensajes(opts = {}) {
             return;
         }
 
-        const dest = parseInt(document.getElementById('nuevo-dest')?.value || '0', 10);
+        const destStr = document.getElementById('nuevo-dest')?.value || '0';
+        const dest = parseInt(destStr, 10);
         const origenTipo = (document.getElementById('nuevo-categoria')?.value || 'manual').trim() || 'manual';
-        if (!dest || !asunto || !cuerpo) {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({ icon: 'warning', text: t.msg_sel_dest || '' });
-            }
-            return;
-        }
-
-        const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
-            IdDestinatario: dest,
+        
+        let payload = {
             Asunto: asunto,
             Cuerpo: cuerpo,
             OrigenTipo: origenTipo
-        });
+        };
+
+        if (destStr.startsWith('inst-')) {
+            payload.EsInstitucional = true;
+            payload.IdInstitucionDestino = parseInt(destStr.replace('inst-', ''), 10);
+            if (payload.OrigenTipo === 'manual') {
+                payload.OrigenTipo = 'consulta_institucion';
+            }
+        } else {
+            payload.IdDestinatario = dest;
+            if (!dest) {
+                if (typeof Swal !== 'undefined') Swal.fire({ icon: 'warning', text: t.msg_sel_dest || '' });
+                return;
+            }
+        }
+
+        const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payload);
 
         if (res.status === 'success') {
             const hid = res.data?.IdMensajeHilo;
@@ -430,6 +492,10 @@ export async function initMensajes(opts = {}) {
             window.NotificationManager.check();
         }
     });
+
+    if (instMode) {
+        fillInstTipoSelect();
+    }
 
     await loadHilos();
 }

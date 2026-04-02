@@ -71,7 +71,9 @@ class AuthController {
             echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
             exit;
         }
-        $data['user'] = is_string($data['user']) ? strtolower(trim($data['user'])) : $data['user'];
+        $data['user'] = is_string($data['user'])
+            ? strtolower(trim(preg_replace('/\s+/', '', $data['user'])))
+            : $data['user'];
 
         // Determinar qué tipo de validación hacer según el Slug
         if ($data['instSlug'] === 'master' || $data['instSlug'] === 'superadmin') {
@@ -178,6 +180,8 @@ class AuthController {
     public function validateInstitution($slug) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+
+        $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
 
         // Los slugs reservados para administración maestra devuelven mock data
         if ($slug === 'superadmin' || $slug === 'admingrobogecko') {

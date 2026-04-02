@@ -5,6 +5,7 @@ import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
+import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 
 let allAnimals = [];
 let currentPage = 1;
@@ -135,6 +136,19 @@ async function syncAllData() {
     }
 }
 
+window.adminDeleteFormularioAnimal = async (idformA) => {
+    await runAdminFormularioDelete({
+        idformA,
+        categoria: 'animal',
+        onSuccess: async () => {
+            const el = document.getElementById('modal-animal');
+            const m = el && bootstrap.Modal.getInstance(el);
+            if (m) m.hide();
+            await syncAllData();
+        }
+    });
+};
+
 /**
  * GESTIÓN DE TABLA Y ORDENAMIENTO
  */
@@ -192,7 +206,13 @@ function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
         const icon = sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : (sortConfig.direction === 'desc' ? ' ▼' : ' -')) : ' -';
-        th.innerHTML = `${th.getAttribute('data-label')}${icon}`;
+        let iconSpan = th.querySelector('.sort-icon');
+        if (!iconSpan) {
+            iconSpan = document.createElement('span');
+            iconSpan.className = 'sort-icon ms-1';
+            th.appendChild(iconSpan);
+        }
+        iconSpan.textContent = icon;
     });
 }
 
@@ -481,6 +501,10 @@ function renderModalHeader(a, derivConfig) {
         : '';
 
     const legacyBanner = renderLegacyDerivacionBannerAnimal(a, false);
+    const tDel = window.txt?.admin_formularios || {};
+    const btnEliminar = puedeEliminarFormularioAdminSede()
+        ? `<button type="button" class="btn btn-sm btn-outline-danger align-self-start me-1" title="${String(tDel.delete_btn_title || '').split('"').join('&quot;')}" onclick="window.adminDeleteFormularioAnimal(${a.idformA})"><i class="bi bi-trash"></i> ${tDel.delete_btn || 'Eliminar'}</button>`
+        : '';
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div class="flex-grow-1 pe-2">
@@ -490,7 +514,10 @@ function renderModalHeader(a, derivConfig) {
             ${derivBox}
             ${derivInfoPanel}
         </div>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="d-flex align-items-center flex-shrink-0">
+            ${btnEliminar}
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
     </div>`;
 }
 

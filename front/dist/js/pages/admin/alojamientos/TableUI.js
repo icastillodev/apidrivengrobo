@@ -171,9 +171,14 @@ export const TableUI = {
     updateHeaderIcons() {
         document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
             const key = th.getAttribute('data-key');
-            const label = th.getAttribute('data-label') || (th.textContent || '').trim() || key || '';
             const icon = this.sortConfig.key === key ? (this.sortConfig.direction === 'asc' ? ' ▲' : (this.sortConfig.direction === 'desc' ? ' ▼' : ' -')) : ' -';
-            th.innerHTML = `${label}${icon}`;
+            let iconSpan = th.querySelector('.sort-icon');
+            if (!iconSpan) {
+                iconSpan = document.createElement('span');
+                iconSpan.className = 'sort-icon ms-1';
+                th.appendChild(iconSpan);
+            }
+            iconSpan.textContent = icon;
         });
     },
 

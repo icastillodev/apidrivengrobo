@@ -159,7 +159,11 @@ class NotificationController {
 
             $countMensajes = 0;
             if ($this->tableExists('mensaje') && $this->tableExists('mensaje_hilo') && $this->tableExists('mensaje_leido')) {
-                $countMensajes = $this->getMensajesNoLeidosCount((int)$sesion['userId'], (int)$instId);
+                $countMensajes = $this->getMensajesNoLeidosCount(
+                    (int) $sesion['userId'],
+                    (int) $instId,
+                    (int) ($sesion['role'] ?? 0)
+                );
             }
 
             $noticiasDesde = isset($_GET['noticias_desde']) ? trim((string)$_GET['noticias_desde']) : '';
@@ -224,11 +228,11 @@ class NotificationController {
         exit;
     }
 
-    private function getMensajesNoLeidosCount(int $userId, int $instId): int {
+    private function getMensajesNoLeidosCount(int $userId, int $instId, int $role): int {
         try {
             $model = new MensajeriaModel($this->db);
 
-            return $model->countUnreadInstitucional($userId, $instId);
+            return $model->countUnreadInstitucional($userId, $instId, $role);
         } catch (\Throwable $e) {
             return 0;
         }

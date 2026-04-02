@@ -839,14 +839,14 @@ window.showProtocolDetail = async (idprotA) => {
         </div>
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <div class="bg-primary bg-opacity-10 rounded p-3 text-center border border-primary">
+                <div class="bg-primary-subtle rounded p-3 text-center border border-primary">
                     <span class="d-block small text-primary text-uppercase fw-bold">Animales que usé</span>
                     <span class="fs-4 fw-bold text-primary">${usados}</span>
                     <div class="small text-muted mt-1">solo en formularios Entregados</div>
                 </div>
             </div>
             <div class="col-6">
-                <div class="bg-success bg-opacity-10 rounded p-3 text-center border border-success">
+                <div class="bg-success-subtle rounded p-3 text-center border border-success">
                     <span class="d-block small text-success text-uppercase fw-bold">Cupo restante</span>
                     <span class="fs-4 fw-bold text-success">${cupo}</span>
                     <div class="small text-muted mt-1">del protocolo</div>

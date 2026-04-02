@@ -3,6 +3,8 @@ import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
+import { refreshMenuNotifications } from '../../components/MenuComponent.js';
+import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 
 let allInsumos = [];
 let currentPage = 1;
@@ -138,6 +140,30 @@ function openInsumoFromUrlIfNeeded() {
     openedInsumoFromUrl = true;
     setTimeout(() => window.openInsumoModal(insumo), 200);
 }
+
+async function syncAllInsumosData() {
+    const instId = localStorage.getItem('instId');
+    const res = await API.request(`/insumos/all?inst=${instId}`);
+    if (res && res.status === 'success') {
+        allInsumos = res.data;
+        setupOriginInstitutionFilterInsumo();
+        renderTable();
+        refreshMenuNotifications();
+    }
+}
+
+window.adminDeleteFormularioInsumo = async (idformA) => {
+    await runAdminFormularioDelete({
+        idformA,
+        categoria: 'insumo',
+        onSuccess: async () => {
+            const el = document.getElementById('modal-insumo');
+            const m = el && bootstrap.Modal.getInstance(el);
+            if (m) m.hide();
+            await syncAllInsumosData();
+        }
+    });
+};
 
 /**
  * 3. RENDERIZADO DE TABLA Y PAGINACIÓN
@@ -322,6 +348,10 @@ function renderModalHeader(f) {
             ${isPendingAtDestination ? `<div>${lblWaitAccept}</div>` : ''}
         </div>`
         : '';
+    const tDel = window.txt?.admin_formularios || {};
+    const btnEliminar = puedeEliminarFormularioAdminSede()
+        ? `<button type="button" class="btn btn-sm btn-outline-danger align-self-start me-1" title="${String(tDel.delete_btn_title || '').split('"').join('&quot;')}" onclick="window.adminDeleteFormularioInsumo(${f.idformA})"><i class="bi bi-trash"></i> ${tDel.delete_btn || 'Eliminar'}</button>`
+        : '';
 
     return `<div class="p-4 border-bottom d-flex justify-content-between align-items-center bg-light">
         <div>
@@ -331,7 +361,10 @@ function renderModalHeader(f) {
             ${derivBox}
             ${derivInfoPanel}
         </div>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="d-flex align-items-center flex-shrink-0">
+            ${btnEliminar}
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
     </div>`;
 }
 
@@ -1047,7 +1080,13 @@ function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
         const icon = sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : (sortConfig.direction === 'desc' ? ' ▼' : '')) : '';
-        th.innerHTML = `${th.getAttribute('data-label')}<span class="small text-muted">${icon}</span>`;
+        let iconSpan = th.querySelector('.sort-icon');
+        if (!iconSpan) {
+            iconSpan = document.createElement('span');
+            iconSpan.className = 'sort-icon ms-1 small text-muted';
+            th.appendChild(iconSpan);
+        }
+        iconSpan.textContent = icon;
     });
 }
 /**

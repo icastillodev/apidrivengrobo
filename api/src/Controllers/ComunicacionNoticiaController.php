@@ -32,7 +32,7 @@ class ComunicacionNoticiaController {
     }
 
     /**
-     * GET ?alcance=local|red&page=1&pageSize=10
+     * GET ?alcance=local|red&page=1&pageSize=10&sort=fecha_desc|fecha_asc|titulo_asc|titulo_desc&search=text
      */
     public function getList() {
         try {
@@ -42,7 +42,13 @@ class ComunicacionNoticiaController {
             $page = max(1, (int)($_GET['page'] ?? 1));
             $pageSize = min(50, max(1, (int)($_GET['pageSize'] ?? 10)));
             $fullCuerpoLocal = isset($_GET['fullCuerpo']) && (string)$_GET['fullCuerpo'] === '1';
-            $out = $this->model->listPublic($instId, $alcance, $page, $pageSize, $fullCuerpoLocal);
+            $sort = strtolower(trim((string)($_GET['sort'] ?? 'fecha_desc')));
+            $search = trim((string)($_GET['search'] ?? ''));
+            $allowedSort = ['fecha_desc', 'fecha_asc', 'titulo_asc', 'titulo_desc'];
+            if (!in_array($sort, $allowedSort, true)) {
+                $sort = 'fecha_desc';
+            }
+            $out = $this->model->listPublic($instId, $alcance, $page, $pageSize, $fullCuerpoLocal, $sort, $search);
             $this->json([
                 'status' => 'success',
                 'data' => [

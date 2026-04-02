@@ -18,7 +18,7 @@
                 await loadLanguage(lang);
                 if (window.txt) translatePage();
             } catch (e) { console.warn('i18n:', e); }
-            initRecuperar();
+            await initRecuperar();
             var current = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
             document.querySelectorAll('[id^="btn-rec-lang-"]').forEach(function(btn) {
                 var isActive = btn.id === 'btn-rec-lang-' + current;
@@ -41,27 +41,62 @@
 
             <div class="bg-white w-full md:w-[60%] rounded-lg flex flex-col items-center justify-center p-12 text-center relative">
                 
-                <div id="recovery-form-container" class="w-full max-w-sm">
+                <div id="recovery-main-flow" class="w-full max-w-sm">
                     <h2 class="text-3xl font-black text-gray-900 uppercase mb-1 tracking-tighter" data-i18n="recuperar.titulo">Recuperar Acceso</h2>
-                    <p id="inst-label" class="text-amber-600 font-bold uppercase text-[10px] mb-8 tracking-widest italic" data-i18n="recuperar.cargando_inst">Cargando Institución...</p>
-                    
-                    <p class="text-gray-500 text-sm mb-8 leading-relaxed" data-i18n="recuperar.descripcion">Ingresa tus datos y te enviaremos un enlace para restablecer tu contraseña.</p>
+                    <p id="inst-label" class="text-amber-600 font-bold uppercase text-[10px] mb-6 tracking-widest italic" data-i18n="recuperar.cargando_inst">Cargando Institución...</p>
 
-                    <form id="recuperar-form" class="space-y-4 text-left">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="recuperar.label_usuario">Nombre de Usuario *</label>
-                            <input type="text" id="recovery-user" required data-i18n="recuperar.ph_usuario" placeholder="Tu login" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="recuperar.label_email">Correo Electrónico *</label>
-                            <input type="email" id="recovery-email" required data-i18n="recuperar.ph_email" placeholder="ejemplo@correo.com" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
-                        </div>
-                        <button type="submit" id="btn-enviar" class="w-full bg-black text-white py-4 rounded-xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-gray-900 transition-all active:scale-95" data-i18n="recuperar.btn_enviar">
-                            Enviar Enlace de Seguridad
+                    <div class="flex rounded-xl overflow-hidden border border-gray-200 mb-6" role="tablist">
+                        <button type="button" id="tab-password" role="tab" aria-selected="true"
+                            class="flex-1 py-3 px-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight bg-black text-white transition-colors">
+                            <span data-i18n="recuperar.tab_password">Olvidé mi contraseña</span>
                         </button>
-                    </form>
+                        <button type="button" id="tab-username" role="tab" aria-selected="false"
+                            class="flex-1 py-3 px-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-tight bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                            <span data-i18n="recuperar.tab_username">Olvidé mi usuario</span>
+                        </button>
+                    </div>
+
+                    <div id="panel-password" class="text-left">
+                        <p class="text-gray-500 text-xs mb-3 font-bold uppercase tracking-wide" data-i18n="recuperar.pasos_titulo">Pasos</p>
+                        <ol class="text-gray-500 text-sm mb-6 leading-relaxed list-decimal pl-4 space-y-2">
+                            <li data-i18n="recuperar.paso1_pass">Indica el mismo nombre de usuario con el que te registraste en esta institución.</li>
+                            <li data-i18n="recuperar.paso2_pass">Indica el correo electrónico asociado a esa cuenta.</li>
+                            <li data-i18n="recuperar.paso3_pass">Te enviaremos un enlace para crear una contraseña nueva.</li>
+                        </ol>
+                        <p class="text-gray-400 text-[10px] mb-4 leading-relaxed" data-i18n="recuperar.ayuda_mismo_correo">Debe ser el mismo correo que usaste al registrarte.</p>
+
+                        <form id="recuperar-form" class="space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="recuperar.label_usuario">Nombre de Usuario *</label>
+                                <input type="text" id="recovery-user" required data-i18n="recuperar.ph_usuario" placeholder="Tu login" autocomplete="username"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="recuperar.label_email">Correo Electrónico *</label>
+                                <input type="email" id="recovery-email" required data-i18n="recuperar.ph_email" placeholder="ejemplo@correo.com" autocomplete="email"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            </div>
+                            <button type="submit" id="btn-enviar" class="w-full bg-black text-white py-4 rounded-xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-gray-900 transition-all active:scale-95" data-i18n="recuperar.btn_enviar">
+                                Enviar enlace de seguridad
+                            </button>
+                        </form>
+                    </div>
+
+                    <div id="panel-username" class="hidden text-left">
+                        <p class="text-gray-500 text-sm mb-2 leading-relaxed" data-i18n="recuperar.descripcion_user">Si recuerdas tu correo pero no tu usuario, te enviaremos los nombres de usuario vinculados a ese correo en esta institución.</p>
+                        <p class="text-gray-400 text-[10px] mb-6 leading-relaxed" data-i18n="recuperar.ayuda_spam_user">Revisa también la carpeta de correo no deseado (SPAM).</p>
+
+                        <form id="recuperar-user-form" class="space-y-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="recuperar.label_email_solo">Correo electrónico *</label>
+                                <input type="email" id="recovery-email-user" required data-i18n="recuperar.ph_email" placeholder="ejemplo@correo.com" autocomplete="email"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                            </div>
+                            <button type="submit" id="btn-enviar-user" class="w-full bg-black text-white py-4 rounded-xl font-bold uppercase text-xs tracking-widest shadow-lg hover:bg-gray-900 transition-all active:scale-95" data-i18n="recuperar.btn_enviar_user">
+                                Enviar recordatorio de usuario
+                            </button>
+                        </form>
+                    </div>
 
                     <div class="mt-8 border-t border-gray-100 pt-6">
                         <a href="#" id="link-volver-login" class="text-[10px] font-bold text-gray-400 hover:text-amber-600 uppercase underline tracking-widest transition-colors" data-i18n="recuperar.volver_login">
@@ -82,8 +117,8 @@
                     <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     </div>
-                    <h2 class="text-2xl font-black text-gray-900 uppercase mb-4" data-i18n="recuperar.success_titulo">¡Correo Enviado!</h2>
-                    <p class="text-gray-500 text-sm mb-6 leading-relaxed" data-i18n="recuperar.success_msg">Revisa tu bandeja de entrada para recuperar tu cuenta.</p>
+                    <h2 id="recovery-success-title" class="text-2xl font-black text-gray-900 uppercase mb-4" data-i18n="recuperar.success_titulo">¡Correo enviado!</h2>
+                    <p id="recovery-success-msg" class="text-gray-500 text-sm mb-6 leading-relaxed" data-i18n="recuperar.success_msg">Revisa tu bandeja de entrada para recuperar tu cuenta.</p>
                     
                     <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 font-bold uppercase text-[9px] mb-8 tracking-tighter italic" data-i18n="recuperar.success_spam">
                         IMPORTANTE: Si no lo recibes, revisa tu carpeta de SPAM.

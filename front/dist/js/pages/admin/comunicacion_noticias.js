@@ -53,7 +53,7 @@ export async function initAdminNoticias() {
         const raw = r.FechaPublicacion;
         const fp = raw ? new Date(String(raw).replace(' ', 'T')) : null;
         if (fp && !Number.isNaN(fp.getTime()) && fp.getTime() > Date.now()) {
-            return t.admin_estado_programada || '';
+            return t.admin_estado_programada || 'Programada';
         }
         return t.admin_estado_publicada || '';
     }
@@ -69,8 +69,20 @@ export async function initAdminNoticias() {
     }
 
     function syncEstadoUI() {
-        const borrador = editEstado?.value === 'borrador';
-        wrapFechaCompartir?.classList.toggle('d-none', borrador);
+        const estado = editEstado?.value;
+        const wrapFc = document.getElementById('wrap-fecha-compartir');
+        const wrapProgramada = document.getElementById('wrap-fecha-programada');
+        
+        if (estado === 'borrador') {
+            wrapFc?.classList.add('d-none');
+        } else {
+            wrapFc?.classList.remove('d-none');
+            if (estado === 'programada') {
+                wrapProgramada?.classList.remove('d-none');
+            } else {
+                wrapProgramada?.classList.add('d-none');
+            }
+        }
     }
 
     editEstado?.addEventListener('change', syncEstadoUI);
@@ -159,8 +171,12 @@ export async function initAdminNoticias() {
         }
 
         const pub = parseInt(row.Publicado, 10) === 1;
+        const refPub = row.FechaPublicacion || row.FechaCreacion || '';
+        const fp = refPub ? new Date(String(refPub).replace(' ', 'T')) : null;
+        const isProgramada = pub && fp && !Number.isNaN(fp.getTime()) && fp.getTime() > Date.now();
+
         if (editEstado) {
-            editEstado.value = pub ? 'publicada' : 'borrador';
+            editEstado.value = !pub ? 'borrador' : (isProgramada ? 'programada' : 'publicada');
         }
         const compartir = legacyRed || parseInt(row.CompartirEnRed, 10) !== 0;
         const cb = document.getElementById('edit-compartir-red');
@@ -168,10 +184,7 @@ export async function initAdminNoticias() {
 
         const fechaIn = document.getElementById('edit-fecha-pub');
         if (fechaIn) {
-            // Si Publicado y FechaPublicacion es NULL (publicó “ahora”), el listado usa FechaCreación;
-            // el modal debe mostrar esa misma base para poder editarla sin depender de “programar”.
-            const refPub = row.FechaPublicacion || row.FechaCreacion || '';
-            fechaIn.value = pub ? toDatetimeLocal(refPub) : '';
+            fechaIn.value = (pub && isProgramada) ? toDatetimeLocal(refPub) : '';
         }
 
         syncEstadoUI();
@@ -204,7 +217,7 @@ export async function initAdminNoticias() {
         const categoriaBadge = document.getElementById('edit-categoria-badge')?.value || 'primary';
         const cuerpo = document.getElementById('edit-cuerpo')?.value?.trim() || '';
         const estado = editEstado?.value || 'borrador';
-        const publicado = estado === 'publicada' ? 1 : 0;
+        const publicado = estado === 'borrador' ? 0 : 1;
         const fechaVal = document.getElementById('edit-fecha-pub')?.value || '';
         const compartir = document.getElementById('edit-compartir-red')?.checked ? 1 : 0;
 
@@ -215,8 +228,13 @@ export async function initAdminNoticias() {
             Categoria: categoria,
             CategoriaBadge: categoria ? categoriaBadge : ''
         };
+        
         if (publicado) {
-            base.FechaPublicacion = fechaVal;
+            if (estado === 'programada' && fechaVal) {
+                base.FechaPublicacion = fechaVal;
+            } else {
+                base.FechaPublicacion = null;
+            }
             base.CompartirEnRed = compartir;
         }
 

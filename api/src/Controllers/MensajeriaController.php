@@ -37,8 +37,33 @@ class MensajeriaController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
             $uid = (int)$sesion['userId'];
-            $local = $this->model->listUsuariosInstitucionParaMensaje($instId, $uid);
-            $red = $this->model->listUsuariosRedMismaDependenciaParaMensaje($instId, $uid);
+            $role = (int)($sesion['role'] ?? 0);
+
+            $local = [];
+            $red = [];
+
+            if ($role === 3) {
+                // Role 3 solo puede enviar a su institución o a otras de la red (como institución)
+                $local[] = [
+                    'isInstitution' => true,
+                    'IdInstitucion' => $instId,
+                    'NombreInstitucion' => $this->model->getNombreInstitucion($instId)
+                ];
+            } else {
+                // Otros roles pueden enviar a personas de su institución
+                $local = $this->model->listUsuariosInstitucionParaMensaje($instId, $uid);
+            }
+
+            // Las de red siempre son instituciones (no personas)
+            $redInsts = $this->model->listInstitucionesRedMismaDependencia($instId);
+            foreach ($redInsts as $i) {
+                $red[] = [
+                    'isInstitution' => true,
+                    'IdInstitucion' => $i['IdInstitucion'],
+                    'NombreInstitucion' => $i['NombreInst']
+                ];
+            }
+
             $this->json(['status' => 'success', 'data' => ['local' => $local, 'red' => $red]]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
@@ -53,8 +78,9 @@ class MensajeriaController {
             $page = max(1, (int)($_GET['page'] ?? 1));
             $limit = min(50, max(5, (int)($_GET['limit'] ?? 20)));
             $alcance = strtolower(trim((string)($_GET['alcance'] ?? 'personal')));
+            $role = (int) ($sesion['role'] ?? 0);
             if ($alcance === 'institucional') {
-                $rows = $this->model->getHilosInstitucionales($instId, $uid, $page, $limit);
+                $rows = $this->model->getHilosInstitucionales($instId, $uid, $role, $page, $limit);
             } else {
                 $rows = $this->model->getHilosPersonal($uid, $page, $limit);
             }
@@ -69,7 +95,8 @@ class MensajeriaController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
             $uid = (int) $sesion['userId'];
-            $inst = $this->model->countUnreadInstitucional($uid, $instId);
+            $role = (int) ($sesion['role'] ?? 0);
+            $inst = $this->model->countUnreadInstitucional($uid, $instId, $role);
             $per = $this->model->countUnreadPersonal($uid);
             $this->json([
                 'status' => 'success',
@@ -90,7 +117,8 @@ class MensajeriaController {
             $instId = $this->requireInst($sesion);
             $hiloId = (int)$id;
             $uid = (int)$sesion['userId'];
-            $hilo = $this->model->getHiloRow($hiloId, $uid, $instId);
+            $role = (int) ($sesion['role'] ?? 0);
+            $hilo = $this->model->getHiloRow($hiloId, $uid, $instId, $role);
             if (!$hilo) {
                 $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
             }
@@ -98,7 +126,15 @@ class MensajeriaController {
             if (!empty($_GET['markRead']) && $_GET['markRead'] === '1') {
                 $this->model->markHiloLeido($hiloId, $uid);
             }
-            $this->json(['status' => 'success', 'data' => ['hilo' => $hilo, 'mensajes' => $mensajes]]);
+            $puedeResponder = $this->model->puedeResponderEnHilo($hilo, $uid, $role);
+            $this->json([
+                'status' => 'success',
+                'data' => [
+                    'hilo' => $hilo,
+                    'mensajes' => $mensajes,
+                    'puedeResponder' => $puedeResponder,
+                ],
+            ]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
@@ -110,7 +146,8 @@ class MensajeriaController {
             $instId = $this->requireInst($sesion);
             $hiloId = (int)$id;
             $uid = (int)$sesion['userId'];
-            if (!$this->model->getHiloRow($hiloId, $uid, $instId)) {
+            $role = (int) ($sesion['role'] ?? 0);
+            if (!$this->model->getHiloRow($hiloId, $uid, $instId, $role)) {
                 $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
             }
             $this->model->markHiloLeido($hiloId, $uid);
@@ -133,13 +170,14 @@ class MensajeriaController {
                 $input = [];
             }
 
+            $role = (int) ($sesion['role'] ?? 0);
             $idHilo = isset($input['IdMensajeHilo']) ? (int)$input['IdMensajeHilo'] : 0;
             if ($idHilo > 0) {
                 $cuerpo = (string)($input['Cuerpo'] ?? '');
-                $out = $this->model->responder($instId, $idHilo, $uid, $cuerpo);
+                $out = $this->model->responder($instId, $idHilo, $uid, $cuerpo, $role);
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 if ($code === 200) {
-                    $hRow = $this->model->getHiloRow($idHilo, $uid, $instId);
+                    $hRow = $this->model->getHiloRow($idHilo, $uid, $instId, $role);
                     if ($hRow) {
                         $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
                         $pb = (int) ($hRow['IdUsrParticipanteB'] ?? 0);
@@ -180,6 +218,8 @@ class MensajeriaController {
                 if ($origenEtiqueta === '') {
                     $origenEtiqueta = null;
                 }
+                $instDestinoId = isset($input['IdInstitucionDestino']) ? (int)$input['IdInstitucionDestino'] : null;
+
                 $out = $this->model->crearHiloInstitucional(
                     $instId,
                     $uid,
@@ -187,10 +227,19 @@ class MensajeriaController {
                     $cuerpo,
                     $origenTipo,
                     $origenId,
-                    $origenEtiqueta
+                    $origenEtiqueta,
+                    $role,
+                    $instDestinoId
                 );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 $this->json($out, $code);
+            }
+
+            if ($role === 3) {
+                $this->json([
+                    'status' => 'error',
+                    'message' => 'Los investigadores no pueden enviar mensajes directos a personas. Use el buzón a su institución o a otra sede de la red.',
+                ], 403);
             }
 
             $dest = (int)($input['IdDestinatario'] ?? 0);

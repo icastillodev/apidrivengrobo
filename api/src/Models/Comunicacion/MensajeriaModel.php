@@ -6,8 +6,73 @@ use PDO;
 class MensajeriaModel {
     private $db;
 
+    /** Comunicado de administración: visible para toda la sede; solo personal (no rol 3) responde. */
+    public const ORIGEN_INST_COMUNICADO = 'institucional_comunicado';
+
+    /** Consulta de un usuario a la institución: ven el autor y el personal; responden ambos. */
+    public const ORIGEN_INST_CONSULTA = 'consulta_institucion';
+
     public function __construct(PDO $db) {
         $this->db = $db;
+    }
+
+    /**
+     * Roles que pueden crear comunicados y responder en hilos institucionales de gestión.
+     * Alineado con menú 204 (excluye investigador típico rol 3).
+     */
+    public function esRolStaffInstitucional(int $role): bool {
+        return in_array($role, [1, 2, 4, 5, 6], true);
+    }
+
+    private function origenTipoInstitucionalNormalizado(array $row): string {
+        return strtolower(trim((string) ($row['OrigenTipo'] ?? '')));
+    }
+
+    /**
+     * Hilos institucionales que el usuario puede abrir (lista / detalle).
+     */
+    public function puedeVerHiloInstitucional(array $row, int $userId, int $role): bool {
+        if (!$this->hiloEsInstitucional($row)) {
+            return true;
+        }
+        $t = $this->origenTipoInstitucionalNormalizado($row);
+        if ($t === self::ORIGEN_INST_CONSULTA) {
+            return $this->esRolStaffInstitucional($role)
+                || (int) ($row['IdUsrParticipanteA'] ?? 0) === $userId;
+        }
+
+        return true;
+    }
+
+    /**
+     * Quién puede enviar una nueva respuesta en un hilo institucional.
+     */
+    public function puedeResponderHiloInstitucional(array $row, int $userId, int $role): bool {
+        if (!$this->hiloEsInstitucional($row)) {
+            return true;
+        }
+        $t = $this->origenTipoInstitucionalNormalizado($row);
+        if ($t === self::ORIGEN_INST_CONSULTA) {
+            return $this->esRolStaffInstitucional($role)
+                || (int) ($row['IdUsrParticipanteA'] ?? 0) === $userId;
+        }
+        if ($t === self::ORIGEN_INST_COMUNICADO) {
+            return $this->esRolStaffInstitucional($role);
+        }
+        // Legacy u otros (p. ej. "institucional"): solo personal autorizado o el autor del hilo (p. ej. consulta).
+        return $this->esRolStaffInstitucional($role)
+            || (int) ($row['IdUsrParticipanteA'] ?? 0) === $userId;
+    }
+
+    /**
+     * Si el usuario puede escribir una respuesta en este hilo (personal o institucional).
+     */
+    public function puedeResponderEnHilo(array $hilo, int $userId, int $role): bool {
+        if ($this->hiloEsInstitucional($hilo)) {
+            return $this->puedeResponderHiloInstitucional($hilo, $userId, $role);
+        }
+        // Investigador: no responde en hilos 1:1 (mensajes a personas); sí en institucional arriba.
+        return (int) $role !== 3;
     }
 
     public function usuarioEnInstitucion(int $instId, int $userId): bool {
@@ -130,13 +195,15 @@ class MensajeriaModel {
     }
 
     /**
-     * Hilos del buzón institucional de la sede (todos los usuarios de la institución ven y responden).
+     * Hilos del buzón institucional: comunicados visibles para toda la sede;
+     * consultas solo para staff y el usuario que las abrió.
      */
-    public function getHilosInstitucionales(int $instId, int $userId, int $page, int $limit): array {
+    public function getHilosInstitucionales(int $instId, int $userId, int $role, int $page, int $limit): array {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
             return [];
         }
         $offset = max(0, ($page - 1) * $limit);
+        $isStaff = $this->esRolStaffInstitucional($role) ? 1 : 0;
         $sql = "
             SELECT h.*,
               (SELECT m.Cuerpo FROM mensaje m
@@ -151,6 +218,11 @@ class MensajeriaModel {
                  )) AS NoLeidos
             FROM mensaje_hilo h
             WHERE h.IdInstitucion = :iid AND h.EsInstitucional = 1
+              AND (
+                LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
+                OR :isStaff = 1
+                OR h.IdUsrParticipanteA = :uid3
+              )
             ORDER BY COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) DESC, h.IdMensajeHilo DESC
             LIMIT {$limit} OFFSET {$offset}
         ";
@@ -158,7 +230,9 @@ class MensajeriaModel {
         $stmt->execute([
             ':uid1' => $userId,
             ':uid2' => $userId,
+            ':uid3' => $userId,
             ':iid' => $instId,
+            ':isStaff' => $isStaff,
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -193,14 +267,20 @@ class MensajeriaModel {
         return (int) $stmt->fetchColumn();
     }
 
-    public function countUnreadInstitucional(int $userId, int $instId): int {
+    public function countUnreadInstitucional(int $userId, int $instId, int $role): int {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
             return 0;
         }
+        $isStaff = $this->esRolStaffInstitucional($role) ? 1 : 0;
         $sql = "
             SELECT COUNT(*) FROM mensaje m
             INNER JOIN mensaje_hilo h ON h.IdMensajeHilo = m.IdMensajeHilo
             WHERE h.IdInstitucion = :iid AND h.EsInstitucional = 1
+              AND (
+                LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
+                OR :isStaff = 1
+                OR h.IdUsrParticipanteA = :uid3
+              )
               AND m.IdUsrRemitente <> :uid
               AND NOT EXISTS (
                 SELECT 1 FROM mensaje_leido ml
@@ -208,14 +288,20 @@ class MensajeriaModel {
               )
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([':iid' => $instId, ':uid' => $userId, ':uid2' => $userId]);
+        $stmt->execute([
+            ':iid' => $instId,
+            ':uid' => $userId,
+            ':uid2' => $userId,
+            ':uid3' => $userId,
+            ':isStaff' => $isStaff,
+        ]);
         return (int) $stmt->fetchColumn();
     }
 
     /**
-     * Acceso a un hilo: personal (A/B) o institucional (cualquier usuario de la sede).
+     * Acceso a un hilo: personal (A/B) o institucional (según tipo: comunicado sede / consulta privada a staff).
      */
-    public function getHiloAccesible(int $hiloId, int $userId, int $instId): ?array {
+    public function getHiloAccesible(int $hiloId, int $userId, int $instId, int $role = 0): ?array {
         $stmt = $this->db->prepare('
             SELECT * FROM mensaje_hilo
             WHERE IdMensajeHilo = ? AND IdInstitucion = ?
@@ -227,7 +313,11 @@ class MensajeriaModel {
             return null;
         }
         if ($this->hiloEsInstitucional($row)) {
-            return $this->usuarioEnInstitucion($instId, $userId) ? $row : null;
+            if (!$this->usuarioEnInstitucion($instId, $userId)) {
+                return null;
+            }
+
+            return $this->puedeVerHiloInstitucional($row, $userId, $role) ? $row : null;
         }
         $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
         $bRaw = $row['IdUsrParticipanteB'] ?? null;
@@ -239,7 +329,7 @@ class MensajeriaModel {
         return $userId === $a ? $row : null;
     }
 
-    public function getHiloRow(int $hiloId, int $userId, int $instId = 0): ?array {
+    public function getHiloRow(int $hiloId, int $userId, int $instId = 0, int $role = 0): ?array {
         if ($instId <= 0) {
             $stmt = $this->db->prepare('
                 SELECT * FROM mensaje_hilo
@@ -251,7 +341,7 @@ class MensajeriaModel {
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         }
 
-        return $this->getHiloAccesible($hiloId, $userId, $instId);
+        return $this->getHiloAccesible($hiloId, $userId, $instId, $role);
     }
 
     private function hiloEsInstitucional(array $row): bool {
@@ -302,6 +392,36 @@ class MensajeriaModel {
         ");
         $stmt->execute([$instId, $excludeUserId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listInstitucionesRedMismaDependencia(int $instId): array {
+        $stmt = $this->db->prepare("
+            SELECT i.IdInstitucion, i.NombreInst
+            FROM institucion i
+            INNER JOIN institucion mi ON mi.IdInstitucion = ?
+            WHERE i.IdInstitucion <> ?
+              AND mi.DependenciaInstitucion IS NOT NULL AND mi.DependenciaInstitucion <> ''
+              AND i.DependenciaInstitucion = mi.DependenciaInstitucion
+            ORDER BY i.NombreInst ASC
+        ");
+        $stmt->execute([$instId, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Otra sede pertenece a la misma dependencia (red) que la sede de referencia.
+     */
+    public function institucionEnMismaRed(int $instReferencia, int $instOtra): bool {
+        if ($instOtra <= 0 || $instReferencia === $instOtra) {
+            return $instReferencia === $instOtra && $instOtra > 0;
+        }
+        foreach ($this->listInstitucionesRedMismaDependencia($instReferencia) as $row) {
+            if ((int) ($row['IdInstitucion'] ?? 0) === $instOtra) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -388,10 +508,16 @@ class MensajeriaModel {
         }
     }
 
-    public function responder(int $instId, int $hiloId, int $remitenteId, string $cuerpo): array {
-        $h = $this->getHiloAccesible($hiloId, $remitenteId, $instId);
+    public function responder(int $instId, int $hiloId, int $remitenteId, string $cuerpo, int $role = 0): array {
+        $h = $this->getHiloAccesible($hiloId, $remitenteId, $instId, $role);
         if (!$h) {
             return ['status' => 'error', 'message' => 'Hilo no encontrado.'];
+        }
+        if (!$this->hiloEsInstitucional($h) && (int) $role === 3) {
+            return ['status' => 'error', 'message' => 'Los investigadores no responden en mensajes personales; use el buzón institucional.'];
+        }
+        if ($this->hiloEsInstitucional($h) && !$this->puedeResponderHiloInstitucional($h, $remitenteId, $role)) {
+            return ['status' => 'error', 'message' => 'No tiene permiso para responder en este hilo.'];
         }
         $cuerpo = trim(strip_tags($cuerpo));
         if ($cuerpo === '') {
@@ -441,7 +567,40 @@ class MensajeriaModel {
     }
 
     /**
-     * Nuevo hilo del buzón institucional (sin destinatario único; responde cualquier usuario de la sede).
+     * Resuelve el tipo de hilo institucional nuevo y comprueba permisos de creación.
+     *
+     * @return array{status:string, tipo?:string, message?:string}
+     */
+    private function resolverTipoCreacionInstitucional(?string $origenTipo, int $role): array {
+        $t = strtolower(trim((string) $origenTipo));
+        if ($t === self::ORIGEN_INST_CONSULTA) {
+            return ['status' => 'ok', 'tipo' => self::ORIGEN_INST_CONSULTA];
+        }
+        if ($t === self::ORIGEN_INST_COMUNICADO) {
+            if (!$this->esRolStaffInstitucional($role)) {
+                return ['status' => 'error', 'message' => 'Solo el personal autorizado puede publicar un comunicado institucional.'];
+            }
+
+            return ['status' => 'ok', 'tipo' => self::ORIGEN_INST_COMUNICADO];
+        }
+        // Legacy "institucional" o vacío: staff → comunicado; investigador → consulta a la institución
+        if ($t === 'institucional' || $t === '') {
+            if ($this->esRolStaffInstitucional($role)) {
+                return ['status' => 'ok', 'tipo' => self::ORIGEN_INST_COMUNICADO];
+            }
+
+            return ['status' => 'ok', 'tipo' => self::ORIGEN_INST_CONSULTA];
+        }
+
+        if (!$this->esRolStaffInstitucional($role)) {
+            return ['status' => 'error', 'message' => 'Tipo de mensaje institucional no permitido para su rol.'];
+        }
+
+        return ['status' => 'ok', 'tipo' => self::ORIGEN_INST_COMUNICADO];
+    }
+
+    /**
+     * Nuevo hilo institucional: comunicado de gestión (toda la sede) o consulta a la institución (autor + staff).
      */
     public function crearHiloInstitucional(
         int $instId,
@@ -450,7 +609,9 @@ class MensajeriaModel {
         string $cuerpo,
         ?string $origenTipo,
         ?int $origenId,
-        ?string $origenEtiqueta
+        ?string $origenEtiqueta,
+        int $role = 0,
+        ?int $instDestinoId = null
     ): array {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
             return ['status' => 'error', 'message' => 'El buzón institucional no está disponible. Ejecute la migración de base de datos.'];
@@ -467,6 +628,16 @@ class MensajeriaModel {
             return ['status' => 'error', 'message' => 'El asunto es demasiado largo.'];
         }
 
+        $resTipo = $this->resolverTipoCreacionInstitucional($origenTipo, $role);
+        if (($resTipo['status'] ?? '') !== 'ok') {
+            return ['status' => 'error', 'message' => $resTipo['message'] ?? 'No se pudo crear el mensaje.'];
+        }
+        $tipoGuardar = (string) $resTipo['tipo'];
+        $targetInst = $instDestinoId > 0 ? $instDestinoId : $instId;
+        if ($targetInst !== $instId && !$this->institucionEnMismaRed($instId, $targetInst)) {
+            return ['status' => 'error', 'message' => 'Institución destino no válida para su red.'];
+        }
+
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("
@@ -476,10 +647,10 @@ class MensajeriaModel {
                 VALUES (?, ?, ?, NULL, NOW(), NOW(), ?, ?, ?, 1)
             ");
             $stmt->execute([
-                $instId,
+                $targetInst,
                 $asunto,
                 $remitenteId,
-                $origenTipo,
+                $tipoGuardar,
                 $origenId,
                 $origenEtiqueta,
             ]);

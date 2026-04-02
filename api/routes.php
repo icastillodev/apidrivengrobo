@@ -23,8 +23,9 @@ $router->post('/user/config/update', 'UserConfigMenuController@updateConfig');
 // api/routes.php
 $router->post('/verify-2fa', 'AuthController@verify2FA');
 
-// Recuperación de Contraseña
+// Recuperación de Contraseña / usuario
 $router->post('/forgot-password', 'UserController@forgotPassword');
+$router->post('/forgot-username', 'UserController@forgotUsername');
 $router->post('/update-password-recovery', 'UserController@updatePasswordRecovery');
 
 // Rutas PÚBLICAS para el Formulario de Onboarding
@@ -196,6 +197,7 @@ $router->get('/animals/protocol-details', 'AnimalController@getProtocolDetails')
 $router->get('/animals/cepas', 'AnimalController@getCepasBySubespecie');
 $router->post('/animals/create-order', 'AnimalController@createOrder');
 
+$router->post('/admin/forms/delete', 'AdminFormularioController@delete');
 
 // ============================================================
 // SECCIÓN: Reactivos (Otros reactivos biológicos) 

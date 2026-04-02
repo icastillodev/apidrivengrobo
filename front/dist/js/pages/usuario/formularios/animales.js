@@ -582,7 +582,7 @@ async function handleReview(e) {
                 <span>Retiro:</span> <strong>${fecha}</strong>
             </div>
             
-            <div class="mb-2 p-2 bg-warning bg-opacity-10 border border-warning rounded">
+            <div class="mb-2 p-2 bg-warning-subtle border border-warning rounded">
                 <span class="text-muted small fw-bold">Aclaraciones:</span><br>
                 <em class="small text-dark">${aclaracion}</em>
             </div>

@@ -713,11 +713,26 @@ class FormDerivacionModel
 
     private function deleteFormularioAndRelated($idformA): void
     {
+        $idformA = (int)$idformA;
+        if (self::tableExists($this->db, 'facturacion_formulario_derivado')) {
+            $this->db->prepare("DELETE FROM facturacion_formulario_derivado WHERE idformA = ?")->execute([$idformA]);
+        }
+        if (self::tableExists($this->db, 'formulario_datos_originales')) {
+            $this->db->prepare("DELETE FROM formulario_datos_originales WHERE idformA = ?")->execute([$idformA]);
+        }
+        if (self::tableExists($this->db, 'formulario_estado_historial')) {
+            $this->db->prepare("DELETE FROM formulario_estado_historial WHERE idformA = ?")->execute([$idformA]);
+        }
         if (self::tableExists($this->db, 'formulario_owner_actual')) {
             $this->db->prepare("DELETE FROM formulario_owner_actual WHERE idformA = ?")->execute([$idformA]);
         }
-        if (self::tableExists($this->db, 'facturacion_formulario_derivado')) {
-            $this->db->prepare("DELETE FROM facturacion_formulario_derivado WHERE idformA = ?")->execute([$idformA]);
+        if (self::tableExists($this->db, 'formulario_derivacion')) {
+            if ($this->columnExists('formulario_derivacion', 'idformAOrigen')) {
+                $this->db->prepare("DELETE FROM formulario_derivacion WHERE idformA = ? OR idformAOrigen = ?")
+                         ->execute([$idformA, $idformA]);
+            } else {
+                $this->db->prepare("DELETE FROM formulario_derivacion WHERE idformA = ?")->execute([$idformA]);
+            }
         }
         $this->db->prepare("DELETE FROM sexoe WHERE idformA = ?")->execute([$idformA]);
         $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idformA]);
@@ -729,10 +744,36 @@ class FormDerivacionModel
         }
         $this->db->prepare("DELETE FROM precioinsumosformulario WHERE idformA = ?")->execute([$idformA]);
         $this->db->prepare("DELETE FROM formespe WHERE idformA = ?")->execute([$idformA]);
-        if (self::tableExists($this->db, 'formulario_estado_historial')) {
-            $this->db->prepare("DELETE FROM formulario_estado_historial WHERE idformA = ?")->execute([$idformA]);
-        }
         $this->db->prepare("DELETE FROM formularioe WHERE idformA = ?")->execute([$idformA]);
+    }
+
+    /**
+     * Borrado en cascada del formulario y tablas relacionadas (derivación, precios, etc.).
+     * Llamar dentro de transacción cuando el flujo lo requiera.
+     */
+    public function deleteFormularioCompletely(int $idformA): void
+    {
+        $this->deleteFormularioAndRelated($idformA);
+    }
+
+    /**
+     * Comprueba que la institución de sesión pueda operar sobre el formulario (dueño actual o fila legacy).
+     */
+    public static function assertSessionInstMayDeleteForm(\PDO $db, int $idformA, int $instId): void
+    {
+        if (self::tableExists($db, 'formulario_owner_actual')) {
+            self::assertInstitutionCanMutate($db, $idformA, $instId);
+            return;
+        }
+        $stmt = $db->prepare("SELECT IdInstitucion FROM formularioe WHERE idformA = ? LIMIT 1");
+        $stmt->execute([$idformA]);
+        $ownInst = (int)($stmt->fetchColumn() ?: 0);
+        if ($ownInst <= 0) {
+            throw new Exception("Formulario no encontrado.");
+        }
+        if ($ownInst !== (int)$instId) {
+            throw new Exception("Formulario no pertenece a esta institución.");
+        }
     }
 
     private function getActiveDerivation($idformA)

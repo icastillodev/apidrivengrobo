@@ -1,3 +1,5 @@
+import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
+
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO
     urlBase: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
@@ -136,13 +138,8 @@ export const API = {
             return;
         }
 
-        // Si es usuario normal
-        let slugDestino = '';
-        const pathParts = window.location.pathname.split('/'); 
-        const frontIndex = pathParts.indexOf('front');
-        if (frontIndex !== -1 && pathParts[frontIndex + 1] && pathParts[frontIndex + 1] !== 'paginas') {
-            slugDestino = pathParts[frontIndex + 1];
-        }
+        // Si es usuario normal: mismo criterio que Auth (barra final, /front/{slug}, ?inst=)
+        let slugDestino = extractInstitutionSlugFromPath(window.location.pathname, window.location.search);
         const reserved = ['admin', 'usuario', 'panel', 'superadmin', 'dist', 'api', 'paginas'];
         if (reserved.includes((slugDestino || '').toLowerCase())) {
             slugDestino = '';

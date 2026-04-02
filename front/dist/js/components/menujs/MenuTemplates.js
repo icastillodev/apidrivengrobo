@@ -6,8 +6,7 @@ export function getMenuTemplates(roleId = 0) {
         { label: window.txt.menu.my_accommodations, path: 'panel/misalojamientos' },
         { label: window.txt.menu.my_reservations, path: 'panel/misreservas' },
         { label: window.txt.menu.my_protocols, path: 'panel/misprotocolos' },
-        { label: window.txt.menu.messages_personal, path: 'panel/mensajes' },
-        { label: window.txt.menu.news_portal, path: 'panel/noticias' }
+        { label: window.txt.menu.messages_personal, path: 'panel/mensajes' }
     ];
     const children55 = inv55Children;
 

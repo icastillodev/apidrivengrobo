@@ -8,6 +8,7 @@ import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
+import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 
 let allReactivos = [];
 let currentPage = 1;
@@ -277,6 +278,10 @@ function renderModalHeader(r) {
             ${isPendingAtDestination ? `<div>${lblWaitAccept}</div>` : ''}
         </div>`
         : '';
+    const tDel = window.txt?.admin_formularios || {};
+    const btnEliminar = puedeEliminarFormularioAdminSede()
+        ? `<button type="button" class="btn btn-sm btn-outline-danger align-self-start me-1" title="${String(tDel.delete_btn_title || '').split('"').join('&quot;')}" onclick="window.adminDeleteFormularioReactivo(${r.idformA})"><i class="bi bi-trash"></i> ${tDel.delete_btn || 'Eliminar'}</button>`
+        : '';
     return `
     <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
         <div>
@@ -285,7 +290,10 @@ function renderModalHeader(r) {
             ${derivBox}
             ${derivInfoPanel}
         </div>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="d-flex align-items-center flex-shrink-0">
+            ${btnEliminar}
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
     </div>`;
 }
 
@@ -913,6 +921,19 @@ async function syncAllData() {
     }
 }
 
+window.adminDeleteFormularioReactivo = async (idformA) => {
+    await runAdminFormularioDelete({
+        idformA,
+        categoria: 'reactivo',
+        onSuccess: async () => {
+            const el = document.getElementById('modal-reactivo');
+            const m = el && bootstrap.Modal.getInstance(el);
+            if (m) m.hide();
+            await syncAllData();
+        }
+    });
+};
+
 function renderTable() {
     const tbody = document.getElementById('table-body-reactivos');
     const data = getFilteredAndSortedData(); 
@@ -1076,7 +1097,13 @@ function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
         const icon = sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : (sortConfig.direction === 'desc' ? ' ▼' : ' -')) : ' -';
-        th.innerHTML = `${th.getAttribute('data-label')}${icon}`;
+        let iconSpan = th.querySelector('.sort-icon');
+        if (!iconSpan) {
+            iconSpan = document.createElement('span');
+            iconSpan.className = 'sort-icon ms-1';
+            th.appendChild(iconSpan);
+        }
+        iconSpan.textContent = icon;
     });
 }
 

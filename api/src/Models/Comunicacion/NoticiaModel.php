@@ -64,7 +64,26 @@ class NoticiaModel {
     }
 
     /**
+     * Orden del listado público (whitelist; evita inyección SQL).
+     */
+    private function sqlOrderPublicList(string $sort, string $alias = ''): string {
+        $p = $alias !== '' ? $alias . '.' : '';
+        switch (strtolower(trim($sort))) {
+            case 'fecha_asc':
+                return "ORDER BY {$p}FechaPublicacion ASC, {$p}IdNoticia ASC";
+            case 'titulo_asc':
+                return "ORDER BY {$p}Titulo ASC, {$p}IdNoticia ASC";
+            case 'titulo_desc':
+                return "ORDER BY {$p}Titulo DESC, {$p}IdNoticia DESC";
+            case 'fecha_desc':
+            default:
+                return "ORDER BY {$p}FechaPublicacion DESC, {$p}IdNoticia DESC";
+        }
+    }
+
+    /**
      * Fecha/hora de publicación al guardar: borrador => null; publicar => payload, existente o ahora.
+     * Si el payload trae fecha, esa es la que debe guardarse, no sobreescribir con 'now()'.
      * @param string|null $fromPayload Valor enviado por el cliente (ISO o vacío).
      */
     private function resolveFechaPublicacion(?string $fromPayload, bool $publicado, ?string $existing): ?string {
@@ -95,6 +114,9 @@ class NoticiaModel {
     }
 
     public function puedePublicarNoticias(int $instId, int $idTipousrA): bool {
+        if ((int)$idTipousrA === 3) {
+            return false;
+        }
         $stmt = $this->db->prepare('
             SELECT Activo FROM noticia_rol_publicar
             WHERE IdInstitucion = ? AND IdTipousrA = ? LIMIT 1
@@ -110,10 +132,32 @@ class NoticiaModel {
     /**
      * Listado público paginado (solo publicadas).
      * @param bool $fullCuerpoLocal Si true y alcance=local, devuelve el cuerpo completo en Cuerpo (p. ej. dashboard).
+     * @param string $sort fecha_desc|fecha_asc|titulo_asc|titulo_desc
      */
-    public function listPublic(int $instId, string $alcance, int $page, int $pageSize, bool $fullCuerpoLocal = false): array {
+    public function listPublic(int $instId, string $alcance, int $page, int $pageSize, bool $fullCuerpoLocal = false, string $sort = 'fecha_desc', string $search = ''): array {
         $alcance = strtolower($alcance) === 'red' ? 'red' : 'local';
         $offset = max(0, ($page - 1) * $pageSize);
+        $orderLocal = $this->sqlOrderPublicList($sort, '');
+        $orderRed = $this->sqlOrderPublicList($sort, 'n');
+
+        $searchFilterLocal = "";
+        $searchFilterRed = "";
+        $paramsLocal = [$instId];
+        $paramsRed = [$instId];
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $searchFilterLocal = " AND (Titulo LIKE ? OR Cuerpo LIKE ? OR FechaPublicacion LIKE ?)";
+            $paramsLocal[] = $like;
+            $paramsLocal[] = $like;
+            $paramsLocal[] = $like;
+
+            $searchFilterRed = " AND (n.Titulo LIKE ? OR n.Cuerpo LIKE ? OR n.FechaPublicacion LIKE ? OR i.NombreInst LIKE ?)";
+            $paramsRed[] = $like;
+            $paramsRed[] = $like;
+            $paramsRed[] = $like;
+            $paramsRed[] = $like;
+        }
 
         if ($alcance === 'local') {
             $cuerpoSel = $fullCuerpoLocal
@@ -124,48 +168,54 @@ class NoticiaModel {
                        FechaPublicacion, FechaCreacion
                 FROM noticia
                 WHERE IdInstitucion = ? AND Alcance = 'local' AND " . $this->sqlVisiblePublicas() . "
-                ORDER BY FechaPublicacion DESC, IdNoticia DESC
+                {$searchFilterLocal}
+                {$orderLocal}
                 LIMIT " . (int)$pageSize . " OFFSET " . (int)$offset;
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$instId]);
+            $stmt->execute($paramsLocal);
         } else {
             // "Red" = noticias locales publicadas por otras instituciones con la misma dependencia (misma red).
             $dep = $this->getDependenciaRed($instId);
             if ($dep === null || $dep === '') {
                 return ['rows' => [], 'total' => 0];
             }
+            $paramsRed[] = $dep;
+
             $sql = "
                 SELECT n.IdNoticia, n.IdInstitucion, n.Alcance, n.Titulo, n.Categoria, n.CategoriaBadge,
                        LEFT(n.Cuerpo, 400) AS CuerpoResumen,
-                       n.FechaPublicacion, n.FechaCreacion, n.DependenciaRed
+                       n.FechaPublicacion, n.FechaCreacion, n.DependenciaRed,
+                       i.NombreInst AS NombreInstitucion
                 FROM noticia n
                 INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
                 WHERE n.Alcance = 'local' AND " . $this->sqlVisiblePublicas('n') . "
                   AND COALESCE(n.CompartirEnRed, 1) = 1
                   AND n.IdInstitucion <> ?
                   AND i.DependenciaInstitucion = ?
-                ORDER BY n.FechaPublicacion DESC, n.IdNoticia DESC
+                {$searchFilterRed}
+                {$orderRed}
                 LIMIT " . (int)$pageSize . " OFFSET " . (int)$offset;
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$instId, $dep]);
+            $stmt->execute($paramsRed);
         }
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $countSql = $alcance === 'local'
-            ? 'SELECT COUNT(*) FROM noticia WHERE IdInstitucion = ? AND Alcance = \'local\' AND ' . $this->sqlVisiblePublicas()
+            ? 'SELECT COUNT(*) FROM noticia WHERE IdInstitucion = ? AND Alcance = \'local\' AND ' . $this->sqlVisiblePublicas() . $searchFilterLocal
             : 'SELECT COUNT(*) FROM noticia n INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
                 WHERE n.Alcance = \'local\' AND ' . $this->sqlVisiblePublicas('n') . '
-                  AND COALESCE(n.CompartirEnRed, 1) = 1 AND n.IdInstitucion <> ? AND i.DependenciaInstitucion = ?';
+                  AND COALESCE(n.CompartirEnRed, 1) = 1 AND n.IdInstitucion <> ? AND i.DependenciaInstitucion = ?' . $searchFilterRed;
+        
         $cstmt = $this->db->prepare($countSql);
         if ($alcance === 'local') {
-            $cstmt->execute([$instId]);
+            $cstmt->execute($paramsLocal);
         } else {
             $dep = $this->getDependenciaRed($instId);
             if ($dep === null || $dep === '') {
                 return ['rows' => [], 'total' => 0];
             }
-            $cstmt->execute([$instId, $dep]);
+            $cstmt->execute($paramsRed);
         }
         $total = (int)$cstmt->fetchColumn();
 
@@ -355,6 +405,7 @@ class NoticiaModel {
             SELECT t.IdTipousrA, t.NombreCompleto, COALESCE(n.Activo, 0) AS Activo
             FROM tipousuarioe t
             LEFT JOIN noticia_rol_publicar n ON n.IdTipousrA = t.IdTipousrA AND n.IdInstitucion = ?
+            WHERE t.IdTipousrA NOT IN (1, 3)
             ORDER BY t.IdTipousrA ASC
         ");
         $stmt->execute([$instId]);
@@ -362,6 +413,9 @@ class NoticiaModel {
     }
 
     public function setRolPublicar(int $instId, int $idTipousrA, int $activo): array {
+        if (in_array((int)$idTipousrA, [1, 3], true)) {
+            return ['status' => 'error', 'message' => 'Este perfil no se configura aquí.'];
+        }
         $stmt = $this->db->prepare("
             INSERT INTO noticia_rol_publicar (IdInstitucion, IdTipousrA, Activo)
             VALUES (?, ?, ?)

@@ -49,25 +49,25 @@ class MenuController {
 
         $r = (int) $roleId;
 
-        // Superadmin (1), admin sede (2), subadmin (4): comunicación completa siempre (no depende de menudistr).
+        // Superadmin (1), admin sede (2), subadmin (4): 204 y 205 siempre en sede; 206 solo por menudistr (o forzado sin sede).
         if (in_array($r, [1, 2, 4], true)) {
-            foreach ([204, 205, 206] as $mid) {
+            foreach ([204, 205] as $mid) {
                 if (!in_array($mid, $ids)) {
                     $ids[] = $mid;
                 }
             }
+            // Sin IdInstitución (p. ej. superadmin): portal disponible; con sede, 206 solo si Activo=1 en menudistr (ya en $ids).
+            if ($instId <= 0 && !in_array(206, $ids)) {
+                $ids[] = 206;
+            }
             return array_values(array_unique($ids));
         }
 
-        // Resto de roles: 204 y 206 por defecto ON si no hay fila en menudistr; desactivables con Activo = 2.
-        // Investigador (3): misma regla (mensajería institucional + portal de noticias).
-        foreach ([204, 206] as $mid) {
-            if (in_array($mid, $ids)) {
-                continue;
-            }
-            $activo = $this->model->getMenudistrActivo($instId, $r, $mid);
-            if ($activo === null || $activo === 1) {
-                $ids[] = $mid;
+        // 204 (mensajería institucional): por defecto ON si no hay fila; Activo = 2 desactiva.
+        if (!in_array(204, $ids)) {
+            $activo204 = $this->model->getMenudistrActivo($instId, $r, 204);
+            if ($activo204 === null || $activo204 === 1) {
+                $ids[] = 204;
             }
         }
 

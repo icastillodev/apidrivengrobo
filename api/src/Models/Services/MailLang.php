@@ -26,6 +26,14 @@ class MailLang {
             'reset_paragraph2' => 'Haz clic en el botón inferior para definir una nueva contraseña. El enlace es válido por tiempo limitado.',
             'reset_btn' => 'CAMBIAR CONTRASEÑA',
 
+            'forgot_user_subject' => 'Tu nombre de usuario en GROBO',
+            'forgot_user_title' => 'Recordatorio de usuario',
+            'forgot_user_hello' => 'Hola',
+            'forgot_user_intro' => 'Solicitaste recordar tu nombre de usuario para la institución',
+            'forgot_user_list_intro' => 'Usuario(s) asociado(s) a este correo:',
+            'forgot_user_footer' => 'Si no solicitaste este mensaje, ignóralo. Para entrar, usa el botón inferior.',
+            'forgot_user_btn' => 'IR AL INICIO DE SESIÓN',
+
             'insumo_subject' => 'Actualización Pedido de Insumos',
             'insumo_title' => 'Actualización de Pedido',
             'insumo_hello' => 'Hola',
@@ -128,6 +136,14 @@ class MailLang {
             'reset_paragraph2' => 'Click the button below to set a new password. The link is valid for a limited time.',
             'reset_btn' => 'CHANGE PASSWORD',
 
+            'forgot_user_subject' => 'Your GROBO username',
+            'forgot_user_title' => 'Username reminder',
+            'forgot_user_hello' => 'Hello',
+            'forgot_user_intro' => 'You asked for a reminder of your username for the institution',
+            'forgot_user_list_intro' => 'Username(s) linked to this email:',
+            'forgot_user_footer' => 'If you did not request this message, you can ignore it. Use the button below to sign in.',
+            'forgot_user_btn' => 'GO TO SIGN IN',
+
             'insumo_subject' => 'Supplies Order Update',
             'insumo_title' => 'Order Update',
             'insumo_hello' => 'Hello',
@@ -229,6 +245,14 @@ class MailLang {
             'reset_paragraph' => 'Você solicitou a redefinição de sua senha para a instituição',
             'reset_paragraph2' => 'Clique no botão abaixo para definir uma nova senha. O link é válido por tempo limitado.',
             'reset_btn' => 'ALTERAR SENHA',
+
+            'forgot_user_subject' => 'Seu nome de usuário no GROBO',
+            'forgot_user_title' => 'Lembrete de usuário',
+            'forgot_user_hello' => 'Olá',
+            'forgot_user_intro' => 'Você solicitou lembrar seu nome de usuário na instituição',
+            'forgot_user_list_intro' => 'Usuário(s) associado(s) a este e-mail:',
+            'forgot_user_footer' => 'Se você não solicitou esta mensagem, ignore-a. Use o botão abaixo para entrar.',
+            'forgot_user_btn' => 'IR AO LOGIN',
 
             'insumo_subject' => 'Atualização do Pedido de Insumos',
             'insumo_title' => 'Atualização do Pedido',

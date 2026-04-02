@@ -29,7 +29,8 @@ class UserModel {
                     (SELECT COUNT(*) FROM protocoloexpe WHERE IdUsrA = u.IdUsrA AND IdInstitucion = u.IdInstitucion) as ProtocolCount
                     ,
                     COALESCE(a.ActivoA, 1) as ActivoA,
-                    t.IdTipousrA
+                    t.IdTipousrA,
+                    (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
                 FROM usuarioe u
                 JOIN personae p ON u.IdUsrA = p.IdUsrA
                 LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
@@ -42,17 +43,60 @@ class UserModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Usuario de login: minúsculas, sin espacios, [a-z0-9] inicial y luego [a-z0-9_-], 3–64 caracteres.
+     */
+    public function isValidUsernameFormat(string $user): bool {
+        $user = strtolower(trim($user));
+        if ($user === '' || strlen($user) < 3 || strlen($user) > 64) {
+            return false;
+        }
+        if (preg_match('/\s/', $user)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[a-z0-9][a-z0-9_-]*$/', $user);
+    }
+
+    /**
+     * Mismo nombre de usuario no puede repetirse en la misma institución (sí en otra).
+     */
+    public function existsUsernameInInstitution(string $user, int $instId): bool {
+        if ($instId <= 0) {
+            return false;
+        }
+        $user = is_string($user) ? strtolower(trim($user)) : '';
+        if ($user === '') {
+            return false;
+        }
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM usuarioe WHERE LOWER(TRIM(UsrA)) = ? AND IdInstitucion = ?');
+        $stmt->execute([$user, $instId]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
     public function registerUser($data) {
         try {
             $this->db->beginTransaction();
 
-            $email = isset($data['EmailA']) && is_string($data['EmailA']) ? trim($data['EmailA']) : '';
-            if ($email !== '' && $this->existsEmailInInstitution($email, $data['IdInstitucion'] ?? 0)) {
+            $instId = (int) ($data['IdInstitucion'] ?? 0);
+            $email = isset($data['EmailA']) && is_string($data['EmailA']) ? strtolower(trim($data['EmailA'])) : '';
+            if ($email !== '' && $this->existsEmailInInstitution($email, $instId)) {
                 $this->db->rollBack();
                 return ['status' => false, 'message' => 'email_duplicate_institution'];
             }
 
-            $usuario = is_string($data['usuario'] ?? '') ? strtolower(trim($data['usuario'])) : ($data['usuario'] ?? '');
+            $usuario = is_string($data['usuario'] ?? '') ? strtolower(trim($data['usuario'])) : '';
+            $usuario = preg_replace('/\s+/', '', $usuario);
+            if (!$this->isValidUsernameFormat($usuario)) {
+                $this->db->rollBack();
+                return ['status' => false, 'message' => 'username_invalid'];
+            }
+            if ($this->existsUsernameInInstitution($usuario, $instId)) {
+                $this->db->rollBack();
+                return ['status' => false, 'message' => 'username_duplicate_institution'];
+            }
+
             $token = bin2hex(random_bytes(32));
             $passHash = password_hash($data['contrasena'], PASSWORD_BCRYPT);
 
@@ -73,7 +117,7 @@ class UserModel {
             $stmtPers->execute([
                 $data['NombreA'], 
                 $data['ApellidoA'], 
-                $data['EmailA'], 
+                $email, 
                 $data['PaisA'], 
                 $data['CelularA'] ?? '', 
                 $userId
@@ -118,24 +162,21 @@ class UserModel {
         }
     }
 
-    public function existsUsername($user) {
-        $user = is_string($user) ? strtolower(trim($user)) : $user;
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM usuarioe WHERE LOWER(TRIM(UsrA)) = ?");
-        $stmt->execute([$user]);
-        return $stmt->fetchColumn() > 0;
-    }
-
     /**
      * Comprueba si el correo ya está registrado en la misma institución.
-     * El mismo correo puede existir en distintas instituciones.
+     * El mismo correo puede existir en distintas instituciones (comparación sin distinguir mayúsculas).
      */
     public function existsEmailInInstitution($email, $instId) {
-        if (!is_string($email) || trim($email) === '') return false;
-        $sql = "SELECT 1 FROM personae p 
+        if (!is_string($email) || trim($email) === '' || (int) $instId <= 0) {
+            return false;
+        }
+        $emailNorm = strtolower(trim($email));
+        $sql = 'SELECT 1 FROM personae p 
                 INNER JOIN usuarioe u ON p.IdUsrA = u.IdUsrA 
-                WHERE TRIM(p.EmailA) = ? AND u.IdInstitucion = ? LIMIT 1";
+                WHERE LOWER(TRIM(p.EmailA)) = ? AND u.IdInstitucion = ? LIMIT 1';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([trim($email), $instId]);
+        $stmt->execute([$emailNorm, $instId]);
+
         return $stmt->fetchColumn() > 0;
     }
 
@@ -178,12 +219,34 @@ class UserModel {
 
     public function getUserForRecovery($email, $username, $instId) {
         $username = is_string($username) ? strtolower(trim($username)) : $username;
+        $emailNorm = is_string($email) ? strtolower(trim($email)) : $email;
         $sql = "SELECT p.IdUsrA, p.NombreA FROM personae p 
                 JOIN usuarioe u ON p.IdUsrA = u.IdUsrA 
-                WHERE p.EmailA = ? AND LOWER(TRIM(u.UsrA)) = ? AND u.IdInstitucion = ? LIMIT 1";
+                WHERE LOWER(TRIM(p.EmailA)) = ? AND LOWER(TRIM(u.UsrA)) = ? AND u.IdInstitucion = ? LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$email, $username, $instId]);
+        $stmt->execute([$emailNorm, $username, $instId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Logins (UsrA) registrados con el correo en la institución (puede haber más de uno en datos legados).
+     *
+     * @return array<int, array{IdUsrA: int, UsrA: string, NombreA: string}>
+     */
+    public function getLoginsByEmailAndInst(string $email, int $instId): array {
+        $emailNorm = strtolower(trim($email));
+        if ($emailNorm === '' || $instId <= 0) {
+            return [];
+        }
+        $sql = "SELECT p.IdUsrA, u.UsrA, p.NombreA FROM personae p
+                INNER JOIN usuarioe u ON p.IdUsrA = u.IdUsrA
+                WHERE LOWER(TRIM(p.EmailA)) = ? AND u.IdInstitucion = ?
+                ORDER BY u.UsrA ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$emailNorm, $instId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows ?: [];
     }
 
     public function runMaintenance($instId) {

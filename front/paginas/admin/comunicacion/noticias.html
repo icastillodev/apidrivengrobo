@@ -101,11 +101,14 @@
                     <select class="form-select mb-2" id="edit-estado">
                         <option value="borrador" data-i18n="comunicacion.admin_estado_borrador"></option>
                         <option value="publicada" data-i18n="comunicacion.admin_estado_publicada_label"></option>
+                        <option value="programada" data-i18n="comunicacion.admin_estado_programada_label">Programada</option>
                     </select>
                     <div id="wrap-fecha-compartir" class="d-none">
-                        <label class="form-label small fw-bold" data-i18n="comunicacion.admin_fecha_publicacion"></label>
-                        <input type="datetime-local" class="form-control mb-1" id="edit-fecha-pub" step="60">
-                        <p class="small text-muted mb-2" data-i18n="comunicacion.admin_fecha_publicacion_help"></p>
+                        <div id="wrap-fecha-programada" class="d-none">
+                            <label class="form-label small fw-bold" data-i18n="comunicacion.admin_fecha_publicacion"></label>
+                            <input type="datetime-local" class="form-control mb-1" id="edit-fecha-pub" step="60">
+                            <p class="small text-muted mb-2" data-i18n="comunicacion.admin_fecha_publicacion_help"></p>
+                        </div>
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="edit-compartir-red" checked>
                             <label class="form-check-label" for="edit-compartir-red" data-i18n="comunicacion.admin_compartir_red"></label>

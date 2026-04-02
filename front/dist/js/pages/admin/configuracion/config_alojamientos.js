@@ -143,7 +143,7 @@ function renderClinical(list) {
         tbody.innerHTML += `
             <tr class="${isInactive ? 'bg-light text-muted' : ''}">
                 <td class="fw-bold ${isInactive ? 'text-muted' : 'text-dark'}">${c.NombreCatAlojUnidad}</td>
-                <td><span class="badge bg-info bg-opacity-10 text-info border border-info">${tipoHumano}</span></td>
+                <td><span class="badge bg-info-subtle text-info-emphasis border border-info">${tipoHumano}</span></td>
                 <td>${parentName}</td>
                 <td class="text-center">
                     <span class="badge ${isInactive ? 'bg-secondary' : 'bg-success'} rounded-pill" style="font-size: 10px; width: 80px;">
