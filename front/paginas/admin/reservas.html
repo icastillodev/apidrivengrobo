@@ -25,7 +25,7 @@
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
-        import { initAdminReservas } from '../../dist/js/pages/admin/reservas.js?v=20260331';
+        import { initAdminReservas } from '../../dist/js/pages/admin/reservas.js?v=20260403';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -47,6 +47,7 @@
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 
 <body class="bg-light" style="font-family: Lato, sans-serif;">
@@ -66,6 +67,9 @@
                 <button class="btn btn-outline-dark btn-sm fw-bold" id="btn-pdf-cal-mes">
                     <i class="bi bi-calendar3 me-1"></i><span data-i18n="admin_reservas.btn_pdf_cal_mes"></span>
                 </button>
+                <button class="btn btn-dark btn-sm fw-bold" type="button" id="btn-imprimir-qr" data-i18n="admin_reservas.btn_imprimir_qr">
+                    IMPRIMIR QR
+                </button>
                 <button class="btn btn-outline-secondary btn-sm fw-bold" id="btn-refresh">
                     <i class="bi bi-arrow-repeat me-1"></i><span data-i18n="admin_reservas.btn_actualizar"></span>
                 </button>
@@ -80,7 +84,12 @@
                 <div class="row g-3 align-items-end">
                     <div class="col-md-5">
                         <label class="form-label small fw-bold" data-i18n="admin_reservas.label_sala"></label>
-                        <select class="form-select fw-bold" id="select-sala"></select>
+                        <div class="d-flex gap-2 align-items-stretch">
+                            <select class="form-select fw-bold flex-grow-1" id="select-sala"></select>
+                            <button class="btn btn-outline-dark btn-sm fw-bold d-none text-nowrap" type="button" id="btn-qr-sala-rapido" title="">
+                                <i class="bi bi-qr-code"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small fw-bold" data-i18n="admin_reservas.label_dia_pdf"></label>
@@ -149,6 +158,38 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="modal-qr-print" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h5 class="modal-title fw-bold fs-6" data-i18n="admin_reservas.modal_qr_titulo"></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2" data-i18n="admin_reservas.modal_qr_desc"></p>
+                    <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_elige"></label>
+                    <select class="form-select mb-3" id="qr-print-tipo"></select>
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_titulo"></label>
+                            <input type="text" class="form-control form-control-sm" id="qr-pdf-titulo">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_sub"></label>
+                            <input type="text" class="form-control form-control-sm" id="qr-pdf-sub">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal" data-i18n="admin_reservas.modal_qr_cancel"></button>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold" id="btn-qr-print-ejecutar" data-i18n="admin_reservas.modal_qr_generar"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="qr-print-buffer" style="display:none;"></div>
 
     <div class="modal fade" id="modal-reserva" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">

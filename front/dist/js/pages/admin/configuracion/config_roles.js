@@ -5,15 +5,28 @@ let menuConfig = [];
 let currentPage = 1;
 const rowsPerPage = 12; 
 
-// --- 1. AGREGADO ROL 2 (ADMIN) Y CORRECCIÓN DE LABORATORIO A 6 ---
-const ROLE_NAMES = {
-    2: { label: 'Administrador', class: 'bg-dark text-white border-dark' }, // Admin
-    3: { label: 'Investigador', class: 'bg-info-subtle text-info border-info' },
-    4: { label: 'Sub Admin', class: 'bg-primary-subtle text-primary border-primary' },
-    5: { label: 'Asistente', class: 'bg-warning-subtle text-warning border-warning' },
-    6: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }, // Corregido a 6
-    7: { label: 'Laboratorio', class: 'bg-secondary-subtle text-secondary border-secondary' }  // Se mantiene por si hay registros legacy
+const ROLE_BADGE_CLASS = {
+    2: 'bg-dark text-white border-dark',
+    3: 'bg-info-subtle text-info border-info',
+    4: 'bg-primary-subtle text-primary border-primary',
+    5: 'bg-warning-subtle text-warning border-warning',
+    6: 'bg-secondary-subtle text-secondary border-secondary',
+    7: 'bg-secondary-subtle text-secondary border-secondary'
 };
+
+function roleLabelFromI18n(roleId) {
+    const t = window.txt?.config_roles;
+    if (!t) return String(roleId);
+    const map = {
+        2: t.rol_admin,
+        3: t.rol_investigador,
+        4: t.rol_subadmin,
+        5: t.rol_asistente,
+        6: t.rol_laboratorio,
+        7: t.rol_laboratorio
+    };
+    return map[roleId] || t.sin_rol_label || '—';
+}
 
 function esc(str) {
     return String(str || '')
@@ -36,9 +49,60 @@ const MENU_DEFINITION = [
     { id: 206, i18n: 'menu_206' }
 ];
 
+async function loadNoticiasRolesPublicar() {
+    const roleLevel = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    const bloque = document.getElementById('bloque-noticias-roles');
+    const tbody = document.getElementById('noticias-roles-tbody');
+    if (!bloque || !tbody || ![1, 2].includes(roleLevel)) {
+        return;
+    }
+
+    const res = await API.request('/admin/comunicacion/noticias/roles-publicar', 'GET');
+    if (res.status !== 'success' || !Array.isArray(res.data)) {
+        return;
+    }
+
+    bloque.classList.remove('d-none');
+    tbody.innerHTML = res.data.map((r) => {
+        const idt = parseInt(r.IdTipousrA, 10);
+        const activo = parseInt(r.Activo, 10) === 1;
+        const nombre = r.NombreCompleto || `Rol ${idt}`;
+        return `
+            <tr>
+                <td class="ps-3">${esc(nombre)}</td>
+                <td class="text-center">
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input noticia-rol-pub-switch" type="checkbox" data-id="${idt}" ${activo ? 'checked' : ''}>
+                    </div>
+                </td>
+            </tr>`;
+    }).join('');
+
+    const cr = window.txt?.config_roles || {};
+    tbody.querySelectorAll('.noticia-rol-pub-switch').forEach((inp) => {
+        inp.addEventListener('change', async () => {
+            const idt = parseInt(inp.getAttribute('data-id'), 10);
+            const Activo = inp.checked ? 1 : 0;
+            const r2 = await API.request('/admin/comunicacion/noticias/roles-publicar', 'POST', {
+                IdTipousrA: idt,
+                Activo
+            });
+            if (r2.status !== 'success' && typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: cr.swal_error_titulo || '',
+                    text: r2.message || cr.swal_error_generico || ''
+                });
+                inp.checked = !inp.checked;
+            }
+        });
+    });
+}
+
 export async function initConfigRoles() {
     await loadData();
-    
+    await loadNoticiasRolesPublicar();
+
     // Eventos de filtrado combinados
     document.getElementById('user-search').onkeyup = () => { 
         currentPage = 1; 
@@ -106,29 +170,32 @@ function renderUsers() {
     tbody.innerHTML = '';
 
     if (pageData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted">No se encontraron usuarios con esos filtros</td></tr>`;
+        const emptyMsg = window.txt?.config_roles?.tabla_sin_resultados || '';
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-muted">${esc(emptyMsg)}</td></tr>`;
         renderPagination(0);
         return;
     }
 
     pageData.forEach(u => {
         // Ya detectará el rol 2 y el 6 correctamente gracias al const ROLE_NAMES actualizado
-        const role = ROLE_NAMES[u.CurrentRoleId] || { label: 'Sin Rol', class: 'bg-light text-dark' };
+        const badgeClass = ROLE_BADGE_CLASS[u.CurrentRoleId] || 'bg-light text-dark';
+        const roleLabel = roleLabelFromI18n(u.CurrentRoleId);
         
         const tr = document.createElement('tr');
         tr.className = "clickable-row"; 
         const isAdminRole = u.CurrentRoleId == 2;
+        const tipSuper = window.txt?.config_roles?.tooltip_rol_super || '';
         tr.innerHTML = `
             <td class="ps-3 text-dark">
                 <span class="text-secondary small fw-normal me-1" style="font-size: 0.85em;">#${u.IdUsrA}</span>
                 <span class="fw-bold">${u.ApellidoA || ''}, ${u.NombreA || ''}</span>
             </td>
             <td class="text-primary fw-bold" style="letter-spacing: 0.5px;">@${u.UsrA || '---'}</td>
-            <td><span class="badge border ${role.class}" style="font-size: 10px;">${role.label}</span></td>
+            <td><span class="badge border ${badgeClass}" style="font-size: 10px;">${esc(roleLabel)}</span></td>
             <td class="text-end pe-3">
                 <button 
                     class="btn btn-sm btn-light border shadow-sm"
-                    ${isAdminRole ? 'disabled title="El rol Administrador (2) solo se modifica desde Superadmin."' : ''}
+                    ${isAdminRole ? `disabled title="${esc(tipSuper)}"` : ''}
                     data-usr="${esc(u.UsrA)}"
                     data-nombre="${esc(u.NombreA)}"
                     data-apellido="${esc(u.ApellidoA)}"
@@ -223,9 +290,9 @@ function renderMenuPermissions() {
 }
 
 window.openRoleModal = (userId, currentRole, btnEl) => {
-    // El rol 2 (Administrador) no se puede cambiar desde aquí
+    const cr = window.txt?.config_roles || {};
     if (currentRole == 2) {
-        Swal.fire('Rol protegido', 'El rol Administrador (2) solo puede ser otorgado o quitado por Superadmin.', 'info');
+        Swal.fire(cr.swal_rol_protegido_titulo || '', cr.swal_rol_protegido_texto || '', 'info');
         return;
     }
 
@@ -256,19 +323,20 @@ window.processRoleChange = async () => {
     fd.append('userId', userId);
     fd.append('newRoleId', newRoleId);
 
-    Swal.fire({ title: 'Actualizando...', didOpen: () => Swal.showLoading() });
+    const cr = window.txt?.config_roles || {};
+    Swal.fire({ title: cr.swal_actualizando || '...', didOpen: () => Swal.showLoading() });
 
     try {
         const res = await API.request('/admin/config/roles/update-user-role', 'POST', fd);
         if(res.status === 'success') {
-            Swal.fire({ title: 'Rol Actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
+            Swal.fire({ title: cr.swal_rol_actualizado || '', icon: 'success', timer: 1000, showConfirmButton: false });
             bootstrap.Modal.getInstance(document.getElementById('modal-role')).hide();
             loadData(); 
         } else {
-            Swal.fire('Error', res.message || 'Error al actualizar', 'error');
+            Swal.fire(cr.swal_error_titulo || 'Error', res.message || cr.swal_error_generico || '', 'error');
         }
     } catch (err) {
-        Swal.fire('Error', 'No se pudo actualizar el rol.', 'error');
+        Swal.fire(cr.swal_error_titulo || 'Error', cr.swal_error_actualizar_rol || '', 'error');
     }
 };
 

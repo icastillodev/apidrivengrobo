@@ -90,6 +90,16 @@ class AdminConfigReservasController {
         $this->jsonResponse($out);
     }
 
+    public function generarQrInstitucion() {
+        $sesion = Auditoria::getDatosSesion();
+        $role = (int)($sesion['role'] ?? 0);
+        if (!in_array($role, [1, 2, 4, 5, 6], true)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
+        }
+        $out = $this->model->generarQrInstitucion((int)$sesion['instId']);
+        $this->jsonResponse($out);
+    }
+
     public function getModoAprobacion() {
         $sesion = Auditoria::getDatosSesion();
         $out = $this->model->getModoAprobacion($sesion['instId']);

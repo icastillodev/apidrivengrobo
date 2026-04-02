@@ -15,19 +15,25 @@ function toDatetimeLocal(val) {
     return s.length >= 16 ? s.substring(0, 16) : s;
 }
 
+const NOTICIA_BADGE_VARIANTS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+
+function noticiaCategoriaBadgeHtml(r) {
+    const name = String(r?.Categoria ?? '').trim();
+    if (!name) return '';
+    let v = String(r?.CategoriaBadge ?? 'primary').toLowerCase();
+    if (!NOTICIA_BADGE_VARIANTS.includes(v)) v = 'primary';
+    return `<span class="badge text-bg-${v} ms-1" style="font-size:10px;vertical-align:middle;">${escapeHtml(name)}</span>`;
+}
+
 export async function initAdminNoticias() {
     const t = window.txt?.comunicacion || {};
     const pageSize = 15;
     let page = 1;
     let total = 0;
-    const roleLevel = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-
     const tbody = document.getElementById('admin-noticias-tbody');
     const infoEl = document.getElementById('admin-noticias-pag-info');
     const btnPrev = document.getElementById('admin-noticias-prev');
     const btnNext = document.getElementById('admin-noticias-next');
-    const bloqueRoles = document.getElementById('bloque-roles');
-    const rolesTbody = document.getElementById('roles-tbody');
     const editEstado = document.getElementById('edit-estado');
     const wrapFechaCompartir = document.getElementById('wrap-fecha-compartir');
 
@@ -95,7 +101,7 @@ export async function initAdminNoticias() {
                 const est = estadoLabel(r);
                 return `
                     <tr>
-                        <td class="text-muted">${escapeHtml(String(fp).substring(0, 16))}</td>
+                        <td class="text-muted text-nowrap">${escapeHtml(String(fp).substring(0, 16))}${noticiaCategoriaBadgeHtml(r)}</td>
                         <td class="fw-semibold">${escapeHtml(r.Titulo || '—')}</td>
                         <td class="text-center">${enRedBadge(r)}</td>
                         <td class="text-center"><span class="badge bg-light text-dark border">${escapeHtml(est)}</span></td>
@@ -138,6 +144,12 @@ export async function initAdminNoticias() {
         const row = res.data;
         document.getElementById('edit-id').value = String(row.IdNoticia || id);
         document.getElementById('edit-titulo').value = row.Titulo || '';
+        document.getElementById('edit-categoria').value = row.Categoria || '';
+        const selBadge = document.getElementById('edit-categoria-badge');
+        if (selBadge) {
+            const v = String(row.CategoriaBadge || 'primary').toLowerCase();
+            selBadge.value = NOTICIA_BADGE_VARIANTS.includes(v) ? v : 'primary';
+        }
         document.getElementById('edit-cuerpo').value = row.Cuerpo || '';
 
         const legacyRed = (row.Alcance || '').toLowerCase() === 'red';
@@ -156,7 +168,10 @@ export async function initAdminNoticias() {
 
         const fechaIn = document.getElementById('edit-fecha-pub');
         if (fechaIn) {
-            fechaIn.value = pub ? toDatetimeLocal(row.FechaPublicacion || '') : '';
+            // Si Publicado y FechaPublicacion es NULL (publicó “ahora”), el listado usa FechaCreación;
+            // el modal debe mostrar esa misma base para poder editarla sin depender de “programar”.
+            const refPub = row.FechaPublicacion || row.FechaCreacion || '';
+            fechaIn.value = pub ? toDatetimeLocal(refPub) : '';
         }
 
         syncEstadoUI();
@@ -168,6 +183,8 @@ export async function initAdminNoticias() {
     function abrirNueva() {
         document.getElementById('edit-id').value = '';
         document.getElementById('edit-titulo').value = '';
+        document.getElementById('edit-categoria').value = '';
+        document.getElementById('edit-categoria-badge').value = 'primary';
         document.getElementById('edit-cuerpo').value = '';
         document.getElementById('edit-legacy-red-hint')?.classList.add('d-none');
         if (editEstado) editEstado.value = 'borrador';
@@ -183,6 +200,8 @@ export async function initAdminNoticias() {
     async function guardar() {
         const idStr = document.getElementById('edit-id')?.value || '';
         const titulo = document.getElementById('edit-titulo')?.value?.trim() || '';
+        const categoria = document.getElementById('edit-categoria')?.value?.trim() || '';
+        const categoriaBadge = document.getElementById('edit-categoria-badge')?.value || 'primary';
         const cuerpo = document.getElementById('edit-cuerpo')?.value?.trim() || '';
         const estado = editEstado?.value || 'borrador';
         const publicado = estado === 'publicada' ? 1 : 0;
@@ -192,7 +211,9 @@ export async function initAdminNoticias() {
         const base = {
             Titulo: titulo,
             Cuerpo: cuerpo,
-            Publicado: publicado
+            Publicado: publicado,
+            Categoria: categoria,
+            CategoriaBadge: categoria ? categoriaBadge : ''
         };
         if (publicado) {
             base.FechaPublicacion = fechaVal;
@@ -240,46 +261,6 @@ export async function initAdminNoticias() {
         }
     }
 
-    async function cargarRoles() {
-        if (![1, 2, 4].includes(roleLevel) || !bloqueRoles || !rolesTbody) return;
-
-        const res = await API.request('/admin/comunicacion/noticias/roles-publicar', 'GET');
-        if (res.status !== 'success' || !Array.isArray(res.data)) {
-            return;
-        }
-
-        bloqueRoles.classList.remove('d-none');
-        rolesTbody.innerHTML = res.data.map((r) => {
-            const idt = parseInt(r.IdTipousrA, 10);
-            const activo = parseInt(r.Activo, 10) === 1;
-            const nombre = r.NombreCompleto || `Rol ${idt}`;
-            return `
-                <tr>
-                    <td>${escapeHtml(nombre)}</td>
-                    <td class="text-center">
-                        <div class="form-check form-switch d-inline-block">
-                            <input class="form-check-input rol-pub-switch" type="checkbox" data-id="${idt}" ${activo ? 'checked' : ''}>
-                        </div>
-                    </td>
-                </tr>`;
-        }).join('');
-
-        rolesTbody.querySelectorAll('.rol-pub-switch').forEach((inp) => {
-            inp.addEventListener('change', async () => {
-                const idt = parseInt(inp.getAttribute('data-id'), 10);
-                const Activo = inp.checked ? 1 : 0;
-                const r2 = await API.request('/admin/comunicacion/noticias/roles-publicar', 'POST', {
-                    IdTipousrA: idt,
-                    Activo
-                });
-                if (r2.status !== 'success' && typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'error', text: r2.message || t.err_generico || '' });
-                    inp.checked = !inp.checked;
-                }
-            });
-        });
-    }
-
     document.getElementById('btn-nueva-noticia')?.addEventListener('click', abrirNueva);
     document.getElementById('btn-guardar-noticia')?.addEventListener('click', guardar);
     btnPrev?.addEventListener('click', () => {
@@ -301,6 +282,5 @@ export async function initAdminNoticias() {
         await cargarLista({ silent: true });
     });
 
-    await cargarRoles();
     await cargarLista();
 }

@@ -120,6 +120,25 @@ class AdminConfigEspeciesController {
         exit;
     }
 
+    public function getSubespeciesByEspecie() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idespA = isset($_GET['idespA']) ? (int)$_GET['idespA'] : 0;
+            if ($idespA <= 0) {
+                throw new \Exception('Falta idespA.');
+            }
+            $data = $this->model->listSubespeciesByEspecieInst((int)$sesion['instId'], $idespA);
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function getCepas() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

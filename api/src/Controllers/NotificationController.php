@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Comunicacion\MensajeriaModel;
 use App\Models\Comunicacion\NoticiaModel;
+use App\Models\Reactivo\ReactivoModel;
 use App\Utils\Auditoria;
 
 class NotificationController {
@@ -10,6 +11,14 @@ class NotificationController {
 
     public function __construct($db) {
         $this->db = $db;
+    }
+
+    /**
+     * Misma noción de “pendiente” que la bandeja admin: sin estado explícito, NULL o vacío.
+     */
+    private function sqlFormularioEstadoPendienteBadge(string $alias = 'f'): string {
+        $e = "{$alias}.estado";
+        return "({$e} IS NULL OR TRIM(COALESCE({$e},'')) = '' OR LOWER(TRIM({$e})) = 'sin estado' OR {$e} = 'Sin estado')";
     }
 
     public function getMenuNotifications() {
@@ -80,11 +89,12 @@ class NotificationController {
             $countProtRedIncomplete = (int)($stmtProtRedIncomplete->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
             $countProt = $countProtSolicitudes + $countProtRedIncomplete;
 
+            $pend = $this->sqlFormularioEstadoPendienteBadge('f');
             $sqlAni = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
-                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                       WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.categoriaformulario = 'Animal'";
+                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
+                       WHERE f.IdInstitucion = ? AND {$pend}
+                       AND LOWER(TRIM(t.categoriaformulario)) IN ('animal', 'animal vivo')";
             $stmtAni = $this->db->prepare($sqlAni);
             $stmtAni->execute([$instId]);
             $countAni = $stmtAni->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
@@ -92,21 +102,22 @@ class NotificationController {
                 $sqlAniDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
                                 FROM formulario_derivacion d
                                 INNER JOIN formularioe f ON f.idformA = d.idformA
-                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
                                 WHERE d.IdInstitucionDestino = ?
                                   AND d.estado_derivacion = 1
                                   AND d.Activo = 1
-                                  AND t.categoriaformulario = 'Animal'";
+                                  AND LOWER(TRIM(t.categoriaformulario)) IN ('animal', 'animal vivo')";
                 $stmtAniDeriv = $this->db->prepare($sqlAniDeriv);
                 $stmtAniDeriv->execute([$instId]);
                 $countAni += (int)($stmtAniDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
             }
 
+            $reaPred = ReactivoModel::sqlPredicadoFormularioReactivo('t');
             $sqlRea = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
-                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                       WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.categoriaformulario = 'Otros reactivos biologicos'";
+                       LEFT JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
+                       WHERE f.IdInstitucion = ? AND {$pend}
+                       AND {$reaPred}";
             $stmtRea = $this->db->prepare($sqlRea);
             $stmtRea->execute([$instId]);
             $countRea = $stmtRea->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
@@ -114,11 +125,11 @@ class NotificationController {
                 $sqlReaDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
                                 FROM formulario_derivacion d
                                 INNER JOIN formularioe f ON f.idformA = d.idformA
-                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                LEFT JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
                                 WHERE d.IdInstitucionDestino = ?
                                   AND d.estado_derivacion = 1
                                   AND d.Activo = 1
-                                  AND t.categoriaformulario = 'Otros reactivos biologicos'";
+                                  AND {$reaPred}";
                 $stmtReaDeriv = $this->db->prepare($sqlReaDeriv);
                 $stmtReaDeriv->execute([$instId]);
                 $countRea += (int)($stmtReaDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
@@ -126,9 +137,9 @@ class NotificationController {
 
             $sqlIns = "SELECT COUNT(f.idformA) as total 
                        FROM formularioe f 
-                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
-                       WHERE f.IdInstitucion = ? AND f.estado = 'Sin estado' 
-                       AND t.categoriaformulario = 'Insumos'";
+                       INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
+                       WHERE f.IdInstitucion = ? AND {$pend}
+                       AND LOWER(TRIM(t.categoriaformulario)) = 'insumos'";
             $stmtIns = $this->db->prepare($sqlIns);
             $stmtIns->execute([$instId]);
             $countIns = $stmtIns->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0;
@@ -136,11 +147,11 @@ class NotificationController {
                 $sqlInsDeriv = "SELECT COUNT(DISTINCT d.idformA) as total
                                 FROM formulario_derivacion d
                                 INNER JOIN formularioe f ON f.idformA = d.idformA
-                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                                INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario AND t.IdInstitucion = f.IdInstitucion
                                 WHERE d.IdInstitucionDestino = ?
                                   AND d.estado_derivacion = 1
                                   AND d.Activo = 1
-                                  AND t.categoriaformulario = 'Insumos'";
+                                  AND LOWER(TRIM(t.categoriaformulario)) = 'insumos'";
                 $stmtInsDeriv = $this->db->prepare($sqlInsDeriv);
                 $stmtInsDeriv->execute([$instId]);
                 $countIns += (int)($stmtInsDeriv->fetch(\PDO::FETCH_ASSOC)['total'] ?? 0);
@@ -148,7 +159,7 @@ class NotificationController {
 
             $countMensajes = 0;
             if ($this->tableExists('mensaje') && $this->tableExists('mensaje_hilo') && $this->tableExists('mensaje_leido')) {
-                $countMensajes = $this->getMensajesNoLeidosCount((int)$sesion['userId']);
+                $countMensajes = $this->getMensajesNoLeidosCount((int)$sesion['userId'], (int)$instId);
             }
 
             $noticiasDesde = isset($_GET['noticias_desde']) ? trim((string)$_GET['noticias_desde']) : '';
@@ -213,11 +224,11 @@ class NotificationController {
         exit;
     }
 
-    private function getMensajesNoLeidosCount(int $userId): int {
+    private function getMensajesNoLeidosCount(int $userId, int $instId): int {
         try {
             $model = new MensajeriaModel($this->db);
 
-            return $model->countUnreadTotal($userId);
+            return $model->countUnreadInstitucional($userId, $instId);
         } catch (\Throwable $e) {
             return 0;
         }

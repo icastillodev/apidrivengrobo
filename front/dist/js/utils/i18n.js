@@ -118,13 +118,15 @@ const PATH_TO_TITLE_KEY = {
     'usuario/misprotocolos': 'mis_protocolos', 'panel/misprotocolos': 'mis_protocolos',
     'usuario/misalojamientos': 'mis_alojamientos', 'panel/misalojamientos': 'mis_alojamientos',
     'usuario/misreservas': 'mis_reservas', 'panel/misreservas': 'mis_reservas',
-    'usuario/mensajes': 'mensajes', 'panel/mensajes': 'mensajes', 'usuario/perfil': 'perfil', 'panel/perfil': 'perfil',
+    'usuario/mensajes': 'mensajes', 'panel/mensajes': 'mensajes',
+    'usuario/mensajes_institucion': 'mensajes_institucion', 'panel/mensajes_institucion': 'mensajes_institucion',
+    'usuario/perfil': 'perfil', 'panel/perfil': 'perfil',
     'panel/noticias': 'noticias_portal',
     'admin/comunicacion/noticias': 'noticias_admin',
     'superadmin/dashboard': 'superadmin_dashboard', 'superadmin/instituciones': 'superadmin_instituciones',
     'superadmin/institucionformulario': 'superadmin_formulario', 'superadmin/usuarios_global': 'superadmin_usuarios', 'superadmin/bitacora': 'superadmin_dashboard',
     'registro': 'registro', 'recuperar': 'recuperar', 'confirmar': 'confirmar', 'resetear': 'resetear', 'error404': 'error404', 'construccion': 'construccion',
-    'formulario/index': 'formulario_registro_inst', 'qr-alojamiento': 'qr_alojamiento', 'qr-sala': 'qr_sala'
+    'formulario/index': 'formulario_registro_inst', 'qr-alojamiento': 'qr_alojamiento', 'qr-sala': 'qr_sala', 'qr-salas': 'qr_salas'
 };
 
 export function applyPageTitle() {

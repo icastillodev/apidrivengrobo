@@ -65,10 +65,6 @@ try {
             if (resMenu && resMenu.status === "success") {
                 ids = (resMenu.data || []).map(id => Number(id));
             }
-            // Investigador (3): sin entrada de mensajes (204); el desplegable 55 también se filtra en plantillas.
-            if (roleId === 3) {
-                ids = ids.filter((id) => id !== 204);
-            }
         }
 
         // Forzar SIEMPRE el menú 55 para roles 5 (Asistente) y 6 (Laboratorio)

@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 
 let SALAS = [];
 let INVESTIGADORES = [];
@@ -9,6 +10,28 @@ const calState = {
   bundle: null,
   selectedDate: null,
   selectedSlot: null
+};
+
+window.composeMensajeReservaTitular = async (idUsrTitular, idReserva) => {
+  const id = parseInt(idUsrTitular, 10);
+  const rid = parseInt(idReserva, 10);
+  const tc = window.txt?.comunicacion || {};
+  if (!id || !rid) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
+    }
+    return;
+  }
+  const tr = window.txt?.admin_reservas || {};
+  const asunto = `${tc.msg_asunto || ''} · ${tr.msg_asunto_reserva_prefix || 'Reserva'} #${rid}`;
+  await openMensajeriaCompose({
+    destinatarioId: id,
+    origenTipo: 'manual',
+    origenId: rid,
+    origenEtiqueta: `Reserva #${rid}`,
+    asunto,
+    lockCategory: true
+  });
 };
 
 export function initAdminReservas() {
@@ -39,6 +62,10 @@ export function initAdminReservas() {
   if (btnPdfCalMes) btnPdfCalMes.onclick = () => exportPDFCalendarioMesSala();
   const btnPend = document.getElementById('btn-refresh-pend');
   if (btnPend) btnPend.onclick = () => loadPendientes();
+
+  document.getElementById('btn-imprimir-qr')?.addEventListener('click', () => openModalQrPrint(false));
+  document.getElementById('btn-qr-sala-rapido')?.addEventListener('click', () => openModalQrPrint(true));
+  document.getElementById('btn-qr-print-ejecutar')?.addEventListener('click', () => ejecutarImpresionQrPdf());
 
   document.getElementById('res-modo').onchange = () => toggleSerieUI();
   document.getElementById('serie-tipo').onchange = () => toggleSerieUI();
@@ -84,6 +111,111 @@ async function loadSalas() {
   });
 
   sel.value = 'all';
+  wireSelectSalaQrVisibility();
+}
+
+function wireSelectSalaQrVisibility() {
+  const sel = document.getElementById('select-sala');
+  const btn = document.getElementById('btn-qr-sala-rapido');
+  if (!sel || !btn || sel.dataset.qrWired === '1') return;
+  sel.dataset.qrWired = '1';
+  const sync = () => {
+    const v = sel.value;
+    const show = v && v !== 'all';
+    btn.classList.toggle('d-none', !show);
+    const t = window.txt?.admin_reservas || {};
+    btn.title = t.btn_qr_sala_tooltip || '';
+  };
+  sel.addEventListener('change', sync);
+  sync();
+}
+
+function fillQrPrintTipoOptions(preselectId) {
+  const sel = document.getElementById('qr-print-tipo');
+  if (!sel) return;
+  const t = window.txt?.admin_reservas || {};
+  sel.innerHTML = `<option value="general">${escapeHtml(t.qr_opt_general || 'Todas las salas (general)')}</option>`;
+  SALAS.forEach((s) => {
+    const label = `${s.Nombre || ''}${s.Lugar ? ` — ${s.Lugar}` : ''}`;
+    sel.insertAdjacentHTML('beforeend', `<option value="${s.IdSalaReserva}">${escapeHtml(label)}</option>`);
+  });
+  if (preselectId && String(preselectId) !== 'all') {
+    sel.value = String(preselectId);
+  } else {
+    sel.value = 'general';
+  }
+}
+
+function openModalQrPrint(preferSalaSeleccionada) {
+  const main = document.getElementById('select-sala')?.value || 'all';
+  const pre = preferSalaSeleccionada && main && main !== 'all' ? main : null;
+  fillQrPrintTipoOptions(pre);
+  const t = window.txt?.admin_reservas || {};
+  const inst = localStorage.getItem('NombreInst') || '';
+  const tit = document.getElementById('qr-pdf-titulo');
+  const sub = document.getElementById('qr-pdf-sub');
+  if (tit && !tit.value) tit.value = t.qr_pdf_default_titulo || 'Reservas';
+  if (sub && !sub.value) sub.value = (t.qr_pdf_default_sub || '').replace(/\{inst\}/g, inst);
+  new bootstrap.Modal(document.getElementById('modal-qr-print')).show();
+}
+
+async function ejecutarImpresionQrPdf() {
+  const tipo = document.getElementById('qr-print-tipo')?.value || 'general';
+  const tit = document.getElementById('qr-pdf-titulo')?.value?.trim() || '';
+  const sub = document.getElementById('qr-pdf-sub')?.value?.trim() || '';
+  const t = window.txt?.admin_reservas || {};
+
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF || typeof QRCode === 'undefined') {
+    Swal.fire(t.err_generico || 'Error', t.pdf_no_lib || '', 'error');
+    return;
+  }
+
+  const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+  const origin = window.location.origin;
+
+  Swal.fire({ title: t.procesando || '...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+  try {
+    let publicUrl;
+    let fileName;
+    if (tipo === 'general') {
+      const res = await API.request('/admin/config/reservas/institucion/generar-qr', 'POST', {});
+      if (res?.status !== 'success') throw new Error(res?.message || '');
+      publicUrl = `${origin}${basePath}qr-salas.html?token=${encodeURIComponent(res.codigo)}`;
+      fileName = 'QR_Reservas_General.pdf';
+    } else {
+      const idSala = parseInt(tipo, 10);
+      const res = await API.request('/admin/config/reservas/sala/generar-qr', 'POST', { IdSalaReserva: idSala });
+      if (res?.status !== 'success') throw new Error(res?.message || '');
+      publicUrl = `${origin}${basePath}qr-sala.html?token=${encodeURIComponent(res.codigo)}`;
+      fileName = `QR_Sala_${idSala}.pdf`;
+    }
+
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 80] });
+    const midX = 40;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    if (tit) doc.text(tit, midX, 10, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+    if (sub) doc.text(sub, midX, 17, { align: 'center', maxWidth: 70 });
+
+    const buf = document.getElementById('qr-print-buffer');
+    buf.innerHTML = '';
+    new QRCode(buf, { text: publicUrl, width: 400, height: 400 });
+
+    await new Promise((r) => setTimeout(r, 160));
+    const qrImg = buf.querySelector('img') || buf.querySelector('canvas');
+    if (!qrImg) throw new Error('QR');
+    const qrBase64 = qrImg.src || qrImg.toDataURL('image/png');
+    doc.addImage(qrBase64, 'PNG', midX - 22.5, 24, 45, 45);
+    doc.save(fileName);
+
+    Swal.close();
+    bootstrap.Modal.getInstance(document.getElementById('modal-qr-print'))?.hide();
+  } catch (e) {
+    console.error(e);
+    Swal.fire(t.swal_error || 'Error', e.message || t.err_generico || '', 'error');
+  }
 }
 
 async function loadInvestigadores() {
@@ -140,11 +272,19 @@ async function loadAgenda() {
     return;
   }
 
+  const tc = window.txt?.comunicacion || {};
+  const msgTitle = escapeHtml(tc.btn_msg_investigador || '');
+
   tbody.innerHTML = rows.map(r => {
     const titular = (r.TitularNombre || '').trim();
     const titularLbl = titular && titular !== ',' ? titular : `ID ${r.IdUsrTitular}`;
     const aprobada = (String(r.Aprobada ?? '1') === '1');
     const salaCell = escapeHtml(salaLabelForAgendaRow(r, salaSingle));
+    const uid = parseInt(r.IdUsrTitular, 10) || 0;
+    const rid = parseInt(r.idReserva, 10) || 0;
+    const msgBtn = uid > 0 && rid > 0
+      ? `<button type="button" class="btn btn-outline-secondary btn-sm fw-bold me-1" data-action="msg" data-user="${uid}" data-res="${rid}" title="${msgTitle}"><i class="bi bi-chat-dots"></i></button>`
+      : '';
     return `
       <tr>
         <td class="ps-4 fw-bold">${r.fechaini}</td>
@@ -159,6 +299,7 @@ async function loadAgenda() {
           }
         </td>
         <td class="text-end pe-4">
+          ${msgBtn}
           <button class="btn btn-outline-primary btn-sm fw-bold me-1" data-action="edit" data-id="${r.idReserva}">
             <i class="bi bi-pencil-square"></i>
           </button>
@@ -170,6 +311,9 @@ async function loadAgenda() {
     `;
   }).join('');
 
+  tbody.querySelectorAll('button[data-action="msg"]').forEach(b => {
+    b.onclick = () => window.composeMensajeReservaTitular(parseInt(b.dataset.user, 10), parseInt(b.dataset.res, 10));
+  });
   tbody.querySelectorAll('button[data-action="edit"]').forEach(b => {
     b.onclick = () => openModalForEdit(parseInt(b.dataset.id, 10));
   });
@@ -215,10 +359,18 @@ async function loadPendientes() {
     return;
   }
 
+  const tc = window.txt?.comunicacion || {};
+  const msgTitle = escapeHtml(tc.btn_msg_investigador || '');
+
   tbody.innerHTML = rows.map(r => {
     const titular = (r.TitularNombre || '').trim();
     const titularLbl = titular && titular !== ',' ? titular : `ID ${r.IdUsrTitular}`;
     const salaLbl = `${r.SalaNombre || ''}${r.SalaLugar ? ` - ${r.SalaLugar}` : ''}`.trim() || `ID ${r.IdSalaReserva}`;
+    const uid = parseInt(r.IdUsrTitular, 10) || 0;
+    const rid = parseInt(r.idReserva, 10) || 0;
+    const msgBtn = uid > 0 && rid > 0
+      ? `<button type="button" class="btn btn-outline-secondary btn-sm fw-bold me-1" data-action="msg-pend" data-user="${uid}" data-res="${rid}" title="${msgTitle}"><i class="bi bi-chat-dots"></i></button>`
+      : '';
     return `
       <tr>
         <td class="ps-4 fw-bold">${r.fechaini}</td>
@@ -226,6 +378,7 @@ async function loadPendientes() {
         <td>${escapeHtml(salaLbl)}</td>
         <td>${escapeHtml(titularLbl)}</td>
         <td class="text-end pe-4">
+          ${msgBtn}
           <button class="btn btn-warning btn-sm fw-bold" data-action="approve" data-id="${r.idReserva}">
             <i class="bi bi-check2-circle me-1"></i>${window.txt?.admin_reservas?.btn_aprobar || 'Aprobar'}
           </button>
@@ -234,6 +387,9 @@ async function loadPendientes() {
     `;
   }).join('');
 
+  tbody.querySelectorAll('button[data-action="msg-pend"]').forEach(b => {
+    b.onclick = () => window.composeMensajeReservaTitular(parseInt(b.dataset.user, 10), parseInt(b.dataset.res, 10));
+  });
   tbody.querySelectorAll('button[data-action="approve"]').forEach(b => {
     b.onclick = () => onApprove(parseInt(b.dataset.id, 10));
   });

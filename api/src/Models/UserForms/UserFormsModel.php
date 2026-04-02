@@ -459,16 +459,17 @@ class UserFormsModel {
      * Incluye institución. Campos: insumo, tipo/cantidad presentación, cantidad pedida, institución.
      */
     public function getInsumosExperimentalesPedidosByUser($userId) {
+        $reactPred = \App\Models\Reactivo\ReactivoModel::sqlPredicadoFormularioReactivo('tf');
         $sql = "SELECT f.idformA, f.fechainicioA as Inicio, f.estado,
                 ie.NombreInsumo, ie.CantidadInsumo as PresentacionCant, ie.TipoInsumo as PresentacionTipo,
                 COALESCE(s.organo, 0) as Cantidad,
                 f.IdInstitucion, i.NombreInst as NombreInstitucion
                 FROM formularioe f
-                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
                 LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
-                WHERE f.IdUsrA = ? AND tf.categoriaformulario = 'Otros reactivos biologicos'
+                WHERE f.IdUsrA = ? AND {$reactPred}
                 ORDER BY f.idformA DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);

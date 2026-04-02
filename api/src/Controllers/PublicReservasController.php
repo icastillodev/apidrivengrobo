@@ -28,6 +28,22 @@ class PublicReservasController {
         $this->jsonResponse($this->model->getSalaPublicBundle($token, $from, $to, $userId));
     }
 
+    public function getInstitucionPublicBundle() {
+        $token = $_GET['token'] ?? null;
+        $from = $_GET['from'] ?? null;
+        $to = $_GET['to'] ?? null;
+
+        $userId = null;
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $userId = (int)($sesion['userId'] ?? 0);
+        } catch (\Exception $e) {
+            $userId = null;
+        }
+
+        $this->jsonResponse($this->model->getInstitucionPublicBundle($token, $from, $to, $userId));
+    }
+
     private function jsonResponse($data) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

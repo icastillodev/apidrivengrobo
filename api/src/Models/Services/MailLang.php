@@ -102,6 +102,12 @@ class MailLang {
             'delete_summary_user' => 'Usuario eliminado:',
             'delete_summary_code' => 'Código utilizado:',
             'delete_summary_detail' => 'Detalle eliminado:',
+
+            'msg_int_title' => 'Mensaje en GROBO',
+            'msg_int_hello' => 'Hola',
+            'msg_int_intro' => 'Recibió el siguiente mensaje en GROBO. También puede verlo en la sección Mensajes del sistema.',
+            'msg_int_from' => 'Remitente:',
+            'msg_int_subject_label' => 'Asunto:',
         ],
         'en' => [
             'footer_developed' => 'Developed by Gekos.uy & UDELAR - Unit of Reagents and Experimentation Biomodels',
@@ -198,6 +204,12 @@ class MailLang {
             'delete_summary_user' => 'Deleted user:',
             'delete_summary_code' => 'Code used:',
             'delete_summary_detail' => 'Deleted detail:',
+
+            'msg_int_title' => 'Message in GROBO',
+            'msg_int_hello' => 'Hello',
+            'msg_int_intro' => 'You received the following message in GROBO. You can also read it in the Messages section of the system.',
+            'msg_int_from' => 'From:',
+            'msg_int_subject_label' => 'Subject:',
         ],
         'pt' => [
             'footer_developed' => 'Desenvolvido por Gekos.uy & UDELAR - Unidade de Reagentes e Biomodelos de Experimentação',
@@ -294,6 +306,12 @@ class MailLang {
             'delete_summary_user' => 'Usuário eliminado:',
             'delete_summary_code' => 'Código utilizado:',
             'delete_summary_detail' => 'Detalhe eliminado:',
+
+            'msg_int_title' => 'Mensagem no GROBO',
+            'msg_int_hello' => 'Olá',
+            'msg_int_intro' => 'Você recebeu a seguinte mensagem no GROBO. Também pode vê-la na seção Mensagens do sistema.',
+            'msg_int_from' => 'Remetente:',
+            'msg_int_subject_label' => 'Assunto:',
         ],
     ];
 

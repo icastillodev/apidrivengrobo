@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Comunicacion\MensajeriaModel;
+use App\Models\Services\MailService;
 use App\Utils\Auditoria;
 
 class MensajeriaController {
@@ -48,9 +49,15 @@ class MensajeriaController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
+            $uid = (int) $sesion['userId'];
             $page = max(1, (int)($_GET['page'] ?? 1));
             $limit = min(50, max(5, (int)($_GET['limit'] ?? 20)));
-            $rows = $this->model->getHilos((int)$sesion['userId'], $page, $limit);
+            $alcance = strtolower(trim((string)($_GET['alcance'] ?? 'personal')));
+            if ($alcance === 'institucional') {
+                $rows = $this->model->getHilosInstitucionales($instId, $uid, $page, $limit);
+            } else {
+                $rows = $this->model->getHilosPersonal($uid, $page, $limit);
+            }
             $this->json(['status' => 'success', 'data' => $rows]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
@@ -61,8 +68,17 @@ class MensajeriaController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
-            $n = $this->model->countUnreadTotal((int)$sesion['userId']);
-            $this->json(['status' => 'success', 'data' => ['total' => $n]]);
+            $uid = (int) $sesion['userId'];
+            $inst = $this->model->countUnreadInstitucional($uid, $instId);
+            $per = $this->model->countUnreadPersonal($uid);
+            $this->json([
+                'status' => 'success',
+                'data' => [
+                    'institucional' => $inst,
+                    'personal' => $per,
+                    'total' => $inst + $per,
+                ],
+            ]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
@@ -74,7 +90,7 @@ class MensajeriaController {
             $instId = $this->requireInst($sesion);
             $hiloId = (int)$id;
             $uid = (int)$sesion['userId'];
-            $hilo = $this->model->getHiloRow($hiloId, $uid);
+            $hilo = $this->model->getHiloRow($hiloId, $uid, $instId);
             if (!$hilo) {
                 $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
             }
@@ -94,7 +110,7 @@ class MensajeriaController {
             $instId = $this->requireInst($sesion);
             $hiloId = (int)$id;
             $uid = (int)$sesion['userId'];
-            if (!$this->model->getHiloRow($hiloId, $uid)) {
+            if (!$this->model->getHiloRow($hiloId, $uid, $instId)) {
                 $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
             }
             $this->model->markHiloLeido($hiloId, $uid);
@@ -121,6 +137,58 @@ class MensajeriaController {
             if ($idHilo > 0) {
                 $cuerpo = (string)($input['Cuerpo'] ?? '');
                 $out = $this->model->responder($instId, $idHilo, $uid, $cuerpo);
+                $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
+                if ($code === 200) {
+                    $hRow = $this->model->getHiloRow($idHilo, $uid, $instId);
+                    if ($hRow) {
+                        $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
+                        $pb = (int) ($hRow['IdUsrParticipanteB'] ?? 0);
+                        $destMsg = ($pb > 0) ? (($pa === $uid) ? $pb : $pa) : 0;
+                        $asuntoHilo = trim((string) ($hRow['Asunto'] ?? ''));
+                        $hiloInst = (int) ($hRow['IdInstitucion'] ?? $instId);
+                        if ($destMsg > 0 && $asuntoHilo !== '') {
+                            $cuerpoT = trim(strip_tags($cuerpo));
+                            if ($cuerpoT !== '') {
+                                $emailInfo = $this->notificarCorreoPorMensajeInterno(
+                                    $hiloInst,
+                                    $destMsg,
+                                    $uid,
+                                    $asuntoHilo,
+                                    $cuerpoT
+                                );
+                                $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
+                            }
+                        }
+                    }
+                }
+                $this->json($out, $code);
+            }
+
+            $esInst = !empty($input['EsInstitucional']) || !empty($input['esInstitucional']);
+            if ($esInst) {
+                $asunto = (string) ($input['Asunto'] ?? '');
+                $cuerpo = (string) ($input['Cuerpo'] ?? '');
+                $origenTipo = isset($input['OrigenTipo']) ? trim((string) $input['OrigenTipo']) : null;
+                if ($origenTipo === '') {
+                    $origenTipo = 'institucional';
+                }
+                $origenId = isset($input['OrigenId']) ? (int) $input['OrigenId'] : null;
+                if ($origenId !== null && $origenId <= 0) {
+                    $origenId = null;
+                }
+                $origenEtiqueta = isset($input['OrigenEtiqueta']) ? trim((string) $input['OrigenEtiqueta']) : null;
+                if ($origenEtiqueta === '') {
+                    $origenEtiqueta = null;
+                }
+                $out = $this->model->crearHiloInstitucional(
+                    $instId,
+                    $uid,
+                    $asunto,
+                    $cuerpo,
+                    $origenTipo,
+                    $origenId,
+                    $origenEtiqueta
+                );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 $this->json($out, $code);
             }
@@ -152,9 +220,79 @@ class MensajeriaController {
                 $origenEtiqueta
             );
             $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
+
+            if ($code === 200) {
+                $asuntoT = trim(strip_tags($asunto));
+                $cuerpoT = trim(strip_tags($cuerpo));
+                if ($asuntoT !== '' && $cuerpoT !== '') {
+                    $emailInfo = $this->notificarCorreoPorMensajeInterno(
+                        $instId,
+                        $dest,
+                        $uid,
+                        $asuntoT,
+                        $cuerpoT
+                    );
+                    $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
+                }
+            }
+
             $this->json($out, $code);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * @return array{ok: bool, codigo: string}
+     */
+    private function notificarCorreoPorMensajeInterno(
+        int $instIdContexto,
+        int $destinatarioId,
+        int $remitenteId,
+        string $asunto,
+        string $cuerpo
+    ): array {
+        $asunto = trim(strip_tags($asunto));
+        $cuerpo = trim(strip_tags($cuerpo));
+        if ($asunto === '' || $cuerpo === '') {
+            return ['ok' => false, 'codigo' => 'datos_vacios'];
+        }
+
+        $destInfo = $this->model->getPersonaCorreoParaNotificacion($destinatarioId, $instIdContexto);
+        $remInfo = $this->model->getPersonaCorreoParaNotificacion($remitenteId, $instIdContexto);
+        if (!$destInfo) {
+            return ['ok' => false, 'codigo' => 'sin_email'];
+        }
+        $emailTo = isset($destInfo['EmailA']) ? trim((string) $destInfo['EmailA']) : '';
+        if ($emailTo === '' || !filter_var($emailTo, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'codigo' => 'sin_email'];
+        }
+
+        $nombreDest = trim((string) (($destInfo['NombreA'] ?? '') . ' ' . ($destInfo['ApellidoA'] ?? '')));
+        $nombreRem = $remInfo
+            ? trim((string) (($remInfo['NombreA'] ?? '') . ' ' . ($remInfo['ApellidoA'] ?? '')))
+            : '';
+        if ($nombreRem === '') {
+            $nombreRem = 'ID ' . $remitenteId;
+        }
+
+        $lang = strtolower(trim((string) ($destInfo['lang'] ?? 'es')));
+        if (!in_array($lang, ['es', 'en', 'pt'], true)) {
+            $lang = 'es';
+        }
+
+        $instName = $this->model->getNombreInstitucion($instIdContexto);
+        $mail = new MailService();
+        $ok = $mail->sendInternalMessageNotification(
+            $emailTo,
+            $nombreDest,
+            $asunto,
+            $cuerpo,
+            $instName,
+            $nombreRem,
+            $lang
+        );
+
+        return ['ok' => $ok, 'codigo' => $ok ? 'ok' : 'smtp_error'];
     }
 }

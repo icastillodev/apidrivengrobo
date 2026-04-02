@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
-import { TrazabilidadUI } from './alojamientos/trazabilidad.js'; 
+import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
+import { AnimalFichaUI } from './alojamientos/animalFicha.js'; 
 
 let isAdmin = false;
 let currentHistoryData = [];
@@ -308,6 +309,7 @@ export const initQRPage = async () => {
     renderAuthZone(userName, role);
 
     window.TrazabilidadUI = TrazabilidadUI;
+    window.AnimalFichaUI = AnimalFichaUI;
     window.TrazabilidadUI.isReadOnly = !isAdmin;
 
     await cargarDatosQR(historiaParam, tokenQR);

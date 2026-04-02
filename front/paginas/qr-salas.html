@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservas - Todas las salas - GROBO</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        body { background-color: #f0f2f1; font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; }
+        #qrcode-buffer { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container py-4" style="max-width: 980px;">
+        <div class="bg-white p-3 rounded border shadow-sm mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <div class="fw-black text-dark" id="qr-salas-title" data-i18n="qr_salas.titulo">RESERVAS — TODAS LAS SALAS</div>
+                <div class="small text-muted" data-i18n="qr_salas.subtitulo">Ocupación por día y acceso a reservar en cada sala</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <div id="auth-zone"></div>
+                <button class="btn btn-sm btn-primary fw-bold d-none" type="button" id="btn-qr-etiqueta-general">
+                    <i class="bi bi-qr-code"></i> <span data-i18n="qr_sala.btn_etiqueta">ETIQUETA QR</span>
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold bg-light" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-globe"></i> <span id="current-lang-lbl">ES</span>
+                    </button>
+                    <ul class="dropdown-menu shadow-sm" style="min-width: auto;">
+                        <li><a class="dropdown-item small" href="#" onclick="window.cambiarIdiomaQRSalas('es'); return false;">Español</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="window.cambiarIdiomaQRSalas('en'); return false;">English</a></li>
+                        <li><a class="dropdown-item small" href="#" onclick="window.cambiarIdiomaQRSalas('pt'); return false;">Português</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <div class="small text-muted fw-bold" data-i18n="qr_salas.institucion">INSTITUCIÓN</div>
+                        <div class="fw-black" id="inst-nombre">—</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold mb-0" data-i18n="qr_salas.label_fecha">Día</label>
+                        <input type="date" class="form-control" id="qr-salas-fecha">
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="btn-qr-salas-reload">
+                            <i class="bi bi-arrow-clockwise"></i> <span data-i18n="qr_salas.actualizar">Actualizar</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="salas-list"></div>
+    </div>
+
+    <div id="qrcode-buffer"></div>
+
+    <div class="modal fade" id="modal-personalizar-qr-salas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary text-white py-2">
+                    <h6 class="modal-title fw-bold" data-i18n="qr_sala.modal_titulo">Personalizar Etiqueta</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_titulo">TÍTULO</label>
+                            <input type="text" id="qr-custom-title" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_texto">INDICACIÓN</label>
+                            <textarea id="qr-custom-text" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="small fw-bold" data-i18n="qr_sala.modal_label_tamano">TAMAÑO</label>
+                            <select id="qr-custom-size" class="form-select">
+                                <option value="chico" data-i18n="qr_sala.size_sm">Chico (5x5 cm)</option>
+                                <option value="mediano" selected data-i18n="qr_sala.size_md">Mediano (8x8 cm)</option>
+                                <option value="grande" data-i18n="qr_sala.size_lg">Grande (10x10 cm)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer p-2">
+                    <button class="btn btn-primary w-100 fw-bold" type="button" id="btn-gen-pdf" data-i18n="qr_sala.btn_generar_pdf">GENERAR PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { loadLanguage, translatePage, applyPageTitle } from './dist/js/utils/i18n.js';
+        import { initQRSalasPage } from './dist/js/pages/qr_salas.js?v=20260402';
+
+        window.cambiarIdiomaQRSalas = (lang) => {
+            localStorage.setItem('lang', lang);
+            localStorage.setItem('idioma', lang);
+            window.location.reload();
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+            if (window.txt) {
+                translatePage();
+                applyPageTitle();
+            }
+            initQRSalasPage();
+        });
+    </script>
+</body>
+</html>

@@ -6,12 +6,10 @@ export function getMenuTemplates(roleId = 0) {
         { label: window.txt.menu.my_accommodations, path: 'panel/misalojamientos' },
         { label: window.txt.menu.my_reservations, path: 'panel/misreservas' },
         { label: window.txt.menu.my_protocols, path: 'panel/misprotocolos' },
-        { label: window.txt.menu.messages, path: 'panel/mensajes', badgeMenuId: 204 },
+        { label: window.txt.menu.messages_personal, path: 'panel/mensajes' },
         { label: window.txt.menu.news_portal, path: 'panel/noticias' }
     ];
-    const children55 = roleId === 3
-        ? inv55Children.filter((c) => c.path !== 'panel/mensajes')
-        : inv55Children;
+    const children55 = inv55Children;
 
     return {
         1: { label: window.txt.menu.users, svg: `<svg viewBox="0 0 640 512"><path d="M320 16a104 104 0 1 1 0 208a104 104 0 1 1 0-208M96 88a72 72 0 1 1 0 144a72 72 0 1 1 0-144M0 416c0-70.7 57.3-128 128-128c12.8 0 25.2 1.9 36.9 5.4C132 330.2 112 378.8 112 432v16c0 11.4 2.4 22.2 6.7 32H32c-17.7 0-32-14.3-32-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32v-16c0-53.2-20-101.8-52.9-138.6c11.7-3.5 24.1-5.4 36.9-5.4c70.7 0 128 57.3 128 128v32c0 17.7-14.3 32-32 32zM472 160a72 72 0 1 1 144 0a72 72 0 1 1-144 0M160 432c0-88.4 71.6-160 160-160s160 71.6 160 160v16c0 17.7-14.3 32-32 32H192c-17.7 0-32-14.3-32-32z"/></svg>`, path: 'admin/usuarios' },
@@ -30,7 +28,7 @@ export function getMenuTemplates(roleId = 0) {
         14: { label: window.txt.menu.my_reservations, svg: `<svg viewBox="0 0 26 26"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>`, path: 'panel/misreservas' },
         15: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>`, path: 'admin/protocolos' },
         203: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,path: 'panel/misprotocolos' },
-        204: { label: window.txt.menu.messages, svg: `<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4H4V6h16v2z"/></svg>`, path: 'panel/mensajes' },
+        204: { label: window.txt.menu.messages_institucional, svg: `<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4H4V6h16v2z"/></svg>`, path: 'panel/mensajes_institucion' },
         205: { label: window.txt.menu.news_admin, svg: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`, path: 'admin/comunicacion/noticias' },
         206: { label: window.txt.menu.news_portal, svg: `<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>`, path: 'panel/noticias' },
         

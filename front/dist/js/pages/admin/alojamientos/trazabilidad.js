@@ -1,6 +1,7 @@
 import { API } from '../../../api.js';
 // AÑADE ESTA LÍNEA PARA SOLUCIONAR EL ERROR DEL LOADER
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
+import { AnimalFichaUI } from './animalFicha.js';
 
 function __ubAct(r) {
     return Number(r?.Activo) === 1;
@@ -340,8 +341,27 @@ async toggleRow(idAlojamiento, idEspecie) {
         }
 
         let html = `
-            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                <h6 class="text-primary fw-bold m-0"><i class="bi bi-diagram-3"></i> ${txt.trace_physical || 'Trazabilidad Física'} <span class="badge bg-secondary ms-2">${cajasActuales} / ${limite}</span></h6>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 border-bottom pb-2">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <h6 class="text-primary fw-bold m-0"><i class="bi bi-diagram-3"></i> ${txt.trace_physical || 'Trazabilidad Física'} <span class="badge bg-secondary ms-2">${cajasActuales} / ${limite}</span></h6>
+                    <div class="dropdown">
+                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="${__ubEsc(txt.animal_ficha_dropdown_aloj_title || '')}">
+                            <i class="bi bi-collection"></i> ${__ubEsc(txt.animal_ficha_dropdown_aloj_toggle || '')}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li>
+                                <button type="button" class="dropdown-item" onclick="window.AnimalFichaUI.openAlojamiento(${idAlojamiento})">
+                                    <i class="bi bi-card-heading me-2"></i>${__ubEsc(txt.animal_ficha_btn_tramo || '')}
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item text-danger" onclick="window.AnimalFichaUI.downloadPdfAlojamiento(${idAlojamiento})">
+                                    <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_btn_tramo_pdf || '')}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
                 <div>
                     ${!isReadOnly ? `
                         <button class="btn btn-sm btn-outline-secondary fw-bold me-2" onclick="window.TrazabilidadUI.importarCajaExistente(${idAlojamiento}, ${idEspecie}, ${limite}, ${cajasActuales})">
@@ -381,6 +401,23 @@ async toggleRow(idAlojamiento, idEspecie) {
                                 <div class="d-flex align-items-center flex-wrap gap-1">
                                     <span class="fw-bold"><i class="bi bi-box-seam me-1"></i>${caja.NombreCaja}</span>
                                     ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-link text-white p-0 ms-1" title="${__ubEsc(txt.trace_renombrar || 'Renombrar')}" onclick="window.TrazabilidadUI.renameBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil"></i></button>` : ''}
+                                    <div class="dropdown d-inline-block ms-1">
+                                        <button type="button" class="btn btn-sm btn-outline-light py-0 dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="${__ubEsc(txt.animal_ficha_dropdown_caja_title || '')}">
+                                            <i class="bi bi-card-heading"></i> ${__ubEsc(txt.animal_ficha_dropdown_caja_toggle || '')}
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            <li>
+                                                <button type="button" class="dropdown-item" onclick="window.AnimalFichaUI.openCaja(${caja.IdCajaAlojamiento})">
+                                                    <i class="bi bi-card-heading me-2"></i>${__ubEsc(txt.animal_ficha_btn_caja || '')}
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button type="button" class="dropdown-item text-danger" onclick="window.AnimalFichaUI.downloadPdfCaja(${caja.IdCajaAlojamiento})">
+                                                    <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_btn_caja_pdf || '')}
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
                                 ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-danger" onclick="window.TrazabilidadUI.deleteBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${caja.unidades ? caja.unidades.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-trash"></i></button>` : ''}
                             </div>
@@ -393,13 +430,31 @@ async toggleRow(idAlojamiento, idEspecie) {
                     caja.unidades.forEach(unidad => {
                         html += `
                         <div class="border rounded p-3 mb-2 bg-white shadow-sm">
-                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">
                                 <span class="fw-bold small text-dark"><i class="bi bi-bug-fill text-success"></i> ${unidad.NombreEspecieAloj}</span>
-                                ${!isReadOnly ? `
-                                <div>
-                                    <button class="btn btn-xs btn-light border text-primary me-1" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
-                                    <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>
-                                </div>` : ''}
+                                <div class="d-flex align-items-center flex-wrap gap-1">
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="${__ubEsc(txt.animal_ficha_dropdown_toggle_title || txt.animal_ficha_title || '')}">
+                                            <i class="bi bi-card-heading"></i> ${__ubEsc(txt.animal_ficha_dropdown_toggle || txt.animal_ficha_title || 'Ficha')}
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            <li>
+                                                <button type="button" class="dropdown-item" onclick="window.AnimalFichaUI.open(${unidad.IdEspecieAlojUnidad})">
+                                                    <i class="bi bi-card-heading me-2"></i>${__ubEsc(txt.animal_ficha_btn || '')}
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button type="button" class="dropdown-item text-danger" onclick="window.AnimalFichaUI.downloadPdf(${unidad.IdEspecieAlojUnidad})">
+                                                    <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_pdf || 'PDF')}
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    ${!isReadOnly ? `
+                                    <button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_ficha_btn_title || '')}" onclick="window.TrazabilidadUI.editSubjectFicha(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>
+                                    <button class="btn btn-xs btn-light border text-primary" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
+                                    <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>` : ''}
+                                </div>
                             </div>`;
                         
                         // Ocultamos el formulario EAV si es solo lectura
@@ -552,6 +607,104 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
         }
     },
 
+    async editSubjectFicha(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
+        const txt = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        const target = document.getElementById('modal-historial') || 'body';
+        try {
+            const res = await API.request(`/trazabilidad/ficha-animal?idEspecieAlojUnidad=${encodeURIComponent(String(idEspecieAlojUnidad))}`, 'GET');
+            if (res.status !== 'success' || !res.data) {
+                throw new Error(res.message || txt.animal_ficha_error || 'Error');
+            }
+            const s = res.data.sujeto || {};
+            let cepas = [];
+            try {
+                const cr = await API.request(`/admin/config/cepas/all?idespA=${encodeURIComponent(String(idEspecie))}`, 'GET');
+                if (cr.status === 'success' && Array.isArray(cr.data)) {
+                    cepas = cr.data.filter((c) => String(c.Habilitado) !== '2');
+                }
+            } catch (e) {
+                cepas = [];
+            }
+            let subesps = [];
+            try {
+                const sr = await API.request(`/admin/config/subespecies/by-especie?idespA=${encodeURIComponent(String(idEspecie))}`, 'GET');
+                if (sr.status === 'success' && Array.isArray(sr.data)) {
+                    subesps = sr.data.filter((x) => String(x.Existe) !== '2');
+                }
+            } catch (e) {
+                subesps = [];
+            }
+            const selCepa = String(s.idcepaA_sujeto ?? '');
+            const cepaOpts = [`<option value="">${__ubEsc(txt.trace_subject_ficha_cepa_none || '—')}</option>`].concat(
+                cepas.map((c) => `<option value="${c.idcepaA}"${String(c.idcepaA) === selCepa ? ' selected' : ''}>${__ubEsc(c.CepaNombreA)}</option>`),
+            );
+            const selSub = String(s.idsubespA_sujeto ?? '');
+            const subOpts = [`<option value="">${__ubEsc(txt.trace_subject_subespecie_none || '—')}</option>`].concat(
+                subesps.map((x) => `<option value="${x.idsubespA}"${String(x.idsubespA) === selSub ? ' selected' : ''}>${__ubEsc(x.SubEspeNombreA)}</option>`),
+            );
+            const pesoVal = s.PesoSujetoKg !== null && s.PesoSujetoKg !== undefined && s.PesoSujetoKg !== '' ? String(s.PesoSujetoKg) : '';
+            const fn = s.FechaNacimientoSujeto ? String(s.FechaNacimientoSujeto).slice(0, 10) : '';
+            const rawSex = String(s.SexoSujeto || '').toUpperCase().trim();
+            let sexSel = '';
+            if (rawSex === 'M' || rawSex === 'MACHO' || rawSex === 'MALE') sexSel = 'M';
+            else if (rawSex === 'H' || rawSex === 'F' || rawSex === 'HEMBRA' || rawSex === 'FEMALE') sexSel = 'H';
+            else if (rawSex === 'I' || rawSex === 'INDISTINTO' || rawSex === 'IND') sexSel = 'I';
+            const html = `
+                <div class="text-start small">
+                  <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_peso || '')}</label>
+                  <input type="number" step="0.001" id="sf-peso" class="form-control form-control-sm mb-2" value="${__ubEsc(pesoVal)}">
+                  <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_nacimiento || '')}</label>
+                  <input type="date" id="sf-fn" class="form-control form-control-sm mb-2" value="${__ubEsc(fn)}">
+                  <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_sexo || '')}</label>
+                  <select id="sf-sexo" class="form-select form-select-sm mb-2">
+                    <option value="">${__ubEsc(txt.trace_sexo_elegir || '—')}</option>
+                    <option value="M"${sexSel === 'M' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_macho || '')}</option>
+                    <option value="H"${sexSel === 'H' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_hembra || '')}</option>
+                    <option value="I"${sexSel === 'I' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_indistinto || '')}</option>
+                  </select>
+                  <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_cepa_catalogo || '')}</label>
+                  <select id="sf-cepa" class="form-select form-select-sm mb-2">${cepaOpts.join('')}</select>
+                  <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_subespecie || '')}</label>
+                  <select id="sf-subesp" class="form-select form-select-sm mb-0">${subOpts.join('')}</select>
+                </div>`;
+
+            const { value: formValues } = await Swal.fire({
+                title: txt.trace_edit_subject_ficha || 'Datos del sujeto',
+                html,
+                target,
+                showCancelButton: true,
+                confirmButtonText: txt.trace_subject_ficha_save || 'Guardar',
+                width: 'min(32rem, 96vw)',
+                preConfirm: () => ({
+                    PesoSujetoKg: document.getElementById('sf-peso').value,
+                    FechaNacimientoSujeto: document.getElementById('sf-fn').value,
+                    SexoSujeto: document.getElementById('sf-sexo').value,
+                    idcepaA_sujeto: document.getElementById('sf-cepa').value,
+                    idsubespA_sujeto: document.getElementById('sf-subesp').value,
+                }),
+            });
+            if (!formValues) return;
+            const body = {
+                IdEspecieAlojUnidad: idEspecieAlojUnidad,
+                PesoSujetoKg: formValues.PesoSujetoKg,
+                FechaNacimientoSujeto: formValues.FechaNacimientoSujeto,
+                SexoSujeto: formValues.SexoSujeto,
+                idcepaA_sujeto: formValues.idcepaA_sujeto,
+                idsubespA_sujeto: formValues.idsubespA_sujeto,
+            };
+            const saveRes = await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', body);
+            if (saveRes.status !== 'success') {
+                throw new Error(saveRes.message || txt.trace_error || 'Error');
+            }
+            await this.refreshArbol(idAlojamiento, idEspecie);
+        } catch (e) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', title: txt.trace_error || 'Error', text: String(e.message || e), target });
+            }
+        }
+    },
+
     async renameBox(idCaja, nombre, idAloj, idEspecie) {
         const { value: val } = await Swal.fire({ title: 'Renombrar', input: 'text', inputValue: nombre, target: document.getElementById('modal-historial') || 'body', showCancelButton: true });
         if (val) { await API.request('/trazabilidad/rename-box', 'POST', { idCaja, nombre: val }); await this.refreshArbol(idAloj, idEspecie); }
@@ -673,3 +826,4 @@ window.guardarObservacion = async (idUnidad, idAlojamiento, idEspecie, formEl) =
     }
 };
 window.TrazabilidadUI = TrazabilidadUI;
+window.AnimalFichaUI = AnimalFichaUI;

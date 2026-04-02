@@ -133,8 +133,24 @@ class AlojamientoModel {
 
                         foreach ($unidadesCaja as $oldUnit) {
                             if (in_array($oldUnit['IdEspecieAlojUnidad'], $unidadesViejasIds)) {
-                                $stmtInsertUnit = $this->db->prepare("INSERT INTO especie_alojamiento_unidad (IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento) VALUES (?, ?, ?, ?)");
-                                $stmtInsertUnit->execute([$oldUnit['IdUnidadAlojamiento'], $oldUnit['NombreEspecieAloj'], $oldUnit['DetalleEspecieAloj'], $newIdCaja]);
+                                $stmtInsertUnit = $this->db->prepare(
+                                    "INSERT INTO especie_alojamiento_unidad (
+                                        IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento,
+                                        PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                                );
+                                $stmtInsertUnit->execute([
+                                    $oldUnit['IdUnidadAlojamiento'],
+                                    $oldUnit['NombreEspecieAloj'],
+                                    $oldUnit['DetalleEspecieAloj'] ?? null,
+                                    $newIdCaja,
+                                    $oldUnit['PesoSujetoKg'] ?? null,
+                                    $oldUnit['FechaNacimientoSujeto'] ?? null,
+                                    $oldUnit['SexoSujeto'] ?? null,
+                                    $oldUnit['idcepaA_sujeto'] ?? null,
+                                    $oldUnit['CategoriaRazaSujeto'] ?? null,
+                                    $oldUnit['idsubespA_sujeto'] ?? null,
+                                ]);
                             }
                         }
                     }

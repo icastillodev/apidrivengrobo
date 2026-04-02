@@ -15,7 +15,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
-        import { initPortalNoticias } from '../../dist/js/pages/panel/noticias.js?v=20260401';
+        import { initPortalNoticias } from '../../dist/js/pages/panel/noticias.js?v=20260404';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -79,7 +79,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="small text-muted mb-2" id="modal-noticia-meta"></div>
+                    <div class="small text-muted mb-2 d-flex flex-wrap align-items-center gap-2" id="modal-noticia-meta"></div>
                     <div class="noticia-cuerpo" id="modal-noticia-cuerpo" style="white-space: pre-wrap;"></div>
                 </div>
                 <div class="modal-footer">

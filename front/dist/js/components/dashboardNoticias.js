@@ -9,6 +9,16 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
+const NOTICIA_BADGE_VARIANTS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+
+function noticiaCategoriaBadgeHtml(r) {
+    const name = String(r?.Categoria ?? '').trim();
+    if (!name) return '';
+    let v = String(r?.CategoriaBadge ?? 'primary').toLowerCase();
+    if (!NOTICIA_BADGE_VARIANTS.includes(v)) v = 'primary';
+    return `<span class="badge text-bg-${v} ms-1" style="font-size:10px;vertical-align:middle;">${escapeHtml(name)}</span>`;
+}
+
 function portalHref() {
     return getCorrectPath('panel/noticias');
 }
@@ -54,7 +64,9 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     const bloqueLocal = first
         ? `
             <div class="border rounded-3 p-3 bg-white shadow-sm">
-                <div class="small text-muted text-uppercase mb-1" style="font-size:10px;">${escapeHtml(String(fp).substring(0, 16))}</div>
+                <div class="d-flex flex-wrap align-items-center gap-2 small text-muted text-uppercase mb-1" style="font-size:10px;">
+                    <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(first)}
+                </div>
                 <h6 class="fw-bold mb-2">${titulo}</h6>
                 <div class="small text-dark" style="white-space: pre-wrap;">${cuerpoHtml}</div>
                 ${idNoticia ? `<a href="${portalHref()}?id=${encodeURIComponent(String(idNoticia))}" class="d-inline-block mt-2 small text-success fw-semibold">${escapeHtml(t.dash_abrir_noticia || t.ver_mas || '')}</a>` : ''}
@@ -62,16 +74,13 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         : `<div class="border rounded-3 p-3 bg-white shadow-sm"><p class="text-muted small mb-0">${escapeHtml(t.dash_sin_noticias || '')}</p></div>`;
 
     mount.innerHTML = `
-        <div class="col-12 mb-2 d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <span class="fw-black text-uppercase small text-muted">${escapeHtml(t.portal_titulo || '')}</span>
-            <div class="d-flex flex-column align-items-stretch gap-1" style="min-width: 200px;">
+        <div class="col-12">
+            <div class="fw-black text-uppercase small text-muted mb-2">${escapeHtml(t.dash_noticias_locales || '')}</div>
+            ${bloqueLocal}
+            <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3">
                 <a href="${portalHref()}" class="btn btn-sm btn-outline-success fw-bold">${escapeHtml(t.dash_ver_todas || '')}</a>
                 <a href="${portalHref()}?alcance=red" class="btn btn-sm btn-outline-secondary fw-bold">${escapeHtml(t.dash_ver_noticias_red || '')}</a>
             </div>
-        </div>
-        <div class="col-12">
-            <div class="fw-bold text-uppercase small text-muted mb-2">${escapeHtml(t.dash_noticias_locales || '')}</div>
-            ${bloqueLocal}
         </div>`;
 
     mount.dataset.newsDashboardInjected = '1';

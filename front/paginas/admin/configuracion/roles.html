@@ -146,9 +146,7 @@
                     <div class="card-body p-4">
                         <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_roles.label_seleccionar_rol"></label>
                         <select id="select-role-menu" class="form-select fw-bold mb-4 shadow-sm border-secondary">
-                            <option value="3" data-i18n="config_roles.opcion_investigador"></option>
-                            <option value="4" data-i18n="config_roles.opcion_subadmin"></option>
-                            <option value="5" data-i18n="config_roles.opcion_asistente"></option>
+                            <option value="5" selected data-i18n="config_roles.opcion_asistente"></option>
                             <option value="6" data-i18n="config_roles.opcion_laboratorio"></option>
                         </select>
 
@@ -158,6 +156,26 @@
                 </div>
             </div>
 
+        </div>
+
+        <div id="bloque-noticias-roles" class="card border-0 bg-white shadow-sm mt-4 d-none">
+            <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="fw-bold text-dark m-0"><i class="bi bi-newspaper me-2"></i><span data-i18n="config_roles.noticias_publicar_titulo"></span></h6>
+                <p class="text-muted small mb-0 mt-2" data-i18n="config_roles.noticias_publicar_sub"></p>
+            </div>
+            <div class="card-body py-3">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0 align-middle" style="font-size: 12px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3" data-i18n="config_roles.noticias_col_tipo"></th>
+                                <th class="text-center" data-i18n="config_roles.noticias_col_permiso"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="noticias-roles-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -25,7 +25,7 @@ class AdminConfigRolesModel {
         $stmtUsers->execute([$instId]);
         $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
 
-        $sqlMenus = "SELECT * FROM menudistr WHERE IdInstitucion = ? AND IdTipoUsrA IN (3, 4, 5, 6)";
+        $sqlMenus = "SELECT * FROM menudistr WHERE IdInstitucion = ? AND IdTipoUsrA IN (5, 6)";
         $stmtMenus = $this->db->prepare($sqlMenus);
         $stmtMenus->execute([$instId]);
         $menus = $stmtMenus->fetchAll(PDO::FETCH_ASSOC);
@@ -47,9 +47,13 @@ class AdminConfigRolesModel {
 
     public function toggleMenu($data) {
         $instId = $data['instId'];
-        $roleId = $data['roleId'];
-        $menuId = $data['menuId']; 
-        $newStatus = $data['status']; 
+        $roleId = (int) $data['roleId'];
+        $menuId = $data['menuId'];
+        $newStatus = $data['status'];
+
+        if (!in_array($roleId, [5, 6], true)) {
+            throw new \Exception('Solo Asistente y Laboratorio admiten configuración de menús desde esta pantalla.');
+        }
 
         $check = $this->db->prepare("SELECT IdMenu FROM menudistr WHERE IdInstitucion = ? AND IdTipoUsrA = ? AND NombreMenu = ?");
         $check->execute([$instId, $roleId, $menuId]);

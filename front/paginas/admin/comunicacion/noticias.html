@@ -15,7 +15,7 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260311';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js';
-        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260402';
+        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260408';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -45,23 +45,6 @@
             <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nueva-noticia">
                 <i class="bi bi-plus-lg me-1"></i><span data-i18n="comunicacion.admin_nueva"></span>
             </button>
-        </div>
-
-        <div id="bloque-roles" class="card shadow-sm border-0 mb-3 d-none">
-            <div class="card-body py-3">
-                <div class="fw-bold small text-uppercase text-muted mb-2" data-i18n="comunicacion.admin_roles_titulo"></div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0 bg-white small">
-                        <thead class="table-light">
-                            <tr>
-                                <th data-i18n="comunicacion.admin_col_rol"></th>
-                                <th class="text-center" data-i18n="comunicacion.admin_permiso_activo"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="roles-tbody"></tbody>
-                    </table>
-                </div>
-            </div>
         </div>
 
         <div class="card shadow-sm border-0">
@@ -100,6 +83,18 @@
                     <input type="hidden" id="edit-id" value="">
                     <label class="form-label small fw-bold" data-i18n="comunicacion.admin_titulo_campo"></label>
                     <input type="text" class="form-control mb-2" id="edit-titulo" maxlength="500">
+                    <label class="form-label small fw-bold" data-i18n="comunicacion.admin_categoria"></label>
+                    <input type="text" class="form-control mb-2" id="edit-categoria" maxlength="80" data-i18n="comunicacion.admin_categoria_ph">
+                    <label class="form-label small fw-bold" data-i18n="comunicacion.admin_categoria_color"></label>
+                    <select class="form-select mb-2" id="edit-categoria-badge">
+                        <option value="primary" data-i18n="comunicacion.badge_variant_primary"></option>
+                        <option value="secondary" data-i18n="comunicacion.badge_variant_secondary"></option>
+                        <option value="success" data-i18n="comunicacion.badge_variant_success"></option>
+                        <option value="danger" data-i18n="comunicacion.badge_variant_danger"></option>
+                        <option value="warning" data-i18n="comunicacion.badge_variant_warning"></option>
+                        <option value="info" data-i18n="comunicacion.badge_variant_info"></option>
+                        <option value="dark" data-i18n="comunicacion.badge_variant_dark"></option>
+                    </select>
                     <p class="small text-muted mb-2" data-i18n="comunicacion.admin_publicar_solo_local"></p>
                     <p class="small text-warning mb-2 d-none" id="edit-legacy-red-hint" data-i18n="comunicacion.admin_legacy_red_hint"></p>
                     <label class="form-label small fw-bold" data-i18n="comunicacion.admin_estado_publicacion"></label>

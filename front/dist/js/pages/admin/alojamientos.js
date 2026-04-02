@@ -10,6 +10,7 @@ import { TramosUI } from './alojamientos/TramosUI.js';
 import { RegistroUI } from './alojamientos/RegistroUI.js';
 import { ExportUI } from './alojamientos/ExportUI.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 
 // Base Path dinámico para compatibilidad Local / Producción
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
@@ -103,4 +104,42 @@ window.verPaginaQR = async (historiaId = null) => {
         const t = window.txt?.alojamientos;
         Swal.fire('Error', t?.qr_error_link || 'No se pudo generar el enlace del QR.', 'error');
     }
+};
+
+window.openMensajeriaComposeAlojamiento = async () => {
+    const hist = AlojamientoState.currentHistoryData;
+    const tc = window.txt?.comunicacion || {};
+    const ta = window.txt?.alojamientos || {};
+    if (!hist || hist.length === 0) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
+        }
+        return;
+    }
+    const last = hist[hist.length - 1];
+    const first = hist[0];
+    let destId = parseInt(last.IdUsrA, 10);
+    if (!destId || destId <= 0) {
+        destId = parseInt(first.IdTitularProtocolo, 10);
+    }
+    if (!destId || destId <= 0) {
+        const rowTit = hist.find((r) => parseInt(r.IdTitularProtocolo, 10) > 0);
+        destId = rowTit ? parseInt(rowTit.IdTitularProtocolo, 10) : 0;
+    }
+    if (!destId || destId <= 0) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
+        }
+        return;
+    }
+    const hid = parseInt(last.historia ?? first.historia, 10) || null;
+    const asunto = `${tc.msg_asunto || ''} · ${ta.history_record || ''}${hid ? ' #' + hid : ''}`;
+    await openMensajeriaCompose({
+        destinatarioId: destId,
+        origenTipo: 'alojamiento',
+        origenId: hid,
+        origenEtiqueta: hid ? `Historia #${hid}` : null,
+        asunto,
+        lockCategory: true
+    });
 };

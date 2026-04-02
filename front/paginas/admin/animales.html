@@ -161,9 +161,15 @@
     </div>
 
     <div class="modal fade" id="modal-animal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 border-top border-5 border-success shadow-lg">
                 <div id="modal-content-animal" class="modal-body p-4 p-md-5"></div>
+                <div class="modal-footer border-top bg-white py-2 px-3 px-md-4 d-flex justify-content-end gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold shadow-sm" id="btn-modal-animal-pdf" disabled onclick="window.downloadAnimalPDFFromModal()">
+                        <i class="bi bi-file-earmark-pdf me-1"></i><span data-i18n="admin_animales.modal_pdf_ficha">PDF ficha</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm fw-bold px-4" data-bs-dismiss="modal" data-i18n="admin_animales.modal_cerrar">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>

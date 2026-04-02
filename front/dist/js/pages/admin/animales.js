@@ -4,6 +4,7 @@ import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 
 let allAnimals = [];
 let currentPage = 1;
@@ -265,9 +266,14 @@ function getFilteredAndSortedData() {
     const retiroVal = retiroDate ? (retiroDate.value || '').trim() : '';
 
     let data = allAnimals.filter(a => {
-        const estadoFila = (a.estado || "sin estado").toString().toLowerCase().trim();
-        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
         const isDerived = Number(a.DerivadoActivo || 0) === 1;
+        let eff = a.estado;
+        if (isDerived && (a.estado_origen != null || a.estado_destino != null)) {
+            if (a.estado_destino != null && String(a.estado_destino).trim() !== '') eff = a.estado_destino;
+            else if (a.estado_origen != null && String(a.estado_origen).trim() !== '') eff = a.estado_origen;
+        }
+        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
+        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
         if (derivFilter === 'derived' && !isDerived) return false;
         if (derivFilter === 'local' && isDerived) return false;
         const originName = (a.InstitucionOrigenNombre || '').trim();
@@ -300,6 +306,8 @@ function getFilteredAndSortedData() {
 window.openAnimalModal = async (a) => {
     const instId = localStorage.getItem('instId');
     const container = document.getElementById('modal-content-animal');
+    const btnPdfFoot = document.getElementById('btn-modal-animal-pdf');
+    if (btnPdfFoot) btnPdfFoot.disabled = true;
     container.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div></div>`;
 
     const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
@@ -343,6 +351,7 @@ window.openAnimalModal = async (a) => {
     html += renderOrderModificationSection(a, sex, formDataCache);
 
     container.innerHTML = html;
+    if (btnPdfFoot) btnPdfFoot.disabled = false;
 
     // Actualizar org/ámbito al cambiar departamento
     const selDepto = document.getElementById('modal-depto-animal');
@@ -486,12 +495,19 @@ function renderModalHeader(a, derivConfig) {
 }
 
 function renderResearcherContact(a) {
+    const ta = window.txt?.admin_animales || {};
+    const lblBtn = ta.btn_msg_investigador || '';
     return `
-    <div class="row g-2 mb-3 small border-bottom pb-3 text-center">
+    <div class="row g-2 mb-3 small border-bottom pb-3 text-center" data-id-investigador="${a.IdInvestigador}" data-idform-a="${a.idformA}">
         <div class="col-md-3"><strong>ID Inv:</strong> ${a.IdInvestigador}</div>
         <div class="col-md-3 text-truncate"><strong>Email:</strong> ${a.EmailInvestigador}</div>
         <div class="col-md-3"><strong>Cel:</strong> ${a.CelularInvestigador}</div>
         <div class="col-md-3 text-truncate"><strong>Depto:</strong> ${a.DeptoProtocolo}</div>
+        <div class="col-12 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold shadow-sm" onclick="window.composeMsgToInvestigador(${a.IdInvestigador}, ${a.idformA})">
+                <i class="bi bi-chat-dots me-1"></i>${lblBtn}
+            </button>
+        </div>
     </div>`;
 }
 
@@ -733,9 +749,6 @@ function renderOrderModificationSection(a, sex, cache) {
             ${panelResumen}
 
             <div class="mt-4 d-flex justify-content-end gap-2 border-top pt-3 w-100">
-                <button type="button" class="btn btn-outline-danger btn-sm px-4 fw-bold shadow-sm" onclick="window.downloadAnimalPDF(${a.idformA})">
-                    <i class="bi bi-file-pdf"></i> DESCARGAR PDF
-                </button>
                 <button type="submit" class="btn btn-success btn-sm px-5 fw-bold shadow-sm" style="background-color: #1a5d3b;" ${(isDerivedActive && (isOriginInst || (wf || '').includes('PENDIENTE'))) ? 'disabled title="' + (tx.derivacion_guardar_bloqueado || 'No se puede guardar: el formulario está en derivación.') + '"' : ''}>GUARDAR CAMBIOS</button>
             </div>
         </div>
@@ -1291,17 +1304,41 @@ window.openNotifyPopup = async (idformA) => {
             
             if (res.status === 'success') {
                 sessionStorage.setItem('reopenAnimalId', idformA);
-
-                // El nuevo Swal reemplaza automáticamente al de "Cargando"
-                window.Swal.fire({
+                const tc = window.txt?.comunicacion || {};
+                const wrap = document.querySelector('#modal-animal [data-id-investigador]');
+                const idInv = wrap ? parseInt(wrap.getAttribute('data-id-investigador'), 10) : 0;
+                window.Swal.close();
+                if (idInv > 0) {
+                    const ask = await window.Swal.fire({
+                        title: tc.notify_post_ask_title || '',
+                        text: tc.notify_post_ask_text || '',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: tc.notify_post_ask_confirm || '',
+                        cancelButtonText: tc.notify_post_ask_dismiss || ''
+                    });
+                    if (ask.isConfirmed) {
+                        const pref = tc.msg_default_subject_prefix || '';
+                        const asunto = `${tc.msg_asunto || 'Asunto'} · ${pref} #${idformA}`;
+                        await openMensajeriaCompose({
+                            destinatarioId: idInv,
+                            origenTipo: 'notificacion',
+                            origenId: idformA,
+                            origenEtiqueta: `Formulario #${idformA}`,
+                            cuerpo: nota,
+                            asunto,
+                            lockCategory: true
+                        });
+                    }
+                }
+                await window.Swal.fire({
                     title: '¡Enviado!',
                     text: 'Los correos han sido enviados correctamente.',
                     icon: 'success',
-                    timer: 2000, // Se cierra solo a los 2 seg
+                    timer: 2000,
                     showConfirmButton: false
-                }).then(() => {
-                    location.reload(); 
                 });
+                location.reload();
             } else {
                 window.Swal.fire('Error', res.message || 'Fallo en el servidor', 'error');
             }
@@ -1355,11 +1392,12 @@ function getStatusWithWorkflow(item) {
     const hasDualEstados = isDerived && (item.estado_origen != null || item.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        // Solo 2 badges: ruta derivación + un estado (destino; si falta, origen). Quitar el del medio.
         const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
             ? item.estado_destino
-            : item.estado_origen;
-        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+            : (item.estado_origen != null && String(item.estado_origen).trim() !== '')
+                ? item.estado_origen
+                : (item.estado != null && String(item.estado).trim() !== '' ? item.estado : null);
+        const b = st ? getStatusBadge(st) : getStatusBadge('Sin estado');
         estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
@@ -1385,6 +1423,14 @@ function renderPagination(t, c, r) {
     if (total > 1) pag.appendChild(btn(total, total, false, currentPage === total));
     pag.appendChild(btn('Siguiente', currentPage + 1, currentPage === total));
 }
+
+/** PDF ficha desde el pie del modal (usa el idformA cargado en el formulario). */
+window.downloadAnimalPDFFromModal = () => {
+    const hid = document.getElementById('current-idformA');
+    const id = hid ? parseInt(hid.value, 10) : 0;
+    if (!id) return;
+    window.downloadAnimalPDF(id);
+};
 
 /**
  * GENERACIÓN DE FICHA PDF PERSONALIZADA - GROBO
@@ -1590,4 +1636,21 @@ window.processExcelExport = () => {
     
     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modal-excel-animal'));
     if (modalInstance) modalInstance.hide();
+};
+
+window.composeMsgToInvestigador = async (idInv, idformA) => {
+    const id = parseInt(idInv, 10);
+    const fid = parseInt(idformA, 10);
+    if (!id || !fid) return;
+    const tc = window.txt?.comunicacion || {};
+    const pref = tc.msg_default_subject_prefix || '';
+    const asunto = `${tc.msg_asunto || 'Asunto'} · ${pref} #${fid}`;
+    await openMensajeriaCompose({
+        destinatarioId: id,
+        origenTipo: 'formulario',
+        origenId: fid,
+        origenEtiqueta: `Formulario #${fid}`,
+        asunto,
+        lockCategory: true
+    });
 };

@@ -4,6 +4,7 @@ import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
 import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
 
@@ -338,6 +339,7 @@ function buildModalHtml(opts) {
     html += '<div class="col-12"><label class="form-label text-muted small fw-bold uppercase">' + orgLabel + '</label><div class="form-control-plaintext fw-bold border-0 px-0">' + (orgVal || '') + '</div></div>';
     html += '<div class="mt-4 d-flex gap-2 flex-wrap">';
     html += '<button type="button" class="btn btn-success btn-sm fw-bold px-4 uppercase" onclick="saveUserData(' + (u.IdUsrA || '') + ')">' + (t && t.btn_guardar_cambios ? t.btn_guardar_cambios : 'Guardar Cambios') + '</button>';
+    html += '<button type="button" class="btn btn-outline-info btn-sm fw-bold px-3 uppercase" onclick="window.openMensajeriaComposeAUsuario(' + (u.IdUsrA || '') + ')"><i class="bi bi-chat-dots me-1"></i>' + (t && t.btn_enviar_mensaje ? t.btn_enviar_mensaje : 'Mensaje interno') + '</button>';
     html += '<button type="button" class="btn btn-warning btn-sm fw-bold px-3 uppercase" onclick="resetPassword(' + (u.IdUsrA || '') + ')">' + (t && t.btn_resetear_clave ? t.btn_resetear_clave : 'Resetear Clave') + '</button>';
     if (t && t.reset_leyenda) html += '<span class="small text-muted align-middle ms-1" title="' + (t.reset_leyenda || '').replace(/"/g, '&quot;') + '"><i class="bi bi-info-circle"></i></span>';
     var tieneDatosEliminar = (protocolos ? protocolos.length : 0) + (formularios ? formularios.length : 0) + (alojamientos ? alojamientos.length : 0) > 0;
@@ -476,6 +478,18 @@ window.resetPassword = async (id) => {
     } else {
         alert((t?.reset_error || "Error:") + " " + res.message);
     }
+};
+
+window.openMensajeriaComposeAUsuario = async (idUsr) => {
+    const id = parseInt(idUsr, 10);
+    if (!id) return;
+    await openMensajeriaCompose({
+        destinatarioId: id,
+        origenTipo: 'lista_usuarios',
+        origenId: id,
+        origenEtiqueta: null,
+        lockCategory: true
+    });
 };
 
 window.openProtocolFromUserCard = (idprotA) => {

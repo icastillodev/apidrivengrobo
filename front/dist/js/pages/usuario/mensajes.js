@@ -20,11 +20,167 @@ function formatDateTime(ds) {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
 }
 
-export async function initMensajes() {
+const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'lista_usuarios', 'notificacion', 'institucional'];
+
+function labelOrigenTipo(ot) {
+    const t = window.txt?.comunicacion || {};
+    const m = {
+        manual: t.msg_cat_manual,
+        formulario: t.msg_cat_formulario,
+        alojamiento: t.msg_cat_alojamiento,
+        lista_usuarios: t.msg_cat_lista_usuarios,
+        notificacion: t.msg_cat_notificacion,
+        institucional: t.msg_cat_institucional
+    };
+    const k = String(ot || '').trim();
+    return m[k] || k || '';
+}
+
+function avisoCorreoMensajeSiFallo(res) {
+    const emailN = res?.data?.emailNotificacion;
+    if (!emailN || emailN.ok || typeof Swal === 'undefined') return;
+    const t = window.txt?.comunicacion || {};
+    const text = emailN.codigo === 'sin_email'
+        ? (t.msg_email_sin_direccion || '')
+        : (t.msg_email_smtp_error || '');
+    Swal.fire({ icon: 'warning', title: t.msg_enviado_ok || '', text });
+}
+
+function fillCategoriaNuevo() {
+    const sel = document.getElementById('nuevo-categoria');
+    if (!sel) return;
+    const t = window.txt?.comunicacion || {};
+    const m = {
+        manual: t.msg_cat_manual,
+        formulario: t.msg_cat_formulario,
+        alojamiento: t.msg_cat_alojamiento,
+        lista_usuarios: t.msg_cat_lista_usuarios,
+        notificacion: t.msg_cat_notificacion,
+        institucional: t.msg_cat_institucional
+    };
+    sel.innerHTML = MSG_CAT_ORDER.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(m[v] || v)}</option>`).join('');
+}
+
+/**
+ * @param {{ alcance?: 'personal' | 'institucional' }} [opts]
+ */
+export async function initMensajes(opts = {}) {
     const t = window.txt?.comunicacion || {};
     const uid = parseInt(sessionStorage.getItem('userId') || '0', 10);
+    const alcance = opts.alcance === 'institucional' ? 'institucional' : 'personal';
+    const instMode = alcance === 'institucional';
+
+    const destBlock = document.getElementById('msg-nuevo-dest-block');
+    const catBlock = document.getElementById('msg-nuevo-cat-block');
+    if (instMode) {
+        if (destBlock) destBlock.classList.add('d-none');
+        if (catBlock) catBlock.classList.add('d-none');
+    }
 
     let currentHiloId = null;
+
+    /** Cache para filtrar destinatarios sin volver a pedir la API */
+    let destinatariosCache = { local: [], red: [] };
+
+    function destinatarioHaystack(u) {
+        return [
+            u.NombreA,
+            u.ApellidoA,
+            u.Usuario,
+            String(u.IdUsrA ?? ''),
+            u.NombreInstitucion
+        ].filter(Boolean).join(' ').toLowerCase();
+    }
+
+    function formatDestinatarioLabel(u) {
+        const nom = (u.NombreA || '').trim();
+        const ape = (u.ApellidoA || '').trim();
+        const id = String(u.IdUsrA ?? '');
+        const usr = (u.Usuario || '').trim();
+        const idLbl = t.msg_dest_id_short || 'ID';
+        const nameStr = [nom, ape].filter(Boolean).join(' ').trim();
+        let s = '';
+        if (nameStr) {
+            s = `${nameStr} · ${idLbl} ${id}`;
+        } else {
+            s = `${idLbl} ${id}`;
+        }
+        if (usr) s += ` · ${usr}`;
+        return s;
+    }
+
+    function nombreInstitucionGrupo(u) {
+        const n = String(u.NombreInstitucion || '').trim();
+        if (n) return n;
+        const id = parseInt(u.IdInstitucion, 10);
+        if (id > 0) {
+            const fb = t.msg_dest_inst_fallback || '';
+            return fb ? `${fb} ${id}` : `ID ${id}`;
+        }
+        return t.msg_dest_inst_sin_nombre || '—';
+    }
+
+    function renderDestinatariosSelect(query) {
+        const sel = document.getElementById('nuevo-dest');
+        if (!sel) return;
+
+        const prevVal = sel.value;
+        const q = String(query || '').trim().toLowerCase();
+        const words = q ? q.split(/\s+/).filter(Boolean) : [];
+        const match = (u) => {
+            if (!words.length) return true;
+            const hay = destinatarioHaystack(u);
+            return words.every((w) => hay.includes(w));
+        };
+
+        sel.innerHTML = `<option value="">${escapeHtml(t.msg_sel_dest || '')}</option>`;
+
+        const localFiltered = destinatariosCache.local.filter(match);
+        const redFiltered = destinatariosCache.red.filter(match);
+        const combined = [...localFiltered, ...redFiltered];
+
+        const byInst = new Map();
+        for (const u of combined) {
+            const idInst = parseInt(u.IdInstitucion, 10) || 0;
+            if (!byInst.has(idInst)) {
+                byInst.set(idInst, { instId: idInst, label: nombreInstitucionGrupo(u), users: [] });
+            }
+            byInst.get(idInst).users.push(u);
+        }
+
+        const myInst = parseInt(sessionStorage.getItem('instId') || localStorage.getItem('instId') || '0', 10);
+        const grupos = [...byInst.values()].sort((a, b) => {
+            if (a.instId === myInst && b.instId !== myInst) return -1;
+            if (b.instId === myInst && a.instId !== myInst) return 1;
+            return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+        });
+
+        for (const g of grupos) {
+            g.users.sort((a, b) => {
+                const aa = `${(a.ApellidoA || '').trim()} ${(a.NombreA || '').trim()}`.trim().toLowerCase();
+                const bb = `${(b.ApellidoA || '').trim()} ${(b.NombreA || '').trim()}`.trim().toLowerCase();
+                return aa.localeCompare(bb, undefined, { sensitivity: 'base' });
+            });
+            const hdr = document.createElement('option');
+            hdr.disabled = true;
+            hdr.value = '';
+            hdr.textContent = ` ${g.label} `;
+            hdr.className = 'mensajes-dest-inst-banner';
+            sel.appendChild(hdr);
+            g.users.forEach((u) => {
+                const opt = document.createElement('option');
+                opt.value = String(u.IdUsrA);
+                opt.textContent = `\u00A0\u00A0${formatDestinatarioLabel(u)}`;
+                sel.appendChild(opt);
+            });
+        }
+
+        if (prevVal && [...sel.options].some((o) => o.value === prevVal)) {
+            sel.value = prevVal;
+        } else {
+            sel.value = '';
+        }
+    }
 
     async function loadHilos(options = {}) {
         const silent = options.silent === true;
@@ -35,7 +191,8 @@ export async function initMensajes() {
             list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.msg_cargando || '')}</div>`;
         }
 
-        const res = await API.request('/comunicacion/mensajes/hilos', 'GET');
+        const q = encodeURIComponent(alcance);
+        const res = await API.request(`/comunicacion/mensajes/hilos?alcance=${q}`, 'GET');
 
         if (res.status !== 'success' || !Array.isArray(res.data)) {
             list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.err_generico || '')}</div>`;
@@ -88,12 +245,18 @@ export async function initMensajes() {
         const asuntoEl = document.getElementById('hilo-asunto');
         if (asuntoEl) asuntoEl.textContent = hilo.Asunto || '';
 
-        const other = parseInt(hilo.IdUsrParticipanteA, 10) === uid
-            ? parseInt(hilo.IdUsrParticipanteB, 10)
-            : parseInt(hilo.IdUsrParticipanteA, 10);
         const metaEl = document.getElementById('hilo-meta');
         if (metaEl) {
-            metaEl.textContent = `${t.msg_hilo || ''} · ID ${other}`;
+            const ot = String(hilo.OrigenTipo || '').trim();
+            const extra = ot ? ` · ${labelOrigenTipo(ot)}` : '';
+            if (instMode || parseInt(hilo.EsInstitucional || 0, 10) === 1) {
+                metaEl.textContent = `${t.msg_hilo_inst || ''}${extra}`;
+            } else {
+                const other = parseInt(hilo.IdUsrParticipanteA, 10) === uid
+                    ? parseInt(hilo.IdUsrParticipanteB, 10)
+                    : parseInt(hilo.IdUsrParticipanteA, 10);
+                metaEl.textContent = `${t.msg_hilo || ''} · ID ${other}${extra}`;
+            }
         }
 
         const box = document.getElementById('hilo-mensajes');
@@ -133,6 +296,7 @@ export async function initMensajes() {
 
         if (res.status === 'success') {
             el.value = '';
+            avisoCorreoMensajeSiFallo(res);
             await openHilo(currentHiloId);
         } else if (typeof Swal !== 'undefined') {
             Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
@@ -159,55 +323,75 @@ export async function initMensajes() {
         modal = new window.bootstrap.Modal(modalEl);
     }
 
-    function labelUsuario(u) {
-        return [u.ApellidoA, u.NombreA].filter(Boolean).join(', ') || u.Usuario || (`#${u.IdUsrA}`);
-    }
-
     async function fillDestinatarios() {
-        const sel = document.getElementById('nuevo-dest');
-        if (!sel) return;
-        sel.innerHTML = `<option value="">${escapeHtml(t.msg_sel_dest || '')}</option>`;
+        const fil = document.getElementById('nuevo-dest-filter');
+        if (fil) fil.value = '';
+
         const res = await API.request('/comunicacion/mensajes/destinatarios', 'GET');
-        if (res.status !== 'success' || !res.data) return;
+        if (res.status !== 'success' || !res.data) {
+            destinatariosCache = { local: [], red: [] };
+            renderDestinatariosSelect('');
+            return;
+        }
         const local = Array.isArray(res.data.local) ? res.data.local : [];
         const red = Array.isArray(res.data.red) ? res.data.red : [];
 
-        if (local.length) {
-            const og = document.createElement('optgroup');
-            og.label = t.msg_dest_grupo_local || '';
-            local.forEach((u) => {
-                if (parseInt(u.IdUsrA, 10) === uid) return;
-                const opt = document.createElement('option');
-                opt.value = String(u.IdUsrA);
-                opt.textContent = labelUsuario(u);
-                og.appendChild(opt);
-            });
-            if (og.children.length) sel.appendChild(og);
-        }
-        if (red.length) {
-            const og = document.createElement('optgroup');
-            og.label = t.msg_dest_grupo_red || '';
-            red.forEach((u) => {
-                const opt = document.createElement('option');
-                opt.value = String(u.IdUsrA);
-                const inst = u.NombreInstitucion || '';
-                const base = labelUsuario(u);
-                opt.textContent = inst ? `${base} (${inst})` : base;
-                og.appendChild(opt);
-            });
-            sel.appendChild(og);
-        }
+        destinatariosCache = {
+            local: local.filter((u) => parseInt(u.IdUsrA, 10) !== uid),
+            red
+        };
+        renderDestinatariosSelect('');
     }
 
+    document.getElementById('nuevo-dest-filter')?.addEventListener('input', (e) => {
+        renderDestinatariosSelect(e.target?.value || '');
+    });
+
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
-        await fillDestinatarios();
+        if (!instMode) {
+            await fillDestinatarios();
+            fillCategoriaNuevo();
+        }
         modal?.show();
     });
 
     document.getElementById('btn-enviar-nuevo')?.addEventListener('click', async () => {
-        const dest = parseInt(document.getElementById('nuevo-dest')?.value || '0', 10);
         const asunto = document.getElementById('nuevo-asunto')?.value?.trim() || '';
         const cuerpo = document.getElementById('nuevo-cuerpo')?.value?.trim() || '';
+
+        if (instMode) {
+            if (!asunto || !cuerpo) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', text: t.msg_requiere_asunto_cuerpo || '' });
+                }
+                return;
+            }
+            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
+                EsInstitucional: true,
+                Asunto: asunto,
+                Cuerpo: cuerpo,
+                OrigenTipo: 'institucional'
+            });
+            if (res.status === 'success') {
+                const hid = res.data?.IdMensajeHilo;
+                modal?.hide();
+                const a = document.getElementById('nuevo-asunto');
+                const c = document.getElementById('nuevo-cuerpo');
+                if (a) a.value = '';
+                if (c) c.value = '';
+                await loadHilos();
+                if (hid) await openHilo(hid);
+                if (window.NotificationManager?.check) {
+                    window.NotificationManager.check();
+                }
+            } else if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            }
+            return;
+        }
+
+        const dest = parseInt(document.getElementById('nuevo-dest')?.value || '0', 10);
+        const origenTipo = (document.getElementById('nuevo-categoria')?.value || 'manual').trim() || 'manual';
         if (!dest || !asunto || !cuerpo) {
             if (typeof Swal !== 'undefined') {
                 Swal.fire({ icon: 'warning', text: t.msg_sel_dest || '' });
@@ -218,7 +402,8 @@ export async function initMensajes() {
         const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
             IdDestinatario: dest,
             Asunto: asunto,
-            Cuerpo: cuerpo
+            Cuerpo: cuerpo,
+            OrigenTipo: origenTipo
         });
 
         if (res.status === 'success') {
@@ -228,6 +413,7 @@ export async function initMensajes() {
             const c = document.getElementById('nuevo-cuerpo');
             if (a) a.value = '';
             if (c) c.value = '';
+            avisoCorreoMensajeSiFallo(res);
             await loadHilos();
             if (hid) await openHilo(hid);
         } else if (typeof Swal !== 'undefined') {

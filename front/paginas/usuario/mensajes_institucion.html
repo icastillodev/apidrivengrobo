@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mensajes - GROBO</title>
+    <title>Mensajería institucional - GROBO</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -35,7 +35,7 @@
                 if (window.txt) {
                     initMenu();
                     NotificationManager.init();
-                    initMensajes();
+                    initMensajes({ alcance: 'institucional' });
                 }
             } catch (e) {
                 console.error(e);
@@ -45,12 +45,12 @@
         });
     </script>
 </head>
-<body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="mensajes">
+<body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="mensajes_institucion">
     <div class="container my-4 px-3">
         <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
             <div>
-                <h4 class="fw-black m-0" data-i18n="comunicacion.msg_page_title"></h4>
-                <small class="text-muted d-block" data-i18n="comunicacion.msg_page_subtitle"></small>
+                <h4 class="fw-black m-0" data-i18n="comunicacion.msg_page_title_inst"></h4>
+                <small class="text-muted d-block" data-i18n="comunicacion.msg_page_subtitle_inst"></small>
             </div>
             <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nuevo-msg">
                 <i class="bi bi-envelope-plus me-1"></i><span data-i18n="comunicacion.msg_nuevo"></span>

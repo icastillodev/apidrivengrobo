@@ -437,4 +437,38 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
         $body = $this->getTemplate($t['delete_summary_title'], $msg, '', '', 'GROBO', $lang);
         return $this->executeSend($to, $subject, $body);
     }
+
+    /**
+     * Notificación por correo de cada mensaje interno (nuevo hilo o respuesta).
+     *
+     * @param string $lang es|en|pt
+     */
+    public function sendInternalMessageNotification(
+        string $to,
+        string $nombreDest,
+        string $asunto,
+        string $cuerpoPlano,
+        string $instName,
+        string $nombreRemitente,
+        string $lang = 'es'
+    ): bool {
+        $t = MailLang::get($lang);
+        $subject = $asunto . ($instName !== '' ? ' — ' . $instName : '');
+        $cuerpoHtml = nl2br(htmlspecialchars($cuerpoPlano, ENT_QUOTES, 'UTF-8'));
+        $nombreDestHtml = $nombreDest !== '' ? htmlspecialchars($nombreDest, ENT_QUOTES, 'UTF-8') : '';
+        $helloTarget = $nombreDestHtml !== '' ? $nombreDestHtml : htmlspecialchars($to, ENT_QUOTES, 'UTF-8');
+
+        $mensajeCompleto = $t['msg_int_hello'] . ' <b>' . $helloTarget . '</b>,<br><br>'
+            . $t['msg_int_intro'] . '<br><br>'
+            . '<b>' . htmlspecialchars($t['msg_int_from'], ENT_QUOTES, 'UTF-8') . '</b> '
+            . htmlspecialchars($nombreRemitente, ENT_QUOTES, 'UTF-8') . '<br><br>'
+            . '<b>' . htmlspecialchars($t['msg_int_subject_label'], ENT_QUOTES, 'UTF-8') . '</b> '
+            . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8') . '<br><br>'
+            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;">'
+            . $cuerpoHtml . '</div>';
+
+        $body = $this->getTemplate($t['msg_int_title'], $mensajeCompleto, '', '', $instName, $lang);
+
+        return $this->executeSend($to, $subject, $body);
+    }
 }

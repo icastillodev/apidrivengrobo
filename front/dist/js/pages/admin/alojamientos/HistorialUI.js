@@ -216,12 +216,16 @@ renderTable() {
         const titleEl = document.getElementById('historial-title');
         if (titleEl) titleEl.innerText = txt.history_record || 'Ficha de Alojamiento';
 
+        const btnMsg = `
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm ms-1" onclick="window.openMensajeriaComposeAlojamiento && window.openMensajeriaComposeAlojamiento()">
+                    <i class="bi bi-chat-dots me-1"></i>${txt.btn_msg_responsable || ''}
+                </button>`;
         if (isFinalizado) {
             footer.innerHTML = `
                 <button type="button" class="btn btn-warning btn-sm fw-bold shadow-sm" onclick="window.confirmarDesfinalizar(${historiaId})">
                     <i class="bi bi-unlock-fill me-1"></i> ${txt.btn_unfinalize || 'Desfinalizar'}
                 </button>
-                <span class="badge bg-danger px-3 py-2">${txt.badge_finished || 'FINALIZADO'}</span>`;
+                <span class="badge bg-danger px-3 py-2">${txt.badge_finished || 'FINALIZADO'}</span>${btnMsg}`;
         } else {
             const ultimaFecha = history[history.length - 1].fechavisado;
             footer.innerHTML = `
@@ -230,7 +234,7 @@ renderTable() {
                 </button>
                 <button type="button" class="btn btn-primary btn-sm fw-bold shadow-sm" onclick="window.openModalActualizar(${historiaId}, true)">
                     <i class="bi bi-plus-circle me-1"></i> ${txt.btn_update_stay || 'Actualizar estadía'}
-                </button>`;
+                </button>${btnMsg}`;
         }
     },
 

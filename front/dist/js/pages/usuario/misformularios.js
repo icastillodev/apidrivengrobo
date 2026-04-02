@@ -59,12 +59,14 @@ function renderTable() {
     const derivationFilter = document.getElementById('filter-derivation')?.value || 'all';
     const originInstFilter = document.getElementById('filter-origin-inst')?.value || 'all';
 
+    const normEst = (v) => (v == null || String(v).trim() === '' ? 'Sin estado' : String(v).trim());
+
     const filtered = allForms.filter(f => {
         const matchText = Object.values(f).join(' ').toLowerCase().includes(term);
         const matchStatus = statusFilter === 'all'
-            || f.estado === statusFilter
-            || (f.estado_origen != null && f.estado_origen === statusFilter)
-            || (f.estado_destino != null && f.estado_destino === statusFilter);
+            || normEst(f.estado) === statusFilter
+            || normEst(f.estado_origen) === statusFilter
+            || normEst(f.estado_destino) === statusFilter;
         const instNames = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
             ? f.institucionesParticipantes.map(i => i.NombreInst)
             : [f.NombreInstitucion].filter(Boolean);
@@ -570,8 +572,9 @@ function getStatusBadge(estado, porInstitucion) {
         'Sin estado': 'bg-secondary', 'Proceso': 'bg-primary', 'Listo para entrega': 'bg-info text-dark',
         'Entregado': 'bg-success', 'Suspendido': 'bg-warning text-dark', 'Rechazado': 'bg-danger', 'Reservado': 'bg-info text-dark'
     };
-    const lbl = porInstitucion ? `${estado || 'Sin estado'} ${tx.estado_por || 'por'} ${porInstitucion}` : (estado || 'Sin estado');
-    return `<span class="badge ${map[estado] || 'bg-light text-dark border'} shadow-sm badge-status mt-1">${lbl}</span>`;
+    const keyEst = (estado != null && String(estado).trim() !== '') ? String(estado).trim() : 'Sin estado';
+    const lbl = porInstitucion ? `${keyEst} ${tx.estado_por || 'por'} ${porInstitucion}` : keyEst;
+    return `<span class="badge ${map[keyEst] || 'bg-light text-dark border'} shadow-sm badge-status mt-1">${lbl}</span>`;
 }
 
 function getWorkflowBadgeRow(f) {
@@ -603,11 +606,13 @@ function getStatusWithWorkflow(f) {
     const hasDualEstados = isDerived && (hasEstadoOrigenKey || hasEstadoDestinoKey || f.estado_origen != null || f.estado_destino != null);
     let estadoBadge;
     if (hasDualEstados) {
-        // Solo 2 badges en columna: ruta "Derivado · …" + un estado (el del destino; fallback origen).
+        // Destino → origen → estado del formulario (evita "—" cuando derivación aún no copió columnas).
         const st = (f.estado_destino != null && String(f.estado_destino).trim() !== '')
             ? f.estado_destino
-            : f.estado_origen;
-        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+            : (f.estado_origen != null && String(f.estado_origen).trim() !== '')
+                ? f.estado_origen
+                : (f.estado != null && String(f.estado).trim() !== '' ? f.estado : null);
+        const b = st ? getStatusBadge(st) : getStatusBadge('Sin estado');
         estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (f.InstitucionActualNombre || '').trim() : '';

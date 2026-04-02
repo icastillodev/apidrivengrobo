@@ -14,7 +14,26 @@ class ReactivoModel {
 // ============================================================
     // LÓGICA DE ADMINISTRADOR (BANDEJA DE ENTRADA)
     // ============================================================
-    public function getAllByInstitution($instId, $categoryName) {
+    /**
+     * Predicado SQL: pedido de reactivos por categoría de tipoformularios o por fila con insumo experimental (reactivo).
+     * Evita bandeja vacía si el tipo cambió, el JOIN falla o la categoría tiene variante (ej. tilde).
+     *
+     * @param string $tAlias alias de tipoformularios en el query (p. ej. "t")
+     */
+    public static function sqlPredicadoFormularioReactivo(string $tAlias = 't'): string {
+        $cn = "LOWER(TRIM({$tAlias}.categoriaformulario))";
+        // Cubre variantes con/sin tilde, mayúsculas y textos extendidos en BD.
+        $cat = "({$cn} IN ('otros reactivos biologicos', 'otros reactivos biológicos') OR {$cn} LIKE 'otros reactivos bio%')";
+        $porInsumo = '(f.reactivo IS NOT NULL AND CAST(f.reactivo AS UNSIGNED) > 0 AND EXISTS ('
+            . 'SELECT 1 FROM insumoexperimental ie WHERE ie.IdInsumoexp = f.reactivo AND ie.IdInstitucion = f.IdInstitucion'
+            . '))';
+
+        return "({$cat} OR {$porInsumo})";
+    }
+
+    public function getAllByInstitution($instId, $categoryName = null) {
+        // Segundo parámetro ignorado (compatibilidad); la bandeja usa sqlPredicadoFormularioReactivo().
+
         $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
             && $this->hasColumn('formularioe', 'DerivadoActivo')
             && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
@@ -151,10 +170,9 @@ class ReactivoModel {
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
                 WHERE {$whereInst} 
                 {$legacyCopyExclusion}
-                AND (t.categoriaformulario = ? {$derivDestinoAndClause} {$derivOrigenAndClause})
+                AND (" . self::sqlPredicadoFormularioReactivo('t') . " {$derivDestinoAndClause} {$derivOrigenAndClause})
                 ORDER BY f.idformA DESC";
 
-        $params[] = $categoryName;
         $stmt = $this->db->prepare($sql);
         $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
         $stmt->execute($execParams);
@@ -247,7 +265,8 @@ class ReactivoModel {
         $sql = "SELECT IdTipoFormulario, nombreTipo, color
                 FROM tipoformularios
                 WHERE IdInstitucion = ?
-                  AND categoriaformulario = 'Otros reactivos biologicos'
+                  AND (LOWER(TRIM(categoriaformulario)) IN ('otros reactivos biologicos', 'otros reactivos biológicos')
+                       OR LOWER(TRIM(categoriaformulario)) LIKE 'otros reactivos bio%')
                 ORDER BY nombreTipo ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([(int)$instId]);
@@ -285,6 +304,12 @@ class ReactivoModel {
 
         if ($isDerived && !empty($deriv['is_destination'])) {
             $cfg = $formDerivModel->checkDestinoConfigCompleta($id, $instId, 'Otros reactivos biologicos');
+            if (!$cfg['completa']) {
+                $cfgTilde = $formDerivModel->checkDestinoConfigCompleta($id, $instId, 'Otros reactivos biológicos');
+                if ($cfgTilde['completa']) {
+                    $cfg = $cfgTilde;
+                }
+            }
             if (!$cfg['completa']) {
                 throw new \Exception('Actualizar formulario para la aplicación: faltan ' . implode(', ', $cfg['faltantes']) . '. Complete los datos antes de cambiar el estado.');
             }
@@ -390,7 +415,9 @@ class ReactivoModel {
                 if (!$tipoDestino) {
                     throw new \Exception("Debe seleccionar tipo de pedido para la institución destino.");
                 }
-                $stTipo = $this->db->prepare("SELECT 1 FROM tipoformularios WHERE IdTipoFormulario = ? AND IdInstitucion = ? AND categoriaformulario = 'Otros reactivos biologicos' LIMIT 1");
+                $stTipo = $this->db->prepare("SELECT 1 FROM tipoformularios WHERE IdTipoFormulario = ? AND IdInstitucion = ?
+                    AND (LOWER(TRIM(categoriaformulario)) IN ('otros reactivos biologicos', 'otros reactivos biológicos')
+                         OR LOWER(TRIM(categoriaformulario)) LIKE 'otros reactivos bio%') LIMIT 1");
                 $stTipo->execute([$tipoDestino, $instIdRequest]);
                 if (!$stTipo->fetchColumn()) {
                     throw new \Exception("El tipo seleccionado no pertenece a la institución destino.");
@@ -565,7 +592,10 @@ class ReactivoModel {
         $stmtIns = $this->db->prepare("SELECT IdInsumoexp, NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);
 
-        $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario = 'Otros reactivos biologicos' AND IdInstitucion = ? LIMIT 1");
+        $stmtType = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE IdInstitucion = ?
+                  AND (LOWER(TRIM(categoriaformulario)) IN ('otros reactivos biologicos', 'otros reactivos biológicos')
+                       OR LOWER(TRIM(categoriaformulario)) LIKE 'otros reactivos bio%')
+                  ORDER BY IdTipoFormulario ASC LIMIT 1");
         $stmtType->execute([$instId]);
         $idTipo = $stmtType->fetchColumn();
 

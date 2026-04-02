@@ -36,6 +36,49 @@ class TrazabilidadController {
         exit;
     }
 
+    /**
+     * Ficha unificada de un sujeto (animal) con historial de tramos y registros clínicos (PDF / modal).
+     */
+    public function getFichaAnimal() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        $idEu = (int)($_GET['idEspecieAlojUnidad'] ?? 0);
+        $idCaja = (int)($_GET['idCajaAlojamiento'] ?? 0);
+        $idAloj = (int)($_GET['idAlojamiento'] ?? 0);
+        $n = ($idEu > 0 ? 1 : 0) + ($idCaja > 0 ? 1 : 0) + ($idAloj > 0 ? 1 : 0);
+        if ($n !== 1) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Indique exactamente uno: idEspecieAlojUnidad, idCajaAlojamiento o idAlojamiento.']);
+            exit;
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int)$sesion['instId'];
+            if ($idEu > 0) {
+                $data = $this->model->getFichaAnimalCompleta($idEu, $instId);
+                $err = 'Sujeto no encontrado o sin permiso.';
+            } elseif ($idCaja > 0) {
+                $data = $this->model->getFichaCajaAgrupada($idCaja, $instId);
+                $err = 'Caja no encontrada o sin permiso.';
+            } else {
+                $data = $this->model->getFichaAlojamientoAgrupada($idAloj, $instId);
+                $err = 'Alojamiento no encontrado o sin permiso.';
+            }
+            if ($data === null) {
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => $err]);
+                exit;
+            }
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function saveObservation() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -90,6 +133,32 @@ class TrazabilidadController {
             $this->model->renameSujeto($data['idUnidad'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** Peso, nacimiento, sexo, cepa y categoría/raza por tramo (IdEspecieAlojUnidad). */
+    public function updateSubjectFichaBio() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $id = (int)($data['IdEspecieAlojUnidad'] ?? 0);
+            if ($id <= 0) {
+                throw new \InvalidArgumentException('Falta IdEspecieAlojUnidad.');
+            }
+            unset($data['IdEspecieAlojUnidad']);
+            $this->model->updateSujetoFichaBio($id, (int)$sesion['instId'], $data);
+            echo json_encode(['status' => 'success']);
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        } catch (\Exception $e) {
+            http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

@@ -60,11 +60,8 @@ class MenuController {
         }
 
         // Resto de roles: 204 y 206 por defecto ON si no hay fila en menudistr; desactivables con Activo = 2.
-        // Investigador (3): sin mensajes (204); sí portal de noticias (206).
+        // Investigador (3): misma regla (mensajería institucional + portal de noticias).
         foreach ([204, 206] as $mid) {
-            if ($mid === 204 && $r === 3) {
-                continue;
-            }
             if (in_array($mid, $ids)) {
                 continue;
             }
@@ -86,13 +83,6 @@ class MenuController {
                     $ids[] = 205;
                 }
             }
-        }
-
-        // 204 puede venir de menudistr u otros permisos; investigador no debe verlo.
-        if ($r === 3) {
-            $ids = array_filter($ids, static function ($id) {
-                return (int)$id !== 204;
-            });
         }
 
         return array_values(array_unique($ids));

@@ -263,11 +263,13 @@ $router->post('/alojamiento/update-config', 'AlojamientoController@updateConfig'
 // SECCIÓN: Trazabilidad Biológica (Alojamiento)
 // ============================================================
 $router->get('/trazabilidad/get-arbol', 'TrazabilidadController@getArbol');
+$router->get('/trazabilidad/ficha-animal', 'TrazabilidadController@getFichaAnimal');
 $router->post('/trazabilidad/save-observation', 'TrazabilidadController@saveObservation');
 $router->post('/trazabilidad/add-caja', 'TrazabilidadController@addCaja');
 
 $router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
 $router->post('/trazabilidad/rename-subject', 'TrazabilidadController@renameSubject');
+$router->post('/trazabilidad/update-subject-ficha-bio', 'TrazabilidadController@updateSubjectFichaBio');
 
 // ============================================================
 // SECCIÓN: Protocolos (Para el Registro de Alojamiento)
@@ -350,11 +352,13 @@ $router->post('/user/reservas/series/create', 'UserReservasSeriesController@crea
 // SECCIÓN: Reservas (QR Sala - público)
 // ============================================================
 $router->get('/reservas/sala/public-bundle', 'PublicReservasController@getSalaPublicBundle');
+$router->get('/reservas/institucion/public-bundle', 'PublicReservasController@getInstitucionPublicBundle');
 
 // ============================================================
 // SECCIÓN: Admin - QR Sala
 // ============================================================
 $router->post('/admin/config/reservas/sala/generar-qr', 'AdminConfigReservasController@generarQrSala');
+$router->post('/admin/config/reservas/institucion/generar-qr', 'AdminConfigReservasController@generarQrInstitucion');
 
 // ============================================================
 // SECCIÓN: Admin - Reservas (Agenda + Creación)
@@ -443,6 +447,7 @@ $router->post('/admin/config/especies/delete', 'AdminConfigEspeciesController@de
 $router->post('/admin/config/subespecies/save', 'AdminConfigEspeciesController@saveSubespecie');
 $router->post('/admin/config/subespecies/toggle', 'AdminConfigEspeciesController@toggleSubespecie');
 $router->post('/admin/config/subespecies/delete', 'AdminConfigEspeciesController@deleteSubespecie');
+$router->get('/admin/config/subespecies/by-especie', 'AdminConfigEspeciesController@getSubespeciesByEspecie');
 $router->get('/admin/config/cepas/all', 'AdminConfigEspeciesController@getCepas');
 $router->post('/admin/config/cepas/save', 'AdminConfigEspeciesController@saveCepa');
 $router->post('/admin/config/cepas/toggle', 'AdminConfigEspeciesController@toggleCepa');

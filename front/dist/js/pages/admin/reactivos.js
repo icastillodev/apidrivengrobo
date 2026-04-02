@@ -3,6 +3,7 @@
  * Sistema: GROBO 2026
  */
 import { API } from '../../api.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
@@ -14,6 +15,28 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedReactivoFromUrl = false;
+
+window.composeMensajeReactivoInvestigador = async (idInvestigador, idformA) => {
+    const id = parseInt(idInvestigador, 10);
+    const fid = parseInt(idformA, 10);
+    const tc = window.txt?.comunicacion || {};
+    if (!id || !fid) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
+        }
+        return;
+    }
+    const tm = window.txt?.reactivos?.modal || {};
+    const asunto = `${tc.msg_asunto || ''} · ${tm.detail_title || 'Reactivos'} #${fid}`;
+    await openMensajeriaCompose({
+        destinatarioId: id,
+        origenTipo: 'formulario',
+        origenId: fid,
+        origenEtiqueta: `Reactivos #${fid}`,
+        asunto,
+        lockCategory: true
+    });
+};
 
 function getI18nValue(path) {
     if (!path) return '';
@@ -271,11 +294,21 @@ function renderModalHeader(r) {
  */
 function renderResearcherContact(r) {
     const t = window.txt.reactivos.modal;
+    const tc = window.txt?.comunicacion || {};
+    const idInv = parseInt(r.IdInvestigador, 10) || 0;
+    const btnMsg = idInv > 0
+        ? `<div class="col-12 mt-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm" onclick="window.composeMensajeReactivoInvestigador(${idInv}, ${parseInt(r.idformA, 10) || 0})">
+                <i class="bi bi-chat-dots me-1"></i>${tc.btn_msg_investigador || ''}
+            </button>
+        </div>`
+        : '';
     return `
     <div class="row g-2 mb-3 small border-bottom pb-3 text-center">
         <div class="col-md-4 text-truncate"><strong>${t.email}:</strong> ${r.EmailInvestigador || '---'}</div>
         <div class="col-md-4"><strong>${t.phone}:</strong> ${r.CelularInvestigador || '---'}</div>
         <div class="col-md-4 text-truncate"><strong>${t.dept}:</strong> <span class="text-primary fw-bold">${r.Departamento || '---'}</span></div>
+        ${btnMsg}
     </div>`;
 }
 
@@ -981,8 +1014,10 @@ function getStatusWithWorkflow(item) {
     if (hasDualEstados) {
         const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
             ? item.estado_destino
-            : item.estado_origen;
-        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+            : (item.estado_origen != null && String(item.estado_origen).trim() !== '')
+                ? item.estado_origen
+                : (item.estado != null && String(item.estado).trim() !== '' ? item.estado : null);
+        const b = st ? getStatusBadge(st) : getStatusBadge('Sin estado');
         estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';
@@ -1003,9 +1038,14 @@ function getFilteredAndSortedData() {
     const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
 
     let data = allReactivos.filter(r => {
-        const estadoFila = (r.estado || "sin estado").toString().toLowerCase().trim();
-        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
         const isDerived = Number(r.DerivadoActivo || 0) === 1;
+        let eff = r.estado;
+        if (isDerived && (r.estado_origen != null || r.estado_destino != null)) {
+            if (r.estado_destino != null && String(r.estado_destino).trim() !== '') eff = r.estado_destino;
+            else if (r.estado_origen != null && String(r.estado_origen).trim() !== '') eff = r.estado_origen;
+        }
+        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
+        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
         if (derivFilter === 'derived' && !isDerived) return false;
         if (derivFilter === 'local' && isDerived) return false;
         const originName = (r.InstitucionOrigenNombre || '').trim();

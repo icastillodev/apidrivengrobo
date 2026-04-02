@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
@@ -8,6 +9,28 @@ let currentPage = 1;
 const rowsPerPage = 15;
 window.catalogoInsumos = []; // Global para acceso desde addItemRow
 let openedInsumoFromUrl = false;
+
+window.composeMensajeInsumoInvestigador = async (idInvestigador, idformA) => {
+    const id = parseInt(idInvestigador, 10);
+    const fid = parseInt(idformA, 10);
+    const tc = window.txt?.comunicacion || {};
+    if (!id || !fid) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
+        }
+        return;
+    }
+    const ti = window.txt?.admin_insumos || {};
+    const asunto = `${tc.msg_asunto || ''} · ${ti.titulo || 'Insumos'} #${fid}`;
+    await openMensajeriaCompose({
+        destinatarioId: id,
+        origenTipo: 'formulario',
+        origenId: fid,
+        origenEtiqueta: `Insumos #${fid}`,
+        asunto,
+        lockCategory: true
+    });
+};
 
 /**
  * 1. INICIALIZACIÓN
@@ -313,10 +336,22 @@ function renderModalHeader(f) {
 }
 
 function renderResearcherContact(f) {
+    const tc = window.txt?.comunicacion || {};
+    const tInv = window.txt?.admin_insumos?.col_investigador || 'Investigador';
+    const idInv = parseInt(f.IdInvestigador, 10) || 0;
+    const fid = parseInt(f.idformA, 10) || 0;
+    const btnMsg = idInv > 0
+        ? `<div class="col-12 mt-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm" onclick="window.composeMensajeInsumoInvestigador(${idInv}, ${fid})">
+                <i class="bi bi-chat-dots me-1"></i>${tc.btn_msg_investigador || ''}
+            </button>
+        </div>`
+        : '';
     return `<div class="row g-2 p-3 small border-bottom text-center bg-white shadow-sm">
-        <div class="col-md-4"><strong>Investigador:</strong><br>${f.Investigador}</div>
+        <div class="col-md-4"><strong>${tInv}:</strong><br>${f.Investigador}</div>
         <div class="col-md-4"><strong>Email:</strong><br>${f.EmailInvestigador || '---'}</div>
         <div class="col-md-4"><strong>Celular:</strong><br>${f.CelularInvestigador || '---'}</div>
+        ${btnMsg}
     </div>`;
 }
 
@@ -835,11 +870,15 @@ function getFilteredAndSortedData() {
     const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
 
     let data = allInsumos.filter(f => {
-        // A. Normalización del estado
-        const estadoFila = (f.estado || "sin estado").toString().toLowerCase().trim();
+        const isDerived = Number(f.DerivadoActivo || 0) === 1;
+        let eff = f.estado;
+        if (isDerived && (f.estado_origen != null || f.estado_destino != null)) {
+            if (f.estado_destino != null && String(f.estado_destino).trim() !== '') eff = f.estado_destino;
+            else if (f.estado_origen != null && String(f.estado_origen).trim() !== '') eff = f.estado_origen;
+        }
+        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
         const matchStatus = statusFilter === 'all' || estadoFila === statusFilter;
         if (!matchStatus) return false;
-        const isDerived = Number(f.DerivadoActivo || 0) === 1;
         if (derivFilter === 'derived' && !isDerived) return false;
         if (derivFilter === 'local' && isDerived) return false;
         const originName = (f.InstitucionOrigenNombre || '').trim();
@@ -945,8 +984,10 @@ function getStatusWithWorkflow(item) {
     if (hasDualEstados) {
         const st = (item.estado_destino != null && String(item.estado_destino).trim() !== '')
             ? item.estado_destino
-            : item.estado_origen;
-        const b = st ? getStatusBadge(st) : '<span class="badge bg-light text-muted">—</span>';
+            : (item.estado_origen != null && String(item.estado_origen).trim() !== '')
+                ? item.estado_origen
+                : (item.estado != null && String(item.estado).trim() !== '' ? item.estado : null);
+        const b = st ? getStatusBadge(st) : getStatusBadge('Sin estado');
         estadoBadge = `<div class="d-flex flex-column gap-1 small">${b}</div>`;
     } else {
         const porInst = isDerived ? (item.InstitucionActualNombre || '').trim() : '';

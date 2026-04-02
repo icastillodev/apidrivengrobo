@@ -144,6 +144,34 @@ class AdminConfigReservasModel {
         return ['status' => 'success', 'codigo' => $token];
     }
 
+    /**
+     * Token único por institución para la vista QR de todas las salas (puerta / cartel general).
+     */
+    public function generarQrInstitucion(int $instId) {
+        if ($instId <= 0) {
+            return ['status' => 'error', 'message' => 'Institución inválida'];
+        }
+        try {
+            $stmt = $this->db->prepare("SELECT IdInstitucion, ReservaQrTokenGeneral FROM institucion WHERE IdInstitucion = ? LIMIT 1");
+            $stmt->execute([$instId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Ejecute la migración ReservaQrTokenGeneral en institucion.'];
+        }
+        if (!$row) {
+            return ['status' => 'error', 'message' => 'Institución no encontrada'];
+        }
+
+        $token = $row['ReservaQrTokenGeneral'];
+        if (!$token) {
+            $token = $this->randomToken(12);
+            $this->db->prepare("UPDATE institucion SET ReservaQrTokenGeneral = ? WHERE IdInstitucion = ?")->execute([$token, $instId]);
+            Auditoria::log($this->db, 'UPDATE', 'institucion', "Generó QR token general reservas IdInstitucion: $instId");
+        }
+
+        return ['status' => 'success', 'codigo' => $token];
+    }
+
     public function getModoAprobacion($instId) {
         // Si la columna no existe aún, devolvemos default 0
         try {

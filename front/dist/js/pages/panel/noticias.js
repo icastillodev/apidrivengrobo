@@ -15,6 +15,16 @@ function formatFecha(ds) {
     return Number.isNaN(d.getTime()) ? String(ds).substring(0, 16) : d.toLocaleString();
 }
 
+const NOTICIA_BADGE_VARIANTS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+
+function noticiaCategoriaBadgeHtml(r) {
+    const name = String(r?.Categoria ?? '').trim();
+    if (!name) return '';
+    let v = String(r?.CategoriaBadge ?? 'primary').toLowerCase();
+    if (!NOTICIA_BADGE_VARIANTS.includes(v)) v = 'primary';
+    return `<span class="badge text-bg-${v} ms-1" style="font-size:10px;vertical-align:middle;">${escapeHtml(name)}</span>`;
+}
+
 export async function initPortalNoticias() {
     const t = window.txt?.comunicacion || {};
     const pageSize = 10;
@@ -66,7 +76,7 @@ export async function initPortalNoticias() {
                 const fp = r.FechaPublicacion || r.FechaCreacion || '';
                 return `
                     <tr class="noticia-row" style="cursor:pointer" data-id="${id}">
-                        <td class="text-muted">${escapeHtml(String(fp).substring(0, 16))}</td>
+                        <td class="text-muted text-nowrap">${escapeHtml(String(fp).substring(0, 16))}${noticiaCategoriaBadgeHtml(r)}</td>
                         <td class="fw-semibold">${escapeHtml(r.Titulo || '—')}</td>
                         <td class="text-end"><span class="text-success small">${escapeHtml(t.ver_mas || '')}</span></td>
                     </tr>`;
@@ -114,7 +124,10 @@ export async function initPortalNoticias() {
         if (meta) {
             const fp = row.FechaPublicacion || row.FechaCreacion || '';
             const inst = row.NombreInstitucion || '';
-            meta.textContent = [formatFecha(fp), inst].filter(Boolean).join(' · ');
+            const fechaTxt = escapeHtml(formatFecha(fp));
+            const instTxt = escapeHtml(inst);
+            const badge = noticiaCategoriaBadgeHtml(row);
+            meta.innerHTML = `<span>${fechaTxt}</span>${badge}${inst ? `<span class="text-muted"> · ${instTxt}</span>` : ''}`;
         }
         if (cuerpo) cuerpo.textContent = row.Cuerpo || '';
         modal?.show();

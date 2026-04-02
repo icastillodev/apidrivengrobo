@@ -6,8 +6,55 @@ use PDO;
 class NoticiaModel {
     private $db;
 
+    /** Variantes permitidas para `CategoriaBadge` (clases Bootstrap 5 `text-bg-*`). */
+    private const BADGE_VARIANTS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+
     public function __construct(PDO $db) {
         $this->db = $db;
+    }
+
+    private function normalizeCategoria(?string $label): ?string {
+        $s = trim(strip_tags((string)$label));
+        if ($s === '') {
+            return null;
+        }
+        if (function_exists('mb_substr')) {
+            return mb_substr($s, 0, 80, 'UTF-8');
+        }
+        return substr($s, 0, 80);
+    }
+
+    private function normalizeCategoriaBadge(?string $raw): ?string {
+        $v = strtolower(trim((string)$raw));
+        if ($v === '' || $v === 'none') {
+            return null;
+        }
+        return in_array($v, self::BADGE_VARIANTS, true) ? $v : null;
+    }
+
+    /** Si no hay texto de categoría, no se guarda color suelto. */
+    private function resolveCategoriaFields(array $payload, ?array $existingRow = null): array {
+        $hasKey = array_key_exists('Categoria', $payload);
+        $cat = $hasKey
+            ? $this->normalizeCategoria($payload['Categoria'] !== null ? (string)$payload['Categoria'] : '')
+            : ($existingRow !== null ? $this->normalizeCategoria((string)($existingRow['Categoria'] ?? '')) : null);
+
+        $hasColorKey = array_key_exists('CategoriaBadge', $payload);
+        $badgeRaw = '';
+        if ($hasColorKey) {
+            $badgeRaw = $payload['CategoriaBadge'] !== null ? (string)$payload['CategoriaBadge'] : '';
+        } elseif ($existingRow !== null) {
+            $badgeRaw = (string)($existingRow['CategoriaBadge'] ?? '');
+        }
+        $badge = $this->normalizeCategoriaBadge($badgeRaw !== '' ? $badgeRaw : null);
+
+        if ($cat === null) {
+            return [null, null];
+        }
+        if ($badge === null) {
+            $badge = 'primary';
+        }
+        return [$cat, $badge];
     }
 
     /** Solo noticias ya visibles en portal (publicadas y fecha efectiva <= ahora). */
@@ -73,7 +120,7 @@ class NoticiaModel {
                 ? 'Cuerpo AS Cuerpo'
                 : 'LEFT(Cuerpo, 400) AS CuerpoResumen';
             $sql = "
-                SELECT IdNoticia, IdInstitucion, Alcance, Titulo, {$cuerpoSel},
+                SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge, {$cuerpoSel},
                        FechaPublicacion, FechaCreacion
                 FROM noticia
                 WHERE IdInstitucion = ? AND Alcance = 'local' AND " . $this->sqlVisiblePublicas() . "
@@ -88,7 +135,8 @@ class NoticiaModel {
                 return ['rows' => [], 'total' => 0];
             }
             $sql = "
-                SELECT n.IdNoticia, n.IdInstitucion, n.Alcance, n.Titulo, LEFT(n.Cuerpo, 400) AS CuerpoResumen,
+                SELECT n.IdNoticia, n.IdInstitucion, n.Alcance, n.Titulo, n.Categoria, n.CategoriaBadge,
+                       LEFT(n.Cuerpo, 400) AS CuerpoResumen,
                        n.FechaPublicacion, n.FechaCreacion, n.DependenciaRed
                 FROM noticia n
                 INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
@@ -171,7 +219,8 @@ class NoticiaModel {
     public function listAdmin(int $instId, int $page, int $pageSize): array {
         $offset = max(0, ($page - 1) * $pageSize);
         $sql = "
-            SELECT IdNoticia, IdInstitucion, Alcance, Titulo, LEFT(Cuerpo, 200) AS CuerpoPreview,
+            SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge,
+                   LEFT(Cuerpo, 200) AS CuerpoPreview,
                    Publicado, CompartirEnRed, FechaPublicacion, FechaCreacion, FechaActualizacion, IdUsrAutor, DependenciaRed
             FROM noticia
             WHERE IdInstitucion = ?
@@ -210,15 +259,19 @@ class NoticiaModel {
             return ['status' => 'error', 'message' => 'Título y cuerpo son obligatorios.'];
         }
 
+        [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, null);
+
         $stmt = $this->db->prepare("
             INSERT INTO noticia
-            (IdInstitucion, Alcance, DependenciaRed, Titulo, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, NOW())
+            (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
         $stmt->execute([
             $instId,
             $alcance,
             $titulo,
+            $categoria,
+            $categoriaBadge,
             $cuerpo,
             $publicado,
             $compartirEnRed,
@@ -264,15 +317,20 @@ class NoticiaModel {
             return ['status' => 'error', 'message' => 'Título y cuerpo son obligatorios.'];
         }
 
+        [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, $row);
+
         $stmt = $this->db->prepare("
             UPDATE noticia SET
-            Alcance = ?, DependenciaRed = ?, Titulo = ?, Cuerpo = ?, Publicado = ?, CompartirEnRed = ?, FechaPublicacion = ?
+            Alcance = ?, DependenciaRed = ?, Titulo = ?, Categoria = ?, CategoriaBadge = ?, Cuerpo = ?,
+            Publicado = ?, CompartirEnRed = ?, FechaPublicacion = ?
             WHERE IdNoticia = ? AND IdInstitucion = ?
         ");
         $stmt->execute([
             $alcance,
             $depRed,
             $titulo,
+            $categoria,
+            $categoriaBadge,
             $cuerpo,
             $publicado,
             $compartirEnRed,

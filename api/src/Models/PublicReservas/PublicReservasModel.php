@@ -12,11 +12,53 @@ class PublicReservasModel {
         $from = $from ?: date('Y-m-01');
         $to = $to ?: date('Y-m-t');
 
-        $salaStmt = $this->db->prepare("SELECT IdSalaReserva, IdInstitucion, Nombre, Lugar, tipohorasalas FROM reserva_sala WHERE QrToken = ? AND habilitado = 1 LIMIT 1");
+        $salaStmt = $this->db->prepare("SELECT IdSalaReserva, IdInstitucion, Nombre, Lugar, tipohorasalas, QrToken FROM reserva_sala WHERE QrToken = ? AND habilitado = 1 LIMIT 1");
         $salaStmt->execute([$token]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala no encontrada'];
 
+        return $this->buildBundleDataForSala($sala, $from, $to, $userId);
+    }
+
+    /**
+     * Vista pública: todas las salas habilitadas de la institución (token en institucion.ReservaQrTokenGeneral).
+     */
+    public function getInstitucionPublicBundle($token, $from, $to, $userId = null) {
+        if (!$token) return ['status' => 'error', 'message' => 'Token inválido'];
+        $from = $from ?: date('Y-m-01');
+        $to = $to ?: date('Y-m-t');
+
+        try {
+            $instStmt = $this->db->prepare("SELECT IdInstitucion, NombreInst FROM institucion WHERE ReservaQrTokenGeneral = ? LIMIT 1");
+            $instStmt->execute([$token]);
+            $inst = $instStmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Configuración de QR no disponible.'];
+        }
+        if (!$inst) return ['status' => 'error', 'message' => 'Institución no encontrada'];
+
+        $salasStmt = $this->db->prepare("
+            SELECT IdSalaReserva, IdInstitucion, Nombre, Lugar, tipohorasalas, QrToken
+            FROM reserva_sala
+            WHERE IdInstitucion = ? AND habilitado = 1
+            ORDER BY Nombre ASC
+        ");
+        $salasStmt->execute([(int)$inst['IdInstitucion']]);
+        $salas = $salasStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $outSalas = [];
+        foreach ($salas as $sala) {
+            $outSalas[] = $this->buildBundleDataForSala($sala, $from, $to, $userId);
+        }
+
+        return [
+            'mode' => 'general',
+            'institucion' => $inst,
+            'salas' => $outSalas
+        ];
+    }
+
+    private function buildBundleDataForSala(array $sala, $from, $to, $userId) {
         $horStmt = $this->db->prepare("SELECT IdDiaSala, HoraIni, HoraFin FROM reserva_horariospordiasala WHERE IdSalaReserva = ?");
         $horStmt->execute([$sala['IdSalaReserva']]);
         $horarios = $horStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -55,7 +97,6 @@ class PublicReservasModel {
                 $availableDays[] = $dateStr;
             }
 
-            // Para el modo "puerta": mostrar ocupación por bloques (sin nombres)
             $busyByDay[$dateStr] = $this->buildBusyBlocksForDay($dateStr, $reservas, $userId);
         }
 

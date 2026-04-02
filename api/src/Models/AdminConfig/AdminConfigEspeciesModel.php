@@ -185,6 +185,19 @@ class AdminConfigEspeciesModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** Subespecies de una especie para la institución (p. ej. ficha de sujeto en alojamiento). */
+    public function listSubespeciesByEspecieInst(int $instId, int $idespA): array {
+        $stmt = $this->db->prepare("
+            SELECT s.idsubespA, s.SubEspeNombreA, s.Existe
+            FROM subespecie s
+            INNER JOIN especiee e ON s.idespA = e.idespA
+            WHERE s.idespA = ? AND e.IdInstitucion = ?
+            ORDER BY s.SubEspeNombreA ASC
+        ");
+        $stmt->execute([$idespA, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     /** Guarda cepa asociada a especie (idespA). Valida que la especie sea de la instituci?n. */
     public function saveCepaByEspecie($instId, $idespA, $nombre) {
         $nombre = trim((string)$nombre);
