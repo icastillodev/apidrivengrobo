@@ -11,6 +11,8 @@ import { renderTopMenuStructure, renderSideMenuStructure } from './menujs/MenuRe
 import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle } from '../utils/i18n.js';
+import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
+import { initCapacitacionHelpFab } from './CapacitacionHelpFab.js';
 
 export { refreshMenuNotifications }; 
 
@@ -19,6 +21,8 @@ export async function initMenu() {
     const instId = getSession('instId') || 0; 
     
     console.log("🚀 InitMenu -> Rol:", roleId, "| Inst:", instId);
+
+    await ensureInstModulesLoaded(API.request.bind(API));
 
     if (isNaN(roleId)) {
         console.warn("Menú detenido: No hay rol de usuario definido.");
@@ -48,10 +52,11 @@ export async function initMenu() {
 try {
         let ids = [];
 
-        // Si es SUPERADMIN / ADMIN (Roles 1, 2, 4), le forzamos a ver todo, sin preguntar a la API
-        // Incluye comunicación (204 mensajes, 205 noticias admin, 206 portal noticias) — mismo criterio que API /menu para otros roles.
+        // GeckoDev (1), Superadmin sede (2), Admin (4): lista base completa + sin filtrar por módulos en cliente (el API aplica permisos).
+        // Incluye comunicación (204, 205, 206) — investigadores (3,5,6) siguen usando /menu.
         if (roleId === 1 || roleId === 2 || roleId === 4) {
             ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 998, 999];
+            ids = filterMenuIdsByModulos(ids, roleId, parseInt(instId, 10) || 0);
         } 
 
     /*    if (roleId === 4 || roleId === 5 || roleId === 6) {
@@ -65,6 +70,7 @@ try {
             if (resMenu && resMenu.status === "success") {
                 ids = (resMenu.data || []).map(id => Number(id));
             }
+            ids = filterMenuIdsByModulos(ids, roleId, parseInt(instId, 10) || 0);
         }
 
         // Forzar SIEMPRE el menú 55 para roles 5 (Asistente) y 6 (Laboratorio)
@@ -75,7 +81,9 @@ try {
         // Si después de preguntar, tenemos IDs para mostrar, dibujamos el menú
         if (ids.length > 0) {
             if (![1, 2].includes(roleId)) ids = ids.filter(id => id !== 9);
-            [999, 998, 10].forEach(fixedId => { if(!ids.includes(fixedId)) ids.push(fixedId); });
+            [999, 998].forEach((fixedId) => {
+                if (!ids.includes(fixedId)) ids.push(fixedId);
+            });
 
             ['header.gecko-header', '#gecko-sidebar-element', '#gecko-mobile-toggle', '#gecko-mobile-toggle-top'].forEach(s => {
                 const el = document.querySelector(s);
@@ -83,6 +91,13 @@ try {
             });
 
             const templates = getMenuTemplates(roleId);
+
+            if (ids.includes(55)) {
+                const t55 = templates[55];
+                if (!t55 || !t55.children || t55.children.length === 0) {
+                    ids = ids.filter((id) => id !== 55);
+                }
+            }
 
             if (menuLayout === 'menu_lateral') {
                 renderSideMenuStructure(document.body, ids, templates);
@@ -94,6 +109,8 @@ try {
             applyPageTitle();
             setupEventListeners();
             updateBreadcrumbInstitution();
+
+            initCapacitacionHelpFab().catch(() => {});
 
             if (localStorage.getItem('gecko_ok') == 1) {
                 if (navigator.userAgent.toLowerCase().includes('firefox')) {

@@ -4,12 +4,15 @@ namespace App\Controllers;
 use App\Models\Comunicacion\NoticiaModel;
 use App\Models\Menu\MenuModel;
 use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
 
 class MenuController {
+    private $db;
     private $model;
     private $noticiaModel;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new MenuModel($db);
         $this->noticiaModel = new NoticiaModel($db);
     }
@@ -24,7 +27,12 @@ class MenuController {
             $instId = $sesion['instId'];
 
             $activeIds = $this->model->getPermissions($instId, $roleId);
-            $filteredIds = $this->assembleMenu($activeIds, $roleId, (int) $instId);
+            $filteredIds = $this->assembleMenu(
+                $activeIds,
+                $roleId,
+                (int) $instId,
+                (int) ($sesion['userId'] ?? 0)
+            );
 
             echo json_encode(["status" => "success", "data" => $filteredIds]);
         } catch (\Exception $e) {
@@ -34,7 +42,7 @@ class MenuController {
         exit;
     }
 
-    private function assembleMenu($activeIds, $roleId, int $instId) {
+    private function assembleMenu($activeIds, $roleId, int $instId, int $userId = 0) {
         $ids = $activeIds;
 
         if (!in_array($roleId, [1, 2])) {
@@ -60,31 +68,35 @@ class MenuController {
             if ($instId <= 0 && !in_array(206, $ids)) {
                 $ids[] = 206;
             }
-            return array_values(array_unique($ids));
-        }
+        } else {
+            // 204 (mensajería institucional): por defecto ON si no hay fila; Activo = 2 desactiva.
+            if (!in_array(204, $ids)) {
+                $activo204 = $this->model->getMenudistrActivo($instId, $r, 204);
+                if ($activo204 === null || $activo204 === 1) {
+                    $ids[] = 204;
+                }
+            }
 
-        // 204 (mensajería institucional): por defecto ON si no hay fila; Activo = 2 desactiva.
-        if (!in_array(204, $ids)) {
-            $activo204 = $this->model->getMenudistrActivo($instId, $r, 204);
-            if ($activo204 === null || $activo204 === 1) {
-                $ids[] = 204;
+            // 205: alineado con AdminNoticiaController; respetar menudistr.Activo = 2 como cierre explícito.
+            if ($instId > 0 && !in_array(205, $ids)) {
+                $activo205 = $this->model->getMenudistrActivo($instId, $r, 205);
+                if ($activo205 !== 2) {
+                    $mostrar205 = ($r === 2);
+                    if (!$mostrar205 && $r >= 3 && $r <= 6) {
+                        $mostrar205 = $this->noticiaModel->puedePublicarNoticias($instId, $r);
+                    }
+                    if ($mostrar205) {
+                        $ids[] = 205;
+                    }
+                }
             }
         }
 
-        // 205: alineado con AdminNoticiaController; respetar menudistr.Activo = 2 como cierre explícito.
-        if ($instId > 0 && !in_array(205, $ids)) {
-            $activo205 = $this->model->getMenudistrActivo($instId, $r, 205);
-            if ($activo205 !== 2) {
-                $mostrar205 = ($r === 2);
-                if (!$mostrar205 && $r >= 3 && $r <= 6) {
-                    $mostrar205 = $this->noticiaModel->puedePublicarNoticias($instId, $r);
-                }
-                if ($mostrar205) {
-                    $ids[] = 205;
-                }
-            }
-        }
+        $ids = array_values(array_unique($ids));
+        $snap = ModulosInstitucion::getSnapshot($this->db, $instId);
 
-        return array_values(array_unique($ids));
+        $uid = $userId > 0 ? $userId : null;
+
+        return ModulosInstitucion::filterMenuIds($ids, $snap['byKey'], $r, $instId, $this->db, $uid);
     }
 }

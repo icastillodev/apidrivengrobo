@@ -2,12 +2,17 @@
 namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigAlojamientoModel;
-use App\Utils\Auditoria; // <-- IMPORTANTE
+use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AdminConfigAlojamientoController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminConfigAlojamientoModel($db);
     }
 
@@ -23,8 +28,8 @@ class AdminConfigAlojamientoController {
         }
 
         try {
-            // Validamos que el usuario tenga sesión/token
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
 
             $data = [
                 'types' => $this->model->getTypes($espId),
@@ -55,6 +60,7 @@ class AdminConfigAlojamientoController {
         try {
             // Seguridad: Forzamos que la institución sea la del token real, no la que manda el formulario
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $_POST['instId'] = $sesion['instId'];
             
             $this->model->$method($_POST);
@@ -71,7 +77,8 @@ class AdminConfigAlojamientoController {
         header('Content-Type: application/json');
         $input = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion(); // Solo validamos que esté logueado
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             if(empty($input['id'])) throw new \Exception("ID faltante");
             
             $this->model->$method($input['id'], $input['status']);
@@ -88,7 +95,8 @@ class AdminConfigAlojamientoController {
         header('Content-Type: application/json');
         $input = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion(); // Solo validamos que esté logueado
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             if(empty($input['id'])) throw new \Exception("ID faltante");
             
             $this->model->$method($input['id']);

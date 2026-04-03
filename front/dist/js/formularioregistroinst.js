@@ -3,6 +3,335 @@ import { loadLanguage, translatePage } from './utils/i18n.js';
 
 let especieCount = 0;
 
+function onboardingI18n() {
+    return window.txt?.onboarding || {};
+}
+
+/** Plan JSON desde form_registro_config.plan_modulos (null = mostrar todo, compatibilidad). */
+function parsePlanModulos(raw) {
+    if (raw == null || raw === '') return null;
+    try {
+        const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return typeof o === 'object' && o !== null ? o : null;
+    } catch {
+        return null;
+    }
+}
+
+function planIsWideOpen(plan) {
+    return plan == null || Object.keys(plan).length === 0;
+}
+
+function moduleEnabledInPlan(plan, key) {
+    if (planIsWideOpen(plan)) return true;
+    const v = parseInt(plan[key], 10);
+    return !Number.isNaN(v) && v > 1;
+}
+
+function setBlockVisible(el, visible) {
+    if (!el) return;
+    el.classList.toggle('d-none', !visible);
+    const dis = !visible;
+    el.querySelectorAll('input,select,textarea,button').forEach((node) => {
+        if (node.type === 'hidden') return;
+        node.disabled = dis;
+    });
+}
+
+function applySpeciesSubcolumns(plan) {
+    document.querySelectorAll('#contenedor-especies .onboarding-subcol').forEach((col) => {
+        const sub = col.getAttribute('data-onboarding-sub');
+        let ok = true;
+        if (sub === 'sub') ok = moduleEnabledInPlan(plan, 'animales');
+        else if (sub === 'aloj') ok = moduleEnabledInPlan(plan, 'alojamientos');
+        else if (sub === 'traz') ok = moduleEnabledInPlan(plan, 'trazabilidad_alojamientos');
+        setBlockVisible(col, ok);
+    });
+}
+
+function applyOnboardingPlan(plan) {
+    window.__onboardingPlan = plan;
+    const showProt = planIsWideOpen(plan)
+        || moduleEnabledInPlan(plan, 'animales')
+        || moduleEnabledInPlan(plan, 'reactivos')
+        || moduleEnabledInPlan(plan, 'insumos');
+    const showAnim = planIsWideOpen(plan)
+        || moduleEnabledInPlan(plan, 'animales')
+        || moduleEnabledInPlan(plan, 'alojamientos')
+        || moduleEnabledInPlan(plan, 'trazabilidad_alojamientos');
+    const showReac = moduleEnabledInPlan(plan, 'reactivos');
+    const showIns = moduleEnabledInPlan(plan, 'insumos');
+    const showRes = moduleEnabledInPlan(plan, 'reservas');
+
+    setBlockVisible(document.getElementById('block-protocolos'), showProt);
+    const hp = document.getElementById('heading-protocolos');
+    if (hp) hp.classList.toggle('d-none', !showProt);
+
+    setBlockVisible(document.getElementById('block-animales'), showAnim);
+
+    setBlockVisible(document.getElementById('block-inv-reac'), showReac);
+    setBlockVisible(document.getElementById('block-inv-ins'), showIns);
+    const hi = document.getElementById('heading-inventario');
+    if (hi) hi.classList.toggle('d-none', !(showReac || showIns));
+
+    setBlockVisible(document.getElementById('block-reservas'), showRes);
+
+    const permisoMap = [
+        ['menuRol4_Animales', 'animales'], ['menuRol4_Reactivos', 'reactivos'], ['menuRol4_Insumos', 'insumos'],
+        ['menuRol4_Alojamientos', 'alojamientos'], ['menuRol4_Reservas', 'reservas'],
+        ['menuRol5_Animales', 'animales'], ['menuRol5_Reactivos', 'reactivos'], ['menuRol5_Insumos', 'insumos'],
+        ['menuRol5_Alojamientos', 'alojamientos'], ['menuRol5_Reservas', 'reservas'],
+        ['menuRol6_Animales', 'animales'], ['menuRol6_Reactivos', 'reactivos'], ['menuRol6_Insumos', 'insumos'],
+        ['menuRol6_Alojamientos', 'alojamientos'], ['menuRol6_Reservas', 'reservas'],
+    ];
+    permisoMap.forEach(([name, modKey]) => {
+        const cb = document.querySelector(`input[name="${name}"]`);
+        if (!cb) return;
+        const row = cb.closest('.form-check');
+        if (!row) return;
+        const on = planIsWideOpen(plan) || moduleEnabledInPlan(plan, modKey);
+        row.classList.toggle('d-none', !on);
+        cb.disabled = !on;
+    });
+
+    applySpeciesSubcolumns(plan);
+
+    document.querySelectorAll('[data-onboarding-block]').forEach((block) => {
+        const blockHidden = block.classList.contains('d-none');
+        block.querySelectorAll('input,select,textarea,button').forEach((node) => {
+            if (node.type === 'hidden') return;
+            const inHiddenSub = node.closest('.onboarding-subcol.d-none');
+            node.disabled = blockHidden || !!inHiddenSub;
+        });
+    });
+}
+
+function showOnboardingIntroOnce(slug) {
+    const t = onboardingI18n();
+    const key = `grobo_onboarding_intro_${slug}`;
+    if (sessionStorage.getItem(key) === '1') return;
+    const html = `
+        <div class="text-start small" style="max-height:65vh;overflow-y:auto;">
+            <p class="fw-bold text-success">${t.intro_p1 || ''}</p>
+            <p>${t.intro_p2 || ''}</p>
+            <p>${t.intro_p3 || ''}</p>
+            <ul class="mb-2">
+                <li><strong>${t.intro_li_base || ''}</strong> — ${t.intro_li_base_d || ''}</li>
+                <li><strong>${t.intro_li_prot || ''}</strong> — ${t.intro_li_prot_d || ''}</li>
+                <li><strong>${t.intro_li_anim || ''}</strong> — ${t.intro_li_anim_d || ''}</li>
+                <li><strong>${t.intro_li_inv || ''}</strong> — ${t.intro_li_inv_d || ''}</li>
+                <li><strong>${t.intro_li_res || ''}</strong> — ${t.intro_li_res_d || ''}</li>
+                <li><strong>${t.intro_li_perm || ''}</strong> — ${t.intro_li_perm_d || ''}</li>
+            </ul>
+            <p class="text-muted mb-0">${t.intro_p4 || ''}</p>
+        </div>`;
+    Swal.fire({
+        title: t.intro_title || 'Bienvenido',
+        html,
+        icon: 'info',
+        confirmButtonText: t.intro_btn || 'Entendido, comenzar',
+        confirmButtonColor: '#1a5d3b',
+        width: 'min(640px, 96vw)',
+    }).then(() => {
+        sessionStorage.setItem(key, '1');
+    });
+}
+
+function rowHasValue(r) {
+    const v = r?.valor;
+    return v != null && String(v).trim() !== '';
+}
+
+function protocolsSuppressed(plan) {
+    return !moduleEnabledInPlan(plan, 'animales')
+        && !moduleEnabledInPlan(plan, 'reactivos')
+        && !moduleEnabledInPlan(plan, 'insumos');
+}
+
+const PERMISO_SUFFIX_TO_MOD = {
+    Animales: 'animales',
+    Reactivos: 'reactivos',
+    Insumos: 'insumos',
+    Alojamientos: 'alojamientos',
+    Reservas: 'reservas',
+};
+
+function permisoModKeyFromCampo(campo) {
+    const m = String(campo || '').match(/^menuRol\d+_(.+)$/);
+    if (!m) return null;
+    return PERMISO_SUFFIX_TO_MOD[m[1]] || null;
+}
+
+function orphanedEspeciesRows(rows, plan) {
+    if (!rows?.length) return [];
+    const anim = moduleEnabledInPlan(plan, 'animales');
+    const aloj = moduleEnabledInPlan(plan, 'alojamientos');
+    const traz = moduleEnabledInPlan(plan, 'trazabilidad_alojamientos');
+    const blockOn = anim || aloj || traz;
+    return rows.filter((r) => {
+        if (!rowHasValue(r)) return false;
+        const c = r.campo || '';
+        if (!blockOn) return true;
+        if (c.startsWith('esp_nombre_')) return false;
+        if (/^sub_nom_/.test(c)) return !anim;
+        if (/^aloj_/.test(c)) return !aloj;
+        if (/^traz_/.test(c)) return !traz;
+        return false;
+    });
+}
+
+/**
+ * Datos guardados que ya no pertenecen a módulos activos en el plan (solo si el plan es estricto).
+ * @returns {Object<string, Array<{campo:string,valor:string}>>|null}
+ */
+function buildOrphanExportPayload(plan, grouped) {
+    if (planIsWideOpen(plan) || !grouped || typeof grouped !== 'object') return null;
+    const out = {};
+    const take = (cat, rows) => {
+        const arr = (rows || []).filter(rowHasValue);
+        if (arr.length) {
+            out[cat] = arr.map((r) => ({ campo: r.campo, valor: String(r.valor ?? '') }));
+        }
+    };
+    if (protocolsSuppressed(plan)) {
+        take('tipo_protocolo', grouped.tipo_protocolo);
+        take('severidad', grouped.severidad);
+    }
+    if (!moduleEnabledInPlan(plan, 'reactivos')) take('reactivos', grouped.reactivos);
+    if (!moduleEnabledInPlan(plan, 'insumos')) take('insumos', grouped.insumos);
+    if (!moduleEnabledInPlan(plan, 'reservas')) take('reservas', grouped.reservas);
+
+    const espOr = orphanedEspeciesRows(grouped.especies || [], plan);
+    if (espOr.length) {
+        out.especies = espOr.map((r) => ({ campo: r.campo, valor: String(r.valor ?? '') }));
+    }
+
+    ['permisos_rol_4_sec_admin', 'permisos_rol_5_asistente', 'permisos_rol_6_laboratorio'].forEach((cat) => {
+        const rows = (grouped[cat] || []).filter(rowHasValue).filter((r) => {
+            const mk = permisoModKeyFromCampo(r.campo);
+            return mk && !moduleEnabledInPlan(plan, mk);
+        });
+        if (rows.length) {
+            out[cat] = rows.map((r) => ({ campo: r.campo, valor: String(r.valor ?? '') }));
+        }
+    });
+
+    return Object.keys(out).length ? out : null;
+}
+
+function orphanSectionLabel(cat, t) {
+    const map = {
+        tipo_protocolo: t.seccion_exp_prot || 'Tipos de protocolo',
+        severidad: t.seccion_exp_sev || 'Severidades',
+        reactivos: t.seccion_exp_reac || 'Reactivos',
+        insumos: t.seccion_exp_ins || 'Insumos',
+        reservas: t.seccion_exp_res || 'Reservas',
+        especies: t.seccion_exp_esp || 'Especies / alojamiento / trazabilidad',
+        permisos_rol_4_sec_admin: t.seccion_exp_p4 || 'Permisos rol 4',
+        permisos_rol_5_asistente: t.seccion_exp_p5 || 'Permisos rol 5',
+        permisos_rol_6_laboratorio: t.seccion_exp_p6 || 'Permisos rol 6',
+    };
+    return map[cat] || cat;
+}
+
+function renderOrphanExportBar(plan, grouped, slug) {
+    const bar = document.getElementById('onboarding-orphan-export');
+    if (!bar) return;
+    const payload = buildOrphanExportPayload(plan, grouped);
+    window.__onboardingOrphanPayload = payload;
+    window.__onboardingSlugExport = slug || 'formulario';
+    if (!payload) {
+        bar.classList.add('d-none');
+        bar.innerHTML = '';
+        return;
+    }
+    const t = onboardingI18n();
+    bar.classList.remove('d-none');
+    bar.innerHTML = `
+    <div class="alert alert-warning border border-warning shadow-sm mb-0">
+      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div>
+          <h6 class="fw-bold mb-1 text-dark"><i class="bi bi-archive me-2"></i>${t.orphan_alert_title || 'Respaldo: datos de servicios desactivados'}</h6>
+          <p class="small mb-0 text-dark">${t.orphan_alert_desc || 'Había información guardada en módulos que ya no están en su plan. Descargue copia antes de guardar el formulario, o esos campos dejarán de enviarse.'}</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2 flex-shrink-0">
+          <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-orphan-excel"><i class="bi bi-file-earmark-excel me-1"></i>${t.orphan_btn_excel || 'Descargar Excel'}</button>
+          <button type="button" class="btn btn-danger btn-sm fw-bold" id="btn-orphan-pdf"><i class="bi bi-file-earmark-pdf me-1"></i>${t.orphan_btn_pdf || 'Descargar PDF'}</button>
+        </div>
+      </div>
+    </div>`;
+    const bx = document.getElementById('btn-orphan-excel');
+    const bp = document.getElementById('btn-orphan-pdf');
+    if (bx) bx.onclick = () => exportOrphanExcel();
+    if (bp) bp.onclick = () => exportOrphanPdf();
+}
+
+function exportOrphanExcel() {
+    const t = onboardingI18n();
+    const payload = window.__onboardingOrphanPayload;
+    if (!payload || typeof window.XLSX === 'undefined') {
+        Swal.fire({ icon: 'error', title: t.orphan_libs_missing || 'No se pudo generar Excel', text: t.orphan_try_pdf || 'Pruebe PDF o recargue la página.' });
+        return;
+    }
+    const rows = [];
+    Object.keys(payload).sort().forEach((cat) => {
+        payload[cat].forEach((r) => {
+            rows.push({
+                [t.export_col_seccion || 'Sección']: orphanSectionLabel(cat, t),
+                [t.export_col_campo || 'Campo']: r.campo,
+                [t.export_col_valor || 'Valor']: r.valor,
+            });
+        });
+    });
+    const ws = window.XLSX.utils.json_to_sheet(rows);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Respaldo');
+    const safe = String(window.__onboardingSlugExport || 'onboarding').replace(/[^\w\-]+/g, '_');
+    window.XLSX.writeFile(wb, `GROBO_onboarding_respaldo_modulos_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function exportOrphanPdf() {
+    const t = onboardingI18n();
+    const payload = window.__onboardingOrphanPayload;
+    const jsp = window.jspdf?.jsPDF;
+    if (!payload || typeof jsp !== 'function') {
+        Swal.fire({ icon: 'error', title: t.orphan_libs_pdf_missing || 'No se pudo generar PDF', text: t.orphan_try_excel || 'Pruebe Excel o recargue la página.' });
+        return;
+    }
+    const doc = new jsp({ unit: 'mm', format: 'a4' });
+    const margin = 14;
+    let y = 16;
+    const lineH = 5;
+    const pageH = 285;
+    doc.setFontSize(11);
+    doc.text(t.orphan_pdf_title || 'GROBO — Respaldo datos (módulos desactivados)', margin, y);
+    y += lineH * 2;
+    doc.setFontSize(9);
+    Object.keys(payload).sort().forEach((cat) => {
+        const title = orphanSectionLabel(cat, t);
+        doc.setFont('helvetica', 'bold');
+        const headLines = doc.splitTextToSize(`■ ${title}`, 180);
+        headLines.forEach((ln) => {
+            if (y > pageH) { doc.addPage(); y = 16; }
+            doc.text(ln, margin, y);
+            y += lineH;
+        });
+        doc.setFont('helvetica', 'normal');
+        payload[cat].forEach((r) => {
+            const txt = `${r.campo}: ${r.valor}`;
+            const lines = doc.splitTextToSize(txt, 180);
+            lines.forEach((ln) => {
+                if (y > pageH) { doc.addPage(); y = 16; }
+                doc.text(ln, margin + 2, y);
+                y += lineH;
+            });
+        });
+        y += lineH;
+    });
+    const safe = String(window.__onboardingSlugExport || 'onboarding').replace(/[^\w\-]+/g, '_');
+    doc.save(`GROBO_onboarding_respaldo_modulos_${safe}_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 window.cambiarIdioma = async (lang) => {
     localStorage.setItem('lang', lang);
     window.location.reload(); 
@@ -12,8 +341,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || null;
     await loadLanguage(lang);
     translatePage(); 
-    const txt = window.txt || {};
-
     const urlParams = new URLSearchParams(window.location.search);
     let slug = urlParams.get('inst');
 
@@ -26,7 +353,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!slug) {
-        mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_invalid_url) || "URL Inválida");
+        mostrarErrorPantalla((onboardingI18n().err_invalid_url) || "URL Inválida");
         return;
     }
 
@@ -35,40 +362,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (res && res.status === 'success') {
             if (res.data && parseInt(res.data.activo) === 0) {
-                mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_pausado) || "Este formulario ha sido pausado o desactivado por el administrador de GROBO. Comuníquese con soporte si cree que es un error.");
+                mostrarErrorPantalla((onboardingI18n().err_pausado) || "Este formulario ha sido pausado o desactivado por el administrador de GROBO. Comuníquese con soporte si cree que es un error.");
                 return;
             }
 
             document.getElementById('id_form_config').value = res.data.id_form_config;
-            document.getElementById('display-nombre-inst').innerText = `${(txt.onboarding && txt.onboarding.config_title) || 'Configuración:'} ${res.data.nombre_inst_previa}`;
-            document.getElementById('display-encargado').innerText = `${(txt.onboarding && txt.onboarding.resp_title) || 'Responsable:'} ${res.data.encargado_nombre}`;
+            document.getElementById('display-nombre-inst').innerText = `${(onboardingI18n().config_title) || 'Configuración:'} ${res.data.nombre_inst_previa}`;
+            document.getElementById('display-encargado').innerText = `${(onboardingI18n().resp_title) || 'Responsable:'} ${res.data.encargado_nombre}`;
             
-            // LA MAGIA: Si existen respuestas, reconstruimos. Si no, cargamos los defaults.
+            // Si existen respuestas, reconstruimos. Si no, cargamos los defaults.
             if (res.respuestas && Object.keys(res.respuestas).length > 0) {
                 reconstruirFormulario(res.respuestas);
             } else {
                 cargarValoresPorDefecto();
             }
+
+            const plan = parsePlanModulos(res.data.plan_modulos);
+            applyOnboardingPlan(plan);
+            const groupedResp = (res.respuestas && typeof res.respuestas === 'object') ? res.respuestas : {};
+            renderOrphanExportBar(plan, groupedResp, slug);
+            showOnboardingIntroOnce(slug);
         } else {
-            throw new Error((txt.onboarding && txt.onboarding.err_expired) || "El enlace ha expirado o no es válido.");
+            throw new Error((onboardingI18n().err_expired) || "El enlace ha expirado o no es válido.");
         }
     } catch (e) { 
-        mostrarErrorPantalla((txt.onboarding && txt.onboarding.err_conn) || "El enlace no es válido o el servidor no responde.");
+        mostrarErrorPantalla((onboardingI18n().err_conn) || "El enlace no es válido o el servidor no responde.");
         return; 
     }
 
     // LISTENERS
-    document.getElementById('btn-add-org').onclick = () => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', (txt.onboarding && txt.onboarding.ph_org) || "Ej: Facultad de Medicina");
+    document.getElementById('btn-add-org').onclick = () => agregarItemSimple('contenedor-organizaciones', 'org_nom[]', (onboardingI18n().ph_org) || "Ej: Facultad de Medicina");
     document.getElementById('btn-add-depto').onclick = () => agregarDepartamento();
     
-    document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', (txt.onboarding && txt.onboarding.ph_prot) || "Ej: Investigación, Docencia");
-    document.getElementById('btn-add-sev').onclick = () => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', (txt.onboarding && txt.onboarding.ph_sev) || "Ej: Leve, Moderada");
+    document.getElementById('btn-add-prot').onclick = () => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', (onboardingI18n().ph_prot) || "Ej: Investigación, Docencia");
+    document.getElementById('btn-add-sev').onclick = () => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', (onboardingI18n().ph_sev) || "Ej: Leve, Moderada");
     
     document.getElementById('btn-add-form').onclick = () => agregarTipoFormulario();
     document.getElementById('btn-add-reactivo').onclick = () => agregarReactivo(); 
     document.getElementById('btn-add-insumo').onclick = () => agregarInsumo();
-    document.getElementById('btn-add-sala').onclick = () => agregarItemDoble('contenedor-salas', 'sala_nom[]', 'sala_lugar[]', (txt.onboarding && txt.onboarding.ph_room_name) || "Nombre Sala", (txt.onboarding && txt.onboarding.ph_room_loc) || "Ubicación Física");
-    document.getElementById('btn-add-instrumento').onclick = () => agregarItemDoble('contenedor-instrumentos', 'instru_nom[]', 'instru_cant[]', (txt.onboarding && txt.onboarding.ph_equip_name) || "Nombre Instrumento", (txt.onboarding && txt.onboarding.ph_qty_disp) || "Cantidad a disposición", 'number');
+    document.getElementById('btn-add-sala').onclick = () => agregarItemDoble('contenedor-salas', 'sala_nom[]', 'sala_lugar[]', (onboardingI18n().ph_room_name) || "Nombre Sala", (onboardingI18n().ph_room_loc) || "Ubicación Física");
+    document.getElementById('btn-add-instrumento').onclick = () => agregarItemDoble('contenedor-instrumentos', 'instru_nom[]', 'instru_cant[]', (onboardingI18n().ph_equip_name) || "Nombre Instrumento", (onboardingI18n().ph_qty_disp) || "Cantidad a disposición", 'number');
     
     document.getElementById('btn-add-especie').onclick = () => agregarEspecie();
     const btnServicio = document.getElementById('btn-add-servicio');
@@ -196,14 +529,14 @@ function reconstruirFormulario(db) {
 // RENDERIZADORES Y BUILDERS CON SOPORTE EAV
 // ==========================================
 function mostrarErrorPantalla(msj) {
-    document.body.innerHTML = `<div class="p-5 text-center"><h1 class="text-danger">Error</h1><p>${msj}</p><a href="https://groboapp.com" class="btn btn-primary">${txt.onboarding.btn_back}</a></div>`;
+    document.body.innerHTML = `<div class="p-5 text-center"><h1 class="text-danger">Error</h1><p>${msj}</p><a href="https://groboapp.com" class="btn btn-primary">${onboardingI18n().btn_back}</a></div>`;
 }
 
 function cargarValoresPorDefecto() {
     if(document.getElementById('contenedor-organizaciones').children.length === 0) {
-        [txt.onboarding.prot_inv, txt.onboarding.prot_doc].forEach(v => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', '', v));
-        [txt.onboarding.sev_1, txt.onboarding.sev_2, txt.onboarding.sev_3, txt.onboarding.sev_4].forEach(v => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', '', v));
-        agregarItemSimple('contenedor-organizaciones', 'org_nom[]', txt.onboarding.ph_org, 'Universidad General');
+        [onboardingI18n().prot_inv, onboardingI18n().prot_doc].forEach(v => agregarItemSimple('contenedor-tipos-prot', 'prot_tipo[]', '', v));
+        [onboardingI18n().sev_1, onboardingI18n().sev_2, onboardingI18n().sev_3, onboardingI18n().sev_4].forEach(v => agregarItemSimple('contenedor-severidades', 'sev_tipo[]', '', v));
+        agregarItemSimple('contenedor-organizaciones', 'org_nom[]', onboardingI18n().ph_org, 'Universidad General');
         agregarDepartamento();
         agregarTipoFormulario(); 
     }
@@ -211,7 +544,7 @@ function cargarValoresPorDefecto() {
 
 window.poblarSelectOrgs = (selectElement) => {
     const currentVal = selectElement.value;
-    selectElement.innerHTML = `<option value="">${txt.onboarding.ph_depto_org}</option>`;
+    selectElement.innerHTML = `<option value="">${onboardingI18n().ph_depto_org}</option>`;
     document.querySelectorAll('input[name="org_nom[]"]').forEach(input => {
         const val = input.value.trim();
         if (val) selectElement.innerHTML += `<option value="${val}" ${val === currentVal ? 'selected' : ''}>${val}</option>`;
@@ -220,7 +553,7 @@ window.poblarSelectOrgs = (selectElement) => {
 
 window.poblarSelectEspecies = (selectElement) => {
     const currentVal = selectElement.value;
-    selectElement.innerHTML = `<option value="">${txt.onboarding.ph_species_opt}</option>`;
+    selectElement.innerHTML = `<option value="">${onboardingI18n().ph_species_opt}</option>`;
     document.querySelectorAll('input[name^="esp_nombre_"]').forEach(input => {
         const val = input.value.trim();
         if (val) selectElement.innerHTML += `<option value="${val}" ${val === currentVal ? 'selected' : ''}>${val}</option>`;
@@ -232,10 +565,10 @@ function agregarDepartamento(nom = '', org = '') {
     const orgOpt = org ? `<option value="${org}" selected>${org}</option>` : '';
     const html = `
         <div class="row g-1 mb-2">
-            <div class="col-6"><input type="text" class="form-control form-control-sm" name="depto_nom[]" value="${nom}" placeholder="${txt.onboarding.ph_depto_name}"></div>
+            <div class="col-6"><input type="text" class="form-control form-control-sm" name="depto_nom[]" value="${nom}" placeholder="${onboardingI18n().ph_depto_name}"></div>
             <div class="col-5">
                 <select class="form-select form-select-sm" name="depto_org[]" onfocus="window.poblarSelectOrgs(this)">
-                    <option value="">${txt.onboarding.ph_depto_org}</option>
+                    <option value="">${onboardingI18n().ph_depto_org}</option>
                     ${orgOpt}
                 </select>
             </div>
@@ -249,7 +582,7 @@ function agregarTipoFormulario(cat = 'Animal', nom = '', exento = '2') {
         <div class="row g-2 mb-2 p-2 bg-light border rounded position-relative shadow-sm">
             <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.6rem" onclick="this.parentElement.remove()"></button>
             <div class="col-md-4">
-                <label class="small text-muted fw-bold">${txt.onboarding.form_cat}</label>
+                <label class="small text-muted fw-bold">${onboardingI18n().form_cat}</label>
                 <select class="form-select form-select-sm fw-bold text-primary" name="form_cat[]">
                     <option value="Animal" ${cat==='Animal'?'selected':''}>Animal</option>
                     <option value="Otros reactivos biologicos" ${cat==='Otros reactivos biologicos'?'selected':''}>Otros Reactivos</option>
@@ -257,14 +590,14 @@ function agregarTipoFormulario(cat = 'Animal', nom = '', exento = '2') {
                 </select>
             </div>
             <div class="col-md-5">
-                <label class="small text-muted fw-bold">${txt.onboarding.form_name}</label>
-                <input type="text" class="form-control form-control-sm" name="form_nom[]" value="${nom}" placeholder="${txt.onboarding.ph_form_name}">
+                <label class="small text-muted fw-bold">${onboardingI18n().form_name}</label>
+                <input type="text" class="form-control form-control-sm" name="form_nom[]" value="${nom}" placeholder="${onboardingI18n().ph_form_name}">
             </div>
             <div class="col-md-3">
-                <label class="small text-muted fw-bold">${txt.onboarding.form_billing}</label>
+                <label class="small text-muted fw-bold">${onboardingI18n().form_billing}</label>
                 <select class="form-select form-select-sm" name="form_exento[]">
-                    <option value="2" ${exento==='2'?'selected':''}>${txt.onboarding.form_normal}</option>
-                    <option value="1" class="text-success fw-bold" ${exento==='1'?'selected':''}>${txt.onboarding.form_free}</option>
+                    <option value="2" ${exento==='2'?'selected':''}>${onboardingI18n().form_normal}</option>
+                    <option value="1" class="text-success fw-bold" ${exento==='1'?'selected':''}>${onboardingI18n().form_free}</option>
                 </select>
             </div>
         </div>`;
@@ -277,12 +610,12 @@ function agregarReactivo(nom = '', cant = '', med = '', esp = '') {
         <div class="dynamic-box mb-2 p-2 border rounded bg-light position-relative">
             <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.6rem" onclick="this.parentElement.remove()"></button>
             <div class="row g-2">
-                <div class="col-12"><input type="text" class="form-control form-control-sm fw-bold" name="reac_nom[]" value="${nom}" placeholder="${txt.onboarding.ph_reagent_name}"></div>
-                <div class="col-4"><input type="number" class="form-control form-control-sm" name="reac_cant[]" value="${cant}" placeholder="${txt.onboarding.ph_qty}"></div>
-                <div class="col-3"><input type="text" class="form-control form-control-sm" name="reac_medida[]" value="${med}" placeholder="${txt.onboarding.ph_measure}"></div>
+                <div class="col-12"><input type="text" class="form-control form-control-sm fw-bold" name="reac_nom[]" value="${nom}" placeholder="${onboardingI18n().ph_reagent_name}"></div>
+                <div class="col-4"><input type="number" class="form-control form-control-sm" name="reac_cant[]" value="${cant}" placeholder="${onboardingI18n().ph_qty}"></div>
+                <div class="col-3"><input type="text" class="form-control form-control-sm" name="reac_medida[]" value="${med}" placeholder="${onboardingI18n().ph_measure}"></div>
                 <div class="col-5">
                     <select class="form-select form-select-sm text-success" name="reac_esp[]" onfocus="window.poblarSelectEspecies(this)">
-                        <option value="">${txt.onboarding.ph_species_opt}</option>
+                        <option value="">${onboardingI18n().ph_species_opt}</option>
                         ${espOpt}
                     </select>
                 </div>
@@ -297,12 +630,12 @@ function agregarInsumo(nom = '', cant = '', med = '', esp = '') {
         <div class="dynamic-box mb-2 p-2 border rounded bg-light position-relative">
             <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.6rem" onclick="this.parentElement.remove()"></button>
             <div class="row g-2">
-                <div class="col-12"><input type="text" class="form-control form-control-sm fw-bold" name="ins_nom[]" value="${nom}" placeholder="${txt.onboarding.ph_insumo_name}"></div>
-                <div class="col-4"><input type="number" class="form-control form-control-sm" name="ins_cant[]" value="${cant}" placeholder="${txt.onboarding.ph_qty}"></div>
-                <div class="col-3"><input type="text" class="form-control form-control-sm" name="ins_medida[]" value="${med}" placeholder="${txt.onboarding.ph_measure}"></div>
+                <div class="col-12"><input type="text" class="form-control form-control-sm fw-bold" name="ins_nom[]" value="${nom}" placeholder="${onboardingI18n().ph_insumo_name}"></div>
+                <div class="col-4"><input type="number" class="form-control form-control-sm" name="ins_cant[]" value="${cant}" placeholder="${onboardingI18n().ph_qty}"></div>
+                <div class="col-3"><input type="text" class="form-control form-control-sm" name="ins_medida[]" value="${med}" placeholder="${onboardingI18n().ph_measure}"></div>
                 <div class="col-5">
                     <select class="form-select form-select-sm text-success" name="ins_esp[]" onfocus="window.poblarSelectEspecies(this)">
-                        <option value="">${txt.onboarding.ph_species_opt}</option>
+                        <option value="">${onboardingI18n().ph_species_opt}</option>
                         ${espOpt}
                     </select>
                 </div>
@@ -314,9 +647,9 @@ function agregarInsumo(nom = '', cant = '', med = '', esp = '') {
 function agregarServicio(nom = '', cant = '', med = '') {
     const html = `
         <div class="input-group input-group-sm mb-2 shadow-sm">
-            <input type="text" class="form-control w-50 fw-bold" name="serv_nom[]" value="${nom}" placeholder="${txt.onboarding.ph_serv_name}">
-            <input type="number" class="form-control" name="serv_cant[]" value="${cant}" placeholder="${txt.onboarding.ph_qty}">
-            <input type="text" class="form-control" name="serv_medida[]" value="${med}" placeholder="${txt.onboarding.ph_serv_measure}">
+            <input type="text" class="form-control w-50 fw-bold" name="serv_nom[]" value="${nom}" placeholder="${onboardingI18n().ph_serv_name}">
+            <input type="number" class="form-control" name="serv_cant[]" value="${cant}" placeholder="${onboardingI18n().ph_qty}">
+            <input type="text" class="form-control" name="serv_medida[]" value="${med}" placeholder="${onboardingI18n().ph_serv_measure}">
             <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
         </div>`;
     document.getElementById('contenedor-servicios').insertAdjacentHTML('beforeend', html);
@@ -346,40 +679,40 @@ function agregarEspecie(nomVal = '') {
     const html = `
         <div class="dynamic-box p-3 mb-4 border-start border-4 border-success shadow bg-white rounded">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <input type="text" class="form-control fw-bold w-50" value="${nomVal}" placeholder="${txt.onboarding.ph_species_name}" name="esp_nombre_${especieCount}">
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.parentElement.remove()"><i class="bi bi-trash"></i> ${txt.onboarding.btn_del_species}</button>
+                <input type="text" class="form-control fw-bold w-50" value="${nomVal}" placeholder="${onboardingI18n().ph_species_name}" name="esp_nombre_${especieCount}">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.parentElement.remove()"><i class="bi bi-trash"></i> ${onboardingI18n().btn_del_species}</button>
             </div>
             
             <div class="row g-3">
-                <div class="col-md-4 border-end">
+                <div class="col-md-4 border-end onboarding-subcol" data-onboarding-sub="sub">
                     <div class="d-flex flex-column mb-2 border-bottom pb-1">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="small fw-bold text-success">${txt.onboarding.sub_title}</label>
+                            <label class="small fw-bold text-success">${onboardingI18n().sub_title}</label>
                             <button type="button" class="btn btn-xs btn-outline-success" onclick="window.agregarSubespecie(${especieCount})">+</button>
                         </div>
-                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${txt.onboarding.sub_desc}</small>
+                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${onboardingI18n().sub_desc}</small>
                     </div>
                     <div id="sub-contenedor-${especieCount}"></div>
                 </div>
                 
-                <div class="col-md-4 border-end">
+                <div class="col-md-4 border-end onboarding-subcol" data-onboarding-sub="aloj">
                     <div class="d-flex flex-column mb-2 border-bottom pb-1">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="small fw-bold text-primary">${txt.onboarding.aloj_title}</label>
+                            <label class="small fw-bold text-primary">${onboardingI18n().aloj_title}</label>
                             <button type="button" class="btn btn-xs btn-outline-primary" onclick="window.agregarAlojamientoEsp(${especieCount})">+</button>
                         </div>
-                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${txt.onboarding.aloj_desc}</small>
+                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${onboardingI18n().aloj_desc}</small>
                     </div>
                     <div id="aloj-contenedor-${especieCount}"></div>
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-4 onboarding-subcol" data-onboarding-sub="traz">
                     <div class="d-flex flex-column mb-2 border-bottom pb-1">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="small fw-bold text-secondary">${txt.onboarding.traz_title}</label>
+                            <label class="small fw-bold text-secondary">${onboardingI18n().traz_title}</label>
                             <button type="button" class="btn btn-xs btn-outline-secondary" onclick="window.agregarTrazabilidad(${especieCount})">+</button>
                         </div>
-                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${txt.onboarding.traz_desc}</small>
+                        <small class="text-muted" style="font-size: 0.65rem; line-height: 1.1;">${onboardingI18n().traz_desc}</small>
                     </div>
                     <div id="traz-contenedor-${especieCount}"></div>
                 </div>
@@ -393,12 +726,13 @@ function agregarEspecie(nomVal = '') {
         window.agregarAlojamientoEsp(especieCount);
         window.agregarTrazabilidad(especieCount);
     }
+    applySpeciesSubcolumns(window.__onboardingPlan);
 }
 
 window.agregarSubespecie = (parentID, val = '') => {
     const html = `
         <div class="input-group input-group-sm mb-1">
-            <input type="text" class="form-control" value="${val}" placeholder="${txt.onboarding.ph_sub}" name="sub_nom_${parentID}[]">
+            <input type="text" class="form-control" value="${val}" placeholder="${onboardingI18n().ph_sub}" name="sub_nom_${parentID}[]">
             <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
         </div>`;
     document.getElementById(`sub-contenedor-${parentID}`).insertAdjacentHTML('beforeend', html);
@@ -408,8 +742,8 @@ window.agregarAlojamientoEsp = (parentID, nom = '', det = '') => {
     const html = `
         <div class="mb-2 p-1 border rounded bg-light position-relative">
             <button type="button" class="btn-close position-absolute top-0 end-0 m-1" style="font-size: 0.5rem" onclick="this.parentElement.remove()"></button>
-            <input type="text" class="form-control form-control-sm fw-bold mb-1 pe-4" value="${nom}" placeholder="${txt.onboarding.ph_aloj_name}" name="aloj_nom_${parentID}[]">
-            <input type="text" class="form-control form-control-sm text-muted" value="${det}" placeholder="${txt.onboarding.ph_aloj_det}" name="aloj_det_${parentID}[]">
+            <input type="text" class="form-control form-control-sm fw-bold mb-1 pe-4" value="${nom}" placeholder="${onboardingI18n().ph_aloj_name}" name="aloj_nom_${parentID}[]">
+            <input type="text" class="form-control form-control-sm text-muted" value="${det}" placeholder="${onboardingI18n().ph_aloj_det}" name="aloj_det_${parentID}[]">
         </div>`;
     document.getElementById(`aloj-contenedor-${parentID}`).insertAdjacentHTML('beforeend', html);
 };
@@ -417,11 +751,11 @@ window.agregarAlojamientoEsp = (parentID, nom = '', det = '') => {
 window.agregarTrazabilidad = (parentID, nom = '', tipo = 'Texto') => {
     const html = `
         <div class="input-group input-group-sm mb-2">
-            <input type="text" class="form-control" value="${nom}" placeholder="${txt.onboarding.ph_traz_name}" name="traz_nom_${parentID}[]">
+            <input type="text" class="form-control" value="${nom}" placeholder="${onboardingI18n().ph_traz_name}" name="traz_nom_${parentID}[]">
             <select class="form-select text-secondary" name="traz_tipo_${parentID}[]" style="max-width: 90px;">
-                <option value="Texto" ${tipo==='Texto'?'selected':''}>${txt.onboarding.traz_txt}</option>
-                <option value="Numero" ${tipo==='Numero'?'selected':''}>${txt.onboarding.traz_num}</option>
-                <option value="Fecha" ${tipo==='Fecha'?'selected':''}>${txt.onboarding.traz_date}</option>
+                <option value="Texto" ${tipo==='Texto'?'selected':''}>${onboardingI18n().traz_txt}</option>
+                <option value="Numero" ${tipo==='Numero'?'selected':''}>${onboardingI18n().traz_num}</option>
+                <option value="Fecha" ${tipo==='Fecha'?'selected':''}>${onboardingI18n().traz_date}</option>
             </select>
             <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">×</button>
         </div>`;
@@ -461,17 +795,17 @@ async function saveForm(action) {
 
     if (action === 'confirm') {
         const result = await Swal.fire({
-            title: txt.onboarding.confirm_title,
-            text: txt.onboarding.confirm_text,
+            title: onboardingI18n().confirm_title,
+            text: onboardingI18n().confirm_text,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#1a5d3b',
-            confirmButtonText: txt.onboarding.btn_yes_send
+            confirmButtonText: onboardingI18n().btn_yes_send
         });
         if (!result.isConfirmed) return;
     }
 
-    Swal.fire({ title: txt.onboarding.loading_save, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    Swal.fire({ title: onboardingI18n().loading_save, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
     try {
         const payload = { id_form: idForm, respuestas: respuestas, action: action, lang: localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es' };
@@ -479,11 +813,11 @@ async function saveForm(action) {
 
         if (res && res.status === 'success') {
             Swal.fire({
-                title: txt.onboarding.saved_title,
-                text: action === 'confirm' ? txt.onboarding.saved_send_txt : txt.onboarding.saved_draft_txt,
+                title: onboardingI18n().saved_title,
+                text: action === 'confirm' ? onboardingI18n().saved_send_txt : onboardingI18n().saved_draft_txt,
                 icon: 'success',
                 confirmButtonColor: '#1a5d3b',
-                confirmButtonText: (txt.onboarding && txt.onboarding.saved_seguir_editando) || 'Seguir editando'
+                confirmButtonText: (onboardingI18n().saved_seguir_editando) || 'Seguir editando'
             }).then(() => {
                 if (action === 'confirm') {
                     // No redirigir; el usuario permanece en el formulario para seguir editando

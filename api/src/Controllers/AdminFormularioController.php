@@ -15,11 +15,11 @@ class AdminFormularioController
         $this->db = $db;
     }
 
-    /** Solo roles 1 y 2 (misma regla que eliminar usuarios en admin sede). */
+    /** Roles 1 (maestro), 2 (Superadmin sede) y 4 (Admin sede). */
     private function assertMayDeleteForms(array $sesion): void
     {
         $r = (int)($sesion['role'] ?? 0);
-        if ($r !== 1 && $r !== 2) {
+        if (!in_array($r, [1, 2, 4], true)) {
             throw new Exception('Sin permiso para eliminar formularios.');
         }
     }

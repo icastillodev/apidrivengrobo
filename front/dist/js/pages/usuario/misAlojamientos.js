@@ -1,6 +1,7 @@
 import { API } from '../../api.js';
 // Importamos el motor de trazabilidad que ya construiste (¡Reutilización de código!)
 import { TrazabilidadUI } from '../admin/alojamientos/trazabilidad.js';
+import { hasTrazabilidadAlojamientosForUser } from '../../modulesAccess.js';
 
 let allHousings = [];
 let currentPage = 1;
@@ -14,6 +15,9 @@ export async function initMisAlojamientos() {
 
     // ENGANCHE GLOBAL PARA LA TRAZABILIDAD (A prueba de fallos)
     window.toggleTrazabilidadReadOnly = async (idAlojamiento, idEspecie) => {
+        const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '3', 10);
+        if (!hasTrazabilidadAlojamientosForUser(roleOpen)) return;
+
         // Si por algún motivo llega undefined, forzamos un 0 para que no rompa la API
         const idEspSeguro = idEspecie || 0; 
         
@@ -53,6 +57,8 @@ window.openDetailModal = async (id) => {
         if (res.status === 'success') {
             const h = res.data.header;
             const rows = res.data.rows;
+            const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '3', 10);
+            const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen);
 
             const contactInfo = { NombreInst: h.Institucion, InstCorreo: h.InstCorreo, InstContacto: h.InstContacto };
             const contactString = encodeURIComponent(JSON.stringify(contactInfo));
@@ -98,9 +104,9 @@ window.openDetailModal = async (id) => {
                     </div>
                 </div>
 
-                <div class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
+                ${showTraz ? `<div class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
                     <i class="bi bi-info-circle-fill me-1"></i> ${window.txt?.misalojamientos?.hint_clic_trazabilidad || 'Haga clic en una fila para desplegar la trazabilidad clínica y física.'}
-                </div>
+                </div>` : ''}
             `;
 
             // TABLA MODAL CON TRAZABILIDAD EXPANSIBLE
@@ -109,7 +115,7 @@ window.openDetailModal = async (id) => {
                 const espId = r.TipoAnimal || r.idespA || h.EspecieID || 0;
 
                 return `
-                <tr class="clickable-row bg-white" onclick="window.toggleTrazabilidadReadOnly(${r.IdAlojamiento}, ${espId})">
+                <tr class="clickable-row bg-white"${showTraz ? ` onclick="window.toggleTrazabilidadReadOnly(${r.IdAlojamiento}, ${espId})"` : ''}>
                     <td class="text-muted small fw-bold">#${r.IdAlojamiento}</td>
                     <td class="small fw-bold text-secondary">${r.fechavisado}</td>
                     <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || (window.txt?.misalojamientos?.vigente || 'Vigente')}</td>
@@ -117,12 +123,13 @@ window.openDetailModal = async (id) => {
                     <td class="text-center fw-bold text-dark">${r.totaldiasdefinidos}</td>
                     <td class="text-center"><i class="bi bi-chevron-down text-muted"></i></td>
                 </tr>
+                ${showTraz ? `
                 <tr id="trazabilidad-row-${r.IdAlojamiento}" class="d-none bg-light">
                     <td colspan="6" class="p-0 border-0">
                         <div id="trazabilidad-content-${r.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner">
                             </div>
                     </td>
-                </tr>
+                </tr>` : ''}
                 `;
             }).join('');
 
@@ -246,115 +253,11 @@ function renderPagination(total) {
     btn('&raquo;', currentPage+1, currentPage===pages, false);
 }
 
-/* --- MODAL FICHA DE ALOJAMIENTO (CON TRAZABILIDAD) --- */
-window.openDetailModal = async (id) => {
-    const modal = new bootstrap.Modal(document.getElementById('modal-visor'));
-    const body = document.getElementById('modal-visor-body');
-    const actions = document.getElementById('modal-actions');
-    
-    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">${window.txt?.misalojamientos?.buscando_historia || 'Buscando historia...'}</p></div>`;
-    modal.show();
-
-    try {
-        const res = await API.request(`/user/housing-detail/${id}`);
-        if (res.status === 'success') {
-            const h = res.data.header;
-            const rows = res.data.rows;
-
-            const contactInfo = { NombreInst: h.Institucion, InstCorreo: h.InstCorreo, InstContacto: h.InstContacto };
-            const contactString = encodeURIComponent(JSON.stringify(contactInfo));
-
-            actions.innerHTML = `
-                <div class="d-flex gap-2">
-                    <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="window.downloadPDF(${h.IdHistoria})">
-                        <i class="bi bi-file-earmark-pdf me-2"></i> ${window.txt?.misalojamientos?.pdf_ficha || 'PDF FICHA'}
-                    </button>
-                    <button class="btn btn-outline-dark btn-sm fw-bold shadow-sm" onclick="window.openContactModal('${contactString}')">
-                        <i class="bi bi-envelope-at me-2"></i> ${window.txt?.misalojamientos?.contactar_sede || 'CONTACTAR SEDE'}
-                    </button>
-                </div>
-            `;
-
-            // CABECERA MODAL
-            let html = `
-                <div class="text-center mb-3">
-                    <h5 class="fw-bold text-success m-0 text-uppercase" style="letter-spacing: 1px;">${h.Institucion}</h5>
-                </div>
-
-                <div class="header-card bg-white shadow-sm border border-success border-2 border-top-0 border-end-0 border-start-0">
-                    <div class="row text-center g-3">
-                        <div class="col-md-2 border-end">
-                            <span class="header-label">HISTORIA</span>
-                            <span class="badge bg-dark fs-6">#${h.IdHistoria}</span>
-                        </div>
-                        <div class="col-md-3 border-end text-start px-3">
-                            <span class="header-label">PROTOCOLO</span>
-                            <span class="header-value text-primary d-block text-truncate">${h.Protocolo}</span>
-                        </div>
-                        <div class="col-md-3 border-end text-start px-3">
-                            <span class="header-label">ESPECIE / TIPO</span>
-                            <span class="header-value text-success d-block">${h.Especie}</span>
-                        </div>
-                        <div class="col-md-2 border-end">
-                            <span class="header-label">DÍAS ESTADÍA</span>
-                            <span class="header-value">${h.TotalDias}</span>
-                        </div>
-                        <div class="col-md-2">
-                            <span class="header-label text-success">COSTO ACUM.</span>
-                            <span class="header-value text-success">$ ${h.TotalCosto}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
-                    <i class="bi bi-info-circle-fill me-1"></i> Haga clic en una fila para desplegar la trazabilidad clínica y física.
-                </div>
-            `;
-
-            // TABLA MODAL CON TRAZABILIDAD EXPANSIBLE
-            const tableRows = rows.map(r => `
-                <tr class="clickable-row bg-white" onclick="window.toggleTrazabilidadReadOnly(${r.IdAlojamiento}, ${r.TipoAnimal || h.EspecieID})">
-                    <td class="text-muted small fw-bold">#${r.IdAlojamiento}</td>
-                    <td class="small fw-bold text-secondary">${r.fechavisado}</td>
-                    <td class="small fw-bold ${!r.hastafecha ? 'text-primary' : 'text-secondary'}">${r.hastafecha || (window.txt?.misalojamientos?.vigente || 'Vigente')}</td>
-                    <td class="text-center fw-bold text-primary">${r.totalcajagrande > 0 ? r.totalcajagrande + ' Gr' : r.totalcajachica + ' Ch'}</td>
-                    <td class="text-center fw-bold text-dark">${r.totaldiasdefinidos}</td>
-                    <td class="text-center"><i class="bi bi-chevron-down text-muted"></i></td>
-                </tr>
-                <tr id="trazabilidad-row-${r.IdAlojamiento}" class="d-none bg-light">
-                    <td colspan="6" class="p-0 border-0">
-                        <div id="trazabilidad-content-${r.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner">
-                            <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${window.txt?.misalojamientos?.cargando_cajas || 'Cargando cajas...'}</div>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-
-            html += `
-                <div class="table-responsive shadow-sm rounded border">
-                    <table class="table table-hover table-sm align-middle mb-0">
-                        <thead class="table-secondary text-uppercase small text-muted text-center">
-                            <tr>
-                                <th>${window.txt?.misalojamientos?.tramo || 'Tramo'}</th>
-                                <th>${window.txt?.misalojamientos?.desde || 'Desde'}</th>
-                                <th>${window.txt?.misalojamientos?.hasta || 'Hasta'}</th>
-                                <th>${window.txt?.misalojamientos?.cajas || 'Cajas'}</th>
-                                <th>${window.txt?.misalojamientos?.dias || 'Días'}</th>
-                                <th>${window.txt?.misalojamientos?.clinica || 'Clínica'}</th>
-                            </tr>
-                        </thead>
-                        <tbody>${tableRows}</tbody>
-                    </table>
-                </div>
-            `;
-
-            body.innerHTML = html;
-        }
-    } catch (e) { body.innerHTML = `<div class="alert alert-danger">Error cargando detalles: ${e.message}</div>`; }
-};
-
 /* --- PDF GENERATOR AVANZADO --- */
 window.downloadPDF = async (id) => {
+    const rolePdf = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '3', 10);
+    const canPdfTraz = hasTrazabilidadAlojamientosForUser(rolePdf);
+
     // 1. PREGUNTAR QUÉ INCLUIR EN EL PDF
     const { value: options } = await Swal.fire({
         title: 'Exportar Ficha PDF',
@@ -365,10 +268,11 @@ window.downloadPDF = async (id) => {
                     <input class="form-check-input" type="checkbox" id="chk-aloj" checked>
                     <label class="form-check-label fw-bold small">Tramos de Alojamiento (Contabilidad)</label>
                 </div>
+                ${canPdfTraz ? `
                 <div class="form-check form-switch">
                     <input class="form-check-input border-primary" type="checkbox" id="chk-traz" checked>
                     <label class="form-check-label fw-bold small text-primary">Trazabilidad y Clínica de los Animales</label>
-                </div>
+                </div>` : ''}
             </div>
         `,
         showCancelButton: true,
@@ -376,7 +280,7 @@ window.downloadPDF = async (id) => {
         confirmButtonColor: '#dc3545',
         preConfirm: () => ({
             aloj: document.getElementById('chk-aloj').checked,
-            traz: document.getElementById('chk-traz').checked
+            traz: canPdfTraz ? document.getElementById('chk-traz').checked : false
         })
     });
 

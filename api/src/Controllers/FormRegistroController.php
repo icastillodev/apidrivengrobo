@@ -32,9 +32,25 @@ class FormRegistroController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            Auditoria::getDatosSesion(); // Solo admins leen el JSON resultante
+            Auditoria::getDatosSesion();
+            $config = $this->model->getConfigById($id);
+            if (!$config) {
+                http_response_code(404);
+                echo json_encode(['status' => 'error', 'message' => 'Formulario no encontrado.']);
+                exit;
+            }
+            $planMap = null;
+            if (!empty($config['plan_modulos'])) {
+                $decoded = json_decode($config['plan_modulos'], true);
+                $planMap = is_array($decoded) ? $decoded : null;
+            }
+            $config['plan_modulos_map'] = $planMap;
             $data = $this->model->getFullResponsesGrouped($id);
-            echo json_encode(['status' => 'success', 'data' => $data]);
+            echo json_encode([
+                'status' => 'success',
+                'config' => $config,
+                'data' => $data,
+            ]);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

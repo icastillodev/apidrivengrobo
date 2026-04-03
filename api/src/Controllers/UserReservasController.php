@@ -3,21 +3,28 @@ namespace App\Controllers;
 
 use App\Models\UserReservas\UserReservasModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class UserReservasController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new UserReservasModel($db);
     }
 
     public function getSalas() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getSalas($sesion['instId']));
     }
 
     public function getSalaBundle() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $salaId = $_GET['IdSalaReserva'] ?? null;
         $from = $_GET['from'] ?? null;
         $to = $_GET['to'] ?? null;
@@ -27,6 +34,7 @@ class UserReservasController {
 
     public function getInstrumentosDisponiblesSlot() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $salaId = $_GET['IdSalaReserva'] ?? null;
         $date = $_GET['date'] ?? null;
         $start = $_GET['start'] ?? null;
@@ -37,6 +45,7 @@ class UserReservasController {
 
     public function getMisReservas() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrInvestigatorLegacyOrExit($sesion, 'reservas');
         $from = $_GET['from'] ?? null;
         $to = $_GET['to'] ?? null;
         $this->jsonResponse($this->model->getMisReservas($sesion['instId'], $sesion['userId'], $from, $to));
@@ -44,6 +53,7 @@ class UserReservasController {
 
     public function createReserva() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
 

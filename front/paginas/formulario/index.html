@@ -8,6 +8,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../../dist/style/css/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="bg-light gecko-loaded">
 
@@ -33,6 +35,8 @@
         </div>
     </div>
 
+    <div id="onboarding-orphan-export" class="container mb-3 d-none"></div>
+
 <main class="container mb-5">
         
         <div class="text-center mb-4">
@@ -43,6 +47,7 @@
         <form id="form-full-registro">
             <input type="hidden" id="id_form_config" name="id_form_config">
 
+            <div id="block-base" data-onboarding-block="base">
             <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-4" data-i18n="onboarding.mod_inst">1. Datos Institucionales</h5>
             
             <div class="card shadow-sm mb-4 border-0">
@@ -126,8 +131,10 @@
                     <div id="contenedor-formularios"></div>
                 </div>
             </div>
+            </div>
 
-            <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_prot">2. Módulo de Protocolos</h5>
+            <div id="block-protocolos" data-onboarding-block="protocolos">
+            <h5 id="heading-protocolos" class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_prot">2. Módulo de Protocolos</h5>
             <div class="row g-4 mb-4">
                 <div class="col-md-6">
                     <div class="card shadow-sm border-0 h-100">
@@ -152,7 +159,9 @@
                     </div>
                 </div>
             </div>
+            </div>
 
+            <div id="block-animales" data-onboarding-block="animales">
             <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_anim">3. Módulo de Animales</h5>
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-body">
@@ -163,10 +172,11 @@
                     <div id="contenedor-especies"></div>
                 </div>
             </div>
+            </div>
 
-            <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_inv">4. Módulo de Inventario</h5>
+            <h5 id="heading-inventario" class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_inv">4. Módulo de Inventario</h5>
             <div class="row g-4 mb-4">
-                <div class="col-md-6">
+                <div class="col-md-6" id="block-inv-reac" data-onboarding-block="reactivos">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
@@ -177,7 +187,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-6" id="block-inv-ins" data-onboarding-block="insumos">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
@@ -190,6 +200,7 @@
                 </div>
             </div>
 
+            <div id="block-reservas" data-onboarding-block="reservas">
             <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_res">5. Módulo de Reservas</h5>
             <div class="row g-4 mb-4">
                 <div class="col-md-6">
@@ -215,7 +226,9 @@
                     </div>
                 </div>
             </div>
+            </div>
 
+            <div id="block-servicios" data-onboarding-block="servicios">
             <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_serv">6. Servicios Extra</h5>
             <div class="card shadow-sm mb-4 border-0">
                 <div class="card-body">
@@ -230,10 +243,13 @@
                     <div id="contenedor-servicios" class="row g-3"></div>
                 </div>
             </div>
-<h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5">7. Permisos por Rol de Usuario</h5>
+            </div>
+
+            <div id="block-permisos" data-onboarding-block="permisos">
+            <h5 class="text-success fw-bold border-bottom pb-2 mb-3 mt-5" data-i18n="onboarding.mod_permisos">7. Permisos por Rol de Usuario</h5>
             <div class="card shadow-sm mb-4 border-0 bg-light">
                 <div class="card-body">
-                    <p class="text-muted small border-bottom border-secondary pb-2 mb-3">Defina qué módulos estarán visibles para cada rol de usuario en su institución.</p>
+                    <p class="text-muted small border-bottom border-secondary pb-2 mb-3" data-i18n="onboarding.permisos_desc">Defina qué módulos estarán visibles para cada rol de usuario en su institución.</p>
                     
                     <div class="row g-3">
                         <div class="col-md-4 border-end border-secondary">

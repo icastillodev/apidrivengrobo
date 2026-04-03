@@ -18,7 +18,7 @@ class UserController {
         $this->model = new UserModel($db);
     }
 
-    /** Solo roles 1 y 2 (superadmin sistema / superadmin) pueden eliminar usuarios en admin sede. */
+    /** Solo roles 1 y 2 (GeckoDev / Superadmin sede) pueden eliminar usuarios en admin sede. */
     private function assertMayDeleteUsers(array $sesion): void {
         $r = (int) ($sesion['role'] ?? 0);
         if ($r !== 1 && $r !== 2) {

@@ -116,6 +116,12 @@ class MailLang {
             'msg_int_intro' => 'Recibió el siguiente mensaje en GROBO. También puede verlo en la sección Mensajes del sistema.',
             'msg_int_from' => 'Remitente:',
             'msg_int_subject_label' => 'Asunto:',
+
+            'support_user_reply_subject' => 'Respuesta a su ticket',
+            'support_user_reply_title' => 'Respuesta de soporte',
+            'support_user_reply_hello' => 'Hola',
+            'support_user_reply_intro' => 'El equipo de soporte respondió a su consulta en GROBO.',
+            'support_user_reply_ticket_subject' => 'Asunto del ticket',
         ],
         'en' => [
             'footer_developed' => 'Developed by Gekos.uy & UDELAR - Unit of Reagents and Experimentation Biomodels',
@@ -226,6 +232,12 @@ class MailLang {
             'msg_int_intro' => 'You received the following message in GROBO. You can also read it in the Messages section of the system.',
             'msg_int_from' => 'From:',
             'msg_int_subject_label' => 'Subject:',
+
+            'support_user_reply_subject' => 'Reply to your ticket',
+            'support_user_reply_title' => 'Support reply',
+            'support_user_reply_hello' => 'Hello',
+            'support_user_reply_intro' => 'The GROBO support team replied to your request.',
+            'support_user_reply_ticket_subject' => 'Ticket subject',
         ],
         'pt' => [
             'footer_developed' => 'Desenvolvido por Gekos.uy & UDELAR - Unidade de Reagentes e Biomodelos de Experimentação',
@@ -336,6 +348,12 @@ class MailLang {
             'msg_int_intro' => 'Você recebeu a seguinte mensagem no GROBO. Também pode vê-la na seção Mensagens do sistema.',
             'msg_int_from' => 'Remetente:',
             'msg_int_subject_label' => 'Assunto:',
+
+            'support_user_reply_subject' => 'Resposta ao seu ticket',
+            'support_user_reply_title' => 'Resposta do suporte',
+            'support_user_reply_hello' => 'Olá',
+            'support_user_reply_intro' => 'A equipe de suporte do GROBO respondeu à sua solicitação.',
+            'support_user_reply_ticket_subject' => 'Assunto do ticket',
         ],
     ];
 

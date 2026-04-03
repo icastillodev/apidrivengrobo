@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
+import { esRolInvestigadorVisibilidadModulos, getInstModulesSnapshot } from '../../modulesAccess.js';
 
 let allSedes = []; 
 let currentInstId = null;
@@ -96,22 +97,28 @@ function renderSedesList(sedes, isMulti) {
 
 /**
  * LÓGICA DE PERMISOS CRUZADA (Backend SQL devuelve 0, 1, o 2)
- * 0 = Módulo apagado para toda la institución (Nadie lo ve).
- * 1 = Habilitado, pero cerrado a investigadores (Solo lo ven Admins/Roles 1 y 2).
- * 2 = Habilitado y abierto a investigadores (Lo ven todos).
+ * 0 = Módulo apagado para toda la institución.
+ * 1 = Solo admin sede (1,2,4).
+ * 2 = Abierto a investigadores.
+ * Investigador: si 0 en la sede pero tiene datos propios en SU sede (invHasData), sigue viendo la tarjeta solo al elegir esa sede.
  */
-function checkPermission(flagValue) {
-    const val = parseInt(flagValue);
-    
-    // Si la institución no tiene el módulo, NADIE lo ve.
-    if (val === 0) return false;
-    
-    // Si el módulo está abierto para investigadores (2), TODO EL MUNDO lo ve.
+function checkPermission(flagValue, moduleKey, idInstSede) {
+    if ([1, 2, 4].includes(userRole)) {
+        return true;
+    }
+    const val = parseInt(flagValue, 10);
+
     if (val === 2) return true;
-    
-    // Si el módulo es de uso exclusivo interno (1), SOLO roles administrativos (1 y 2) lo ven.
+
     if (val === 1) {
-        return [1, 2].includes(userRole);
+        return [1, 2, 4].includes(userRole);
+    }
+
+    if (val === 0) {
+        if (!esRolInvestigadorVisibilidadModulos(userRole) || !moduleKey) return false;
+        if (String(idInstSede) !== String(currentInstId)) return false;
+        const { invHasData } = getInstModulesSnapshot();
+        return !!(invHasData && invHasData[moduleKey]);
     }
 
     return false;
@@ -122,7 +129,7 @@ function renderActionButtons(sede) {
     const target = sede.IdInstitucion;
 
     // 1. Animales
-    if (checkPermission(sede.flag_animales)) {
+    if (checkPermission(sede.flag_animales, 'animales', sede.IdInstitucion)) {
         const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
             t?.solicitud_animales || 'Solicitud Animales', 
@@ -134,7 +141,7 @@ function renderActionButtons(sede) {
     }
 
     // 2. Reactivos
-    if (checkPermission(sede.flag_reactivos)) {
+    if (checkPermission(sede.flag_reactivos, 'reactivos', sede.IdInstitucion)) {
         const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
             t?.reactivos_biologicos || 'Reactivos Biológicos', 
@@ -146,7 +153,7 @@ function renderActionButtons(sede) {
     }
 
     // 3. Insumos
-    if (checkPermission(sede.flag_insumos)) {
+    if (checkPermission(sede.flag_insumos, 'insumos', sede.IdInstitucion)) {
         const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
             t?.pedido_insumos || 'Pedido de Insumos', 
@@ -158,7 +165,7 @@ function renderActionButtons(sede) {
     }
     
     // 4. Reservas
-    if (checkPermission(sede.flag_reservas)) {
+    if (checkPermission(sede.flag_reservas, 'reservas', sede.IdInstitucion)) {
         const t = window.txt?.centro_solicitudes;
         buttonsHtml += createCard(
             t?.reserva_salas || 'Reserva de Salas', 

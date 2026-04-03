@@ -32,7 +32,8 @@ class AlojamientoModel {
     }
 
     public function getHistory($historiaId) {
-        $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo, 
+        $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
+                       a.IdUsrA AS IdUsrResponsableAlojamiento,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador,
                        CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA) as TitularNombre,

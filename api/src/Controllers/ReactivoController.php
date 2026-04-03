@@ -5,8 +5,11 @@ use App\Models\Reactivo\ReactivoModel;
 use App\Models\Services\MailService; 
 use App\Utils\Auditoria;
 use App\Utils\VisorHelper;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class ReactivoController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
     private $db;
 
@@ -23,6 +26,7 @@ class ReactivoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             $data = $this->model->getAllByInstitution($sesion['instId'], "Otros reactivos biologicos");
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -37,6 +41,7 @@ class ReactivoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             $data = [
                 'insumos' => $this->model->getAvailableInsumos($sesion['instId']),
                 'protocols' => $this->model->getAvailableProtocols($sesion['instId']),
@@ -55,7 +60,8 @@ class ReactivoController {
         header('Content-Type: application/json');
         $id = $_GET['id'] ?? 0;
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             echo json_encode(['status' => 'success', 'data' => $this->model->getLastNotification($id)]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -72,6 +78,7 @@ class ReactivoController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             $estado = $data['estado'] ?? 'Sin estado';
             $data['instId'] = $sesion['instId'];
             
@@ -100,6 +107,7 @@ class ReactivoController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             $data['instId'] = $sesion['instId'];
             $data['userId'] = (int)($sesion['userId'] ?? 0);
             $this->model->updateFull($data);
@@ -116,7 +124,8 @@ class ReactivoController {
         header('Content-Type: application/json');
         $id = $_GET['id'] ?? 0;
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             echo json_encode(['status' => 'success', 'data' => $this->model->getUsageData($id)]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -140,6 +149,7 @@ class ReactivoController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'reactivos');
             $data['idformA'] = $idformA;
             $data['adminId'] = $sesion['userId'];
             
@@ -183,6 +193,7 @@ class ReactivoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'reactivos', $_GET['inst'] ?? null);
             // 🚀 FIX DE LA RED: Leemos el ID que manda el Frontend
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             
@@ -200,6 +211,7 @@ class ReactivoController {
         $id = $_GET['id'] ?? 0;
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'reactivos', $_GET['inst'] ?? null);
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             echo json_encode(['status' => 'success', 'data' => $this->model->getProtocolDetails($id, $targetInst)]);
         } catch (\Exception $e) {
@@ -220,6 +232,7 @@ class ReactivoController {
 
             // 🚀 FIX DE LA RED: Usamos la institución enviada en el POST
             $data['instId'] = !empty($data['instId']) ? $data['instId'] : $sesion['instId'];
+            $this->enforceModuloInstOrExit($sesion, 'reactivos', (int)$data['instId']);
 
             $res = $this->model->saveOrder($data);
             $idForm = $res['id'];
@@ -253,6 +266,7 @@ class ReactivoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'reactivos', $_GET['inst'] ?? null);
             // 🚀 FIX DE LA RED: PDF de la institución correcta
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             

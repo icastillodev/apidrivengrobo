@@ -2,6 +2,7 @@ import { API } from '../../../api.js';
 // AÑADE ESTA LÍNEA PARA SOLUCIONAR EL ERROR DEL LOADER
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AnimalFichaUI } from './animalFicha.js';
+import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
 
 function __ubAct(r) {
     return Number(r?.Activo) === 1;
@@ -290,6 +291,9 @@ export const TrazabilidadUI = {
     _lastArbolData: {},
 
 async toggleRow(idAlojamiento, idEspecie) {
+        const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        if (!hasTrazabilidadAlojamientosForUser(roleOpen)) return;
+
         const detailRow = document.getElementById(`trazabilidad-row-${idAlojamiento}`);
         const contentDiv = document.getElementById(`trazabilidad-content-${idAlojamiento}`);
         // Fila maestra (la que tocaste)

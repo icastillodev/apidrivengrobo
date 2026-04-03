@@ -10,6 +10,7 @@ import { TramosUI } from './alojamientos/TramosUI.js';
 import { RegistroUI } from './alojamientos/RegistroUI.js';
 import { ExportUI } from './alojamientos/ExportUI.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
+import { hasTrazabilidadAlojamientosForUser } from '../../modulesAccess.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 
 // Base Path dinámico para compatibilidad Local / Producción
@@ -74,6 +75,8 @@ export async function loadAlojamientos() {
     }
 }
 window.toggleTrazabilidad = (idAlojamiento, idEspecie) => {
+    const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    if (!hasTrazabilidadAlojamientosForUser(roleOpen)) return;
     TrazabilidadUI.toggleRow(idAlojamiento, idEspecie);
 };
 
@@ -106,7 +109,28 @@ window.verPaginaQR = async (historiaId = null) => {
     }
 };
 
-window.openMensajeriaComposeAlojamiento = async () => {
+function parseIdUsrAlojamientoRow(row) {
+    if (!row || typeof row !== 'object') return 0;
+    const raw =
+        row.IdUsrResponsableAlojamiento ??
+        row.idUsrResponsableAlojamiento ??
+        row.IdUsrA ??
+        row.idUsrA;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function parseIdTitularRow(row) {
+    if (!row || typeof row !== 'object') return 0;
+    const raw = row.IdTitularProtocolo ?? row.idTitularProtocolo;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * @param {number} [historiaIdDesdeModal] Id de historia pasado desde el footer del modal (más fiable que depender solo del último tramo).
+ */
+window.openMensajeriaComposeAlojamiento = async (historiaIdDesdeModal) => {
     const hist = AlojamientoState.currentHistoryData;
     const tc = window.txt?.comunicacion || {};
     const ta = window.txt?.alojamientos || {};
@@ -116,23 +140,40 @@ window.openMensajeriaComposeAlojamiento = async () => {
         }
         return;
     }
-    const last = hist[hist.length - 1];
     const first = hist[0];
-    let destId = parseInt(last.IdUsrA, 10);
-    if (!destId || destId <= 0) {
-        destId = parseInt(first.IdTitularProtocolo, 10);
+    const last = hist[hist.length - 1];
+
+    let destId = 0;
+    for (let i = hist.length - 1; i >= 0; i--) {
+        const id = parseIdUsrAlojamientoRow(hist[i]);
+        if (id > 0) {
+            destId = id;
+            break;
+        }
     }
-    if (!destId || destId <= 0) {
-        const rowTit = hist.find((r) => parseInt(r.IdTitularProtocolo, 10) > 0);
-        destId = rowTit ? parseInt(rowTit.IdTitularProtocolo, 10) : 0;
+    if (!destId) {
+        destId = parseIdTitularRow(first);
     }
-    if (!destId || destId <= 0) {
+    if (!destId) {
+        const rowTit = hist.find((r) => parseIdTitularRow(r) > 0);
+        destId = rowTit ? parseIdTitularRow(rowTit) : 0;
+    }
+    if (!destId) {
         if (typeof Swal !== 'undefined') {
             Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
         }
         return;
     }
-    const hid = parseInt(last.historia ?? first.historia, 10) || null;
+
+    const hidFromArg = parseInt(historiaIdDesdeModal, 10);
+    const hidFromData = parseInt(last.historia ?? first.historia, 10);
+    const hid =
+        Number.isFinite(hidFromArg) && hidFromArg > 0
+            ? hidFromArg
+            : Number.isFinite(hidFromData) && hidFromData > 0
+              ? hidFromData
+              : null;
+
     const asunto = `${tc.msg_asunto || ''} · ${ta.history_record || ''}${hid ? ' #' + hid : ''}`;
     await openMensajeriaCompose({
         destinatarioId: destId,

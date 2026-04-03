@@ -3,13 +3,42 @@ namespace App\Controllers;
 
 use App\Models\Alojamiento\TrazabilidadModel;
 use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
 
 class TrazabilidadController {
-    
+    private $db;
     private $model;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new TrazabilidadModel($db);
+    }
+
+    private function guardTrazabilidad(array $sesion): void
+    {
+        ModulosInstitucion::assertTrazabilidadAlojamientos($this->db, (int) $sesion['instId'], (int) $sesion['role']);
+    }
+
+    private function tryGuardTrazabilidad(array $sesion): void
+    {
+        try {
+            $this->guardTrazabilidad($sesion);
+        } catch (\RuntimeException $e) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    private function tryGuardTrazabilidadLectura(array $sesion): void
+    {
+        try {
+            ModulosInstitucion::assertTrazabilidadLecturaOlegacy($this->db, $sesion);
+        } catch (\RuntimeException $e) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
+        }
     }
 
     public function getArbol() {
@@ -27,6 +56,7 @@ class TrazabilidadController {
 
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad
+            $this->tryGuardTrazabilidadLectura($sesion);
             $data = $this->model->getArbolBiologico($idAlojamiento, $idEspecie, $sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -55,6 +85,7 @@ class TrazabilidadController {
         }
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidadLectura($sesion);
             $instId = (int)$sesion['instId'];
             if ($idEu > 0) {
                 $data = $this->model->getFichaAnimalCompleta($idEu, $instId);
@@ -92,6 +123,7 @@ class TrazabilidadController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->insertarObservaciones($data['IdEspecieAlojUnidad'], $data['fechaObs'], $data['valores'], $sesion['instId']);
             echo json_encode(['status' => 'success', 'message' => 'Observaciones registradas']);
         } catch (\Exception $e) {
@@ -108,6 +140,7 @@ class TrazabilidadController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $ubic = (isset($data['ubicacion']) && is_array($data['ubicacion'])) ? $data['ubicacion'] : null;
             $this->model->crearCajaYUnidades(
                 $data['idAlojamiento'],
@@ -129,7 +162,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->renameSujeto($data['idUnidad'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -147,6 +181,7 @@ class TrazabilidadController {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $id = (int)($data['IdEspecieAlojUnidad'] ?? 0);
             if ($id <= 0) {
                 throw new \InvalidArgumentException('Falta IdEspecieAlojUnidad.');
@@ -169,7 +204,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->renameCaja($data['idCaja'], $data['nombre']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -182,6 +218,7 @@ class TrazabilidadController {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             if (empty($data['idCaja'])) {
                 throw new \InvalidArgumentException('Falta idCaja.');
             }
@@ -199,7 +236,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->deleteCaja($data['idCaja']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -211,7 +249,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->deleteSujeto($data['idUnidad']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -223,7 +262,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->addSujeto($data['idCaja'], $data['idAlojamiento'], $data['nombreSujeto']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -234,7 +274,8 @@ class TrazabilidadController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidadLectura($sesion);
             $data = $this->model->getCajasTramoAnterior($_GET['idAlojamiento']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
@@ -246,7 +287,8 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
             $this->model->clonarCajasBajoDemanda($data['idAlojamientoActual'], $data['cajas'], $data['unidades']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }

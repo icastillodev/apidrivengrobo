@@ -3,21 +3,28 @@ namespace App\Controllers;
 
 use App\Models\AdminReservas\AdminReservasModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AdminReservasController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminReservasModel($db);
     }
 
     public function getSalas() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getSalas($sesion['instId']));
     }
 
     public function getSalaAgenda() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $salaId = $_GET['IdSalaReserva'] ?? null;
         $from = $_GET['from'] ?? null;
         $to = $_GET['to'] ?? null;
@@ -26,6 +33,7 @@ class AdminReservasController {
 
     public function getAgenda() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $from = $_GET['from'] ?? null;
         $to = $_GET['to'] ?? null;
         $this->jsonResponse($this->model->getAgenda($sesion['instId'], $from, $to));
@@ -33,6 +41,7 @@ class AdminReservasController {
 
     public function createReserva() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $input['IdUsrCreador'] = $sesion['userId'];
@@ -42,6 +51,7 @@ class AdminReservasController {
 
     public function updateReserva() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $input['IdUsrCreador'] = $sesion['userId'];
@@ -51,6 +61,7 @@ class AdminReservasController {
 
     public function deleteReserva() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $out = $this->model->deleteReserva($sesion['instId'], $input);
@@ -59,11 +70,13 @@ class AdminReservasController {
 
     public function getPendingCount() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getPendingCount($sesion['instId']));
     }
 
     public function getPendingList() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $salaId = $_GET['IdSalaReserva'] ?? null;
         $from = $_GET['from'] ?? null;
         $to = $_GET['to'] ?? null;
@@ -72,6 +85,7 @@ class AdminReservasController {
 
     public function approveReserva() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $out = $this->model->approveReserva($sesion['instId'], $sesion['userId'], $input);

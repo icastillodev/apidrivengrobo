@@ -3,11 +3,16 @@ namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigInsumoExpModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AdminConfigInsumoExpController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminConfigInsumoExpModel($db);
     }
 
@@ -15,7 +20,8 @@ class AdminConfigInsumoExpController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            $sesion = Auditoria::getDatosSesion(); // Seguridad
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = $this->model->getAll($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -30,6 +36,7 @@ class AdminConfigInsumoExpController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = $this->model->getSpecies($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -46,7 +53,8 @@ class AdminConfigInsumoExpController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            Auditoria::getDatosSesion(); // Validamos que esté logueado
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $res = $this->model->delete($_POST['id']);
             echo json_encode(['status' => 'success', 'mode' => $res]);
         } catch (\Exception $e) {
@@ -61,6 +69,7 @@ class AdminConfigInsumoExpController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $_POST['instId'] = $sesion['instId']; // Inyectamos el ID real
             
             $this->model->$method($_POST);

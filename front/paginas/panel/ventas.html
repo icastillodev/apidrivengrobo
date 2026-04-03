@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas - GROBO</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
+    <script type="module">
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
+        import { Auth } from '../../dist/js/auth.js';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        import { initVentasContacto } from '../../dist/js/pages/usuario/panelVentas.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                if (window.txt) translatePage();
+                Auth.checkAccess([1, 2, 3, 4, 5, 6]);
+                if (window.txt) {
+                    initMenu();
+                    NotificationManager.init();
+                    await initVentasContacto();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                hideLoader();
+            }
+        });
+    </script>
+</head>
+<body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="ventas">
+    <div class="container my-4 px-3" style="max-width: 720px;">
+        <div class="mb-4 border-bottom pb-3">
+            <h4 class="fw-black text-success m-0" data-i18n="ventas.page_title"></h4>
+            <small class="text-muted d-block mt-1" data-i18n="ventas.page_sub"></small>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body small" id="ventas-intro" data-i18n="ventas.intro_html"></div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <p class="small text-muted mb-2">
+                    <span data-i18n="ventas.correo_perfil"></span>
+                    <strong id="ventas-user-email" class="text-dark">—</strong>
+                </p>
+                <label class="form-label fw-bold small" for="ventas-mensaje" data-i18n="ventas.mensaje_label"></label>
+                <textarea class="form-control mb-3" id="ventas-mensaje" rows="8" maxlength="8000"></textarea>
+                <button type="button" class="btn btn-success fw-bold" id="ventas-btn-enviar">
+                    <i class="bi bi-send-fill me-1"></i><span data-i18n="ventas.btn_enviar"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

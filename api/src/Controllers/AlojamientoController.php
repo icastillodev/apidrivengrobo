@@ -3,11 +3,16 @@ namespace App\Controllers;
 
 use App\Models\Alojamiento\AlojamientoModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AlojamientoController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AlojamientoModel($db);
     }
 
@@ -16,6 +21,7 @@ class AlojamientoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'alojamientos', $_GET['inst'] ?? null);
             $instParam = $_GET['inst'] ?? null;
             // Normalizar: si el front manda "NaN", "" o no es número válido, usar institución de la sesión
             $targetInst = null;
@@ -41,7 +47,8 @@ class AlojamientoController {
         header('Content-Type: application/json');
         $id = $_GET['historia'] ?? 0;
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             echo json_encode(['status' => 'success', 'data' => $this->model->getHistory($id)]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -63,7 +70,8 @@ class AlojamientoController {
         }
 
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $res = $this->model->finalizarHistoria($historiaId, $fechaFin);
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -78,7 +86,8 @@ class AlojamientoController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $res = $this->model->desfinalizarHistoria($data['historia']);
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -98,7 +107,8 @@ class AlojamientoController {
         }
 
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $res = $this->model->updateRow($data); 
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -120,7 +130,8 @@ class AlojamientoController {
         }
 
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $res = $this->model->deleteRow($data['IdAlojamiento'], $data['historia']);
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -147,6 +158,7 @@ public function save() {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $data['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId real
             
             // Mandamos a guardar al modelo (el modelo se encarga de crear la historia nueva si no existe)
@@ -172,6 +184,7 @@ public function getTiposPorEspecie() {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $data = $this->model->getTiposAlojamientoHabilitados($idEsp, $sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -192,7 +205,8 @@ public function getTiposPorEspecie() {
         }
 
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $res = $this->model->updateHistoryConfig($data);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -214,7 +228,8 @@ public function getTiposPorEspecie() {
         }
 
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $this->model->updatePrice($data['IdAlojamiento'], $data['precio']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
@@ -257,6 +272,7 @@ public function generarAlojamientoQR() {
         
         try {
             $sesion = Auditoria::getDatosSesion(); // 🛡️ Validamos token y extraemos datos
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             
             $idUsuario = $sesion['userId'] ?? $sesion['IdUsrA'] ?? $sesion['id'] ?? 1;
             $instId = $sesion['instId'] ?? 1; // 🚀 Extraemos la institución

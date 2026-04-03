@@ -1,5 +1,6 @@
 import { API } from './api.js?v1';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
+import { setInstModulesSnapshot } from './modulesAccess.js';
 
 const SESSION_KEYS = [
     'token', 
@@ -348,6 +349,10 @@ async init() {
             });
             localStorage.setItem('instId', sessionData.instId);
             localStorage.setItem('NombreInst', sessionData.NombreInst);
+        }
+
+        if (res.modulos) {
+            setInstModulesSnapshot(res.modulos);
         }
 
         localStorage.setItem('lang', savedLang);

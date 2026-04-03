@@ -3,26 +3,34 @@ namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigReservasModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AdminConfigReservasController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminConfigReservasModel($db);
     }
 
     public function getAllSalas() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getAllSalas($sesion['instId']));
     }
 
     public function getSalaDetail() {
-        Auditoria::getDatosSesion(); // Valida Token
+        $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getSalaDetail($_GET['id']));
     }
 
     public function saveSala() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $_POST['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId Real
         
         $horarios = json_decode($_POST['horarios'], true);
@@ -31,7 +39,8 @@ class AdminConfigReservasController {
     }
 
     public function toggleSala() {
-        Auditoria::getDatosSesion();
+        $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         $this->model->toggleSala($input['id'], $input['status']);
         $this->jsonResponse(['status' => 'success']);
@@ -39,6 +48,7 @@ class AdminConfigReservasController {
 
     public function updateGlobalTimeType() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         
         $this->model->updateGlobalTimeType($sesion['instId'], $input['type']);
@@ -47,17 +57,27 @@ class AdminConfigReservasController {
 
     public function getAllInst() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $this->jsonResponse($this->model->getAllInst($sesion['instId']));
     }
 
     public function getInstSalasPermitidas() {
-        Auditoria::getDatosSesion(); // Valida Token
+        $sesion = Auditoria::getDatosSesion();
+        $targetInst = (int)($sesion['instId'] ?? 0);
+        if ((int)($sesion['role'] ?? 0) === 1 && isset($_GET['id']) && $_GET['id'] !== '') {
+            $v = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+            if ($v !== false && (int) $v > 0) {
+                $targetInst = (int) $v;
+            }
+        }
+        $this->enforceModuloInstOrExit($sesion, 'reservas', $targetInst);
         $id = $_GET['id'] ?? null;
         $this->jsonResponse($this->model->getInstSalasPermitidas($id));
     }
 
     public function saveInst() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $_POST['IdInstitucion'] = $sesion['instId'];
         
         $salasPermitidas = [];
@@ -71,7 +91,8 @@ class AdminConfigReservasController {
     }
 
     public function toggleInst() {
-        Auditoria::getDatosSesion();
+        $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         $this->model->toggleInst($input['id'], $input['status']);
         $this->jsonResponse(['status' => 'success']);
@@ -79,6 +100,7 @@ class AdminConfigReservasController {
 
     public function generarQrSala() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         // Solo admins/roles altos
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2, 4, 5, 6], true)) {
@@ -92,6 +114,7 @@ class AdminConfigReservasController {
 
     public function generarQrInstitucion() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2, 4, 5, 6], true)) {
             $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
@@ -102,12 +125,14 @@ class AdminConfigReservasController {
 
     public function getModoAprobacion() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $out = $this->model->getModoAprobacion($sesion['instId']);
         $this->jsonResponse($out);
     }
 
     public function setModoAprobacion() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2], true)) {
             $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);

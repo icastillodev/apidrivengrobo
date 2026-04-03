@@ -35,6 +35,7 @@ $router->post('/form-registro/submit', 'FormRegistroController@submit'); // <-- 
 // 🚀 NUEVAS RUTAS: ESCUDO DE SEGURIDAD OBLIGATORIO
 $router->get('/auth/security-check', 'AuthController@securityCheck');
 $router->post('/auth/update-security', 'AuthController@updateSecurity');
+$router->get('/session/modulos', 'AuthController@sessionModulos');
 
 // ============================================================
 // SECCIÓN: Menú y Notificaciones , busqueda global
@@ -125,6 +126,16 @@ $router->get('/comunicacion/mensajes/no-leidos', 'MensajeriaController@getUnread
 $router->get('/comunicacion/mensajes/hilo/:id', 'MensajeriaController@getHilo');
 $router->post('/comunicacion/mensajes/hilo/:id/leer', 'MensajeriaController@markHiloRead');
 $router->post('/comunicacion/mensajes/enviar', 'MensajeriaController@enviar');
+
+// Tickets de soporte Gecko (turnos 1:1, correo a soporte@appgrobo.com)
+$router->get('/support/tickets', 'SupportTicketController@listTickets');
+$router->get('/support/tickets/:id', 'SupportTicketController@getTicket');
+$router->post('/support/tickets', 'SupportTicketController@createTicket');
+$router->post('/support/tickets/:id/reply', 'SupportTicketController@replyTicket');
+$router->post('/support/tickets/:id/cerrar', 'SupportTicketController@cerrarTicket');
+
+// Consulta comercial (correo a ventas@groboapp.com, categoría venta)
+$router->post('/sales/inquiry', 'SalesContactController@sendInquiry');
 
 $router->get('/comunicacion/noticias', 'ComunicacionNoticiaController@getList');
 $router->get('/comunicacion/noticias/:id', 'ComunicacionNoticiaController@getOne');

@@ -1,12 +1,12 @@
 /**
  * Eliminación de formularios (animales / reactivos / insumos) en admin:
- * roles 1 y 2, confirmación con contraseña, endpoint /admin/forms/delete
+ * roles 1, 2 y 4, confirmación con contraseña, endpoint /admin/forms/delete
  */
 import { API } from '../api.js';
 
 export function puedeEliminarFormularioAdminSede() {
     const r = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-    return r === 1 || r === 2;
+    return r === 1 || r === 2 || r === 4;
 }
 
 /**
@@ -23,7 +23,7 @@ export async function runAdminFormularioDelete(opts) {
         if (SwalLib) {
             await SwalLib.fire(
                 t.delete_sin_permiso_titulo || 'Sin permiso',
-                t.delete_sin_permiso_rol || 'Solo perfiles Superadmin (roles 1 y 2) pueden eliminar formularios.',
+                t.delete_sin_permiso_rol || 'Solo perfiles maestro (1), Superadmin (2) y Admin (4) pueden eliminar formularios.',
                 'warning'
             );
         } else if (window.mostrarNotificacion) {

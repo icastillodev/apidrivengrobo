@@ -1,7 +1,8 @@
 <?php
 namespace App\Models\FormRegistro;
 use PDO;
-use App\Utils\Auditoria; 
+use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion; 
 
 class FormRegistroModel {
     private $db;
@@ -11,13 +12,49 @@ class FormRegistroModel {
     }
 
     public function saveConfig($data, $adminId) {
-        $sql = "INSERT INTO form_registro_config (slug_url, nombre_inst_previa, encargado_nombre) VALUES (?, ?, ?)";
+        $planJson = $this->buildPlanModulosJson($data['modulos'] ?? null);
+
+        $sql = "INSERT INTO form_registro_config (slug_url, nombre_inst_previa, encargado_nombre, plan_modulos) VALUES (?, ?, ?, ?)";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$data['slug_url'], $data['nombre_inst_previa'], $data['encargado_nombre']]);
-        
+        $stmt->execute([
+            $data['slug_url'],
+            $data['nombre_inst_previa'],
+            $data['encargado_nombre'],
+            $planJson,
+        ]);
+
         $id = $this->db->lastInsertId();
         Auditoria::logManual($this->db, $adminId, 'INSERT', 'form_registro_config', "Creó link de Onboarding: " . $data['slug_url']);
         return $id;
+    }
+
+    /**
+     * @param mixed $modulos Lista [{ IdModulosApp, estado_logico }] como en alta de institución
+     */
+    private function buildPlanModulosJson($modulos): ?string
+    {
+        if (!is_array($modulos) || $modulos === []) {
+            return null;
+        }
+        $plan = [];
+        $stmt = $this->db->prepare('SELECT NombreModulo FROM modulosapp WHERE IdModulosApp = ? LIMIT 1');
+        foreach ($modulos as $m) {
+            $id = (int) ($m['IdModulosApp'] ?? 0);
+            $est = (int) ($m['estado_logico'] ?? 1);
+            if ($id <= 0) {
+                continue;
+            }
+            $stmt->execute([$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                continue;
+            }
+            $k = ModulosInstitucion::nombreModuloToKey($row['NombreModulo'] ?? '');
+            if ($k !== null && $k !== '') {
+                $plan[$k] = $est;
+            }
+        }
+        return $plan === [] ? null : json_encode($plan, JSON_UNESCAPED_UNICODE);
     }
 
 // Agrega esta función dentro de FormRegistroModel

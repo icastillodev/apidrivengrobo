@@ -3,7 +3,8 @@ namespace App\Models\Admin;
 
 use PDO;
 use Exception;
-use App\Utils\Auditoria; 
+use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
 
 class InstitucionModel {
     private $db;
@@ -14,7 +15,13 @@ class InstitucionModel {
 
     // Trae los módulos existentes en la app
     public function getModulosMaestros() {
-        return $this->db->query("SELECT IdModulosApp, NombreModulo FROM modulosapp")->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->db->query("SELECT IdModulosApp, NombreModulo FROM modulosapp")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $k = ModulosInstitucion::nombreModuloToKey($r['NombreModulo'] ?? '');
+            $r['clave_modulo'] = $k ?? '';
+        }
+        unset($r);
+        return $rows;
     }
 
     public function getAllInstitutions() {
@@ -152,13 +159,19 @@ class InstitucionModel {
     private function procesarModulos($idInst, $modulosList) {
         if (!$modulosList || !is_array($modulosList)) return;
 
+        $validIds = $this->db->query('SELECT IdModulosApp FROM modulosapp')->fetchAll(PDO::FETCH_COLUMN);
+        $validSet = array_map('intval', $validIds ?: []);
+
         // Validamos si ya existe el registro para saber si hacer UPDATE o INSERT
         $checkStmt = $this->db->prepare("SELECT ModulosActivosInstId FROM modulosactivosinst WHERE IdInstitucion = ? AND IdModulosApp = ?");
         $updateStmt = $this->db->prepare("UPDATE modulosactivosinst SET Habilitado = ?, ActivoInvestigador = ? WHERE IdInstitucion = ? AND IdModulosApp = ?");
         $insertStmt = $this->db->prepare("INSERT INTO modulosactivosinst (IdInstitucion, IdModulosApp, Habilitado, ActivoInvestigador) VALUES (?, ?, ?, ?)");
 
         foreach ($modulosList as $mod) {
-            $idModulo = $mod['IdModulosApp'];
+            $idModulo = (int)($mod['IdModulosApp'] ?? 0);
+            if ($idModulo <= 0 || !in_array($idModulo, $validSet, true)) {
+                continue;
+            }
             $estadoLogico = $mod['estado_logico']; // 1, 2 o 3
 
             // Traducción del estado lógico a las columnas físicas

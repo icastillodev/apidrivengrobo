@@ -3,11 +3,17 @@ namespace App\Controllers;
 
 use App\Models\Alojamiento\AlojamientoExportModel;
 use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AlojamientoExportController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AlojamientoExportModel($db);
     }
 
@@ -16,12 +22,17 @@ class AlojamientoExportController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
             $instIdSeguro = $sesion['instId'];
 
             $historiaId = $_GET['historia'] ?? 'GLOBAL';
             $formato = $_GET['formato'] ?? 'pdf';
             $incluirAloj = $_GET['alojamientos'] ?? 'true';
             $incluirTraz = $_GET['trazabilidad'] ?? 'true';
+
+            if (strtolower((string) $incluirTraz) === 'true') {
+                $this->enforceModuloSesionOrExit($sesion, 'trazabilidad_alojamientos');
+            }
 
             $data = $this->model->getExportData($instIdSeguro, $historiaId, $incluirAloj, $incluirTraz);
 
@@ -53,6 +64,13 @@ class AlojamientoExportController {
             if (!$info) {
                 http_response_code(404);
                 echo json_encode(['status' => 'error', 'message' => 'Enlace revocado o no encontrado']);
+                exit;
+            }
+            $instId = (int) $info['instId'];
+            $snap = ModulosInstitucion::getSnapshot($this->db, $instId);
+            if (ModulosInstitucion::estadoParaKey($snap['byKey'], 'alojamientos') <= 1) {
+                http_response_code(403);
+                echo json_encode(['status' => 'error', 'message' => 'Exportación no disponible para esta institución.']);
                 exit;
             }
             $data = $this->model->getExportData(

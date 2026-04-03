@@ -5,8 +5,11 @@ use App\Models\Animal\AnimalModel;
 use App\Models\Services\MailService;
 use App\Utils\Auditoria;
 use App\Utils\VisorHelper;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AnimalController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
     private $db;
 
@@ -19,6 +22,7 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad Total
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             // ✅ Respetar la institución que manda el Front (como en protocolos)
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             $data = $this->model->getByInstitution($targetInst);
@@ -34,7 +38,8 @@ class AnimalController {
 
     public function getLastNotification() {
         if (ob_get_length()) ob_clean();
-        Auditoria::getDatosSesion(); // Valida Token
+        $sesion = Auditoria::getDatosSesion(); // Valida Token
+        $this->enforceModuloSesionOrExit($sesion, 'animales');
         $id = $_GET['id'] ?? null;
         $data = $this->model->getLastNotification($id);
         header('Content-Type: application/json');
@@ -50,6 +55,7 @@ class AnimalController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'animales');
             $estado = $data['estado'] ?? 'Sin estado';
             $data['instId'] = $sesion['instId'];
 
@@ -75,6 +81,7 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             $count = $this->model->getPendingCount($targetInst);
             header('Content-Type: application/json');
@@ -87,7 +94,8 @@ class AnimalController {
 
     public function saveNotification() {
         if (ob_get_length()) ob_clean();
-        Auditoria::getDatosSesion();
+        $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'animales');
         $this->model->saveNotification($_POST);
         echo json_encode(['status' => 'success']);
         exit;
@@ -97,6 +105,7 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'animales');
             $data = $this->model->getFormData($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -107,7 +116,8 @@ class AnimalController {
 
     public function getSexData() {
         if (ob_get_length()) ob_clean();
-        Auditoria::getDatosSesion();
+        $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'animales');
         $id = $_GET['id'] ?? null;
         $data = $this->model->getSexData($id);
         echo json_encode(['status' => 'success', 'data' => $data]);
@@ -121,6 +131,7 @@ class AnimalController {
             $sesion = Auditoria::getDatosSesion();
             $instFromUrl = isset($_GET['inst']) ? (int)$_GET['inst'] : 0;
             $_POST['instId'] = ($instFromUrl > 0) ? $instFromUrl : (int)($sesion['instId'] ?? 0);
+            $this->enforceModuloInstOrExit($sesion, 'animales', (int)$_POST['instId']);
             $_POST['userId'] = (int)($sesion['userId'] ?? 0);
             $this->model->updateFull($_POST);
             echo json_encode(['status' => 'success']);
@@ -135,6 +146,7 @@ class AnimalController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
         $protId = $_GET['id'] ?? null;
         $allLocal = (int)($_GET['all'] ?? 0) === 1;
         $targetInst = (int)($_GET['inst'] ?? $sesion['instId']);
@@ -179,6 +191,7 @@ class AnimalController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'animales');
             $data['adminId'] = $sesion['userId']; // Validado
             $data['idformA'] = $idformA;
             
@@ -233,6 +246,7 @@ public function searchProtocols() {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             // 🚀 FIX: Respetar la institución que pide el Frontend
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             
@@ -253,6 +267,7 @@ public function getProtocolDetails() {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             // 🚀 FIX: Respetar la institución que pide el Frontend
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
 
@@ -273,6 +288,7 @@ public function getProtocolDetails() {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             $idespA = $_GET['idespA'] ?? null;
             $idSub = $_GET['idsubespA'] ?? $_GET['idSub'] ?? null;
@@ -302,7 +318,8 @@ public function getProtocolDetails() {
         try {
             $sesion = Auditoria::getDatosSesion();
             // 🚀 FIX: Si el frontend manda un instId en el POST, lo usamos. Si no, usamos el Token.
-            $data['instId'] = !empty($data['instId']) ? $data['instId'] : $sesion['instId']; 
+            $data['instId'] = !empty($data['instId']) ? $data['instId'] : $sesion['instId'];
+            $this->enforceModuloInstOrExit($sesion, 'animales', (int)$data['instId']);
             $data['userId'] = $sesion['userId'];
 
             $idForm = $this->model->saveOrder($data);
@@ -342,6 +359,7 @@ public function getProtocolDetails() {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'animales', $_GET['inst'] ?? null);
             // 🚀 FIX: Respetar la institución que pide el Frontend
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
             

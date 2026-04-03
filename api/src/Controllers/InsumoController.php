@@ -4,8 +4,11 @@ namespace App\Controllers;
 use App\Models\Insumo\InsumoModel;
 use App\Utils\Auditoria;
 use App\Utils\VisorHelper;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class InsumoController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
     private $db;
 
@@ -20,6 +23,7 @@ class InsumoController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = $this->model->getAllByInstitution($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
@@ -34,7 +38,8 @@ class InsumoController {
         header('Content-Type: application/json');
         
         try {
-            Auditoria::getDatosSesion();
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $items = $this->model->getInsumosDetails($_GET['id'] ?? 0);
             echo json_encode(['status' => 'success', 'data' => $items]);
         } catch (\Exception $e) {
@@ -48,6 +53,7 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = $this->model->getInsumosCatalog($sesion['instId']); 
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) { echo json_encode(['status' => 'error']); }
@@ -59,6 +65,7 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = json_decode(file_get_contents('php://input'), true) ?? $_POST;
             $estado = $data['estado'] ?? 'Sin estado';
             $data['instId'] = $sesion['instId'];
@@ -86,6 +93,7 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $deptos = $this->model->getDepartments($sesion['instId']);
             $types = $this->model->getAvailableTypes($sesion['instId']);
             echo json_encode(['status' => 'success', 'data' => ['deptos' => $deptos, 'types' => $types]]);
@@ -100,6 +108,7 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $_POST['instId'] = $sesion['instId'];
             $_POST['userId'] = (int)($sesion['userId'] ?? 0);
             $success = $this->model->updateFullInsumo($_POST);
@@ -116,6 +125,7 @@ class InsumoController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'insumos');
             $data = $_POST;
             $data['instId'] = $sesion['instId']; 
             

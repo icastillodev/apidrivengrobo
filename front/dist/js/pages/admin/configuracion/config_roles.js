@@ -1,4 +1,5 @@
 import { API } from '../../../api.js';
+import { menuIdVisibleInRolesConfig } from '../../../modulesAccess.js';
 
 let allUsers = [];
 let menuConfig = [];
@@ -284,7 +285,7 @@ function renderMenuPermissions() {
     container.innerHTML = '';
 
     const trCfg = window.txt?.config_roles || {};
-    MENU_DEFINITION.forEach(m => {
+    MENU_DEFINITION.filter((m) => menuIdVisibleInRolesConfig(m.id, roleId)).forEach(m => {
         const config = menuConfig.find(c => c.IdTipoUsrA == roleId && c.NombreMenu == m.id);
         // 204: sin fila en menudistr el API asume activo (MenuController). 206 (portal) solo si está explícito Activo=1.
         const defaultOn = m.id === 204;

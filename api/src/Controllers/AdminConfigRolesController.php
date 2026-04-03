@@ -3,11 +3,14 @@ namespace App\Controllers;
 
 use App\Models\AdminConfig\AdminConfigRolesModel;
 use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
 
 class AdminConfigRolesController {
+    private $db;
     private $model;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminConfigRolesModel($db);
     }
 
@@ -44,7 +47,16 @@ class AdminConfigRolesController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $_POST['instId'] = $sesion['instId']; // Inyecta ID de seguridad
-            
+
+            $menuId = (int) ($_POST['menuId'] ?? 0);
+            $newStatus = (int) ($_POST['status'] ?? 0);
+            ModulosInstitucion::assertMenuIdPermitidoParaInstitucion(
+                $this->db,
+                (int) $sesion['instId'],
+                $menuId,
+                $newStatus
+            );
+
             $this->model->toggleMenu($_POST);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {

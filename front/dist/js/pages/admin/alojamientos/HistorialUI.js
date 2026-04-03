@@ -3,6 +3,7 @@ import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AlojamientoState, loadAlojamientos } from '../alojamientos.js';
 import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
+import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
 
 export const HistorialUI = {
     init() {
@@ -54,7 +55,9 @@ export const HistorialUI = {
 
 renderSummary(historiaId) {
         const summaryContainer = document.getElementById('historial-summary');
-        if (summaryContainer && !document.getElementById('leyenda-trazabilidad')) {
+        const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen);
+        if (showTraz && summaryContainer && !document.getElementById('leyenda-trazabilidad')) {
             summaryContainer.insertAdjacentHTML('afterend', `
                 <div id="leyenda-trazabilidad" class="alert alert-info py-2 small text-center mb-3 fw-bold shadow-sm" style="border-left: 4px solid #0dcaf0;">
                     <i class="bi bi-info-circle-fill me-1"></i> ${(window.txt?.alojamientos?.legend_click_row || 'Haga clic en una fila para ver la trazabilidad.')}
@@ -127,6 +130,8 @@ renderTable() {
         const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
         const txt = window.txt.alojamientos || {};
         const gen = window.txt?.generales || {};
+        const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen);
 
         const tbody = document.getElementById('tbody-historial');
         if (!tbody) return;
@@ -177,7 +182,7 @@ renderTable() {
                 : cant;
 
             const trMaster = `
-            <tr class="pointer table-light" onclick="window.toggleTrazabilidad(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})">
+            <tr class="pointer table-light"${showTraz ? ` onclick="window.toggleTrazabilidad(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})"` : ''}>
                 <td><span class="badge bg-secondary">#${h.IdAlojamiento}</span></td>
                 <td>${fIni.toLocaleDateString()}</td> 
                 <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
@@ -195,14 +200,16 @@ renderTable() {
                 </td>
             </tr>`;
 
-            const trDetail = `
+            const trDetail = showTraz
+                ? `
             <tr id="trazabilidad-row-${h.IdAlojamiento}" class="d-none bg-white">
                 <td colspan="9" class="p-0 border-0">
                     <div id="trazabilidad-content-${h.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner bg-light">
                         <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${txt.traceability_loading || 'Cargando trazabilidad...'}</div>
                     </div>
                 </td>
-            </tr>`;
+            </tr>`
+                : '';
 
             return trMaster + trDetail;
         }).join('');
@@ -217,7 +224,7 @@ renderTable() {
         if (titleEl) titleEl.innerText = txt.history_record || 'Ficha de Alojamiento';
 
         const btnMsg = `
-                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm ms-1" onclick="window.openMensajeriaComposeAlojamiento && window.openMensajeriaComposeAlojamiento()">
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm ms-1" onclick="window.openMensajeriaComposeAlojamiento && window.openMensajeriaComposeAlojamiento(${historiaId})">
                     <i class="bi bi-chat-dots me-1"></i>${txt.btn_msg_responsable || ''}
                 </button>`;
         if (isFinalizado) {

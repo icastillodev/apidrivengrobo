@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Models\Auth\AuthModel;
 use App\Models\Auth\AuthService;
 use App\Utils\Auditoria; // Importamos nuestro guardián
+use App\Utils\ModulosInstitucion;
 
 class AuthController {
     private $service;
@@ -110,6 +111,12 @@ class AuthController {
         // GUARDAMOS AUDITORÍA DEL LOGIN
         Auditoria::logManual($this->db, $user['IdUsrA'], 'LOGIN', 'usuarioe', 'Inicio de sesión exitoso en sede: ' . $data['instSlug']);
 
+        $snap = $this->snapshotModulosConInvLegacy(
+            (int) $user['IdInstitucion'],
+            (int) $user['role'],
+            (int) $user['IdUsrA']
+        );
+
         echo json_encode([
             'status'   => 'success',
             'token'    => $tokenReal,
@@ -118,7 +125,8 @@ class AuthController {
             'userFull' => $user['Nombre'] ?? $user['UsrA'],
             'userApe'  => $user['ApellidoA'] ?? $user['UsrA'],
             'role'     => $user['role'],
-            'instId'   => $user['IdInstitucion']
+            'instId'   => $user['IdInstitucion'],
+            'modulos'  => $snap,
         ]);
         exit;
     }
@@ -151,6 +159,12 @@ class AuthController {
             // GUARDAMOS AUDITORÍA
             Auditoria::logManual($this->db, $user['IdUsrA'], 'LOGIN_2FA', 'usuarioe', 'Inicio de sesión con 2FA exitoso');
 
+            $snap = $this->snapshotModulosConInvLegacy(
+                (int) $finalInstId,
+                (int) $user['role'],
+                (int) $user['IdUsrA']
+            );
+
             echo json_encode([
                 'status'   => 'success',
                 'token'    => $tokenReal,
@@ -159,7 +173,8 @@ class AuthController {
                 'userFull' => $user['NombreA'] ?? $user['UsrA'],
                 'userApe'  => $user['ApellidoA'] ?? $user['UsrA'],
                 'role'     => $user['role'],
-                'instId'   => $finalInstId
+                'instId'   => $finalInstId,
+                'modulos'  => $snap,
             ]);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Código inválido o expirado']);
@@ -245,6 +260,44 @@ class AuthController {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
+    }
+
+    /**
+     * Módulos contratados para la institución de la sesión (JWT).
+     */
+    public function sessionModulos() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $snap = $this->snapshotModulosConInvLegacy(
+                (int) $sesion['instId'],
+                (int) $sesion['role'],
+                (int) ($sesion['userId'] ?? 0)
+            );
+            echo json_encode(['status' => 'success', 'data' => $snap]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Snapshot de módulos + flags de datos legacy del investigador (menú / UI solo lectura).
+     *
+     * @return array{byKey: array<string,int>, list: array<int, array<string,mixed>>, invHasData?: array<string,bool>}
+     */
+    private function snapshotModulosConInvLegacy(int $instId, int $roleId, int $userId): array
+    {
+        $snap = ModulosInstitucion::getSnapshot($this->db, $instId);
+        if ($userId > 0 && ModulosInstitucion::esRolInvestigadorVisibilidadModulos($roleId)) {
+            $snap['invHasData'] = ModulosInstitucion::getInvestigatorLegacyDataFlags($this->db, $userId, $instId);
+        }
+
+        return $snap;
     }
 
     public function updateSecurity() {

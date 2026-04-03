@@ -4,9 +4,12 @@ namespace App\Controllers;
 use App\Models\InsumoFormulario\InsumoFormularioModel;
 use App\Models\Services\MailService; 
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 use PDO;
 
 class InsumoFormularioController {
+    use ModuloInstitucionGuardTrait;
+
     private $model;
     private $db; 
 
@@ -20,6 +23,7 @@ class InsumoFormularioController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloWithRequestInstOrExit($sesion, 'insumos', $_GET['inst'] ?? null);
             // 🚀 FIX: Usamos la institución que manda el Frontend (la elegida en el selector)
             $targetInst = $_GET['inst'] ?? $sesion['instId'];
 
@@ -45,7 +49,8 @@ class InsumoFormularioController {
             $input['userId'] = $sesion['userId']; // Seguridad
             
             // 🚀 FIX: Si viene instId en el POST lo usamos, sino el de sesión
-            $input['instId'] = !empty($input['instId']) ? $input['instId'] : $sesion['instId']; 
+            $input['instId'] = !empty($input['instId']) ? $input['instId'] : $sesion['instId'];
+            $this->enforceModuloInstOrExit($sesion, 'insumos', (int)$input['instId']);
             
             $res = $this->model->saveOrder($input);
             $idForm = is_array($res) ? ($res['id'] ?? null) : $res;

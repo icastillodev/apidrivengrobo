@@ -137,7 +137,7 @@ class MailService {
         return $this->executeSend($to, $subject, $body);
     }
 
-public function executeSend($to, $subject, $body) {
+public function executeSend($to, $subject, $body, $replyTo = null) {
         $mail = new PHPMailer(true);
         try {
             $mail->isSMTP();
@@ -172,6 +172,9 @@ public function executeSend($to, $subject, $body) {
             }
 
             $mail->setFrom($this->fromEmail ?: $this->user, $this->fromName ?: 'GROBO');
+            if ($replyTo !== null && $replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                $mail->addReplyTo($replyTo);
+            }
             $mail->addAddress($to);
             $mail->isHTML(true);
             $mail->Subject = $subject;
@@ -508,5 +511,125 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
         $body = $this->getTemplate($t['msg_int_title'], $mensajeCompleto, '', '', $instName, $lang);
 
         return $this->executeSend($to, $subject, $body);
+    }
+
+    public function getSupportMailTo(): string
+    {
+        $e = getenv('SUPPORT_MAIL_TO');
+        if ($e !== false && trim((string) $e) !== '') {
+            return trim((string) $e);
+        }
+
+        return 'soporte@appgrobo.com';
+    }
+
+    /** Correo comercial (consultas / presupuestos desde el panel). */
+    public function getSalesMailTo(): string
+    {
+        $e = getenv('SALES_MAIL_TO');
+        if ($e !== false && trim((string) $e) !== '') {
+            return trim((string) $e);
+        }
+
+        return 'ventas@groboapp.com';
+    }
+
+    /**
+     * Envía consulta de ventas al equipo comercial. Reply-To = correo del usuario.
+     *
+     * @param string $categoria ej. venta
+     */
+    public function sendSalesInquiryEmail(
+        string $mensajePlano,
+        string $userEmail,
+        string $userName,
+        string $userLogin,
+        string $instName,
+        string $categoria = 'venta'
+    ): bool {
+        $to = $this->getSalesMailTo();
+        $cat = htmlspecialchars($categoria, ENT_QUOTES, 'UTF-8');
+        $subject = '[GROBO · ' . $categoria . '] Consulta desde el panel';
+        $instHtml = $instName !== ''
+            ? '<p><b>Institución:</b> ' . htmlspecialchars($instName, ENT_QUOTES, 'UTF-8') . '</p>'
+            : '';
+        $msg = '<p><b>Categoría:</b> ' . $cat . '</p>'
+            . '<p><b>Usuario:</b> ' . htmlspecialchars($userName, ENT_QUOTES, 'UTF-8')
+            . ' · <code>' . htmlspecialchars($userLogin, ENT_QUOTES, 'UTF-8') . '</code></p>'
+            . '<p><b>Correo de contacto (responder a):</b> '
+            . htmlspecialchars($userEmail, ENT_QUOTES, 'UTF-8') . '</p>'
+            . $instHtml
+            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;margin-top:12px;">'
+            . nl2br(htmlspecialchars($mensajePlano, ENT_QUOTES, 'UTF-8')) . '</div>';
+
+        $body = $this->getTemplate('Consulta comercial GROBO', $msg, 'https://groboapp.com/', 'Ver GROBO en groboapp.com', $instName !== '' ? $instName : 'GROBO', 'es');
+
+        return $this->executeSend($to, $subject, $body, $userEmail);
+    }
+
+    /**
+     * Notifica a soporte Gecko: ticket nuevo o nueva respuesta del usuario.
+     */
+    public function sendSupportNotifyGecko(
+        int $ticketId,
+        string $asunto,
+        string $cuerpoPlano,
+        string $usuarioNombre,
+        string $usuarioLogin,
+        string $instName,
+        bool $esNuevo
+    ): bool {
+        $tipo = $esNuevo ? 'Nuevo ticket' : 'Respuesta del usuario';
+        $subject = "[GROBO #{$ticketId}] {$tipo}: " . mb_substr($asunto, 0, 120);
+        $instHtml = $instName !== '' ? '<p><b>Institución:</b> ' . htmlspecialchars($instName, ENT_QUOTES, 'UTF-8') . '</p>' : '';
+        $msg = '<p><b>' . htmlspecialchars($tipo, ENT_QUOTES, 'UTF-8') . '</b> · ID #' . (int) $ticketId . '</p>'
+            . '<p><b>Asunto:</b> ' . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8') . '</p>'
+            . '<p><b>Usuario:</b> ' . htmlspecialchars($usuarioNombre, ENT_QUOTES, 'UTF-8')
+            . ' · <code>' . htmlspecialchars($usuarioLogin, ENT_QUOTES, 'UTF-8') . '</code></p>'
+            . $instHtml
+            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;margin-top:12px;">'
+            . nl2br(htmlspecialchars($cuerpoPlano, ENT_QUOTES, 'UTF-8')) . '</div>';
+
+        $body = $this->getTemplate('Soporte GROBO', $msg, '', '', 'Gecko', 'es');
+
+        return $this->executeSend($this->getSupportMailTo(), $subject, $body);
+    }
+
+    /**
+     * Respuesta del equipo Gecko al correo del usuario que abrió el ticket.
+     */
+    public function sendSupportReplyToUser(
+        string $toEmail,
+        string $nombreUsuario,
+        int $ticketId,
+        string $asunto,
+        string $cuerpoPlano,
+        string $instName,
+        string $lang = 'es'
+    ): bool {
+        if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        $t = MailLang::get($lang);
+        $subject = ($t['support_user_reply_subject'] ?? 'Respuesta a su ticket') . " #{$ticketId}";
+        $hello = ($t['support_user_reply_hello'] ?? 'Hola') . ' <b>' . htmlspecialchars($nombreUsuario, ENT_QUOTES, 'UTF-8') . '</b>,<br><br>';
+        $intro = $t['support_user_reply_intro'] ?? 'El equipo de soporte respondió a su consulta.';
+        $asuntoLbl = $t['support_user_reply_ticket_subject'] ?? 'Asunto del ticket';
+        $msg = $hello . $intro . '<br><br>'
+            . '<p><b>' . htmlspecialchars($asuntoLbl, ENT_QUOTES, 'UTF-8') . ':</b> '
+            . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8') . '</p>'
+            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;">'
+            . nl2br(htmlspecialchars($cuerpoPlano, ENT_QUOTES, 'UTF-8')) . '</div>';
+
+        $body = $this->getTemplate(
+            $t['support_user_reply_title'] ?? 'Respuesta de soporte',
+            $msg,
+            '',
+            '',
+            $instName !== '' ? $instName : 'GROBO',
+            $lang
+        );
+
+        return $this->executeSend($toEmail, $subject, $body);
     }
 }
