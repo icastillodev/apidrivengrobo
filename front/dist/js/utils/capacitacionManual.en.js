@@ -435,17 +435,37 @@ export const CHAPTERS = {
       'Authorized configuration staff only; master data changes are high impact.',
     blocks: [
       {
+        id: 'intro',
+        cat: 'hub',
+        icon: 'gear-wide-connected',
+        h: 'Hub vs sub-pages',
+        html: '<p>This screen is the <strong>entry hub</strong>: you see a grid of cards; each card opens another URL with the specific form or table.</p><p>Do not confuse the <strong>card overview</strong> (this page) with the <strong>editable detail</strong> inside each module—there you will find fields, validation, tables, and sometimes pop-up confirmations.</p>',
+      },
+      {
         id: 'mapa',
+        cat: 'hub',
+        icon: 'diagram-3',
         h: 'Subsection map',
         html: '<ul class="mb-0"><li><strong>Institution / departments:</strong> identity and org structure.</li><li><strong>Species and categories:</strong> base for orders and housing.</li><li><strong>Reservations and spaces:</strong> rooms, equipment, usage rules.</li><li><strong>Form types / supplies:</strong> what each profile can request.</li><li><strong>Protocols:</strong> templates, states, or local validations.</li><li><strong>Housing:</strong> physical locations, associated fees if any.</li><li><strong>Users and roles:</strong> sometimes linked to global user management.</li></ul>',
       },
       {
         id: 'riesgos',
+        cat: 'forms',
+        icon: 'exclamation-triangle',
         h: 'Risks when changing parameters',
         html: '<p>A change to species or form types can invalidate drafts. Plan maintenance windows and warn key users.</p>',
       },
       {
+        id: 'modals',
+        cat: 'modals',
+        icon: 'window-stack',
+        h: 'Pop-ups and save',
+        html: '<dl class="manual-glossary mb-0"><dt><i class="bi bi-check2-circle text-success" aria-hidden="true"></i> Save / OK</dt><dd>On sub-pages commits changes to the server; wait for the success message before closing the tab.</dd><dt><i class="bi bi-x-circle text-success" aria-hidden="true"></i> Cancel</dt><dd>Drops unsaved edits on the current form.</dd><dt><i class="bi bi-exclamation-triangle text-success" aria-hidden="true"></i> SweetAlert / alert</dt><dd>Often validation errors, permission denied, or conflicts; read the text and fix before retrying.</dd><dt><i class="bi bi-layout-text-window-reverse text-success" aria-hidden="true"></i> Bootstrap modal</dt><dd>Some screens edit one record in an overlay without leaving the list; closing returns to the grid.</dd></dl>',
+      },
+      {
         id: 'documentar',
+        cat: 'content',
+        icon: 'journal-text',
         h: 'Good practice',
         html: '<p>Keep an external log (internal wiki) of “what each state means” and who authorized critical changes for audits.</p>',
       },

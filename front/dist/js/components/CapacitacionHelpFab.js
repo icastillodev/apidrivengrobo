@@ -1,5 +1,6 @@
 import { Auth } from '../auth.js';
 import { API } from '../api.js';
+import { syncCapUiPrefsToBackend } from '../utils/userCapUiPrefsBackend.js';
 import { filterMenuIdsByModulos, ensureInstModulesLoaded } from '../modulesAccess.js';
 import { pathnameToMenuPath, menuPathToSlug } from '../utils/capacitacionPaths.js';
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
@@ -27,6 +28,7 @@ export function isCapacitacionFabHidden() {
 export function setCapacitacionFabHidden(hidden) {
   if (hidden) localStorage.setItem(FAB_HIDDEN_KEY, '1');
   else localStorage.removeItem(FAB_HIDDEN_KEY);
+  syncCapUiPrefsToBackend();
 }
 
 function removeModalHelpStrip() {

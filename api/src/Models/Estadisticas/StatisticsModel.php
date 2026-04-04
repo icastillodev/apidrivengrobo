@@ -150,9 +150,11 @@ class StatisticsModel {
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
-            return ['madre_grupo' => 0, 'red' => '', 'NombreInst' => ''];
+            return ['madre_grupo' => 0, 'red' => '', 'NombreInst' => '', 'instituciones_en_red' => 0];
         }
         $row['madre_grupo'] = (int) $row['madre_grupo'];
+        $ids = $this->getInstitutionIdsInNetwork($instId);
+        $row['instituciones_en_red'] = count($ids);
         return $row;
     }
 
@@ -249,19 +251,19 @@ class StatisticsModel {
             }
         }
 
-        // 5. DETALLE ESPECIES (agregado red)
-        $sqlDetalle = "SELECT d.NombreDeptoA as departamento, e.EspeNombreA as especie, sb.SubEspeNombreA as subespecie, SUM(s.totalA) as cantidad_animales
-            FROM formularioe f JOIN sexoe s ON f.idformA = s.idformA JOIN formespe fe ON f.idformA = fe.idformA JOIN especiee e ON fe.idespA = e.idespA LEFT JOIN subespecie sb ON f.idsubespA = sb.idsubespA JOIN protformr pfr ON f.idformA = pfr.idformA JOIN protdeptor pdr ON pfr.idprotA = pdr.idprotA JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA
+        // 5. DETALLE ESPECIES (agregado red; departamento incluye sede para no colisionar nombres)
+        $sqlDetalle = "SELECT CONCAT(inst.NombreInst, ' – ', d.NombreDeptoA) as departamento, e.EspeNombreA as especie, sb.SubEspeNombreA as subespecie, SUM(s.totalA) as cantidad_animales
+            FROM formularioe f JOIN sexoe s ON f.idformA = s.idformA JOIN formespe fe ON f.idformA = fe.idformA JOIN especiee e ON fe.idespA = e.idespA LEFT JOIN subespecie sb ON f.idsubespA = sb.idsubespA JOIN protformr pfr ON f.idformA = pfr.idformA JOIN protdeptor pdr ON pfr.idprotA = pdr.idprotA JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA JOIN institucion inst ON inst.IdInstitucion = f.IdInstitucion
             WHERE f.IdInstitucion IN ($placeholders) AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ?
-            GROUP BY d.NombreDeptoA, e.EspeNombreA, sb.SubEspeNombreA ORDER BY d.NombreDeptoA, cantidad_animales DESC";
+            GROUP BY inst.NombreInst, d.NombreDeptoA, e.EspeNombreA, sb.SubEspeNombreA ORDER BY inst.NombreInst, d.NombreDeptoA, cantidad_animales DESC";
         $stmtDet = $this->db->prepare($sqlDetalle);
         $stmtDet->execute(array_merge($ids, [$from, $to]));
         $res['detalle_especies'] = $stmtDet->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 6. DETALLE PROTOCOLOS
-        $sqlProtUso = "SELECT DISTINCT d.NombreDeptoA as departamento, pe.nprotA, pe.tituloA, pe.FechaFinProtA
-            FROM formularioe f JOIN protformr pfr ON f.idformA = pfr.idformA JOIN protocoloexpe pe ON pfr.idprotA = pe.idprotA JOIN protdeptor pdr ON pe.idprotA = pdr.idprotA JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA
-            WHERE f.IdInstitucion IN ($placeholders) AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? ORDER BY d.NombreDeptoA, pe.nprotA";
+        // 6. DETALLE PROTOCOLOS (misma clave de departamento que por_departamento / detalle especies)
+        $sqlProtUso = "SELECT DISTINCT CONCAT(inst.NombreInst, ' – ', d.NombreDeptoA) as departamento, pe.nprotA, pe.tituloA, pe.FechaFinProtA
+            FROM formularioe f JOIN protformr pfr ON f.idformA = pfr.idformA JOIN protocoloexpe pe ON pfr.idprotA = pe.idprotA JOIN protdeptor pdr ON pe.idprotA = pdr.idprotA JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA JOIN institucion inst ON inst.IdInstitucion = pe.IdInstitucion
+            WHERE f.IdInstitucion IN ($placeholders) AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? ORDER BY inst.NombreInst, d.NombreDeptoA, pe.nprotA";
         $stmtP = $this->db->prepare($sqlProtUso);
         $stmtP->execute(array_merge($ids, [$from, $to]));
         $res['detalle_protocolos'] = $stmtP->fetchAll(\PDO::FETCH_ASSOC);

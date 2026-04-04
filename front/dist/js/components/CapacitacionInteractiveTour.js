@@ -215,10 +215,31 @@ function placeTooltip(tooltip, el) {
   tooltip.style.left = `${left}px`;
 }
 
+/** Ruta de menú de la pantalla donde se mostró el tour (evita otro auto-tutorial encima tras la bienvenida). */
+function resolveHostRouteKey(hostMenuPath) {
+  const h = String(hostMenuPath || '').trim();
+  if (h && h !== '__welcome__') return h;
+  return pathnameToMenuPath(window.location.pathname || '') || null;
+}
+
+/**
+ * Cierra el tour de bienvenida (5 pasos): no repetir bienvenida y dar por vista la ruta actual
+ * (p. ej. panel/dashboard) para que no arranque enseguida el tutorial específico de esa pantalla.
+ */
+function finishWelcomeTourPersist(hostMenuPath) {
+  markWelcomeTourDone();
+  try {
+    sessionStorage.setItem('gecko_skip_next_route_tour', '1');
+  } catch {
+    /* ignore */
+  }
+  const routeKey = resolveHostRouteKey(hostMenuPath);
+  if (routeKey) markRouteTourSeen(routeKey);
+}
+
 function applyTourEndState(menuPath, hostMenuPath) {
   if (menuPath === '__welcome__') {
-    markWelcomeTourDone();
-    sessionStorage.setItem('gecko_skip_next_route_tour', '1');
+    finishWelcomeTourPersist(hostMenuPath);
     return;
   }
   if (menuPath === '__modals__') return;
@@ -334,8 +355,7 @@ export function startCapacitacionInteractiveTour(menuPath, opts = {}) {
     const offAll = tooltip.querySelector('.gecko-tour-off-all');
     offThis?.addEventListener('click', () => {
       if (isWelcome) {
-        markWelcomeTourDone();
-        sessionStorage.setItem('gecko_skip_next_route_tour', '1');
+        finishWelcomeTourPersist(hostMenuPath);
       } else if (hostMenuPath) {
         markRouteTourSeen(hostMenuPath);
       }
@@ -343,7 +363,7 @@ export function startCapacitacionInteractiveTour(menuPath, opts = {}) {
     });
     offAll?.addEventListener('click', () => {
       setAutoToursGloballyDisabled(true);
-      if (isWelcome) markWelcomeTourDone();
+      if (isWelcome) finishWelcomeTourPersist(hostMenuPath);
       else if (hostMenuPath) markRouteTourSeen(hostMenuPath);
       finishTour(false);
     });

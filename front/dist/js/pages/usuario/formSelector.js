@@ -16,6 +16,11 @@ export async function initFormSelector() {
     const depTitle = document.getElementById('dependency-title');
     const searchInput = document.getElementById('inst-search');
 
+    if (depTitle) {
+        depTitle.textContent = '';
+        depTitle.classList.add('d-none');
+    }
+
     try {
         const res = await API.request(`/forms/selector?inst=${currentInstId}`);
         
@@ -23,12 +28,22 @@ export async function initFormSelector() {
             const { dependency_name, is_multi_sede, sedes } = res.data;
             allSedes = sedes; 
 
+            if (depTitle) {
+                if (is_multi_sede) {
+                    depTitle.textContent = `${(window.txt?.centro_solicitudes?.red) || 'RED:'} ${dependency_name || (window.txt?.centro_solicitudes?.grupo_inst || 'GRUPO INSTITUCIONAL')}`;
+                    depTitle.classList.remove('d-none');
+                } else if (sedes.length > 0) {
+                    depTitle.textContent = sedes[0].NombreCompletoInst;
+                    depTitle.classList.remove('d-none');
+                } else {
+                    depTitle.classList.add('d-none');
+                }
+            }
+
             if (is_multi_sede) {
-                depTitle.innerText = `${(window.txt?.centro_solicitudes?.red) || 'RED:'} ${dependency_name || (window.txt?.centro_solicitudes?.grupo_inst || 'GRUPO INSTITUCIONAL')}`;
-                if(searchInput) searchInput.parentElement.parentElement.classList.remove('d-none');
+                if (searchInput) searchInput.parentElement.parentElement.classList.remove('d-none');
             } else {
-                if(sedes.length > 0) depTitle.innerText = sedes[0].NombreCompletoInst;
-                if(searchInput) searchInput.parentElement.parentElement.classList.add('d-none');
+                if (searchInput) searchInput.parentElement.parentElement.classList.add('d-none');
             }
 
             renderSedesList(allSedes, is_multi_sede);
@@ -61,35 +76,41 @@ function renderSedesList(sedes, isMulti) {
         return;
     }
 
-    sedes.forEach(sede => {
+    sedes.forEach((sede, idx) => {
         const isCurrent = (sede.IdInstitucion == currentInstId);
-        const headerClass = isCurrent ? "bg-success text-white" : "bg-white text-success border border-success";
-        const iconColor = isCurrent ? "text-white" : "text-success";
+        const isLast = idx === sedes.length - 1;
         const t = window.txt?.centro_solicitudes;
         const labelText = isCurrent ? (t?.tu_sede_actual || "(TU SEDE ACTUAL)") : "";
 
         if (isMulti) {
             html += `
-            <div class="col-12 mt-4 mb-2 fade-in">
-                <div class="d-flex align-items-center border-bottom border-2 border-success border-opacity-25 pb-3 pt-1">
-                    <div class="${headerClass} rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm flex-shrink-0" 
-                         style="width: 48px; height: 48px; font-weight: 900; font-size: 22px;">
-                        <i class="bi bi-building ${iconColor}"></i>
+            <div class="col-12 mt-4 mb-0 fade-in gecko-sede-block" data-gecko-current="${isCurrent}">
+                <div class="d-flex align-items-stretch gecko-sede-row">
+                    <div class="gecko-sede-rail d-flex flex-column align-items-center flex-shrink-0 me-3" aria-hidden="true">
+                        <span class="gecko-sede-dot ${isCurrent ? 'gecko-sede-dot--current' : ''}"></span>
+                        <span class="gecko-sede-line ${isLast ? 'd-none' : ''}"></span>
                     </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <h5 class="fw-bold mb-1 text-dark institution-name-selector" style="font-size: 1.1rem; line-height: 1.3;">
-                            ${sede.NombreCompletoInst} 
-                            ${labelText ? `<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle ms-2 align-middle" style="font-size: 0.65rem;">${labelText}</span>` : ''}
-                        </h5>
-                        <span class="text-success fw-semibold text-uppercase d-inline-block mt-0" style="font-size: 0.8rem; letter-spacing: 0.5px;">
-                            ${sede.NombreInst}
-                        </span>
+                    <div class="flex-grow-1 min-w-0 pt-0 pb-1">
+                        <div class="d-flex flex-wrap align-items-baseline gap-2 gap-md-3 mb-1">
+                            <h3 class="h5 fw-bold mb-0 text-dark institution-name-selector">${sede.NombreCompletoInst}</h3>
+                            ${labelText ? `<span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle align-middle" style="font-size: 0.65rem;">${labelText}</span>` : ''}
+                        </div>
+                        <p class="mb-0 small text-success fw-semibold text-uppercase gecko-sede-code" style="letter-spacing: 0.12em;">${sede.NombreInst}</p>
                     </div>
                 </div>
             </div>`;
         }
 
         html += renderActionButtons(sede);
+
+        if (isMulti && !isLast) {
+            html += `
+            <div class="col-12 gecko-sede-separator" aria-hidden="true">
+                <div class="gecko-sede-separator__wing" aria-hidden="true"></div>
+                <span class="gecko-sede-separator__core" aria-hidden="true"></span>
+                <div class="gecko-sede-separator__wing gecko-sede-separator__wing--flip" aria-hidden="true"></div>
+            </div>`;
+        }
     });
 
     container.innerHTML = html;
@@ -181,7 +202,7 @@ function renderActionButtons(sede) {
         buttonsHtml = `<div class="col-12 text-center text-muted small italic py-2">${t?.sin_formularios || 'Sin formularios habilitados para tu nivel de acceso.'}</div>`;
     }
 
-    return `<div class="row g-3 justify-content-start w-100 mb-3 px-3">${buttonsHtml}</div>`;
+    return `<div class="row g-3 justify-content-start w-100 mb-4 px-2 px-md-3 gecko-tramites-row">${buttonsHtml}</div>`;
 }
 
 function createCard(title, iconClass, bgClass, modulePath, targetId) {

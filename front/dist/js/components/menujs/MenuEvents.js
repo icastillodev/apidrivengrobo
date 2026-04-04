@@ -74,6 +74,17 @@ function handleSwipe() {
         // 🚀 ESCUDO CONTRA EL ERROR DE CONSOLA (Si tocas el scroll o un nodo de texto)
         if (!e.target || typeof e.target.closest !== 'function') return;
 
+        const langPick = e.target.closest('.gecko-lang-pick');
+        if (langPick) {
+            e.preventDefault();
+            e.stopPropagation();
+            const code = langPick.getAttribute('data-gecko-lang');
+            if (code && typeof window.setAppLang === 'function') {
+                window.setAppLang(code);
+            }
+            return;
+        }
+
         if (sidebar && sidebar.classList.contains('open')) {
             if (!sidebar.contains(e.target) && 
                (!toggleSide || !toggleSide.contains(e.target)) && 

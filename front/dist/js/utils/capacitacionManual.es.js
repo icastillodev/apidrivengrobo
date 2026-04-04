@@ -437,17 +437,37 @@ export const CHAPTERS = {
       'Solo personal de configuración autorizado; cambios masivos en datos maestros.',
     blocks: [
       {
+        id: 'intro',
+        cat: 'hub',
+        icon: 'gear-wide-connected',
+        h: 'Hub frente a subpantallas',
+        html: '<p>Esta pantalla es el <strong>centro de accesos</strong>: verá una cuadrícula de tarjetas; al pulsar una navega a otra URL con el formulario o tabla concreta.</p><p>No confunda el <strong>listado de tarjetas</strong> (esta página) con el <strong>detalle editable</strong> de cada módulo: allí están campos, validaciones, tablas y a veces confirmaciones en ventana emergente.</p>',
+      },
+      {
         id: 'mapa',
+        cat: 'hub',
+        icon: 'diagram-3',
         h: 'Mapa de subsecciones',
         html: '<ul class="mb-0"><li><strong>Institución / departamentos:</strong> datos identitarios y estructura organizativa.</li><li><strong>Especies y categorías:</strong> base para pedidos y alojamientos.</li><li><strong>Reservas y espacios:</strong> salas, equipos, reglas de uso.</li><li><strong>Tipos de formulario / insumos:</strong> qué puede pedir cada perfil.</li><li><strong>Protocolos:</strong> plantillas, estados o validaciones locales.</li><li><strong>Alojamientos:</strong> ubicaciones físicas, tarifas asociadas si aplica.</li><li><strong>Usuarios y roles:</strong> a veces enlazado con la gestión global de usuarios.</li></ul>',
       },
       {
         id: 'riesgos',
+        cat: 'forms',
+        icon: 'exclamation-triangle',
         h: 'Riesgos al cambiar parámetros',
         html: '<p>Un cambio en especie o en tipo de formulario puede invalidar pedidos en borrador. Planifique ventanas de mantenimiento y avise a usuarios clave.</p>',
       },
       {
+        id: 'modals',
+        cat: 'modals',
+        icon: 'window-stack',
+        h: 'Ventanas emergentes y guardado',
+        html: '<dl class="manual-glossary mb-0"><dt><i class="bi bi-check2-circle text-success" aria-hidden="true"></i> Guardar / Aceptar</dt><dd>En subpantallas confirma cambios en servidor; espere el mensaje de éxito antes de cerrar el navegador.</dd><dt><i class="bi bi-x-circle text-success" aria-hidden="true"></i> Cancelar</dt><dd>Descarta cambios no guardados en el formulario actual.</dd><dt><i class="bi bi-exclamation-triangle text-success" aria-hidden="true"></i> SweetAlert / aviso</dt><dd>Suele indicar error de validación, permiso denegado o conflicto; lea el texto y corrija antes de reintentar.</dd><dt><i class="bi bi-layout-text-window-reverse text-success" aria-hidden="true"></i> Modal Bootstrap</dt><dd>En algunas pantallas edita un ítem en una capa sin salir de la lista; al cerrar vuelve a la grilla.</dd></dl>',
+      },
+      {
         id: 'documentar',
+        cat: 'content',
+        icon: 'journal-text',
         h: 'Buena práctica',
         html: '<p>Mantenga un registro externo (wiki interna) de “qué significa cada estado” y “quién autorizó” cambios críticos para auditorías.</p>',
       },

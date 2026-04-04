@@ -1,6 +1,10 @@
 import { API } from './api.js?v1';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
 import { setInstModulesSnapshot } from './modulesAccess.js';
+import {
+    snapshotGroboPersistentUiPrefs,
+    restoreGroboPersistentUiPrefs,
+} from './utils/groboPersistentUiPrefs.js';
 
 const SESSION_KEYS = [
     'token', 
@@ -316,11 +320,13 @@ async init() {
 
         const savedLang = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
         const savedLogo = localStorage.getItem('instLogo') || '';
+        const uiPrefsSnap = snapshotGroboPersistentUiPrefs();
 
         localStorage.clear();
         sessionStorage.clear();
         this.clearAllCookies();
         if (savedLogo) localStorage.setItem('instLogo', savedLogo);
+        restoreGroboPersistentUiPrefs(uiPrefsSnap);
 
         const sessionData = {
             token: res.token,
@@ -479,10 +485,12 @@ autoRedirectIfLogged(role) {
             if (!slug || slug === 'null' || slug === 'undefined') slug = 'urbe';
         }
         
+        const uiPrefsSnap = snapshotGroboPersistentUiPrefs();
         localStorage.clear();
         sessionStorage.clear();
         this.clearAllCookies();
-        
+        restoreGroboPersistentUiPrefs(uiPrefsSnap);
+
         this.redirectToLogin(slug);
     },
 

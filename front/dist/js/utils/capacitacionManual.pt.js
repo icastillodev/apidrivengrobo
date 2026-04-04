@@ -435,17 +435,37 @@ export const CHAPTERS = {
       'Apenas pessoal de configuração autorizado; alterações em dados mestres são de alto impacto.',
     blocks: [
       {
+        id: 'intro',
+        cat: 'hub',
+        icon: 'gear-wide-connected',
+        h: 'Hub vs subpáginas',
+        html: '<p>Este ecrã é o <strong>centro de acessos</strong>: vê uma grelha de cartões; cada um abre outro URL com o formulário ou tabela específica.</p><p>Não confunda a <strong>lista de cartões</strong> (esta página) com o <strong>detalhe editável</strong> de cada módulo: aí estão campos, validações, tabelas e por vezes confirmações em janela.</p>',
+      },
+      {
         id: 'mapa',
+        cat: 'hub',
+        icon: 'diagram-3',
         h: 'Mapa de subsecções',
         html: '<ul class="mb-0"><li><strong>Instituição / departamentos:</strong> identidade e estrutura.</li><li><strong>Espécies e categorias:</strong> base para pedidos e alojamentos.</li><li><strong>Reservas e espaços:</strong> salas, equipamentos, regras.</li><li><strong>Tipos de formulário / insumos:</strong> o que cada perfil pode pedir.</li><li><strong>Protocolos:</strong> modelos, estados ou validações locais.</li><li><strong>Alojamentos:</strong> localizações físicas, tarifas se aplicável.</li><li><strong>Utilizadores e perfis:</strong> por vezes ligado à gestão global.</li></ul>',
       },
       {
         id: 'riesgos',
+        cat: 'forms',
+        icon: 'exclamation-triangle',
         h: 'Riscos ao alterar parâmetros',
         html: '<p>Uma mudança em espécie ou tipo de formulário pode invalidar rascunhos. Planeie janelas de manutenção e avise utilizadores-chave.</p>',
       },
       {
+        id: 'modals',
+        cat: 'modals',
+        icon: 'window-stack',
+        h: 'Janelas e gravação',
+        html: '<dl class="manual-glossary mb-0"><dt><i class="bi bi-check2-circle text-success" aria-hidden="true"></i> Guardar / Aceitar</dt><dd>Nas subpáginas confirma alterações no servidor; espere a mensagem de sucesso antes de fechar o separador.</dd><dt><i class="bi bi-x-circle text-success" aria-hidden="true"></i> Cancelar</dt><dd>Descarta alterações não gravadas no formulário atual.</dd><dt><i class="bi bi-exclamation-triangle text-success" aria-hidden="true"></i> SweetAlert / aviso</dt><dd>Por vezes erro de validação, permissão negada ou conflito; leia o texto e corrija antes de repetir.</dd><dt><i class="bi bi-layout-text-window-reverse text-success" aria-hidden="true"></i> Modal Bootstrap</dt><dd>Em alguns ecrãs edita um registo numa camada sem sair da lista; ao fechar volta à grelha.</dd></dl>',
+      },
+      {
         id: 'documentar',
+        cat: 'content',
+        icon: 'journal-text',
         h: 'Boa prática',
         html: '<p>Mantenha registo externo (wiki interna) do significado de cada estado e de quem autorizou mudanças críticas para auditorias.</p>',
       },

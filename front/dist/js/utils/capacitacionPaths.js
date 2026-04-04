@@ -43,6 +43,19 @@ export function pathnameToMenuPath(pathname) {
     return 'panel/perfil';
   }
 
+  /** Misma página `panel/capacitacion`: el hash distingue el tema RED para tour y barra contextual. */
+  if (/^panel\/capacitacion$/i.test(rel) && typeof window !== 'undefined' && window.location?.hash) {
+    const hm = window.location.hash.match(/[#&]t=([^&]+)/);
+    if (hm) {
+      try {
+        const slug = decodeURIComponent(hm[1].replace(/\+/g, ' ')).trim();
+        if (slug === 'capacitacion__tema__red') return 'capacitacion/tema/red';
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   return rel;
 }
 

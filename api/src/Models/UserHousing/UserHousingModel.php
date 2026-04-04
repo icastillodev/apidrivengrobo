@@ -91,6 +91,7 @@ class UserHousingModel {
 
         $header = [
             'IdHistoria' => $historiaId,
+            'IdInstitucion' => (int)($first['IdInstitucion'] ?? 0),
             'Investigador' => $first['Investigador'],
             'Protocolo' => $first['nprotA'],
             'Especie' => $first['EspecieNombre'], // Usamos el nombre traído

@@ -3,6 +3,10 @@
 import { store } from './store.js';
 import { fetchSpeciesDetails } from './api_service.js';
 import { API } from '../../../api.js';
+import {
+    isInvestigatorRole,
+    buildMensajesNuevoFromContext,
+} from '../../../utils/investigatorMensajesLink.js';
 
 function getProtocolById(id) {
     const tabs = ['my', 'local', 'network'];
@@ -374,6 +378,33 @@ export async function viewProtocol(id) {
 
     const deptoDisplay = getDeptoDisplay(p);
 
+    const mp = window.txt?.misprotocolos || {};
+    const instProtId = parseInt(p.IdInstitucion || '0', 10);
+    const mailProt = p.ProtocoloInstCorreo || '';
+    const telProt = p.ProtocoloInstContacto || '';
+    let contactSedeHtml = '';
+    if (isInvestigatorRole() && instProtId > 0) {
+        const asuntoPref = `${mp.contacto_msg_asunto_prot || 'Consulta protocolo GROBO'} #${p.nprotA || p.idprotA}`;
+        const hrefMsg = buildMensajesNuevoFromContext({
+            instId: instProtId,
+            asunto: asuntoPref,
+            origenTipo: 'manual',
+        });
+        const mailtoSubj = encodeURIComponent(mp.contacto_mail_asunto || 'Consulta protocolo GROBO');
+        const mailSafe = String(mailProt).replace(/"/g, '').replace(/</g, '');
+        contactSedeHtml = `
+            <div class="col-12">
+                <div class="p-3 bg-light rounded border border-success border-opacity-25">
+                    <h6 class="fw-bold text-success small text-uppercase mb-3">${mp.contacto_sede_titulo || 'Contacto con la sede del protocolo'}</h6>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        ${mailProt ? `<a href="mailto:${mailSafe}?subject=${mailtoSubj}" class="btn btn-outline-primary btn-sm fw-bold"><i class="bi bi-envelope-at me-1"></i>${mailSafe.replace(/</g, '&lt;')}</a>` : ''}
+                        ${hrefMsg ? `<a href="${hrefMsg}" class="btn btn-success btn-sm fw-bold"><i class="bi bi-chat-dots me-1"></i>${mp.btn_enviar_mensaje_app || 'Enviar mensaje (app)'}</a>` : ''}
+                    </div>
+                    ${telProt ? `<p class="small text-muted mb-0 mt-2"><i class="bi bi-telephone me-1"></i>${String(telProt).replace(/</g, '&lt;')}</p>` : ''}
+                </div>
+            </div>`;
+    }
+
     // Badge de estado coherente con la grilla
     let estadoBadge = '';
     if (p.Aprobado == 1) {
@@ -462,6 +493,7 @@ export async function viewProtocol(id) {
                 <label class="small text-muted fw-bold d-block mb-2">ESPECIES AUTORIZADAS</label>
                 ${especiesHtml}
             </div>
+            ${contactSedeHtml}
         </div>
     `;
 }

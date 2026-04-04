@@ -109,6 +109,17 @@ export const pt = {
         portal_sort_titulo_desc: "Título (Z → A)",
         portal_leer_mas: "Ler mais",
         admin_titulo: "Administração de notícias",
+        admin_btn_ayuda: "Ajuda",
+        admin_page_help_titulo: "Guia — Notícias (administração)",
+        admin_page_help_s1_title: "1. O que é este ecrã",
+        admin_page_help_s1_text:
+            "Lista as notícias da sua instituição para criar, editar ou eliminar; controla se aparecem no portal local e no separador Rede.",
+        admin_page_help_s2_title: "2. Nova notícia e modal",
+        admin_page_help_s2_text:
+            "«Nova notícia» abre o formulário: título, categoria, corpo, estado (rascunho/publicada/agendada) e âmbito em rede quando aplicável.",
+        admin_page_help_s3_title: "3. Tabela e ações",
+        admin_page_help_s3_text:
+            "Cada linha mostra data, título, visibilidade na rede e estado; use Editar ou Eliminar conforme permissões.",
         admin_nueva: "Nova notícia",
         admin_editar: "Editar",
         admin_eliminar: "Excluir",
@@ -946,6 +957,17 @@ alojamientos: {
         bread_admin: "Admin",
         centro_liquidacion: "Centro de Liquidação e Cobranças",
         subtitulo: "Selecione o método de processamento para os boletos de pagamento",
+        btn_ayuda: "Ajuda",
+        help_titulo: "Guia — Centro de faturamento",
+        help_s1_title: "1. O que é este ecrã",
+        help_s1_text:
+            "Ponto de entrada para abrir relatórios e liquidações por departamento, organização, pessoa, protocolo ou instituição (rede) conforme o que a sua sede mostra.",
+        help_s2_title: "2. Como continuar",
+        help_s2_text:
+            "Clique num cartão para ir à subpágina correspondente; aí verá tabelas, filtros e exportações conforme o módulo.",
+        help_s3_title: "3. Instituição e rede",
+        help_s3_text:
+            "O cartão «Por instituição» só aparece se a sede tiver fluxos derivados em rede; as outras rotas costumam estar disponíveis para perfis contabilísticos.",
         por_depto: "Por Departamento",
         desc_depto: "Liquidação em massa agrupada por Faculdades ou Unidades Acadêmicas. Ideal para relatórios institucionais.",
         por_investigador: "Por Pessoa",
@@ -1326,9 +1348,9 @@ alojamientos: {
         btn_ayuda: "Ajuda",
         help_titulo: "Guia — Centro de solicitações",
         help_s1_title: "1. Contexto e instituição",
-        help_s1_text: "A linha sob o título indica se está na sua sede, na rede ou noutro contexto habilitado. Aguarde o carregamento dos cartões.",
+        help_s1_text: "Depois de carregar, por baixo do título verá se trabalha na sua sede ou em contexto de rede. Com várias instituições, use a pesquisa.",
         help_s2_title: "2. Escolher o trâmite",
-        help_s2_text: "Cada bloco agrupa a instituição e os botões de pedido (animais, reagentes, insumos, reservas…) conforme a contratação.",
+        help_s2_text: "Cada sede aparece como um marco na lista (ponto e linha que liga); abaixo ficam os cartões de cada trâmite ativo.",
         help_s3_title: "3. Sem opções visíveis",
         help_s3_text: "Se não vir formulários, o seu papel ou a configuração da sede podem limitar o catálogo. Fale com a administração do biotério."
     },
@@ -1604,6 +1626,8 @@ alojamientos: {
         contacto_modal_todas: "Contato — instituições",
         contacto_modal_una: "Instituição",
         contacto_mail_asunto: "Consulta pedido GROBO",
+        contacto_msg_asunto_prefill: "Consulta pedido GROBO",
+        btn_enviar_mensaje_app: "Enviar mensagem (app)",
         contacto_sin_correo: "Sem e-mail",
         contacto_tel_lbl: "Telefone / Contato",
         contacto_no_tel: "Não disponível",
@@ -1708,7 +1732,11 @@ alojamientos: {
         red_enviado_msg: "Solicitação enviada para a rede.",
         red_faltan_envios_title: "Envio para a rede pendente",
         red_faltan_envios_msg: "Ainda há instituições da rede que não receberam a solicitação.",
-        red_btn_enviar_desde_detalle: "Enviar para a rede"
+        red_btn_enviar_desde_detalle: "Enviar para a rede",
+        contacto_sede_titulo: "Contato com a sede do protocolo",
+        contacto_mail_asunto: "Consulta protocolo GROBO",
+        contacto_msg_asunto_prot: "Consulta protocolo GROBO",
+        btn_enviar_mensaje_app: "Enviar mensagem (app)"
     },
     misalojamientos: {
         titulo: "MEUS ALOJAMENTOS",
@@ -1736,6 +1764,8 @@ alojamientos: {
         buscando_historia: "Buscando história...",
         pdf_ficha: "PDF FICHA",
         contactar_sede: "CONTATAR SEDE",
+        btn_enviar_mensaje_app: "Enviar mensagem (app)",
+        contacto_msg_asunto_aloj: "Consulta alojamento GROBO",
         label_historia: "HISTÓRIA",
         label_protocolo: "PROTOCOLO",
         label_especie_tipo: "ESPÉCIE / TIPO",
@@ -2202,7 +2232,22 @@ alojamientos: {
         red_hasta: "Até",
         red_btn_cargar: "Carregar",
         red_export_pdf: "Exportar PDF",
-        red_export_excel: "Exportar Excel"
+        red_export_excel: "Exportar Excel",
+        tab_sede: "Esta sede",
+        tab_red: "Rede institucional",
+        red_tab_hint: "O separador Rede consolida formulários (animais, reagentes, insumos), protocolos ativos, alojamentos e rastreabilidade de todas as sedes com o mesmo código de rede.",
+        filtros_visuales_red: "Filtros (vista rede)",
+        red_sin_datos: "Carregue primeiro as estatísticas da rede (separador Rede) antes de exportar.",
+        red_pdf_title: "Exportar PDF (rede)",
+        red_pdf_text: "Incluir os gráficos da rede no PDF? (pode demorar um pouco mais)",
+        red_pdf_con_graf: "Sim, com gráficos",
+        red_pdf_solo_tablas: "Só tabelas",
+        red_pdf_doc_title: "RELATÓRIO ESTATÍSTICO — REDE — GROBO",
+        red_pdf_fecha: "Data",
+        red_pdf_graf_depto: "Gráfico por departamento (rede)",
+        red_pdf_graf_esp: "Uso de espécies (rede)",
+        red_pdf_tab_depto: "Detalhe por departamento (rede)",
+        red_pdf_tab_esp: "Detalhe de espécies (rede)"
     },
     admin_historialcontable: {
         bread_grobo: "GROBO",
@@ -2231,14 +2276,36 @@ alojamientos: {
         col_investigador: "Investigador (Afetado)",
         col_tipo_operacion: "Tipo Operação",
         col_ref_pedido: "Ref. Pedido",
-        col_monto: "Valor ($)"
+        col_monto: "Valor ($)",
+        btn_ayuda: "Ajuda",
+        help_titulo: "Guia — Histórico contabilístico",
+        help_s1_title: "1. O que é este ecrã",
+        help_s1_text:
+            "Registo de movimentos contabilísticos (cargas, liquidações, pagamentos, devoluções) para auditoria e reconciliação.",
+        help_s2_title: "2. Filtros e pesquisa",
+        help_s2_text:
+            "Escolha o tipo de operação, o campo e o texto; use Buscar para atualizar a grelha. Exporte para Excel quando precisar de trabalhar fora do sistema.",
+        help_s3_title: "3. Tabela e paginação",
+        help_s3_text:
+            "Cada linha resume um movimento; use a paginação inferior para percorrer lotes grandes.",
     },
     admin_config: {
         bread_grobo: "GROBO",
         bread_admin: "Admin",
         bread_panel: "Painel de Configuração",
         titulo: "CENTRO DE CONFIGURA�?�fO",
-        subtitulo: "Gerir os parâmetros globais de"
+        subtitulo: "Gerir os parâmetros globais de",
+        btn_ayuda: "Ajuda",
+        help_titulo: "Guia — Centro de configuração",
+        help_s1_title: "1. O que é este ecrã",
+        help_s1_text:
+            "Ponto de entrada com cartões para cada módulo de parâmetros da sede; não é o formulário de edição em si.",
+        help_s2_title: "2. Como continuar",
+        help_s2_text:
+            "Toque num cartão para abrir a subpágina correspondente; aí grava alterações e vê validações ou avisos.",
+        help_s3_title: "3. Impacto e ajuda",
+        help_s3_text:
+            "Os ajustes podem afetar todos os utilizadores. Use o manual de capacitação e a barra de ajuda para o tour guiado desta vista.",
     },
     config_institucion: {
         bread_gestion: "Configuração da Instituição",
@@ -3670,6 +3737,63 @@ alojamientos: {
         tour_misreservas_s4_title: "Confirmar reserva",
         tour_misreservas_s4_body:
             "{{i:clock-history}} Após dia e franja, preencha instrumentos ou motivo se pedido e {{i:arrow-repeat}} repetição se existir.\n\n{{i:hand-thumbs-up}} Reservar/Confirmar só activa com obrigatórios válidos e sem conflito.\n\n{{svg:click}} Envie e espere sucesso; leia erro para sobreposição ou horário.",
+        tour_config_s1_title: "Onde está no GROBO",
+        tour_config_s1_body:
+            "Confirme que está na administração e no painel de configuração antes de alterar parâmetros globais da sede.\n\n{{i:signpost-split}} `nav[aria-label=\"breadcrumb\"]`: migas (GROBO → Admin → painel de configuração).\n\n- Verifique instituição ou sede ativa na barra ou menu se aparecer.\n- O passo seguinte destaca o título e o nome da instituição.",
+        tour_config_s2_title: "Título e instituição",
+        tour_config_s2_body:
+            "Veja para que sede está a configurar e que esta página é só o hub de acessos.\n\n{{i:type-h1}} Cabeçalho `.config-hub-header`: título do centro e nome da instituição (`#lbl-inst-name`).\n\n- {{i:question-circle}} Botão Ajuda: modal local + manual e tour pelo menu / barra inferior.\n- Não edita dados aqui: só escolhe o módulo na grelha.",
+        tour_config_s3_title: "Grelha de módulos",
+        tour_config_s3_body:
+            "Escolha a área a configurar (instituição, espécies, reservas, perfis, etc.) conforme contrato e permissões.\n\n{{i:grid-3x3-gap}} `#config-grid`: cartões clicáveis para cada subpágina.\n\n{{svg:click}} Cada cartão abre formulários ou tabelas próprios; use Guardar aí e leia avisos.\n\n{{i:book}} Capacitação (`#t=admin__configuracion__config`) explica hub, riscos e janelas habituais.",
+        tour_fact_index_s1_title: "Faturamento no menu",
+        tour_fact_index_s1_body:
+            "Confirme o contexto de administração e o módulo contabilístico antes de abrir um relatório de liquidação.\n\n{{i:signpost-split}} Migalhas: GROBO → Admin → Faturamento.\n\n- Se faltar o menu contabilístico, verifique o perfil e os módulos contratados.",
+        tour_fact_index_s2_title: "Centro de liquidação",
+        tour_fact_index_s2_body:
+            "Título e subtítulo explicam o objetivo: escolher o critério de agrupamento do relatório (depto, organização, pessoa, protocolo…).\n\n{{i:type-h1}} Cabeçalho do hub: a mesma página para todos os cartões; o detalhe está em cada sub-rota.",
+        tour_fact_index_s3_title: "Cartões de acesso",
+        tour_fact_index_s3_body:
+            "Cada bloco abre uma vista distinta com tabelas e ações próprias (PDF, filtros, pagamentos, etc.).\n\n{{i:grid-3x3-gap}} `#billing-hub-grid`: um cartão por modalidade.\n\n{{svg:click}} Clique no bloco desejado; aguarde o carregamento da subpágina.",
+        tour_fact_index_s4_title: "Escolher a vista certa",
+        tour_fact_index_s4_body:
+            "Exemplo de cartão de acesso: o ícone e o título indicam o critério (depto, org, investigador, protocolo…).\n\n{{i:building}} «Por instituição» só se a sede opera com derivações em rede.\n\n{{i:book}} O manual `admin__facturacion__index` resume o fluxo com preços e histórico contabilístico.",
+        tour_hist_cont_s1_title: "Onde fica o histórico",
+        tour_hist_cont_s1_body:
+            "Auditoria de movimentos financeiros ligados a pedidos e operações do biotério.\n\n{{i:signpost-split}} Migalhas com instituição e perfil.\n\n- Só pessoal autorizado deve exportar ou interpretar saldos.",
+        tour_hist_cont_s2_title: "Título do relatório",
+        tour_hist_cont_s2_body:
+            "«Auditoria financeira e pagamentos» concentra a lista filtrável de movimentos.\n\n{{i:clipboard-data}} Use este ecrã para rastrear quem registou o quê e quando.",
+        tour_hist_cont_s3_title: "Filtros, pesquisa e Excel",
+        tour_hist_cont_s3_body:
+            "Ajuste tipo de operação, campo de pesquisa e texto; confirme com Buscar.\n\n{{i:funnel}} A mesma faixa inclui {{i:file-earmark-excel}} exportação para Excel para análise externa.\n\n{{svg:click}} Verifique se a grelha se atualiza após cada pesquisa.",
+        tour_hist_cont_s4_title: "Grelha de movimentos",
+        tour_hist_cont_s4_body:
+            "Colunas: ID, datas, intervenientes, tipo, referência e montantes.\n\n{{i:table}} `#table-body-historial`: linhas paginadas no rodapé.\n\n{{i:book}} Reconcilie com faturamento e preços conforme o processo da sede.",
+        tour_admin_noticias_s1_title: "Administração de notícias",
+        tour_admin_noticias_s1_body:
+            "Publicar e manter avisos que investigadores e pessoal veem no portal de notícias.\n\n{{i:journal-richtext}} Cabeçalho com título da página e acesso à ajuda.",
+        tour_admin_noticias_s2_title: "Nova notícia",
+        tour_admin_noticias_s2_body:
+            "Abre o modal de edição: título, categoria, corpo, estado e opções de rede.\n\n{{i:plus-lg}} `#btn-nueva-noticia`\n\n- Guarde como rascunho até validar texto e âmbito.",
+        tour_admin_noticias_s3_title: "Listagem publicada",
+        tour_admin_noticias_s3_body:
+            "Revise data, título, se está na rede e o estado de publicação.\n\n{{i:list-ul}} Tabela responsiva com ações por linha.\n\n{{svg:click}} Editar reabre o mesmo formulário com dados carregados.",
+        tour_admin_noticias_s4_title: "Paginação",
+        tour_admin_noticias_s4_body:
+            "Navegue listas longas sem perder o contexto do filtro atual.\n\n{{i:chevron-left}} {{i:chevron-right}} Botões anterior/seguinte.\n\n{{i:book}} O portal de leitura (`panel/noticias`) mostra o resultado publicado.",
+        tour_cap_red_s1_title: "Manual e tema Rede",
+        tour_cap_red_s1_body:
+            "Está a ler o capítulo transversal sobre **rede multi-sede**: mensagens, derivações e faturamento cruzado quando a instituição o utiliza.\n\n{{i:diagram-3}} O conteúdo aplica-se a vários perfis; verifique sempre que rotas tem no menu real.",
+        tour_cap_red_s2_title: "Lista de temas",
+        tour_cap_red_s2_body:
+            "O item Rede aparece quando o perfil e os módulos o permitem; outros temas filtram-se pelo menu contratado.\n\n{{i:list}} `#cap-list`: clique noutro tema para mudar o documento sem sair de Capacitação.",
+        tour_cap_red_s3_title: "Conteúdo do capítulo",
+        tour_cap_red_s3_body:
+            "Resumo, âmbito por perfil e acordeões com detalhe operacional.\n\n{{i:book}} `#cap-content-region`\n\n- Use `#t=capacitacion__tema__red` para partilhar esta vista.",
+        tour_cap_red_s4_title: "Preferências e tour da biblioteca",
+        tour_cap_red_s4_body:
+            "Reative a barra inferior de ajuda se a ocultou e execute o tutorial genérico da biblioteca quando quiser.\n\n{{i:lightning-charge}} Cartão inferior: interruptor da barra + tutorial da página do manual.\n\n{{i:journal-richtext}} Noutros pontos do painel, a barra contextual liga aqui com o slug adequado.",
         nav_library: "Temas do manual por secção do menu",
         main_landmark: "Manual de capacitação e biblioteca de temas",
         hash_unavailable_title: "Ligação indisponível para o seu perfil",

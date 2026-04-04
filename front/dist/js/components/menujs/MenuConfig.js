@@ -1,6 +1,11 @@
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
 import { loadLanguage, translatePage } from '../../utils/i18n.js';
+import { mergeCapacitacionPrefsFromServer } from '../../utils/capacitacionTourPrefs.js';
+import {
+  mergeNoticiasVistaFromServer,
+  syncCapUiPrefsToBackend,
+} from '../../utils/userCapUiPrefsBackend.js';
 
 // --- HELPERS ---
 export const getSession = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -120,6 +125,12 @@ export const UserPreferences = {
                     if (dbConfig.letra_preferida) localStorage.setItem('fontSize', dbConfig.letra_preferida);
                     if (dbConfig.menu_preferido) localStorage.setItem('menuLayout', dbConfig.menu_preferido);
                     if (dbConfig.gecko_ok !== null && dbConfig.gecko_ok !== "") localStorage.setItem('gecko_ok', dbConfig.gecko_ok);
+                    mergeCapacitacionPrefsFromServer(dbConfig);
+                    mergeNoticiasVistaFromServer(dbConfig);
+                    if (!sessionStorage.getItem('gecko_cap_ui_synced')) {
+                        sessionStorage.setItem('gecko_cap_ui_synced', '1');
+                        syncCapUiPrefsToBackend();
+                    }
                 }
             }
         } catch (e) {
@@ -301,6 +312,9 @@ export const UserPreferences = {
         if (data.menu) payload.menu = data.menu;
         if (data.fontSize) payload.fontSize = data.fontSize;
         if (data.gecko_ok !== undefined) payload.gecko_ok = data.gecko_ok;
+        if (data.setupWizardDone !== undefined) payload.setupWizardDone = data.setupWizardDone ? 1 : 0;
+        if (data.capAutoTourOff !== undefined) payload.capAutoTourOff = data.capAutoTourOff ? 1 : 0;
+        if (data.capHelpFabHidden !== undefined) payload.capHelpFabHidden = data.capHelpFabHidden ? 1 : 0;
 
         try {
             const res = await API.request('/user/config/update', 'POST', payload);

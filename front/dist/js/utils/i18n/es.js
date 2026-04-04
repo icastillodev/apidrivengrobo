@@ -109,6 +109,17 @@ export const es = {
         portal_sort_titulo_desc: "Título (Z → A)",
         portal_leer_mas: "Leer más",
         admin_titulo: "Administración de noticias",
+        admin_btn_ayuda: "Ayuda",
+        admin_page_help_titulo: "Guía — Noticias (administración)",
+        admin_page_help_s1_title: "1. Qué es esta pantalla",
+        admin_page_help_s1_text:
+            "Lista las noticias de su institución para crear, editar o eliminar; controla si aparecen en el portal local y en la pestaña Red.",
+        admin_page_help_s2_title: "2. Nueva noticia y modal",
+        admin_page_help_s2_text:
+            "«Nueva noticia» abre el formulario: título, categoría, cuerpo, estado (borrador/publicada/programada) y alcance en red cuando aplique.",
+        admin_page_help_s3_title: "3. Tabla y acciones",
+        admin_page_help_s3_text:
+            "Cada fila muestra fecha, título, visibilidad en red y estado; use Editar o Eliminar según permisos.",
         admin_nueva: "Nueva noticia",
         admin_editar: "Editar",
         admin_eliminar: "Eliminar",
@@ -950,6 +961,17 @@ export const es = {
         bread_admin: "Admin",
         centro_liquidacion: "Centro de Liquidación y Cobranzas",
         subtitulo: "Seleccione el método de procesamiento para las boletas de pago",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Centro de facturación",
+        help_s1_title: "1. Qué es esta pantalla",
+        help_s1_text:
+            "Punto de entrada para abrir informes y liquidaciones por departamento, organización, persona, protocolo o institución (RED) según lo que muestre su sede.",
+        help_s2_title: "2. Cómo continuar",
+        help_s2_text:
+            "Pulse una tarjeta para ir a la subpantalla correspondiente; allí verá tablas, filtros y exportaciones según el módulo.",
+        help_s3_title: "3. Institución y red",
+        help_s3_text:
+            "La tarjeta «Por institución» solo aparece si su sede tiene trámites derivados en red; el resto de rutas suele estar siempre disponible para roles contables.",
         por_depto: "Por Departamento",
         desc_depto: "Liquidación masiva agrupada por Facultades o Unidades Académicas. Ideal para reportes institucionales.",
         por_investigador: "Por Persona",
@@ -1330,9 +1352,9 @@ export const es = {
         btn_ayuda: "Ayuda",
         help_titulo: "Guía — Centro de solicitudes",
         help_s1_title: "1. Contexto e institución",
-        help_s1_text: "La línea bajo el título indica si trabaja en su sede, en red u otro contexto habilitado. Espere a que carguen las tarjetas.",
+        help_s1_text: "Cuando termine de cargar, debajo del título verá si trabaja en su sede o en contexto de red. Con varias instituciones puede usar el buscador.",
         help_s2_title: "2. Elegir trámite",
-        help_s2_text: "Cada bloque agrupa la institución y los botones de pedido (animales, reactivos, insumos, reservas…) según contratación.",
+        help_s2_text: "Cada sede aparece como un hito en la lista (indicador y línea que une); debajo, las tarjetas de cada trámite habilitado.",
         help_s3_title: "3. Sin opciones visibles",
         help_s3_text: "Si no ve formularios, su rol o la configuración de la sede pueden limitar el catálogo. Consulte con administración del bioterio."
     },
@@ -1608,6 +1630,8 @@ export const es = {
         contacto_modal_todas: "Contacto — instituciones",
         contacto_modal_una: "Institución",
         contacto_mail_asunto: "Consulta pedido GROBO",
+        contacto_msg_asunto_prefill: "Consulta pedido GROBO",
+        btn_enviar_mensaje_app: "Enviar mensaje (app)",
         contacto_sin_correo: "Sin correo",
         contacto_tel_lbl: "Teléfono / Contacto",
         contacto_no_tel: "No disponible",
@@ -1712,7 +1736,11 @@ export const es = {
         red_enviado_msg: "Solicitud enviada a la red.",
         red_faltan_envios_title: "Envío a la red pendiente",
         red_faltan_envios_msg: "Faltan instituciones de red por recibir la solicitud.",
-        red_btn_enviar_desde_detalle: "Enviar a la red"
+        red_btn_enviar_desde_detalle: "Enviar a la red",
+        contacto_sede_titulo: "Contacto con la sede del protocolo",
+        contacto_mail_asunto: "Consulta protocolo GROBO",
+        contacto_msg_asunto_prot: "Consulta protocolo GROBO",
+        btn_enviar_mensaje_app: "Enviar mensaje (app)"
     },
     misalojamientos: {
         titulo: "MIS ALOJAMIENTOS",
@@ -1740,6 +1768,8 @@ export const es = {
         buscando_historia: "Buscando historia...",
         pdf_ficha: "PDF FICHA",
         contactar_sede: "CONTACTAR SEDE",
+        btn_enviar_mensaje_app: "Enviar mensaje (app)",
+        contacto_msg_asunto_aloj: "Consulta alojamiento GROBO",
         label_historia: "HISTORIA",
         label_protocolo: "PROTOCOLO",
         label_especie_tipo: "ESPECIE / TIPO",
@@ -2206,7 +2236,22 @@ export const es = {
         red_hasta: "Hasta",
         red_btn_cargar: "Cargar",
         red_export_pdf: "Exportar PDF",
-        red_export_excel: "Exportar Excel"
+        red_export_excel: "Exportar Excel",
+        tab_sede: "Esta sede",
+        tab_red: "Red institucional",
+        red_tab_hint: "La pestaña Red consolida formularios (animales, reactivos, insumos), protocolos vigentes, alojamientos y trazabilidad de todas las sedes con el mismo código de red.",
+        filtros_visuales_red: "Filtros (vista red)",
+        red_sin_datos: "Pulse «Actualizar» en la pestaña Red para cargar los datos antes de exportar.",
+        red_pdf_title: "Exportar PDF (red)",
+        red_pdf_text: "¿Incluir los gráficos de la red en el PDF? (puede tardar un poco más)",
+        red_pdf_con_graf: "Sí, con gráficos",
+        red_pdf_solo_tablas: "No, solo tablas",
+        red_pdf_doc_title: "REPORTE ESTADÍSTICO — RED — GROBO",
+        red_pdf_fecha: "Fecha",
+        red_pdf_graf_depto: "Gráfico por departamento (red)",
+        red_pdf_graf_esp: "Uso de especies (red)",
+        red_pdf_tab_depto: "Desglose por departamento (red)",
+        red_pdf_tab_esp: "Detalle de especies (red)"
     },
     admin_historialcontable: {
         bread_grobo: "GROBO",
@@ -2235,14 +2280,36 @@ export const es = {
         col_investigador: "Investigador (Afectado)",
         col_tipo_operacion: "Tipo Operación",
         col_ref_pedido: "Ref. Pedido",
-        col_monto: "Monto ($)"
+        col_monto: "Monto ($)",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Historial contable",
+        help_s1_title: "1. Qué es esta pantalla",
+        help_s1_text:
+            "Registro de movimientos contables (cargas, liquidaciones, pagos, devoluciones) para auditoría y conciliación.",
+        help_s2_title: "2. Filtros y búsqueda",
+        help_s2_text:
+            "Elija tipo de operación, campo y texto; use Buscar para refrescar la grilla. Exporte a Excel cuando necesite trabajar fuera del sistema.",
+        help_s3_title: "3. Tabla y paginación",
+        help_s3_text:
+            "Cada fila resume un movimiento; use la paginación inferior para recorrer lotes grandes.",
     },
     admin_config: {
         bread_grobo: "GROBO",
         bread_admin: "Admin",
         bread_panel: "Panel de Configuración",
         titulo: "CENTRO DE CONFIGURACIÓN",
-        subtitulo: "Gestione los parámetros globales de"
+        subtitulo: "Gestione los parámetros globales de",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Centro de configuración",
+        help_s1_title: "1. Qué es esta pantalla",
+        help_s1_text:
+            "Punto de entrada con tarjetas hacia cada módulo de parámetros de la sede; no es el formulario de edición en sí.",
+        help_s2_title: "2. Cómo continuar",
+        help_s2_text:
+            "Pulse una tarjeta para abrir la subpantalla correspondiente; allí guardará cambios y verá validaciones o avisos.",
+        help_s3_title: "3. Impacto y ayuda",
+        help_s3_text:
+            "Los ajustes pueden afectar a todos los usuarios. Use el manual de capacitación y la barra de ayuda para el tour guiado de esta vista.",
     },
     config_institucion: {
         bread_gestion: "Configuración Institución",
@@ -3674,6 +3741,63 @@ export const es = {
         tour_misreservas_s4_title: "Confirmar reserva",
         tour_misreservas_s4_body:
             "{{i:clock-history}} Tras elegir día y franja, complete instrumentos o motivo si el formulario lo pide y marque {{i:arrow-repeat}} repetición si aplica.\n\n{{i:hand-thumbs-up}} El botón «Reservar» o «Confirmar» solo se habilita cuando todos los obligatorios son válidos y no hay conflicto.\n\n{{svg:click}} Confirme y espere el mensaje de éxito; si falla, lea el texto del error (solape, fuera de horario, etc.).",
+        tour_config_s1_title: "Ubicación en GROBO",
+        tour_config_s1_body:
+            "Confirmar que está en administración y en el panel de configuración antes de tocar parámetros globales de la sede.\n\n{{i:signpost-split}} `nav[aria-label=\"breadcrumb\"]`: migas (GROBO → Admin → panel de configuración).\n\n- Verifique institución o sede activa en la barra o menú si aplica.\n- El siguiente paso marca título e institución de referencia.",
+        tour_config_s2_title: "Título e institución",
+        tour_config_s2_body:
+            "Identificar para qué sede está gestionando parámetros y que esta vista es solo el hub de accesos.\n\n{{i:type-h1}} Cabecera `.config-hub-header`: título del centro y nombre de institución (`#lbl-inst-name`).\n\n- {{i:question-circle}} Botón Ayuda: modal local + enlace al manual y tour desde menú / barra inferior.\n- No edita datos aquí: solo elige módulo en la cuadrícula.",
+        tour_config_s3_title: "Cuadrícula de módulos",
+        tour_config_s3_body:
+            "Elegir el área a configurar (institución, especies, reservas, roles, etc.) según contratación y permisos.\n\n{{i:grid-3x3-gap}} `#config-grid`: tarjetas clicables hacia cada subpantalla.\n\n{{svg:click}} Cada tarjeta abre formularios o tablas propias; allí use Guardar y lea avisos.\n\n{{i:book}} Capacitación (`#t=admin__configuracion__config`) detalla hub, riesgos y ventanas emergentes habituales.",
+        tour_fact_index_s1_title: "Facturación en el menú",
+        tour_fact_index_s1_body:
+            "Confirmar contexto admin y módulo contable antes de abrir un informe de liquidación.\n\n{{i:signpost-split}} Migas: GROBO → Admin → Facturación.\n\n- Si falta el menú contable, revise rol y módulos contratados.",
+        tour_fact_index_s2_title: "Centro de liquidación",
+        tour_fact_index_s2_body:
+            "Título y texto guían el objetivo: elegir el criterio de agrupación del informe (depto, organización, persona, protocolo…).\n\n{{i:type-h1}} Cabecera del hub: misma página para todas las tarjetas; el detalle está en cada subruta.",
+        tour_fact_index_s3_title: "Tarjetas de acceso",
+        tour_fact_index_s3_body:
+            "Cada bloque abre una vista distinta con tablas y acciones propias (PDF, filtros, pagos, etc.).\n\n{{i:grid-3x3-gap}} `#billing-hub-grid`: una tarjeta por modalidad.\n\n{{svg:click}} Pulse el bloque deseado; espere la carga de la subpantalla.",
+        tour_fact_index_s4_title: "Elegir la vista adecuada",
+        tour_fact_index_s4_body:
+            "Ejemplo de tarjeta de acceso: el icono y el título indican el criterio (depto, org, investigador, protocolo…).\n\n{{i:building}} «Por institución» solo si su sede opera con derivaciones en red.\n\n{{i:book}} El manual `admin__facturacion__index` resume el flujo con precios e historial contable.",
+        tour_hist_cont_s1_title: "Ubicación del historial",
+        tour_hist_cont_s1_body:
+            "Auditoría de movimientos financieros vinculados a pedidos y operaciones del bioterio.\n\n{{i:signpost-split}} Migas con institución y rol.\n\n- Solo personal autorizado debería exportar o interpretar saldos.",
+        tour_hist_cont_s2_title: "Título del informe",
+        tour_hist_cont_s2_body:
+            "«Auditoría financiera y pagos» concentra el listado filtrable de movimientos.\n\n{{i:clipboard-data}} Use esta pantalla para rastrear quién registró qué y cuándo.",
+        tour_hist_cont_s3_title: "Filtros, búsqueda y Excel",
+        tour_hist_cont_s3_body:
+            "Ajuste tipo de operación, campo de búsqueda y texto; confirme con Buscar.\n\n{{i:funnel}} Misma franja incluye {{i:file-earmark-excel}} exportación a Excel para análisis externo.\n\n{{svg:click}} Compruebe que la grilla se actualiza tras cada búsqueda.",
+        tour_hist_cont_s4_title: "Grilla de movimientos",
+        tour_hist_cont_s4_body:
+            "Columnas: ID, fechas, actores, tipo, referencia y montos.\n\n{{i:table}} `#table-body-historial`: filas paginadas al pie.\n\n{{i:book}} Concilie con facturación y precios según el proceso de su sede.",
+        tour_admin_noticias_s1_title: "Administración de noticias",
+        tour_admin_noticias_s1_body:
+            "Publicar y mantener avisos que verán investigadores y personal en el portal de noticias.\n\n{{i:journal-richtext}} Cabecera con título de pantalla y acceso a ayuda.",
+        tour_admin_noticias_s2_title: "Nueva noticia",
+        tour_admin_noticias_s2_body:
+            "Abre el modal de edición: título, categoría, cuerpo, estado y opciones de red.\n\n{{i:plus-lg}} `#btn-nueva-noticia`\n\n- Guarde como borrador hasta validar texto y alcance.",
+        tour_admin_noticias_s3_title: "Listado publicado",
+        tour_admin_noticias_s3_body:
+            "Revise fecha, título, si está en red y el estado de publicación.\n\n{{i:list-ul}} Tabla responsive con acciones por fila.\n\n{{svg:click}} Editar reabre el mismo formulario con datos cargados.",
+        tour_admin_noticias_s4_title: "Paginación",
+        tour_admin_noticias_s4_body:
+            "Navegue listas largas sin perder el contexto del filtro actual.\n\n{{i:chevron-left}} {{i:chevron-right}} Botones anterior/siguiente.\n\n{{i:book}} El portal de lectura (`panel/noticias`) muestra el resultado publicado.",
+        tour_cap_red_s1_title: "Manual y tema RED",
+        tour_cap_red_s1_body:
+            "Está leyendo el capítulo transversal sobre **red multi-sede**: mensajes, derivaciones y facturación cruzada cuando su institución lo usa.\n\n{{i:diagram-3}} El contenido aplica a varios roles; revise siempre qué rutas tiene usted en el menú real.",
+        tour_cap_red_s2_title: "Lista de temas",
+        tour_cap_red_s2_body:
+            "El ítem RED aparece cuando su perfil y módulos lo permiten; otros temas se filtran por menú contratado.\n\n{{i:list}} `#cap-list`: pulse otro tema para cambiar el documento sin salir de Capacitación.",
+        tour_cap_red_s3_title: "Contenido del capítulo",
+        tour_cap_red_s3_body:
+            "Resumen, alcance por rol y acordeones con detalle operativo.\n\n{{i:book}} `#cap-content-region`\n\n- Use el enlace `#t=capacitacion__tema__red` para compartir esta vista.",
+        tour_cap_red_s4_title: "Preferencias y tour de la biblioteca",
+        tour_cap_red_s4_body:
+            "Reactive la barra inferior de ayuda si la ocultó y ejecute el tutorial genérico de la biblioteca cuando quiera.\n\n{{i:lightning-charge}} Tarjeta inferior: interruptor de barra + tutorial de la página de manual.\n\n{{i:journal-richtext}} En el resto del panel, la barra contextual enlaza aquí con el slug adecuado.",
         nav_library: "Temas del manual por sección del menú",
         main_landmark: "Manual de capacitación y biblioteca de temas",
         hash_unavailable_title: "Enlace no disponible para su perfil",

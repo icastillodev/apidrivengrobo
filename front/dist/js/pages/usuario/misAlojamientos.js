@@ -2,6 +2,10 @@ import { API } from '../../api.js';
 // Importamos el motor de trazabilidad que ya construiste (¡Reutilización de código!)
 import { TrazabilidadUI } from '../admin/alojamientos/trazabilidad.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../modulesAccess.js';
+import {
+    isInvestigatorRole,
+    buildMensajesNuevoFromContext,
+} from '../../utils/investigatorMensajesLink.js';
 
 let allHousings = [];
 let currentPage = 1;
@@ -60,7 +64,12 @@ window.openDetailModal = async (id) => {
             const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '3', 10);
             const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen);
 
-            const contactInfo = { NombreInst: h.Institucion, InstCorreo: h.InstCorreo, InstContacto: h.InstContacto };
+            const contactInfo = {
+                IdInstitucion: h.IdInstitucion,
+                NombreInst: h.Institucion,
+                InstCorreo: h.InstCorreo,
+                InstContacto: h.InstContacto,
+            };
             const contactString = encodeURIComponent(JSON.stringify(contactInfo));
 
             actions.innerHTML = `
@@ -434,6 +443,21 @@ window.openContactModal = (infoStr) => {
     const info = JSON.parse(decodeURIComponent(infoStr));
     const correo = info.InstCorreo || '';
     const telefono = info.InstContacto || 'No registrado';
+    const ma = window.txt?.misalojamientos || {};
+    const iid = parseInt(String(info.IdInstitucion || ''), 10);
+    const hrefMsg =
+        iid > 0 && isInvestigatorRole()
+            ? buildMensajesNuevoFromContext({
+                  instId: iid,
+                  asunto: `${ma.contacto_msg_asunto_aloj || 'Consulta alojamiento GROBO'} — ${info.NombreInst || ''}`.trim(),
+                  origenTipo: 'alojamiento',
+              })
+            : '';
+    const btnMsg = hrefMsg
+        ? `<a href="${hrefMsg}" class="btn btn-success fw-bold shadow-sm py-2 text-uppercase w-100" style="letter-spacing: 1px;">
+                <i class="bi bi-chat-dots-fill me-2"></i> ${ma.btn_enviar_mensaje_app || 'Enviar mensaje (app)'}
+            </a>`
+        : '';
 
     Swal.fire({
         title: `<h5 class="fw-bold m-0 text-dark">CONTACTAR AL BIOTERIO</h5><span class="text-success small">${info.NombreInst.toUpperCase()}</span>`,
@@ -449,6 +473,7 @@ window.openContactModal = (infoStr) => {
                         <i class="bi bi-envelope-at-fill me-2"></i> Enviar Correo
                     </a>
                 ` : `<div class="alert alert-warning small py-2">La sede no registró un correo electrónico.</div>`}
+                ${btnMsg}
             </div>
         `,
         showConfirmButton: false,

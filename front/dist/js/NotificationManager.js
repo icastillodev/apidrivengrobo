@@ -108,7 +108,7 @@ export const NotificationManager = {
         });
     },
 
-    /** Portal de noticias (206): badge azul si hay publicaciones con FechaPublicacion posterior al último detalle abierto (no al entrar al listado). */
+    /** Portal de noticias (206): badge azul si hay publicaciones con FechaPublicacion posterior a `grobo_noticias_vista_hasta` (se actualiza al cargar el listado o al abrir un detalle). */
     setNewsBadge(id, count) {
         const containers = document.querySelectorAll(`.menu-icon[data-menu-id="${id}"]`);
         if (!containers.length) return;

@@ -40,7 +40,7 @@
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
         // Lógica de estadísticas (Charts, reportes y métricas globales)
-        import { initStatsPage } from '../../dist/js/pages/admin/GeckoStats.js?v=20260311';
+        import { initStatsPage } from '../../dist/js/pages/admin/GeckoStats.js?v=20260402';
 
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
@@ -114,14 +114,16 @@
                         </button>
                     </div>
 
-                    <div id="stats-red-card" class="card mb-4 border-success border-2 shadow-sm" style="display: none;">
-                        <div class="card-body d-flex flex-md-row flex-column align-items-md-center justify-content-between gap-3">
-                            <div>
-                                <h6 class="card-title text-success fw-bold mb-1" data-i18n="admin_estadisticas.red_card_title"></h6>
-                                <p class="card-text small text-muted mb-0" data-i18n="admin_estadisticas.red_card_desc"></p>
-                            </div>
-                            <button type="button" class="btn btn-success fw-bold px-4" id="btn-open-red-stats" style="background-color: #1a5d3b;" data-i18n="admin_estadisticas.red_btn_ver"></button>
-                        </div>
+                    <div id="stats-scope-wrap" class="d-none mb-3">
+                        <ul class="nav nav-tabs" id="stats-scope-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active fw-bold px-4" id="tab-sede-btn" data-bs-toggle="tab" data-bs-target="#pane-sede" type="button" role="tab" aria-controls="pane-sede" aria-selected="true" data-i18n="admin_estadisticas.tab_sede"></button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link fw-bold px-4 text-success" id="tab-red-btn" data-bs-toggle="tab" data-bs-target="#pane-red" type="button" role="tab" aria-controls="pane-red" aria-selected="false" data-i18n="admin_estadisticas.tab_red"></button>
+                            </li>
+                        </ul>
+                        <p class="small text-muted mb-0 mt-2" id="stats-red-tab-hint" data-i18n="admin_estadisticas.red_tab_hint"></p>
                     </div>
 
                     <div class="row g-3 align-items-end mb-4 pb-3 border-bottom">
@@ -147,28 +149,31 @@
                         </div>
                     </div>
 
+                    <div class="tab-content border-0">
+                    <div class="tab-pane fade show active" id="pane-sede" role="tabpanel" aria-labelledby="tab-sede-btn" tabindex="0">
+
                     <div class="card mb-4 border-0 shadow-sm bg-white">
                         <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
                             <span class="small fw-bold text-muted"><i class="bi bi-funnel-fill"></i> <span data-i18n="admin_estadisticas.filtros_visuales"></span></span>
                             
                             <div class="form-check form-check-inline m-0">
-                                <input class="form-check-input col-chk" type="checkbox" id="chk-ani" data-col="1" checked>
+                                <input class="form-check-input col-chk col-chk-sede" type="checkbox" id="chk-ani" data-col="1" checked>
                                 <label class="form-check-label small fw-bold text-success" for="chk-ani" data-i18n="admin_estadisticas.label_animales"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
-                                <input class="form-check-input col-chk" type="checkbox" id="chk-rea" data-col="2" checked>
+                                <input class="form-check-input col-chk col-chk-sede" type="checkbox" id="chk-rea" data-col="2" checked>
                                 <label class="form-check-label small fw-bold text-warning" for="chk-rea" data-i18n="admin_estadisticas.label_reactivos"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
-                                <input class="form-check-input col-chk" type="checkbox" id="chk-ins" data-col="3" checked>
+                                <input class="form-check-input col-chk col-chk-sede" type="checkbox" id="chk-ins" data-col="3" checked>
                                 <label class="form-check-label small fw-bold text-secondary" for="chk-ins" data-i18n="admin_estadisticas.label_insumos"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
-                                <input class="form-check-input col-chk" type="checkbox" id="chk-pro" data-col="4" checked>
+                                <input class="form-check-input col-chk col-chk-sede" type="checkbox" id="chk-pro" data-col="4" checked>
                                 <label class="form-check-label small fw-bold text-primary" for="chk-pro" data-i18n="admin_estadisticas.label_prot_aprob"></label>
                             </div>
                             <div class="form-check form-check-inline m-0">
-                                <input class="form-check-input col-chk" type="checkbox" id="chk-alo" data-col="5" checked>
+                                <input class="form-check-input col-chk col-chk-sede" type="checkbox" id="chk-alo" data-col="5" checked>
                                 <label class="form-check-label small fw-bold text-info" for="chk-alo" data-i18n="admin_estadisticas.label_aloj_activos"></label>
                             </div>
                         </div>
@@ -284,27 +289,151 @@
                         <div id="details-container" class="row g-4"></div>
 
                     </div>
-                    <div class="modal fade" id="modal-stats-red" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-                            <div class="modal-content">
-                                <div class="modal-header border-0">
-                                    <h5 class="modal-title fw-bold" data-i18n="admin_estadisticas.red_modal_title"></h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="tab-pane fade" id="pane-red" role="tabpanel" aria-labelledby="tab-red-btn" tabindex="0">
+                    <div class="card mb-4 border-0 shadow-sm bg-white border-start border-success border-3">
+                        <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+                            <span class="small fw-bold text-success"><i class="bi bi-diagram-3"></i> <span data-i18n="admin_estadisticas.filtros_visuales_red"></span></span>
+                            <div class="form-check form-check-inline m-0">
+                                <input class="form-check-input col-chk col-chk-red" type="checkbox" id="red-chk-ani" data-col="1" checked>
+                                <label class="form-check-label small fw-bold text-success" for="red-chk-ani" data-i18n="admin_estadisticas.label_animales"></label>
+                            </div>
+                            <div class="form-check form-check-inline m-0">
+                                <input class="form-check-input col-chk col-chk-red" type="checkbox" id="red-chk-rea" data-col="2" checked>
+                                <label class="form-check-label small fw-bold text-warning" for="red-chk-rea" data-i18n="admin_estadisticas.label_reactivos"></label>
+                            </div>
+                            <div class="form-check form-check-inline m-0">
+                                <input class="form-check-input col-chk col-chk-red" type="checkbox" id="red-chk-ins" data-col="3" checked>
+                                <label class="form-check-label small fw-bold text-secondary" for="red-chk-ins" data-i18n="admin_estadisticas.label_insumos"></label>
+                            </div>
+                            <div class="form-check form-check-inline m-0">
+                                <input class="form-check-input col-chk col-chk-red" type="checkbox" id="red-chk-pro" data-col="4" checked>
+                                <label class="form-check-label small fw-bold text-primary" for="red-chk-pro" data-i18n="admin_estadisticas.label_prot_aprob"></label>
+                            </div>
+                            <div class="form-check form-check-inline m-0">
+                                <input class="form-check-input col-chk col-chk-red" type="checkbox" id="red-chk-alo" data-col="5" checked>
+                                <label class="form-check-label small fw-bold text-info" for="red-chk-alo" data-i18n="admin_estadisticas.label_aloj_activos"></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="stats-content-red" style="display: none;">
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-auto">
+                                <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion"></label>
+                                <select id="red-chart-type" class="form-select form-select-sm" style="min-width: 160px;">
+                                    <option value="bar" data-i18n="admin_estadisticas.chart_barras"></option>
+                                    <option value="pie" data-i18n="admin_estadisticas.chart_circular"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_animales"></small><h2 class="mb-0 fw-bold text-success" id="red-box-animales">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_reactivos"></small><h2 class="mb-0 fw-bold text-warning" id="red-box-reactivos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_insumos"></small><h2 class="mb-0 fw-bold text-secondary" id="red-box-insumos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_protocolos"></small><h2 class="mb-0 fw-bold text-primary" id="red-box-protocolos">0</h2></div></div>
+                            <div class="col"><div class="card p-3 border-0 bg-light shadow-sm text-center"><small class="text-muted fw-bold" data-i18n="admin_estadisticas.box_alojamientos"></small><h2 class="mb-0 fw-bold text-info" id="red-box-alojamientos">0</h2></div></div>
+                        </div>
+
+                        <h6 class="fw-bold mb-2 text-secondary border-bottom pb-2"><i class="bi bi-houses"></i> <span data-i18n="admin_estadisticas.seccion_aloj_traz"></span></h6>
+                        <div id="red-alojamiento-trazabilidad-section" class="row g-3 mb-4"></div>
+
+                        <div class="row mb-5">
+                            <div class="col-lg-7 mb-4 mb-lg-0">
+                                <div class="card shadow-sm border-0 h-100">
+                                    <div class="card-header bg-white fw-bold" data-i18n="admin_estadisticas.desglose_depto"></div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0" style="font-size: 11px;" id="red-main-stats-table">
+                                            <thead class="table-light text-uppercase">
+                                                <tr>
+                                                    <th data-i18n="admin_estadisticas.th_departamento"></th>
+                                                    <th class="text-center red-col-val-1" data-i18n="admin_estadisticas.th_animales"></th>
+                                                    <th class="text-center red-col-val-2" data-i18n="admin_estadisticas.th_reactivos"></th>
+                                                    <th class="text-center red-col-val-3" data-i18n="admin_estadisticas.th_insumos"></th>
+                                                    <th class="text-center red-col-val-4" data-i18n="admin_estadisticas.th_prot_aprob"></th>
+                                                    <th class="text-center red-col-val-5" data-i18n="admin_estadisticas.th_aloj_activos"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="red-table-body-stats"></tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div class="modal-body">
-                                    <div class="row g-2 align-items-end mb-3">
-                                        <div class="col-auto"><label class="small fw-bold" data-i18n="admin_estadisticas.red_desde"></label><input type="date" id="red-stats-from" class="form-control form-control-sm"></div>
-                                        <div class="col-auto"><label class="small fw-bold" data-i18n="admin_estadisticas.red_hasta"></label><input type="date" id="red-stats-to" class="form-control form-control-sm"></div>
-                                        <div class="col-auto"><button type="button" class="btn btn-success btn-sm fw-bold" id="btn-load-red-stats" data-i18n="admin_estadisticas.red_btn_cargar"></button></div>
-                                        <div class="col-auto ms-auto d-flex gap-2">
-                                            <button type="button" class="btn btn-outline-danger btn-sm" id="btn-red-export-pdf" disabled><i class="bi bi-file-pdf"></i> <span data-i18n="admin_estadisticas.red_export_pdf"></span></button>
-                                            <button type="button" class="btn btn-outline-success btn-sm" id="btn-red-export-excel" disabled><i class="bi bi-file-earmark-excel"></i> <span data-i18n="admin_estadisticas.red_export_excel"></span></button>
+                            </div>
+                            <div class="col-lg-5">
+                                <div class="card shadow-sm border-0 h-100">
+                                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                                        <span data-i18n="admin_estadisticas.estadisticas_depto"></span>
+                                        <div class="chart-header-actions">
+                                            <button class="btn btn-outline-danger me-1" type="button" onclick="exportChartToPDF('red-chart-canvas', 'Grafico_Red_Deptos')" title="PDF"><i class="bi bi-file-pdf"></i></button>
+                                            <button class="btn btn-light text-secondary border" type="button" onclick="viewChartFullScreen('mainRed')" title="Pantalla completa"><i class="bi bi-arrows-fullscreen"></i></button>
                                         </div>
                                     </div>
-                                    <div id="red-stats-content" class="mt-3"></div>
+                                    <div class="card-body">
+                                        <canvas id="red-chart-canvas" style="max-height: 300px;"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-0">
+                                    <div class="card-header bg-white fw-bold" data-i18n="admin_estadisticas.desglose_org"></div>
+                                    <div class="table-responsive">
+                                        <table class="table table-hover align-middle mb-0" style="font-size: 11px;" id="red-org-stats-table">
+                                            <thead class="table-light text-uppercase">
+                                                <tr>
+                                                    <th data-i18n="admin_estadisticas.th_organizacion"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_animales"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_reactivos"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_insumos"></th>
+                                                    <th class="text-center" data-i18n="admin_estadisticas.th_prot_aprob"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="red-table-body-org"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">
+                            <i class="bi bi-trophy"></i> <span data-i18n="admin_estadisticas.top_especies"></span>
+                        </h5>
+                        <div id="red-species-counters-container" class="row g-3 mb-4"></div>
+
+                        <div class="row mb-5">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-0">
+                                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span data-i18n="admin_estadisticas.uso_especies"></span>
+                                            <select id="red-species-chart-type" class="form-select form-select-sm" style="width: 120px;">
+                                                <option value="bar" data-i18n="admin_estadisticas.chart_torres"></option>
+                                                <option value="pie" data-i18n="admin_estadisticas.chart_queso"></option>
+                                            </select>
+                                        </div>
+                                        <div class="chart-header-actions">
+                                            <button class="btn btn-outline-danger me-1" type="button" onclick="exportChartToPDF('red-chart-species', 'Grafico_Red_Especies')" title="PDF"><i class="bi bi-file-pdf"></i></button>
+                                            <button class="btn btn-light text-secondary border" type="button" onclick="viewChartFullScreen('speciesRed')" title="Pantalla completa"><i class="bi bi-arrows-fullscreen"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="red-species-chart-container" style="height: 400px; position: relative;">
+                                            <canvas id="red-chart-species"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">
+                            <i class="bi bi-list-nested"></i> <span data-i18n="admin_estadisticas.desglose_detallado"></span>
+                        </h5>
+                        <div id="red-details-container" class="row g-4"></div>
+                    </div>
+                    </div>
                     </div>
                     <div class="modal fade" id="chartModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-xl modal-dialog-centered">

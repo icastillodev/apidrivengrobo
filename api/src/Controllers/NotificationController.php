@@ -172,15 +172,10 @@ class NotificationController {
             if ($this->tableExists('noticia')) {
                 try {
                     $nm = new NoticiaModel($this->db);
-                    $desdeSql = $noticiasDesde !== ''
-                        ? $noticiasDesde
-                        : date('Y-m-d H:i:s', strtotime('-7 days'));
-                    $tsDesde = strtotime($desdeSql);
-                    if ($tsDesde === false) {
-                        $desdeSql = date('Y-m-d H:i:s', strtotime('-7 days'));
-                    } else {
-                        $desdeSql = date('Y-m-d H:i:s', $tsDesde);
-                    }
+                    $desdeSql = $this->resolveNoticiasDesdeEfectivo(
+                        $noticiasDesde,
+                        (int)($sesion['userId'] ?? 0)
+                    );
                     $countNoticiasNuevas = $nm->countPublicadasDesde((int)$instId, $desdeSql);
                     $countBorradores = $nm->countBorradores((int)$instId);
                 } catch (\Throwable $e) {
@@ -256,5 +251,41 @@ class NotificationController {
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Fecha “desde” para contar noticias nuevas: el máximo entre cliente, personae.noticias_vista_hasta y -7 días.
+     */
+    private function resolveNoticiasDesdeEfectivo(string $fromClient, int $userId): string {
+        $floor = strtotime('-7 days');
+        $candidates = [$floor !== false ? $floor : time()];
+
+        if ($fromClient !== '') {
+            $tc = strtotime($fromClient);
+            if ($tc !== false) {
+                $candidates[] = $tc;
+            }
+        }
+
+        if ($userId > 0) {
+            try {
+                $stmt = $this->db->prepare(
+                    'SELECT noticias_vista_hasta FROM personae WHERE IdUsrA = ? LIMIT 1'
+                );
+                $stmt->execute([$userId]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+                if ($row && !empty($row['noticias_vista_hasta'])) {
+                    $td = strtotime((string)$row['noticias_vista_hasta']);
+                    if ($td !== false) {
+                        $candidates[] = $td;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Columna inexistente hasta migrar, u otro error: ignorar.
+            }
+        }
+
+        $max = max($candidates);
+        return date('Y-m-d H:i:s', $max);
     }
 }

@@ -1,4 +1,8 @@
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
+import {
+    snapshotGroboPersistentUiPrefs,
+    restoreGroboPersistentUiPrefs,
+} from './utils/groboPersistentUiPrefs.js';
 
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO
@@ -111,9 +115,11 @@ export const API = {
      * Helper centralizado para expulsar al usuario, limpiar todo rastro y redirigir
      */
     forceLogout() {
-        // Limpiamos todo rastro de sesión
+        const uiPrefsSnap = snapshotGroboPersistentUiPrefs();
+        // Limpiamos todo rastro de sesión (preservamos onboarding/tours por usuario en clave gecko_cap_tour_*)
         localStorage.clear();
         sessionStorage.clear();
+        restoreGroboPersistentUiPrefs(uiPrefsSnap);
         
         // Limpiamos Cookies de forma segura (Evitando el error de nombre vacío)
         try {

@@ -52,6 +52,8 @@ class UsuarioTodosProtocolosModel {
     private function getCommonFields() {
         return "p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, p.FechaIniProtA as FechaInicio, p.FechaFinProtA as Vencimiento, 
                 p.variasInst, p.protocoloexpe as IsExterno, p.CantidadAniA, p.IdUsrA, p.departamento as IdDepto,
+                p.IdInstitucion,
+                i_orig.InstCorreo as ProtocoloInstCorreo, i_orig.InstContacto as ProtocoloInstContacto,
                 t.NombreTipoprotocolo as TipoNombre,
                 COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA, CONCAT('ID: ', p.IdUsrA)) as ResponsableName,
                 i_orig.NombreCompletoInst as Origen, i_orig.NombreInst as InstitucionOrigen,

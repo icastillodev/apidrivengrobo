@@ -452,6 +452,116 @@ const TOUR_STEPS_PANEL_MISRESERVAS = [
   },
 ];
 
+const TOUR_STEPS_ADMIN_CONFIG = [
+  {
+    selector: 'nav[aria-label="breadcrumb"]',
+    titleKey: 'tour_config_s1_title',
+    bodyKey: 'tour_config_s1_body',
+  },
+  {
+    selector: '.config-hub-header',
+    titleKey: 'tour_config_s2_title',
+    bodyKey: 'tour_config_s2_body',
+  },
+  {
+    selector: '#config-grid',
+    titleKey: 'tour_config_s3_title',
+    bodyKey: 'tour_config_s3_body',
+  },
+];
+
+const TOUR_STEPS_ADMIN_FACTURACION_INDEX = [
+  {
+    selector: 'nav[aria-label="breadcrumb"]',
+    titleKey: 'tour_fact_index_s1_title',
+    bodyKey: 'tour_fact_index_s1_body',
+  },
+  {
+    selector: '.facturacion-hub-header',
+    titleKey: 'tour_fact_index_s2_title',
+    bodyKey: 'tour_fact_index_s2_body',
+  },
+  {
+    selector: '#billing-hub-grid',
+    titleKey: 'tour_fact_index_s3_title',
+    bodyKey: 'tour_fact_index_s3_body',
+  },
+  {
+    selector: '.card-billing-option',
+    titleKey: 'tour_fact_index_s4_title',
+    bodyKey: 'tour_fact_index_s4_body',
+  },
+];
+
+const TOUR_STEPS_ADMIN_HISTORIAL_CONTABLE = [
+  {
+    selector: 'nav[aria-label="breadcrumb"]',
+    titleKey: 'tour_hist_cont_s1_title',
+    bodyKey: 'tour_hist_cont_s1_body',
+  },
+  {
+    selector: '#historial-contable-title',
+    titleKey: 'tour_hist_cont_s2_title',
+    bodyKey: 'tour_hist_cont_s2_body',
+  },
+  {
+    selector: '.row.align-items-end.mb-4.pb-3.border-bottom',
+    titleKey: 'tour_hist_cont_s3_title',
+    bodyKey: 'tour_hist_cont_s3_body',
+  },
+  {
+    selector: '#table-body-historial',
+    titleKey: 'tour_hist_cont_s4_title',
+    bodyKey: 'tour_hist_cont_s4_body',
+  },
+];
+
+const TOUR_STEPS_ADMIN_COMUNICACION_NOTICIAS = [
+  {
+    selector: '.admin-noticias-page-header',
+    titleKey: 'tour_admin_noticias_s1_title',
+    bodyKey: 'tour_admin_noticias_s1_body',
+  },
+  {
+    selector: '#btn-nueva-noticia',
+    titleKey: 'tour_admin_noticias_s2_title',
+    bodyKey: 'tour_admin_noticias_s2_body',
+  },
+  {
+    selector: '#admin-noticias-table-wrap',
+    titleKey: 'tour_admin_noticias_s3_title',
+    bodyKey: 'tour_admin_noticias_s3_body',
+  },
+  {
+    selector: '#admin-noticias-footer',
+    titleKey: 'tour_admin_noticias_s4_title',
+    bodyKey: 'tour_admin_noticias_s4_body',
+  },
+];
+
+const TOUR_STEPS_CAPACITACION_RED = [
+  {
+    selector: 'h1.h3, h1',
+    titleKey: 'tour_cap_red_s1_title',
+    bodyKey: 'tour_cap_red_s1_body',
+  },
+  {
+    selector: '#cap-list',
+    titleKey: 'tour_cap_red_s2_title',
+    bodyKey: 'tour_cap_red_s2_body',
+  },
+  {
+    selector: '#cap-content-region',
+    titleKey: 'tour_cap_red_s3_title',
+    bodyKey: 'tour_cap_red_s3_body',
+  },
+  {
+    selector: '#cap-help-prefs-card',
+    titleKey: 'tour_cap_red_s4_title',
+    bodyKey: 'tour_cap_red_s4_body',
+  },
+];
+
 export const CAPACITACION_TOUR_STEPS = {
   __welcome__: TOUR_STEPS_WELCOME,
   __modals__: TOUR_STEPS_MODALES,
@@ -472,6 +582,7 @@ export const CAPACITACION_TOUR_STEPS = {
       bodyKey: 'tour_cap_s3_body',
     },
   ],
+  'capacitacion/tema/red': TOUR_STEPS_CAPACITACION_RED,
   'admin/usuarios': [
     {
       selector: '.container.my-5 h1.h4',
@@ -606,6 +717,10 @@ export const CAPACITACION_TOUR_STEPS = {
   ],
   'admin/reservas': TOUR_STEPS_ADMIN_RESERVAS,
   'admin/estadisticas': TOUR_STEPS_ADMIN_ESTADISTICAS,
+  'admin/configuracion/config': TOUR_STEPS_ADMIN_CONFIG,
+  'admin/facturacion/index': TOUR_STEPS_ADMIN_FACTURACION_INDEX,
+  'admin/historialcontable': TOUR_STEPS_ADMIN_HISTORIAL_CONTABLE,
+  'admin/comunicacion/noticias': TOUR_STEPS_ADMIN_COMUNICACION_NOTICIAS,
   'admin/precios': TOUR_STEPS_ADMIN_PRECIOS,
   'admin/solicitud_protocolo': TOUR_STEPS_ADMIN_SOLICITUD_PROTOCOLO,
   'panel/misformularios': TOUR_STEPS_MISFORMULARIOS,

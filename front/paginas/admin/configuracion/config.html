@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración General - GROBO</title>
-    
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
@@ -129,14 +130,54 @@
                 </ol>
             </nav>
 
-            <div class="text-center mb-5">
-                <h4 class="fw-black m-0 uppercase text-dark" style="letter-spacing: -0.5px;" data-i18n="admin_config.titulo"></h4>
-                <p class="text-muted small mt-1"><span data-i18n="admin_config.subtitulo"></span> <span id="lbl-inst-name" class="fw-bold text-success">...</span></p>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-5 config-hub-header">
+                <div class="text-center text-md-start flex-grow-1">
+                    <h4 class="fw-black m-0 uppercase text-dark" style="letter-spacing: -0.5px;" data-i18n="admin_config.titulo"></h4>
+                    <p class="text-muted small mt-1 mb-0"><span data-i18n="admin_config.subtitulo"></span> <span id="lbl-inst-name" class="fw-bold text-success">...</span></p>
+                </div>
+                <button
+                    type="button"
+                    id="btn-ayuda-admin-config"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
+                    data-gecko-cap-help="admin/configuracion/config"
+                    data-gecko-cap-modal="#modal-admin-config-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_config.btn_ayuda">Ayuda</span>
+                </button>
             </div>
 
             <div class="row g-4 justify-content-center mb-4" id="config-grid">
                 </div>
 
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-admin-config-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="admin_config.help_titulo">Guía — Centro de configuración</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_config.help_s1_title">1. Qué es esta pantalla</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_config.help_s1_text">Punto de entrada con tarjetas hacia cada módulo de parámetros de la sede; no es el formulario de edición en sí.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_config.help_s2_title">2. Cómo continuar</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_config.help_s2_text">Pulse una tarjeta para abrir la subpantalla correspondiente; allí guardará cambios y verá validaciones o avisos.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_config.help_s3_title">3. Impacto y ayuda</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_config.help_s3_text">Los ajustes pueden afectar a todos los usuarios. Use el manual de capacitación y la barra de ayuda para el tour guiado de esta vista.</p>
+                    </section>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1,5 +1,9 @@
 import { API } from '../../api.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
+import {
+    isInvestigatorRole,
+    buildMensajesNuevoFromContext,
+} from '../../utils/investigatorMensajesLink.js';
 
 let allForms = [];
 let currentPage = 1;
@@ -183,11 +187,13 @@ window.openDetailModal = async (id) => {
             // Inyectar botones (PDF + contacto por cada institución participante)
             const participantesContacto = Array.isArray(h.institucionesParticipantes) && h.institucionesParticipantes.length
                 ? h.institucionesParticipantes.map((inst) => ({
+                    IdInstitucion: inst.IdInstitucion,
                     NombreInst: inst.NombreInst || '—',
                     InstCorreo: inst.InstCorreo || '',
                     InstContacto: inst.InstContacto || ''
                 }))
                 : [{
+                    IdInstitucion: h.IdInstitucion,
                     NombreInst: h.NombreInstitucion || '—',
                     InstCorreo: h.InstCorreo || '',
                     InstContacto: h.InstContacto || ''
@@ -338,6 +344,7 @@ window.openContactModal = (encodedInfo) => {
     const modalBody = document.getElementById('contact-modal-body');
     const tmf = window.txt?.misformularios || {};
     const subj = encodeURIComponent(tmf.contacto_mail_asunto || 'Consulta pedido GROBO');
+    const showMsgApp = isInvestigatorRole();
 
     modalTitle.innerText = list.length > 1
         ? (tmf.contacto_modal_todas || 'Contacto — instituciones').toUpperCase()
@@ -348,11 +355,25 @@ window.openContactModal = (encodedInfo) => {
         const phone = info.InstContacto || (tmf.contacto_no_tel || 'No disponible');
         const sinCorreo = tmf.contacto_sin_correo || 'Sin correo';
         const telLbl = tmf.contacto_tel_lbl || 'Teléfono / Contacto';
+        const iid = parseInt(String(info.IdInstitucion ?? ''), 10);
+        const asuntoPref = `${tmf.contacto_msg_asunto_prefill || 'Consulta pedido GROBO'} — ${info.NombreInst || ''}`.trim();
+        const hrefMsg =
+            showMsgApp && iid > 0
+                ? buildMensajesNuevoFromContext({
+                      instId: iid,
+                      asunto: asuntoPref,
+                      origenTipo: 'formulario',
+                  })
+                : '';
+        const btnMsg = hrefMsg
+            ? `<a href="${hrefMsg}" class="btn btn-success fw-bold btn-sm"><i class="bi bi-chat-dots me-2"></i>${tmf.btn_enviar_mensaje_app || 'Enviar mensaje (app)'}</a>`
+            : '';
         return `
         <div class="border rounded p-3 mb-3 bg-light">
             <div class="text-center mb-3"><i class="bi bi-building fs-3 text-success"></i><h6 class="mt-2 fw-bold text-dark mb-0">${String(info.NombreInst || '').replace(/</g, '&lt;')}</h6></div>
             <div class="d-grid gap-2">
                 <a href="${mailLink}" class="btn btn-outline-primary fw-bold btn-sm ${!info.InstCorreo ? 'disabled' : ''}"><i class="bi bi-envelope-at me-2"></i> ${info.InstCorreo || sinCorreo}</a>
+                ${btnMsg}
                 <div class="p-2 bg-white rounded border small"><span class="text-muted text-uppercase fw-bold">${telLbl}</span><div class="fw-bold text-dark mt-1"><i class="bi bi-telephone me-2"></i> ${String(phone).replace(/</g, '&lt;')}</div></div>
             </div>
         </div>`;

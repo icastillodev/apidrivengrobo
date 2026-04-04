@@ -105,12 +105,22 @@
                 </ol>
             </nav>
 
-            <div class="text-center mb-5">
-                <h4 class="fw-bold m-0 uppercase" style="letter-spacing: -0.5px;" data-i18n="facturacion.centro_liquidacion"></h4>
-                <p class="text-muted small" data-i18n="facturacion.subtitulo"></p>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4 facturacion-hub-header">
+                <div class="text-center text-md-start flex-grow-1">
+                    <h4 class="fw-bold m-0 uppercase" style="letter-spacing: -0.5px;" data-i18n="facturacion.centro_liquidacion"></h4>
+                    <p class="text-muted small mt-1 mb-0" data-i18n="facturacion.subtitulo"></p>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
+                    data-gecko-cap-help="admin/facturacion/index"
+                    data-gecko-cap-modal="#modal-facturacion-index-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="facturacion.btn_ayuda">Ayuda</span>
+                </button>
             </div>
 
-            <div class="row g-4 justify-content-center mb-4">
+            <div class="row g-4 justify-content-center mb-4" id="billing-hub-grid">
                 
                 <div class="col-lg-3 col-md-4">
                     <div class="card h-100 shadow-sm card-billing-option p-4 text-center border-top border-5 border-success" onclick="irFacturacion('depto')">
@@ -162,6 +172,35 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-facturacion-index-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="facturacion.help_titulo">Guía — Centro de facturación</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="facturacion.help_s1_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="facturacion.help_s1_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="facturacion.help_s2_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="facturacion.help_s2_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="facturacion.help_s3_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="facturacion.help_s3_text"></p>
+                    </section>
+                </div>
             </div>
         </div>
     </div>

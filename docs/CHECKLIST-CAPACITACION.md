@@ -328,11 +328,11 @@ flowchart TB
 | `admin/reservas` | `admin__reservas` | [x] | [ ] | [ ] | [ ] |
 | `admin/alojamientos` | `admin__alojamientos` | [x] | [ ] | [ ] | [ ] |
 | `admin/estadisticas` | `admin__estadisticas` | [x] | [ ] | [ ] | [ ] |
-| `admin/configuracion/config` | `admin__configuracion__config` | [x] | [ ] | [ ] | [ ] |
+| `admin/configuracion/config` | `admin__configuracion__config` | [x] | [ ] | [ ] | [x] |
 | `admin/precios` | `admin__precios` | [x] | [ ] | [ ] | [ ] |
-| `admin/facturacion/index` | `admin__facturacion__index` | [x] | [ ] | [ ] | [ ] |
-| `admin/historialcontable` | `admin__historialcontable` | [x] | [ ] | [ ] | [ ] |
-| `admin/comunicacion/noticias` | `admin__comunicacion__noticias` | [x] | [ ] | [ ] | [ ] |
+| `admin/facturacion/index` | `admin__facturacion__index` | [x] | [ ] | [ ] | [x] modal ayuda en página |
+| `admin/historialcontable` | `admin__historialcontable` | [x] | [ ] | [ ] | [x] modal ayuda en página |
+| `admin/comunicacion/noticias` | `admin__comunicacion__noticias` | [x] | [ ] | [ ] | [x] modal ayuda en página (+ modal edición noticia) |
 
 ### 5.3 Panel investigador / usuario
 
@@ -401,6 +401,7 @@ flowchart TB
 …/paginas/panel/capacitacion.html#t=capacitacion__tema__red
 …/paginas/panel/capacitacion.html#t=panel__ventas
 …/paginas/panel/capacitacion.html#t=panel__soporte
+…/paginas/panel/capacitacion.html#t=admin__configuracion__config
 ```
 
 ---
@@ -444,6 +445,8 @@ flowchart TB
 | **Variación por sede** | Redactar con «suele», «típico», «si su sede muestra…»; el producto puede personalizar etiquetas. |
 | **Paridad de idiomas** | Mismos `id` de bloque y mismas claves `cat`/`icon` en `capacitacionManual.es.js`, `.en.js`, `.pt.js`; solo cambian `h` y `html`. |
 | **Render** | `capacitacion.js` inserta cabeceras de categoría y soporta `icon`/`cat`; estilos en `capacitacion.html` (`.manual-glossary`, `.manual-cat-heading`). |
+
+> **Avance:** `admin__configuracion__config` ya sigue §7.4 (hub, mapa, riesgos, bloque `modals` con glosario) y §13 (tour 3 pasos + modal Ayuda en `config.html`).
 
 - [ ] ⬜ Resto de capítulos del manual: aplicar §7.4 al mismo nivel que los piloto (dashboard admin/panel, usuarios, protocolos, animales, centro de solicitudes, mis formularios, tema capacitación).
 
@@ -725,7 +728,7 @@ Marcar **[x]** en **Pasos** cuando exista entrada en `CAPACITACION_TOUR_STEPS` y
 | `admin/reservas` | 4 | [x] | [x] | [x] (`admin/reservas.html`, informes/QR + ayuda) | [ ] |
 | `admin/alojamientos` | 4 | [x] | [x] | [x] (`alojamientos.html`) | [ ] |
 | `admin/estadisticas` | 4 | [x] | [x] | [x] (`admin/estadisticas.html`, Excel/PDF + ayuda) | [ ] |
-| `admin/configuracion/config` | — | [ ] | [ ] | [ ] | [ ] |
+| `admin/configuracion/config` | 3 | [x] | [x] | [x] solo ayuda (`admin/configuracion/config.html`) | [ ] |
 | `panel/formularios` | 3 | [x] | [x] | [x] solo ayuda (`panel/formularios.html`; `usuario/formularios.html` → mismo `menuPath`) | [ ] |
 | `panel/misformularios` | 4 | [x] | [x] | [x] (`panel/misformularios.html`) | [ ] |
 | `usuario/misformularios` | 4 | [x] | [x] | [x] (`usuario/misformularios.html`, misma plantilla) | [ ] |
@@ -741,10 +744,10 @@ Marcar **[x]** en **Pasos** cuando exista entrada en `CAPACITACION_TOUR_STEPS` y
 | `panel/soporte` | 4 | [x] | [x] | [x] solo ayuda (`panel/soporte.html`) | [ ] |
 | `panel/ventas` | 4 | [x] | [x] | [x] solo ayuda (`panel/ventas.html`) | [ ] |
 | `admin/precios` | 4 | [x] | [x] | [x] (`admin/precios.html`, Excel/PDF + ayuda) | [ ] |
-| `admin/facturacion/index` | — | [ ] | [ ] | [ ] | [ ] |
-| `admin/historialcontable` | — | [ ] | [ ] | [ ] | [ ] |
-| `admin/comunicacion/noticias` | — | [ ] | [ ] | [ ] | [ ] |
-| `capacitacion/tema/red` | — | [ ] | [ ] | [ ] | [ ] |
+| `admin/facturacion/index` | 4 | [x] | [x] | [x] solo ayuda (`admin/facturacion/index.html`) | [ ] |
+| `admin/historialcontable` | 4 | [x] | [x] | [x] ayuda + botón Excel en franja de filtros (`historialcontable.html`) | [ ] |
+| `admin/comunicacion/noticias` | 4 | [x] | [x] | [x] solo ayuda (`admin/comunicacion/noticias.html`) | [ ] |
+| `capacitacion/tema/red` | 4 | [x] | [x] | N/A (misma `capacitacion.html`; deep link `#t=capacitacion__tema__red` vía `pathnameToMenuPath`) | [ ] |
 | `__modals__` (tour genérico cabecera/cuerpo/pie) | 4 | [x] | [x] | Solo con `.modal.show`; botón barra + menú Ayuda + franja modal | [ ] |
 
 ### 13.5 · Tour solo con modal (Bootstrap) y backlog por modal

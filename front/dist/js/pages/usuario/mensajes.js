@@ -497,5 +497,47 @@ export async function initMensajes(opts = {}) {
         fillInstTipoSelect();
     }
 
+    async function applyMsgNuevoDeepLink() {
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.get('msgNuevo') !== '1' || instMode) return;
+
+        const instId = sp.get('instId');
+        const asuntoRaw = sp.get('asunto') || '';
+        const origen = sp.get('origen') || 'manual';
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('msgNuevo');
+        url.searchParams.delete('instId');
+        url.searchParams.delete('asunto');
+        url.searchParams.delete('origen');
+        const nq = url.searchParams.toString();
+        window.history.replaceState({}, '', url.pathname + (nq ? `?${nq}` : '') + url.hash);
+
+        if (!modal) return;
+
+        const avisoInv = document.getElementById('msg-investigador-aviso');
+        if (avisoInv) avisoInv.classList.add('d-none');
+        await fillDestinatarios();
+        fillCategoriaNuevo();
+
+        const selDest = document.getElementById('nuevo-dest');
+        if (instId && selDest) {
+            const want = `inst-${instId}`;
+            if ([...selDest.options].some((o) => o.value === want)) {
+                selDest.value = want;
+            }
+        }
+        const cat = document.getElementById('nuevo-categoria');
+        if (cat && ['formulario', 'alojamiento', 'manual'].includes(origen)) {
+            cat.value = origen;
+        }
+        const a = document.getElementById('nuevo-asunto');
+        if (a) a.value = asuntoRaw;
+        const c = document.getElementById('nuevo-cuerpo');
+        if (c) c.value = '';
+        modal.show();
+    }
+
     await loadHilos();
+    await applyMsgNuevoDeepLink();
 }

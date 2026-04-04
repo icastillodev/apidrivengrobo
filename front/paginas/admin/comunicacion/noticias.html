@@ -38,17 +38,27 @@
 </head>
 <body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="noticias_admin">
     <div class="container-fluid my-4 px-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2 admin-noticias-page-header">
             <div>
                 <h4 class="fw-black m-0" data-i18n="comunicacion.admin_titulo"></h4>
             </div>
-            <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nueva-noticia">
-                <i class="bi bi-plus-lg me-1"></i><span data-i18n="comunicacion.admin_nueva"></span>
-            </button>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm"
+                    data-gecko-cap-help="admin/comunicacion/noticias"
+                    data-gecko-cap-modal="#modal-admin-noticias-page-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i><span data-i18n="comunicacion.admin_btn_ayuda">Ayuda</span>
+                </button>
+                <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nueva-noticia">
+                    <i class="bi bi-plus-lg me-1"></i><span data-i18n="comunicacion.admin_nueva"></span>
+                </button>
+            </div>
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="table-responsive">
+            <div id="admin-noticias-table-wrap" class="table-responsive">
                 <table class="table table-hover align-middle mb-0 small">
                     <thead class="table-light">
                         <tr>
@@ -62,11 +72,40 @@
                     <tbody id="admin-noticias-tbody"></tbody>
                 </table>
             </div>
-            <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2 bg-white border-0">
+            <div id="admin-noticias-footer" class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2 bg-white border-0">
                 <span class="text-muted small" id="admin-noticias-pag-info"></span>
                 <div class="btn-group btn-group-sm">
                     <button type="button" class="btn btn-outline-secondary" id="admin-noticias-prev" data-i18n="comunicacion.portal_pag_prev"></button>
                     <button type="button" class="btn btn-outline-secondary" id="admin-noticias-next" data-i18n="comunicacion.portal_pag_next"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-admin-noticias-page-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="comunicacion.admin_page_help_titulo"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.admin_page_help_s1_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.admin_page_help_s1_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.admin_page_help_s2_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.admin_page_help_s2_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.admin_page_help_s3_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.admin_page_help_s3_text"></p>
+                    </section>
                 </div>
             </div>
         </div>

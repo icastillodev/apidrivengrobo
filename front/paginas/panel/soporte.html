@@ -22,7 +22,8 @@
             try {
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
                 if (window.txt) translatePage();
-                Auth.checkAccess([1, 2, 3, 4, 5, 6]);
+                /* Investigador (3): sin menú Ticket/Contacto; no exponer la ruta por URL. */
+                Auth.checkAccess([1, 2, 4, 5, 6]);
                 if (window.txt) {
                     initMenu();
                     NotificationManager.init();

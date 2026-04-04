@@ -109,6 +109,17 @@ export const en = {
         portal_sort_titulo_desc: "Title (Z → A)",
         portal_leer_mas: "Read more",
         admin_titulo: "News administration",
+        admin_btn_ayuda: "Help",
+        admin_page_help_titulo: "Guide — News (administration)",
+        admin_page_help_s1_title: "1. What this screen is",
+        admin_page_help_s1_text:
+            "Lists your institution’s news so you can create, edit, or delete them; controls whether they appear on the local portal and on the Network tab.",
+        admin_page_help_s2_title: "2. New article and modal",
+        admin_page_help_s2_text:
+            "“New article” opens the form: title, category, body, status (draft/published/scheduled), and network scope when applicable.",
+        admin_page_help_s3_title: "3. Table and actions",
+        admin_page_help_s3_text:
+            "Each row shows date, title, network visibility, and status; use Edit or Delete according to permissions.",
         admin_nueva: "New article",
         admin_editar: "Edit",
         admin_eliminar: "Delete",
@@ -945,6 +956,17 @@ alojamientos: {
         bread_admin: "Admin",
         centro_liquidacion: "Settlement and Collections Center",
         subtitulo: "Select the processing method for payment invoices",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Billing center",
+        help_s1_title: "1. What this screen is",
+        help_s1_text:
+            "Entry point to open reports and settlements by department, organization, person, protocol, or institution (network) depending on what your site shows.",
+        help_s2_title: "2. How to continue",
+        help_s2_text:
+            "Click a card to go to the related sub-page; there you will see tables, filters, and exports as appropriate.",
+        help_s3_title: "3. Institution and network",
+        help_s3_text:
+            "The “By institution” card only appears if your site has network-derived workflows; other routes are usually available for accounting roles.",
         por_depto: "By Department",
         desc_depto: "Bulk settlement grouped by Faculties or Academic Units. Ideal for institutional reports.",
         por_investigador: "By Person",
@@ -1325,9 +1347,9 @@ alojamientos: {
         btn_ayuda: "Help",
         help_titulo: "Guide — Request center",
         help_s1_title: "1. Context and institution",
-        help_s1_text: "The line under the title shows whether you are on your site, the network, or another enabled context. Wait until the cards load.",
+        help_s1_text: "Once loaded, the line below the title shows your site or network context. If there are several institutions, use the search box.",
         help_s2_title: "2. Choose a workflow",
-        help_s2_text: "Each block groups the institution and request buttons (animals, reagents, supplies, room booking…) per your contract.",
+        help_s2_text: "Each site appears as a step in the list (dot and connecting line); below it are the cards for each enabled workflow.",
         help_s3_title: "3. If nothing appears",
         help_s3_text: "If you see no forms, your role or site settings may limit the catalog. Contact your vivarium administration."
     },
@@ -1603,6 +1625,8 @@ alojamientos: {
         contacto_modal_todas: "Contact — institutions",
         contacto_modal_una: "Institution",
         contacto_mail_asunto: "GROBO order inquiry",
+        contacto_msg_asunto_prefill: "GROBO order inquiry",
+        btn_enviar_mensaje_app: "Send message (app)",
         contacto_sin_correo: "No email",
         contacto_tel_lbl: "Phone / Contact",
         contacto_no_tel: "Not available",
@@ -1707,7 +1731,11 @@ alojamientos: {
         red_enviado_msg: "Request sent to the network.",
         red_faltan_envios_title: "Network sending pending",
         red_faltan_envios_msg: "Some network institutions still have not received the request.",
-        red_btn_enviar_desde_detalle: "Send to network"
+        red_btn_enviar_desde_detalle: "Send to network",
+        contacto_sede_titulo: "Contact your site about this protocol",
+        contacto_mail_asunto: "GROBO protocol inquiry",
+        contacto_msg_asunto_prot: "GROBO protocol inquiry",
+        btn_enviar_mensaje_app: "Send message (app)"
     },
     misalojamientos: {
         titulo: "MY ACCOMMODATIONS",
@@ -1735,6 +1763,8 @@ alojamientos: {
         buscando_historia: "Searching history...",
         pdf_ficha: "PDF RECORD",
         contactar_sede: "CONTACT SITE",
+        btn_enviar_mensaje_app: "Send message (app)",
+        contacto_msg_asunto_aloj: "GROBO housing inquiry",
         label_historia: "HISTORY",
         label_protocolo: "PROTOCOL",
         label_especie_tipo: "SPECIES / TYPE",
@@ -2201,7 +2231,22 @@ alojamientos: {
         red_hasta: "To",
         red_btn_cargar: "Load",
         red_export_pdf: "Export PDF",
-        red_export_excel: "Export Excel"
+        red_export_excel: "Export Excel",
+        tab_sede: "This site",
+        tab_red: "Institutional network",
+        red_tab_hint: "The Network tab aggregates forms (animals, reagents, supplies), active protocols, housing and traceability across all sites sharing the same network code.",
+        filtros_visuales_red: "Filters (network view)",
+        red_sin_datos: "Click “Refresh” on the Network tab to load data before exporting.",
+        red_pdf_title: "Export PDF (network)",
+        red_pdf_text: "Include network charts in the PDF? (may take longer)",
+        red_pdf_con_graf: "Yes, with charts",
+        red_pdf_solo_tablas: "Tables only",
+        red_pdf_doc_title: "STATISTICAL REPORT — NETWORK — GROBO",
+        red_pdf_fecha: "Date",
+        red_pdf_graf_depto: "Chart by department (network)",
+        red_pdf_graf_esp: "Species usage (network)",
+        red_pdf_tab_depto: "Breakdown by department (network)",
+        red_pdf_tab_esp: "Species detail (network)"
     },
     admin_historialcontable: {
         bread_grobo: "GROBO",
@@ -2230,14 +2275,36 @@ alojamientos: {
         col_investigador: "Investigator (Affected)",
         col_tipo_operacion: "Operation Type",
         col_ref_pedido: "Ref. Order",
-        col_monto: "Amount ($)"
+        col_monto: "Amount ($)",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Accounting history",
+        help_s1_title: "1. What this screen is",
+        help_s1_text:
+            "Log of accounting movements (top-ups, settlements, payments, refunds) for audit and reconciliation.",
+        help_s2_title: "2. Filters and search",
+        help_s2_text:
+            "Choose operation type, field, and text; use Search to refresh the grid. Export to Excel when you need to work outside the system.",
+        help_s3_title: "3. Table and pagination",
+        help_s3_text:
+            "Each row summarizes one movement; use the bottom pagination to browse large batches.",
     },
     admin_config: {
         bread_grobo: "GROBO",
         bread_admin: "Admin",
         bread_panel: "Configuration Panel",
         titulo: "CONFIGURATION CENTER",
-        subtitulo: "Manage global parameters for"
+        subtitulo: "Manage global parameters for",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Configuration center",
+        help_s1_title: "1. What this screen is",
+        help_s1_text:
+            "Entry point with cards to each site settings module; it is not the edit form itself.",
+        help_s2_title: "2. How to proceed",
+        help_s2_text:
+            "Click a card to open the related sub-page; there you save changes and see validation or alerts.",
+        help_s3_title: "3. Impact and help",
+        help_s3_text:
+            "Changes may affect all users. Use the training manual and the help bar for the guided tour of this view.",
     },
     config_institucion: {
         bread_gestion: "Institution Configuration",
@@ -3668,6 +3735,63 @@ alojamientos: {
         tour_misreservas_s4_title: "Confirm booking",
         tour_misreservas_s4_body:
             "{{i:clock-history}} After day and slot, fill instruments or reason if asked and set {{i:arrow-repeat}} repeats when offered.\n\n{{i:hand-thumbs-up}} Book/Confirm enables only when required fields are valid and there’s no conflict.\n\n{{svg:click}} Submit and wait for success; read error text for overlaps or out-of-hours issues.",
+        tour_config_s1_title: "Where you are in GROBO",
+        tour_config_s1_body:
+            "Confirm you are in administration and the configuration panel before changing site-wide parameters.\n\n{{i:signpost-split}} `nav[aria-label=\"breadcrumb\"]`: breadcrumbs (GROBO → Admin → configuration panel).\n\n- Check active institution or site in the bar or menu if shown.\n- Next step highlights the title and institution label.",
+        tour_config_s2_title: "Title and institution",
+        tour_config_s2_body:
+            "See which site you are configuring and that this page is only the access hub.\n\n{{i:type-h1}} Header `.config-hub-header`: center title and institution name (`#lbl-inst-name`).\n\n- {{i:question-circle}} Help button: local modal plus manual and tour from menu / bottom bar.\n- No data editing here—only pick a module from the grid.",
+        tour_config_s3_title: "Module grid",
+        tour_config_s3_body:
+            "Choose the area to configure (institution, species, reservations, roles, etc.) per contract and permissions.\n\n{{i:grid-3x3-gap}} `#config-grid`: clickable cards to each sub-page.\n\n{{svg:click}} Each card opens its own forms or tables; use Save there and read alerts.\n\n{{i:book}} Training (`#t=admin__configuracion__config`) covers the hub, risks, and common pop-ups.",
+        tour_fact_index_s1_title: "Billing in the menu",
+        tour_fact_index_s1_body:
+            "Confirm admin context and accounting module before opening a settlement report.\n\n{{i:signpost-split}} Breadcrumbs: GROBO → Admin → Billing.\n\n- If the accounting menu is missing, check role and contracted modules.",
+        tour_fact_index_s2_title: "Settlement center",
+        tour_fact_index_s2_body:
+            "Title and subtitle explain the goal: pick how the report is grouped (dept, organization, person, protocol…).\n\n{{i:type-h1}} Hub header: same page for all cards; detail lives on each sub-route.",
+        tour_fact_index_s3_title: "Access cards",
+        tour_fact_index_s3_body:
+            "Each block opens a different view with its own tables and actions (PDF, filters, payments, etc.).\n\n{{i:grid-3x3-gap}} `#billing-hub-grid`: one card per mode.\n\n{{svg:click}} Click the block you need; wait for the sub-page to load.",
+        tour_fact_index_s4_title: "Pick the right view",
+        tour_fact_index_s4_body:
+            "Example access card: icon and title show the criterion (dept, org, researcher, protocol…).\n\n{{i:building}} “By institution” only if your site uses network derivations.\n\n{{i:book}} The manual `admin__facturacion__index` summarizes flow with pricing and accounting history.",
+        tour_hist_cont_s1_title: "Where the history lives",
+        tour_hist_cont_s1_body:
+            "Audit trail of financial movements tied to orders and biorepository operations.\n\n{{i:signpost-split}} Breadcrumbs with institution and role.\n\n- Only authorized staff should export or interpret balances.",
+        tour_hist_cont_s2_title: "Report title",
+        tour_hist_cont_s2_body:
+            "“Financial audit and payments” holds the filterable list of movements.\n\n{{i:clipboard-data}} Use this screen to trace who recorded what and when.",
+        tour_hist_cont_s3_title: "Filters, search, and Excel",
+        tour_hist_cont_s3_body:
+            "Adjust operation type, search field, and text; confirm with Search.\n\n{{i:funnel}} The same strip includes {{i:file-earmark-excel}} export to Excel for external analysis.\n\n{{svg:click}} Check that the grid refreshes after each search.",
+        tour_hist_cont_s4_title: "Movement grid",
+        tour_hist_cont_s4_body:
+            "Columns: ID, dates, actors, type, reference, and amounts.\n\n{{i:table}} `#table-body-historial`: paginated rows at the bottom.\n\n{{i:book}} Reconcile with billing and pricing per your site’s process.",
+        tour_admin_noticias_s1_title: "News administration",
+        tour_admin_noticias_s1_body:
+            "Publish and maintain notices that researchers and staff see on the news portal.\n\n{{i:journal-richtext}} Header with page title and help access.",
+        tour_admin_noticias_s2_title: "New article",
+        tour_admin_noticias_s2_body:
+            "Opens the edit modal: title, category, body, status, and network options.\n\n{{i:plus-lg}} `#btn-nueva-noticia`\n\n- Save as draft until text and scope are validated.",
+        tour_admin_noticias_s3_title: "Published list",
+        tour_admin_noticias_s3_body:
+            "Review date, title, network flag, and publication status.\n\n{{i:list-ul}} Responsive table with row actions.\n\n{{svg:click}} Edit reopens the same form with data loaded.",
+        tour_admin_noticias_s4_title: "Pagination",
+        tour_admin_noticias_s4_body:
+            "Browse long lists without losing the current filter context.\n\n{{i:chevron-left}} {{i:chevron-right}} Previous / next buttons.\n\n{{i:book}} The reader portal (`panel/noticias`) shows the published result.",
+        tour_cap_red_s1_title: "Manual and network topic",
+        tour_cap_red_s1_body:
+            "You are reading the cross-cutting chapter on **multi-site networks**: messages, derivations, and cross-site billing when your institution uses them.\n\n{{i:diagram-3}} Content applies to several roles; always check which routes you actually have in the live menu.",
+        tour_cap_red_s2_title: "Topic list",
+        tour_cap_red_s2_body:
+            "The network item appears when your profile and modules allow it; other topics are filtered by contracted menu.\n\n{{i:list}} `#cap-list`: click another topic to change the document without leaving Training.",
+        tour_cap_red_s3_title: "Chapter content",
+        tour_cap_red_s3_body:
+            "Summary, role scope, and accordions with operational detail.\n\n{{i:book}} `#cap-content-region`\n\n- Use `#t=capacitacion__tema__red` to share this view.",
+        tour_cap_red_s4_title: "Preferences and library tour",
+        tour_cap_red_s4_body:
+            "Turn the bottom help bar back on if you hid it, and run the generic library tutorial when you want.\n\n{{i:lightning-charge}} Bottom card: bar toggle + manual page tutorial.\n\n{{i:journal-richtext}} Elsewhere in the panel, the contextual bar links here with the right slug.",
         nav_library: "Manual topics by menu section",
         main_landmark: "Training manual and topic library",
         hash_unavailable_title: "Link not available for your profile",

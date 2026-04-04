@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { NotificationManager } from '../../NotificationManager.js';
+import { scheduleCapUiPrefsToBackend } from '../../utils/userCapUiPrefsBackend.js';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -40,7 +41,25 @@ function bindLeerMas(grid, onOpen) {
     });
 }
 
-/** Avanza el cursor de “noticias vistas” solo al abrir una noticia (no al entrar al listado). */
+/**
+ * Al entrar al portal (listado cargado): considera vistas todas las noticias hasta ahora
+ * (local + red, mismo criterio que el badge del menú 206).
+ */
+function markNoticiasPortalVistoHastaAhora() {
+    try {
+        localStorage.setItem('grobo_noticias_vista_hasta', new Date().toISOString());
+    } catch (e) {
+        /* ignore */
+    }
+    try {
+        NotificationManager.check();
+    } catch (e) {
+        /* ignore */
+    }
+    scheduleCapUiPrefsToBackend();
+}
+
+/** Avanza el cursor al abrir el detalle de una noticia (refuerza la fecha de esa publicación). */
 function advanceNoticiasVistaHasta(fechaPublicacionOCreacion) {
     const raw = fechaPublicacionOCreacion != null ? String(fechaPublicacionOCreacion).trim() : '';
     if (!raw) return;
@@ -62,6 +81,7 @@ function advanceNoticiasVistaHasta(fechaPublicacionOCreacion) {
     } catch (e) {
         /* ignore */
     }
+    scheduleCapUiPrefsToBackend();
 }
 
 export async function initPortalNoticias() {
@@ -250,6 +270,8 @@ export async function initPortalNoticias() {
                 window.scrollTo(0, 0);
             }
         }
+
+        markNoticiasPortalVistoHastaAhora();
     }
 
     async function abrirDetalle(id) {
