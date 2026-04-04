@@ -107,10 +107,16 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i><span data-i18n="alojamientos.title">Gestión de Alojamientos</span></h5>
                 <div class="d-flex gap-2">
-                    <button id="btn-ayuda-alojamiento" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm">
+                    <button
+                        type="button"
+                        id="btn-ayuda-alojamiento"
+                        class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm"
+                        data-gecko-cap-help="admin/alojamientos"
+                        data-gecko-cap-modal="#modal-alojamiento-help"
+                    >
                         <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda">AYUDA</span>
                     </button>
-                    <button class="btn btn-outline-success btn-sm fw-bold shadow-sm" onclick="window.exportExcelAlojamientos()">
+                    <button type="button" id="btn-excel-alojamiento" class="btn btn-outline-success btn-sm fw-bold shadow-sm" onclick="window.exportExcelAlojamientos()">
                         <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="generales.excel">EXCEL</span>
                     </button>
                     <button class="btn btn-success btn-sm fw-bold shadow-sm" onclick="window.openModalRegistro()">
@@ -141,7 +147,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover align-middle border">
+                <table id="tabla-alojamientos" class="table table-hover align-middle border">
                     <thead class="bg-dark text-white small uppercase">
                         <tr>
                             <th data-key="historia" data-sortable="true" data-i18n="alojamientos.th_history">Historia</th>

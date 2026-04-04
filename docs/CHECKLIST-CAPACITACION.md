@@ -8,7 +8,7 @@
 
 # 📚 Checklist maestro — Capacitación
 
-**Manual por rol · biblioteca `panel/capacitacion` · ayuda contextual (FAB)**
+**Manual por rol · biblioteca `panel/capacitacion` · barra inferior (documento de ayuda + tutorial interactivo) · menú Ayuda junto a Excel**
 
 *Documento vivo: marcar casillas a medida que se avanza. Prioridad: claridad para el usuario final.*
 
@@ -25,12 +25,15 @@
 | [3. Patrones de pantalla](#3--patrones-de-ui-en-grobo-listas-popups-crear--editar) | Listas, popups, crear/modificar |
 | [4. Para qué sirve cada menú](#4--tabla-maestra-para-qué-sirve-cada-ruta-del-menú) | Tabla maestra por ruta |
 | [5. Checklist por módulo](#5--checklist-por-módulo-contenido-del-manual) | Detalle por tema / slug |
-| [6. Infraestructura técnica](#6--infraestructura-técnica) | Archivos, i18n, FAB, deep links |
+| [6. Infraestructura técnica](#6--infraestructura-técnica) | Archivos, i18n, barra ayuda, deep links |
 | [7. Calidad y medios](#7--calidad-contenido-capturas-glosario) | Capturas, glosario, revisión |
 | [8. QA y accesibilidad](#8--qa-manual-y-accesibilidad) | Pruebas por rol e idioma |
 | [9. Extras](#9--extras-superadmin-registro-público-páginas-huérfanas) | QR, registro público, sub-rutas config |
 | [10. Roles GROBO (1–6)](#10--roles-grobo-visibilidad-en-capacitación) | **No todos ven lo mismo** · matriz menú/capacitación |
 | [11. RED multi-sede](#11--red-multi-sede-checklist-por-rol-y-área) | Protocolos, formularios, mensajes… por rol |
+| [12. Seguimiento por release](#12--seguimiento-por-release) | Cierre de versión, prioridades, bloqueadores |
+| [13. Tutorial interactivo](#13--tutorial-interactivo-spotlight--checklist) | Pasos por ruta, i18n, selectores, botón contextual |
+| [13.5–13.6](#135--tour-solo-con-modal-bootstrap-y-backlog-por-modal) | Tour `__modals__` solo con modal abierto · backlog campo a campo |
 
 ---
 
@@ -81,7 +84,7 @@ flowchart LR
   end
   subgraph Ayuda["❓ Ayuda"]
     C["Ayuda → Capacitación"]
-    FAB["Barra inferior verde (FAB)"]
+    FAB["Barra inferior: documento de ayuda + tutorial interactivo"]
   end
   subgraph Biblio["📚 Biblioteca"]
     L["Lista izquierda temas"]
@@ -116,6 +119,8 @@ flowchart TB
     cap["capacitacion.js"]
     paths["capacitacionPaths.js · capacitacionMenuPaths.js"]
     fab["CapacitacionHelpFab.js"]
+    tour["CapacitacionInteractiveTour.js · capacitacionTours.js"]
+    phm["CapacitacionPageHelpMenu.js"]
     html["paginas/panel/capacitacion.html"]
     manES["capacitacionManual.es.js"]
     manEN["capacitacionManual.en.js"]
@@ -128,6 +133,10 @@ flowchart TB
   cap --> manPT
   cap --> i18n
   fab --> paths
+  fab --> tour
+  tour --> paths
+  phm --> tour
+  phm --> paths
   html --> cap
 ```
 
@@ -267,7 +276,7 @@ flowchart TB
 | `panel/mensajes_institucion` | `panel__mensajes_institucion` | Canal institucional / RED | Todos (con módulo) |
 | `admin/comunicacion/noticias` | `admin__comunicacion__noticias` | **Publicar** noticias del portal | Comunicación / admin |
 | `panel/noticias` | `panel__noticias` | **Leer** noticias | Todos (con módulo) |
-| `panel/perfil` | `panel__perfil` | Datos personales, idioma, tema | Todos |
+| `panel/perfil` | `panel__perfil` | Datos personales; barra del menú (tema claro/oscuro, idioma, letra, layout, mic); Gecko Search/IA/voz | Todos |
 | `panel/soporte` | `panel__soporte` | Tickets técnicos Gecko (turnos) | Todos (con módulo) |
 | `panel/ventas` | `panel__ventas` | Consulta comercial por correo a ventas | Todos (con módulo) |
 | `panel/capacitacion` | `panel__capacitacion` | Esta biblioteca de ayuda | Todos (con módulo) |
@@ -285,7 +294,8 @@ flowchart TB
 
 ## 5 · Checklist por módulo (contenido del manual)
 
-> Para **cada** fila: marcar 👀 revisión sede, 🖼 si faltan capturas, 🌐 si hay que pulir EN/PT.
+> Para **cada** fila: marcar 👀 revisión sede, 🖼 si faltan capturas, 🌐 si hay que pulir EN/PT.  
+> **Cruce obligatorio:** antes de dar por cerrado un tema, contrastar con **[§10](#10--roles-grobo-visibilidad-en-capacitación)** (¿ese rol lo ve en la lista?) y, si aplica RED, con **[§11](#11--red-multi-sede-checklist-por-rol-y-área)**.
 
 ### 5.1 Infraestructura del producto capacitación
 
@@ -296,10 +306,13 @@ flowchart TB
 | 3 | `admin/dashboard` y `panel/dashboard` inyectados según rol | [x] |
 | 4 | Filtrado por `/menu` + `filterMenuIdsByModulos` | [x] |
 | 5 | Deep link `#t=slug` | [x] |
-| 6 | `CapacitacionHelpFab` (barra inferior) | [x] |
+| 6 | `CapacitacionHelpFab` (barra inferior: documento + tour + ocultar) | [x] |
 | 7 | Manuales `capacitacionManual.{es,en,pt}.js` | [x] |
 | 8 | Acordeones + cinta “cómo leer” + fallback `bodies` | [x] |
-| 9 | i18n UI capacitación (banner, FAB, roles_label, RED…) | [x] |
+| 9 | i18n UI capacitación (banner, barra, roles_label, tour_*, RED…) | [x] |
+| 10 | `CapacitacionInteractiveTour.js` + `capacitacionTours.js` (spotlight) | [x] |
+| 11 | `CapacitacionPageHelpMenu.js` (`data-gecko-cap-help` / modal opcional) | [x] |
+| 12 | Preferencia `gecko_hide_capacitacion_fab` + tarjeta en `capacitacion.html` | [x] |
 
 ### 5.2 Administración — contenido por tema
 
@@ -354,10 +367,14 @@ flowchart TB
 | Archivo | Responsabilidad | Verificar |
 |---------|-----------------|-----------|
 | `front/paginas/panel/capacitacion.html` | Layout, Bootstrap CSS+JS, banner i18n | [x] |
-| `front/dist/js/pages/usuario/capacitacion.js` | Lista temas, `topicHtml`, hash, idioma manual | [x] |
+| `front/dist/js/pages/usuario/capacitacion.js` | Lista temas, `topicHtml` (+ `cat` / `icon` por bloque), hash, idioma manual | [x] |
 | `front/dist/js/utils/capacitacionPaths.js` | `pathnameToMenuPath`, `menuPathToSlug` | [x] |
+| `front/dist/js/utils/capacitacionLabels.js` | Etiquetas menú → i18n (lista capacitación, FAB) | [x] |
 | `front/dist/js/utils/capacitacionMenuPaths.js` | `CAPACITACION_PATH_ORDER`, `collectMenuPathsFromIds` | [x] |
-| `front/dist/js/components/CapacitacionHelpFab.js` | FAB contextual + rutas permitidas | [x] |
+| `front/dist/js/components/CapacitacionHelpFab.js` | Barra inferior contextual + `FAB_HIDDEN_KEY` | [x] |
+| `front/dist/js/components/CapacitacionInteractiveTour.js` | Overlay spotlight, pasos, teclado | [x] |
+| `front/dist/js/utils/capacitacionTours.js` | `CAPACITACION_TOUR_STEPS` por `menuPath` | [x] |
+| `front/dist/js/components/CapacitacionPageHelpMenu.js` | Menú flotante Ayuda + Excel | [x] |
 | `front/dist/js/utils/capacitacionManual.es.js` | Capítulos ES | [x] |
 | `front/dist/js/utils/capacitacionManual.en.js` | Capítulos EN | [x] |
 | `front/dist/js/utils/capacitacionManual.pt.js` | Capítulos PT | [x] |
@@ -370,7 +387,10 @@ flowchart TB
 - [ ] ⬜ Incluir ruta en `CAPACITACION_PATH_ORDER` (posición lógica).
 - [ ] ⬜ Crear slug y capítulo en **los tres** `capacitacionManual.*.js`.
 - [ ] ⬜ Añadir `titulos_pagina` + `PATH_TO_TITLE_KEY` en `i18n.js` si hay `data-page-title-key`.
-- [ ] ⬜ Probar FAB: `pathnameToMenuPath` debe resolver la nueva página.
+- [ ] ⬜ Probar barra inferior: `pathnameToMenuPath` debe resolver la nueva página.
+- [ ] ⬜ Añadir la ruta en `capacitacionLabels.js` (`CAPACITACION_MENU_LABEL_KEYS`) para título coherente en lista y barra.
+- [ ] ⬜ **Tutorial interactivo (§13):** añadir entradas en `capacitacionTours.js` + claves `capacitacion.tour_*` en ES/EN/PT (o marcar ruta como pendiente en la tabla §13.2).
+- [ ] ⬜ Opcional: botón Ayuda de la grilla con `data-gecko-cap-help="<menuPath>"` y `data-gecko-cap-modal="#…"` si hay modal local.
 - [ ] ⬜ Actualizar **esta tabla maestra** (sección 4) y la sub-sección 5 correspondiente.
 
 ### 6.3 Deep links de ejemplo (para pruebas)
@@ -379,7 +399,8 @@ flowchart TB
 …/paginas/panel/capacitacion.html#t=admin__protocolos
 …/paginas/panel/capacitacion.html#t=admin__solicitud_protocolo
 …/paginas/panel/capacitacion.html#t=capacitacion__tema__red
-…/paginas/panel/capacitacion.html#t=panel__ventas   ← tras añadir manual
+…/paginas/panel/capacitacion.html#t=panel__ventas
+…/paginas/panel/capacitacion.html#t=panel__soporte
 ```
 
 ---
@@ -405,6 +426,26 @@ flowchart TB
 | **Solicitud de protocolo** | Trámite para alta/cambio ante comité o admin |
 | **Módulo** | Funcionalidad contratable; puede ocultar menús |
 | **Slug** | Identificador estable del tema en la URL `#t=` |
+| **menudistr** | Distribución de ítems de menú por usuario/institución (excepciones a la plantilla estándar) |
+| **invHasData** | Lógica que puede mostrar módulos al investigador si ya tiene historial aunque el menú base sea más restrictivo |
+| **Plantilla admin (1, 2, 4)** | Menú amplio generado en front + filtro por módulos contratados |
+| **Menú panel (3, 5, 6)** | Menú obtenido vía API (`/menu`) + mismos filtros de módulos |
+| **modulesAccess** | Reglas de acceso a rutas `panel/*` según path y rol |
+
+### 7.4 Convención «control por control» (botones, iconos, categorías)
+
+> **Objetivo:** documentación muy detallada, categorizada, con iconos de referencia (Bootstrap Icons) alineados a zonas reales de la UI.
+
+| Regla | Detalle |
+|--------|---------|
+| **Categorías (`cat`)** | Valores estándar: `navigation`, `toolbar`, `filters`, `table`, `row`, `bulk`, `modals`, `forms`, `detail`, `sidebar`, `dashboard`, `content`, `comms`, `hub`, `profile`, `links`, `help`. Se traducen vía `capacitacion.cat_*` en i18n ES/EN/PT. |
+| **Icono del apartado (`icon`)** | Nombre Bootstrap Icons **sin** prefijo `bi-` (ej. `funnel`). Aparece junto al título del acordeón. |
+| **Glosario de controles** | En `blocks[].html`, usar `<dl class="manual-glossary">` con `<dt>` (control + `<i class="bi bi-…">`) y `<dd>` (qué hace, cuándo usarlo, advertencias). |
+| **Variación por sede** | Redactar con «suele», «típico», «si su sede muestra…»; el producto puede personalizar etiquetas. |
+| **Paridad de idiomas** | Mismos `id` de bloque y mismas claves `cat`/`icon` en `capacitacionManual.es.js`, `.en.js`, `.pt.js`; solo cambian `h` y `html`. |
+| **Render** | `capacitacion.js` inserta cabeceras de categoría y soporta `icon`/`cat`; estilos en `capacitacion.html` (`.manual-glossary`, `.manual-cat-heading`). |
+
+- [ ] ⬜ Resto de capítulos del manual: aplicar §7.4 al mismo nivel que los piloto (dashboard admin/panel, usuarios, protocolos, animales, centro de solicitudes, mis formularios, tema capacitación).
 
 ### 7.3 Capturas y GIFs (opcional pero recomendado)
 
@@ -422,19 +463,33 @@ flowchart TB
 
 | Caso | Pasos | Esperado | ⬜ |
 |------|--------|----------|---|
-| Investigador | Login rol 3–6, abrir capacitación | Solo temas de su menú filtrado + RED | [ ] |
-| Admin sede | Login rol 2/4, abrir capacitación | Temas admin + contable + comunicación según API | [ ] |
-| FAB | Abrir `admin/usuarios`, mirar barra inferior | Enlace a `#t=admin__usuarios` | [ ] |
+| Investigador | Login rol **3**, abrir capacitación | Solo temas de su menú + `capacitacion__tema__red` si aplica; **sin** bandejas admin salvo excepción real | [ ] |
+| Asistente | Login rol **5** | Misma familia de menú que investigador; validar **permisos extra** de la sede vs matriz §10.1 | [ ] |
+| Laboratorio | Login rol **6** | Temas panel acordes a operación (pedidos, alojamientos, etc.); **no** narrar como “titular de protocolo” si no aplica | [ ] |
+| Admin sede | Login rol **4** (y **2** si aplica) | Temas admin + contable + comunicación según módulos; lista ≠ investigador | [ ] |
+| GeckoDev | Login rol **1** (solo entorno prueba) | Coherencia barra inferior + lista; textos no asumen una sola sede | [ ] |
+| Barra inferior | Abrir `admin/usuarios` | **Ver documento de ayuda** → `#t=admin__usuarios` | [ ] |
+| Barra + tour | Misma pantalla | **Tutorial interactivo** → 4 pasos (título, filtro, Excel, tabla) sin errores de consola | [ ] |
+| Barra panel | Abrir `panel/misformularios` | Documento de ayuda resuelve a `#t=panel__misformularios` (o slug vigente) | [ ] |
+| Ocultar barra | Pulsar “No mostrar más…” | `localStorage` `gecko_hide_capacitacion_fab`; barra desaparece en otras páginas | [ ] |
+| Reactivar barra | `panel/capacitacion` | Interruptor + `refreshCapacitacionHelpFab` muestra de nuevo la barra al navegar | [ ] |
+| Ayuda + Excel | `admin/usuarios` → Ayuda | Menú: ayuda modal + documento + tour + mostrar barra (si oculta) | [ ] |
+| Tour biblioteca | `panel/capacitacion` | Botón “Tutorial interactivo de esta biblioteca” → 3 pasos | [ ] |
+| Soporte | `panel/soporte`: enviar ticket de prueba | Correo / confirmación según backend; manual alineado al flujo real | [ ] |
+| Ventas | `panel/ventas`: enviar consulta | Mensaje de éxito con destino; categoría venta | [ ] |
+| Tema RED | Abrir `capacitacion__tema__red` desde lista | Visible para roles que deben verlo; contenido coherente con §11 | [ ] |
 | Acordeón | Abrir un tema largo, expandir/colapsar | Bootstrap JS funciona | [ ] |
 | Idioma | Cambiar ES → EN → PT | Textos UI + capítulos coherentes | [ ] |
 | Hash | Pegar URL con `#t=` | Se selecciona el tema correcto | [ ] |
-| Sin tema | Rol sin un módulo | Ese ítem **no** aparece en la lista izquierda | [ ] |
+| Sin tema | Institución **sin** módulo (ej. reactivos) | Ese ítem **no** aparece en la lista izquierda | [ ] |
+| Hash huérfano | `#t=admin__precios` con rol investigador | Aviso traducido + primer tema de la biblioteca + hash corregido (`replaceState`) | [x] |
 
 ### 8.2 Accesibilidad (mejoras futuras)
 
-- [ ] ⬜ Revisar `aria-label` / `role` en lista de temas y acordeón
+- [x] Lista de temas: `role="navigation"`, `aria-label`, `aria-current` en el ítem activo, `aria-controls` → región de contenido; `<main>` con `aria-label`; región contenido `aria-labelledby` + `aria-live="polite"`; barra inferior: `aria-label` en región + enlace al documento de ayuda.
+- [x] Tutorial interactivo: foco visible en botones Anterior/Siguiente (`CapacitacionInteractiveTour.js`); `role="dialog"` + `aria-modal` en la tarjeta del tour; cierre con clic en overlay (§13.3).
 - [ ] ⬜ Contraste de la cinta verde y badges en tema claro/oscuro
-- [ ] ⬜ Navegación solo teclado en lista lateral
+- [x] Navegación por teclado en lista lateral: botones nativos (Tab / Enter); acordeón Bootstrap (foco en cabeceras)
 
 ---
 
@@ -442,7 +497,7 @@ flowchart TB
 
 | Área | Situación | Acción sugerida |
 |------|-----------|-----------------|
-| **Superadmin** | FAB suele no aplicar o rutas distintas | [ ] ⬜ Documentar exclusión o mapeo en `pathnameToMenuPath` |
+| **Superadmin** | Barra inferior suele no aplicar o rutas distintas | [ ] ⬜ Documentar exclusión o mapeo en `pathnameToMenuPath` |
 | **Registro / login público** | Sin menú panel | [ ] ⬜ Manual aparte o enlace a groboapp.com |
 | **QR / salas** | Pueden no pasar por menú estándar | [ ] ⬜ Entrada “padre” en checklist o FAQ interno |
 | **Configuración sub-rutas** | Muchas URLs bajo `admin/configuracion/*` | [ ] ⬜ Ampliar `pathnameToMenuPath` o capítulos hijos en el manual del hub |
@@ -497,7 +552,7 @@ flowchart TB
 
 #### 🏛 Rol 2 — Superadmin
 - [ ] ⬜ Misma base que Admin (4) pero mencionar **alcance** (varias sedes / políticas) donde aplique.
-- [ ] ⬜ Noticias admin (205) y mensajería 204 según `MenuController` / `menudistr`.
+- [ ] ⬜ Noticias (admin) y mensajería institucional: visibilidad según **menú real** de la sede (`MenuController` / `menudistr`), no asumir ítems que la API no devuelve.
 
 #### ⚙️ Rol 4 — Admin
 - [ ] ⬜ Cada tema **admin/** debe explicar **impacto en investigadores** (estados de pedido, facturación).
@@ -523,7 +578,7 @@ flowchart TB
 |---|--------|
 | [ ] | Iniciar sesión como **3, 5, 6** y anotar lista exacta de temas mostrados; comparar con matriz 10.1 |
 | [ ] | Iniciar sesión como **4** (y **2** si aplica) y repetir |
-| [ ] | Iniciar sesión como **1** solo en entorno de prueba; validar FAB + capacitación |
+| [ ] | Iniciar sesión como **1** solo en entorno de prueba; validar barra inferior + capacitación + §13 |
 | [ ] | Desactivar un módulo (ej. reactivos) en una sede de prueba: confirmar que **desaparece** el tema correspondiente |
 | [ ] | Campo `chapter.roles` en `capacitacionManual.*.js` alineado con la matriz (sin prometer pantallas admin a investigador) |
 
@@ -606,6 +661,143 @@ flowchart TB
 
 ---
 
+## 12 · Seguimiento por release
+
+> Usar esta sección como **cierre de sprint o versión** de contenido/código. Copiar la tabla a un comentario de issue o nota interna con fecha.
+
+### 12.1 Criterios de “listo para publicar” (contenido capacitación)
+
+| # | Criterio | ⬜ |
+|---|----------|---|
+| 1 | Todos los temas **listados** en §5.2–5.4 tienen `summary` + `roles` coherentes con §10 | [ ] |
+| 2 | §10.3 ejecutado en al menos **un** usuario de cada familia: panel (3/5/6) y admin (4 o 2) | [ ] |
+| 3 | Institución de prueba **sin** un módulo: temas ocultos verificados (§8.1 “Sin tema”) | [ ] |
+| 4 | EN/PT: pasada rápida 🌐 en temas tocados en el release | [ ] |
+| 5 | RED: si la sede usa red, §11.3 áreas A–F revisadas o explícitamente N/A documentado | [ ] |
+| 6 | §9: QR / registro público / superadmin — decidido (documentado o fuera de alcance) | [ ] |
+
+### 12.2 Bloqueadores frecuentes (check rápido)
+
+- [ ] ⬜ Nueva pantalla en menú **sin** entrada en `CAPACITACION_PATH_ORDER` o sin capítulo en los tres idiomas.
+- [ ] ⬜ `pathnameToMenuPath` no resuelve la URL → barra inferior rota o enlace incorrecto.
+- [ ] ⬜ Selectores en `capacitacionTours.js` desalineados con el HTML → pasos saltados o tour vacío (revisar §13.2).
+- [ ] ⬜ Texto del manual promete permisos **admin** a rol **investigador** (revisar `chapter.roles`).
+
+### 12.3 Priorización sugerida (cuando falte tiempo)
+
+1. Temas con **mayor tráfico** o tickets de soporte (pedidos, protocolos, formularios).  
+2. **RED** solo en sedes que contratan multi-sede.  
+3. Capturas y GIF (§7.3) después de estabilizar textos.
+
+---
+
+## 13 · Tutorial interactivo (spotlight) — checklist
+
+> **Objetivo:** completar el recorrido guiado **pantalla a pantalla**, alineado al **mismo `menuPath`** que capacitación (`pathnameToMenuPath`). Cada fila de §13.2 es el “contrato” entre código (`capacitacionTours.js`), textos i18n y QA.
+
+### 13.1 Convenciones (antes de marcar [x])
+
+| Regla | Detalle |
+|--------|---------|
+| **Datos** | `front/dist/js/utils/capacitacionTours.js` → objeto `CAPACITACION_TOUR_STEPS[menuPath]` = array de `{ selector, titleKey, bodyKey }`. |
+| **i18n** | Claves bajo `window.txt.capacitacion.*` en `es.js`, `en.js`, `pt.js` (`tour_*` por pantalla + genéricas `tour_prev`, `tour_next`, …). |
+| **Selectores** | Deben existir en el DOM **después** de `DOMContentLoaded` / datos cargados; preferir `id` estables. Probar en tema claro y oscuro. |
+| **Sin pasos** | Si la ruta no está en el objeto, el usuario ve diálogo informativo + opción de abrir el **documento de ayuda** en Capacitación. |
+| **Ayuda en grilla** | Opcional: `data-gecko-cap-help="<menuPath>"` y `data-gecko-cap-modal="#idModal"` en el botón Ayuda (ver `admin/usuarios.html`). |
+| **Barra inferior** | `CapacitacionHelpFab.js` llama al mismo motor; no duplicar lógica en páginas. |
+
+### 13.2 Matriz por ruta (estado del tutorial interactivo)
+
+Marcar **[x]** en **Pasos** cuando exista entrada en `CAPACITACION_TOUR_STEPS` y textos en **los tres** idiomas. Marcar **[x]** en **Ayuda+Excel** cuando el HTML tenga `data-gecko-cap-help` (y modal si aplica).
+
+| Ruta `menuPath` | # Pasos | Pasos | i18n ES/EN/PT | Ayuda+Excel | QA manual ⬜ |
+|-----------------|:-------:|:-----:|:-------------:|:-----------:|:-------------:|
+| `panel/capacitacion` | 3 | [x] | [x] | N/A (biblioteca) | [ ] |
+| `admin/usuarios` | 4 | [x] | [x] | [x] (`usuarios.html`) | [ ] |
+| `admin/dashboard` | 4 | [x] | [x] | [x] solo ayuda (`admin/dashboard.html`) | [ ] |
+| `panel/dashboard` | 4 | [x] | [x] | [x] solo ayuda (`panel/dashboard.html`) | [ ] |
+| `usuario/dashboard` | 4 | [x] | [x] | [x] solo ayuda (`usuario/dashboard.html`, misma plantilla) | [ ] |
+| `admin/protocolos` | 4 | [x] | [x] | [x] (`protocolos.html`) | [ ] |
+| `admin/solicitud_protocolo` | 4 | [x] | [x] | [x] solo ayuda (`admin/solicitud_protocolo.html`) | [ ] |
+| `admin/animales` | 4 | [x] | [x] | [x] (`animales.html`) | [ ] |
+| `admin/reactivos` | 4 | [x] | [x] | [x] (`reactivos.html`) | [ ] |
+| `admin/insumos` | 4 | [x] | [x] | [x] (`insumos.html`) | [ ] |
+| `admin/reservas` | 4 | [x] | [x] | [x] (`admin/reservas.html`, informes/QR + ayuda) | [ ] |
+| `admin/alojamientos` | 4 | [x] | [x] | [x] (`alojamientos.html`) | [ ] |
+| `admin/estadisticas` | 4 | [x] | [x] | [x] (`admin/estadisticas.html`, Excel/PDF + ayuda) | [ ] |
+| `admin/configuracion/config` | — | [ ] | [ ] | [ ] | [ ] |
+| `panel/formularios` | 3 | [x] | [x] | [x] solo ayuda (`panel/formularios.html`; `usuario/formularios.html` → mismo `menuPath`) | [ ] |
+| `panel/misformularios` | 4 | [x] | [x] | [x] (`panel/misformularios.html`) | [ ] |
+| `usuario/misformularios` | 4 | [x] | [x] | [x] (`usuario/misformularios.html`, misma plantilla) | [ ] |
+| `panel/misalojamientos` | 4 | [x] | [x] | [x] (`panel/misalojamientos.html`, Excel + ayuda) | [ ] |
+| `usuario/misalojamientos` | 4 | [x] | [x] | [x] (`usuario/misalojamientos.html`, Excel + ayuda) | [ ] |
+| `panel/misreservas` | 4 | [x] | [x] | [x] solo ayuda (`panel/misreservas.html`) | [ ] |
+| `usuario/misreservas` | 4 | [x] | [x] | [x] solo ayuda (`usuario/misreservas.html`) | [ ] |
+| `panel/misprotocolos` | 4 | [x] | [x] | [x] solo ayuda (`modal-ayuda-protocolos`; `usuario/misprotocolos.html` → mismo `menuPath`) | [ ] |
+| `panel/mensajes` | 4 | [x] | [x] | [x] solo ayuda (`panel/mensajes.html`, `usuario/mensajes.html` → mismo `menuPath`) | [ ] |
+| `panel/mensajes_institucion` | 4 | [x] | [x] | [x] solo ayuda (`panel/mensajes_institucion.html`, `usuario/mensajes_institucion.html` → mismo `menuPath`) | [ ] |
+| `panel/noticias` | 4 | [x] | [x] | [x] solo ayuda (`panel/noticias.html`) | [ ] |
+| `panel/perfil` | 4 | [x] | [x] | [x] solo ayuda (`panel/perfil.html`, `usuario/perfil.html` → mismo `menuPath`) | [ ] |
+| `panel/soporte` | 4 | [x] | [x] | [x] solo ayuda (`panel/soporte.html`) | [ ] |
+| `panel/ventas` | 4 | [x] | [x] | [x] solo ayuda (`panel/ventas.html`) | [ ] |
+| `admin/precios` | 4 | [x] | [x] | [x] (`admin/precios.html`, Excel/PDF + ayuda) | [ ] |
+| `admin/facturacion/index` | — | [ ] | [ ] | [ ] | [ ] |
+| `admin/historialcontable` | — | [ ] | [ ] | [ ] | [ ] |
+| `admin/comunicacion/noticias` | — | [ ] | [ ] | [ ] | [ ] |
+| `capacitacion/tema/red` | — | [ ] | [ ] | [ ] | [ ] |
+| `__modals__` (tour genérico cabecera/cuerpo/pie) | 4 | [x] | [x] | Solo con `.modal.show`; botón barra + menú Ayuda + franja modal | [ ] |
+
+### 13.5 · Tour solo con modal (Bootstrap) y backlog por modal
+
+**Regla de producto:** el tour `__modals__` **no se ofrece** sin un `.modal.show` (Bootstrap). Entradas ocultas hasta entonces:
+
+- Fila del menú **Ayuda** (?): `<li class="gecko-help-modals-tour-item d-none">` — visibilidad vía `syncModalsTourEntrypoints()` en `CapacitacionHelpFab.js` (eventos `shown.bs.modal` / `hidden.bs.modal`).
+- Botón en la **barra inferior** (`.gecko-fab-tour-modals d-none` por defecto).
+- Menú contextual **Ayuda junto a Excel**: la fila del tutorial de modal solo se inserta si hay modal abierto al abrir el menú (`CapacitacionPageHelpMenu.js`).
+- **Doble seguridad:** `startCapacitacionInteractiveTour('__modals__')` aborta con mensaje i18n si no hay modal.
+
+**Pasos actuales** (`TOUR_STEPS_MODALES` en `capacitacionTours.js`): diálogo → cabecera → cuerpo → pie. Si un modal **no tiene** `.modal-footer`, el último paso se omite (comportamiento del motor al no encontrar selector).
+
+**UX tour (todos los recorridos):** las opciones «no mostrar tutorial automático» solo en el **último paso**; en pasos intermedios texto corto que indica que esas opciones vienen al final. Al cerrar el último paso, párrafo i18n `tour_end_where_hint` (barra, Excel, menú Ayuda, reactivar barra).
+
+### 13.6 · Backlog: tour interactivo por ventana (campo a campo)
+
+> **Objetivo incremental:** además del tour genérico `__modals__`, documentar **cada ventana relevante** con pasos que nombren controles editables y su función. No rellenar “de rebote”: marcar fila y cerrar cuando existan pasos + i18n en los tres idiomas.
+
+**Convención propuesta (cuando se implemente un modal concreto):**
+
+| Opción | Descripción |
+|--------|-------------|
+| **A** | Nuevo `menuPath` ficticio, p. ej. `__modal__admin_animal_detail__`, registrado en `CAPACITACION_TOUR_STEPS` solo si conviene separar del tour de página. |
+| **B** | Ampliar el tour de la **ruta de página** (`admin/animales`, …) con pasos extra cuyos `selector` apunten a `#idModal .campo` (solo visibles con modal abierto; el motor salta si no existen). |
+
+**Tabla de seguimiento (ampliar filas según inventario de modales):**
+
+| ID / selector modal | `menuPath` pantalla | Estado | Pasos / notas |
+|---------------------|---------------------|--------|----------------|
+| Ej. `#modal-animal` | `admin/animales` | ⬜ | Inventariar inputs; claves `tour_*` ES/EN/PT |
+| … | … | ⬜ | … |
+
+**Referencia para redacción:** mismo tono que el manual en `capacitacionManual.*.js` y glosario §7.
+
+### 13.3 QA mínimo del tour (cada vez que se añadan pasos)
+
+> Comprobación **en navegador** (no automatizada en repo). Tras implementar pasos nuevos, validar una vez y anotar fecha/equipo si el proceso lo exige.
+
+- [ ] ⬜ **Chrome/Edge:** micrófono no requerido; sin errores en consola al abrir/cerrar tour.
+- [ ] ⬜ **Anterior / Siguiente:** el spotlight se reposiciona; el elemento resaltado es el esperado.
+- [ ] ⬜ **Último paso:** “Terminar” cierra overlay y restaura scroll del `body`; en el **último** paso deben verse las opciones de desactivar tutorial automático y el texto de dónde volver a abrir ayuda (no en el primer paso).
+- [ ] ⬜ **Clic en fondo oscuro:** cierra el tour (comportamiento actual del producto).
+- [ ] ⬜ **EN/PT:** textos de pasos no quedan en clave cruda (`tour_*`).
+
+### 13.4 Orden recomendado de implementación (siguiente backlog)
+
+1. Pantallas con **barra inferior** ya visible para más usuarios (`panel/misformularios`, `admin/protocolos`, …).  
+2. Módulos con **botón Ayuda + Excel** ya maquetado (reutilizar patrón `usuarios`).  
+3. Pantallas solo panel investigador (menos selectores compartidos con admin).
+
+---
+
 <div align="center">
 
 ### 📌 Recordatorio para el equipo de redacción
@@ -613,6 +805,6 @@ flowchart TB
 **Un buen tema de capacitación responde en este orden:**  
 **1)** ¿Para qué entro aquí? → **2)** ¿Qué veo (lista, botones)? → **3)** ¿Qué pasa si creo/edito/cierro (popups)? → **4)** ¿A qué otra pantalla me lleva esto?
 
-*Última ampliación: roles 1–6 (visibilidad distinta), RED por área y por rol, diagrama de filtrado menú/módulos.*
+*Última ampliación: barra inferior “documento de ayuda” + tutorial interactivo, §13 matriz tour, `capacitacionTours.js`, menú Ayuda+Excel, i18n y manuales alineados (ES/EN/PT).*
 
 </div>

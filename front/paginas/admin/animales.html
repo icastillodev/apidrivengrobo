@@ -127,14 +127,21 @@
         <button id="btn-excel-animal" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" title="Exportar Excel">
             <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="admin_animales.btn_excel">EXCEL</span>
         </button>
-        <button id="btn-ayuda-animal" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" title="Guía de ayuda">
+        <button
+            type="button"
+            id="btn-ayuda-animal"
+            class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm"
+            title="Guía de ayuda"
+            data-gecko-cap-help="admin/animales"
+            data-gecko-cap-modal="#modal-animal-help"
+        >
             <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_animales.btn_ayuda">AYUDA</span>
         </button>
     </div>
 </div>
 
 <div class="table-responsive">
-    <table class="table table-hover align-middle border" style="font-size: 11px;">
+    <table id="tabla-animales" class="table table-hover align-middle border" style="font-size: 11px;">
         <thead class="table-light text-uppercase">
 <tr>
                 <th data-key="idformA" data-sortable="true" class="py-3 px-2" data-i18n="admin_animales.col_id">ID</th>

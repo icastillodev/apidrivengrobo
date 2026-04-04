@@ -38,28 +38,70 @@
 </head>
 <body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="ventas">
     <div class="container my-4 px-3" style="max-width: 720px;">
-        <div class="mb-4 border-bottom pb-3">
-            <h4 class="fw-black text-success m-0" data-i18n="ventas.page_title"></h4>
-            <small class="text-muted d-block mt-1" data-i18n="ventas.page_sub"></small>
+        <div id="ventas-page-header" class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4 border-bottom pb-3">
+            <div>
+                <h4 class="fw-black text-success m-0" data-i18n="ventas.page_title"></h4>
+                <small class="text-muted d-block mt-1" data-i18n="ventas.page_sub"></small>
+            </div>
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm fw-bold flex-shrink-0"
+                id="btn-ayuda-ventas"
+                data-gecko-cap-help="panel/ventas"
+                data-gecko-cap-modal="#modal-ventas-help"
+            >
+                <i class="bi bi-question-circle me-1"></i><span data-i18n="comunicacion.btn_ayuda"></span>
+            </button>
         </div>
 
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body small" id="ventas-intro" data-i18n="ventas.intro_html"></div>
         </div>
 
-        <div class="card shadow-sm border-0">
+        <div id="ventas-form-card" class="card shadow-sm border-0">
             <div class="card-body">
                 <p class="small text-muted mb-2">
                     <span data-i18n="ventas.correo_perfil"></span>
                     <strong id="ventas-user-email" class="text-dark">—</strong>
                 </p>
                 <label class="form-label fw-bold small" for="ventas-mensaje" data-i18n="ventas.mensaje_label"></label>
-                <textarea class="form-control mb-3" id="ventas-mensaje" rows="8" maxlength="8000"></textarea>
+                <textarea class="form-control mb-3" id="ventas-mensaje" rows="8" maxlength="8000" data-i18n="ventas.placeholder_mensaje"></textarea>
                 <button type="button" class="btn btn-success fw-bold" id="ventas-btn-enviar">
                     <i class="bi bi-send-fill me-1"></i><span data-i18n="ventas.btn_enviar"></span>
                 </button>
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="modal-ventas-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="ventas.cap_help_titulo"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="ventas.cap_help_s1_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="ventas.cap_help_s1_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="ventas.cap_help_s2_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="ventas.cap_help_s2_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="ventas.cap_help_s3_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="ventas.cap_help_s3_text"></p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

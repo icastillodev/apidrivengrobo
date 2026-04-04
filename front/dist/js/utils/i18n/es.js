@@ -35,6 +35,9 @@ export const es = {
         panel_inicio: "Panel de inicio",
         help_group: "Ayuda",
         help_capacitacion: "Capacitación",
+        help_interactive_screen: "Tutorial interactivo (esta pantalla)",
+        help_interactive_modals: "Tutorial de ventana emergente (abierta)",
+        help_menu_show_fab: "Mostrar barra inferior de ayuda",
         help_ticket: "Ticket/Contacto",
         help_ventas: "Ventas",
         messages: "Mensajes (institución)",
@@ -56,6 +59,7 @@ export const es = {
         dash_noticias_error: "No se pudieron cargar las noticias del panel. Intente más tarde.",
         portal_titulo: "Noticias",
         portal_sub: "Institución y red",
+        portal_search_ph: "Buscar noticias…",
         filtro_local: "Locales",
         filtro_red: "Otras sedes (red)",
         col_fecha: "Fecha",
@@ -167,7 +171,37 @@ export const es = {
         err_forbidden: "No tiene permiso.",
         err_generico: "Ocurrió un error.",
         msg_email_sin_direccion: "El mensaje se guardó, pero el destinatario no tiene un correo válido registrado; no se pudo enviar el aviso por email.",
-        msg_email_smtp_error: "El mensaje se guardó, pero no se pudo enviar el correo de aviso. Intente más tarde o revise la configuración del servidor de correo."
+        msg_email_smtp_error: "El mensaje se guardó, pero no se pudo enviar el correo de aviso. Intente más tarde o revise la configuración del servidor de correo.",
+        btn_ayuda: "Ayuda",
+        cap_help_titulo: "Mensajes: guía rápida",
+        cap_help_s1_title: "Qué es esta pantalla",
+        cap_help_s1_text:
+            "Lista sus conversaciones con usuarios de la institución y el buzón de la sede cuando aplica. Use «Nuevo mensaje» para iniciar un hilo eligiendo destinatario y asunto.",
+        cap_help_s2_title: "Lista de conversaciones",
+        cap_help_s2_text: "Seleccione un ítem para cargar los mensajes a la derecha. Las respuestas quedan agrupadas en el mismo hilo.",
+        cap_help_s3_title: "Panel del hilo",
+        cap_help_s3_text:
+            "Lea el historial y escriba en el cuadro inferior; pulse «Responder» para enviar (atajo Ctrl+Enter u ⌘+Enter si está habilitado).",
+        cap_help_inst_titulo: "Mensajería institucional: guía rápida",
+        cap_help_inst_s1_title: "Canal institucional",
+        cap_help_inst_s1_text:
+            "Aquí recibe comunicados de administración y puede abrir consultas a la institución. Las conversaciones 1:1 con personas siguen en «Mensajes».",
+        cap_help_inst_s2_title: "Lista de hilos",
+        cap_help_inst_s2_text:
+            "Seleccione un hilo para ver el contenido. Los comunicados pueden ser visibles para toda la sede; las consultas son privadas entre usted y el personal autorizado.",
+        cap_help_inst_s3_title: "Lectura y respuesta",
+        cap_help_inst_s3_text:
+            "En algunos hilos solo puede leer; si no ve el botón de respuesta, abra una nueva consulta desde «Nuevo mensaje». Elija tipo (comunicado/consulta) según lo que permita su rol.",
+        cap_help_portal_titulo: "Portal de noticias: guía rápida",
+        cap_help_portal_s1_title: "Qué verá aquí",
+        cap_help_portal_s1_text:
+            "Avisos publicados por su institución y, si aplica, novedades de la red GROBO. No confunda esta pantalla con la mensajería interna: las noticias son lectura pública para quien tenga acceso al portal.",
+        cap_help_portal_s2_title: "Locales y red",
+        cap_help_portal_s2_text:
+            "Use el interruptor para alternar entre noticias solo de su sede y las compartidas con otras sedes de la misma dependencia (cuando existan).",
+        cap_help_portal_s3_title: "Buscar, ordenar y abrir",
+        cap_help_portal_s3_text:
+            "Filtre por texto, ordene por fecha o título y pulse una tarjeta para leer el cuerpo completo en la ventana emergente. La paginación aparece al pie cuando hay muchos ítems."
     },
     bread: {
         users: "Administración de Usuarios",
@@ -1266,7 +1300,15 @@ export const es = {
         card_mensajes: "Mensajes",
         card_mensajes_desc: "Conversaciones con tu institución y la red",
         btn_ir_modulo: "IR AL MÓDULO",
-        btn_ver_tarifario: "VER TARIFARIO"
+        btn_ver_tarifario: "VER TARIFARIO",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Panel de inicio",
+        help_s1_title: "1. Bienvenida y menú",
+        help_s1_text: "Este es su punto de partida. Use el menú lateral para ir a formularios, pedidos, protocolos y mensajes según lo que su sede tenga contratado.",
+        help_s2_title: "2. Noticias",
+        help_s2_text: "Aquí pueden aparecer avisos de su institución o de la red; revíselos con frecuencia.",
+        help_s3_title: "3. Accesos rápidos",
+        help_s3_text: "Las tarjetas llevan a los módulos habituales (nuevo pedido, mis formularios, precios, etc.). Pulse una tarjeta para abrir el módulo."
     },
     centro_solicitudes: {
         titulo: "Centro de Solicitudes",
@@ -1284,7 +1326,15 @@ export const es = {
         pedido_insumos: "Pedido de Insumos",
         reserva_salas: "Reserva de Salas",
         iniciar: "Iniciar",
-        sin_formularios: "Sin formularios habilitados para tu nivel de acceso."
+        sin_formularios: "Sin formularios habilitados para tu nivel de acceso.",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Centro de solicitudes",
+        help_s1_title: "1. Contexto e institución",
+        help_s1_text: "La línea bajo el título indica si trabaja en su sede, en red u otro contexto habilitado. Espere a que carguen las tarjetas.",
+        help_s2_title: "2. Elegir trámite",
+        help_s2_text: "Cada bloque agrupa la institución y los botones de pedido (animales, reactivos, insumos, reservas…) según contratación.",
+        help_s3_title: "3. Sin opciones visibles",
+        help_s3_text: "Si no ve formularios, su rol o la configuración de la sede pueden limitar el catálogo. Consulte con administración del bioterio."
     },
     perfil: {
         titulo: "Mi Perfil",
@@ -1314,7 +1364,17 @@ export const es = {
         swal_pass_actualizada: "¡Contraseña Actualizada!",
         swal_clave_modificada: "Tu clave ha sido modificada correctamente.",
         swal_error_servidor: "No se pudo conectar con el servidor.",
-        swal_error_solicitud: "No se pudo procesar la solicitud."
+        swal_error_solicitud: "No se pudo procesar la solicitud.",
+        cap_help_titulo: "Mi perfil: guía rápida",
+        cap_help_s1_title: "Datos de cuenta",
+        cap_help_s1_text:
+            "Revise nombre visible, usuario e institución. El correo es importante para notificaciones y recuperación de acceso: manténgalo actualizado.",
+        cap_help_s2_title: "Datos personales",
+        cap_help_s2_text:
+            "Edite nombre, apellido, correo y teléfono; pulse «Guardar cambios» para persistir. Si la sede exige validaciones adicionales, siga los mensajes del sistema.",
+        cap_help_s3_title: "Contraseña",
+        cap_help_s3_text:
+            "Para cambiar la clave indique la contraseña actual, la nueva dos veces y confirme. Use una contraseña segura y no la comparta."
     },
     form_animales: {
         titulo: "Pedido de animales",
@@ -1550,7 +1610,15 @@ export const es = {
         contacto_mail_asunto: "Consulta pedido GROBO",
         contacto_sin_correo: "Sin correo",
         contacto_tel_lbl: "Teléfono / Contacto",
-        contacto_no_tel: "No disponible"
+        contacto_no_tel: "No disponible",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Mis formularios",
+        help_s1_title: "1. Atajos superiores",
+        help_s1_text: "Revise animales usados en protocolos y resúmenes de insumos pedidos; el Excel global exporta su historial con rango de fechas.",
+        help_s2_title: "2. Filtros y búsqueda",
+        help_s2_text: "Estado, derivación e institución (si aparecen) acotan la lista. El buscador localiza por ID, protocolo o tipo.",
+        help_s3_title: "3. Tabla y detalle",
+        help_s3_text: "Clic en una fila abre el detalle; según el pedido verá contacto, derivación u otras acciones permitidas."
     },
     misprotocolos: {
         bread_investigador: "Investigador",
@@ -1717,7 +1785,15 @@ export const es = {
         card_noticias_admin: "Noticias (administración)",
         card_noticias_admin_desc: "Publicar, editar y permisos de noticias",
         btn_ir_modulo: "IR AL MÓDULO",
-        btn_pedidos_responder: "PEDIDOS PARA RESPONDER"
+        btn_pedidos_responder: "PEDIDOS PARA RESPONDER",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía — Panel administración",
+        help_s1_title: "1. Rol del inicio",
+        help_s1_text: "Vista resumen: desde aquí accede a protocolos, bandejas operativas, estadísticas y comunicación según permisos de su rol.",
+        help_s2_title: "2. Noticias",
+        help_s2_text: "Avisos institucionales o de red en la franja superior del tablero.",
+        help_s3_title: "3. Métricas y accesos",
+        help_s3_text: "Las tarjetas muestran contadores y enlazan a cada módulo; use el menú lateral para el resto de tareas administrativas."
     },
     admin_usuarios: {
         bread_grobo: "GROBO",
@@ -1927,7 +2003,15 @@ export const es = {
         transmitir_ok: "Protocolo enviado a la red correctamente.",
         transmitir_error: "No se pudo enviar el protocolo a la red.",
         transmitir_sin_destinos: "No hay instituciones de red disponibles.",
-        transmitir_seleccione: "Seleccione al menos una institución."
+        transmitir_seleccione: "Seleccione al menos una institución.",
+        btn_ayuda: "Ayuda",
+        help_titulo: "Guía de gestión de protocolos",
+        help_s1_title: "1. Filtros y búsqueda",
+        help_s1_text: "Use origen, ámbito (si aplica), el campo «Filtrar por» y el cuadro de texto; pulse el botón de búsqueda para actualizar la grilla.",
+        help_s2_title: "2. Solicitudes, alta y detalle",
+        help_s2_text: "«Solicitudes» abre la bandeja de trámites entrantes. «Nuevo» crea un protocolo. Clic en una fila abre la ficha para revisar o editar según permisos.",
+        help_s3_title: "3. Exportar a Excel",
+        help_s3_text: "Descarga el listado filtrado actual para informes o auditoría interna."
     },
     admin_formularios: {
         delete_btn: "Eliminar formulario",
@@ -3135,7 +3219,17 @@ export const es = {
         msg_vacio: "Escriba un mensaje.",
         validar_campos: "Complete asunto y mensaje.",
         creado_ok: "Ticket creado.",
-        nuevo_gecko_hint: "Como GeckoDev puede abrir tickets de prueba; el correo se envía igual a soporte."
+        nuevo_gecko_hint: "Como GeckoDev puede abrir tickets de prueba; el correo se envía igual a soporte.",
+        cap_help_titulo: "Soporte Gecko: guía rápida",
+        cap_help_s1_title: "Tickets por turnos",
+        cap_help_s1_text:
+            "Cada conversación es un ticket: escribe el equipo de soporte o usted por turnos, no en ráfaga. Cada envío notifica por correo a soporte.",
+        cap_help_s2_title: "Lista y detalle",
+        cap_help_s2_text:
+            "Seleccione un ticket a la izquierda para ver el historial a la derecha, el estado y si corresponde responder o esperar.",
+        cap_help_s3_title: "Nuevo ticket y cierre",
+        cap_help_s3_text:
+            "Use «Nuevo ticket» con asunto y primer mensaje claros. Cuando el caso quede resuelto puede cerrar el ticket si la interfaz lo permite; si no, responda indicando el cierre."
     },
     ventas: {
         page_title: "Ventas GROBO",
@@ -3154,28 +3248,460 @@ export const es = {
         error_enviar: "No se pudo enviar. Intente de nuevo más tarde.",
         msg_corto_titulo: "Mensaje incompleto",
         msg_corto: "Escriba al menos 10 caracteres.",
-        error_sin_email: "Actualice su correo en Mi perfil para poder enviar."
+        error_sin_email: "Actualice su correo en Mi perfil para poder enviar.",
+        cap_help_titulo: "Ventas GROBO: guía rápida",
+        cap_help_s1_title: "Para qué sirve",
+        cap_help_s1_text:
+            "Canal comercial: presupuestos, contratación de módulos o consultas previas a comprar GROBO. No use esta pantalla para fallos del programa: el ticket a Soporte Gecko (Ayuda → Ticket/Contacto) es para incidencias técnicas y suele estar solo en perfiles administrativos; si no lo tiene, avise a administración de sede.",
+        cap_help_s2_title: "Correo de respuesta",
+        cap_help_s2_text:
+            "Se muestra el correo de su usuario en GROBO; allí recibirá la respuesta del equipo comercial. Actualícelo en Mi perfil si está desactualizado.",
+        cap_help_s3_title: "Enviar el mensaje",
+        cap_help_s3_text:
+            "Escriba al menos unas líneas claras (mínimo 10 caracteres) y pulse «Enviar mensaje». El envío genera un correo categorizado como venta a ventas@groboapp.com."
     },
     capacitacion: {
         page_title: "Capacitación",
-        page_sub: "Manual de usuario por sección del menú. Solo verá las áreas que su rol puede usar.",
+        page_sub: "Manual claro y por secciones: el mismo orden que su menú. Solo aparecen las áreas que su institución le habilitó.",
         page_banner:
-            "<strong class=\"text-info-emphasis\">Cómo encontrar la ayuda que necesita:</strong> cada tema incluye un resumen, <em>quién aplica por rol</em> y apartados desplegables al detalle. En el resto del panel, mire la <strong>barra inferior verde</strong> para abrir directamente el tutorial de esa pantalla. Para fallos del sistema: <strong>Ayuda → Ticket/Contacto</strong>.",
+            "<strong class=\"text-info-emphasis\">Bienvenido al manual:</strong> arriba elige un tema en la lista; a la derecha verá primero una <strong>explicación amplia</strong> de qué es esa parte del sistema, luego un <strong>resumen corto</strong>, quién suele usarla y, más abajo, apartados que puede abrir y cerrar con calma. En otras pantallas del panel, una <strong>barra de ayuda fija en el borde inferior de la ventana</strong> (no en la cabecera), con estilo verde, ofrece <strong>abrir este manual</strong> ya situado en el tema de esa pantalla y los <strong>tutoriales interactivos</strong>. Si ocultó la barra, reactívela con el interruptor de abajo, con <strong>Ayuda → Mostrar barra inferior de ayuda</strong> o desde el botón <strong>Ayuda</strong> junto a Excel (mismo menú permite abrir tutoriales sin barra). <strong>Fallos de la aplicación (errores del programa):</strong> el ítem <strong>Ayuda → Ticket/Contacto</strong> (Soporte Gecko) está pensado para incidencias técnicas del software y <strong>suele verlo solo personal administrativo</strong> de la sede; si usted es investigador y no tiene esa opción, avise a <strong>administración del bioterio</strong> para que abran o escalen el ticket.",
         library_heading: "Biblioteca de ayuda",
         content_heading: "Contenido",
         no_topics: "No hay secciones de manual disponibles para su perfil.",
+        chapter_about_heading: "Sobre esta sección",
+        chapter_summary_label: "En resumen",
         roles_label: "Alcance por rol",
         red_menu_label: "Trabajar en RED (varias sedes)",
+        modals_menu_label: "Ventanas emergentes (modales y diálogos)",
         content_help_title: "Cómo leer este tutorial",
         content_help_body:
-            "Abra cada apartado del acordeón. Si un texto no coincide del todo con su sede, confirme con su administración local. Para errores o bugs use Ayuda → Ticket/Contacto.",
+            "Despliegue los apartados de abajo cuando quiera profundizar; puede leerlos en cualquier orden. Los nombres de botones pueden variar un poco según su institución: lo importante es la función que se describe. Si algo no coincide con su sede, consulte a su administración local. Hay un apartado sobre el ticket de Soporte Gecko (fallos de la aplicación): normalmente lo usan perfiles administrativos; los investigadores suelen canalizar incidencias técnicas a través de administración de sede.",
         fab_hint: "¿Necesita ayuda con esta pantalla?",
         fab_hint_title: "Ayuda de esta pantalla",
         fab_hint_sub: "Abra el manual con apartados detallados, rol y buenas prácticas.",
-        fab_btn: "Ver tutorial en capacitación",
+        fab_btn: "Ver documento de ayuda",
         fab_region: "Ayuda contextual",
+        fab_open_topic_aria: "Abrir en capacitación el documento de ayuda: {title}",
+        fab_interactive_btn: "Tutorial interactivo",
+        fab_interactive_aria: "Iniciar tutorial interactivo de esta pantalla",
+        fab_dismiss_bar: "No mostrar más esta barra",
+        fab_dismiss_toast_title: "Barra de ayuda oculta",
+        fab_dismiss_toast_body:
+            "Puede volver a mostrarla aquí (interruptor de abajo) o desde el botón Ayuda junto a Excel → «Mostrar barra inferior de ayuda». También deja de mostrarse la ayuda sobre ventanas emergentes.",
+        fab_dismiss_ok: "Entendido",
+        fab_tour_modals_aria: "Iniciar tutorial de la ventana emergente abierta (solo visible con una abierta)",
+        modal_help_region: "Ayuda contextual en ventana emergente",
+        modal_help_title: "Ayuda con esta ventana",
+        modal_help_sub:
+            "La barra inferior queda detrás del fondo oscuro; aquí puede abrir el manual de esta pantalla o el tutorial que recorre esta ventana (estructura y zonas).",
+        modal_help_tour_modals_btn: "Tutorial de esta ventana",
+        modal_help_tour_modals_aria: "Iniciar tutorial guiado de la ventana emergente abierta",
+        tour_modals_need_open_title: "Abra un detalle en ventana emergente",
+        tour_modals_need_open_body:
+            "El tutorial de ventanas emergentes solo está disponible mientras tenga abierto un formulario o vista en ventana emergente. Ábralo desde la tabla o el botón correspondiente y use de nuevo el botón de ayuda, la franja de abajo o Ayuda en el menú (la opción aparece solo con la ventana abierta).",
+        tour_modal_in_s1_title: "Esta ventana emergente",
+        tour_modal_in_s1_body:
+            "Completar o revisar un trámite puntual (detalle, edición, confirmación) sin perder de vista que sigue dentro del mismo panel: el fondo queda bloqueado hasta cerrar.\n\n{{i:window-stack}} `.modal-dialog`: cuadro sobre {{i:mask}} fondo atenuado.\n\n- Si el contenido es alto, {{svg:hand}} desplácese dentro del modal, no solo detrás.\n- Este tour marca {{i:layout-three-columns}} cabecera, cuerpo y pie; los campos cambian por módulo.\n\n{{i:book-half}} Capacitación → tema de esa pantalla desarrolla cada campo según el módulo.",
+        tour_modal_in_s2_title: "Cabecera",
+        tour_modal_in_s2_body:
+            "Saber qué trámite está abriendo y cerrar o abandonar de forma segura sin dejar datos a medias.\n\n{{i:type-h5}} `.modal-header`: título del caso (pedido, usuario, etc.).\n\n- {{i:x-lg}} Cerrar: {{svg:click}}; a veces equivale a pulsar fuera con confirmación.\n- Subtítulo o {{i:tag}} estado (borrador, enviado…).\n\n{{i:exclamation-triangle}} Cerrar sin guardar puede perder cambios: lea el aviso si aparece.",
+        tour_modal_in_s3_title: "Cuerpo: campos y contenido",
+        tour_modal_in_s3_body:
+            "Introducir o revisar datos del trámite, recorrer pestañas largas y validar obligatorios antes de confirmar en el pie.\n\n{{i:ui-checks-grid}} `.modal-body`: formularios, tablas, {{i:folder2-open}} pestañas o listas.\n\n- Obligatorios suelen marcarse en rojo si faltan.\n- {{svg:click}} Desplegables, calendarios, buscadores integrados.\n- Cambiar de pestaña sin cerrar el modal.\n\nPermisos según rol: a veces solo lectura.",
+        tour_modal_in_s4_title: "Pie de la ventana",
+        tour_modal_in_s4_body:
+            "Confirmar, descartar o enviar el trámite según el flujo; es el cierre operativo del modal.\n\n{{i:hand-index-thumb}} `.modal-footer`: {{i:check-lg}} Guardar, {{i:x-circle}} Cancelar, {{i:download}} exportar, {{i:send}} Enviar, etc.\n\n{{svg:click}} Botón primario solo tras revisar obligatorios.\n\n{{i:bell-slash}} Puede desactivar tutoriales automáticos en el último paso del tour; {{i:lightning-charge}} el tutorial manual sigue en la barra de ayuda o en Ayuda del menú.",
+        tour_mid_footer_hint:
+            "«Terminar» o Esc cierran el tutorial en cualquier paso (incluido el del panel de inicio). La primera vez que entra a cada sección el recorrido se abre solo; después puede iniciarlo desde Ayuda. Para no volver a abrirlo automáticamente al entrar, use las opciones del último paso.",
+        tour_end_where_hint:
+            "Puede repetir este tutorial cuando quiera: barra de ayuda fija abajo en la ventana (si no la ocultó), botón Ayuda junto a Excel o menú Ayuda en la cabecera superior. Si ocultó la barra del pie, reactívela en Capacitación, en Ayuda → Mostrar barra inferior de ayuda o desde ese menú.",
+        pref_show_fab_label: "Mostrar la barra inferior de ayuda en el resto del panel",
+        pref_show_fab_help:
+            "Incluye accesos al manual en Capacitación, tutoriales interactivos y, al abrir una ventana emergente, la misma ayuda encima del fondo oscuro si la barra está visible.",
+        library_tour_btn: "Tutorial interactivo de esta biblioteca",
+        page_help_intro:
+            "Si ocultó la barra inferior, desde aquí puede seguir abriendo el manual, el tutorial de esta pantalla y volver a mostrar la barra. Con una ventana emergente abierta también verá el tutorial de esa ventana.",
+        page_help_screen: "Ayuda de esta pantalla (ventana)",
+        page_help_show_fab: "Mostrar barra inferior de ayuda",
+        help_menu_no_screen_tour_title: "Tutorial de pantalla",
+        help_menu_no_screen_tour_body:
+            "Abra una sección del panel (por ejemplo desde el menú) para usar el tutorial alineado con esa pantalla. En Capacitación tiene el manual completo.",
+        help_menu_bar_visible_title: "La barra ya está visible",
+        help_menu_bar_visible_body:
+            "Para ocultarla use «No mostrar más esta barra» en la propia barra inferior (o el enlace equivalente sobre una ventana emergente). Puede volver a mostrarla desde Ayuda → Mostrar barra inferior de ayuda o con el interruptor en esta página.",
+        tour_no_steps_title: "Tutorial interactivo",
+        tour_no_steps_body:
+            "Todavía no hay pasos guiados para esta pantalla. Puede leer el tema completo en Capacitación.",
+        tour_open_manual: "Abrir manual",
+        tour_close: "Cerrar",
+        tour_prev: "Anterior",
+        tour_next: "Siguiente",
+        setup_back: "Atrás",
+        setup_next: "Siguiente",
+        setup_continue: "Continuar",
+        setup_lang_category: "Idioma",
+        setup_lang_hint:
+            "Elija su idioma tocando solo la bandera. Podrá cambiarlo después con el botón circular de la bandera en el menú.",
+        setup_theme_category: "Tema de la pantalla",
+        setup_theme_hint:
+            "Pulse Claro u Oscuro y observe cómo cambia la interfaz. Cuando esté conforme, pulse Siguiente.",
+        setup_theme_light: "Claro",
+        setup_theme_dark: "Oscuro",
+        setup_theme_menu_hint:
+            "Todo esto (idioma, tema, tamaño de letra y menú arriba o lateral) lo puede modificar en cualquier momento desde la barra del menú: bandera, sol o luna, letra e icono de diseño.",
+        setup_layout_category: "Menú",
+        setup_layout_hint:
+            "Elija si prefiere la barra de menú arriba (horizontal) o el panel a la izquierda (lateral).",
+        setup_layout_top: "Arriba",
+        setup_layout_side: "A la izquierda",
+        setup_layout_reload_hint:
+            "Pulse Continuar para guardar y recargar la página; verá el menú en la posición elegida y seguirá el tour de bienvenida.",
+        setup_font_category: "Tamaño de letra",
+        setup_font_hint:
+            "Elija un tamaño y mire cómo cambia el texto de prueba. Luego pulse Continuar.",
+        setup_font_sample:
+            "Texto de prueba: así verá listas, formularios y tablas con el tamaño elegido. El botón del menú también cambia el tamaño; aquí elige de forma explícita.",
+        setup_font_chica: "Chica",
+        setup_font_mediana: "Mediana",
+        setup_font_grande: "Grande",
+        tour_finish: "Terminar",
+        tour_step_of: "Paso {n} de {m}",
+        tour_skipped_title: "Tour finalizado",
+        tour_skipped_body: "Algunos pasos no tenían elementos visibles; el resto se omitió.",
+        tour_intro_label: "Para qué sirve",
+        tour_detail_label: "Detalle y uso",
+        tour_step_intro_fallback:
+            "El recuadro marca «{title}»: cumple un papel concreto en esta pantalla.",
+        tour_off_this: "No mostrar el tutorial automático en esta sección",
+        tour_off_all: "No mostrar tutoriales automáticos en ninguna sección",
+        tour_off_welcome: "No volver a mostrar la bienvenida automática",
+        tour_esc_hint: "También puede pulsar Esc para terminar en cualquier momento.",
+        page_help_reset_auto_tour: "Reactivar tutorial automático en esta sección",
+        page_help_reset_auto_ok_title: "Preferencia actualizada",
+        page_help_reset_auto_ok_body:
+            "La próxima vez que abra esta pantalla podrá volver a ver el tutorial automático al entrar (si no desactivó los tutoriales globales). Sigue pudiendo abrir el tutorial manualmente desde la barra inferior, el botón Ayuda junto a Excel o Ayuda → Tutorial interactivo en el menú principal.",
+        tour_welcome_s1_title: "Bienvenido a GROBO",
+        tour_welcome_s1_body:
+            "Identificar el producto (GROBO) y a quién pertenece el desarrollo; ofrecer salida rápida a web pública o documentación sin mezclarlo con el trabajo diario en el panel.\n\n{{i:link-45deg}} En la cabecera está el enlace del producto y los créditos (Geckos.uy y UDELAR). {{svg:click}} Son enlaces informativos: puede abrirlos en otra pestaña; no son obligatorios para operar.\n\nQué muestra esta zona:\n- Identidad del producto y quién lo desarrolla.\n- Accesos externos a documentación o sitio público.\n\nQué puede hacer:\n- {{svg:hand}} Pulsar el enlace para ampliar información.\n- Seguir con «Siguiente» para el menú y el resto de la interfaz.",
+        tour_welcome_s2_title: "El menú principal",
+        tour_welcome_s2_body:
+            "Llevarle a cualquier módulo del portal según su rol y lo contratado por la sede; es el mapa operativo de toda la aplicación (panel, formularios, pedidos, protocolos, mensajes, noticias, perfil, ayuda…).\n\n{{i:list}} Qué refleja el menú:\n- Solo rutas habilitadas para usted.\n- Ítems con flecha: submenús con varias pantallas.\n\nCómo usarlo:\n- {{svg:click}} Clic en un texto del menú: carga esa sección (a veces cambia la URL).\n- {{i:chevron-down}} Submenú: pase el ratón o pulse y elija la subruta.\n- {{i:phone}} En móvil, icono de tres rayas {{i:list}} para abrir el menú completo.\n\nSi falta un módulo, puede no estar contratado o no aplicar a su perfil: consulte a administración de sede.",
+        tour_welcome_s3_title: "Preferencias, voz y atajos",
+        tour_welcome_s3_body:
+            "Si acaba de usar el asistente inicial al entrar, ya probó idioma, tema y tamaño de letra: estos son los mismos controles, siempre a mano en la barra.\n\nCambiar de un solo lugar la experiencia global (idioma, tema, tamaño de letra, voz, atajos y disposición del menú) sin abrir «Mi perfil»; acelera ajustes que usa a menudo.\n\n{{i:sliders}} Qué hace cada icono al {{svg:click}}:\n- {{i:mic}} Micrófono: Gecko Voice (voz del navegador; puede decir «Gecko» para comandos). El navegador pedirá permiso la primera vez.\n- {{i:fonts}} Letra: chica / mediana / grande.\n- {{i:brightness-high}} Sol/luna: tema claro u oscuro.\n- {{i:globe2}} Idioma: español, inglés o portugués; se guarda en su usuario cuando aplica.\n- {{i:keyboard}} Teclado: tabla de atajos (p. ej. Ctrl+G búsqueda, Alt+D panel, Alt+F formularios).\n- {{i:layout-sidebar-reverse}} Último icono: menú superior o lateral.\n\nEn pantallas muy pequeñas algunos iconos se ocultan; los atajos de teclado suelen seguir activos.",
+        tour_welcome_s4_title: "Gecko Search (búsqueda)",
+        tour_welcome_s4_body:
+            "Buscar registros y ayuda en un solo punto y, si su sede lo tiene, recibir asistencia contextual o por voz sin salir del flujo de la pantalla actual.\n\n{{i:search}} Al abrir el panel:\n- Campo de texto para buscar en el sistema.\n- Resultados y, si está habilitado, ayuda por IA según lo que escriba o dicte.\n\nCómo usarla:\n- {{svg:click}} Clic en la píldora para abrir o cerrar (también Ctrl+G en muchos teclados).\n- {{i:mic}} Dentro del panel suele haber micrófono para dictar.\n- Escriba y pulse Intro o elija un resultado.\n\n{{i:exclamation-triangle}} Firefox a veces limita la voz; Chrome o Edge suelen ir mejor con dictado.",
+        tour_welcome_s5_title: "Barra de ayuda (abajo en la pantalla)",
+        tour_welcome_s5_body:
+            "Abrir ayuda alineada con la pantalla donde está (manual del tema, tutorial con recuadro verde) y decidir si la barra de ayuda del pie sigue visible; sustituye buscar ayuda solo en la cabecera.\n\n{{i:arrow-down-circle}} La barra fija en el borde inferior (verde) ofrece:\n- {{i:book-half}} «Ver documento de ayuda»: manual ya situado en el tema de esta pantalla.\n- {{i:lightning-charge}} «Tutorial interactivo»: recorrido con foco (si hay pasos).\n- {{i:x-lg}} «No mostrar más esta barra»: ocultarla (reactivable en Capacitación o Ayuda → Mostrar barra inferior).\n\nCon un modal abierto puede haber franja similar sobre el fondo oscuro; el menú «Ayuda» del encabezado también ofrece el tutorial de esa ventana.\n\nSi no ve la barra, haga scroll al final de la página o compruebe que no la ocultó antes.",
+        tour_dashboard_menu_s1_title: "Menú: a qué lleva cada entrada",
+        tour_dashboard_menu_s1_body:
+            "Saltar desde el inicio a cualquier módulo autorizado y comprobar qué rutas tiene disponibles sin memorizar direcciones.\n\n{{i:grid-3x3-gap}} Es el mismo menú que en la bienvenida. Qué refleja:\n- Solo módulos habilitados para su institución y rol.\n- Desplegables que agrupan rutas relacionadas.\n\nAl {{svg:click}}:\n- Carga la pantalla del módulo; cambia el contenido central y la barra inferior de ayuda se alinea con esa pantalla.\n- Cada sección puede tener tutorial bajo {{i:lightning-charge}}.\n\nSi falta un ítem, es contratación o permisos: hable con administración de sede.",
+        tour_cap_s1_title: "Biblioteca de capacitación",
+        tour_cap_s1_body:
+            "Consultar procedimientos por escrito, alineados con el menú y su rol, y recuperar la barra de ayuda del pie si la ocultó; complementa al tutorial que recorre cada pantalla concreta.\n\n{{i:book-half}} En esta cabecera:\n- Título de la biblioteca.\n- {{i:toggle2-on}} Interruptor para volver a mostrar la {{i:arrow-down-circle}} barra verde del pie (en el resto del portal esa barra va abajo de la ventana).\n\nAcciones:\n- {{svg:click}} Tema en la lista izquierda → texto a la derecha.\n- Manual como referencia fija; {{i:lightning-charge}} tutorial en la pantalla donde trabaje.",
+        tour_cap_s2_title: "Lista de temas",
+        tour_cap_s2_body:
+            "Elegir qué capítulo del manual abrir y compartir un enlace directo al mismo tema con quien tenga acceso.\n\n{{i:list-ul}} Columna izquierda: capítulos disponibles para usted.\n\nPor fila:\n- Nombre alineado con menú o módulo.\n- A veces icono o agrupación visual.\n\nAl {{svg:click}}:\n- Tema activo y contenido en el panel derecho.\n- La {{i:link-45deg}} URL cambia: puede copiarla para un compañero.",
+        tour_cap_s3_title: "Contenido del tema",
+        tour_cap_s3_body:
+            "Leer el procedimiento completo del módulo elegido (alcance por rol, pasos y comprobaciones) sin salir de la biblioteca.\n\n{{i:journal-text}} Panel derecho: artículo seleccionado.\n\nSuele incluir:\n- Resumen del módulo.\n- {{i:people}} Alcance por rol cuando aplica.\n- Apartados {{i:chevron-down}} desplegables con pasos o listas de comprobación.\n\nUso:\n- {{svg:hand}} Abrir o cerrar bloques según necesite.\n- {{i:info-circle}} Iconos junto a títulos son ayuda visual; nombres de botones pueden variar por sede.",
+        tour_usuarios_s1_title: "Directorio de usuarios",
+        tour_usuarios_s1_body:
+            "{{i:people}} Vista principal del módulo de cuentas: aquí administra usuarios del bioterio según los permisos que tenga.\n\nQué refleja la pantalla:\n- Contexto de la sede o institución en la que opera.\n- {{i:ui-radios}} Barra superior con búsqueda, exportación y a veces altas rápidas.\n\nQué puede hacer:\n- Preparar filtros antes de tocar datos sensibles: trabaje siempre sobre el conjunto correcto de personas.\n- Pasar al siguiente paso para ver cómo acotar la grilla y luego exportar o abrir filas.",
+        tour_usuarios_s2_title: "Filtros y búsqueda",
+        tour_usuarios_s2_body:
+            "{{i:funnel}} Zona para acotar quién aparece en la tabla sin recargar toda la base a simple vista.\n\nDatos que suele pedir:\n- {{i:ui-radios}} Campo o columna (ID, correo, laboratorio, nombre…).\n- Cuadro de texto con el criterio.\n\nCómo actuar:\n- {{svg:click}} Elija el campo, escriba el texto y pulse {{i:search}} Buscar (o el botón equivalente) para refrescar la grilla.\n- Vacíe criterios y vuelva a buscar si no ve resultados: puede haber un filtro activo anterior.",
+        tour_usuarios_s3_title: "Exportar a Excel",
+        tour_usuarios_s3_body:
+            "{{i:file-earmark-excel}} Descarga del listado actualmente visible en pantalla (tras sus filtros).\n\nPara qué sirve:\n- Auditorías, revisiones offline o informes internos.\n\nQué debe tener en cuenta:\n- {{i:shield-exclamation}} Los datos personales están sujetos a política de protección de datos y uso interno de su institución.\n- {{svg:click}} Pulse el botón de Excel cerca de la barra de herramientas; confirme en el cuadro si pide rango o columnas.",
+        tour_usuarios_s4_title: "Tabla de resultados",
+        tour_usuarios_s4_body:
+            "{{i:table}} Grilla principal: una fila por usuario que cumple el filtro.\n\nQué suele mostrar cada fila:\n- Identificadores, contacto, rol, laboratorio o estado según diseño de su sede.\n- {{i:three-dots-vertical}} Botones o menú de acciones al final de la fila.\n\nInteracción:\n- {{svg:click}} Clic en el encabezado de columna si hay ordenación.\n- {{svg:click}} Clic en «Editar», el nombre o el icono de acción para abrir ficha o modal de detalle.\n- Las acciones disponibles (activar, resetear, etc.) dependen de su rol.",
+        tour_animales_s1_title: "Bandeja de animales",
+        tour_animales_s1_body:
+            "{{i:egg}} Módulo de pedidos de animales vivos: cola operativa para el personal del bioterio.\n\nQué verá:\n- Listado de solicitudes con estados (pendiente, en curso, cerrado…) según flujo.\n- Barra superior con {{i:funnel}} filtros, {{i:file-earmark-excel}} exportación y a veces botones de alta o actualización.\n\nQué puede hacer:\n- Priorizar por filtros antes de abrir cada caso.\n- Registrar o avanzar trámites desde el detalle de cada fila (según permisos).",
+        tour_animales_s2_title: "Filtros y búsqueda",
+        tour_animales_s2_body:
+            "{{i:search}} Misma lógica que otras bandejas: columna + texto + ejecutar búsqueda.\n\nDatos habituales en el selector de columna:\n- Identificadores de pedido, protocolo, solicitante.\n- {{i:building}} Institución de origen si su sede opera en red.\n\nCómo usarlo:\n- {{svg:click}} Elija columna, escriba el criterio y pulse Buscar.\n- Combine con fechas o estados si la pantalla los ofrece en la misma barra.",
+        tour_animales_s3_title: "Exportar a Excel",
+        tour_animales_s3_body:
+            "{{i:file-earmark-excel}} Exportación con asistente de fechas: define el periodo del listado a descargar.\n\nPara qué sirve:\n- Seguimiento masivo, informes a dirección o archivo documental.\n\n{{i:lock}} Trate el archivo como información confidencial; no lo reenvíe fuera de canales aprobados.",
+        tour_animales_s4_title: "Tabla de solicitudes",
+        tour_animales_s4_body:
+            "{{i:table}} Cada fila es un pedido de animales.\n\nQué muestra:\n- Columnas de resumen (fechas, cantidades, estado, solicitante…) según configuración.\n\nQué puede hacer al hacer {{svg:click}}:\n- Abrir el detalle en la misma página, nueva vista o {{i:window}} ventana emergente según el flujo.\n- Desde el detalle: aprobar, rechazar, pedir datos, adjuntar documentos o cambiar estado si su rol lo permite.",
+        tour_insumos_s1_title: "Bandeja de insumos",
+        tour_insumos_s1_body:
+            "{{i:box-seam}} Solicitudes de insumos de laboratorio: materiales, consumibles o similares.\n\nEstructura típica:\n- Cabecera con filtros y exportación.\n- Tabla con el estado de cada pedido.\n\nObjetivo:\n- Dar seguimiento centralizado sin mezclar con animales o reactivos en otras bandejas.",
+        tour_insumos_s2_title: "Filtros y búsqueda",
+        tour_insumos_s2_body:
+            "{{i:funnel}} Acote por columna relevante (código, solicitante, {{i:building}} origen, estado…).\n\nPasos:\n- Seleccione la columna en el desplegable.\n- Escriba el texto o el código.\n- {{svg:click}} Pulse Buscar para actualizar solo las filas que coinciden.\n\nSi la grilla queda vacía, revise que no quede un filtro demasiado estricto.",
+        tour_insumos_s3_title: "Exportar a Excel",
+        tour_insumos_s3_body:
+            "{{i:file-earmark-excel}} Igual que en animales: suele abrirse un modal para elegir {{i:calendar-range}} rango de fechas antes de generar el archivo.\n\nUso recomendado:\n- Auditorías de compras o consumo.\n- Cruce con inventario físico en su sede.",
+        tour_insumos_s4_title: "Tabla de insumos",
+        tour_insumos_s4_body:
+            "{{i:table}} Listado ordenable de pedidos de insumos.\n\nPor fila:\n- Resumen del ítem y del trámite.\n- Acciones (ver, editar, anular…) según política interna.\n\n{{svg:click}} Abra una fila para ver líneas de detalle, historial de mensajes o documentos asociados si el módulo los muestra.",
+        tour_reactivos_s1_title: "Bandeja de reactivos",
+        tour_reactivos_s1_body:
+            "{{i:moisture}} Pedidos de material biológico / reactivos: flujo aparte de animales e insumos genéricos.\n\nQué centraliza:\n- Formularios entrantes y su estado regulatorio o técnico según su institución.\n\nDesde aquí:\n- Filtre por volumen de trabajo, exporte para comités o abra cada registro para tramitar.",
+        tour_reactivos_s2_title: "Filtros y búsqueda",
+        tour_reactivos_s2_body:
+            "{{i:funnel}} Selección de columna + texto; en redes puede añadirse filtro por {{i:building}} institución de origen o destino.\n\n{{svg:click}} Ejecute la búsqueda después de cambiar criterios: la tabla no siempre se actualiza sola al escribir.",
+        tour_reactivos_s3_title: "Exportar a Excel",
+        tour_reactivos_s3_body:
+            "{{i:file-earmark-excel}} El modal de exportación pide fechas desde/hasta: confirme el periodo que debe aparecer en el Excel.\n\nEl archivo refleja el mismo subconjunto que vería en pantalla si aplicara los mismos filtros antes de exportar (según implementación de su sede).",
+        tour_reactivos_s4_title: "Tabla de reactivos",
+        tour_reactivos_s4_body:
+            "{{i:table}} Filas con estado del trámite, identificadores y a veces clase de material.\n\n{{svg:click}} Al abrir una fila accede al formulario completo, anexos y acciones (aprobar, observar, derivar).\n- No todas las acciones están visibles para todos los roles.",
+        tour_alojamientos_s1_title: "Gestión de alojamientos",
+        tour_alojamientos_s1_body:
+            "{{i:houses}} Vista de ocupación y gestión de espacios (jaulas, salas, lotes) del bioterio.\n\nQué suele mostrar:\n- Resumen o KPIs en cabecera si existen.\n- Accesos a informes o a {{i:plus-lg}} altas desde la barra superior.\n\nObjetivo:\n- Tener una foto operativa de dónde hay cupo y qué está reservado o bloqueado.",
+        tour_alojamientos_s2_title: "Búsqueda y filtros",
+        tour_alojamientos_s2_body:
+            "{{i:search}} Cuadro de búsqueda libre más filtros desplegables ({{i:bug}} especie, {{i:activity}} estado del espacio, rack, sala…).\n\nCómo usarlo:\n- Escriba texto parcial (código, protocolo) o elija filtros y pulse aplicar/buscar según indique la pantalla.\n- La grilla se reduce a coincidencias: ideal para inspecciones puntuales.",
+        tour_alojamientos_s3_title: "Exportar a Excel",
+        tour_alojamientos_s3_body:
+            "{{i:file-earmark-excel}} Descarga del snapshot filtrado para planillas internas o reuniones.\n\n{{i:info-circle}} Si no ve el botón, su perfil puede no tener permiso de exportación en este módulo.",
+        tour_alojamientos_s4_title: "Tabla de alojamientos",
+        tour_alojamientos_s4_body:
+            "{{i:table}} Una fila por espacio o por asignación según la vista configurada.\n\n{{svg:click}} Clic en fila o en icono de detalle para ver historial, animales asociados o acciones de liberación/cierre.\n- Use ordenación por columnas para agrupar por especie, protocolo o fecha.",
+        tour_protocolos_s1_title: "Gestión de protocolos",
+        tour_protocolos_s1_body:
+            "Administrar el archivo de protocolos de la sede (altas, revisiones, PDF, envíos en red) y saltar a la cola de solicitudes si está separada; sitúa la pantalla dentro del módulo admin, no en la vista del investigador.\n\n{{i:file-medical}} Migas / cabecera: contexto institucional.\n\nLa vista añade listado maestro con filtros (origen, ámbito, tipo de estudio…) y enlace a {{i:inbox}} solicitudes si aplica.\n\nTareas típicas: metadatos, {{i:file-earmark-pdf}} PDF, coordinación en red.",
+        tour_protocolos_s2_title: "Filtros y búsqueda",
+        tour_protocolos_s2_body:
+            "{{i:funnel}} Combinación de varios criterios: {{i:building}} origen, ámbito local/red, tipo de campo de búsqueda y texto libre.\n\nPasos:\n- Ajuste los desplegables según lo que busque (p. ej. solo protocolos de un laboratorio).\n- {{svg:click}} Ejecute la búsqueda; la tabla mostrará solo coincidencias.\n- Limpie filtros si necesita volver al listado completo autorizado.",
+        tour_protocolos_s3_title: "Exportar a Excel",
+        tour_protocolos_s3_body:
+            "{{i:file-earmark-excel}} Exporta el conjunto visible después de filtrar: útil para comités éticos, auditorías ISO o reportes a dirección.\n\nConfirme en el diálogo si el sistema pregunta por fechas o formato.",
+        tour_protocolos_s4_title: "Tabla de protocolos",
+        tour_protocolos_s4_body:
+            "{{i:table}} Cada fila es un protocolo o versión según su modelo de datos.\n\n{{svg:click}} Clic en la fila abre ficha detallada.\n\nDesde el detalle suele poder:\n- {{i:pencil-square}} Editar campos permitidos.\n- Adjuntar o regenerar PDF.\n- Enviar o sincronizar con otra sede de la red si está contratado.\n- Ver historial de estados y observaciones.",
+        tour_misformularios_s1_title: "Mis formularios",
+        tour_misformularios_s1_body:
+            "Dar seguimiento como investigador a todos sus pedidos (animales, reactivos, insumos) en una sola bandeja, sin entrar en cada cola administrativa por separado.\n\n{{i:ui-checks}} El título `h4` de la barra superior nombra la pantalla; junto a él suelen ir exportación y ayuda.\n\nLa tabla mezcla tipos de trámite con color o etiqueta y a veces atajos a exportación o vistas relacionadas.",
+        tour_misformularios_s2_title: "Filtros y búsqueda",
+        tour_misformularios_s2_body:
+            "{{i:funnel}} Filtros de {{i:flag}} estado, derivación o {{i:building}} institución si opera en red.\n\nCampo de texto:\n- Refina por ID de formulario, número de protocolo, tipo de pedido o texto libre según el selector.\n\n{{svg:click}} Pulse buscar tras cambiar criterios para refrescar resultados.",
+        tour_misformularios_s3_title: "Exportar a Excel",
+        tour_misformularios_s3_body:
+            "{{i:file-earmark-excel}} Abre selector de {{i:calendar-range}} fechas y genera un archivo con las filas que cumplen el filtro actual.\n\nIdeal para anexar a informes de proyecto o reclasificar pedidos offline.",
+        tour_misformularios_s4_title: "Tabla de pedidos",
+        tour_misformularios_s4_body:
+            "{{i:table}} Cada fila es un envío suyo.\n\n{{svg:click}} Abra la fila para ver:\n- Estado y comentarios del bioterio.\n- Posibilidad de responder o adjuntar si el flujo lo permite.\n- En derivaciones entre sedes, enlaces o acciones para aceptar/rechazar según caso.\n\nUse la paginación inferior si el historial es muy largo.",
+        tour_panel_dash_s1_title: "Su panel en GROBO",
+        tour_panel_dash_s1_body:
+            "Confirmar en un vistazo que está en la cuenta y sede correctas antes de abrir pedidos o protocolos; reduce errores si maneja varias cuentas o instituciones.\n\n{{i:speedometer2}} La tarjeta `#dashboard-welcome` suele mostrar:\n- Saludo y nombre de usuario (o primer nombre).\n- Texto corto de contexto (panel de investigador/técnico).\n- Institución o bioterio.\n\n{{i:question-circle}} Si hay «Ayuda» en la tarjeta, {{svg:click}} abre un resumen en ventana; no sustituye al manual ni a la barra verde inferior. El resto de acciones importantes están en el menú y en las tarjetas inferiores.",
+        tour_panel_dash_s2_title: "Noticias y avisos",
+        tour_panel_dash_s2_body:
+            "Enterarse de avisos operativos o institucionales sin depender solo del correo; centraliza comunicación de la sede (y de la red si aplica) en el propio panel.\n\n{{i:newspaper}} En `#dashboard-noticias-mount`, cada noticia suele traer:\n- Fecha y a veces categoría con color.\n- Título y extracto; el cuerpo al pulsar «Leer más» o la tarjeta.\n\nUso:\n- {{svg:click}} Tarjeta o botón → detalle (a veces modal).\n- Revise con frecuencia: no todo se reenvía por correo.\n- Pestañas «Local / Red» si existen: cambian el conjunto de avisos.",
+        tour_panel_dash_s3_title: "Módulos y accesos rápidos",
+        tour_panel_dash_s3_body:
+            "Llegar en un clic a los módulos que más usa (mensajes, solicitudes, historial, protocolos, alojamientos, tarifario) sin recorrer todo el menú.\n\n{{i:grid-3x3-gap}} `#dashboard-grid` repite destinos del menú en tarjetas. Ejemplos habituales:\n- {{i:chat-dots}} Mensajes.\n- {{i:plus-square-dotted}} Centro de solicitudes.\n- {{i:ui-checks}} Mis formularios.\n- {{i:file-medical}} Mis protocolos.\n- {{i:houses}} Mis alojamientos.\n- {{i:file-earmark-pdf}} Precios / PDF.\n\n{{svg:click}} Tarjeta o «Ir al módulo» → misma pantalla; a veces botón en el pie por claridad en móvil.\n\nSi falta tarjeta: módulo no contratado o no aplica a su rol.",
+        tour_admin_dash_s1_title: "Panel de administración del bioterio",
+        tour_admin_dash_s1_body:
+            "Anclar el contexto de gestión del bioterio (no el portal solo-investigador) y pasar en seguida a usuarios, bandejas, configuración o facturación desde menú o atajos.\n\n{{i:shield-lock}} `#dashboard-welcome` confirma:\n- Contexto de administración.\n- Bienvenida y, a menudo, sede o institución.\n\nDesde aquí:\n- {{i:list}} Menú → usuarios, pedidos, configuración, facturación, etc.\n- Tarjetas inferiores: mismos accesos rápidos.\n\nGROBO (Geckos.uy y UDELAR) integra protocolos, pedidos, alojamientos y mensajería en un solo sistema.",
+        tour_admin_dash_s2_title: "Noticias",
+        tour_admin_dash_s2_body:
+            "Difundir a quien opera la sede políticas, horarios, cierres o comunicados oficiales; complementa correo y reuniones sin asumir que todos leyeron el email.\n\n{{i:bullhorn}} `#dashboard-noticias-mount` en admin: lista o tarjetas con fecha, título y extracto; {{svg:click}} abre detalle como en el panel investigador.",
+        tour_admin_dash_s3_title: "Indicadores y módulos",
+        tour_admin_dash_s3_body:
+            "Entrar de inmediato a la operación diaria (usuarios, protocolos, colas de pedidos, alojamientos, mensajes) con el módulo completo: tablas, filtros y acciones según permisos.\n\n{{i:boxes}} `#dashboard-grid` suele incluir:\n- {{i:people}} Usuarios.\n- {{i:clipboard-data}} Protocolos / solicitudes.\n- {{i:cart3}} Pedidos (animales, reactivos, insumos).\n- {{i:houses}} Alojamientos.\n- {{i:chat-left-text}} Mensajes / institucional.\n\n{{svg:click}} → pantalla del módulo; allí buscar, exportar Excel, abrir filas y cambiar estados. Contenido según contratación y rol.",
+        tour_formularios_s1_title: "Centro de solicitudes",
+        tour_formularios_s1_body:
+            "Comprobar la ruta y el contexto (panel correcto, investigador vs admin) antes de iniciar un pedido; evita enviar trámites desde la sesión o el rol equivocado.\n\n{{i:signpost-split}} `nav[aria-label=\"breadcrumb\"]`: migas (p. ej. «Nueva solicitud» o equivalente).\n\n- Confirme portal y marco GROBO (menú, barra superior).\n- El siguiente paso del tour marca título y franja con {{i:building}} institución o red desde la que tramita.",
+        tour_formularios_s2_title: "Título y contexto",
+        tour_formularios_s2_body:
+            "Ver desde qué institución o red está actuando y qué tipos de pedido puede abrir en esta pantalla antes de elegir una tarjeta de la cuadrícula.\n\n{{i:type-h1}} `#header-container`: título y {{i:brush}} franja verde de contexto.\n\n- Ámbito: sede única, {{i:diagram-3}} grupo o {{i:globe2}} red según contratación.\n- Texto aclaratorio de trámites disponibles.\n\nNo requiere clic: referencia previa al «Iniciar» de la cuadrícula.",
+        tour_formularios_s3_title: "Cuadrícula de pedidos",
+        tour_formularios_s3_body:
+            "Iniciar el trámite correcto (animales, reactivos, insumos…) hacia la institución destino adecuada; aquí se concentra la puerta de entrada a cada formulario.\n\n{{i:grid-3x3-gap}} `#forms-grid`: tarjetas por {{i:building}} centro o categoría.\n\n- Botón {{i:play-circle}} «Iniciar» por formulario: {{i:egg}} {{i:moisture}} {{i:box-seam}} etc.\n\n{{svg:click}} «Iniciar» solo donde corresponda → asistente o PDF según sede. Deshabilitado: permiso o configuración.",
+        tour_misprotocolos_s1_title: "Mis protocolos",
+        tour_misprotocolos_s1_body:
+            "Consultar y tramitar solo los protocolos en los que usted participa (titular o miembro según reglas de sede), separado del archivo maestro que ve administración.\n\n{{i:file-medical}} Migas y contexto confirman la bandeja de investigador.\n\nMismas reglas de confidencialidad que el resto del portal.",
+        tour_misprotocolos_s2_title: "Vistas: míos, sede y red",
+        tour_misprotocolos_s2_body:
+            "{{i:layout-text-window-reverse}} Pestañas o botones segmentados en la parte superior del listado.\n\nQué muestra cada pestaña:\n- {{i:person-badge}} Míos: solo protocolos vinculados a su usuario.\n- {{i:building}} Sede / institución: los visibles en su centro actual.\n- {{i:globe2}} Red o multicentro: si su contrato enlaza sedes, aquí aparecen los compartidos.\n\n{{svg:click}} Cambie de pestaña para recargar la grilla con otro subconjunto; los filtros pueden resetearse al cambiar.",
+        tour_misprotocolos_s3_title: "Filtros y búsqueda",
+        tour_misprotocolos_s3_body:
+            "{{i:funnel}} Desplegable de campo (ID, título, tipo de estudio, estado…) más cuadro de texto.\n\nCómo usarlo:\n- Elija el campo más discriminating (p. ej. código interno si lo conoce).\n- Escriba el criterio y pulse {{i:search}} la lupa o «Buscar» para aplicar.\n\n{{i:info-circle}} Si no hay resultados, pruebe otra pestaña de la vista o borre el texto y busque de nuevo.",
+        tour_misprotocolos_s4_title: "Tabla de protocolos",
+        tour_misprotocolos_s4_body:
+            "{{i:table}} Columnas de identificador, título, vigencia, estado y a veces botonera al final.\n\n{{svg:click}} Clic en la fila o en «Ver» abre detalle, {{i:file-earmark-pdf}} PDF o historial.\n\nBotones adicionales:\n- {{i:plus-lg}} «Solicitud protocolo» o similar: inicia un trámite nuevo o de renovación/derivación hacia otra sede si está habilitado.\n- Las acciones visibles dependen del estado del protocolo y de su rol.",
+        tour_mensajes_s1_title: "Mensajes",
+        tour_mensajes_s1_body:
+            "Enmarcar la herramienta de mensajería 1:1, abrir ayuda o iniciar un hilo nuevo; la cabecera agrupa esas acciones globales de la pantalla.\n\n{{i:chat-dots}} `#mensajes-page-header` suele incluir:\n- Título.\n- {{i:question-circle}} Ayuda / tour.\n- {{i:envelope-plus}} «Nuevo mensaje».\n\nLayout: lista izquierda (o arriba en móvil) y detalle derecha.",
+        tour_mensajes_s2_title: "Lista de conversaciones",
+        tour_mensajes_s2_body:
+            "{{i:inbox}} Lista de hilos: cada ítem muestra asunto corto, contraparte y a veces fecha del último mensaje.\n\nQué hacer:\n- {{svg:click}} Pulse un hilo para seleccionarlo: el panel derecho carga el historial completo.\n- El hilo activo suele resaltarse con fondo distinto o borde.\n\nSi la lista es larga, use scroll dentro de la columna; no confunda con el scroll de la página entera.",
+        tour_mensajes_s3_title: "Detalle del hilo",
+        tour_mensajes_s3_body:
+            "{{i:chat-left-text}} Panel derecho: burbujas o bloques con remitente, fecha y texto de cada mensaje.\n\nPartes habituales:\n- Zona de lectura con historial cronológico.\n- {{i:pencil-square}} Cuadro de texto inferior para escribir una respuesta.\n- Botón {{i:send}} «Enviar» o icono de avión de papel.\n\n{{svg:click}} Escriba y envíe; el hilo se actualiza sin salir de la pantalla en la mayoría de los casos.",
+        tour_mensajes_s4_title: "Nuevo mensaje",
+        tour_mensajes_s4_body:
+            "{{i:envelope-plus}} Al pulsar «Nuevo mensaje» se abre un {{i:window}} modal o una vista paso a paso.\n\nCampos típicos:\n- {{i:person}} Destinatario (búsqueda o selector).\n- {{i:type}} Asunto.\n- Cuerpo del mensaje.\n\n{{svg:click}} Confirme con «Enviar»; si falta un campo obligatorio el formulario marcará el error antes de cerrar.",
+        tour_mensajes_inst_s1_title: "Mensajería institucional",
+        tour_mensajes_inst_s1_body:
+            "{{i:building}} Variante para comunicación oficial entre sede e investigadores (o entre áreas del bioterio).\n\nCabecera:\n- Título, ayuda y botón de redactar similar a mensajes personales pero con reglas de {{i:shield-check}} institución.\n\nUse esta bandeja para avisos que deben quedar registrados en el sistema, no solo en correo externo.",
+        tour_mensajes_inst_s2_title: "Hilos institucionales",
+        tour_mensajes_inst_s2_body:
+            "{{i:list-ul}} Lista de asuntos institucionales; puede incluir etiquetas de prioridad o categoría.\n\n{{svg:click}} Seleccione un ítem: el contenido aparece en el panel contiguo igual que en mensajes estándar.\n\nAlgunos hilos pueden ser solo lectura según su rol (anuncio de la sede).",
+        tour_mensajes_inst_s3_title: "Panel del mensaje",
+        tour_mensajes_inst_s3_body:
+            "{{i:journal-text}} Cuerpo del comunicado y, si aplica, lista de adjuntos o enlaces.\n\nSi tiene permiso de respuesta:\n- Use el área de texto inferior y envíe como en el módulo de mensajes.\n\nSi no ve el cuadro de respuesta, su perfil es de solo lectura para ese hilo.",
+        tour_mensajes_inst_s4_title: "Nuevo mensaje",
+        tour_mensajes_inst_s4_body:
+            "{{i:plus-lg}} Asistente para crear {{i:chat-square-text}} consulta o {{i:bullhorn}} comunicado masivo según lo habilite su sede.\n\nComplete:\n- Tipo de envío si se ofrece desplegable.\n- Destinatarios (individual, rol o lista) cuando el formulario lo pida.\n- Asunto y cuerpo claros para que soporte o dirección puedan actuar sin pedir aclaraciones.",
+        tour_noticias_s1_title: "Portal de noticias",
+        tour_noticias_s1_body:
+            "Leer avisos institucionales (y de red si aplica) en modo consulta; la cabecera orienta y da acceso a ayuda. La redacción de noticias suele estar en otro módulo admin.\n\n{{i:newspaper}} `#noticias-page-header`: título, subtítulo y {{i:question-circle}} ayuda / manual / tour.\n\nNo es editor de noticias.",
+        tour_noticias_s2_title: "Alcance local o red",
+        tour_noticias_s2_body:
+            "{{i:geo-alt}} Pestañas o botones «Local / Red» (nombres pueden variar).\n\nQué muestra cada modo:\n- {{i:building}} Local: comunicados solo de su bioterio o institución.\n- {{i:globe2}} Red: noticias compartidas entre sedes enlazadas.\n\n{{svg:click}} Cambie de pestaña para intercambiar el conjunto de tarjetas debajo; el buscador suele aplicarse al modo activo.",
+        tour_noticias_s3_title: "Buscar y ordenar",
+        tour_noticias_s3_body:
+            "{{i:search}} Cuadro de texto para filtrar por palabras del título o cuerpo.\n\n{{i:sort-down}} Selector de orden: por fecha (más recientes primero) o por título alfabético.\n\n{{svg:click}} Escriba y pulse Intro o el botón de buscar si existe; el ordenamiento puede aplicarse al instante al cambiar el desplegable.",
+        tour_noticias_s4_title: "Tarjetas de noticias",
+        tour_noticias_s4_body:
+            "{{i:grid}} Cuadrícula de tarjetas con imagen opcional, fecha, título y extracto.\n\n{{svg:click}} Pulse la tarjeta, la imagen o «Leer más» para abrir el artículo completo (a veces en modal, a veces en vista expandida).\n\n{{i:info-circle}} Abrir el detalle suele marcar la noticia como vista para contadores de avisos del panel, según la configuración de su sede.",
+        tour_soporte_s1_title: "Soporte Gecko",
+        tour_soporte_s1_body:
+            "Registrar incidencias técnicas del producto y abrir conversación con soporte Gecko; la cabecera concentra título, ayuda y alta de ticket.\n\n{{i:headset}} `#soporte-page-header`: texto de alcance del soporte, {{i:question-circle}} ayuda, {{i:plus-lg}} «Nuevo ticket».\n\nTenga a mano capturas o usuario/sede si el caso es técnico.",
+        tour_soporte_s2_title: "Sus tickets",
+        tour_soporte_s2_body:
+            "{{i:ticket-detailed}} Lista de casos: número de ticket, asunto, estado (abierto, en curso, cerrado…) y última actualización.\n\n{{svg:click}} Elija un ticket: el panel derecho carga toda la conversación con el equipo de soporte.\n\nUse scroll en la lista si tiene muchos históricos.",
+        tour_soporte_s3_title: "Hilo del ticket",
+        tour_soporte_s3_body:
+            "{{i:chat-quote}} Mensajes alternados entre usted y soporte; puede haber {{i:paperclip}} adjuntos.\n\nAcciones comunes:\n- {{i:reply}} Responder añadiendo más información.\n- Cerrar o reabrir el ticket si el estado lo permite.\n\nLea el estado en la cabecera del panel: «Esperando respuesta del usuario» vs «En análisis» cambia la expectativa de plazo.",
+        tour_soporte_s4_title: "Nuevo ticket",
+        tour_soporte_s4_body:
+            "{{i:plus-circle}} Abre un formulario: asunto, categoría (si existe), descripción detallada y a veces prioridad.\n\n{{svg:click}} Envíe el primer mensaje; recibirá confirmación en pantalla y el ticket aparecerá en la lista izquierda.\n\n{{i:exclamation-triangle}} No incluya contraseñas ni datos clínicos innecesarios en el texto del ticket.",
+        tour_perfil_s1_title: "Mi perfil",
+        tour_perfil_s1_body:
+            "Gestionar identidad, contacto y seguridad de la cuenta; lo que cambie aquí afecta notificaciones, recuperación de acceso y cómo le ven otros en el sistema.\n\n{{i:person-circle}} `#perfil-page-header` enmarca la página; debajo: resumen, datos editables y seguridad en bloques.\n\nIncluye {{i:question-circle}} ayuda o tour.",
+        tour_perfil_s2_title: "Resumen de cuenta",
+        tour_perfil_s2_body:
+            "{{i:card-heading}} Tarjeta o franja superior con información no editable de un vistazo.\n\nSuele incluir:\n- Nombre completo y {{i:at}} nombre de usuario.\n- {{i:building}} Institución o bioterio principal.\n- Rol o etiquetas visibles (investigador, técnico…).\n\nSirve para confirmar que inició sesión en la cuenta correcta antes de editar abajo.",
+        tour_perfil_s3_title: "Datos personales",
+        tour_perfil_s3_body:
+            "{{i:pencil-square}} Formulario con correo, teléfono, laboratorio u otros campos que su sede mantenga visibles.\n\nQué hacer:\n- Modifique solo lo permitido; campos grises suelen venir del directorio institucional.\n- {{svg:click}} Pulse {{i:check-lg}} «Guardar» al final del bloque; espere el mensaje de confirmación.\n\nSi algo no guarda, revise validaciones (formato de correo, campos obligatorios).",
+        tour_perfil_s4_title: "Seguridad",
+        tour_perfil_s4_body:
+            "{{i:shield-lock}} Sección de contraseña: siempre pide la clave actual antes de la nueva.\n\nPasos:\n- Escriba contraseña actual, nueva y repetición (según diseño del formulario).\n- {{svg:click}} Confirme con el botón de actualizar.\n\n{{i:key}} Si olvidó la clave, use el flujo de recuperación en la pantalla de login, no este formulario.",
+        tour_ventas_s1_title: "Ventas GROBO",
+        tour_ventas_s1_body:
+            "Canal aparte del trabajo operativo del bioterio: enviar consultas comerciales (contratación, módulos, precios) al equipo de ventas; no sustituye a pedidos de animales ni protocolos.\n\n{{i:cart-check}} `#ventas-page-header`: título, descripción y {{i:question-circle}} ayuda.\n\nEl envío va a comercial (correo o ticket interno), no a las bandejas de pedido.",
+        tour_ventas_s2_title: "Texto introductorio",
+        tour_ventas_s2_body:
+            "{{i:info-circle}} Bloque explicativo con enlaces a web pública, PDF de servicios o correos generales.\n\nQué debe leer:\n- Qué tipo de consultas se atienden por este canal.\n- Aviso de que la respuesta llegará por {{i:envelope}} correo comercial, no por la mensajería interna del bioterio.\n\n{{svg:click}} Los enlaces externos abren en nueva pestaña.",
+        tour_ventas_s3_title: "Mensaje y correo",
+        tour_ventas_s3_body:
+            "{{i:envelope-at}} Campo o etiqueta con el correo desde el que desea recibir la respuesta: verifíquelo antes de enviar.\n\n{{i:textarea-t}} Área grande para describir necesidad, número de investigadores, módulos de interés, etc.\n\nSea concreto: sede, país y volumen aproximado ayudan a enrutar la consulta.",
+        tour_ventas_s4_title: "Enviar",
+        tour_ventas_s4_body:
+            "{{i:send-check}} Botón principal de envío del formulario.\n\n{{svg:click}} Al pulsar, espere el {{i:check-circle}} mensaje de éxito o un {{i:x-circle}} error de validación/red.\n\nSi no llega correo de confirmación, revise carpeta de spam y que el correo indicado sea correcto.",
+        tour_admin_reservas_s1_title: "Agenda de reservas",
+        tour_admin_reservas_s1_body:
+            "{{i:calendar-week}} Pantalla de gestión de turnos de salas o equipos para el equipo del bioterio.\n\nBarra de acciones habitual:\n- {{i:file-pdf}} Informes PDF por día o rango.\n- {{i:calendar3}} Vista de calendario mensual.\n- {{i:qr-code}} Impresión de códigos QR de sala.\n- {{i:arrow-clockwise}} Actualizar datos.\n- {{i:plus-lg}} Nueva reserva.\n\n{{svg:click}} Use cada icono según el procedimiento interno de su sede.",
+        tour_admin_reservas_s2_title: "Sala y fechas",
+        tour_admin_reservas_s2_body:
+            "{{i:door-open}} Selector de sala o recurso: define qué agenda está viendo.\n\nCampos de fecha:\n- Referencia para informes (día puntual o rango).\n- Rango de búsqueda de la tabla principal.\n\n{{svg:click}} Tras elegir valores, pulse el botón {{i:check-circle}} verde «Buscar» / «Cargar» (nombre exacto puede variar) para llenar la grilla con turnos coincidentes.",
+        tour_admin_reservas_s3_title: "Nueva reserva",
+        tour_admin_reservas_s3_body:
+            "{{i:plus-square}} Abre un asistente en {{i:window}} ventana emergente o vista dedicada.\n\nDatos típicos:\n- {{i:person}} Titular o grupo.\n- {{i:calendar-event}} Fecha y {{i:clock}} franja horaria.\n- {{i:arrow-repeat}} Modo simple (un día) o serie (repetición).\n\nComplete obligatorios y confirme; si hay conflicto de cupo el sistema suele mostrar un aviso.",
+        tour_admin_reservas_s4_title: "Tabla de agenda",
+        tour_admin_reservas_s4_body:
+            "{{i:table}} Filas del periodo consultado: hora, titular, estado, sala.\n\n{{svg:click}} Acciones por fila pueden incluir editar, anular o ver detalle.\n\n{{i:layers}} Más abajo a menudo hay una segunda tabla con {{i:hourglass-split}} solicitudes pendientes de aprobación: revísela antes de dar por cerrado el día.",
+        tour_admin_estadisticas_s1_title: "Panel de estadísticas",
+        tour_admin_estadisticas_s1_body:
+            "{{i:graph-up-arrow}} Módulo de indicadores agregados: números y gráficos para dirección u operaciones.\n\n{{i:signpost}} Miga de pan e {{i:building}} institución confirman que está en el informe de la sede correcta.\n\nLos datos son históricos hasta la última actualización: no son tiempo real salvo que pulse actualizar.",
+        tour_admin_estadisticas_s2_title: "Título y avisos",
+        tour_admin_estadisticas_s2_body:
+            "{{i:type-h3}} Encabezado del informe y, a veces, {{i:info-circle}} avisos de cobertura de datos o retrasos de carga.\n\nSi su contrato incluye {{i:globe2}} red institucional:\n- Puede aparecer una {{i:box-arrow-up-right}} tarjeta o botón hacia métricas de red.\n\nSi no tiene red:\n- Continúe con filtros de fecha y gráficos solo locales.",
+        tour_admin_estadisticas_s3_title: "Periodo y actualización",
+        tour_admin_estadisticas_s3_body:
+            "{{i:calendar-range}} Elija fecha desde y hasta que delimitan el cálculo.\n\n{{i:bar-chart-line-fill}} Tipo de gráfico: barras o circular según opciones de su sede.\n\n{{svg:click}} Pulse «Actualizar» o equivalente para recalcular tarjetas, tablas y botones de {{i:file-earmark-excel}} Excel / {{i:file-pdf}} PDF.\n\nExportar sin actualizar puede usar el último periodo ya cargado: verifique las fechas mostradas arriba.",
+        tour_admin_estadisticas_s4_title: "Filtros visuales",
+        tour_admin_estadisticas_s4_body:
+            "{{i:toggle-on}} Interruptores o casillas junto a cada serie en tablas y gráficos.\n\nQué puede mostrar u ocultar:\n- {{i:egg}} Animales, {{i:moisture}} reactivos, {{i:box-seam}} insumos, {{i:file-medical}} protocolos, {{i:houses}} alojamientos… según lo habilitado.\n\nSirve para presentaciones: enfoca la narrativa sin cambiar el {{i:calendar-range}} periodo global.",
+        tour_admin_precios_s1_title: "Gestión de precios",
+        tour_admin_precios_s1_body:
+            "{{i:currency-dollar}} Administración de tarifas facturables: animales por especie, días de alojamiento, insumos, servicios técnicos, etc.\n\nTodo lo que edite aquí puede impactar {{i:receipt}} facturación o cotizaciones: trabaje con cuidado y siga el calendario de precios de su sede.",
+        tour_admin_precios_s2_title: "Encabezado del tarifario",
+        tour_admin_precios_s2_body:
+            "{{i:textarea-t}} Bloque de texto que aparecerá en {{i:file-pdf}} PDF u otros listados oficiales exportados desde GROBO.\n\nQué hacer:\n- Ajuste título legal, notas al pie o cláusulas antes de generar informes para terceros.\n- {{svg:click}} Guarde si hay botón dedicado al texto de encabezado.\n\n{{i:info-circle}} Si no exporta PDF desde aquí, el campo aun así puede alimentar otros reportes.",
+        tour_admin_precios_s3_title: "Buscador",
+        tour_admin_precios_s3_body:
+            "{{i:search}} Filtro en vivo sobre todas las tablas largas de la página.\n\nEscriba {{i:hash}} código interno o parte de la {{i:tags}} descripción: las filas que no coinciden se ocultan al momento.\n\nÚtil en listados de cientos de ítems sin tocar scroll.",
+        tour_admin_precios_s4_title: "Tarifas por categoría",
+        tour_admin_precios_s4_body:
+            "{{i:list-nested}} La página está dividida en secciones apiladas verticalmente.\n\nOrden habitual:\n- {{i:egg}} Animales y {{i:houses}} alojamiento por especie.\n- {{i:flask}} Insumos experimentales y {{i:box}} comunes.\n- {{i:tools}} Servicios (necropsias, técnicas, etc.).\n\n{{i:save}} Al final suele haber un botón para guardar cambios masivos: pulse una sola vez tras revisar todas las secciones editadas.",
+        tour_solicitud_protocolo_s1_title: "Solicitudes de protocolo",
+        tour_solicitud_protocolo_s1_body:
+            "{{i:inbox}} Cola de trámites entrantes (altas, renovaciones, derivaciones) antes de que queden registrados como protocolo «maestro».\n\n{{i:signpost-split}} La miga de pan sitúa esta pantalla bajo administración, no bajo el portal del investigador.\n\nDesde aquí el equipo valida documentación y decide siguiente paso.",
+        tour_solicitud_protocolo_s2_title: "Encabezado y enlace al gestor",
+        tour_solicitud_protocolo_s2_body:
+            "{{i:type-h3}} Título y subtítulo explicando el tipo de cola.\n\n{{i:link-45deg}} Enlace o botón al {{i:file-medical}} gestor maestro de protocolos: úselo cuando necesite comparar una solicitud con un protocolo ya aprobado o buscar por criterios más amplios.\n\n{{svg:click}} Ese salto abre otra vista manteniendo su sesión.",
+        tour_solicitud_protocolo_s3_title: "Tabla de solicitudes",
+        tour_solicitud_protocolo_s3_body:
+            "{{i:table}} Una fila por trámite con columnas de solicitante, fechas, tipo y estado.\n\n{{i:three-dots-vertical}} Columna de acciones: abrir detalle, {{i:check-lg}} aprobar, {{i:arrow-return-left}} devolver con observaciones o derivar según permisos.\n\n{{svg:click}} El detalle suele abrir {{i:window}} modal con PDF adjunto y comentarios.",
+        tour_solicitud_protocolo_s4_title: "Volver al gestor",
+        tour_solicitud_protocolo_s4_body:
+            "{{i:arrow-left-circle}} Botón o enlace de retorno al listado general de protocolos.\n\nPara qué sirve:\n- Hacer búsquedas globales, {{i:file-earmark-excel}} exportar todo el universo o editar campos fuera del flujo de cola.\n\nNo confunda: la cola es para «entradas nuevas»; el gestor es el archivo completo.",
+        tour_misalojamientos_s1_title: "Mis alojamientos",
+        tour_misalojamientos_s1_body:
+            "{{i:houses}} Vista del investigador: cajas, jaulas o estadías asociadas a sus protocolos y usuario.\n\nCabecera:\n- Título y subtítulo aclaratorio.\n- {{i:question-circle}} Ayuda para abrir manual o tour.\n\nEs un espejo operativo: no sustituye al módulo admin de ocupación total del bioterio.",
+        tour_misalojamientos_s2_title: "Filtros",
+        tour_misalojamientos_s2_body:
+            "{{i:funnel}} {{i:building}} Institución (si ve varias), {{i:calendar-range}} rango de fechas, {{i:toggle-on}} estado del alojamiento y cuadro de búsqueda libre.\n\nCriterios útiles en el texto:\n- Código de historia, {{i:hash}} ID de protocolo, {{i:bug}} especie.\n\n{{svg:click}} Aplique o busque tras cambiar filtros para refrescar la tabla.",
+        tour_misalojamientos_s3_title: "Exportar a Excel",
+        tour_misalojamientos_s3_body:
+            "{{i:file-earmark-excel}} Genera una hoja con las filas visibles tras filtros.\n\nSi aparece modal:\n- Confirme columnas o rango de fechas antes de descargar.\n\n{{i:shield-lock}} Datos de animales y protocolos son sensibles: maneje el archivo según política de su centro.",
+        tour_misalojamientos_s4_title: "Tabla y paginación",
+        tour_misalojamientos_s4_body:
+            "{{i:table}} Cada fila resume una asignación o periodo de estadía.\n\n{{svg:click}} Clic abre ficha con detalle extendido, documentos o botones de solicitud de cambio según flujo.\n\n{{i:chevron-double-down}} Use la paginación inferior para navegar lotes grandes sin perder los filtros activos.",
+        tour_misreservas_s1_title: "Mis reservas",
+        tour_misreservas_s1_body:
+            "{{i:calendar2-week}} Pantalla dividida: a un lado el calendario mensual y al otro el detalle de franjas del día o sala seleccionada.\n\nObjetivo:\n- Autogestionar reservas de salas o equipos permitidos a investigadores sin pasar por admin salvo políticas de su sede.",
+        tour_misreservas_s2_title: "Sala",
+        tour_misreservas_s2_body:
+            "{{i:door-open}} Desplegable o lista de salas/recursos visibles para su {{i:building}} institución.\n\n{{svg:click}} Al cambiar de sala, el calendario y las franjas disponibles se recalculan (capacidad, mantenimiento, bloqueos).\n\nSi una sala no aparece, puede ser por permiso o por configuración del bioterio.",
+        tour_misreservas_s3_title: "Calendario",
+        tour_misreservas_s3_body:
+            "{{i:calendar3}} Navegue con flechas de mes; los días con cupo suelen resaltarse distinto a los llenos o cerrados.\n\n{{svg:click}} Elija un día: la parte derecha lista horarios libres o eventos ya reservados.\n\nLea la {{i:info-circle}} leyenda bajo el calendario si su sede usa colores especiales (feriados, cierre sanitario).",
+        tour_misreservas_s4_title: "Confirmar reserva",
+        tour_misreservas_s4_body:
+            "{{i:clock-history}} Tras elegir día y franja, complete instrumentos o motivo si el formulario lo pide y marque {{i:arrow-repeat}} repetición si aplica.\n\n{{i:hand-thumbs-up}} El botón «Reservar» o «Confirmar» solo se habilita cuando todos los obligatorios son válidos y no hay conflicto.\n\n{{svg:click}} Confirme y espere el mensaje de éxito; si falla, lea el texto del error (solape, fuera de horario, etc.).",
+        nav_library: "Temas del manual por sección del menú",
+        main_landmark: "Manual de capacitación y biblioteca de temas",
+        hash_unavailable_title: "Enlace no disponible para su perfil",
+        hash_unavailable_body:
+            "Ese tema no forma parte de su menú o módulos contratados. Se muestra el primer tema de su biblioteca y la dirección se ha ajustado.",
+        dismiss_alert: "Cerrar aviso",
+        content_help_icons:
+            "Los iconos en los títulos de cada apartado son ayuda visual; el nombre exacto de un botón puede variar ligeramente según su sede.",
+        cat_navigation: "Navegación y marco de la página",
+        cat_toolbar: "Barra de herramientas y acciones globales",
+        cat_filters: "Filtros y búsqueda",
+        cat_table: "Tabla principal (grilla)",
+        cat_row: "Acciones por fila, clic y detalle",
+        cat_bulk: "Exportación, informes y acciones masivas",
+        cat_modals: "Ventanas emergentes, confirmaciones y avisos",
+        cat_forms: "Formularios, campos y pasos de envío",
+        cat_detail: "Ficha, pestañas y vista detalle",
+        cat_sidebar: "Menú lateral y subsecciones",
+        cat_calendar: "Calendario y franjas horarias",
+        cat_comms: "Mensajes, hilos y notificaciones",
+        cat_content: "Contenido principal, tarjetas y listas",
+        cat_hub: "Centro de enlaces (hub de configuración)",
+        cat_profile: "Perfil, cuenta y preferencias",
+        cat_dashboard: "Tablero, atajos e indicadores",
+        cat_links: "Enlaces, pestañas y subpáginas",
+        cat_help: "Ayuda, soporte y contacto",
         body_fallback:
-            '<p class="mb-2">En <strong>{title}</strong> (<code class="small">{path}</code>) tiene las herramientas asociadas a su rol. Revise la barra superior, filtros y botones de acción de la tabla o formulario.</p><p class="mb-0 small text-muted">Si necesita soporte técnico, use <strong>Ayuda → Ticket/Contacto</strong>.</p>',
+            '<p class="mb-2"><strong>{title}</strong> concentra las acciones habituales de esta parte de GROBO según su rol y lo que su institución tenga activo: use la cabecera, los filtros si existen y los botones de la tabla o del formulario para operar.</p><p class="mb-0 text-body-secondary">Si la aplicación falla y tiene <strong>Ayuda → Ticket/Contacto</strong> (Soporte Gecko), úselo para incidencias técnicas; si no lo tiene en el menú, contacte a administración del bioterio.</p>',
         bodies: {
             "admin__usuarios": `<div class="manual-topic"><h5 class="text-success mb-3">Usuarios y roles</h5><p>Desde aquí gestiona cuentas de la sede: búsqueda por nombre, usuario o apellido, filtros y exportación.</p><ul class="small"><li><strong>Clic en fila:</strong> abre la ficha para editar datos personales, departamento y ver protocolos/formularios vinculados.</li><li><strong>Contraseña:</strong> use el botón de restablecimiento según las políticas de su institución.</li><li><strong>Excel/PDF:</strong> descargue listados o fichas desde los botones superiores o desde la ficha.</li></ul></div>`,
             "admin__protocolos": `<div class="manual-topic"><h5 class="text-success mb-3">Protocolos (administración)</h5><p>Bandeja de solicitudes y gestión de protocolos aprobados o en trámite.</p><ul class="small"><li>Revise estados pendientes y adjuntos requeridos.</li><li>Use la búsqueda y filtros para localizar por investigador o título.</li><li>Las acciones disponibles dependen de su rol y del estado del protocolo.</li></ul></div>`,
@@ -3190,8 +3716,12 @@ export const es = {
             "panel__misprotocolos": `<div class="manual-topic"><h5 class="text-success mb-3">Mis protocolos</h5><p>Consulta de protocolos en los que participa como investigador.</p><ul class="small"><li>Verifique vigencia y especies autorizadas antes de nuevos pedidos.</li><li>Los trámites de red o solicitudes internas siguen las reglas de su sede.</li></ul></div>`,
             "admin__facturacion__index": `<div class="manual-topic"><h5 class="text-success mb-3">Facturación</h5><p>Módulo contable: reportes por departamento, investigador, protocolo u organización.</p><ul class="small"><li>Use los informes para conciliar consumos y saldos.</li><li>Los PDF y ajustes suelen estar en cada subvista (depto, investigador, etc.).</li></ul></div>`,
             "panel__mensajes": `<div class="manual-topic"><h5 class="text-success mb-3">Mensajes</h5><p>Mensajería 1:1 y conversaciones personales dentro de GROBO.</p><ul class="small"><li>Cree un hilo nuevo eligiendo destinatario y asunto.</li><li>Las respuestas se agrupan por conversación; puede recibir aviso por correo si está configurado.</li></ul></div>`,
-            "panel__soporte": `<div class="manual-topic"><h5 class="text-success mb-3">Tickets de soporte</h5><p>Contacto con el equipo Gecko por turnos: un mensaje por vez hasta nueva respuesta.</p><ul class="small"><li>Abra un ticket con asunto claro y el primer mensaje.</li><li>Cuando soporte responde, podrá contestar usted en su turno o cerrar el ticket si quedó resuelto.</li><li>Se envía correo a soporte en cada envío.</li></ul></div>`,
-            "panel__capacitacion": `<div class="manual-topic"><h5 class="text-success mb-3">Esta biblioteca</h5><p>Aquí concentramos el manual por secciones del menú según su rol.</p><ul class="small"><li>Use la lista izquierda para saltar entre módulos.</li><li>En otras pantallas, la barra inferior puede traerlo directamente al tutorial del módulo actual.</li></ul></div>`
+            "panel__mensajes_institucion": `<div class="manual-topic"><h5 class="text-success mb-3">Mensajería institucional</h5><p>Comunicados de gestión y consultas al buzón de la sede.</p><ul class="small"><li>Los comunicados pueden ser visibles para toda la institución; las consultas son privadas con quien tenga permisos.</li><li>Use «Nuevo mensaje» para elegir tipo (comunicado o consulta) según su rol.</li><li>El chat directo con personas sigue en «Mensajes».</li></ul></div>`,
+            "panel__noticias": `<div class="manual-topic"><h5 class="text-success mb-3">Noticias</h5><p>Portal de avisos institucionales y, si aplica, de la red.</p><ul class="small"><li>Filtre por alcance local/red y use búsqueda u ordenación para encontrar un aviso.</li><li>Abrir una tarjeta muestra el texto completo.</li><li>Para fallos del programa no use este portal: quien tenga <strong>Ayuda → Ticket/Contacto</strong> (suelen ser administradores) abre ticket a Soporte Gecko; el resto, avise a administración de sede.</li></ul></div>`,
+            "panel__perfil": `<div class="manual-topic"><h5 class="text-success mb-3">Mi perfil</h5><p>Datos personales y seguridad de su cuenta.</p><ul class="small"><li>Mantenga el correo actualizado para notificaciones y recuperación.</li><li>Guarde cambios de datos antes de salir.</li><li>El cambio de contraseña exige la clave actual.</li></ul></div>`,
+            "panel__ventas": `<div class="manual-topic"><h5 class="text-success mb-3">Ventas GROBO</h5><p>Consultas comerciales y presupuestos por correo.</p><ul class="small"><li>El mensaje llega al equipo comercial (categoría venta), no a soporte técnico.</li><li>Revise el correo mostrado: es donde le contestarán.</li><li>Para fallos de la aplicación: ticket a Soporte Gecko vía <strong>Ayuda → Ticket/Contacto</strong> si su perfil lo tiene; si no, administración de sede.</li></ul></div>`,
+            "panel__soporte": `<div class="manual-topic"><h5 class="text-success mb-3">Soporte Gecko (tickets)</h5><p>Canal para <strong>fallos técnicos del programa GROBO</strong> (errores, bloqueos, comportamiento anómalo). No es para trámites científicos ni consultas comerciales.</p><ul class="small"><li>En la configuración habitual este menú lo tienen sobre todo perfiles <strong>administrativos</strong>; los investigadores suelen no verlo y deben avisar a administración de sede.</li><li>Abra un ticket con asunto claro y el primer mensaje (pasos para reproducir, captura, navegador).</li><li>Por turnos: cuando soporte responde, puede contestar o cerrar; cada envío notifica por correo.</li></ul></div>`,
+            "panel__capacitacion": `<div class="manual-topic"><h5 class="text-success mb-3">Esta biblioteca</h5><p>Aquí concentramos el manual por secciones del menú según su rol.</p><ul class="small"><li>Use la lista izquierda para saltar entre módulos.</li><li>En otras pantallas, la barra de ayuda fija en el <strong>borde inferior de la ventana</strong> (no en la cabecera) ofrece el <strong>documento de ayuda</strong> y el <strong>tutorial interactivo</strong> del módulo actual.</li><li>Puede ocultar la barra y reactivarla desde aquí o desde el menú del botón Ayuda junto a Excel.</li><li>El apartado <strong>Ticket Soporte Gecko</strong> en el tema Capacitación explica fallos de la aplicación y que el ticket suele ser solo para administradores.</li></ul></div>`
         }
     },
     titulos_pagina: {
@@ -3229,6 +3759,8 @@ export const es = {
         facturacion_depto: "Facturación por Departamento",
         facturacion_investigador: "Facturación por Investigador",
         facturacion_protocolo: "Facturación por Protocolo",
+        facturacion_institucion: "Facturación por institución (RED)",
+        facturacion_org: "Facturación por organización",
         historial_contable: "Historial Contable",
         solicitud_protocolo: "Solicitudes de Protocolo",
         formularios: "Centro de Solicitudes",

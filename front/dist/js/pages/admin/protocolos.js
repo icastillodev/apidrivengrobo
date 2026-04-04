@@ -157,12 +157,6 @@ export async function initProtocolosPage() {
 
     // Exportar Excel
     document.getElementById('btn-excel-prot').onclick = exportToExcel;
-    
-    // Botón Ayuda
-    const btnAyuda = document.getElementById('btn-ayuda-prot');
-    if (btnAyuda) {
-        btnAyuda.onclick = () => new bootstrap.Modal(document.getElementById('modal-protocol-help')).show();
-    }
 }
 
 function openProtocolFromUrlIfNeeded() {

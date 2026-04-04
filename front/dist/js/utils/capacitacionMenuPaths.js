@@ -28,11 +28,29 @@ export function collectMenuPathsFromIds(menuIds, roleId) {
   return paths;
 }
 
+/** Subrutas de facturación (no salen del menú 202; se añaden si el rol tiene el hub). */
+export const FACTURACION_SUB_PATHS = [
+  'admin/facturacion/depto',
+  'admin/facturacion/investigador',
+  'admin/facturacion/protocolo',
+  'admin/facturacion/institucion',
+  'admin/facturacion/org',
+];
+
+/** Si el usuario puede abrir el centro de facturación, habilita guías FAB/manual por subpantalla. */
+export function expandFacturacionPathsIfAllowed(allowedSet) {
+  if (!allowedSet || typeof allowedSet.has !== 'function') return;
+  if (allowedSet.has('admin/facturacion/index')) {
+    FACTURACION_SUB_PATHS.forEach((p) => allowedSet.add(p));
+  }
+}
+
 /** Orden sugerido de secciones en la biblioteca (filtrado por lo que el rol tiene). */
 export const CAPACITACION_PATH_ORDER = [
   'admin/dashboard',
   'panel/dashboard',
   'capacitacion/tema/red',
+  'capacitacion/tema/modales',
   'admin/usuarios',
   'admin/protocolos',
   'admin/solicitud_protocolo',
@@ -46,10 +64,17 @@ export const CAPACITACION_PATH_ORDER = [
   'panel/formularios',
   'panel/misformularios',
   'panel/misalojamientos',
+  'usuario/misalojamientos',
   'panel/misreservas',
+  'usuario/misreservas',
   'panel/misprotocolos',
   'admin/precios',
   'admin/facturacion/index',
+  'admin/facturacion/depto',
+  'admin/facturacion/investigador',
+  'admin/facturacion/protocolo',
+  'admin/facturacion/institucion',
+  'admin/facturacion/org',
   'admin/historialcontable',
   'panel/mensajes',
   'panel/mensajes_institucion',

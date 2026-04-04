@@ -47,14 +47,25 @@
 </head>
 <body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="mensajes">
     <div class="container my-4 px-3">
-        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+        <div id="mensajes-page-header" class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
             <div>
                 <h4 class="fw-black m-0" data-i18n="comunicacion.msg_page_title"></h4>
                 <small class="text-muted d-block" data-i18n="comunicacion.msg_page_subtitle"></small>
             </div>
-            <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nuevo-msg">
-                <i class="bi bi-envelope-plus me-1"></i><span data-i18n="comunicacion.msg_nuevo"></span>
-            </button>
+            <div class="d-flex gap-2 align-items-center flex-shrink-0">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm fw-bold"
+                    id="btn-ayuda-mensajes"
+                    data-gecko-cap-help="panel/mensajes"
+                    data-gecko-cap-modal="#modal-mensajes-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i><span data-i18n="comunicacion.btn_ayuda"></span>
+                </button>
+                <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nuevo-msg">
+                    <i class="bi bi-envelope-plus me-1"></i><span data-i18n="comunicacion.msg_nuevo"></span>
+                </button>
+            </div>
         </div>
 
         <div class="row g-3">
@@ -77,6 +88,35 @@
                             <button type="button" class="btn btn-primary btn-sm align-self-end" id="btn-reply" data-i18n="comunicacion.msg_responder"></button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-mensajes-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="comunicacion.cap_help_titulo"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.cap_help_s1_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.cap_help_s1_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.cap_help_s2_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.cap_help_s2_text"></p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="comunicacion.cap_help_s3_title"></h6>
+                        <p class="text-muted small mb-0" data-i18n="comunicacion.cap_help_s3_text"></p>
+                    </section>
                 </div>
             </div>
         </div>

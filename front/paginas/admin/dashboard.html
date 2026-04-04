@@ -24,18 +24,30 @@
             transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
         }
     </style>
+</head>
 
 <body class="bg-gray-50 font-sans">
 
     <main class="container mx-auto mt-6 p-6">
-        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6">
-            <div class="max-w-3xl">
-                <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                    <span data-i18n="admin_dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Colega</span>, <span data-i18n="admin_dashboard.bienvenido_grobo">Bienvenido a GROBO</span>
-                </h1>
-                <p class="text-gray-500 font-medium leading-relaxed mb-0" data-i18n="admin_dashboard.panel_desc">
-                    Panel de gestión institucional <strong>GROBO</strong>. Utilice el menú de navegación para gestionar protocolos, revisar solicitudes y administrar la plataforma de manera integral.
-                </p>
+        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6" id="dashboard-welcome">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div class="max-w-3xl flex-grow-1">
+                    <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
+                        <span data-i18n="admin_dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Colega</span>, <span data-i18n="admin_dashboard.bienvenido_grobo">Bienvenido a GROBO</span>
+                    </h1>
+                    <p class="text-gray-500 font-medium leading-relaxed mb-0" data-i18n="admin_dashboard.panel_desc">
+                        Panel de gestión institucional <strong>GROBO</strong>. Utilice el menú de navegación para gestionar protocolos, revisar solicitudes y administrar la plataforma de manera integral.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    id="btn-ayuda-dashboard-admin"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
+                    data-gecko-cap-help="admin/dashboard"
+                    data-gecko-cap-modal="#modal-admin-dashboard-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_dashboard.btn_ayuda">Ayuda</span>
+                </button>
             </div>
         </section>
 
@@ -50,6 +62,35 @@
             </div>
         </div>
     </main>
+
+    <div class="modal fade" id="modal-admin-dashboard-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="admin_dashboard.help_titulo">Guía — Panel administración</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_dashboard.help_s1_title">1. Rol del inicio</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_dashboard.help_s1_text">Vista resumen: desde aquí accede a protocolos, bandejas operativas, estadísticas y comunicación según permisos de su rol.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_dashboard.help_s2_title">2. Noticias</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_dashboard.help_s2_text">Avisos institucionales o de red en la franja superior del tablero.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_dashboard.help_s3_title">3. Métricas y accesos</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_dashboard.help_s3_text">Las tarjetas muestran contadores y enlazan a cada módulo; use el menú lateral para el resto de tareas administrativas.</p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="modal-security-check" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -94,15 +135,16 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260311';
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        import { ensureFirstRunLanguagePick } from '../../dist/js/utils/firstRunLanguageOnboarding.js';
         
         showLoader();
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                Auth.checkAccess([1, 2, 4, 5, 6]);
+                await ensureFirstRunLanguagePick(loadLanguage, translatePage);
                 if (window.txt) translatePage();
-
-                Auth.checkAccess([1, 2, 4, 5, 6]); 
 
                 const userName = localStorage.getItem('userName');
                 const instId = localStorage.getItem('instId');

@@ -123,14 +123,22 @@
                 <button id="btn-excel-reactivo" class="btn btn-outline-success btn-sm px-3 fw-bold shadow-sm" title="Exportar Excel" aria-label="Exportar Excel">
                     <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="generales.excel"></span>
                 </button>
-                <button id="btn-ayuda-reactivo" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm" title="Abrir ayuda" aria-label="Abrir ayuda">
+                <button
+                    type="button"
+                    id="btn-ayuda-reactivo"
+                    class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm"
+                    title="Abrir ayuda"
+                    aria-label="Abrir ayuda"
+                    data-gecko-cap-help="admin/reactivos"
+                    data-gecko-cap-modal="#modal-reactivo-help"
+                >
                     <i class="bi bi-question-circle me-1"></i> <span data-i18n="generales.ayuda"></span>
                 </button>
             </div>
         </div>
         
         <div class="table-responsive">
-            <table class="table table-hover align-middle border" style="font-size: 11px;">
+            <table id="tabla-reactivos" class="table table-hover align-middle border" style="font-size: 11px;">
                 <thead class="table-light text-uppercase">
                     <tr>
                         <th data-key="idformA" data-sortable="true" data-i18n="generales.id" class="py-3 px-2"></th>

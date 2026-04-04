@@ -46,13 +46,16 @@ export async function initUserProtocols() {
         setTimeout(() => { openNewProtocolModal(); }, 300);
     }
 
-    const btnAyuda = document.getElementById('btn-ayuda-protocolos');
-    if (btnAyuda) btnAyuda.onclick = openAyudaProtocolosModal;
     const linkAyudaInline = document.getElementById('link-ayuda-inline');
     if (linkAyudaInline) linkAyudaInline.onclick = openAyudaProtocolosModal;
+
+    const modalAyuda = document.getElementById('modal-ayuda-protocolos');
+    if (modalAyuda) {
+        modalAyuda.addEventListener('show.bs.modal', fillAyudaProtocolosModalContent);
+    }
 }
 
-function openAyudaProtocolosModal() {
+function fillAyudaProtocolosModalContent() {
     const content = document.getElementById('ayuda-protocolos-content');
     if (!content) return;
     const hasNetwork = !!(store.formDataCache && store.formDataCache.has_network);
@@ -75,6 +78,10 @@ function openAyudaProtocolosModal() {
             </ul>
             <p class="small text-muted mt-3 mb-0">Para usar formularios necesitás al menos un protocolo aprobado y vigente en esta institución.</p>`;
     }
+}
+
+function openAyudaProtocolosModal() {
+    fillAyudaProtocolosModalContent();
     const modalEl = document.getElementById('modal-ayuda-protocolos');
     if (modalEl) new bootstrap.Modal(modalEl).show();
 }

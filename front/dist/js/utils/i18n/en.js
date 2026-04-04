@@ -35,6 +35,9 @@ export const en = {
         panel_inicio: "Dashboard",
         help_group: "Help",
         help_capacitacion: "Training",
+        help_interactive_screen: "Interactive tutorial (this screen)",
+        help_interactive_modals: "Open dialog walkthrough (when a dialog is open)",
+        help_menu_show_fab: "Show bottom help bar",
         help_ticket: "Ticket/Contact",
         help_ventas: "Sales",
         messages: "Messages (institution)",
@@ -56,6 +59,7 @@ export const en = {
         dash_noticias_error: "Could not load dashboard news. Please try again later.",
         portal_titulo: "News",
         portal_sub: "Institution and network",
+        portal_search_ph: "Search news…",
         filtro_local: "Local",
         filtro_red: "Other sites (network)",
         col_fecha: "Date",
@@ -167,7 +171,37 @@ export const en = {
         err_forbidden: "You do not have permission.",
         err_generico: "Something went wrong.",
         msg_email_sin_direccion: "The message was saved, but the recipient has no valid email on file; the email notice could not be sent.",
-        msg_email_smtp_error: "The message was saved, but the notice email could not be sent. Try again later or check the mail server configuration."
+        msg_email_smtp_error: "The message was saved, but the notice email could not be sent. Try again later or check the mail server configuration.",
+        btn_ayuda: "Help",
+        cap_help_titulo: "Messages: quick guide",
+        cap_help_s1_title: "What this screen is for",
+        cap_help_s1_text:
+            "Lists your conversations with institution users and the site inbox when applicable. Use “New message” to start a thread with a recipient and subject.",
+        cap_help_s2_title: "Conversation list",
+        cap_help_s2_text: "Select an item to load messages on the right. Replies stay grouped in the same thread.",
+        cap_help_s3_title: "Thread panel",
+        cap_help_s3_text:
+            "Read the history and type in the box below; click “Reply” to send (Ctrl+Enter or ⌘+Enter when enabled).",
+        cap_help_inst_titulo: "Institutional messaging: quick guide",
+        cap_help_inst_s1_title: "Institutional channel",
+        cap_help_inst_s1_text:
+            "Here you receive admin notices and can open queries to the institution. One-to-one chat with people stays under “Messages”.",
+        cap_help_inst_s2_title: "Thread list",
+        cap_help_inst_s2_text:
+            "Pick a thread to read it. Notices may be visible site-wide; queries are private between you and authorized staff.",
+        cap_help_inst_s3_title: "Reading and replying",
+        cap_help_inst_s3_text:
+            "Some threads are read-only; if you do not see reply, start a new query from “New message”. Choose type (notice/query) as your role allows.",
+        cap_help_portal_titulo: "News portal: quick guide",
+        cap_help_portal_s1_title: "What you see here",
+        cap_help_portal_s1_text:
+            "Notices from your institution and, when enabled, updates from the GROBO network. This is not internal messaging: news here are meant to be read by everyone with portal access.",
+        cap_help_portal_s2_title: "Local vs network",
+        cap_help_portal_s2_text:
+            "Toggle between your site’s news only and items shared across sites in the same dependency (when available).",
+        cap_help_portal_s3_title: "Search, sort, and open",
+        cap_help_portal_s3_text:
+            "Filter by text, sort by date or title, and click a card to read the full article in the modal. Pagination appears when there are many items."
     },
     bread: {
         users: "User Administration",
@@ -1261,7 +1295,15 @@ alojamientos: {
         card_mensajes: "Messages",
         card_mensajes_desc: "Chats with your institution and network",
         btn_ir_modulo: "GO TO MODULE",
-        btn_ver_tarifario: "VIEW TARIFF"
+        btn_ver_tarifario: "VIEW TARIFF",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Home dashboard",
+        help_s1_title: "1. Welcome and menu",
+        help_s1_text: "Your starting point. Use the side menu for forms, orders, protocols, and messages per your site’s modules.",
+        help_s2_title: "2. News",
+        help_s2_text: "Institution or network announcements may appear here—check them regularly.",
+        help_s3_title: "3. Quick access",
+        help_s3_text: "Cards link to common modules (new request, my forms, prices, etc.). Click a card to open it."
     },
     centro_solicitudes: {
         titulo: "Request Center",
@@ -1279,7 +1321,15 @@ alojamientos: {
         pedido_insumos: "Supply Order",
         reserva_salas: "Room Reservation",
         iniciar: "Start",
-        sin_formularios: "No forms enabled for your access level."
+        sin_formularios: "No forms enabled for your access level.",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Request center",
+        help_s1_title: "1. Context and institution",
+        help_s1_text: "The line under the title shows whether you are on your site, the network, or another enabled context. Wait until the cards load.",
+        help_s2_title: "2. Choose a workflow",
+        help_s2_text: "Each block groups the institution and request buttons (animals, reagents, supplies, room booking…) per your contract.",
+        help_s3_title: "3. If nothing appears",
+        help_s3_text: "If you see no forms, your role or site settings may limit the catalog. Contact your vivarium administration."
     },
     perfil: {
         titulo: "My Profile",
@@ -1309,7 +1359,17 @@ alojamientos: {
         swal_pass_actualizada: "Password Updated!",
         swal_clave_modificada: "Your password has been changed successfully.",
         swal_error_servidor: "Could not connect to the server.",
-        swal_error_solicitud: "Could not process the request."
+        swal_error_solicitud: "Could not process the request.",
+        cap_help_titulo: "My profile: quick guide",
+        cap_help_s1_title: "Account summary",
+        cap_help_s1_text:
+            "Review your display name, username, and institution. Email matters for notifications and password recovery—keep it up to date.",
+        cap_help_s2_title: "Personal details",
+        cap_help_s2_text:
+            "Edit name, email, and phone; click “Save changes” to persist. Follow any validation messages your site requires.",
+        cap_help_s3_title: "Password",
+        cap_help_s3_text:
+            "To change your password enter your current one, the new password twice, and confirm. Use a strong password and do not share it."
     },
     form_animales: {
         titulo: "Animal request",
@@ -1545,7 +1605,15 @@ alojamientos: {
         contacto_mail_asunto: "GROBO order inquiry",
         contacto_sin_correo: "No email",
         contacto_tel_lbl: "Phone / Contact",
-        contacto_no_tel: "Not available"
+        contacto_no_tel: "Not available",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — My forms",
+        help_s1_title: "1. Top shortcuts",
+        help_s1_text: "Review animals used in protocols and ordered supplies; global Excel exports your history for a date range.",
+        help_s2_title: "2. Filters and search",
+        help_s2_text: "Status, derivation, and institution (when shown) narrow the list. The text box finds by ID, protocol, or type.",
+        help_s3_title: "3. Grid and detail",
+        help_s3_text: "Click a row to open the detail; depending on the order you may contact institutions or manage derivation."
     },
     misprotocolos: {
         bread_investigador: "Researcher",
@@ -1712,7 +1780,15 @@ alojamientos: {
         card_noticias_admin: "News (administration)",
         card_noticias_admin_desc: "Publish, edit, and news permissions",
         btn_ir_modulo: "GO TO MODULE",
-        btn_pedidos_responder: "PENDING ORDERS"
+        btn_pedidos_responder: "PENDING ORDERS",
+        btn_ayuda: "Help",
+        help_titulo: "Guide — Admin home",
+        help_s1_title: "1. Role of this screen",
+        help_s1_text: "Overview: jump to protocols, operational queues, statistics, and messaging per your role.",
+        help_s2_title: "2. News",
+        help_s2_text: "Institutional or network notices in the top strip of the dashboard.",
+        help_s3_title: "3. Metrics and modules",
+        help_s3_text: "Each card summarizes an area (protocols, orders, housing…) and opens the module in one click."
     },
     admin_usuarios: {
         bread_grobo: "GROBO",
@@ -1922,7 +1998,15 @@ alojamientos: {
         transmitir_ok: "Protocol sent to the network successfully.",
         transmitir_error: "Could not send the protocol to the network.",
         transmitir_sin_destinos: "No network institutions available.",
-        transmitir_seleccione: "Select at least one institution."
+        transmitir_seleccione: "Select at least one institution.",
+        btn_ayuda: "Help",
+        help_titulo: "Protocol management guide",
+        help_s1_title: "1. Filters and search",
+        help_s1_text: "Use origin, scope (when shown), the “Filter by” field and the text box; press Search to refresh the grid.",
+        help_s2_title: "2. Requests, create, and detail",
+        help_s2_text: "“Requests” opens incoming workflows. “New” creates a protocol. Click a row to open the record for review or edit per your permissions.",
+        help_s3_title: "3. Export to Excel",
+        help_s3_text: "Downloads the current filtered list for reporting or internal audit."
     },
     admin_formularios: {
         delete_btn: "Delete form",
@@ -3130,7 +3214,17 @@ alojamientos: {
         msg_vacio: "Please enter a message.",
         validar_campos: "Please fill in subject and message.",
         creado_ok: "Ticket created.",
-        nuevo_gecko_hint: "As GeckoDev you can open test tickets; email is still sent to support."
+        nuevo_gecko_hint: "As GeckoDev you can open test tickets; email is still sent to support.",
+        cap_help_titulo: "Gecko support: quick guide",
+        cap_help_s1_title: "Turn-based tickets",
+        cap_help_s1_text:
+            "Each thread is a ticket: you and support take turns—one message at a time, not a chat flood. Each send emails support.",
+        cap_help_s2_title: "List and detail",
+        cap_help_s2_text:
+            "Pick a ticket on the left to load history on the right, see status, and know whether to reply or wait.",
+        cap_help_s3_title: "New ticket and closing",
+        cap_help_s3_text:
+            "Use “New ticket” with a clear subject and first message. Close the ticket from the UI when resolved if available; otherwise reply to confirm closure."
     },
     ventas: {
         page_title: "GROBO sales",
@@ -3149,28 +3243,459 @@ alojamientos: {
         error_enviar: "Could not send. Please try again later.",
         msg_corto_titulo: "Incomplete message",
         msg_corto: "Please enter at least 10 characters.",
-        error_sin_email: "Update your email under My profile before sending."
+        error_sin_email: "Update your email under My profile before sending.",
+        cap_help_titulo: "GROBO sales: quick guide",
+        cap_help_s1_title: "What this is for",
+        cap_help_s1_text:
+            "Commercial channel: quotes, contracting modules, or pre-purchase questions about GROBO. Do not use this screen for application failures: the Gecko Support ticket (Help → Ticket/Contact) is for technical incidents and is usually available only to administrative profiles; if you do not have it, notify site administration.",
+        cap_help_s2_title: "Reply email",
+        cap_help_s2_text:
+            "Shows your GROBO account email; that is where the sales team will reply. Update it under My profile if needed.",
+        cap_help_s3_title: "Send your message",
+        cap_help_s3_text:
+            "Write at least a short clear message (minimum 10 characters) and click “Send message”. This emails sales@groboapp.com tagged as sales."
     },
     capacitacion: {
         page_title: "Training",
-        page_sub: "User manual by menu section. You only see areas your role can access.",
+        page_sub: "Clear manual by section: same order as your menu. Only areas your institution enabled for you are shown.",
         page_banner:
-            "<strong class=\"text-info-emphasis\">How to find the help you need:</strong> each topic includes a summary, <em>who it applies to by role</em>, and detailed collapsible sections. Elsewhere in the portal, use the <strong>green bottom bar</strong> to open this screen’s tutorial. For system issues: <strong>Help → Ticket/Contact</strong>.",
+            "<strong class=\"text-info-emphasis\">Welcome to the manual:</strong> pick a topic in the list; on the right you will first see a <strong>full introduction</strong> to that part of the system, then a <strong>short summary</strong>, who usually uses it, and collapsible sections you can open at your own pace. Elsewhere in the portal, a <strong>help bar fixed along the bottom edge of the window</strong> (not in the header), styled in green, opens this manual <strong>on the topic for that screen</strong> and the <strong>interactive tutorials</strong>. If you hid the bar, turn it back on with the switch below, <strong>Help → Show bottom help bar</strong>, or the <strong>Help</strong> button next to Excel (that menu also starts tutorials without the bar). <strong>Application failures (software errors):</strong> <strong>Help → Ticket/Contact</strong> (Gecko Support) is for technical incidents with the software and <strong>is usually visible only to administrative staff</strong> at the site; if you are a researcher and do not have that option, tell <strong>vivarium administration</strong> so they can open or escalate the ticket.",
         library_heading: "Help library",
         content_heading: "Content",
         no_topics: "No help sections are available for your profile.",
+        chapter_about_heading: "About this section",
+        chapter_summary_label: "In short",
         roles_label: "Role scope",
         red_menu_label: "Working in a NETWORK (multi-site)",
+        modals_menu_label: "Pop-up windows (modals and dialogs)",
         content_help_title: "How to read this tutorial",
         content_help_body:
-            "Expand each accordion section. If wording differs slightly from your site, confirm with your local admin. For bugs or errors use Help → Ticket/Contact.",
+            "Open the sections below when you want more detail; you can read them in any order. Button labels may differ slightly by institution—focus on the function described. If something does not match your site, check with your local admin. There is a section on the Gecko Support ticket (application failures): administrative profiles usually use it; researchers typically route technical issues through site administration.",
         fab_hint: "Need help with this screen?",
         fab_hint_title: "Help for this screen",
         fab_hint_sub: "Open the manual with detailed sections, roles, and good practices.",
-        fab_btn: "Open tutorial in Training",
+        fab_btn: "View help document",
         fab_region: "Contextual help",
+        fab_open_topic_aria: "Open the help document in Training: {title}",
+        fab_interactive_btn: "Interactive tutorial",
+        fab_interactive_aria: "Start an interactive tutorial for this screen",
+        fab_dismiss_bar: "Don’t show this bar again",
+        fab_dismiss_toast_title: "Help bar hidden",
+        fab_dismiss_toast_body:
+            "Turn it back on here (switch below) or via Help next to Excel → “Show bottom help bar”. Help shown on top of dialogs is hidden as well.",
+        fab_dismiss_ok: "OK",
+        fab_tour_modals_aria: "Start the walkthrough for the open dialog (only shown while a dialog is open)",
+        modal_help_region: "Contextual help on dialog",
+        modal_help_title: "Help for this window",
+        modal_help_sub:
+            "The bottom bar sits behind the dimmed backdrop; here you can open this screen’s manual or the walkthrough that explains this dialog (layout and areas).",
+        modal_help_tour_modals_btn: "Walkthrough: this dialog",
+        modal_help_tour_modals_aria: "Start the guided walkthrough for the open dialog",
+        tour_modals_need_open_title: "Open a detail dialog first",
+        tour_modals_need_open_body:
+            "This walkthrough is only available while a form or detail dialog is open. Open it from the grid or the relevant button, then use Help again—the option appears only while the dialog stays open.",
+        tour_modal_in_s1_title: "This dialog",
+        tour_modal_in_s1_body:
+            "Complete or review one focused task (detail, edit, confirm) while staying in the same panel session—the backdrop blocks the rest until you close.\n\n{{i:window-stack}} `.modal-dialog`: box over a {{i:mask}} dimmed layer.\n\n- If content is tall, {{svg:hand}} scroll inside the modal, not only behind it.\n- This tour marks {{i:layout-three-columns}} header, body, footer; fields vary by module.\n\n{{i:book-half}} Training → topic for this screen explains each field for that module.",
+        tour_modal_in_s2_title: "Header",
+        tour_modal_in_s2_body:
+            "Know which case you opened and leave safely without half-saved data.\n\n{{i:type-h5}} `.modal-header`: flow title (order, user, etc.).\n\n- {{i:x-lg}} Close: {{svg:click}}; sometimes same as outside click with confirmation.\n- Subtitle or {{i:tag}} status (draft, submitted…).\n\n{{i:exclamation-triangle}} Closing without saving may lose changes—read any warning.",
+        tour_modal_in_s3_title: "Body: fields and content",
+        tour_modal_in_s3_body:
+            "Enter or review case data, move through long tabs, and satisfy required fields before you confirm in the footer.\n\n{{i:ui-checks-grid}} `.modal-body`: forms, tables, {{i:folder2-open}} tabs, lists.\n\n- Required fields often turn red if missing.\n- {{svg:click}} Dropdowns, date pickers, inline search.\n- Change tabs without closing the modal.\n\nRights depend on your role—read-only when applicable.",
+        tour_modal_in_s4_title: "Footer",
+        tour_modal_in_s4_body:
+            "Commit, discard, or submit the case—this is the operational close of the dialog.\n\n{{i:hand-index-thumb}} `.modal-footer`: {{i:check-lg}} Save, {{i:x-circle}} Cancel, {{i:download}} export, {{i:send}} Submit, etc.\n\n{{svg:click}} Primary only after required fields are OK.\n\n{{i:bell-slash}} You can disable auto tours on the last step; {{i:lightning-charge}} manual tour stays on the help bar or Help menu.",
+        tour_mid_footer_hint:
+            "“Finish” or Esc ends the tour on any step (including the home dashboard). The first time you open each section the walkthrough starts automatically; after that, start it from Help. To stop it from opening automatically on entry, use the options on the last step.",
+        tour_end_where_hint:
+            "You can run this walkthrough again anytime: the help bar fixed at the bottom of the window (if you didn’t hide it), the Help button next to Excel, or Help in the top header menu. If you hid the bottom bar, turn it back on under Training, Help → Show bottom help bar, or that menu.",
+        pref_show_fab_label: "Show the bottom help bar on other portal pages",
+        pref_show_fab_help:
+            "Includes the Training manual, interactive tutorials, and—when a dialog opens—the same help above the dimmed backdrop if the bar is not hidden.",
+        library_tour_btn: "Interactive tour of this library",
+        page_help_intro:
+            "If you hid the bottom bar, you can still open the manual, this screen’s tutorial, and show the bar again from here. With a dialog open you’ll also see the walkthrough for that dialog.",
+        page_help_screen: "This screen’s help (window)",
+        page_help_show_fab: "Show bottom help bar",
+        help_menu_no_screen_tour_title: "Screen tutorial",
+        help_menu_no_screen_tour_body:
+            "Open a portal section (for example from the menu) to run the tutorial aligned with that screen. The full manual is under Training.",
+        help_menu_bar_visible_title: "The bar is already visible",
+        help_menu_bar_visible_body:
+            "To hide it use “Don’t show this bar again” on the bottom bar (or the same link on a dialog). You can show it again from Help → Show bottom help bar or the switch on this page.",
+        tour_no_steps_title: "Interactive tutorial",
+        tour_no_steps_body: "There is no guided walkthrough for this screen yet. Open the full topic in Training.",
+        tour_open_manual: "Open manual",
+        tour_close: "Close",
+        tour_prev: "Back",
+        tour_next: "Next",
+        setup_back: "Back",
+        setup_next: "Next",
+        setup_continue: "Continue",
+        setup_lang_category: "Language",
+        setup_lang_hint:
+            "Choose your language by tapping a flag only. You can change it later with the circular flag button in the menu bar.",
+        setup_theme_category: "Screen theme",
+        setup_theme_hint:
+            "Tap Light or Dark and watch the interface change. When you’re happy, press Next.",
+        setup_theme_light: "Light",
+        setup_theme_dark: "Dark",
+        setup_theme_menu_hint:
+            "You can change language, theme, font size, and top vs side menu anytime from the menu bar: flag, sun/moon, font, and layout icon.",
+        setup_layout_category: "Menu",
+        setup_layout_hint:
+            "Choose a horizontal menu at the top or a side panel on the left.",
+        setup_layout_top: "Top",
+        setup_layout_side: "Left",
+        setup_layout_reload_hint:
+            "Press Continue to save and reload; you’ll see the menu in the chosen position and the welcome tour will continue.",
+        setup_font_category: "Font size",
+        setup_font_hint:
+            "Pick a size and watch the sample text change. Then press Continue.",
+        setup_font_sample:
+            "Sample text: this is how lists, forms, and tables will look at the size you pick. The menu button also cycles sizes; here you choose explicitly.",
+        setup_font_chica: "Small",
+        setup_font_mediana: "Medium",
+        setup_font_grande: "Large",
+        tour_finish: "Finish",
+        tour_step_of: "Step {n} of {m}",
+        tour_skipped_title: "Tour ended",
+        tour_skipped_body: "Some steps had no visible elements on screen and were skipped.",
+        tour_intro_label: "What it’s for",
+        tour_detail_label: "Details and how to use",
+        tour_step_intro_fallback:
+            "The highlight marks “{title}”—it plays a specific role on this screen.",
+        tour_off_this: "Don’t show the automatic tutorial on this screen again",
+        tour_off_all: "Don’t show automatic tutorials on any screen",
+        tour_off_welcome: "Don’t show the welcome walkthrough automatically again",
+        tour_esc_hint: "You can also press Esc to finish at any time.",
+        page_help_reset_auto_tour: "Turn automatic tutorial back on for this screen",
+        page_help_reset_auto_ok_title: "Preference saved",
+        page_help_reset_auto_ok_body:
+            "Next time you open this screen you can see the automatic tutorial again on entry (unless you turned off tutorials globally). You can still start the tutorial anytime from the bottom bar, the Help button next to Excel, or Help → Interactive tutorial in the main menu.",
+        tour_welcome_s1_title: "Welcome to GROBO",
+        tour_welcome_s1_body:
+            "Identify the product (GROBO) and who develops it; jump out to public documentation or the website without mixing that with day-to-day work inside the panel.\n\n{{i:link-45deg}} The header shows the product link and credits (Geckos.uy & UDELAR). {{svg:click}} Informational links—open in a new tab; not required to operate.\n\nWhat this area shows:\n- Product identity and who builds it.\n- External links to documentation or the public site.\n\nWhat you can do:\n- {{svg:hand}} Click a link to learn more.\n- Press “Next” for the menu and the rest of the UI.",
+        tour_welcome_s2_title: "Main menu",
+        tour_welcome_s2_body:
+            "Go to any portal module you’re allowed to use; it’s the operational map of the whole app (home, forms, orders, protocols, messages, news, profile, help…).\n\n{{i:list}} What the menu reflects:\n- Only routes enabled for your site and role.\n- Chevron items: submenus with several pages.\n\nHow to use it:\n- {{svg:click}} Click a label: loads that area (URL may change).\n- {{i:chevron-down}} Expand a submenu and pick a sub-route.\n- {{i:phone}} On mobile, tap the hamburger {{i:list}}.\n\nIf something is missing, it’s contract or permissions—ask your site admin.",
+        tour_welcome_s3_title: "Preferences, voice, and shortcuts",
+        tour_welcome_s3_body:
+            "If you just used the first-run assistant, you already tried language, theme, and font size—these are the same controls, always available in the bar.\n\nChange global experience (language, theme, font size, voice, shortcuts, menu layout) from one place without opening “My profile”—handy for settings you use often.\n\n{{i:sliders}} What each icon does on {{svg:click}}:\n- {{i:mic}} Microphone: Gecko Voice (browser speech; “Gecko” commands). Permission the first time.\n- {{i:fonts}} Font size: small / medium / large.\n- {{i:brightness-high}} Sun/moon: light or dark theme.\n- {{i:globe2}} Language: Spanish, English, Portuguese (saved to your user when applicable).\n- {{i:keyboard}} Shortcuts (e.g. Ctrl+G search, Alt+D dashboard, Alt+F forms).\n- {{i:layout-sidebar-reverse}} Last icon: top vs side menu.\n\nOn very small screens some icons hide; keyboard shortcuts usually still work.",
+        tour_welcome_s4_title: "Gecko Search",
+        tour_welcome_s4_body:
+            "Search records and help in one place and, if your site enables it, get contextual or voice assistance without leaving the current screen flow.\n\n{{i:search}} When the panel opens:\n- Text field to search the app.\n- Results and, if enabled, AI from what you type or dictate.\n\nHow to use it:\n- {{svg:click}} Pill toggles open/close (Ctrl+G on many keyboards).\n- {{i:mic}} Another mic is often inside the panel.\n- Type, press Enter, or pick a result.\n\n{{i:exclamation-triangle}} Firefox may limit voice; Chrome or Edge are usually better for dictation.",
+        tour_welcome_s5_title: "Help bar (bottom of the window)",
+        tour_welcome_s5_body:
+            "Open help tied to the screen you’re on (manual topic, green-spotlight walkthrough) and control whether the bottom help bar stays visible—so you don’t rely only on the header.\n\n{{i:arrow-down-circle}} The fixed green bottom bar offers:\n- {{i:book-half}} “View help document”: manual already scoped to this screen.\n- {{i:lightning-charge}} “Interactive tutorial”: walkthrough when steps exist.\n- {{i:x-lg}} “Don’t show this bar again”: hide (restore under Training or Help → Show bottom help bar).\n\nWith a modal, a similar strip may sit above the dimmed backdrop; header Help also runs a tutorial for that dialog.\n\nIf the bar is missing, scroll to the page bottom or check you didn’t hide it.",
+        tour_dashboard_menu_s1_title: "Menu: what each item does",
+        tour_dashboard_menu_s1_body:
+            "Jump from home to any authorised module and see which routes you have without memorising URLs.\n\n{{i:grid-3x3-gap}} Same menu as welcome. What it reflects:\n- Only modules your site bought and your role allows.\n- Dropdowns group related routes.\n\nOn {{svg:click}}:\n- Loads the module; main content swaps; bottom help aligns with that page.\n- Each area may have its own tour under {{i:lightning-charge}}.\n\nMissing item = contract or permissions—contact your site administrator.",
+        tour_cap_s1_title: "Training library",
+        tour_cap_s1_body:
+            "Read written procedures aligned with the menu and your role, and restore the bottom help bar if you hid it; complements the walkthrough on each live screen.\n\n{{i:book-half}} In this header:\n- Library title.\n- {{i:toggle2-on}} Switch to show the {{i:arrow-down-circle}} green bottom bar again (elsewhere that bar stays at the window bottom).\n\nActions:\n- {{svg:click}} Left topic → right-hand article.\n- Manual as standing reference; {{i:lightning-charge}} tour on the screen where you work.",
+        tour_cap_s2_title: "Topic list",
+        tour_cap_s2_body:
+            "Pick which manual chapter to open and share a direct link with colleagues who have access.\n\n{{i:list-ul}} Left column: chapters available to you.\n\nPer row:\n- Name aligned with menu or module.\n- Sometimes an icon or grouping.\n\nOn {{svg:click}}:\n- Active topic and content in the right panel.\n- {{i:link-45deg}} URL updates—copy for a colleague.",
+        tour_cap_s3_title: "Topic content",
+        tour_cap_s3_body:
+            "Study the full procedure for the chosen module (role scope, steps, checklists) without leaving the library.\n\n{{i:journal-text}} Right panel: selected article.\n\nUsually:\n- Module summary.\n- {{i:people}} Role scope when relevant.\n- {{i:chevron-down}} Collapsible steps or checklists.\n\nUse:\n- {{svg:hand}} Open/close blocks as needed.\n- {{i:info-circle}} Heading icons are hints; button labels may vary by site.",
+        tour_usuarios_s1_title: "User directory",
+        tour_usuarios_s1_body:
+            "{{i:people}} Main accounts module: manage vivarium users according to your permissions.\n\nWhat the screen reflects:\n- Institution context you’re working in.\n- {{i:ui-radios}} Top bar with search, export, and sometimes quick-create actions.\n\nWhat to do:\n- Set filters before touching sensitive data—work on the right population.\n- Continue the tour to narrow the grid, export, and open rows.",
+        tour_usuarios_s2_title: "Filters and search",
+        tour_usuarios_s2_body:
+            "{{i:funnel}} Area to narrow who appears in the table.\n\nTypical inputs:\n- {{i:ui-radios}} Field/column (ID, email, lab, name…).\n- Text box for the criterion.\n\nHow to act:\n- {{svg:click}} Pick the field, type the text, press {{i:search}} Search (or equivalent) to refresh the grid.\n- Clear criteria and search again if you see no rows—a previous filter may still apply.",
+        tour_usuarios_s3_title: "Export to Excel",
+        tour_usuarios_s3_body:
+            "{{i:file-earmark-excel}} Download of the list currently on screen (after your filters).\n\nUse cases:\n- Audits, offline review, internal reporting.\n\nMind:\n- {{i:shield-exclamation}} Personal data is subject to privacy policy and internal rules.\n- {{svg:click}} Use the Excel button on the toolbar; confirm range or columns if a dialog asks.",
+        tour_usuarios_s4_title: "Results table",
+        tour_usuarios_s4_body:
+            "{{i:table}} Main grid: one row per user matching the filter.\n\nRows usually show:\n- IDs, contact, role, lab, or status per your site design.\n- {{i:three-dots-vertical}} Action buttons or overflow menu at the end.\n\nInteraction:\n- {{svg:click}} Column headers if sorting is enabled.\n- {{svg:click}} “Edit”, the name, or an action icon to open a detail sheet or modal.\n- Available actions (activate, reset, etc.) depend on your role.",
+        tour_animales_s1_title: "Animals queue",
+        tour_animales_s1_body:
+            "{{i:egg}} Live-animal order queue for vivarium staff.\n\nWhat you’ll see:\n- Requests with statuses (pending, in progress, closed…) per workflow.\n- Top bar with {{i:funnel}} filters, {{i:file-earmark-excel}} export, and sometimes create/refresh buttons.\n\nGoals:\n- Triage with filters before opening each case.\n- Progress or register work from row detail (per permissions).",
+        tour_animales_s2_title: "Filters and search",
+        tour_animales_s2_body:
+            "{{i:search}} Same pattern as other queues: column + text + run search.\n\nColumn picker often includes:\n- Order or protocol IDs, requester.\n- {{i:building}} Origin institution when you operate in a network.\n\nHow:\n- {{svg:click}} Choose column, type, press Search.\n- Combine with date or status controls if shown on the same bar.",
+        tour_animales_s3_title: "Export to Excel",
+        tour_animales_s3_body:
+            "{{i:file-earmark-excel}} Export with a date-range assistant for the download period.\n\nUse for:\n- Bulk tracking, management reports, records.\n\n{{i:lock}} Treat the file as confidential—share only through approved channels.",
+        tour_animales_s4_title: "Requests table",
+        tour_animales_s4_body:
+            "{{i:table}} Each row is an animal order.\n\nColumns show:\n- Summary (dates, quantities, status, requester…) per configuration.\n\nOn {{svg:click}}:\n- Open detail inline, on a new view, or in a {{i:window}} modal per flow.\n- From detail: approve, reject, request info, attach documents, or change status when your role allows.",
+        tour_insumos_s1_title: "Supplies queue",
+        tour_insumos_s1_body:
+            "{{i:box-seam}} Laboratory supply requests: consumables and similar items.\n\nTypical layout:\n- Header with filters and export.\n- Table of each order’s status.\n\nPurpose:\n- Central tracking separate from animals or biological reagents queues.",
+        tour_insumos_s2_title: "Filters and search",
+        tour_insumos_s2_body:
+            "{{i:funnel}} Narrow by relevant column (code, requester, {{i:building}} origin, status…).\n\nSteps:\n- Pick column in the dropdown.\n- Enter text or code.\n- {{svg:click}} Press Search to refresh matching rows.\n\nIf the grid is empty, the filter may be too strict.",
+        tour_insumos_s3_title: "Export to Excel",
+        tour_insumos_s3_body:
+            "{{i:file-earmark-excel}} Like animals: often opens a modal for {{i:calendar-range}} dates before generating the file.\n\nGood for:\n- Purchase audits or consumption follow-up.",
+        tour_insumos_s4_title: "Supplies table",
+        tour_insumos_s4_body:
+            "{{i:table}} Sortable list of supply orders.\n\nPer row:\n- Item and workflow summary.\n- Actions (view, edit, cancel…) per internal policy.\n\n{{svg:click}} Open a row for line detail, message history, or attachments when the module shows them.",
+        tour_reactivos_s1_title: "Biological reagents queue",
+        tour_reactivos_s1_body:
+            "{{i:moisture}} Biological-material / reagent requests—separate from animals and generic supplies.\n\nCentralises:\n- Incoming forms and their technical or regulatory status per your institution.\n\nFrom here:\n- Filter workload, export for committees, or open each record to process.",
+        tour_reactivos_s2_title: "Filters and search",
+        tour_reactivos_s2_body:
+            "{{i:funnel}} Column + text; networks may add {{i:building}} origin/destination filters.\n\n{{svg:click}} Run search after changing criteria—the table may not auto-refresh while typing.",
+        tour_reactivos_s3_title: "Export to Excel",
+        tour_reactivos_s3_body:
+            "{{i:file-earmark-excel}} The export dialog asks for from/to dates—confirm the period that should appear in Excel.\n\nThe file usually matches the same subset you’d see with the same filters (per site implementation).",
+        tour_reactivos_s4_title: "Reagents table",
+        tour_reactivos_s4_body:
+            "{{i:table}} Rows with workflow status, IDs, and sometimes material class.\n\n{{svg:click}} Opening a row shows the full form, attachments, and actions (approve, comment, forward).\n- Not every action is visible for every role.",
+        tour_alojamientos_s1_title: "Housing management",
+        tour_alojamientos_s1_body:
+            "{{i:houses}} Occupancy and space management (cages, rooms, batches).\n\nOften shows:\n- Summary or KPIs in the header when present.\n- Shortcuts to reports or {{i:plus-lg}} create actions on the top bar.\n\nGoal:\n- Operational picture of capacity, reservations, and holds.",
+        tour_alojamientos_s2_title: "Search and filters",
+        tour_alojamientos_s2_body:
+            "{{i:search}} Free-text box plus dropdowns ({{i:bug}} species, {{i:activity}} space status, rack, room…).\n\nHow:\n- Type partial codes or pick filters, then apply/search as the UI indicates.\n- The grid narrows to matches—useful for spot checks.",
+        tour_alojamientos_s3_title: "Export to Excel",
+        tour_alojamientos_s3_body:
+            "{{i:file-earmark-excel}} Download the filtered snapshot for spreadsheets or meetings.\n\n{{i:info-circle}} If the button is missing, your profile may lack export permission here.",
+        tour_alojamientos_s4_title: "Housing table",
+        tour_alojamientos_s4_body:
+            "{{i:table}} One row per space or assignment depending on the configured view.\n\n{{svg:click}} Row or detail icon opens history, linked animals, or release/close actions.\n- Sort columns to group by species, protocol, or date.",
+        tour_protocolos_s1_title: "Protocol management",
+        tour_protocolos_s1_body:
+            "Run the site’s protocol master file (new entries, reviews, PDFs, network submissions) and jump to the incoming-requests queue when split—admin context, not the investigator view.\n\n{{i:file-medical}} Breadcrumb/header sets institution context.\n\nThe screen adds strong filters (origin, scope, study type…) and a link to {{i:inbox}} requests when applicable.\n\nTypical admin work: metadata, {{i:file-earmark-pdf}} PDFs, network coordination.",
+        tour_protocolos_s2_title: "Filters and search",
+        tour_protocolos_s2_body:
+            "{{i:funnel}} Combine {{i:building}} origin, local/network scope, field type, and free text.\n\nSteps:\n- Adjust dropdowns for what you need (e.g. one lab only).\n- {{svg:click}} Run search; the table shows only matches.\n- Clear filters to return to the full authorised list.",
+        tour_protocolos_s3_title: "Export to Excel",
+        tour_protocolos_s3_body:
+            "{{i:file-earmark-excel}} Exports the filtered set—useful for IACUC/ethical committees, ISO audits, or management.\n\nConfirm dates or format if the dialog asks.",
+        tour_protocolos_s4_title: "Protocols table",
+        tour_protocolos_s4_body:
+            "{{i:table}} Each row is a protocol or version per your data model.\n\n{{svg:click}} Row opens detailed record.\n\nFrom detail you can usually:\n- {{i:pencil-square}} Edit allowed fields.\n- Attach or regenerate PDF.\n- Send or sync to another site on a contracted network.\n- Review status history and comments.",
+        tour_misformularios_s1_title: "My forms",
+        tour_misformularios_s1_body:
+            "Track all your requests (animals, reagents, supplies) in one investigator queue instead of opening each admin queue separately.\n\n{{i:ui-checks}} The top-bar `h4` names the page; export and help usually sit beside it.\n\nThe table mixes request types with labels or colours and may offer export or related shortcuts.",
+        tour_misformularios_s2_title: "Filters and search",
+        tour_misformularios_s2_body:
+            "{{i:funnel}} {{i:flag}} Status, derivation, or {{i:building}} institution filters when your profile shows them.\n\nText field:\n- Narrows by form ID, protocol number, request type, or free text per selector.\n\n{{svg:click}} Search after changing criteria to refresh results.",
+        tour_misformularios_s3_title: "Export to Excel",
+        tour_misformularios_s3_body:
+            "{{i:file-earmark-excel}} Opens a {{i:calendar-range}} date range and downloads rows matching current filters.\n\nHandy for project reports or offline triage.",
+        tour_misformularios_s4_title: "Orders table",
+        tour_misformularios_s4_body:
+            "{{i:table}} Each row is one of your submissions.\n\n{{svg:click}} Open a row to see:\n- Status and vivarium comments.\n- Reply or attach when the flow allows.\n- Cross-site derivation actions (accept/reject) when applicable.\n\nUse bottom pagination for long history without losing filters.",
+        tour_panel_dash_s1_title: "Your GROBO home",
+        tour_panel_dash_s1_body:
+            "Confirm at a glance that you’re in the right account and site before opening orders or protocols—reduces mistakes with multiple logins.\n\n{{i:speedometer2}} `#dashboard-welcome` usually shows:\n- Greeting and username (or first name).\n- Short context (researcher/technician home).\n- Institution or vivarium name.\n\n{{i:question-circle}} Card Help, if present, {{svg:click}} opens a short modal—not a substitute for the manual or green bottom bar. Main actions are in the menu and lower cards.",
+        tour_panel_dash_s2_title: "News and notices",
+        tour_panel_dash_s2_body:
+            "Catch operational or institutional notices without relying only on email; your site centralises communication here (and from the network when enabled).\n\n{{i:newspaper}} `#dashboard-noticias-mount` items usually include:\n- Date and sometimes a category colour.\n- Title and excerpt; full text via “Read more” or the card.\n\nUse:\n- {{svg:click}} Card → detail (sometimes modal).\n- Check regularly—not everything is emailed.\n- Local / Network tabs switch the feed when present.",
+        tour_panel_dash_s3_title: "Modules and quick access",
+        tour_panel_dash_s3_body:
+            "Reach the modules you use most (messages, requests, history, protocols, housing, tariff) in one click instead of scanning the whole menu.\n\n{{i:grid-3x3-gap}} `#dashboard-grid` mirrors menu destinations. Typical cards:\n- {{i:chat-dots}} Messages.\n- {{i:plus-square-dotted}} Request centre.\n- {{i:ui-checks}} My forms.\n- {{i:file-medical}} My protocols.\n- {{i:houses}} My housing.\n- {{i:file-earmark-pdf}} Prices / PDF.\n\n{{svg:click}} Card or “Go to module”; footer button may duplicate for mobile.\n\nMissing card = not purchased or not in your role.",
+        tour_admin_dash_s1_title: "Vivarium administration home",
+        tour_admin_dash_s1_body:
+            "Anchor vivarium admin context (not investigator-only) and move straight to users, queues, configuration, or billing via menu or shortcuts.\n\n{{i:shield-lock}} `#dashboard-welcome` confirms:\n- Admin context.\n- Welcome and often institution name.\n\nFrom here:\n- {{i:list}} Menu → users, queues, config, billing, etc.\n- Lower cards: same quick links.\n\nGROBO (Geckos.uy & UDELAR) brings protocols, orders, housing, and messaging together.",
+        tour_admin_dash_s2_title: "News",
+        tour_admin_dash_s2_body:
+            "Broadcast policies, hours, closures, or official messages to everyone who runs the site; complements email—don’t assume inbox delivery.\n\n{{i:bullhorn}} `#dashboard-noticias-mount` on admin: cards or list with date, title, excerpt; {{svg:click}} opens detail like the investigator dashboard.",
+        tour_admin_dash_s3_title: "Indicators and modules",
+        tour_admin_dash_s3_body:
+            "Open daily operations (users, protocols, order queues, housing, messaging) with full tables, filters, and role-gated actions.\n\n{{i:boxes}} `#dashboard-grid` often includes:\n- {{i:people}} Users.\n- {{i:clipboard-data}} Protocols / requests.\n- {{i:cart3}} Queues (animals, reagents, supplies).\n- {{i:houses}} Housing.\n- {{i:chat-left-text}} Messages / institutional.\n\n{{svg:click}} → module screen; search, Excel export, row actions there. Cards depend on purchase and permissions.",
+        tour_formularios_s1_title: "Request center",
+        tour_formularios_s1_body:
+            "Verify route and context (correct portal, investigator vs admin) before starting a request so submissions aren’t filed under the wrong session or role.\n\n{{i:signpost-split}} `nav[aria-label=\"breadcrumb\"]`: trail (e.g. “New request”).\n\n- Confirm GROBO shell (menu, top bar).\n- Next tour step shows title and green strip with {{i:building}} institution or network.",
+        tour_formularios_s2_title: "Title and context",
+        tour_formularios_s2_body:
+            "See which institution or network you’re acting for and which request types you may open before you pick a card in the grid.\n\n{{i:type-h1}} `#header-container`: title and {{i:brush}} green context strip.\n\n- Scope: single site, {{i:diagram-3}} group, or {{i:globe2}} network.\n- Note on available workflows.\n\nNo click required—orientation before grid “Start”.",
+        tour_formularios_s3_title: "Request grid",
+        tour_formularios_s3_body:
+            "Start the right workflow (animals, reagents, supplies…) toward the correct destination site; this grid is the entry point to each form.\n\n{{i:grid-3x3-gap}} `#forms-grid`: cards per {{i:building}} centre or category.\n\n- {{i:play-circle}} “Start” per form type: {{i:egg}} {{i:moisture}} {{i:box-seam}} etc.\n\n{{svg:click}} Start only where needed → assistant or PDF per site rules. Disabled = permission or configuration.",
+        tour_misprotocolos_s1_title: "My protocols",
+        tour_misprotocolos_s1_body:
+            "Work only on protocols where you’re PI or member per site rules, separate from the admin master list.\n\n{{i:file-medical}} Breadcrumb/context marks the investigator inbox.\n\nSame confidentiality rules as the rest of the portal.",
+        tour_misprotocolos_s2_title: "Views: mine, site, network",
+        tour_misprotocolos_s2_body:
+            "{{i:layout-text-window-reverse}} Tabs or segmented buttons above the grid.\n\nEach tab:\n- {{i:person-badge}} Mine: tied to your user.\n- {{i:building}} Site / institution: current centre.\n- {{i:globe2}} Network / multicentre: when your contract links sites.\n\n{{svg:click}} Switching tabs reloads the grid; filters may reset.",
+        tour_misprotocolos_s3_title: "Filters and search",
+        tour_misprotocolos_s3_body:
+            "{{i:funnel}} Field dropdown (ID, title, study type, status…) plus text.\n\nHow:\n- Pick the most specific field when you know it (e.g. internal code).\n- Type the value and press {{i:search}} search/magnifier to apply.\n\n{{i:info-circle}} No rows? Try another tab or clear the text and search again.",
+        tour_misprotocolos_s4_title: "Protocols table",
+        tour_misprotocolos_s4_body:
+            "{{i:table}} Columns for ID, title, validity, status, sometimes an action column.\n\n{{svg:click}} Row or “View” opens detail, {{i:file-earmark-pdf}} PDF, or history.\n\nExtra buttons:\n- {{i:plus-lg}} “Protocol request” or similar for new or renewal / network workflows when enabled.\n- Visible actions depend on protocol state and your role.",
+        tour_mensajes_s1_title: "Messages",
+        tour_mensajes_s1_body:
+            "Exchange 1:1 messages inside GROBO; the header groups global actions for this screen (help, start a thread).\n\n{{i:chat-dots}} `#mensajes-page-header` usually includes:\n- Title.\n- {{i:question-circle}} Help / tour.\n- {{i:envelope-plus}} “New message”.\n\nLayout: list left (or top on mobile), detail right.",
+        tour_mensajes_s2_title: "Conversation list",
+        tour_mensajes_s2_body:
+            "{{i:inbox}} Threads with short subject, counterparty, sometimes last-message date.\n\nWhat to do:\n- {{svg:click}} Pick a thread to load full history on the right.\n- Active thread is often highlighted.\n\nScroll inside the list column when it’s long—not only the whole page.",
+        tour_mensajes_s3_title: "Thread detail",
+        tour_mensajes_s3_body:
+            "{{i:chat-left-text}} Right panel: messages with sender, date, and body.\n\nParts:\n- Read-only history area.\n- {{i:pencil-square}} Reply text box at the bottom.\n- {{i:send}} Send button or paper-plane icon.\n\n{{svg:click}} Type and send; the thread usually updates without leaving the screen.",
+        tour_mensajes_s4_title: "New message",
+        tour_mensajes_s4_body:
+            "{{i:envelope-plus}} Opens a {{i:window}} modal or step view.\n\nTypical fields:\n- {{i:person}} Recipient (search or picker).\n- {{i:type}} Subject.\n- Message body.\n\n{{svg:click}} Send; required-field errors show before the dialog closes.",
+        tour_mensajes_inst_s1_title: "Institutional messaging",
+        tour_mensajes_inst_s1_body:
+            "{{i:building}} Variant for official communication between the site and researchers (or internal areas).\n\nHeader:\n- Title, help, compose—similar to personal messages but under {{i:shield-check}} institutional rules.\n\nUse for notices that should be logged in-system, not only external email.",
+        tour_mensajes_inst_s2_title: "Institutional threads",
+        tour_mensajes_inst_s2_body:
+            "{{i:list-ul}} Subjects may show priority or category badges.\n\n{{svg:click}} Select an item; content appears beside it like standard messaging.\n\nSome threads may be read-only announcements for your role.",
+        tour_mensajes_inst_s3_title: "Message panel",
+        tour_mensajes_inst_s3_body:
+            "{{i:journal-text}} Announcement body and optional {{i:paperclip}} attachments or links.\n\nIf you can reply:\n- Use the bottom text area and send like personal messages.\n\nIf there’s no reply box, your profile is view-only for that thread.",
+        tour_mensajes_inst_s4_title: "New message",
+        tour_mensajes_inst_s4_body:
+            "{{i:plus-lg}} Wizard to create a {{i:chat-square-text}} query or {{i:bullhorn}} broadcast when your site allows.\n\nFill in:\n- Message type if a dropdown is shown.\n- Recipients (individual, role, or list) when requested.\n- Clear subject and body so support or management can act without extra rounds.",
+        tour_noticias_s1_title: "News portal",
+        tour_noticias_s1_body:
+            "Read institutional (and network) announcements in browse mode; the header orients you and opens help. Authoring lives in a separate admin module.\n\n{{i:newspaper}} `#noticias-page-header`: title, subtitle, {{i:question-circle}} help / manual / tour.\n\nNot an editor screen.",
+        tour_noticias_s2_title: "Local or network scope",
+        tour_noticias_s2_body:
+            "{{i:geo-alt}} Tabs or buttons “Local / Network” (labels may vary).\n\nEach mode:\n- {{i:building}} Local: your vivarium or institution only.\n- {{i:globe2}} Network: items shared across linked sites.\n\n{{svg:click}} Switch tabs to swap the card set below; search usually applies to the active mode.",
+        tour_noticias_s3_title: "Search and sort",
+        tour_noticias_s3_body:
+            "{{i:search}} Text box to match title or body keywords.\n\n{{i:sort-down}} Sort selector: by date (newest first) or title A–Z.\n\n{{svg:click}} Type and press Enter or Search if present; sort may apply instantly when you change the dropdown.",
+        tour_noticias_s4_title: "News cards",
+        tour_noticias_s4_body:
+            "{{i:grid}} Cards with optional image, date, title, excerpt.\n\n{{svg:click}} Card, image, or “Read more” opens the full article (modal or expanded view).\n\n{{i:info-circle}} Opening detail may mark the item as read for dashboard counters, depending on site settings.",
+        tour_soporte_s1_title: "Gecko support",
+        tour_soporte_s1_body:
+            "Log product issues and talk to Gecko support; the header holds title, scope, help, and creating a ticket.\n\n{{i:headset}} `#soporte-page-header`: scope text, {{i:question-circle}} help, {{i:plus-lg}} “New ticket”.\n\nKeep screenshots or user/site details ready for technical cases.",
+        tour_soporte_s2_title: "Your tickets",
+        tour_soporte_s2_body:
+            "{{i:ticket-detailed}} List with ticket id, subject, status (open, in progress, closed…), last update.\n\n{{svg:click}} Pick a ticket to load the full conversation on the right.\n\nScroll the list when you have many historical cases.",
+        tour_soporte_s3_title: "Ticket thread",
+        tour_soporte_s3_body:
+            "{{i:chat-quote}} Alternating messages with optional {{i:paperclip}} attachments.\n\nCommon actions:\n- {{i:reply}} Reply with more detail.\n- Close or reopen when status allows.\n\nRead the status line (waiting on user vs in analysis) to set expectations.",
+        tour_soporte_s4_title: "New ticket",
+        tour_soporte_s4_body:
+            "{{i:plus-circle}} Form: subject, category (if any), detailed description, sometimes priority.\n\n{{svg:click}} Send the first message; confirmation appears and the ticket shows in the left list.\n\n{{i:exclamation-triangle}} Don’t paste passwords or unnecessary clinical data.",
+        tour_perfil_s1_title: "My profile",
+        tour_perfil_s1_body:
+            "Manage identity, contact channels, and security; what you save here affects notifications, password recovery, and how others see you in the system.\n\n{{i:person-circle}} `#perfil-page-header` frames the page; below: summary, editable data, security.\n\nIncludes {{i:question-circle}} help or tour.",
+        tour_perfil_s2_title: "Account summary",
+        tour_perfil_s2_body:
+            "{{i:card-heading}} Card or top strip with read-only snapshot.\n\nUsually shows:\n- Full name and {{i:at}} username.\n- {{i:building}} Main institution or vivarium.\n- Visible role tags (researcher, technician…).\n\nUse it to confirm you’re in the right account before editing below.",
+        tour_perfil_s3_title: "Personal details",
+        tour_perfil_s3_body:
+            "{{i:pencil-square}} Form: email, phone, lab, or other fields your site exposes.\n\nHow:\n- Edit only what’s allowed; grey fields often come from the institutional directory.\n- {{svg:click}} Press {{i:check-lg}} Save at the end of the block; wait for confirmation.\n\nIf save fails, check validation (email format, required fields).",
+        tour_perfil_s4_title: "Security",
+        tour_perfil_s4_body:
+            "{{i:shield-lock}} Password section always asks for the current password before the new one.\n\nSteps:\n- Enter current, new, and confirmation per form layout.\n- {{svg:click}} Submit update.\n\n{{i:key}} If you forgot your password, use the login recovery flow—not this form.",
+        tour_ventas_s1_title: "GROBO sales",
+        tour_ventas_s1_body:
+            "Route commercial questions (licensing, modules, pricing) to the sales team—separate from operational vivarium orders or protocols.\n\n{{i:cart-check}} `#ventas-page-header`: title, description, {{i:question-circle}} help.\n\nSubmit goes to sales (email/ticket), not order queues.",
+        tour_ventas_s2_title: "Intro text",
+        tour_ventas_s2_body:
+            "{{i:info-circle}} Explains what the channel is for, with links to the public site or PDFs.\n\nRead:\n- Which questions belong here.\n- That answers come by {{i:envelope}} commercial email, not internal vivarium messaging.\n\n{{svg:click}} External links open in a new tab.",
+        tour_ventas_s3_title: "Message and email",
+        tour_ventas_s3_body:
+            "{{i:envelope-at}} Reply-to email field—verify it before sending.\n\n{{i:textarea-t}} Large area for needs, headcount, modules of interest, etc.\n\nBe specific: site, country, and rough scale help route the request.",
+        tour_ventas_s4_title: "Send",
+        tour_ventas_s4_body:
+            "{{i:send-check}} Main submit button.\n\n{{svg:click}} Wait for {{i:check-circle}} success or {{i:x-circle}} validation/network errors.\n\nIf no confirmation email arrives, check spam and the address you entered.",
+        tour_admin_reservas_s1_title: "Reservation schedule",
+        tour_admin_reservas_s1_body:
+            "{{i:calendar-week}} Staff view for room or equipment bookings.\n\nAction bar often has:\n- {{i:file-pdf}} PDF reports by day or range.\n- {{i:calendar3}} Monthly calendar view.\n- {{i:qr-code}} Print room QR codes.\n- {{i:arrow-clockwise}} Refresh data.\n- {{i:plus-lg}} New reservation.\n\n{{svg:click}} Use each control per your facility SOP.",
+        tour_admin_reservas_s2_title: "Room and dates",
+        tour_admin_reservas_s2_body:
+            "{{i:door-open}} Room/resource picker defines which schedule you see.\n\nDate inputs:\n- Reference for reports (single day or range).\n- Search range for the main table.\n\n{{svg:click}} After values are set, press the green {{i:check-circle}} Search/Load button (exact label may vary) to fill the grid.",
+        tour_admin_reservas_s3_title: "New reservation",
+        tour_admin_reservas_s3_body:
+            "{{i:plus-square}} Opens a {{i:window}} modal or dedicated view.\n\nTypical fields:\n- {{i:person}} Holder or group.\n- {{i:calendar-event}} Date and {{i:clock}} time window.\n- {{i:arrow-repeat}} Single occurrence or repeating series.\n\nComplete required fields; overlap or capacity errors usually show a warning.",
+        tour_admin_reservas_s4_title: "Schedule table",
+        tour_admin_reservas_s4_body:
+            "{{i:table}} Rows for the queried period: time, holder, status, room.\n\n{{svg:click}} Row actions may edit, cancel, or open detail.\n\n{{i:layers}} A second table below often lists {{i:hourglass-split}} pending approval requests—check it before closing the day.",
+        tour_admin_estadisticas_s1_title: "Statistics dashboard",
+        tour_admin_estadisticas_s1_body:
+            "{{i:graph-up-arrow}} Aggregated indicators for management and operations.\n\n{{i:signpost}} Breadcrumb and {{i:building}} institution confirm you’re in the right site report.\n\nData is historical to the last refresh—not live unless you click update.",
+        tour_admin_estadisticas_s2_title: "Title and notices",
+        tour_admin_estadisticas_s2_body:
+            "{{i:type-h3}} Report heading and sometimes {{i:info-circle}} notices about data coverage or load delays.\n\nIf your contract includes a {{i:globe2}} institutional network:\n- A {{i:box-arrow-up-right}} card or button may open network metrics.\n\nOtherwise continue with local dates and charts only.",
+        tour_admin_estadisticas_s3_title: "Period and refresh",
+        tour_admin_estadisticas_s3_body:
+            "{{i:calendar-range}} From/to dates bound the calculation.\n\n{{i:bar-chart-line-fill}} Chart type: bar or pie per site options.\n\n{{svg:click}} Press Update to recalc tiles, tables, and {{i:file-earmark-excel}} Excel / {{i:file-pdf}} PDF exports.\n\nExporting without updating may use the last loaded period—check the dates shown above.",
+        tour_admin_estadisticas_s4_title: "Visual filters",
+        tour_admin_estadisticas_s4_body:
+            "{{i:toggle-on}} Toggles or checkboxes next to each series in tables and charts.\n\nShow/hide:\n- {{i:egg}} Animals, {{i:moisture}} reagents, {{i:box-seam}} supplies, {{i:file-medical}} protocols, {{i:houses}} housing… when enabled.\n\nUse for presentations—focus the story without changing the global {{i:calendar-range}} period.",
+        tour_admin_precios_s1_title: "Price management",
+        tour_admin_precios_s1_body:
+            "{{i:currency-dollar}} Billable rate maintenance: animals by species, housing days, supplies, technical services, etc.\n\nEdits here may affect {{i:receipt}} billing or quotes—follow your site’s price-change process.",
+        tour_admin_precios_s2_title: "Price list header",
+        tour_admin_precios_s2_body:
+            "{{i:textarea-t}} Text that appears on exported {{i:file-pdf}} PDFs or official listings from GROBO.\n\nAdjust legal title, footnotes, or clauses before third-party reports.\n- {{svg:click}} Save if a dedicated button exists for header text.\n\n{{i:info-circle}} Even if you don’t export from here, the field may feed other reports.",
+        tour_admin_precios_s3_title: "Search",
+        tour_admin_precios_s3_body:
+            "{{i:search}} Live filter across long tables on the page.\n\nType {{i:hash}} internal code or part of the {{i:tags}} description—non-matching rows hide immediately.\n\nHandy for hundreds of rows without endless scrolling.",
+        tour_admin_precios_s4_title: "Rates by category",
+        tour_admin_precios_s4_body:
+            "{{i:list-nested}} Stacked sections down the page.\n\nTypical order:\n- {{i:egg}} Animals and {{i:houses}} housing by species.\n- {{i:flask}} Experimental and {{i:box}} common supplies.\n- {{i:tools}} Services (necropsy, techniques, etc.).\n\n{{i:save}} One save at the bottom often commits all edited sections—click once after reviewing everything.",
+        tour_solicitud_protocolo_s1_title: "Protocol requests",
+        tour_solicitud_protocolo_s1_body:
+            "{{i:inbox}} Incoming workflow queue (new, renewal, referrals) before records become master protocols.\n\n{{i:signpost-split}} Breadcrumb places this under admin, not the investigator portal.\n\nStaff validates documents and decides next steps from here.",
+        tour_solicitud_protocolo_s2_title: "Header and manager link",
+        tour_solicitud_protocolo_s2_body:
+            "{{i:type-h3}} Title and subtitle describing the queue.\n\n{{i:link-45deg}} Link or button to the {{i:file-medical}} master protocol manager—use when cross-checking a request with an existing record or running broader search.\n\n{{svg:click}} That jump opens another view in the same session.",
+        tour_solicitud_protocolo_s3_title: "Request table",
+        tour_solicitud_protocolo_s3_body:
+            "{{i:table}} One row per case with requester, dates, type, status.\n\n{{i:three-dots-vertical}} Actions: open detail, {{i:check-lg}} approve, {{i:arrow-return-left}} return with comments, or forward per permissions.\n\n{{svg:click}} Detail often opens a {{i:window}} modal with PDF and comments.",
+        tour_solicitud_protocolo_s4_title: "Back to manager",
+        tour_solicitud_protocolo_s4_body:
+            "{{i:arrow-left-circle}} Return to the full protocol list.\n\nUse for:\n- Global search, {{i:file-earmark-excel}} full export, or edits outside the queue flow.\n\nQueue = new intake; manager = complete archive.",
+        tour_misalojamientos_s1_title: "My housing",
+        tour_misalojamientos_s1_body:
+            "{{i:houses}} Investigator view of cages or stays linked to your protocols and user.\n\nHeader:\n- Title and subtitle.\n- {{i:question-circle}} Help for manual or tour.\n\nOperational mirror—not the admin occupancy console for the whole vivarium.",
+        tour_misalojamientos_s2_title: "Filters",
+        tour_misalojamientos_s2_body:
+            "{{i:funnel}} {{i:building}} Institution (if you have several), {{i:calendar-range}} dates, {{i:toggle-on}} housing status, free-text search.\n\nUseful text criteria:\n- Chart ID, {{i:hash}} protocol ID, {{i:bug}} species.\n\n{{svg:click}} Apply or search after changes to refresh the table.",
+        tour_misalojamientos_s3_title: "Export to Excel",
+        tour_misalojamientos_s3_body:
+            "{{i:file-earmark-excel}} Spreadsheet of visible rows after filters.\n\nIf a dialog appears:\n- Confirm columns or date span before download.\n\n{{i:shield-lock}} Animal and protocol data is sensitive—handle per centre policy.",
+        tour_misalojamientos_s4_title: "Table and pagination",
+        tour_misalojamientos_s4_body:
+            "{{i:table}} Each row summarises an assignment or stay period.\n\n{{svg:click}} Row opens extended detail, documents, or change-request actions per flow.\n\n{{i:chevron-double-down}} Bottom pagination walks large batches without losing active filters.",
+        tour_misreservas_s1_title: "My reservations",
+        tour_misreservas_s1_body:
+            "{{i:calendar2-week}} Split layout: monthly calendar on one side, day or room slots on the other.\n\nGoal:\n- Self-service booking for allowed rooms/equipment without admin unless site policy requires it.",
+        tour_misreservas_s2_title: "Room",
+        tour_misreservas_s2_body:
+            "{{i:door-open}} Dropdown or list of rooms/resources for your {{i:building}} institution.\n\n{{svg:click}} Changing room recalculates calendar and free slots (capacity, maintenance, blocks).\n\nMissing room? Permission or configuration may hide it.",
+        tour_misreservas_s3_title: "Calendar",
+        tour_misreservas_s3_body:
+            "{{i:calendar3}} Navigate months; days with capacity often look different from full or closed days.\n\n{{svg:click}} Pick a day; the right side lists free times or existing bookings.\n\nRead the {{i:info-circle}} legend under the calendar for holidays or sanitary closures.",
+        tour_misreservas_s4_title: "Confirm booking",
+        tour_misreservas_s4_body:
+            "{{i:clock-history}} After day and slot, fill instruments or reason if asked and set {{i:arrow-repeat}} repeats when offered.\n\n{{i:hand-thumbs-up}} Book/Confirm enables only when required fields are valid and there’s no conflict.\n\n{{svg:click}} Submit and wait for success; read error text for overlaps or out-of-hours issues.",
+        nav_library: "Manual topics by menu section",
+        main_landmark: "Training manual and topic library",
+        hash_unavailable_title: "Link not available for your profile",
+        hash_unavailable_body:
+            "That topic is not part of your menu or contracted modules. Showing the first topic in your library; the address was updated.",
+        dismiss_alert: "Dismiss notice",
+        content_help_icons:
+            "Icons in section titles are visual hints; the exact label of a button may differ slightly for your site.",
+        cat_navigation: "Navigation and page frame",
+        cat_toolbar: "Toolbar and global actions",
+        cat_filters: "Filters and search",
+        cat_table: "Main table (grid)",
+        cat_row: "Row actions, click, and detail",
+        cat_bulk: "Export, reports, and bulk actions",
+        cat_modals: "Pop-ups, confirmations, and alerts",
+        cat_forms: "Forms, fields, and submit steps",
+        cat_detail: "Record view, tabs, and detail screen",
+        cat_sidebar: "Side menu and subsections",
+        cat_calendar: "Calendar and time slots",
+        cat_comms: "Messages, threads, and notifications",
+        cat_content: "Main content, cards, and lists",
+        cat_hub: "Link hub (settings center)",
+        cat_profile: "Profile, account, and preferences",
+        cat_dashboard: "Dashboard, shortcuts, and indicators",
+        cat_links: "Links, tabs, and sub-pages",
+        cat_help: "Help, support, and contact",
         body_fallback:
-            '<p class="mb-2">In <strong>{title}</strong> (<code class="small">{path}</code>) you will find the tools for your role. Check the top bar, filters, and action buttons in the table or form.</p><p class="mb-0 small text-muted">For technical support, use <strong>Help → Ticket/Contact</strong>.</p>',
+            '<p class="mb-2"><strong>{title}</strong> (<code class="small">{path}</code>) gathers the usual actions for this part of GROBO for your role: use the top bar, any filters, and the table or form buttons to work.</p><p class="mb-0 text-body-secondary">If the application fails and you see <strong>Help → Ticket/Contact</strong> (Gecko Support), use it for technical incidents; if you do not have that menu item, contact vivarium administration.</p>',
         bodies: {
             "admin__usuarios": `<div class="manual-topic"><h5 class="text-success mb-3">Users and roles</h5><p>Manage institution accounts: search by name, username, or surname, filters, and export.</p><ul class="small"><li><strong>Row click:</strong> opens the profile to edit personal data, department, and linked protocols/forms.</li><li><strong>Password:</strong> use the reset button according to your institution’s policy.</li><li><strong>Excel/PDF:</strong> download lists or forms from the top buttons or the profile.</li></ul></div>`,
             "admin__protocolos": `<div class="manual-topic"><h5 class="text-success mb-3">Protocols (admin)</h5><p>Queue and management of approved or in-progress protocols.</p><ul class="small"><li>Review pending statuses and required attachments.</li><li>Use search and filters by investigator or title.</li><li>Available actions depend on your role and protocol state.</li></ul></div>`,
@@ -3185,8 +3710,12 @@ alojamientos: {
             "panel__misprotocolos": `<div class="manual-topic"><h5 class="text-success mb-3">My protocols</h5><p>Protocols you participate in as an investigator.</p><ul class="small"><li>Check validity and authorized species before new orders.</li><li>Network or internal requests follow your site’s rules.</li></ul></div>`,
             "admin__facturacion__index": `<div class="manual-topic"><h5 class="text-success mb-3">Billing</h5><p>Accounting module: reports by department, investigator, protocol, or organization.</p><ul class="small"><li>Use reports to reconcile consumption and balances.</li><li>PDFs and adjustments are usually in each sub-view.</li></ul></div>`,
             "panel__mensajes": `<div class="manual-topic"><h5 class="text-success mb-3">Messages</h5><p>1:1 messaging and personal conversations in GROBO.</p><ul class="small"><li>Create a new thread by choosing recipient and subject.</li><li>Replies are grouped by conversation; email alerts may apply.</li></ul></div>`,
-            "panel__soporte": `<div class="manual-topic"><h5 class="text-success mb-3">Support tickets</h5><p>Contact the Gecko team in turns: one message at a time until the next reply.</p><ul class="small"><li>Open a ticket with a clear subject and first message.</li><li>When support replies, you can answer on your turn or close if resolved.</li><li>An email is sent to support on each message.</li></ul></div>`,
-            "panel__capacitacion": `<div class="manual-topic"><h5 class="text-success mb-3">This library</h5><p>Central manual organized by menu sections for your role.</p><ul class="small"><li>Use the left list to jump between modules.</li><li>On other screens, the bottom bar may open the tutorial for the current module.</li></ul></div>`
+            "panel__mensajes_institucion": `<div class="manual-topic"><h5 class="text-success mb-3">Institutional messaging</h5><p>Management notices and queries to the site inbox.</p><ul class="small"><li>Notices may be visible to the whole institution; queries are private with authorized staff.</li><li>Use “New message” to pick type (notice or query) per your role.</li><li>Direct chat with people stays under “Messages”.</li></ul></div>`,
+            "panel__noticias": `<div class="manual-topic"><h5 class="text-success mb-3">News</h5><p>Institutional notice board and, when enabled, network news.</p><ul class="small"><li>Switch local/network scope and use search or sorting to find an item.</li><li>Opening a card shows the full text.</li><li>Do not use this portal for application failures: whoever has <strong>Help → Ticket/Contact</strong> (usually administrators) opens a Gecko Support ticket; everyone else should notify site administration.</li></ul></div>`,
+            "panel__perfil": `<div class="manual-topic"><h5 class="text-success mb-3">My profile</h5><p>Personal data and account security.</p><ul class="small"><li>Keep email current for alerts and recovery.</li><li>Save personal data changes before leaving.</li><li>Password changes require your current password.</li></ul></div>`,
+            "panel__ventas": `<div class="manual-topic"><h5 class="text-success mb-3">GROBO sales</h5><p>Commercial inquiries and quotes by email.</p><ul class="small"><li>Messages go to the sales team (sales category), not technical support.</li><li>Check the displayed email—that is where replies arrive.</li><li>For application failures: Gecko Support ticket via <strong>Help → Ticket/Contact</strong> if your profile includes it; otherwise, site administration.</li></ul></div>`,
+            "panel__soporte": `<div class="manual-topic"><h5 class="text-success mb-3">Gecko Support (tickets)</h5><p>Channel for <strong>technical failures of the GROBO application</strong> (errors, freezes, abnormal behaviour). Not for scientific paperwork or sales inquiries.</p><ul class="small"><li>In typical setups this menu is mainly for <strong>administrative</strong> profiles; researchers often do not see it and should report to site administration.</li><li>Open a ticket with a clear subject and first message (steps to reproduce, screenshot, browser).</li><li>Turn-based: when support replies, you can answer on your turn or close; each send notifies by email.</li></ul></div>`,
+            "panel__capacitacion": `<div class="manual-topic"><h5 class="text-success mb-3">This library</h5><p>Central manual organized by menu sections for your role.</p><ul class="small"><li>Use the left list to jump between modules.</li><li>On other screens, the help bar fixed along the <strong>bottom edge of the window</strong> (not the header) offers the <strong>help document</strong> and <strong>interactive tutorial</strong> for the current module.</li><li>You can hide the bar and turn it back on here or from the Help menu next to Excel.</li><li>The <strong>Gecko Support ticket</strong> section under the Training topic explains application failures and that the ticket is usually for administrators.</li></ul></div>`
         }
     },
     titulos_pagina: {
@@ -3224,6 +3753,8 @@ alojamientos: {
         facturacion_depto: "Billing by Department",
         facturacion_investigador: "Billing by Researcher",
         facturacion_protocolo: "Billing by Protocol",
+        facturacion_institucion: "Billing by institution (network)",
+        facturacion_org: "Billing by organization",
         historial_contable: "Accounting History",
         solicitud_protocolo: "Protocol Requests",
         formularios: "Request Center",

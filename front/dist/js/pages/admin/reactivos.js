@@ -70,14 +70,6 @@ export async function initReactivosPage() {
                 modalExcel.show();
             };
         }
-        const btnAyuda = document.getElementById('btn-ayuda-reactivo');
-    if (btnAyuda) {
-        btnAyuda.onclick = () => {
-            // Asegúrate de que el Modal en el HTML tenga el ID: modal-reactivo-help
-            const modalHelp = new bootstrap.Modal(document.getElementById('modal-reactivo-help'));
-            modalHelp.show();
-        };
-    }
     try {
         // Carga inicial de datos de la institución
         const res = await API.request(`/reactivos/all?inst=${instId}`);

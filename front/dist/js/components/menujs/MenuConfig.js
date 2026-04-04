@@ -154,9 +154,15 @@ export const UserPreferences = {
         let nextIndex = (currentIndex + 1) % sizes.length;
         const newSize = sizes[nextIndex];
 
-        UserPreferences.config.fontSize = newSize;
-        UserPreferences.applyFontSize(newSize);
-        await UserPreferences.saveBackend({ fontSize: newSize });
+        await UserPreferences.setFontSizeChoice(newSize);
+    },
+
+    /** Tamaño explícito (p. ej. asistente inicial) sin ciclar. */
+    setFontSizeChoice: async (size) => {
+        const s = ['chica', 'mediana', 'grande'].includes(size) ? size : 'chica';
+        UserPreferences.config.fontSize = s;
+        UserPreferences.applyFontSize(s);
+        await UserPreferences.saveBackend({ fontSize: s });
     },
 
     applyFontSize: (size) => {
@@ -171,9 +177,15 @@ export const UserPreferences = {
 
     toggleTheme: async () => {
         const newTheme = UserPreferences.config.theme === 'dark' ? 'light' : 'dark';
-        UserPreferences.config.theme = newTheme;
-        UserPreferences.applyTheme(newTheme);
-        await UserPreferences.saveBackend({ theme: newTheme });
+        await UserPreferences.setThemeChoice(newTheme);
+    },
+
+    /** Tema explícito light | dark (p. ej. asistente inicial). */
+    setThemeChoice: async (theme) => {
+        const t = theme === 'dark' ? 'dark' : 'light';
+        UserPreferences.config.theme = t;
+        UserPreferences.applyTheme(t);
+        await UserPreferences.saveBackend({ theme: t });
     },
 
     applyTheme: (theme) => {
@@ -235,12 +247,21 @@ export const UserPreferences = {
         });
     },
 
+    /** Cambia idioma sin recargar (tutorial / asistente inicial). */
+    applyLanguageChoice: async (lang) => {
+        const code = lang === 'en' || lang === 'pt' ? lang : 'es';
+        UserPreferences.config.lang = code;
+        localStorage.setItem('lang', code);
+        localStorage.setItem('idioma', code);
+        UserPreferences.applyLanguageVisuals(code);
+        await loadLanguage(code);
+        if (typeof translatePage === 'function') translatePage();
+        await UserPreferences.saveBackend({ lang: code });
+    },
+
     setLanguage: async (lang) => {
-        UserPreferences.config.lang = lang;
-        localStorage.setItem('lang', lang);
-        UserPreferences.applyLanguageVisuals(lang);
-        await UserPreferences.saveBackend({ lang: lang });
-        window.location.reload(); 
+        await UserPreferences.applyLanguageChoice(lang);
+        window.location.reload();
     },
 
     applyLanguageVisuals: (lang) => {
@@ -250,11 +271,17 @@ export const UserPreferences = {
         });
     },
 
+    /** menu_top | menu_lateral — sin recargar (asistente inicial aplica reload al final). */
+    setMenuLayoutChoice: async (layout) => {
+        const m = layout === 'menu_lateral' ? 'menu_lateral' : 'menu_top';
+        UserPreferences.config.menu = m;
+        localStorage.setItem('menuLayout', m);
+        await UserPreferences.saveBackend({ menu: m });
+    },
+
     toggleMenuLayout: async () => {
         const newLayout = UserPreferences.config.menu === 'menu_top' ? 'menu_lateral' : 'menu_top';
-        UserPreferences.config.menu = newLayout;
-        localStorage.setItem('menuLayout', newLayout);
-        await UserPreferences.saveBackend({ menu: newLayout });
+        await UserPreferences.setMenuLayoutChoice(newLayout);
         window.location.reload();
     },
 

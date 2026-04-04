@@ -108,7 +108,7 @@ export const NotificationManager = {
         });
     },
 
-    /** Portal de noticias (206): badge azul si hay publicaciones nuevas desde la última visita al portal. */
+    /** Portal de noticias (206): badge azul si hay publicaciones con FechaPublicacion posterior al último detalle abierto (no al entrar al listado). */
     setNewsBadge(id, count) {
         const containers = document.querySelectorAll(`.menu-icon[data-menu-id="${id}"]`);
         if (!containers.length) return;

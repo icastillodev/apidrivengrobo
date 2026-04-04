@@ -139,8 +139,17 @@
                     <button class="btn btn-primary btn-sm fw-bold px-4 uppercase" onclick="window.openProtocolModal(null)">
                         <i class="bi bi-plus-lg me-1"></i> <span data-i18n="admin_protocolos.btn_nuevo">Nuevo</span>
                     </button>
-                    <button id="btn-excel-prot" class="btn btn-success btn-sm fw-bold px-4 uppercase">
+                    <button type="button" id="btn-excel-prot" class="btn btn-success btn-sm fw-bold px-4 uppercase">
                         <i class="bi bi-file-earmark-excel me-1"></i> <span data-i18n="admin_protocolos.btn_excel">Excel</span>
+                    </button>
+                    <button
+                        type="button"
+                        id="btn-ayuda-prot"
+                        class="btn btn-outline-secondary btn-sm fw-bold px-3 uppercase"
+                        data-gecko-cap-help="admin/protocolos"
+                        data-gecko-cap-modal="#modal-protocol-help"
+                    >
+                        <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_protocolos.btn_ayuda">Ayuda</span>
                     </button>
                 </div>
             </div>
@@ -162,6 +171,35 @@
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 border-top border-5 border-primary shadow-lg">
                 <div id="modal-content-prot" class="modal-body p-4 p-md-5"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-protocol-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="admin_protocolos.help_titulo">Guía de gestión de protocolos</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_protocolos.help_s1_title">1. Filtros y búsqueda</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_protocolos.help_s1_text">Use origen, ámbito (si aplica), el campo “Filtrar por” y el cuadro de texto; pulse el botón de búsqueda para actualizar la grilla.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_protocolos.help_s2_title">2. Solicitudes, alta y detalle</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_protocolos.help_s2_text">“Solicitudes” abre la bandeja de trámites entrantes. “Nuevo” crea un protocolo. Clic en una fila abre la ficha para revisar o editar según permisos.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="admin_protocolos.help_s3_title">3. Exportar a Excel</h6>
+                        <p class="text-muted small mb-0" data-i18n="admin_protocolos.help_s3_text">Descarga el listado filtrado actual para informes o auditoría interna.</p>
+                    </section>
+                </div>
             </div>
         </div>
     </div>

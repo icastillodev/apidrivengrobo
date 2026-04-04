@@ -115,7 +115,15 @@
                     <button class="btn btn-primary fw-bold shadow-sm dropdown-toggle px-4" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-plus-circle me-2"></i> <span data-i18n="misprotocolos.btn_solicitud">SOLICITUD PROTOCOLO</span>
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" id="btn-ayuda-protocolos" data-i18n="misprotocolos.btn_ayuda_title" title="¿Cómo funciona?">
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary btn-sm px-3"
+                        id="btn-ayuda-protocolos"
+                        data-i18n="misprotocolos.btn_ayuda_title"
+                        title="¿Cómo funciona?"
+                        data-gecko-cap-help="panel/misprotocolos"
+                        data-gecko-cap-modal="#modal-ayuda-protocolos"
+                    >
                         <i class="bi bi-question-circle fs-5"></i>
                     </button>
                     <ul class="dropdown-menu shadow border-0 mt-1 p-2">
@@ -139,7 +147,7 @@
                 </div>
             </div>
 
-            <div class="row align-items-end mb-3 border-bottom pb-3">
+            <div id="misprotocolos-filtros-row" class="row align-items-end mb-3 border-bottom pb-3">
                 <div class="col-12">
                     <div class="input-group shadow-sm flex-nowrap flex-md-wrap">
                         <span class="input-group-text bg-white text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="misprotocolos.filtrar_por">Filtrar por:</span>
@@ -163,7 +171,7 @@
             </div>
 
             <div class="table-responsive mb-4">
-                <table class="table table-hover align-middle border" style="font-size: 11px;">
+                <table id="tabla-misprotocolos" class="table table-hover align-middle border" style="font-size: 11px;">
                     <thead class="table-light text-uppercase text-secondary">
                         <tr>
                             <th class="py-3 px-2" data-i18n="misprotocolos.col_id">ID</th>

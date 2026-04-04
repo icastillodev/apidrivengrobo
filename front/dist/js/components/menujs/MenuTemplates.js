@@ -57,8 +57,20 @@ export function getMenuTemplates(roleId = 0) {
             isDropdown: true,
             children: [
                 { label: window.txt.menu.help_capacitacion || 'Capacitación', path: 'panel/capacitacion' },
+                {
+                    label: window.txt.menu.help_interactive_screen || 'Tutorial interactivo (esta pantalla)',
+                    geckoAction: 'cap_interactive_tour',
+                },
+                {
+                    label: window.txt.menu.help_interactive_modals || 'Tutorial: ventanas emergentes',
+                    geckoAction: 'cap_interactive_modals',
+                },
+                {
+                    label: window.txt.menu.help_menu_show_fab || 'Mostrar barra inferior de ayuda',
+                    geckoAction: 'cap_show_fab',
+                },
                 { label: window.txt.menu.help_ticket || 'Ticket/Contacto', path: 'panel/soporte' },
-                { label: window.txt.menu.help_ventas || 'Ventas', path: 'panel/ventas' }
+                { label: window.txt.menu.help_ventas || 'Ventas', path: 'panel/ventas' },
             ]
         },
         999: { 

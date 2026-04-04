@@ -10,12 +10,100 @@
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../../dist/style/css/tailwind.css">
     <style>
-        body { font-family: Lato, sans-serif; }
+        body.capacitacion-doc { font-family: Lato, sans-serif; font-size: 1.0625rem; }
         #cap-list .list-group-item.active { background-color: #198754; border-color: #198754; color: #fff; }
-        .manual-topic ul { padding-left: 1.1rem; }
+        .manual-topic ul { padding-left: 1.15rem; }
         .manual-topic p:last-child { margin-bottom: 0; }
-        .manual-accordion .accordion-button { font-size: 0.9rem; }
+        .manual-accordion .accordion-button { font-size: 1.05rem; line-height: 1.45; padding-top: 0.85rem; padding-bottom: 0.85rem; }
         .manual-accordion .accordion-button:not(.collapsed) { background: rgba(25, 135, 84, 0.08); color: #146c43; }
+        .manual-accordion .accordion-body { font-size: 1.05rem; line-height: 1.65; }
+        .manual-accordion > .manual-cat-heading:first-child { margin-top: 0 !important; }
+        .manual-cat-heading { letter-spacing: 0.02em; font-size: 0.95rem; }
+        .manual-glossary dt { margin-top: 0.65rem; font-weight: 600; color: var(--bs-body-color); display: flex; align-items: flex-start; gap: 0.35rem; }
+        .manual-glossary dt:first-child { margin-top: 0; }
+        .manual-glossary dt .bi { margin-top: 0.15rem; flex-shrink: 0; }
+        .manual-glossary dd { margin: 0.25rem 0 0 1.35rem; color: var(--bs-secondary-color); max-width: 52rem; font-size: 1.02rem; line-height: 1.6; }
+        #cap-content-body { font-size: 1.0625rem; line-height: 1.65; }
+        #cap-content-body .cap-chapter-intro { border-radius: 0.5rem; border: 1px solid rgba(25, 135, 84, 0.25); background: linear-gradient(180deg, rgba(25, 135, 84, 0.07) 0%, rgba(255, 255, 255, 0.5) 100%); }
+        #cap-content-body .cap-chapter-intro .cap-chapter-intro-body p:last-child { margin-bottom: 0; }
+        #cap-content-body .cap-summary-lead { font-size: 1.12rem; line-height: 1.55; font-weight: 500; color: var(--bs-body-color); }
+        #cap-content-body .cap-roles-note { font-size: 1.02rem; line-height: 1.6; }
+        #cap-content-body .alert.cap-help-strip { font-size: 1.02rem; line-height: 1.55; }
+
+        /* Modo oscuro: documentación legible (fondo oscuro, texto claro; sin gris sobre gris) */
+        [data-bs-theme="dark"] body.capacitacion-doc { background-color: #121212 !important; }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro {
+            border-color: rgba(74, 222, 128, 0.38) !important;
+            background: linear-gradient(180deg, rgba(74, 222, 128, 0.14) 0%, #1c2420 42%, #161616 100%) !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro .cap-chapter-intro-body {
+            color: #e8e8e8;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro h3 {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-item {
+            background-color: #1e1e1e !important;
+            border-color: #333 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-button {
+            background-color: #252525 !important;
+            color: #ececec !important;
+            box-shadow: none !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-button.collapsed {
+            color: #d8d8d8 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-button:not(.collapsed) {
+            background: rgba(74, 222, 128, 0.16) !important;
+            color: #bbf7d0 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-button::after {
+            filter: invert(0.88);
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-body {
+            background-color: #181818 !important;
+            color: #e4e4e4 !important;
+            border-top: 1px solid #2e2e2e;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .manual-topic .text-muted,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .manual-topic .text-body-secondary,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .manual-glossary dd {
+            color: #c8c8c8 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .manual-glossary dt {
+            color: #f0f0f0 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .alert.alert-success.cap-help-strip,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .alert.alert-success {
+            background-color: rgba(22, 36, 26, 0.95) !important;
+            border-color: rgba(74, 222, 128, 0.4) !important;
+            color: #dff7e8 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .alert.alert-success .text-success-emphasis,
+        [data-bs-theme="dark"] .capacitacion-doc .alert.alert-success .fw-bold {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .alert.alert-info.cap-help-strip {
+            background-color: rgba(22, 28, 38, 0.95) !important;
+            border-color: rgba(96, 165, 250, 0.35) !important;
+            color: #dbeafe !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-main .col-lg-8 .card > .card-header {
+            background-color: #252525 !important;
+            border-bottom-color: #333 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-main .col-lg-8 .card > .card-header .text-muted {
+            color: #c0c0c0 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-title {
+            color: #f5f5f5 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .manual-cat-heading {
+            color: #86efac !important;
+            border-bottom-color: rgba(74, 222, 128, 0.25) !important;
+        }
     </style>
     <script type="module">
         import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js';
@@ -44,17 +132,29 @@
         });
     </script>
 </head>
-<body class="bg-light" data-page-title-key="capacitacion">
+<body class="bg-body capacitacion-doc" data-page-title-key="capacitacion">
     <div class="container-fluid py-4 px-3">
         <div class="mb-4 pb-2 border-bottom">
-            <h1 class="h3 fw-black text-success mb-1" data-i18n="capacitacion.page_title"></h1>
-            <p class="text-muted small mb-2" data-i18n="capacitacion.page_sub"></p>
-            <div class="alert alert-info border-info py-2 px-3 small mb-0 shadow-sm" role="note" data-i18n="capacitacion.page_banner"></div>
+            <h1 class="h3 fw-black text-success mb-2" data-i18n="capacitacion.page_title"></h1>
+            <p class="text-muted mb-3 fs-6" data-i18n="capacitacion.page_sub"></p>
+            <div class="alert alert-info border-info py-3 px-3 mb-3 shadow-sm cap-help-strip" role="status" data-i18n="capacitacion.page_banner"></div>
+            <div class="card border-success-subtle shadow-sm mb-0" id="cap-help-prefs-card">
+                <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="cap-pref-show-fab" />
+                        <label class="form-check-label small fw-semibold" for="cap-pref-show-fab" data-i18n="capacitacion.pref_show_fab_label"></label>
+                    </div>
+                    <p class="small text-muted mb-0 flex-grow-1" data-i18n="capacitacion.pref_show_fab_help"></p>
+                    <button type="button" class="btn btn-outline-success btn-sm fw-semibold text-nowrap" id="cap-start-library-tour">
+                        <i class="bi bi-lightning-charge me-1"></i><span data-i18n="capacitacion.library_tour_btn"></span>
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="row g-4">
+        <main id="cap-main" class="row g-4">
             <div class="col-lg-4">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-success text-white fw-bold py-2 small">
+                    <div class="card-header bg-success text-white fw-bold py-2 fs-6">
                         <i class="bi bi-collection me-1"></i><span data-i18n="capacitacion.library_heading"></span>
                     </div>
                     <div class="list-group list-group-flush overflow-auto" id="cap-list" style="max-height: min(70vh, 640px);"></div>
@@ -62,17 +162,18 @@
             </div>
             <div class="col-lg-8">
                 <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white border-bottom py-2 d-flex align-items-center gap-2">
+                    <div class="card-header bg-body border-bottom py-2 d-flex align-items-center gap-2">
                         <i class="bi bi-book text-success"></i>
-                        <span class="fw-bold small text-uppercase text-muted" data-i18n="capacitacion.content_heading"></span>
+                        <span class="fw-bold fs-6 text-uppercase text-muted" data-i18n="capacitacion.content_heading"></span>
                     </div>
-                    <div class="card-body">
-                        <h2 class="h5 fw-bold text-dark mb-3" id="cap-content-title"></h2>
-                        <div id="cap-content-body" class="small text-body" style="line-height: 1.6;"></div>
+                    <div class="card-body" id="cap-content-region" aria-live="polite" aria-labelledby="cap-content-title">
+                        <div id="cap-hash-alert" class="d-none"></div>
+                        <h2 class="h5 fw-bold text-body mb-3" id="cap-content-title"></h2>
+                        <div id="cap-content-body" class="text-body"></div>
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

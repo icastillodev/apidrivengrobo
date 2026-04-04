@@ -70,15 +70,26 @@
     <div class="container-fluid my-5 px-4 px-md-5 fade-in">
         <div class="card shadow-sm border-0 p-4" style="min-height: 80vh;">
             
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
-                    <li class="breadcrumb-item text-muted">Panel</li>
-                    <li class="breadcrumb-item active">
-                        <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="centro_solicitudes.nueva_solicitud">Nueva Solicitud</span>
-                    </li>
-                </ol>
-            </nav>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+                <nav aria-label="breadcrumb" class="mb-0 flex-grow-1">
+                    <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
+                        <li class="breadcrumb-item text-muted">GROBO</li>
+                        <li class="breadcrumb-item text-muted">Panel</li>
+                        <li class="breadcrumb-item active">
+                            <span class="badge bg-success px-2 py-1" style="background-color: #1a5d3b !important;" data-i18n="centro_solicitudes.nueva_solicitud">Nueva Solicitud</span>
+                        </li>
+                    </ol>
+                </nav>
+                <button
+                    type="button"
+                    id="btn-ayuda-centro-solicitudes"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
+                    data-gecko-cap-help="panel/formularios"
+                    data-gecko-cap-modal="#modal-centro-solicitudes-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="centro_solicitudes.btn_ayuda">Ayuda</span>
+                </button>
+            </div>
 
             <div id="header-container" class="text-center mb-4">
                 <h2 class="fw-bold text-uppercase text-dark mb-1" style="letter-spacing: 1px;" data-i18n="centro_solicitudes.titulo">Centro de Solicitudes</h2>
@@ -100,6 +111,35 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-centro-solicitudes-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="centro_solicitudes.help_titulo">Guía — Centro de solicitudes</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="centro_solicitudes.help_s1_title">1. Contexto e institución</h6>
+                        <p class="text-muted small mb-0" data-i18n="centro_solicitudes.help_s1_text">La línea bajo el título indica si trabaja en su sede, en red u otro contexto habilitado. Cargue la página hasta que aparezcan las tarjetas.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="centro_solicitudes.help_s2_title">2. Elegir trámite</h6>
+                        <p class="text-muted small mb-0" data-i18n="centro_solicitudes.help_s2_text">Cada bloque agrupa la institución y los botones de pedido (animales, reactivos, insumos, reservas…) según contratación.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="centro_solicitudes.help_s3_title">3. Sin opciones visibles</h6>
+                        <p class="text-muted small mb-0" data-i18n="centro_solicitudes.help_s3_text">Si no ve formularios, su rol o la configuración de la sede pueden limitar el catálogo. Consulte con administración del bioterio.</p>
+                    </section>
+                </div>
+            </div>
         </div>
     </div>
 

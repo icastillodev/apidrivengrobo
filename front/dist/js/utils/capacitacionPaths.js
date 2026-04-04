@@ -15,13 +15,32 @@ export function pathnameToMenuPath(pathname) {
   if (!rel) return null;
 
   if (lower.includes('/paginas/admin/facturacion/')) {
+    const m = rel.match(/^admin\/facturacion\/([^/]+)$/i);
+    const seg = (m ? m[1] : 'index').toLowerCase();
+    const sub = ['depto', 'investigador', 'protocolo', 'institucion', 'org'];
+    if (sub.includes(seg)) return `admin/facturacion/${seg}`;
     return 'admin/facturacion/index';
   }
   if (lower.includes('/paginas/admin/configuracion/')) {
     return 'admin/configuracion/config';
   }
-  if (lower.includes('/paginas/usuario/formularios/')) {
+  if (lower.includes('/paginas/usuario/formularios')) {
     return 'panel/formularios';
+  }
+  if (lower.includes('/paginas/usuario/misprotocolos')) {
+    return 'panel/misprotocolos';
+  }
+  if (
+    lower.includes('/paginas/usuario/mensajes_institucion') ||
+    lower.includes('/paginas/panel/mensajes_institucion')
+  ) {
+    return 'panel/mensajes_institucion';
+  }
+  if (lower.includes('/paginas/usuario/mensajes') || lower.includes('/paginas/panel/mensajes')) {
+    return 'panel/mensajes';
+  }
+  if (lower.includes('/paginas/usuario/perfil')) {
+    return 'panel/perfil';
   }
 
   return rel;

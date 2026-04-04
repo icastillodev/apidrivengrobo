@@ -282,6 +282,17 @@ function buildMenuItemHTML(id, layout, templates) {
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="12" height="12" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease; flex-shrink: 0;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
         
         const childrenHTML = item.children.map(child => {
+            if (child.geckoAction) {
+                const icons = {
+                    cap_interactive_tour: 'bi-lightning-charge',
+                    cap_interactive_modals: 'bi-window-stack',
+                    cap_show_fab: 'bi-layout-text-window-reverse',
+                };
+                const ic = icons[child.geckoAction] || 'bi-info-circle';
+                const childIcon = `<span class="dropdown-child-icon me-2 d-flex align-items-center text-success" style="width: 18px; height: 18px;"><i class="bi ${ic}" aria-hidden="true"></i></span>`;
+                const liClass = child.geckoAction === 'cap_interactive_modals' ? 'gecko-help-modals-tour-item d-none' : '';
+                return `<li${liClass ? ` class="${liClass}"` : ''}><a href="#" class="dropdown-item-gecko gecko-help-menu-action d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;" data-gecko-action="${child.geckoAction}">${childIcon}<span class="flex-grow-1 text-truncate me-1">${child.label}</span></a></li>`;
+            }
             const isSubActive = pathMatchesMenuRoute(currentPath, child.path);
             const childIcon = (child.svg) ? `<span class="dropdown-child-icon me-2 d-flex align-items-center" style="width: 18px; height: 18px;">${child.svg}</span>` : '';
             const badgeMenuId = child.badgeMenuId != null ? Number(child.badgeMenuId) : null;

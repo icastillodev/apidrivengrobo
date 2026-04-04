@@ -12,7 +12,12 @@ import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle } from '../utils/i18n.js';
 import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
-import { initCapacitacionHelpFab } from './CapacitacionHelpFab.js';
+import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js';
+import {
+  initCapacitacionPageHelpDelegation,
+  initGeckoHelpMenuDropdownActions,
+} from './CapacitacionPageHelpMenu.js';
+import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js';
 
 export { refreshMenuNotifications }; 
 
@@ -33,6 +38,9 @@ export async function initMenu() {
         console.error("❌ Idioma no cargado. Ejecuta await loadLanguage() antes de initMenu().");
         return;
     }
+
+    initCapacitacionPageHelpDelegation();
+    initGeckoHelpMenuDropdownActions();
 
     // Inicializar UI de Buscador Global
     initGlobalSearchUI();
@@ -110,7 +118,9 @@ try {
             setupEventListeners();
             updateBreadcrumbInstitution();
 
+            initCapacitacionModalHelpDelegation();
             initCapacitacionHelpFab().catch(() => {});
+            tryAutoStartCapacitacionTour();
 
             if (localStorage.getItem('gecko_ok') == 1) {
                 if (navigator.userAgent.toLowerCase().includes('firefox')) {

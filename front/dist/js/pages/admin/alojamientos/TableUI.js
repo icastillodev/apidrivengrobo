@@ -23,11 +23,6 @@ export const TableUI = {
     _lastSpeciesIdsKey: null,
 
     init() {
-        const btnAyuda = document.getElementById('btn-ayuda-alojamiento');
-        if (btnAyuda) {
-            btnAyuda.onclick = () => new bootstrap.Modal(document.getElementById('modal-alojamiento-help')).show();
-        }
-
         document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
             th.style.cursor = 'pointer';
             const label = (th.innerText || th.textContent || '').trim() || th.getAttribute('data-key') || '';

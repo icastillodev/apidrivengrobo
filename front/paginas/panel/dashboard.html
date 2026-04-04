@@ -28,14 +28,25 @@
 <body class="bg-gray-50 font-sans" data-page-title-key="dashboard_usuario">
 
     <main class="container mx-auto mt-6 p-6">
-        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6">
-            <div class="max-w-3xl">
-                <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                    <span data-i18n="dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Investigador</span><span data-i18n="dashboard.bienvenido">, Bienvenido al Bioterio</span>
-                </h1>
-                <p class="text-gray-500 font-medium leading-relaxed mb-0">
-                    <span data-i18n="dashboard.panel_desc">Panel de investigador</span> <strong data-i18n="dashboard.grobo">GROBO</strong><span data-i18n="dashboard.panel_uso">. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.</span>
-                </p>
+        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6" id="dashboard-welcome">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div class="max-w-3xl flex-grow-1">
+                    <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
+                        <span data-i18n="dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Investigador</span><span data-i18n="dashboard.bienvenido">, Bienvenido al Bioterio</span>
+                    </h1>
+                    <p class="text-gray-500 font-medium leading-relaxed mb-0">
+                        <span data-i18n="dashboard.panel_desc">Panel de investigador</span> <strong data-i18n="dashboard.grobo">GROBO</strong><span data-i18n="dashboard.panel_uso">. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.</span>
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    id="btn-ayuda-dashboard-investigador"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
+                    data-gecko-cap-help="panel/dashboard"
+                    data-gecko-cap-modal="#modal-investigador-dashboard-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="dashboard.btn_ayuda">Ayuda</span>
+                </button>
             </div>
         </section>
 
@@ -50,6 +61,35 @@
             </div>
         </div>
     </main>
+
+    <div class="modal fade" id="modal-investigador-dashboard-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="dashboard.help_titulo">Guía — Panel de inicio</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="dashboard.help_s1_title">1. Bienvenida y menú</h6>
+                        <p class="text-muted small mb-0" data-i18n="dashboard.help_s1_text">Este es su punto de partida. Use el menú lateral para ir a formularios, pedidos, protocolos y mensajes según lo que su sede tenga contratado.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="dashboard.help_s2_title">2. Noticias</h6>
+                        <p class="text-muted small mb-0" data-i18n="dashboard.help_s2_text">Aquí pueden aparecer avisos de su institución o de la red; revíselos con frecuencia.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="dashboard.help_s3_title">3. Accesos rápidos</h6>
+                        <p class="text-muted small mb-0" data-i18n="dashboard.help_s3_text">Las tarjetas llevan a los módulos habituales (nuevo pedido, mis formularios, precios, etc.). Pulse una tarjeta para abrir el módulo.</p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="modal-security-check" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -95,14 +135,16 @@
         import { NotificationManager } from '../../dist/js/NotificationManager.js';
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js';
+        import { ensureFirstRunLanguagePick } from '../../dist/js/utils/firstRunLanguageOnboarding.js';
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
 
             try {
-                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
-                if (window.txt) translatePage();
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
                 // Investigador, técnico y laboratorio (rutas panel según menú / inicio)
-                Auth.checkAccess([3, 5, 6]); 
+                Auth.checkAccess([3, 5, 6]);
+                await ensureFirstRunLanguagePick(loadLanguage, translatePage);
+                if (window.txt) translatePage();
 
                 const userName = localStorage.getItem('userName');
                 const welcomeSpan = document.getElementById('welcome-name');

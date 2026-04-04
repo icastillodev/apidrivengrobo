@@ -93,8 +93,8 @@ export const translatePage = () => {
 
         if (text) {
             // USAMOS innerHTML para que respete los <strong> o <br>
-            if (el.tagName === 'INPUT') el.placeholder = text;
-            else el.innerHTML = text; 
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = text;
+            else el.innerHTML = text;
         }
     });
 

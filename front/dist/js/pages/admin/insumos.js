@@ -102,9 +102,6 @@ export async function initInsumosPage() {
 
     if(btnSearch) btnSearch.onclick = () => { currentPage = 1; renderTable(); };
     
-    const btnAyuda = document.getElementById('btn-ayuda-insumo');
-    if(btnAyuda) btnAyuda.onclick = () => new bootstrap.Modal(document.getElementById('modal-insumo-help')).show();
-    
     const btnExcel = document.getElementById('btn-excel-insumo');
     if(btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
 }

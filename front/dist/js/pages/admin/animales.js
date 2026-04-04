@@ -31,14 +31,6 @@ function getI18nValue(path) {
 export async function initAnimalesPage() {
     const instId = localStorage.getItem('instId');
 
-    const btnAyuda = document.getElementById('btn-ayuda-animal');
-    if (btnAyuda) {
-        btnAyuda.onclick = () => {
-            const helpModal = new bootstrap.Modal(document.getElementById('modal-animal-help'));
-            helpModal.show();
-        };
-    }
-
     try {
         const res = await API.request(`/animals/all?inst=${instId}`);
         if (res && res.status === 'success') {
@@ -50,11 +42,6 @@ export async function initAnimalesPage() {
         }
     } catch (error) { console.error("❌ Error:", error); }
 
-
-// Botón Ayuda
-    document.getElementById('btn-ayuda-animal').onclick = () => {
-        new bootstrap.Modal(document.getElementById('modal-animal-help')).show();
-    };
 
     // Botón Excel (Abre el popup de fechas)
     document.getElementById('btn-excel-animal').onclick = () => {

@@ -112,8 +112,17 @@
                 <button id="btn-insumos-exp-pedidos" class="btn btn-outline-info btn-sm fw-bold shadow-sm" data-i18n="misformularios.btn_insumos_exp">
                     <i class="bi bi-droplet me-1"></i> INSUMOS EXPERIMENTALES PEDIDOS
                 </button>
-                <button id="btn-export-excel" class="btn btn-success btn-sm fw-bold shadow-sm" data-i18n="misformularios.btn_excel">
+                <button type="button" id="btn-export-excel" class="btn btn-success btn-sm fw-bold shadow-sm" data-i18n="misformularios.btn_excel">
                     <i class="bi bi-file-earmark-excel me-1"></i> EXCEL GLOBAL
+                </button>
+                <button
+                    type="button"
+                    id="btn-ayuda-misformularios"
+                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm"
+                    data-gecko-cap-help="panel/misformularios"
+                    data-gecko-cap-modal="#modal-misformularios-help"
+                >
+                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="misformularios.btn_ayuda">Ayuda</span>
                 </button>
             </div>
         </div>
@@ -159,7 +168,7 @@
 
         <div class="card shadow-sm border-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size: 12px;">
+                <table id="tabla-misformularios" class="table table-hover align-middle mb-0" style="font-size: 12px;">
                     <thead class="table-light text-uppercase">
                         <tr>
                             <th class="ps-3" data-i18n="misformularios.col_id">ID</th>
@@ -262,6 +271,35 @@
                 </div>
                 <div class="modal-body p-0">
                     <div id="insumos-exp-pedidos-list" class="p-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-misformularios-help" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-question-circle me-2"></i><span data-i18n="misformularios.help_titulo">Guía — Mis formularios</span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="misformularios.help_s1_title">1. Atajos superiores</h6>
+                        <p class="text-muted small mb-0" data-i18n="misformularios.help_s1_text">Revise animales usados en protocolos y resúmenes de insumos pedidos; el Excel global exporta su historial con rango de fechas.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-3">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="misformularios.help_s2_title">2. Filtros y búsqueda</h6>
+                        <p class="text-muted small mb-0" data-i18n="misformularios.help_s2_text">Estado, derivación e institución (si aparecen) acotan la lista. El buscador localiza por ID, protocolo o tipo.</p>
+                    </section>
+                    <hr class="text-muted opacity-25" />
+                    <section class="mb-0">
+                        <h6 class="fw-bold text-success text-uppercase small mb-2" data-i18n="misformularios.help_s3_title">3. Tabla y detalle</h6>
+                        <p class="text-muted small mb-0" data-i18n="misformularios.help_s3_text">Clic en una fila abre el detalle; según el pedido verá contacto, derivación u otras acciones permitidas.</p>
+                    </section>
                 </div>
             </div>
         </div>
