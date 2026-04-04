@@ -19,11 +19,58 @@
         .manual-accordion .accordion-body { font-size: 1.05rem; line-height: 1.65; }
         .manual-accordion > .manual-cat-heading:first-child { margin-top: 0 !important; }
         .manual-cat-heading { letter-spacing: 0.02em; font-size: 0.95rem; }
+        /* §8.2 — Solo tema claro: verdes oscuros (#0a3622 / #146c43). En dark deben NO aplicarse (ganaban por especificidad a h3.text-success). */
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .alert-success.cap-help-strip {
+            --bs-alert-color: #0a3622;
+            border-color: rgba(15, 81, 50, 0.38) !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .alert-success.cap-help-strip .text-body-secondary,
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .alert-success.cap-help-strip .text-muted {
+            color: #343a40 !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .alert-info.cap-help-strip {
+            color: #055160;
+            border-color: rgba(5, 81, 96, 0.35) !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .alert-info.cap-help-strip .fw-bold {
+            color: #032830;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .manual-cat-heading.text-success-emphasis {
+            color: #0a3622 !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc .manual-accordion .accordion-button:not(.collapsed) {
+            color: #0a3622 !important;
+            background: rgba(25, 135, 84, 0.11) !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .cap-chapter-intro h3.text-success {
+            color: #0a3622 !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .cap-summary-lead .text-success {
+            color: #0a3622 !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .manual-topic .text-success.bi,
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .accordion-button .text-success {
+            color: #146c43 !important;
+        }
+        /* Badges dentro del HTML del manual (p. ej. temas de facturación) */
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .badge.bg-success-subtle,
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .badge.text-bg-success {
+            color: #0a3622 !important;
+        }
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .badge.bg-info-subtle,
+        html:not([data-bs-theme="dark"]) body.capacitacion-doc #cap-content-body .badge.text-bg-info {
+            color: #055160 !important;
+        }
         .manual-glossary dt { margin-top: 0.65rem; font-weight: 600; color: var(--bs-body-color); display: flex; align-items: flex-start; gap: 0.35rem; }
         .manual-glossary dt:first-child { margin-top: 0; }
         .manual-glossary dt .bi { margin-top: 0.15rem; flex-shrink: 0; }
         .manual-glossary dd { margin: 0.25rem 0 0 1.35rem; color: var(--bs-secondary-color); max-width: 52rem; font-size: 1.02rem; line-height: 1.6; }
         #cap-content-body { font-size: 1.0625rem; line-height: 1.65; }
+        #cap-content-body .manual-cap-figure { background: rgba(0, 0, 0, 0.02); }
+        [data-bs-theme="dark"] #cap-content-body .manual-cap-figure {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
         #cap-content-body .cap-chapter-intro { border-radius: 0.5rem; border: 1px solid rgba(25, 135, 84, 0.25); background: linear-gradient(180deg, rgba(25, 135, 84, 0.07) 0%, rgba(255, 255, 255, 0.5) 100%); }
         #cap-content-body .cap-chapter-intro .cap-chapter-intro-body p:last-child { margin-bottom: 0; }
         #cap-content-body .cap-summary-lead { font-size: 1.12rem; line-height: 1.55; font-weight: 500; color: var(--bs-body-color); }
@@ -40,7 +87,30 @@
         [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro .cap-chapter-intro-body {
             color: #e8e8e8;
         }
-        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .cap-chapter-intro h3 {
+        /* Títulos «Sobre esta sección», «En resumen», iconos del manual y acordeón: verde claro legible (no #0a3622 / #146c43 del tema claro) */
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .cap-chapter-intro h3.text-success,
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .cap-chapter-intro h3 {
+            color: #86efac !important;
+        }
+        /* Cualquier .text-success dentro del bloque intro (h4/h5 del manual embebido) */
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .cap-chapter-intro .text-success {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .cap-summary-lead .text-success {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .manual-topic .text-success.bi,
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .accordion-button .text-success,
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-content-body .manual-glossary .text-success.bi {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] body.capacitacion-doc .manual-cat-heading.text-success-emphasis {
+            color: #bbf7d0 !important;
+        }
+        [data-bs-theme="dark"] body.capacitacion-doc > .container-fluid > .mb-4 h1.text-success {
+            color: #86efac !important;
+        }
+        [data-bs-theme="dark"] body.capacitacion-doc #cap-main .card-header .bi.text-success {
             color: #86efac !important;
         }
         [data-bs-theme="dark"] .capacitacion-doc .manual-accordion .accordion-item {
@@ -101,8 +171,46 @@
             color: #f5f5f5 !important;
         }
         [data-bs-theme="dark"] .capacitacion-doc .manual-cat-heading {
-            color: #86efac !important;
-            border-bottom-color: rgba(74, 222, 128, 0.25) !important;
+            color: #bbf7d0 !important;
+            border-bottom-color: rgba(74, 222, 128, 0.35) !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc .alert-success.cap-help-strip .text-body-secondary,
+        [data-bs-theme="dark"] .capacitacion-doc .alert-success.cap-help-strip .text-muted {
+            color: #d1d5db !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .badge.bg-success-subtle.text-success,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .badge.text-bg-success {
+            background-color: rgba(34, 197, 94, 0.22) !important;
+            color: #dcfce7 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .badge.bg-info-subtle.text-info,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-content-body .badge.text-bg-info {
+            background-color: rgba(59, 130, 246, 0.22) !important;
+            color: #dbeafe !important;
+        }
+        /* Lista temas (izquierda) y tarjeta preferencias FAB: contraste en oscuro */
+        [data-bs-theme="dark"] .capacitacion-doc > .container-fluid > .mb-4.border-bottom {
+            border-color: #333 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-main .col-lg-4 .card,
+        [data-bs-theme="dark"] .capacitacion-doc #cap-main .col-lg-8 .card {
+            background-color: #1e1e1e !important;
+            border-color: #333 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-list .list-group-item:not(.active) {
+            background-color: #252525 !important;
+            color: #ececec !important;
+            border-color: #333 !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-list .list-group-item:hover:not(.active) {
+            background-color: #2e2e2e !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-help-prefs-card {
+            background-color: #1a1f1c !important;
+            border-color: rgba(74, 222, 128, 0.28) !important;
+        }
+        [data-bs-theme="dark"] .capacitacion-doc #cap-help-prefs-card .text-muted {
+            color: #c4c4c4 !important;
         }
     </style>
     <script type="module">

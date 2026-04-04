@@ -19,4 +19,4 @@ alwaysApply: true
 
 Si agregas una pantalla, modal, botón o mensaje nuevo, incluir siempre las claves en es, en y pt en la misma estructura. No dejar "para traducir después".
 
-Referencia: `docs/CHECKLIST-I18N.md`.
+Referencia: `docs/checklist-finalizados/CHECKLIST-I18N-REGLA.md` (inventario largo: `docs/checklist-finalizados/CHECKLIST-I18N.md`).

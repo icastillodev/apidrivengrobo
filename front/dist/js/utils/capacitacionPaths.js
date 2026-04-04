@@ -2,6 +2,13 @@
  * Convierte la URL actual (pathname) en la ruta de menú usada por capacitación / deep links.
  * @param {string} pathname window.location.pathname
  * @returns {string|null}
+ *
+ * Notas checklist §9 (extras):
+ * - **Configuración:** cualquier `admin/configuracion/*` se mapea al hub `admin/configuracion/config`
+ *   (un solo capítulo en el manual). Subpantallas no tienen slug propio en capacitación.
+ * - **Superadmin / rutas fuera de panel estándar:** si `pathname` no contiene `/paginas/`, devuelve `null`;
+ *   la barra inferior de ayuda no enlazará al manual hasta haber mapeo explícito (documentar en §9 si se amplía).
+ * - **QR / salas:** si la URL no pasa por `/paginas/...` típico, mismo criterio: ampliar aquí cuando haya ruta estable.
  */
 export function pathnameToMenuPath(pathname) {
   if (!pathname) return null;

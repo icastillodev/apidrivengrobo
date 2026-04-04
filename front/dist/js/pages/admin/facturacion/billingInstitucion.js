@@ -3,10 +3,24 @@ import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { openAnimalModal } from './modals/animalModal.js';
 import { openReactiveModal } from './modals/reactiveModal.js';
 import { openInsumoModal } from './modals/insumoModal.js';
+import { formatBillingMoney, formatBillingDateTime } from './billingLocale.js';
 import './billingPayments.js';
 import './modals/manager.js';
 
 let currentReportDataInst = null;
+
+function tf(key, fb = '') {
+    return window.txt?.facturacion?.billing_institucion?.[key] ?? fb;
+}
+function tRangoSep() {
+    return window.txt?.facturacion?.billing_investigador?.fecha_rango_sep ?? ' a ';
+}
+function tExp() {
+    return window.txt?.facturacion?.billing_depto_export || {};
+}
+function tInvPdf() {
+    return window.txt?.facturacion?.billing_investigador || {};
+}
 
 export async function initBillingInstitucion() {
     const hoy = new Date();
@@ -48,7 +62,13 @@ async function cargarFacturacionInstitucion() {
             window.currentReportDataInst = res.data;
             await renderResultadosInstitucion(res.data);
         } else {
-            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || 'No se obtuvieron datos.', 'error');
+            if (window.Swal) {
+                window.Swal.fire(
+                    window.txt?.generales?.error || 'Error',
+                    res.message || window.txt?.facturacion?.no_se_obtuvieron_datos || 'No se obtuvieron datos.',
+                    'error'
+                );
+            }
         }
     } catch (e) {
         console.error(e);
@@ -66,7 +86,7 @@ async function renderResultadosInstitucion(data) {
     if (!container) return;
 
     const t = window.txt || {};
-    const fmt = (v) => `$ ${parseFloat(v || 0).toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+    const fmt = (v) => `$ ${formatBillingMoney(parseFloat(v || 0))}`;
 
     const tot = data.totales || {};
     const instituciones = Array.isArray(data.instituciones) ? data.instituciones : [];
@@ -78,12 +98,13 @@ async function renderResultadosInstitucion(data) {
     if (tituloEl) {
         tituloEl.innerText = selInst?.selectedIndex > 0 && selInst?.value
             ? (selInst.options[selInst.selectedIndex]?.text || '')
-            : (t.facturacion?.inst_todas || 'TODAS LAS INSTITUCIONES');
+            : (tf('titulo_todas_inst', t.facturacion?.inst_todas || 'TODAS LAS INSTITUCIONES'));
     }
     if (periodoEl) {
         const desde = document.getElementById('f-desde-inst')?.value || '';
         const hasta = document.getElementById('f-hasta-inst')?.value || '';
-        periodoEl.innerText = (desde && hasta) ? `${desde} a ${hasta}` : '-';
+        const sep = tRangoSep();
+        periodoEl.innerText = (desde && hasta) ? `${desde}${sep}${hasta}` : '-';
     }
 
     // Stats cards (formato departamento)
@@ -91,19 +112,20 @@ async function renderResultadosInstitucion(data) {
         dashboardArea.classList.remove('d-none');
         const statsContainer = document.getElementById('stats-container-inst');
         if (statsContainer) {
+            const gen = t.generales || {};
             const configs = [
-                { label: t.facturacion?.deuda_total || 'DEUDA TOTAL', val: tot.montoDebe || 0, col: '#dc3545' },
-                { label: t.facturacion?.total_pagado_lbl || 'TOTAL PAGADO', val: tot.montoPagado || 0, col: '#198754' },
-                { label: t.facturacion?.total || 'TOTAL', val: tot.montoTotal || 0, col: '#0d6efd' },
-                { label: t.facturacion?.estado_cobro_todos || 'CANTIDAD', val: tot.cantidad || 0, col: '#6f42c1' }
+                { key: 'deuda', always: true, isCount: false, label: t.facturacion?.deuda_total || 'DEUDA TOTAL', val: tot.montoDebe || 0, col: '#dc3545' },
+                { key: 'pagado', always: true, isCount: false, label: t.facturacion?.total_pagado_lbl || 'TOTAL PAGADO', val: tot.montoPagado || 0, col: '#198754' },
+                { key: 'total', always: true, isCount: false, label: t.facturacion?.total || 'TOTAL', val: tot.montoTotal || 0, col: '#0d6efd' },
+                { key: 'cant', always: false, isCount: true, label: gen.cantidad || 'Cantidad', val: tot.cantidad || 0, col: '#6f42c1' }
             ];
             statsContainer.innerHTML = configs
-                .filter(c => c.val > 0 || c.label.includes('DEUDA') || c.label.includes('TOTAL'))
+                .filter(c => c.val > 0 || c.always)
                 .map(c => `
                     <div class="col-md-2">
                         <div class="card stat-card border-0 shadow-sm p-3 text-center" style="border-top: 5px solid ${c.col} !important;">
                             <span class="small text-muted fw-bold uppercase" style="font-size: 9px; letter-spacing: 1px;">${c.label}</span>
-                            <h4 class="fw-bold m-0 mt-2" style="color: ${c.col}; font-family: 'Lato';">${typeof c.val === 'number' && c.label.includes('CANTIDAD') ? c.val : fmt(c.val)}</h4>
+                            <h4 class="fw-bold m-0 mt-2" style="color: ${c.col}; font-family: 'Lato';">${c.isCount ? c.val : fmt(c.val)}</h4>
                         </div>
                     </div>`).join('');
         }
@@ -145,7 +167,7 @@ async function renderResultadosInstitucion(data) {
                                 <span class="text-danger fw-bold">${t.facturacion?.falta || 'Debe'}: ${fmt(ti.montoDebe)}</span>
                             </div>
                         </div>
-                        <button class="btn btn-link btn-sm text-danger p-0" onclick="window.downloadInstItemPDF(${inst.idInstitucionSolicitante})" title="${t.facturacion?.pdf_global || 'PDF'}">
+                        <button class="btn btn-link btn-sm text-danger p-0" onclick="window.downloadInstItemPDF(${inst.idInstitucionSolicitante})" title="${escapeHtml(tf('col_pdf', t.facturacion?.pdf_global || 'PDF'))}">
                             <i class="bi bi-file-earmark-pdf fs-4"></i>
                         </button>
                     </div>
@@ -170,7 +192,7 @@ async function renderResultadosInstitucion(data) {
                                     <th style="width:8%">${t.facturacion?.total || 'TOTAL'}</th>
                                     <th style="width:8%">${t.facturacion?.total_pagado || 'PAGADO'}</th>
                                     <th style="width:8%">${t.facturacion?.falta || 'DEBE'}</th>
-                                    <th style="width:5%">PDF</th>
+                                    <th style="width:5%">${tf('col_pdf', 'PDF')}</th>
                                 </tr>
                             </thead>
                             <tbody>${renderTipoSectionRows(grouped, fmt, inst, t)}</tbody>
@@ -189,7 +211,7 @@ async function renderResultadosInstitucion(data) {
                                 <b class="fs-6 text-danger d-block">${fmt(ti.montoDebe)}</b>
                             </div>
                             <button type="button" class="btn btn-link btn-sm text-danger p-0" onclick="window.downloadInstItemPDF(${inst.idInstitucionSolicitante})">
-                                <i class="bi bi-file-earmark-pdf fs-4 me-1"></i> ${t.facturacion?.pdf_global || 'PDF'}
+                                <i class="bi bi-file-earmark-pdf fs-4 me-1"></i> ${tf('col_pdf', t.facturacion?.pdf_global || 'PDF')}
                             </button>
                         </div>
                         <div class="d-flex align-items-center gap-3">
@@ -249,7 +271,7 @@ async function hydrateInvestigadoresSaldosInst(instituciones) {
                 const saldo = res.status === 'success' ? parseFloat(res.data.SaldoDinero || 0) : 0;
                 const badge = host.querySelector(`.inv-saldo-badge-inst[data-idusr="${v.id}"]`);
                 if (badge) {
-                    badge.textContent = `$ ${saldo.toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+                    badge.textContent = `$ ${formatBillingMoney(saldo)}`;
                 }
             } catch (e) {
                 const badge = host.querySelector(`.inv-saldo-badge-inst[data-idusr="${v.id}"]`);
@@ -293,7 +315,7 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
                     <td class="text-end text-success fw-bold">${fmt(item.montoPagado)}</td>
                     <td class="text-end text-danger fw-bold">${fmt(item.montoDebe)}</td>
                     <td>
-                        <button class="btn btn-link btn-sm text-danger p-0" onclick="event.stopPropagation(); window.downloadInstFilaPDF(${item.idformA}, ${inst.idInstitucionSolicitante})" title="PDF">
+                        <button class="btn btn-link btn-sm text-danger p-0" onclick="event.stopPropagation(); window.downloadInstFilaPDF(${item.idformA}, ${inst.idInstitucionSolicitante})" title="${escapeHtml(tf('col_pdf', 'PDF'))}">
                             <i class="bi bi-file-earmark-pdf"></i>
                         </button>
                     </td>
@@ -345,7 +367,7 @@ function actualizarMontoVisualInst(instId) {
     document.querySelectorAll(`.check-item-inst[data-inst="${instId}"]:checked`).forEach(chk => {
         total += parseFloat(chk.dataset.monto || 0);
     });
-    visor.innerText = `$ ${total.toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+    visor.innerText = `$ ${formatBillingMoney(total)}`;
     visor.classList.toggle('text-success', total > 0);
     visor.classList.toggle('text-primary', total <= 0);
 }
@@ -391,7 +413,7 @@ window.procesarPagoInstitucion = async (idInstSol) => {
     }));
 
     if (insuf.length) {
-        const fmtM = (v) => `$ ${parseFloat(v || 0).toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+        const fmtM = (v) => `$ ${formatBillingMoney(parseFloat(v || 0))}`;
         const reqL = t.inst_requiere || 'Requiere';
         const dispL = t.inst_disponible || 'Disponible';
         const filas = insuf.map((r) =>
@@ -408,19 +430,21 @@ window.procesarPagoInstitucion = async (idInstSol) => {
     }
 
     const resumenInv = [...porInv.entries()].map(([idUsr, m]) => {
-        return `<div class="d-flex justify-content-between small"><span>ID ${idUsr}</span><span class="fw-bold">$ ${m.toLocaleString('es-UY', { minimumFractionDigits: 2 })}</span></div>`;
+        return `<div class="d-flex justify-content-between small"><span>ID ${idUsr}</span><span class="fw-bold">$ ${formatBillingMoney(m)}</span></div>`;
     }).join('');
+
+    const nFormMsg = (tf('confirm_n_formularios', 'Se registrará el pago de <b>{n}</b> formularios derivados.')).replace(/\{n\}/g, String(items.length));
 
     const confirm = await Swal.fire({
         title: t.confirm_pago || 'Confirmar Liquidación',
         html: `
             <div class="text-start">
                 <p>${t.inst_confirm_debito_desc || 'Se descontará el saldo de cada investigador en esta institución (como en las demás facturaciones).'}</p>
-                <p class="mb-2">Estás por registrar pago de <b>${items.length}</b> formularios derivados.</p>
+                <p class="mb-2">${nFormMsg}</p>
                 <div class="p-3 bg-light rounded border shadow-sm mb-2">
                     <div class="d-flex justify-content-between mb-2">
                         <span>${t.total_a_debitar || 'Total a debitar de billeteras'}:</span>
-                        <span class="fw-bold">$ ${totalAPagar.toLocaleString('es-UY', { minimumFractionDigits: 2 })}</span>
+                        <span class="fw-bold">$ ${formatBillingMoney(totalAPagar)}</span>
                     </div>
                     <div class="border-top pt-2 mt-2">${resumenInv}</div>
                 </div>
@@ -429,7 +453,7 @@ window.procesarPagoInstitucion = async (idInstSol) => {
         showCancelButton: true,
         confirmButtonText: t.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#6f42c1',
-        cancelButtonText: window.txt?.generales?.cancelar || 'Cancelar'
+        cancelButtonText: window.txt?.facturacion?.btn_cancelar_swal || gen.cancelar || 'Cancelar'
     });
     if (confirm.isConfirmed) {
         try {
@@ -437,10 +461,10 @@ window.procesarPagoInstitucion = async (idInstSol) => {
             const res = await API.request('/billing/process-payment-institucion', 'POST', { items });
             hideLoader();
             if (res.status === 'success') {
-                if (window.Swal) window.Swal.fire(t.pago_procesado || '¡Pago Procesado!', res.message || 'El pago ha sido registrado.', 'success');
+                if (window.Swal) window.Swal.fire(t.pago_procesado || '¡Pago Procesado!', res.message || tf('pago_registrado_ok', 'El pago ha sido registrado.'), 'success');
                 cargarFacturacionInstitucion();
             } else {
-                if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || 'No se pudo procesar.', 'error');
+                if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || tf('error_procesar_corto', 'No se pudo procesar.'), 'error');
             }
         } catch (e) {
             console.error(e);
@@ -495,15 +519,26 @@ function escapeHtml(s) {
 function getInstSelectedDateRangeLabel() {
     const desde = document.getElementById('f-desde-inst')?.value || '';
     const hasta = document.getElementById('f-hasta-inst')?.value || '';
+    const sep = tRangoSep();
     if (!desde && !hasta) return '-';
-    if (desde && hasta) return `${desde} a ${hasta}`;
+    if (desde && hasta) return `${desde}${sep}${hasta}`;
     return desde || hasta;
 }
 
-function getInstNombreSeleccionada() {
+/** Texto para encabezados PDF (nombre largo si es “todas”). */
+function getInstTituloReporte() {
     const sel = document.getElementById('sel-inst-solicitante');
-    if (!sel || sel.selectedIndex < 1) return (window.txt?.facturacion?.inst_todas || 'TODAS');
-    return sel.options[sel.selectedIndex]?.text || 'INSTITUCIÓN';
+    const f = window.txt?.facturacion || {};
+    if (!sel || sel.selectedIndex < 1) return tf('titulo_todas_inst', f.inst_todas || 'TODAS');
+    return sel.options[sel.selectedIndex]?.text || tf('sel_inst_fallback', 'INSTITUCIÓN');
+}
+
+/** Slug corto para nombre de archivo. */
+function getInstSlugArchivo() {
+    const sel = document.getElementById('sel-inst-solicitante');
+    const f = window.txt?.facturacion || {};
+    if (!sel || sel.selectedIndex < 1) return (f.inst_todas || 'TODAS');
+    return sel.options[sel.selectedIndex]?.text || tf('sel_inst_fallback', 'INSTITUCIÓN');
 }
 
 window.downloadInstFilaPDF = async (idformA, idInstSol) => {
@@ -524,29 +559,35 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
         doc.text(`GROBO - ${instNombre}`, 105, M, { align: 'center' });
         doc.setFontSize(11); doc.setTextColor(100);
-        doc.text('FICHA FINANCIERA - FORMULARIO DERIVADO', 105, M + 7, { align: 'center' });
+        doc.text(tf('pdf_titulo_ficha_form', 'FICHA FINANCIERA - FORMULARIO DERIVADO'), 105, M + 7, { align: 'center' });
         doc.line(M, M + 10, 195, M + 10);
 
         doc.setFontSize(10); doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold'); doc.text('ID Formulario:', M, M + 22);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_id_formulario', 'ID Formulario:'), M, M + 22);
         doc.setFont('helvetica', 'normal'); doc.text(`#${item.idformA}`, 50, M + 22);
-        doc.setFont('helvetica', 'bold'); doc.text('Institución:', M, M + 28);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_institucion', 'Institución:'), M, M + 28);
         doc.setFont('helvetica', 'normal'); doc.text(inst.institucion || '-', 50, M + 28);
-        doc.setFont('helvetica', 'bold'); doc.text('Investigador:', M, M + 34);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_investigador', 'Investigador:'), M, M + 34);
         doc.setFont('helvetica', 'normal'); doc.text(item.investigador || '-', 50, M + 34);
-        doc.setFont('helvetica', 'bold'); doc.text('Tipo:', M, M + 40);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, M + 40);
         doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, M + 40);
-        doc.setFont('helvetica', 'bold'); doc.text('Total:', M, M + 46);
-        doc.setFont('helvetica', 'normal'); doc.text(`$ ${parseFloat(item.montoTotal || 0).toFixed(2)}`, 50, M + 46);
-        doc.setFont('helvetica', 'bold'); doc.text('Pagado:', M, M + 52);
-        doc.setFont('helvetica', 'normal'); doc.text(`$ ${parseFloat(item.montoPagado || 0).toFixed(2)}`, 50, M + 52);
-        doc.setFont('helvetica', 'bold'); doc.text('Debe:', M, M + 58);
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 0, 0); doc.text(`$ ${parseFloat(item.montoDebe || 0).toFixed(2)}`, 50, M + 58);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_total', 'Total:'), M, M + 46);
+        doc.setFont('helvetica', 'normal'); doc.text(`$ ${formatBillingMoney(item.montoTotal || 0)}`, 50, M + 46);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_pagado', 'Pagado:'), M, M + 52);
+        doc.setFont('helvetica', 'normal'); doc.text(`$ ${formatBillingMoney(item.montoPagado || 0)}`, 50, M + 52);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_debe', 'Debe:'), M, M + 58);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(item.montoDebe || 0)}`, 50, M + 58);
 
         doc.save(`Ficha_Form_${item.idformA}_Inst.pdf`);
     } catch (e) {
         console.error(e);
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.error_pdf || 'Error', 'No se pudo generar el PDF.', 'error');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.error || 'Error',
+                window.txt?.facturacion?.error_pdf || 'No se pudo generar el documento PDF.',
+                'error'
+            );
+        }
     } finally { hideLoader(); }
 };
 
@@ -564,26 +605,34 @@ window.downloadInstItemPDF = async (idInstSol) => {
         const violeta = [111, 66, 193];
         const rango = getInstSelectedDateRangeLabel();
 
+        const tp = tInvPdf();
+        const hId = tp.pdf_col_id || 'ID';
+        const hInv = tf('excel_inv', 'Investigador');
+        const hTipo = tf('excel_tipo', 'Tipo');
+        const hTot = tf('excel_total', 'Total');
+        const hPag = tf('excel_pagado', 'Pagado');
+        const hDeb = tf('excel_debe', 'Debe');
+
         doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
         doc.text(`GROBO - ${instNombre}`, 105, M, { align: 'center' });
         doc.setFontSize(11); doc.setTextColor(100);
-        doc.text('REPORTE FACTURACIÓN POR INSTITUCIÓN', 105, M + 7, { align: 'center' });
-        doc.setFontSize(9); doc.text(`INSTITUCIÓN: ${(inst.institucion || '').toUpperCase()}`, 105, M + 12, { align: 'center' });
-        doc.setFontSize(9); doc.text(`RANGO: ${rango}`, 105, M + 16, { align: 'center' });
+        doc.text(tf('pdf_reporte', 'REPORTE FACTURACIÓN POR INSTITUCIÓN'), 105, M + 7, { align: 'center' });
+        doc.setFontSize(9); doc.text(`${tf('pdf_inst_uc', 'INSTITUCIÓN:')} ${(inst.institucion || '').toUpperCase()}`, 105, M + 12, { align: 'center' });
+        doc.setFontSize(9); doc.text(`${tf('pdf_rango', 'RANGO:')} ${rango}`, 105, M + 16, { align: 'center' });
         doc.line(M, M + 19, 195, M + 19);
 
         const body = (inst.items || []).map(i => [
             `#${i.idformA}`,
             i.investigador || '-',
             (i.nombreTipo || i.categoria || '-').substring(0, 40),
-            `$ ${parseFloat(i.montoTotal || 0).toFixed(2)}`,
-            `$ ${parseFloat(i.montoPagado || 0).toFixed(2)}`,
-            `$ ${parseFloat(i.montoDebe || 0).toFixed(2)}`
+            `$ ${formatBillingMoney(i.montoTotal || 0)}`,
+            `$ ${formatBillingMoney(i.montoPagado || 0)}`,
+            `$ ${formatBillingMoney(i.montoDebe || 0)}`
         ]);
 
         doc.autoTable({
             startY: M + 24, margin: { left: M, right: M },
-            head: [['ID', 'Investigador', 'Tipo', 'Total', 'Pagado', 'Debe']],
+            head: [[hId, hInv, hTipo, hTot, hPag, hDeb]],
             body, theme: 'grid', headStyles: { fillColor: violeta },
             styles: { fontSize: 8 },
             columnStyles: { 2: { cellWidth: 60 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
@@ -592,18 +641,30 @@ window.downloadInstItemPDF = async (idInstSol) => {
         const ti = inst.totales || {};
         const finalY = doc.lastAutoTable.finalY + 10;
         doc.setFontSize(10); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
-        doc.text(`TOTAL DEUDA: $ ${parseFloat(ti.montoDebe || 0).toFixed(2)}`, 195, finalY, { align: 'right' });
+        doc.text(`${tf('pdf_total_deuda', 'TOTAL DEUDA:')} $ ${formatBillingMoney(ti.montoDebe || 0)}`, 195, finalY, { align: 'right' });
 
         doc.save(`Facturacion_Inst_${idInstSol}.pdf`);
     } catch (e) {
         console.error(e);
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.error_pdf || 'Error', 'No se pudo generar el PDF.', 'error');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.error || 'Error',
+                window.txt?.facturacion?.error_pdf || 'No se pudo generar el documento PDF.',
+                'error'
+            );
+        }
     } finally { hideLoader(); }
 };
 
 window.downloadInstGlobalPDF = async () => {
     if (!window.currentReportDataInst) {
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.sin_datos_cargados || 'Aviso', 'No hay datos cargados.', 'info');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.swal_atencion || 'Atención',
+                window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.',
+                'info'
+            );
+        }
         return;
     }
     showLoader();
@@ -614,19 +675,30 @@ window.downloadInstGlobalPDF = async () => {
         const instNombre = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
         const violeta = [111, 66, 193];
         const rango = getInstSelectedDateRangeLabel();
-        const titulo = getInstNombreSeleccionada();
+        const tituloRep = getInstTituloReporte();
+        const slug = getInstSlugArchivo();
+        const tp = tInvPdf();
+        const ex = tExp();
+        const gen = window.txt?.generales || {};
+        const f = window.txt?.facturacion || {};
+        const hId = tp.pdf_col_id || 'ID';
+        const hInv = tf('excel_inv', 'Investigador');
+        const hTipo = tf('excel_tipo', 'Tipo');
+        const hTot = tf('excel_total', 'Total');
+        const hDeb = tf('excel_debe', 'Debe');
+        const hCant = gen.cantidad || 'Cantidad';
 
         doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
-        doc.text('REPORTE FACTURACIÓN POR INSTITUCIÓN', 148, M, { align: 'center' });
-        doc.setFontSize(12); doc.setTextColor(100); doc.text(`INSTITUCIÓN: ${titulo.toUpperCase()}`, 148, M + 7, { align: 'center' });
-        doc.setFontSize(10); doc.text(`RANGO: ${rango}`, 148, M + 12, { align: 'center' });
+        doc.text(tf('pdf_reporte', 'REPORTE FACTURACIÓN POR INSTITUCIÓN'), 148, M, { align: 'center' });
+        doc.setFontSize(12); doc.setTextColor(100); doc.text(`${tf('pdf_inst_uc', 'INSTITUCIÓN:')} ${tituloRep.toUpperCase()}`, 148, M + 7, { align: 'center' });
+        doc.setFontSize(10); doc.text(`${tf('pdf_rango', 'RANGO:')} ${rango}`, 148, M + 12, { align: 'center' });
         doc.line(M, M + 15, 277, M + 15);
 
         const t = window.currentReportDataInst.totales || {};
         doc.autoTable({
             startY: M + 22, margin: { left: M, right: M },
-            head: [[(window.txt?.facturacion?.total || 'TOTAL'), (window.txt?.facturacion?.total_pagado || 'PAGADO'), (window.txt?.facturacion?.falta || 'DEBE'), (window.txt?.facturacion?.estado_cobro_todos || 'CANTIDAD')]],
-            body: [[`$ ${parseFloat(t.montoTotal || 0).toFixed(2)}`, `$ ${parseFloat(t.montoPagado || 0).toFixed(2)}`, `$ ${parseFloat(t.montoDebe || 0).toFixed(2)}`, t.cantidad || 0]],
+            head: [[(f.total || 'TOTAL'), (f.total_pagado || 'PAGADO'), (f.falta || 'DEBE'), hCant]],
+            body: [[`$ ${formatBillingMoney(t.montoTotal || 0)}`, `$ ${formatBillingMoney(t.montoPagado || 0)}`, `$ ${formatBillingMoney(t.montoDebe || 0)}`, t.cantidad || 0]],
             theme: 'grid', headStyles: { fillColor: [40, 40, 40], halign: 'center' }, styles: { halign: 'center', fontSize: 10 }
         });
 
@@ -640,12 +712,12 @@ window.downloadInstGlobalPDF = async () => {
 
             const body = (inst.items || []).map(i => [
                 `#${i.idformA}`, i.investigador || '-', (i.nombreTipo || i.categoria || '-').substring(0, 35),
-                `$ ${parseFloat(i.montoTotal || 0).toFixed(2)}`, `$ ${parseFloat(i.montoDebe || 0).toFixed(2)}`
+                `$ ${formatBillingMoney(i.montoTotal || 0)}`, `$ ${formatBillingMoney(i.montoDebe || 0)}`
             ]);
             if (body.length) {
                 doc.autoTable({
                     startY: currentY, margin: { left: M, right: M },
-                    head: [['ID', 'Investigador', 'Tipo', 'Total', 'Debe']],
+                    head: [[hId, hInv, hTipo, hTot, hDeb]],
                     body, theme: 'grid', headStyles: { fillColor: violeta },
                     styles: { fontSize: 7 }
                 });
@@ -654,52 +726,89 @@ window.downloadInstGlobalPDF = async () => {
         });
 
         const pages = doc.internal.getNumberOfPages();
+        const footTpl = ex.pdf_footer_inst_tpl || 'Institución: {inst} | Generado: {fecha}';
+        const pagTpl = ex.pdf_footer_pagina_tpl || 'Página {j} de {pages}';
         for (let j = 1; j <= pages; j++) {
             doc.setPage(j); doc.setFontSize(8); doc.setTextColor(150);
-            doc.text(`Institución: ${instNombre} | ${new Date().toLocaleString()}`, 15, 202);
-            doc.text(`Página ${j} de ${pages}`, 277, 202, { align: 'right' });
+            doc.text(
+                footTpl.replace('{inst}', instNombre).replace('{fecha}', formatBillingDateTime()),
+                15,
+                202
+            );
+            doc.text(
+                pagTpl.replace('{j}', String(j)).replace('{pages}', String(pages)),
+                277,
+                202,
+                { align: 'right' }
+            );
         }
 
-        const safeName = `Facturacion_Inst_${titulo}_${instNombre}`.replace(/[^a-zA-Z0-9_ \-\(\)]/g, '_');
+        const safeName = `Facturacion_Inst_${slug}_${instNombre}`.replace(/[^a-zA-Z0-9_ \-\(\)]/g, '_');
         doc.save(`${safeName}.pdf`);
     } catch (e) {
         console.error(e);
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.error_pdf || 'Error', 'No se pudo generar el PDF.', 'error');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.error || 'Error',
+                window.txt?.facturacion?.error_pdf || 'No se pudo generar el documento PDF.',
+                'error'
+            );
+        }
     } finally { hideLoader(); }
 };
 
 window.exportExcelInstGlobal = () => {
     if (!window.currentReportDataInst) {
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.sin_datos_cargados || 'Aviso', 'No hay datos cargados.', 'info');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.swal_atencion || 'Atención',
+                window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.',
+                'info'
+            );
+        }
         return;
     }
     const instNombre = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
-    const titulo = getInstNombreSeleccionada();
+    const slug = getInstSlugArchivo();
+    const kInst = tf('excel_inst', 'Institución');
+    const kId = tf('excel_id_form', 'ID Formulario');
+    const kInv = tf('excel_inv', 'Investigador');
+    const kTipo = tf('excel_tipo', 'Tipo');
+    const kCat = tf('excel_categoria', 'Categoría');
+    const kTot = tf('excel_total', 'Total');
+    const kPag = tf('excel_pagado', 'Pagado');
+    const kDeb = tf('excel_debe', 'Debe');
     const dataMatrix = [];
 
     (window.currentReportDataInst.instituciones || []).forEach(inst => {
         (inst.items || []).forEach(item => {
             dataMatrix.push({
-                'Institución': inst.institucion || '-',
-                'ID Formulario': item.idformA,
-                'Investigador': item.investigador || '-',
-                'Tipo': item.nombreTipo || item.categoria || '-',
-                'Categoría': item.categoria || '-',
-                'Total': parseFloat(item.montoTotal || 0),
-                'Pagado': parseFloat(item.montoPagado || 0),
-                'Debe': parseFloat(item.montoDebe || 0)
+                [kInst]: inst.institucion || '-',
+                [kId]: item.idformA,
+                [kInv]: item.investigador || '-',
+                [kTipo]: item.nombreTipo || item.categoria || '-',
+                [kCat]: item.categoria || '-',
+                [kTot]: parseFloat(item.montoTotal || 0),
+                [kPag]: parseFloat(item.montoPagado || 0),
+                [kDeb]: parseFloat(item.montoDebe || 0)
             });
         });
     });
 
     if (!dataMatrix.length) {
-        if (window.Swal) window.Swal.fire('Aviso', 'No hay datos para exportar.', 'info');
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.swal_atencion || 'Atención',
+                tf('sin_datos_export', 'No hay datos para exportar.'),
+                'info'
+            );
+        }
         return;
     }
 
     const worksheet = XLSX.utils.json_to_sheet(dataMatrix);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Facturación');
-    const safeName = `Facturacion_Inst_${titulo}_${instNombre}`.replace(/[^a-zA-Z0-9_ \-\(\)]/g, '_');
+    XLSX.utils.book_append_sheet(workbook, worksheet, tf('excel_sheet', 'Facturación'));
+    const safeName = `Facturacion_Inst_${slug}_${instNombre}`.replace(/[^a-zA-Z0-9_ \-\(\)]/g, '_');
     XLSX.writeFile(workbook, `${safeName}.xlsx`);
 };

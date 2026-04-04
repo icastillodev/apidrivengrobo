@@ -44,7 +44,7 @@ Estado del proyecto GROBO / URBE-API-DRIVEN.
 
 ---
 
-**Traducción i18n (ES/EN/PT):** Ver listado completo en **`docs/CHECKLIST-I18N.md`**. Se avanza por página/módulo en sucesivos chats.
+**Traducción i18n (ES/EN/PT):** **[CHECKLIST-I18N-REGLA.md](CHECKLIST-I18N-REGLA.md)** (regla corta); inventario largo: **[CHECKLIST-I18N.md](CHECKLIST-I18N.md)**.
 
 ---
 

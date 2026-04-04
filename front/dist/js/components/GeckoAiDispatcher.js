@@ -1,13 +1,47 @@
 import { API } from '../api.js';
 import { GeckoSearch } from './GeckoSearch.js';
 
+const MAX_IA_PROMPT_CHARS = 2000;
+
+function frontBasePath() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? '/URBE-API-DRIVEN/front/'
+        : '/';
+}
+
+/** Asegura prefijo paginas/ para rutas internas GROBO. */
+function normalizeInternalAppUrl(url) {
+    if (!url || typeof url !== 'string') return url;
+    const u = url.trim().replace(/^\/+/, '');
+    if (/^https?:\/\//i.test(u)) return u;
+    if (u.startsWith('paginas/')) return u;
+    return `paginas/${u}`;
+}
+
 export const GeckoAiDispatcher = {
     async sendCommand(promptText) {
-        GeckoSearch.setInput(promptText); 
-        
+        const prompt = String(promptText ?? '').trim();
+        const promptLen = [...prompt].length;
+        if (promptLen > MAX_IA_PROMPT_CHARS) {
+            const t = window.txt?.gecko_ai;
+            const title = t?.prompt_too_long_title || t?.error_swal_title;
+            const text = t?.prompt_too_long_text || 'Text too long.';
+            if (typeof Swal !== 'undefined') {
+                Swal.fire(title || 'GROBO', text, 'warning');
+            } else if (window.Swal) {
+                window.Swal.fire(title || 'GROBO', text, 'warning');
+            } else {
+                alert(text);
+            }
+            GeckoSearch.renderEmpty();
+            return;
+        }
+
+        GeckoSearch.setInput(prompt);
+
         // Armamos el payload con la información de sesión para la IA
         const payload = {
-            prompt: promptText,
+            prompt,
             inst: localStorage.getItem('instId'),
             uid: localStorage.getItem('userId'),
             role: localStorage.getItem('userLevel')
@@ -15,17 +49,24 @@ export const GeckoAiDispatcher = {
 
         try {
             const response = await API.request('/ia/procesar', 'POST', payload);
-            
+
             if (response.status === 'success') {
                 this.executeAction(response.data);
             } else {
-                // CORRECCIÓN: Buscamos Swal globalmente, si no existe, usamos el alert nativo
+                const errTitle = window.txt?.gecko_ai?.error_swal_title || 'Error de IA';
+                let body = response.message;
+                if (response.error_code === 'ia_forbidden_role') {
+                    body = window.txt?.gecko_ai?.error_role_denied || body;
+                }
+                if (!body) {
+                    body = window.txt?.gecko_ai?.error_generic_body || '—';
+                }
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire('Error de IA', response.message, 'error');
+                    Swal.fire(errTitle, body, 'error');
                 } else if (window.Swal) {
-                    window.Swal.fire('Error de IA', response.message, 'error');
+                    window.Swal.fire(errTitle, body, 'error');
                 } else {
-                    alert('Error de IA: ' + response.message);
+                    alert(`${errTitle}: ${body}`);
                 }
                 GeckoSearch.renderEmpty();
             }
@@ -36,23 +77,40 @@ export const GeckoAiDispatcher = {
     },
 
     executeAction(aiJson) {
-        if (aiJson.mensaje_texto) {
-            this.speak(aiJson.mensaje_texto); 
-            GeckoSearch.setAiMessage(aiJson.mensaje_texto); 
+        const msg = String(aiJson.mensaje_texto || '').trim();
+        if (msg) {
+            this.speak(msg);
+            GeckoSearch.setAiMessage(msg);
         }
 
         switch (aiJson.action_type) {
-            case 'navegacion':
-                const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
-                setTimeout(() => window.location.href = `${basePath}${aiJson.data.url}`, 1500);
+            case 'navegacion': {
+                const basePath = frontBasePath();
+                const rel = normalizeInternalAppUrl(aiJson.data?.url || '');
+                if (rel) {
+                    setTimeout(() => {
+                        window.location.href = `${basePath}${rel}`;
+                    }, 900);
+                }
                 break;
+            }
+            case 'ayuda_manual': {
+                const slug = (aiJson.data && aiJson.data.slug) ? String(aiJson.data.slug).trim() : 'panel__capacitacion';
+                const basePath = frontBasePath();
+                const hash = `t=${encodeURIComponent(slug)}`;
+                setTimeout(() => {
+                    window.location.href = `${basePath}paginas/panel/capacitacion.html#${hash}`;
+                }, 900);
+                break;
+            }
             case 'comando_dom':
                 if (aiJson.data.campos) {
                     aiJson.data.campos.forEach(campo => {
                         const inputEl = document.getElementById(campo.id_html);
                         if (inputEl) {
                             inputEl.value = campo.valor;
-                            inputEl.dispatchEvent(new Event('input', { bubbles: true })); 
+                            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                            inputEl.dispatchEvent(new Event('change', { bubbles: true }));
                         }
                     });
                 }

@@ -957,6 +957,47 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         }
     }
 
+    /**
+     * Suma por historia para el modal legacy de alojamiento (coherente con la grilla agrupada por historia).
+     */
+    public function getLegacyAlojamientoModalData($historia, $instId) {
+        $check = $this->db->prepare(
+            "SELECT COUNT(*) FROM alojamiento a
+             INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+             WHERE a.historia = ? AND p.IdInstitucion = ?"
+        );
+        $check->execute([(int)$historia, (int)$instId]);
+        if ((int)$check->fetchColumn() === 0) {
+            return null;
+        }
+        $sql = "SELECT COALESCE(SUM(a.totaldiasdefinidos), 0) AS totaldiasdefinidos,
+                       COALESCE(SUM(a.cuentaapagar), 0) AS cuentaapagar,
+                       COALESCE(SUM(a.totalpago), 0) AS totalpago
+                FROM alojamiento a
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                WHERE a.historia = ? AND p.IdInstitucion = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([(int)$historia, (int)$instId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return [
+            'totaldiasdefinidos' => (int)$row['totaldiasdefinidos'],
+            'cuentaapagar' => (float)$row['cuentaapagar'],
+            'totalpago' => (float)$row['totalpago'],
+        ];
+    }
+
+    /**
+     * Modal legacy: replica los valores en todos los tramos de la historia (mismo criterio que lectura por SUM).
+     */
+    public function updateLegacyAlojamientoModal($historia, $instId, $dias, $cuenta, $pago) {
+        $sql = "UPDATE alojamiento a
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                SET a.totaldiasdefinidos = ?, a.cuentaapagar = ?, a.totalpago = ?
+                WHERE a.historia = ? AND p.IdInstitucion = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([(int)$dias, (float)$cuenta, (float)$pago, (int)$historia, (int)$instId]);
+    }
+
     private function tableExists($tableName) {
         $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
         $stmt->execute([$tableName]);

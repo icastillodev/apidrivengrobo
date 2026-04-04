@@ -1,6 +1,6 @@
 # Checklist de tareas – Instrucciones por ítem
 
-**Archivado.** Para tareas activas, ver `docs/CHECKLIST-ACTIVO.md`.
+**Archivado.** El sprint cerrado está en `docs/checklist-finalizados/CHECKLIST-ACTIVO.md`. Trabajo vivo solo: `docs/CHECKLIST-CAPACITACION-PENDIENTE.md`, `docs/CHECKLIST-BUSQUEDA-IA-VOZ.md`.
 
 Cada ítem tiene instrucciones para poder ir rellenando los checks.  
 `[x]` = hecho · `[ ]` = pendiente
@@ -168,7 +168,7 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
   Primera tanda: añadidas claves en `alojamientos` (es, en, pt): `ph_buscar_global`, `ph_buscar_prot_reg`, `ph_buscar_user_reg`, `ph_obs_opcional`, `ph_filtrar_prot`. Usadas en `paginas/admin/alojamientos.html` con `data-i18n` para que `translatePage()` rellene los placeholders. Otras pantallas pueden seguir el mismo patrón (data-i18n en input/textarea y clave en i18n).
 
 - [x] **Traducir textos tipo "Vigentes", "Total", "Vencidos" y similares (resultados, badges, filtros).**  
-  Añadidas en `generales` (es, en, pt): `total`, `vigentes`, `vencidos`, `activos`, `inactivos`, `todos`. Usadas en `protocolos.js` (filtro Vigentes/Vencidos y placeholder buscar) y en `GeckoStats.js` (cabecera PDF "Total"). Ver `docs/CHECKLIST-I18N.md`.
+  Añadidas en `generales` (es, en, pt): `total`, `vigentes`, `vencidos`, `activos`, `inactivos`, `todos`. Usadas en `protocolos.js` (filtro Vigentes/Vencidos y placeholder buscar) y en `GeckoStats.js` (cabecera PDF "Total"). Ver `docs/checklist-finalizados/CHECKLIST-I18N-REGLA.md`.
 
 ---
 
@@ -302,7 +302,7 @@ Cada ítem tiene instrucciones para poder ir rellenando los checks.
 ## Multiidioma
 
 - [x] **Asegurar que todas las cadenas nuevas (placeholders, "por organización", "sin organización", estadísticas de red, billing por organización, hotkeys) estén en es/en/pt.**  
-  **Instrucciones:** Por cada texto nuevo añadido en los ítems anteriores, crear la clave correspondiente en `es.js`, `en.js` y `pt.js` y usarla en el código. Actualizar `CHECKLIST-I18N.md` si se añaden nuevas secciones o archivos.
+  **Instrucciones:** Por cada texto nuevo añadido en los ítems anteriores, crear la clave correspondiente en `es.js`, `en.js` y `pt.js` y usarla en el código. Actualizar el inventario i18n en `checklist-finalizados/CHECKLIST-I18N.md` si añadís secciones o archivos nuevos.
   **Hecho:** Revisión de facturación: añadidas en facturacion (ES, EN, PT) claves aviso_protocolo, aviso_investigador, monto_invalido, monto_invalido_saldo, operacion_cancelada, operacion_cancelada_msg, operacion_no_requerida, operacion_no_requerida_msg, sin_datos_cargados, error_info_no_encontrada, error_pdf, confirmar_pago_btn, items_liquidados, ingrese_monto_antes, seleccione_que_pagar, error_cargar_reporte, no_se_obtuvieron_datos, filtro_al_menos, saldo_actualizado_ok, confirmar_pago_titulo, procesado_titulo, exito_titulo, seleccione_insumo_pagar. Reemplazados en billingDepto.js, billingPayments.js, billingProtocolo.js, billingInvestigador.js, billingOrg.js y modals/manager.js los Swal y mensajes fijos por window.txt. Las claves ya existentes (aviso_filtro, aviso_depto, saldo_act, saldo_insuficiente, confirm_pago, pago_procesado, etc.) se usan donde corresponde.
 
 ---

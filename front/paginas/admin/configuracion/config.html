@@ -96,7 +96,9 @@
                     // Inicialización de la lógica del dashboard de configuración
                     initConfigDashboard();
                     translatePage();
-                    
+                    const instBread = document.getElementById('institucionbread');
+                    if (instBread) instBread.textContent = Auth.getVal('NombreInst') || '';
+
                     console.log("✅ Dashboard de Configuración inicializado correctamente.");
                 } else {
                     throw new Error("El objeto de idioma window.txt no se generó.");
@@ -123,6 +125,7 @@
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
                     <li class="breadcrumb-item text-muted" data-i18n="admin_config.bread_grobo"></li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread"></li>
                     <li class="breadcrumb-item text-muted" data-i18n="admin_config.bread_admin"></li>
                     <li class="breadcrumb-item active">
                         <span class="badge bg-dark px-2 py-1" data-i18n="admin_config.bread_panel"></span>

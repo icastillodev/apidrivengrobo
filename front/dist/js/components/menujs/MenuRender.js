@@ -42,8 +42,8 @@ function renderOmniComponents(mode) {
     // 🚀 Cambiamos el texto ALT G por una flechita de deslizar hacia abajo en pantallas menores a 1250px
     trigger.innerHTML = `
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <span class="placeholder-text">Buscar o Diga "Gecko"...</span>
-        <span class="kbd-shortcut d-none d-xl-block">ALT G</span>
+        <span class="placeholder-text" data-i18n="menu.search_omni_placeholder">Buscar o diga «Gecko»…</span>
+        <span class="kbd-shortcut d-none d-xl-block" data-i18n="menu.kbd_search_combo">Ctrl+G · Ctrl+K · Alt+G</span>
         <span class="kbd-shortcut d-xl-none bg-transparent border-0 text-success px-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
         </span>
@@ -63,8 +63,8 @@ function renderOmniComponents(mode) {
             <div class="gecko-omni-box">
                 <div class="gecko-omni-header">
                     <img src="${assetPath}dist/multimedia/imagenes/grobo/gecko.png" class="gecko-search-logo" alt="Gecko">
-                    <input type="text" id="gecko-omni-input" placeholder="Escribe un comando o di &quot;Gecko&quot; para activar la IA..." autocomplete="off">
-                    <button id="gecko-omni-voice-btn" title="Activar Voz">
+                    <input type="text" id="gecko-omni-input" data-i18n="menu.search_omni_input_placeholder" placeholder="Escriba un comando o diga «Gecko»…" autocomplete="off">
+                    <button type="button" id="gecko-omni-voice-btn" data-i18n-aria-label="menu.search_omni_voice_aria" title="">
                         <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0V3z"/>
                             <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/>
@@ -364,7 +364,7 @@ function buildControlsHTML(layout) {
             </ul>
         </div>
         
-        <button class="btn-hotkeys-help ${btnClass} d-none d-md-flex" style="${btnStyle}" title="Atajos de Teclado">
+        <button type="button" class="btn-hotkeys-help ${btnClass} d-none d-md-flex" style="${btnStyle}" data-i18n-aria-label="hotkeys.modal_title" title="">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
         </button>
 

@@ -1,5 +1,5 @@
 import { GeckoSearch } from '../GeckoSearch.js';
-import { HotkeyManager } from '../../utils/hotkeys.js';
+import { HotkeyManager, getHotkeyRowDefinitions } from '../../utils/hotkeys.js';
 import { GeckoVoice } from '../GeckoVoice.js';
 import { UserPreferences } from './MenuConfig.js';
 import { refreshMenuNotifications } from './MenuNotifications.js';
@@ -182,36 +182,47 @@ function handleSwipe() {
 }
 
 function showHotkeysModal() {
-    const hotkeys = HotkeyManager.getVisibleHotkeys();
-    
+    const t = window.txt?.hotkeys;
+    const rows = getHotkeyRowDefinitions();
+    const cards = rows
+        .map((r) => {
+            const desc = (t && r.tid && t[r.tid]) ? t[r.tid] : r.fallbackES;
+            const escKeys = String(r.keys).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `
+        <div class="hotkey-item">
+            <span class="hotkey-desc">${desc}</span>
+            <span class="hotkey-keys"><kbd>${escKeys}</kbd></span>
+        </div>`;
+        })
+        .join('');
+
+    const title = t?.modal_title || 'Atajos de teclado';
+    const footer = t?.modal_footer || 'Flujo rápido solo con teclado en GROBO';
+    const closeAria = t?.modal_close_aria || 'Cerrar';
+    const tip = t?.modal_tip_browser || '';
+
     const oldModal = document.getElementById('modalHotkeys');
     if (oldModal) oldModal.remove();
 
-    const cards = hotkeys.map(h => `
-        <div class="hotkey-item">
-            <span class="hotkey-desc">${h.desc}</span>
-            <span class="hotkey-keys"><kbd>${h.keys}</kbd></span>
-        </div>
-    `).join('');
-
     const modalHTML = `
     <div class="modal fade" id="modalHotkeys" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
                 <div class="modal-header bg-success text-white py-3">
                     <h5 class="modal-title d-flex align-items-center gap-2 fw-bold">
                         <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M0 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5zm13.5 1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm-3-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm-3-3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm0 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zM2 9.5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1zm5 4a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1z"/></svg>
-                        Atajos de Teclado
+                        ${title}
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="${closeAria.replace(/"/g, '&quot;')}"></button>
                 </div>
                 <div class="modal-body bg-light">
+                    ${tip ? `<p class="small text-muted border-bottom pb-2 mb-3">${tip}</p>` : ''}
                     <div class="hotkey-card-container">
                         ${cards}
                     </div>
                 </div>
-                <div class="modal-footer justify-content-center bg-white border-top-0 py-3">
-                    <span class="text-muted small fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 1px;">Optimiza tu flujo de trabajo con GROBO</span>
+                <div class="modal-footer flex-column justify-content-center bg-white border-top-0 py-3">
+                    <span class="text-muted small fw-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 1px;">${footer}</span>
                 </div>
             </div>
         </div>

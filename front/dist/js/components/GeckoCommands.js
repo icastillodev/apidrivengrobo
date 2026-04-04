@@ -4,11 +4,20 @@
  */
 
 export const GeckoCommands = {
-    // Palabras de activación (Universal)
+    /**
+     * Palabras de activación (reconocimiento imperfecto).
+     * No incluir "eco" suelto (demasiados falsos positivos en frases cotidianas).
+     * Incluye marca GROBO y variantes fonéticas frecuentes en ES/EN/PT.
+     */
     wakewords: [
-        'gecko', 'geco', 'gueco', 'eco', 'jeco', 'yecko', 
-        'gico', 'guco', 'gako', 'gicko', 'jecko', 'jeko', 
-        'ghecko', 'getko', 'keko'
+        'gecko', 'geco', 'gueco', 'gueko', 'jeko', 'yecko', 'jecko', 'jeco', 'yeco',
+        'grobo', 'grovo', 'grubo', 'grobot', 'grobu', 'grobow',
+        'gekko', 'geko', 'gheco', 'ghecko', 'gheckoh',
+        'xeco', 'zecko', 'secko', 'ceko', 'decko', 'tecko', 'hecko', 'wecko',
+        'getko', 'keko', 'keco', 'kiko',
+        'gico', 'guco', 'gako', 'gicko', 'gicco', 'greko', 'greco', 'greico',
+        'yeiko', 'ieco', 'iecko', 'ecko', 'heckoh',
+        'guicko', 'geck', 'gek'
     ],
 
     // Acciones categorizadas por idioma (Se usan TODAS simultáneamente)

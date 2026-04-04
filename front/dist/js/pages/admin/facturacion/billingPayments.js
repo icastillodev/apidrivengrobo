@@ -1,5 +1,10 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
+import { formatBillingMoney, formatBillingMoneyLoose } from './billingLocale.js';
+
+function txF() {
+    return window.txt?.facturacion || {};
+}
 
 /**
  * 1. Actualiza el saldo (Suma o Resta)
@@ -10,7 +15,7 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
     const input = document.querySelector(inputSelector);
     
     if (!input || !input.value) {
-        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.ingrese_monto_antes || 'Ingrese un monto antes de operar.', 'warning');
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', txF().ingrese_monto_antes || 'Ingrese un monto antes de operar.', 'warning');
         return;
     }
 
@@ -39,7 +44,7 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
             }
 
             Swal.fire({
-                title: window.txt?.facturacion?.saldo_act || 'Saldo Actualizado',
+                title: txF().saldo_act || 'Saldo Actualizado',
                 icon: 'success',
                 toast: true,
                 position: 'top-end',
@@ -77,48 +82,52 @@ window.procesarPagoProtocolo = async (idProt) => {
     });
 
     if (totalAPagar <= 0) {
-        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_que_pagar || 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', txF().seleccione_que_pagar || 'Seleccione qué desea pagar o revise que tengan deuda.', 'info');
         return;
     }
 
     const saldoActual = parseFloat(prot.saldoInv ?? prot.info?.SaldoPI ?? 0);
 
     if (totalAPagar > saldoActual) {
+        const tf = txF();
+        const m1 = `<b>$ ${formatBillingMoneyLoose(totalAPagar)}</b>`;
+        const m2 = `<b>$ ${formatBillingMoneyLoose(saldoActual)}</b>`;
+        const alerta = (tf.payment_exceso_cuerpo || 'El monto seleccionado ({m1}) es mayor al saldo disponible ({m2}).')
+            .replace(/\{m1\}/g, m1).replace(/\{m2\}/g, m2);
         Swal.fire({
-            title: window.txt?.facturacion?.saldo_insuficiente || 'Saldo Insuficiente',
+            title: tf.saldo_insuficiente || 'Saldo Insuficiente',
             html: `
-                <div class="alert alert-danger">
-                    El monto seleccionado (<b>$ ${totalAPagar.toLocaleString('es-UY')}</b>) 
-                    es mayor al saldo disponible (<b>$ ${saldoActual.toLocaleString('es-UY')}</b>).
-                </div>
-                <p>Por favor, agregue saldo o seleccione menos ítems.</p>`,
+                <div class="alert alert-danger">${alerta}</div>
+                <p>${tf.payment_exceso_sugerencia || 'Por favor, agregue saldo o seleccione menos ítems.'}</p>`,
             icon: 'error'
         });
         return;
     }
 
+    const tf = txF();
+    const intro = (tf.payment_confirm_items || 'Se liquidarán <b>{n}</b> ítems.').replace(/\{n\}/g, String(items.length));
     const confirm = await Swal.fire({
-        title: window.txt?.facturacion?.confirm_pago || 'Confirmar Liquidación',
+        title: tf.confirm_pago || 'Confirmar Liquidación',
         html: `
             <div class="text-start">
-                <p>Estás por liquidar <b>${items.length}</b> ítems.</p>
+                <p>${intro}</p>
                 <div class="p-3 bg-light rounded border shadow-sm">
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Total a pagar:</span> 
-                        <span class="fw-bold">$ ${totalAPagar.toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
+                        <span>${tf.payment_total_a_pagar_lbl || 'Total a pagar:'}</span> 
+                        <span class="fw-bold">$ ${formatBillingMoney(totalAPagar)}</span>
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between text-success fw-bold">
-                        <span>Saldo después del pago:</span> 
-                        <span>$ ${(saldoActual - totalAPagar).toLocaleString('es-UY', {minimumFractionDigits: 2})}</span>
+                        <span>${tf.payment_saldo_despues_lbl || 'Saldo después del pago:'}</span> 
+                        <span>$ ${formatBillingMoney(saldoActual - totalAPagar)}</span>
                     </div>
                 </div>
             </div>`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: window.txt?.facturacion?.confirmar_pago_btn || 'Sí, pagar ahora',
+        confirmButtonText: tf.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#1a5d3b',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar'
     });
 
     if (confirm.isConfirmed) {
@@ -138,7 +147,8 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
 
         if (res.status === 'success') {
             hideLoader();
-            await Swal.fire(window.txt?.facturacion?.pago_procesado || '¡Pago Procesado!', 'El saldo ha sido actualizado.', 'success');
+            const tf = txF();
+            await Swal.fire(tf.pago_procesado || '¡Pago Procesado!', tf.payment_saldo_actualizado_msg || 'El saldo ha sido actualizado.', 'success');
 
             if (typeof window.cargarFacturacionProtocolo === "function") {
                 await window.cargarFacturacionProtocolo();
@@ -148,7 +158,7 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
                 await window.cargarFacturacionDepto();
             }
         } else {
-            Swal.fire('Error', res.message, 'error');
+            Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
         }
     } catch (e) {
         console.error(e);
@@ -169,12 +179,13 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
         });
 
         if (res.status === 'success') {
-            await Swal.fire('Pago Exitoso', 'Los ítems han sido liquidados y el saldo actualizado.', 'success');
+            const tf = txF();
+            await Swal.fire(tf.payment_exitoso_titulo || 'Pago exitoso', tf.payment_exitoso_msg || 'Los ítems han sido liquidados y el saldo actualizado.', 'success');
             await window.cargarFacturacionDepto(); // Refresca tablas y dashboard
         }
     } catch (e) { 
         console.error(e); 
-        Swal.fire('Error', 'No se pudo procesar el pago.', 'error');
+        Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
     } finally { 
         hideLoader(); 
     }
@@ -183,7 +194,7 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
 window.procesarPagoInsumosGenerales = async () => {
     const seleccionados = document.querySelectorAll('.check-item-insumo-global:checked');
     
-    if (seleccionados.length === 0) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.seleccione_insumo_pagar || 'Seleccione al menos un insumo para pagar.', 'info');
+    if (seleccionados.length === 0) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', txF().seleccione_insumo_pagar || 'Seleccione al menos un insumo para pagar.', 'info');
 
     let totalAPagar = 0;
     const items = [];
@@ -198,7 +209,7 @@ window.procesarPagoInsumosGenerales = async () => {
         items.push({ tipo: 'INSUMO_GRAL', id: chk.dataset.id, monto_pago: monto });
         htmlItems += `<li class="list-group-item d-flex justify-content-between">
                         <span class="text-truncate" style="max-width: 200px;">${concepto}</span>
-                        <b>$ ${monto.toLocaleString('es-UY')}</b>
+                        <b>$ ${formatBillingMoneyLoose(monto)}</b>
                       </li>`;
     });
     htmlItems += '</ul>';
@@ -208,45 +219,50 @@ window.procesarPagoInsumosGenerales = async () => {
     const nombreInvestigador = primerItem.solicitante;
 
     if (totalAPagar > saldoActual) {
+        const tf = txF();
+        const s1 = `$ ${formatBillingMoneyLoose(saldoActual)}`;
+        const s2 = `$ ${formatBillingMoneyLoose(totalAPagar)}`;
+        const msg = (tf.payment_insumos_sin_saldo || 'El saldo disponible ({s1}) no es suficiente para cubrir el total ({s2}).')
+            .replace(/\{s1\}/g, s1).replace(/\{s2\}/g, s2);
         Swal.fire({
-            title: window.txt?.facturacion?.saldo_insuficiente || 'Saldo Insuficiente',
+            title: tf.saldo_insuficiente || 'Saldo Insuficiente',
             html: `
                 <div class="text-start">
-                    <p><b>Investigador:</b> ${nombreInvestigador}</p>
-                    <p class="text-danger">El saldo disponible ($ ${saldoActual.toLocaleString('es-UY')}) 
-                    no es suficiente para cubrir el total ($ ${totalAPagar.toLocaleString('es-UY')}).</p>
+                    <p><b>${tf.payment_insumos_inv_swal_b || 'Investigador:'}</b> ${nombreInvestigador}</p>
+                    <p class="text-danger">${msg}</p>
                 </div>`,
             icon: 'error'
         });
         return;
     }
 
+    const tf = txF();
     const confirm = await Swal.fire({
-        title: 'Confirmar Liquidación de Insumos',
+        title: tf.payment_insumos_confirm_titulo || 'Confirmar liquidación de insumos',
         width: '500px',
         html: `
             <div class="text-start">
-                <div class="mb-2 small text-muted text-uppercase fw-bold">Investigador Responsable:</div>
+                <div class="mb-2 small text-muted text-uppercase fw-bold">${tf.payment_insumos_resp_lbl || 'Investigador responsable:'}</div>
                 <h6 class="fw-bold mb-3">${nombreInvestigador}</h6>
                 ${htmlItems}
                 <div class="p-3 bg-light rounded border">
                     <div class="d-flex justify-content-between mb-1">
-                        <span>Saldo Actual:</span> <b>$ ${saldoActual.toLocaleString('es-UY')}</b>
+                        <span>${tf.payment_insumos_saldo_actual || 'Saldo actual:'}</span> <b>$ ${formatBillingMoneyLoose(saldoActual)}</b>
                     </div>
                     <div class="d-flex justify-content-between text-primary">
-                        <span>Total a Pagar:</span> <b>- $ ${totalAPagar.toLocaleString('es-UY')}</b>
+                        <span>${tf.payment_insumos_total_pagar || 'Total a pagar:'}</span> <b>- $ ${formatBillingMoneyLoose(totalAPagar)}</b>
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between text-success fw-bold">
-                        <span>Saldo Restante:</span> <span>$ ${(saldoActual - totalAPagar).toLocaleString('es-UY')}</span>
+                        <span>${tf.payment_insumos_saldo_restante || 'Saldo restante:'}</span> <span>$ ${formatBillingMoneyLoose(saldoActual - totalAPagar)}</span>
                     </div>
                 </div>
             </div>`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, liquidar insumos',
+        confirmButtonText: tf.payment_insumos_confirm_btn || 'Sí, liquidar insumos',
         confirmButtonColor: '#0d6efd',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar'
     });
 
     if (confirm.isConfirmed) {

@@ -28,7 +28,7 @@ No se detectaron claves que existan solo en un archivo; las diferencias de núme
 
 ### 4. Regla permanente
 
-Según `docs/CHECKLIST-I18N.md`, todo texto nuevo de interfaz debe:
+Según `docs/checklist-finalizados/CHECKLIST-I18N-REGLA.md` (e inventario `CHECKLIST-I18N.md` en la misma carpeta), todo texto nuevo de interfaz debe:
 
 1. Añadirse en **es.js**, **en.js** y **pt.js** en la misma ruta.
 2. Usarse en HTML con `data-i18n="ruta.clave"` o en JS con `window.txt?.ruta?.clave`.

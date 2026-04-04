@@ -17,6 +17,9 @@
   },
   "scripts": {
     "dev": "postcss dist/style/css/input.css -o dist/style/css/tailwind.css --watch",
-    "build": "NODE_ENV=production postcss dist/style/css/input.css -o dist/style/css/tailwind.css"
+    "build": "NODE_ENV=production postcss dist/style/css/input.css -o dist/style/css/tailwind.css",
+    "validate-cap-tour-i18n": "node scripts/validate-capacitacion-tour-i18n.cjs",
+    "validate-cap-tour-matrix": "node scripts/validate-capacitacion-tour-matrix.cjs",
+    "validate-cap-manual-parity": "node scripts/validate-capacitacion-manual-parity.mjs"
   }
 }

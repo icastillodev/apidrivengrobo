@@ -34,6 +34,8 @@
             try {
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null); 
                 translatePage();
+                const instBread = document.getElementById('institucionbread');
+                if (instBread) instBread.textContent = Auth.getVal('NombreInst') || '';
 
                 Auth.checkAccess([1, 2, 4, 5, 6]); 
 
@@ -54,9 +56,10 @@
     <div class="container-fluid my-5 px-4 px-md-5">
         <div class="card shadow-sm border-0 p-4">
             
-            <nav aria-label="breadcrumb" class="mb-4">
+            <nav class="mb-4" data-i18n-aria-label="generales.aria_migas">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_grobo"></li>
+                    <li class="breadcrumb-item text-muted" id="institucionbread"></li>
                     <li class="breadcrumb-item text-muted" data-i18n="facturacion.bread_admin">Admin</li>
                     <li class="breadcrumb-item text-muted" data-i18n="facturacion.titulo">Facturación</li>
                     <li class="breadcrumb-item active"><span class="badge bg-success px-2 py-1" data-i18n="facturacion.por_protocolo">Por Protocolo</span></li>

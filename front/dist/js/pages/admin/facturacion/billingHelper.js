@@ -1,6 +1,14 @@
 import { API } from '../../../api.js';
+import { formatBillingMoney } from './billingLocale.js';
 
 let editModalInstance = null;
+
+function itemModalTpl(str, map) {
+    if (!str) return '';
+    return str.replace(/\{m\}/g, () => (map.m != null ? String(map.m) : ''));
+}
+
+const txI = () => window.txt?.facturacion?.billing_item_modal || {};
 
 /**
  * Abre el modal de edición cargando los datos desde la API
@@ -12,8 +20,8 @@ window.abrirEdicionIndividual = async (tipo, id) => {
         const res = await API.request(`/billing/get-item?tipo=${tipo}&id=${id}`);
         if (res.status === 'success') {
             const d = res.data;
+            const im = txI();
 
-            // Mapeo de datos al modal
             document.getElementById('edit-item-id').value = id;
             document.getElementById('edit-item-tipo').value = tipo;
             document.getElementById('txt-edit-id').innerText = id;
@@ -23,18 +31,16 @@ window.abrirEdicionIndividual = async (tipo, id) => {
             document.getElementById('input-edit-total').value = d.total.toFixed(2);
             document.getElementById('input-edit-obs').value = d.observaciones || '';
 
-            // Estética del Header según deuda
             const header = document.getElementById('header-edit-item');
             const badge = document.getElementById('badge-edit-status');
             if (d.debe > 0) {
                 header.className = 'modal-header bg-danger text-white py-2';
-                badge.innerHTML = `<span class="badge bg-danger">DEUDA: $ ${d.debe.toFixed(2)}</span>`;
+                badge.innerHTML = `<span class="badge bg-danger">${itemModalTpl(im.badge_deuda_tpl || 'DEUDA: $ {m}', { m: formatBillingMoney(d.debe) })}</span>`;
             } else {
                 header.className = 'modal-header bg-success text-white py-2';
-                badge.innerHTML = `<span class="badge bg-success">LIQUIDADO</span>`;
+                badge.innerHTML = `<span class="badge bg-success">${im.badge_liquidado || 'LIQUIDADO'}</span>`;
             }
 
-            // Inicializar eventos de calculadora
             setupCalculadora();
 
             editModalInstance = new bootstrap.Modal(document.getElementById('modal-edit-item'));
@@ -43,9 +49,6 @@ window.abrirEdicionIndividual = async (tipo, id) => {
     } catch (e) { console.error(e); }
 };
 
-/**
- * Lógica de cálculo en tiempo real
- */
 function setupCalculadora() {
     const inpCant = document.getElementById('input-edit-cant');
     const inpUnit = document.getElementById('input-edit-unit');
@@ -68,9 +71,6 @@ function setupCalculadora() {
     inpTotal.oninput = recalcularUnitario;
 }
 
-/**
- * Envía los cambios al servidor y refresca la vista activa
- */
 window.guardarCambiosItem = async () => {
     const data = {
         id: document.getElementById('edit-item-id').value,
@@ -86,9 +86,8 @@ window.guardarCambiosItem = async () => {
         const res = await API.request('/billing/update-item', 'POST', data);
         if (res.status === 'success') {
             editModalInstance.hide();
-            Swal.fire({ title: 'Actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
-            
-            // LLAMADA DINÁMICA: Refresca la tabla de la página donde estés
+            Swal.fire({ title: txI().guardado_ok || 'Actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
+
             if (window.cargarFacturacionDepto) window.cargarFacturacionDepto();
             if (window.cargarFacturacionPersona) window.cargarFacturacionPersona();
         }

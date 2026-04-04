@@ -361,14 +361,25 @@ export const GeckoSearch = {
     }
 };
 
-export function initGlobalSearchUI() { 
-    GeckoSearch.init(); 
-    
-    // Atajo Global para abrir (Ctrl+K o Cmd+K)
+export function initGlobalSearchUI() {
+    GeckoSearch.init();
+
     document.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        if (e.repeat) return;
+        if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
+            const typing =
+                ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
+                document.activeElement?.isContentEditable;
+            if (typing && !document.getElementById('gecko-omni-overlay')?.classList.contains('show')) {
+                return;
+            }
             e.preventDefault();
-            GeckoSearch.open();
+            const overlay = document.getElementById('gecko-omni-overlay');
+            if (overlay && overlay.classList.contains('show')) {
+                GeckoSearch.close();
+            } else {
+                GeckoSearch.open();
+            }
         }
     });
 }

@@ -10,7 +10,7 @@ import { getMenuTemplates } from './menujs/MenuTemplates.js';
 import { renderTopMenuStructure, renderSideMenuStructure } from './menujs/MenuRender.js';
 import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
-import { applyPageTitle } from '../utils/i18n.js';
+import { applyPageTitle, translatePage } from '../utils/i18n.js';
 import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
 import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js';
 import {
@@ -116,6 +116,7 @@ try {
             applyGlobalHeadConfigs();
             applyPageTitle();
             setupEventListeners();
+            if (typeof translatePage === 'function') translatePage();
             updateBreadcrumbInstitution();
 
             initCapacitacionModalHelpDelegation();

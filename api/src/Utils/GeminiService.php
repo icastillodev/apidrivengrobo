@@ -36,7 +36,7 @@ class GeminiService {
             ],
             "generationConfig" => [
                 "temperature" => 0.1, 
-                "maxOutputTokens" => 800, // Le damos más espacio para que termine de escribir el JSON
+                "maxOutputTokens" => 512,
                 "responseMimeType" => "application/json" // Esto fuerza el formato
             ]
         ];

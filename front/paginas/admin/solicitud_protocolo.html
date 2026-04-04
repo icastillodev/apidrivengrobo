@@ -37,7 +37,9 @@
                 Auth.checkAccess([1, 2]); 
 
                 if (window.txt) {
-                    translatePage(); 
+                    translatePage();
+                    const instBread = document.getElementById('institucionbread');
+                    if (instBread) instBread.textContent = Auth.getVal('NombreInst') || '';
                     initMenu();
                     NotificationManager.init();
                     initAdminRequests();
@@ -58,9 +60,9 @@
             
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
-                    <li class="breadcrumb-item text-muted">GROBO</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_protocolos.bread_grobo"></li>
                     <li class="breadcrumb-item text-muted" id="institucionbread"></li>
-                    <li class="breadcrumb-item text-muted">Admin</li>
+                    <li class="breadcrumb-item text-muted" data-i18n="admin_protocolos.bread_admin"></li>
                     <li class="breadcrumb-item active">
                         <span class="badge bg-primary" data-i18n="solicitudprotocolo.titulo"></span>
                     </li>

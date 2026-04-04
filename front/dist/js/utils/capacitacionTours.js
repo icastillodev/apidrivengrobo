@@ -266,7 +266,10 @@ const TOUR_STEPS_PANEL_FORMULARIOS = [
 
 /**
  * Ventana emergente abierta (Bootstrap `.modal.show`): solo se ofrece con modal visible.
- * Tour genérico (estructura). Guías campo a campo por modal → backlog §13.6 CHECKLIST-CAPACITACION.md.
+ * Cubre estructura (diálogo → cabecera → cuerpo → pie) de **cualquier** modal, incluidos
+ * `#modal-container` (contenido dinámico facturación) y `#modal-billing-help` en páginas F7.
+ * Claves i18n: `tour_modal_in_s1_*` … `tour_modal_in_s4_*` (ES/EN/PT).
+ * Pasos **campo a campo** por ventana concreta → backlog §13.6 en maestro archivado (incremental).
  */
 const TOUR_STEPS_MODALES = [
   {

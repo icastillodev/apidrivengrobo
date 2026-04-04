@@ -570,6 +570,46 @@ class BillingController {
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error en el servidor: ' . $e->getMessage()); }
     }
 
+    public function getAlojamientoDetail($id) {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $historia = (int)$id;
+            if ($historia <= 0) {
+                return $this->jsonResponse('error', 'ID de historia inválido');
+            }
+            $data = $this->model->getLegacyAlojamientoModalData($historia, (int)$sesion['instId']);
+            if ($data === null) {
+                return $this->jsonResponse('error', 'No se encontró alojamiento para esa historia en esta institución.');
+            }
+            return $this->jsonResponse('success', $data);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        }
+    }
+
+    public function updateAlojamiento() {
+        $f = $this->getRequestData();
+        if (!isset($f['historia'], $f['dias'], $f['total'], $f['pago'])) {
+            return $this->jsonResponse('error', 'Datos incompletos (historia, días, total, pago).');
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $ok = $this->model->updateLegacyAlojamientoModal(
+                (int)$f['historia'],
+                (int)$sesion['instId'],
+                $f['dias'],
+                $f['total'],
+                $f['pago']
+            );
+            if (!$ok) {
+                return $this->jsonResponse('error', 'No se pudo actualizar el registro.');
+            }
+            return $this->jsonResponse('success', ['ok' => true]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        }
+    }
+
     public function getInvestigatorBalance($id) {
         try {
             $sesion = Auditoria::getDatosSesion();

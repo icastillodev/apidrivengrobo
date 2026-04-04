@@ -64,6 +64,7 @@ export async function loadLanguage(lang = null) {
         window.txt = module[selectedLang];
         localStorage.setItem('lang', selectedLang);
         localStorage.setItem('idioma', selectedLang);
+        document.documentElement.lang = selectedLang;
 
         console.log(`✅ Idioma cargado correctamente: ${selectedLang}`);
         return true;
@@ -98,6 +99,18 @@ export const translatePage = () => {
         }
     });
 
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+        const path = el.getAttribute('data-i18n-aria-label');
+        if (!path) return;
+        const keys = path.split('.');
+        let text = window.txt;
+        keys.forEach(key => { text = text ? text[key] : null; });
+        if (text && typeof text === 'string') {
+            const plain = text.replace(/<[^>]*>/g, '').trim();
+            el.setAttribute('aria-label', plain);
+        }
+    });
+
     applyPageTitle();
 };
 
@@ -112,7 +125,8 @@ const PATH_TO_TITLE_KEY = {
     'admin/configuracion/alojamientos-ubicacion': 'config_aloj_ubicacion',
     'admin/configuracion/protocolos-config': 'config_protocolos',
     'admin/facturacion/index': 'facturacion', 'admin/facturacion/depto': 'facturacion_depto', 'admin/facturacion/investigador': 'facturacion_investigador',
-    'admin/facturacion/protocolo': 'facturacion_protocolo', 'admin/historialcontable': 'historial_contable',
+    'admin/facturacion/protocolo': 'facturacion_protocolo', 'admin/facturacion/org': 'facturacion_org', 'admin/facturacion/institucion': 'facturacion_institucion',
+    'admin/historialcontable': 'historial_contable',
     'admin/solicitud_protocolo': 'solicitud_protocolo', 'usuario/formularios': 'formularios', 'panel/formularios': 'formularios', 'usuario/formularios/animales': 'formularios_animales',
     'usuario/formularios/reactivos': 'formularios_reactivos', 'usuario/formularios/insumos': 'formularios_insumos',     'usuario/misformularios': 'mis_formularios', 'panel/misformularios': 'mis_formularios',
     'usuario/misprotocolos': 'mis_protocolos', 'panel/misprotocolos': 'mis_protocolos',

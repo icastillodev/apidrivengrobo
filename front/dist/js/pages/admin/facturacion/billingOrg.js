@@ -1,5 +1,6 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
+import { formatBillingMoney } from './billingLocale.js';
 
 export async function initBillingOrg() {
     const hoy = new Date();
@@ -21,7 +22,7 @@ async function cargarFacturacionOrg() {
     const chkIns = document.getElementById('chk-insumos-org').checked;
 
     if (!chkAni && !chkAlo && !chkIns) {
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.filtro_al_menos || 'Atención', 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
+        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.filtro_al_menos || 'Atención', window.txt?.facturacion?.aviso_filtro || 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
         return;
     }
 
@@ -46,7 +47,7 @@ function renderResultadosOrg(organizaciones, opts) {
     if (!container) return;
 
     const t = window.txt || {};
-    const fDeuda = v => `$ ${parseFloat(v || 0).toLocaleString('es-UY', { minimumFractionDigits: 2 })}`;
+    const fDeuda = v => `$ ${formatBillingMoney(parseFloat(v || 0))}`;
 
     let html = '';
     organizaciones.forEach(org => {
@@ -98,7 +99,7 @@ function renderResultadosOrg(organizaciones, opts) {
             </div>`;
     });
 
-    container.innerHTML = html || `<div class="alert alert-info">${t.generales?.sin_resultados || 'No hay datos para el período y filtros seleccionados.'}</div>`;
+    container.innerHTML = html || `<div class="alert alert-info">${t.facturacion?.org_sin_resultados || 'No hay datos para el período y filtros seleccionados.'}</div>`;
 }
 
 function getDeptoReportLink(deptoId, opts) {

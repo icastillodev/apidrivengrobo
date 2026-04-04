@@ -218,7 +218,7 @@ export const UserPreferences = {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             UserPreferences.applyVoiceVisuals('error');
-            if(window.GeckoVoice) window.GeckoVoice.showErrorModal('not-allowed');
+            if (window.GeckoVoice) window.GeckoVoice.showErrorModal('no-api');
             return;
         }
 

@@ -1,5 +1,26 @@
 import { GeckoCommands } from './GeckoCommands.js';
-import { GeckoSearch } from './GeckoSearch.js'; 
+import { GeckoSearch } from './GeckoSearch.js';
+
+function transcriptHasWakeWord(text) {
+    const norm = String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    const tokens = norm.split(/[^a-z0-9]+/).filter(Boolean);
+    const set = new Set(tokens);
+    const pad = ` ${tokens.join(' ')} `;
+    return GeckoCommands.wakewords.some((w) => {
+        const ww = String(w)
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+        if (ww.length <= 3) {
+            return set.has(ww);
+        }
+        if (set.has(ww)) return true;
+        return tokens.some((t) => t.startsWith(ww) || t.includes(ww)) || pad.includes(` ${ww} `);
+    });
+}
 
 export const GeckoVoice = {
     recognition: null,
@@ -67,9 +88,8 @@ handleResult(event) {
 
         const textDetected = (final || interim).trim();
 
-        // 1. WAKEWORD "Gecko" (Despertar)
-        const detectedWake = GeckoCommands.wakewords.find(w => textDetected.includes(w));
-        if (detectedWake && !this.isListeningCommand) {
+        // 1. Palabra de activación (Gecko / Grobo y fonéticas)
+        if (transcriptHasWakeWord(textDetected) && !this.isListeningCommand) {
             this.startListening();
             return;
         }
@@ -85,11 +105,13 @@ handleResult(event) {
             // CUANDO EL USUARIO TERMINA DE HABLAR (isFinal)
             if (final.length > 0 && command.length > 0) {
                 console.log("🎤 Frase final capturada:", command);
-                
-                // Apagamos el micrófono
-                this.stop(); 
-                
-                // 🚀 ENVIAMOS EL TEXTO A LA IA (El Dispatcher)
+
+                this.stop();
+
+                if (this.tryHandleLocalVoiceCommand(command)) {
+                    return;
+                }
+
                 import('./GeckoAiDispatcher.js').then(module => {
                     module.GeckoAiDispatcher.sendCommand(command);
                 }).catch(err => console.error("Error cargando Dispatcher:", err));
@@ -102,7 +124,119 @@ handleResult(event) {
         // ... llamada a API de IA ...
     },
 
-    showUnsupportedBrowserModal() { 
-        alert("Navegador no compatible."); 
+    /**
+     * Comandos de voz sin llamar a la API (cerrar, siguiente, guardar…).
+     * @returns {boolean} true si ya se manejó el comando
+     */
+    tryHandleLocalVoiceCommand(command) {
+        const raw = String(command || '')
+            .replace(/[.,;:!?¿¡]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+        if (!raw) return false;
+
+        const modal = document.querySelector('.modal.show');
+
+        if (/^(cerrar|cierra|cerrá|salir|close|fechar|sair|cancelar)$/i.test(raw)) {
+            if (modal) {
+                const dismiss = modal.querySelector('[data-bs-dismiss="modal"], .btn-close');
+                if (dismiss) {
+                    dismiss.click();
+                    GeckoSearch.close();
+                    return true;
+                }
+            }
+            GeckoSearch.close();
+            return true;
+        }
+
+        if (/^(siguiente|próximo|proximo|next|continuar|continua|adelante|avançar)$/i.test(raw)) {
+            if (modal) {
+                const buttons = [...modal.querySelectorAll('button.btn-primary, button.btn-success, button.btn-info, a.btn-primary')];
+                const nextBtn = buttons.find(
+                    (b) =>
+                        !b.disabled &&
+                        /siguiente|next|próximo|proximo|continu|avançar|continuar|pr[oó]ximo/i.test(b.textContent || '')
+                );
+                if (nextBtn) {
+                    nextBtn.click();
+                    return true;
+                }
+                const activeTab = modal.querySelector('.nav-tabs .nav-link.active');
+                const sibling = activeTab && activeTab.nextElementSibling;
+                if (sibling && sibling.classList.contains('nav-link')) {
+                    sibling.click();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if (
+            /^(finalizar|terminar|guardar|enviar|listo|hecho|ok|aplicar|confirmar|save|submit|salvar|concluir)$/i.test(
+                raw
+            )
+        ) {
+            if (modal) {
+                const candidates = [...modal.querySelectorAll('button')];
+                const pick = candidates.find(
+                    (b) =>
+                        !b.disabled &&
+                        /guardar|enviar|aceptar|confirmar|finalizar|aplicar|salvar|save|submit|ok|listo|hecho|concluir/i.test(
+                            b.textContent || ''
+                        ) &&
+                        !b.matches('[data-bs-dismiss="modal"]') &&
+                        !b.matches('.btn-close')
+                );
+                if (pick) {
+                    pick.click();
+                    return true;
+                }
+                const sub = modal.querySelector('button[type="submit"]:not([disabled])');
+                if (sub) {
+                    sub.click();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return false;
+    },
+
+    showUnsupportedBrowserModal() {
+        const t = window.txt?.gecko_ai;
+        const title = t?.voice_firefox_title || window.txt?.generales?.error;
+        const text = t?.voice_firefox_text || 'Navegador no compatible.';
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title: title || 'GROBO', text, icon: 'info' });
+        } else if (window.Swal) {
+            window.Swal.fire({ title: title || 'GROBO', text, icon: 'info' });
+        } else {
+            alert(text);
+        }
+    },
+
+    /** @param {'no-api'|'not-allowed'} reason */
+    showErrorModal(reason) {
+        const t = window.txt?.gecko_ai;
+        const title = window.txt?.generales?.error || 'Error';
+        const text =
+            reason === 'no-api'
+                ? (t?.voice_no_api_text || t?.voice_mic_denied_text)
+                : t?.voice_mic_denied_text;
+        const finalText =
+            text ||
+            (reason === 'no-api'
+                ? 'Su navegador no admite reconocimiento de voz.'
+                : 'No se pudo usar el micrófono. Revise los permisos del sitio.');
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title, text: finalText, icon: 'warning' });
+        } else if (window.Swal) {
+            window.Swal.fire({ title, text: finalText, icon: 'warning' });
+        } else {
+            alert(finalText);
+        }
     }
 };
