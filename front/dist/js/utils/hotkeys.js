@@ -147,6 +147,7 @@ export const HotkeyManager = {
 
         const actions = {
             k: () => document.getElementById('btn-hotkeys-help')?.click(),
+            g: () => HotkeyManager.toggleSearch(),
             d: () => {
                 window.location.href = getCorrectPath(
                     usesAdminDashboard() ? 'admin/dashboard.html' : 'panel/dashboard.html'

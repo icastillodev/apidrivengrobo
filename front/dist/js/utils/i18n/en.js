@@ -51,7 +51,17 @@ export const en = {
         search_omni_placeholder: "Search or say “Gecko”…",
         kbd_search_combo: "Ctrl+G · Ctrl+K · Alt+G · ⌘G",
         search_omni_input_placeholder: "Type a command or say “Gecko” for voice…",
-        search_omni_voice_aria: "Turn microphone on or off in search"
+        search_omni_voice_aria: "Turn microphone on or off in search",
+        voice_train_aria: "Customize voice wake words",
+        voice_train_title: "Wake words (voice)",
+        voice_train_intro:
+            "Add up to 15 short words (one per line or comma-separated). They are normalized to plain letters and numbers so the app can treat them as triggers in addition to “Gecko” / “Grobo”.",
+        voice_train_placeholder: "e.g. labname pepito myunit",
+        voice_train_hint:
+            "Chrome and Edge may bias recognition using this list. Firefox does not apply that bias, but the words still wake the mic. Up to 15 terms, 2–32 characters each after normalization.",
+        voice_train_confirm: "Save",
+        voice_train_cancel: "Cancel",
+        voice_train_saved: "Saved. If the microphone was on, recognition was restarted."
     },
     hotkeys: {
         modal_title: "Keyboard shortcuts",

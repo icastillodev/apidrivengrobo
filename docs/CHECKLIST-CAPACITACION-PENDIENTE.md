@@ -46,6 +46,8 @@ Si el equipo pide trazabilidad, copiar una línea con fecha bajo esta lista o en
 |-------|----------------|
 | 2026-04 | Maestro largo archivado; facturación F7 código lotes 2–19; §12.4.1 y Uso rápido quedaron en el archivo archivado. |
 | 2026-04 | Checklist corto **§3 Glosarios** (intro `admin__usuarios`, `panel__misformularios`, es/en/pt) + **§4 Release / i18n** enlazado a maestro §12.1–§12.2 y §12.5; ajuste EN «organization» en glosario usuarios; `validate-cap-manual-parity` OK. |
+| 2026-04 | Manual `panel__perfil`: bloques atajos / Gecko Search / voz alineados con `hotkeys.js` y `GeckoSearch.js`; corrección **Alt+G** → `toggleSearch` en `hotkeys.js`; checklist IA/voz cuatro ítems [x], uno backlog voz. |
+| 2026-04 | **Voz:** palabras de activación personalizadas (`voiceWakePrefs.js`, modal en buscador Gecko), columna `personae.voice_wake_aliases`, `SpeechGrammarList` opcional; checklist IA/voz ítem entrenamiento [x]. Migración: `docs/migrations/20260412_personae_voice_wake_aliases.sql`. |
 
 ---
 

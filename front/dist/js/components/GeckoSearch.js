@@ -8,6 +8,7 @@ export const GeckoSearch = {
     input: null,
     results: null,
     voiceBtn: null,
+    voiceTrainBtn: null,
     aiMessageBox: null,
     selectedIndex: -1, // Índice para navegación por teclado
 
@@ -19,6 +20,7 @@ export const GeckoSearch = {
         this.input = document.getElementById('gecko-omni-input');
         this.results = document.getElementById('gecko-omni-results');
         this.voiceBtn = document.getElementById('gecko-omni-voice-btn');
+        this.voiceTrainBtn = document.getElementById('gecko-omni-voice-train-btn');
         this.aiMessageBox = document.getElementById('gecko-ai-message');
         
         // SECUESTRO DIRECTO DEL INPUT PARA EVENTOS DE TECLADO
@@ -36,6 +38,15 @@ export const GeckoSearch = {
                 } else {
                     GeckoVoice.startListening();
                 }
+            };
+        }
+
+        if (this.voiceTrainBtn) {
+            this.voiceTrainBtn.onclick = (e) => {
+                e.stopPropagation();
+                import('./GeckoVoicePrefsModal.js').then((m) =>
+                    m.openVoiceRefinementModal().catch((err) => console.error('voice prefs', err))
+                );
             };
         }
     },

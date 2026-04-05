@@ -111,6 +111,19 @@ export const translatePage = () => {
         }
     });
 
+    document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+        const path = el.getAttribute('data-i18n-title');
+        if (!path) return;
+        const keys = path.split('.');
+        let text = window.txt;
+        keys.forEach((key) => {
+            text = text ? text[key] : null;
+        });
+        if (text && typeof text === 'string') {
+            el.setAttribute('title', text.replace(/<[^>]*>/g, '').trim());
+        }
+    });
+
     applyPageTitle();
 };
 

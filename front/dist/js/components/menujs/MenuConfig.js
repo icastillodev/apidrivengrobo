@@ -2,6 +2,7 @@ import { API } from '../../api.js';
 import { Auth } from '../../auth.js';
 import { loadLanguage, translatePage } from '../../utils/i18n.js';
 import { mergeCapacitacionPrefsFromServer } from '../../utils/capacitacionTourPrefs.js';
+import { mergeVoiceWakeAliasesFromServer } from '../../utils/voiceWakePrefs.js';
 import {
   mergeNoticiasVistaFromServer,
   syncCapUiPrefsToBackend,
@@ -126,6 +127,7 @@ export const UserPreferences = {
                     if (dbConfig.menu_preferido) localStorage.setItem('menuLayout', dbConfig.menu_preferido);
                     if (dbConfig.gecko_ok !== null && dbConfig.gecko_ok !== "") localStorage.setItem('gecko_ok', dbConfig.gecko_ok);
                     mergeCapacitacionPrefsFromServer(dbConfig);
+                    mergeVoiceWakeAliasesFromServer(dbConfig);
                     mergeNoticiasVistaFromServer(dbConfig);
                     if (!sessionStorage.getItem('gecko_cap_ui_synced')) {
                         sessionStorage.setItem('gecko_cap_ui_synced', '1');
@@ -315,6 +317,7 @@ export const UserPreferences = {
         if (data.setupWizardDone !== undefined) payload.setupWizardDone = data.setupWizardDone ? 1 : 0;
         if (data.capAutoTourOff !== undefined) payload.capAutoTourOff = data.capAutoTourOff ? 1 : 0;
         if (data.capHelpFabHidden !== undefined) payload.capHelpFabHidden = data.capHelpFabHidden ? 1 : 0;
+        if (data.voiceWakeAliases !== undefined) payload.voiceWakeAliases = data.voiceWakeAliases;
 
         try {
             const res = await API.request('/user/config/update', 'POST', payload);

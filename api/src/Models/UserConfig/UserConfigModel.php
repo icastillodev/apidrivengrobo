@@ -11,7 +11,7 @@ class UserConfigModel {
     }
 
     public function getConfig($userId) {
-        $sql = "SELECT tema_preferido, idioma_preferido, letra_preferida, menu_preferido, gecko_ok,
+        $sql = "SELECT tema_preferido, idioma_preferido, letra_preferida, menu_preferido, gecko_ok, voice_wake_aliases,
                        setup_wizard_done, cap_auto_tour_off, cap_help_fab_hidden,
                        noticias_vista_hasta, cap_tours_state_json
                 FROM personae WHERE IdUsrA = ?";
@@ -29,6 +29,11 @@ public function updateConfig($userId, $data) {
         if (isset($data['fontSize'])) { $fields[] = "letra_preferida = ?"; $values[] = $data['fontSize']; }
         if (isset($data['menu'])) { $fields[] = "menu_preferido = ?"; $values[] = $data['menu']; }
         if (isset($data['gecko_ok'])) { $fields[] = "gecko_ok = ?"; $values[] = (int)$data['gecko_ok']; }
+        if (array_key_exists('voiceWakeAliases', $data)) {
+            $enc = self::sanitizeVoiceWakeAliasesJson($data['voiceWakeAliases']);
+            $fields[] = "voice_wake_aliases = ?";
+            $values[] = $enc;
+        }
         if (array_key_exists('setupWizardDone', $data)) {
             $fields[] = "setup_wizard_done = ?";
             $v = $data['setupWizardDone'];
@@ -76,5 +81,32 @@ public function updateConfig($userId, $data) {
         
         // Magia: Nos devuelve cuántas filas alteró realmente
         return $stmt->rowCount(); 
+    }
+
+    /**
+     * @param mixed $raw JSON string o array de strings (palabras de activación extra).
+     */
+    private static function sanitizeVoiceWakeAliasesJson($raw): string {
+        $arr = [];
+        if (is_string($raw)) {
+            $dec = json_decode($raw, true);
+            $arr = is_array($dec) ? $dec : [];
+        } elseif (is_array($raw)) {
+            $arr = $raw;
+        }
+        $out = [];
+        foreach (array_slice($arr, 0, 15) as $w) {
+            $s = strtolower(trim((string) $w));
+            $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+            if ($conv !== false) {
+                $s = $conv;
+            }
+            $s = preg_replace('/[^a-z0-9]+/', '', $s);
+            if (strlen($s) >= 2 && strlen($s) <= 32) {
+                $out[] = $s;
+            }
+        }
+        $out = array_values(array_unique($out));
+        return json_encode($out, JSON_UNESCAPED_UNICODE);
     }
 }

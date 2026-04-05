@@ -492,6 +492,24 @@ function getOmniBoxStyles() {
         }
         
         /* MICRÓFONO */
+        .gecko-omni-voice-train-btn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: #6c757d;
+            cursor: pointer;
+            transition: color 0.2s, background 0.2s;
+        }
+        .gecko-omni-voice-train-btn:hover { background: #f1f3f5; color: #1a5d3b; }
+        [data-bs-theme="dark"] .gecko-omni-voice-train-btn { color: #adb5bd; }
+        [data-bs-theme="dark"] .gecko-omni-voice-train-btn:hover { background: rgba(255,255,255,0.08); color: #86efac; }
+
         #gecko-omni-voice-btn {
             background: none; border: none; cursor: pointer; color: #adb5bd; transition: 0.2s; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
         }

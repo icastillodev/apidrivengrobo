@@ -51,7 +51,17 @@ export const pt = {
         search_omni_placeholder: "Pesquisar ou diga «Gecko»…",
         kbd_search_combo: "Ctrl+G · Ctrl+K · Alt+G · ⌘G",
         search_omni_input_placeholder: "Escreva um comando ou diga «Gecko» para voz…",
-        search_omni_voice_aria: "Ligar ou desligar microfone na pesquisa"
+        search_omni_voice_aria: "Ligar ou desligar microfone na pesquisa",
+        voice_train_aria: "Personalizar palavras de ativação por voz",
+        voice_train_title: "Palavras de ativação (voz)",
+        voice_train_intro:
+            "Acrescente até 15 palavras curtas (uma por linha ou separadas por vírgula). São normalizadas sem acentos e só com letras e números, para servir de gatilho além de «Gecko» / «Grobo».",
+        voice_train_placeholder: "Ex.: laboratorio pepito minhaunidade",
+        voice_train_hint:
+            "No Chrome e Edge o navegador pode usar esta lista para sesgar o reconhecimento. O Firefox não aplica esse viés, mas as palavras continuam a ativar o microfone. Máx. 15 termos, 2–32 caracteres cada um após normalizar.",
+        voice_train_confirm: "Guardar",
+        voice_train_cancel: "Cancelar",
+        voice_train_saved: "Preferências guardadas. Se o microfone estava ativo, o reconhecimento foi reiniciado."
     },
     hotkeys: {
         modal_title: "Atalhos de teclado",

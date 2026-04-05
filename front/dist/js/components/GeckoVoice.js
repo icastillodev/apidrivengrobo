@@ -1,5 +1,6 @@
 import { GeckoCommands } from './GeckoCommands.js';
 import { GeckoSearch } from './GeckoSearch.js';
+import { getEffectiveWakeWords, applyOptionalSpeechGrammar } from '../utils/voiceWakePrefs.js';
 
 function transcriptHasWakeWord(text) {
     const norm = String(text || '')
@@ -9,7 +10,7 @@ function transcriptHasWakeWord(text) {
     const tokens = norm.split(/[^a-z0-9]+/).filter(Boolean);
     const set = new Set(tokens);
     const pad = ` ${tokens.join(' ')} `;
-    return GeckoCommands.wakewords.some((w) => {
+    return getEffectiveWakeWords().some((w) => {
         const ww = String(w)
             .toLowerCase()
             .normalize('NFD')
@@ -39,6 +40,7 @@ export const GeckoVoice = {
             this.recognition.continuous = true;
             this.recognition.interimResults = true;
             this.recognition.lang = this.getLocale();
+            applyOptionalSpeechGrammar(this.recognition, getEffectiveWakeWords());
 
             this.recognition.onresult = (event) => this.handleResult(event);
             this.recognition.start();
@@ -77,6 +79,22 @@ export const GeckoVoice = {
         GeckoSearch.setListening(false);
     },
 
+    /** Tras cambiar palabras de activación: reinicia el reconocedor si el micrófono estaba activo. */
+    restartAfterWakePrefsChanged() {
+        const on = String(localStorage.getItem('gecko_ok')) === '1';
+        if (!on) return;
+        try {
+            this.recognition?.stop();
+        } catch (e) {
+            /* ignore */
+        }
+        this.isListeningCommand = false;
+        GeckoSearch.setListening(false);
+        setTimeout(() => {
+            this.init();
+        }, 120);
+    },
+
 handleResult(event) {
         let interim = "";
         let final = "";
@@ -97,7 +115,10 @@ handleResult(event) {
         // 2. PROCESAR COMANDO FINAL
         if (this.isListeningCommand) {
             let command = textDetected;
-            GeckoCommands.wakewords.forEach(w => { command = command.replace(w, '').trim(); });
+            getEffectiveWakeWords().forEach((w) => {
+                const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+                command = command.replace(re, '').trim();
+            });
             
             // Mostrar lo que va escuchando en el buscador (feedback visual)
             GeckoSearch.setInput(command); 
