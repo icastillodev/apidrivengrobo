@@ -20,6 +20,19 @@ class AuthModel {
     }
 
     /**
+     * Resolución inequívoca por PK (la que devuelve validate-inst en data.id).
+     */
+    public function getInstitucionById(int $id): ?array {
+        if ($id <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
      * Misma lógica que el login en PHP: NBSP→espacio, trim, colapsar \s+, minúsculas.
      * Público para reutilizar en AuthController.
      */

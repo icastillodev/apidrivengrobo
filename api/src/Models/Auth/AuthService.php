@@ -15,10 +15,22 @@ class AuthService {
         return $this->model->getInstitucionBySlug($slug);
     }
 
-public function authenticate($user, $pass, $slug) {
-        // 1. Validar contexto de la sede
+public function authenticate($user, $pass, $slug, ?int $clientInstId = null) {
+        // 1. Slug debe seguir siendo válido (URL / pantalla de login).
         $instContext = $this->model->getInstitucionBySlug($slug);
-        if (!$instContext) return ['status' => false, 'message' => 'Institución no válida'];
+        if (!$instContext) {
+            return ['status' => false, 'message' => 'Institución no válida'];
+        }
+
+        // 2. IdInstitucion que guardó validate-inst (data.id) alinea con usuarioe.IdInstitucion.
+        //    Si solo se usa LOWER(NombreInst)=slug puede haber ambigüedad; el id del cliente gana.
+        $cid = $clientInstId !== null ? (int) $clientInstId : 0;
+        if ($cid > 0) {
+            $byClient = $this->model->getInstitucionById($cid);
+            if ($byClient) {
+                $instContext = $byClient;
+            }
+        }
 
         $instId = (int) ($instContext['IdInstitucion'] ?? 0);
         if ($instId <= 0) {

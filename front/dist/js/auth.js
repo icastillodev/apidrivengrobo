@@ -32,13 +32,15 @@ const normalizeLoginUserInput = (raw) => {
 /** Mensajes de API de /login mapeados a i18n (window.txt.login). Usa `code` si viene en el JSON. */
 const translateLoginApiMessage = (message, code) => {
     const t = window.txt?.login || {};
-    const c = String(code ?? '').trim().toLowerCase();
-    const m = String(message ?? '').trim().toLowerCase();
-    if (c === 'usuario_no_en_institucion' || m === 'usuario_no_en_institucion') {
+    const c = String(code ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+    const m = String(message ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+    const isUserMissing = c === 'usuario_no_en_institucion' || m === 'usuario_no_en_institucion'
+        || c.includes('usuario_no_en_institucion') || m.includes('usuario_no_en_institucion');
+    if (isUserMissing) {
         return t.err_usuario_no_institucion
             || 'No hay una cuenta con ese usuario en esta institución. Revise el enlace de la sede o el nombre de usuario.';
     }
-    if (c === 'credenciales_incorrectas' || m === 'credenciales incorrectas') {
+    if (c === 'credenciales_incorrectas' || m === 'credenciales_incorrectas') {
         return t.err_credenciales || 'Credenciales incorrectas';
     }
     return (typeof message === 'string' && message.trim() !== '') ? message : 'Error desconocido';
@@ -217,10 +219,13 @@ async init() {
         const password = document.getElementById('password').value;
         const remember = document.getElementById('remember-me')?.checked || false;
 
+        const rawInstId = localStorage.getItem('instId') || sessionStorage.getItem('instId');
+        const parsedInstId = rawInstId != null && rawInstId !== '' ? parseInt(String(rawInstId), 10) : 0;
         const payload = {
             user: username,
             pass: password,
-            instSlug: this.slug || localStorage.getItem('NombreInst')
+            instSlug: this.slug || localStorage.getItem('NombreInst'),
+            ...(parsedInstId > 0 ? { instId: parsedInstId } : {}),
         };
 
         window.Swal.fire({

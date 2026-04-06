@@ -81,7 +81,8 @@ class AuthController {
         if ($data['instSlug'] === 'master' || $data['instSlug'] === 'superadmin') {
             $res = $this->service->attemptSuperAdminLogin($data['user'], $data['pass']);
         } else {
-            $res = $this->service->authenticate($data['user'], $data['pass'], $data['instSlug']);
+            $clientInstId = isset($data['instId']) ? (int) $data['instId'] : 0;
+            $res = $this->service->authenticate($data['user'], $data['pass'], $data['instSlug'], $clientInstId > 0 ? $clientInstId : null);
         }
 
         // 2. SI FALLA EL LOGIN, CASTIGAMOS A LA IP
