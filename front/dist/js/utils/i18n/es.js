@@ -1535,6 +1535,8 @@ export const es = {
         password: "Contraseña",
         recordar: "Recordar mi sesión",
         entrar: "Entrar al Sistema",
+        err_usuario_no_institucion: "No hay una cuenta con ese usuario en esta institución. Revise el enlace de la sede o el nombre de usuario.",
+        err_credenciales: "Usuario o contraseña incorrectos.",
         olvidaste: "¿Olvidaste tu contraseña? - ",
         no_cuenta: "¿No tienes cuenta?",
         registrate: "Regístrate",

@@ -1524,6 +1524,8 @@ alojamientos: {
         password: "Senha",
         recordar: "Lembrar minha sessão",
         entrar: "Entrar no Sistema",
+        err_usuario_no_institucion: "Não existe uma conta com esse usuário nesta instituição. Verifique o link da sede ou o nome de usuário.",
+        err_credenciales: "Usuário ou senha incorretos.",
         olvidaste: "Esqueceu sua senha? - ",
         no_cuenta: "Não tem conta?",
         registrate: "Cadastre-se",

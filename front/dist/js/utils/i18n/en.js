@@ -1523,6 +1523,8 @@ alojamientos: {
         password: "Password",
         recordar: "Remember my session",
         entrar: "Log in",
+        err_usuario_no_institucion: "There is no account with that username at this institution. Check the site link or the username.",
+        err_credenciales: "Incorrect username or password.",
         olvidaste: "Forgot your password? - ",
         no_cuenta: "Don't have an account?",
         registrate: "Sign up",

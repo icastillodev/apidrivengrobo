@@ -19,39 +19,80 @@ class AuthModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    public function getUserByUsername($username) {
-        // --- CORRECCIÓN CRÍTICA ---
-        // Cambiamos JOIN por LEFT JOIN en 'institucion'.
-        // Esto permite que el Superadmin (IdInstitucion=0) sea encontrado
-        // aunque el ID 0 no exista en la tabla de instituciones.
-        // Búsqueda case-insensitive: usuario se interpreta siempre en minúsculas.
-        $sql = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
+    /**
+     * Igual que en login: minúsculas, un solo espacio entre palabras (cuentas con espacios en UsrA).
+     */
+    private function normalizeLoginUsername(string $username): string {
+        $t = trim($username);
+        if ($t === '') {
+            return '';
+        }
+        $collapsed = preg_replace('/\s+/u', ' ', $t);
+        return strtolower($collapsed);
+    }
+
+    /**
+     * Login en contexto de sede: solo cuenta de esa institución o superadmin (rol 1) que entra desde la sede.
+     * Sin búsqueda global: evita homónimos y mensajes confusos de “credenciales incorrectas”.
+     *
+     * Comparación de UsrA con colapso de espacios (MariaDB / MySQL 8+ REGEXP_REPLACE).
+     *
+     * @return array|false
+     */
+    public function getUserByUsernameForInstitutionLogin(string $username, int $institucionId) {
+        if ($institucionId <= 0) {
+            return false;
+        }
+        $norm = $this->normalizeLoginUsername($username);
+        if ($norm === '') {
+            return false;
+        }
+
+        $userExpr = "LOWER(TRIM(REGEXP_REPLACE(TRIM(u.UsrA), '[[:space:]]+', ' ')))";
+        $select = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
                 FROM usuarioe u
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
-                LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
-                WHERE LOWER(TRIM(u.UsrA)) = LOWER(TRIM(?))";
+                LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA";
 
+        $sql = "$select WHERE $userExpr = ? AND u.IdInstitucion = ? LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$username]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->execute([$norm, $institucionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            return $row;
+        }
+
+        $sql = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
+                FROM usuarioe u
+                LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
+                INNER JOIN tienetipor t ON u.IdUsrA = t.IdUsrA AND t.IdTipousrA = 1
+                LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
+                WHERE $userExpr = ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$norm]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: false;
     }
 
 public function getSuperAdminByUsername($username) {
-    // CORRECCIÓN: Quitamos validaciones extrañas, solo usuario y rol 1
-    // Búsqueda case-insensitive para coincidir con login en minúsculas.
+    $norm = $this->normalizeLoginUsername((string) $username);
+    if ($norm === '') {
+        return false;
+    }
+    $userExpr = "LOWER(TRIM(REGEXP_REPLACE(TRIM(u.UsrA), '[[:space:]]+', ' ')))";
     $sql = "SELECT u.IdUsrA, u.UsrA, u.password_secure, t.IdTipousrA as role,
-                   COALESCE(p.EmailA, 'admin@admin.com') as EmailA, -- Fallback si no tiene mail
+                   COALESCE(p.EmailA, 'admin@admin.com') as EmailA,
                    COALESCE(p.NombreA, 'Super') as NombreA,
                    COALESCE(p.ApellidoA, 'Admin') as ApellidoA
             FROM usuarioe u
             JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
             LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
-            WHERE LOWER(TRIM(u.UsrA)) = LOWER(TRIM(?)) AND t.IdTipousrA = 1
+            WHERE $userExpr = ? AND t.IdTipousrA = 1
             LIMIT 1";
 
     $stmt = $this->db->prepare($sql);
-    $stmt->execute([$username]);
+    $stmt->execute([$norm]);
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 

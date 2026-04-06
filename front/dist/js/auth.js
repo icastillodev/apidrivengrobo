@@ -22,6 +22,19 @@ const shouldShowFullName = (short, full) => {
     return full.toLowerCase().trim() !== short.toLowerCase().trim();
 };
 
+/** Mensajes de API de /login mapeados a i18n (window.txt.login). */
+const translateLoginApiMessage = (message) => {
+    const t = window.txt?.login || {};
+    if (message === 'usuario_no_en_institucion') {
+        return t.err_usuario_no_institucion
+            || 'No hay una cuenta con ese usuario en esta institución. Revise el enlace de la sede o el nombre de usuario.';
+    }
+    if (message === 'Credenciales incorrectas') {
+        return t.err_credenciales || message;
+    }
+    return message || 'Error desconocido';
+};
+
 export const Auth = {
     slug: null,
     tempRemember: false,
@@ -236,9 +249,9 @@ async init() {
                 });
             } else {
                 window.Swal.close();
-                if (box) { 
-                    box.innerText = (res.message || 'Error desconocido').toUpperCase(); 
-                    box.classList.remove('hidden'); 
+                if (box) {
+                    box.innerText = translateLoginApiMessage(res.message).toUpperCase();
+                    box.classList.remove('hidden');
                 }
             }
         } catch (err) { 

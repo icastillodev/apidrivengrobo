@@ -20,10 +20,17 @@ public function authenticate($user, $pass, $slug) {
         $instContext = $this->model->getInstitucionBySlug($slug);
         if (!$instContext) return ['status' => false, 'message' => 'Institución no válida'];
 
-        $userData = $this->model->getUserByUsername($user);
-        
-        // 2. Verificación de credenciales
-        if (!$userData || !password_verify($pass, $userData['password_secure'])) {
+        $instId = (int) ($instContext['IdInstitucion'] ?? 0);
+        if ($instId <= 0) {
+            return ['status' => false, 'message' => 'Institución no válida'];
+        }
+
+        $userData = $this->model->getUserByUsernameForInstitutionLogin((string) $user, $instId);
+        if (!$userData) {
+            return ['status' => false, 'message' => 'usuario_no_en_institucion'];
+        }
+
+        if (!password_verify($pass, $userData['password_secure'])) {
             return ['status' => false, 'message' => 'Credenciales incorrectas'];
         }
 
