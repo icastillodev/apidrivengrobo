@@ -503,7 +503,7 @@ class UserController {
             $data['EmailA'] = strtolower(trim($data['EmailA']));
         }
         if (isset($data['usuario']) && is_string($data['usuario'])) {
-            $data['usuario'] = strtolower(trim(preg_replace('/\s+/', '', $data['usuario'])));
+            $data['usuario'] = trim($data['usuario']);
         }
 
         $res = $this->model->registerUser($data);
@@ -554,12 +554,17 @@ class UserController {
     public function checkUsername() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
-        $user = isset($_GET['user']) && is_string($_GET['user']) ? strtolower(trim(preg_replace('/\s+/', '', $_GET['user']))) : '';
+        $raw = isset($_GET['user']) && is_string($_GET['user']) ? trim($_GET['user']) : '';
         $instId = isset($_GET['instId']) ? (int) $_GET['instId'] : 0;
         if ($instId <= 0) {
             echo json_encode(['available' => false, 'message' => 'institution_required']);
             exit;
         }
+        if ($raw !== '' && preg_match('/\s/u', $raw)) {
+            echo json_encode(['available' => false, 'message' => 'usuario_sin_espacios']);
+            exit;
+        }
+        $user = strtolower($raw);
         if ($user !== '' && !$this->model->isValidUsernameFormat($user)) {
             echo json_encode(['available' => false, 'message' => 'username_invalid']);
             exit;

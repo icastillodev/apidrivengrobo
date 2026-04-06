@@ -92,9 +92,21 @@ public function getAllGlobal() {
      *
      * @param string|int|null $excludeId IdUsrA a excluir (edición)
      */
+    /**
+     * Login guardado en UsrA tal cual (puede incluir espacios en cuentas antiguas).
+     */
+    public function getUsernameById(int $idUsrA): ?string {
+        if ($idUsrA <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT UsrA FROM usuarioe WHERE IdUsrA = ? LIMIT 1');
+        $stmt->execute([$idUsrA]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (string) $row['UsrA'] : null;
+    }
+
     public function existsUsernameInInstitution($username, int $instId, $excludeId = null): bool {
         $username = strtolower(trim((string) $username));
-        $username = preg_replace('/\s+/', '', $username);
         if ($username === '' || $instId <= 0) {
             return false;
         }

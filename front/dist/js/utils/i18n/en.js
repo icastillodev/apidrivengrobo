@@ -3660,6 +3660,7 @@ alojamientos: {
         user_available: "Available",
         user_taken_same_inst: "Already in use at this institution",
         username_invalid: "Lowercase letters, numbers, hyphen and underscore only (3–64). No spaces.",
+        usuario_sin_espacios: "Spaces are not allowed in the username.",
         save_error_username: "Fix the username before saving.",
         institution_required_validation: "Select an institution.",
         btn_eliminacion_total: "Full deletion",

@@ -47,7 +47,14 @@ public function list() {
             Auditoria::getDatosSesion(); // Valida Token
 
             $instId = (int) ($data['IdInstitucion'] ?? 0);
-            $userNorm = strtolower(trim(preg_replace('/\s+/', '', (string) ($data['UsrA'] ?? ''))));
+            $raw = trim((string) ($data['UsrA'] ?? ''));
+            if ($raw !== '' && preg_match('/\s/u', $raw)) {
+                return $this->jsonOut([
+                    'status' => 'error',
+                    'message' => 'usuario_sin_espacios',
+                ], 400);
+            }
+            $userNorm = strtolower($raw);
             $userRules = new UserModel($this->db);
             if (!$userRules->isValidUsernameFormat($userNorm)) {
                 return $this->jsonOut([
@@ -82,20 +89,36 @@ public function list() {
         $id = $_GET['id'] ?? null;
         try {
             Auditoria::getDatosSesion(); // Valida Token
-            $userNorm = strtolower(trim(preg_replace('/\s+/', '', (string) ($data['UsrA'] ?? ''))));
+            $raw = trim((string) ($data['UsrA'] ?? ''));
             $instId = (int) ($data['IdInstitucion'] ?? 0);
             $userRules = new UserModel($this->db);
-            if (!$userRules->isValidUsernameFormat($userNorm)) {
-                return $this->jsonOut(['status' => 'error', 'message' => 'username_invalid'], 400);
+            $idInt = (int) $id;
+            if ($idInt <= 0) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'ID inválido.'], 400);
+            }
+            $currentUsr = $this->model->getUsernameById($idInt);
+            if ($currentUsr === null) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Usuario no encontrado.'], 404);
+            }
+            if (preg_match('/\s/u', $raw)) {
+                if (strtolower($raw) !== strtolower(trim($currentUsr))) {
+                    return $this->jsonOut(['status' => 'error', 'message' => 'usuario_sin_espacios'], 400);
+                }
+                $userNorm = strtolower($raw);
+            } else {
+                $userNorm = strtolower($raw);
+                if (!$userRules->isValidUsernameFormat($userNorm)) {
+                    return $this->jsonOut(['status' => 'error', 'message' => 'username_invalid'], 400);
+                }
             }
             if ($instId <= 0) {
                 return $this->jsonOut(['status' => 'error', 'message' => 'Institución inválida.'], 400);
             }
-            if ($this->model->existsUsernameInInstitution($userNorm, $instId, $id)) {
+            if ($this->model->existsUsernameInInstitution($userNorm, $instId, $idInt)) {
                 return $this->jsonOut(['status' => 'error', 'message' => 'username_duplicate_institution'], 400);
             }
             $data['UsrA'] = $userNorm;
-            $this->model->updateGlobal($id, $data);
+            $this->model->updateGlobal($idInt, $data);
             $this->jsonOut(['status' => 'success']);
         } catch (\Exception $e) {
             $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
@@ -117,7 +140,7 @@ public function list() {
         if (ob_get_length()) ob_clean(); 
         header('Content-Type: application/json');
 
-        $username = strtolower(trim(preg_replace('/\s+/', '', (string) ($_GET['user'] ?? ''))));
+        $raw = trim((string) ($_GET['user'] ?? ''));
         $excludeId = $_GET['exclude'] ?? null;
         $instId = isset($_GET['instId']) ? (int) $_GET['instId'] : 0;
 
@@ -126,6 +149,19 @@ public function list() {
                 echo json_encode(['available' => false, 'message' => 'institution_required']);
                 exit;
             }
+            if ($raw !== '' && preg_match('/\s/u', $raw)) {
+                $ex = ($excludeId !== null && $excludeId !== '' && $excludeId !== 'undefined') ? (int) $excludeId : 0;
+                if ($ex > 0) {
+                    $current = $this->model->getUsernameById($ex);
+                    if ($current !== null && strtolower($raw) === strtolower(trim($current))) {
+                        echo json_encode(['available' => true]);
+                        exit;
+                    }
+                }
+                echo json_encode(['available' => false, 'message' => 'usuario_sin_espacios']);
+                exit;
+            }
+            $username = strtolower($raw);
             $userRules = new UserModel($this->db);
             if ($username !== '' && !$userRules->isValidUsernameFormat($username)) {
                 echo json_encode(['available' => false, 'message' => 'username_invalid']);

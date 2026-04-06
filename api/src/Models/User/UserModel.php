@@ -86,8 +86,12 @@ class UserModel {
                 return ['status' => false, 'message' => 'email_duplicate_institution'];
             }
 
-            $usuario = is_string($data['usuario'] ?? '') ? strtolower(trim($data['usuario'])) : '';
-            $usuario = preg_replace('/\s+/', '', $usuario);
+            $usuario = is_string($data['usuario'] ?? '') ? trim($data['usuario']) : '';
+            if ($usuario !== '' && preg_match('/\s/u', $usuario)) {
+                $this->db->rollBack();
+                return ['status' => false, 'message' => 'usuario_sin_espacios'];
+            }
+            $usuario = strtolower($usuario);
             if (!$this->isValidUsernameFormat($usuario)) {
                 $this->db->rollBack();
                 return ['status' => false, 'message' => 'username_invalid'];

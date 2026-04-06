@@ -3661,6 +3661,7 @@ alojamientos: {
         user_available: "Disponível",
         user_taken_same_inst: "Já está em uso nesta instituição",
         username_invalid: "Apenas minúsculas, números, hífen e sublinhado (3–64). Sem espaços.",
+        usuario_sin_espacios: "Não são permitidos espaços no nome de usuário.",
         save_error_username: "Corrija o nome de usuário antes de guardar.",
         institution_required_validation: "Selecione uma instituição.",
         btn_eliminacion_total: "Eliminação total",

@@ -7,6 +7,8 @@ let modalUser;
 let modalDeleteFull;
 let deletePreviewUserId = null;
 let deletePreviewData = null;
+/** UsrA al abrir el modal en edición (cuentas legadas con espacios). */
+let modalOriginalUsrA = '';
 
 function getRolesMap() {
     const t = window.txt?.superadmin_usuarios_global;
@@ -148,6 +150,7 @@ function renderPagination(totalRows) {
 // --- ACCIONES MODAL ---
 
 window.abrirModalCrear = () => {
+    modalOriginalUsrA = '';
     document.getElementById('form-user').reset();
     document.getElementById('IdUsrA').value = "";
     document.getElementById('hint-pass').classList.remove('d-none');
@@ -160,6 +163,7 @@ window.abrirModalEditar = (id) => {
     const u = allUsers.find(user => user.IdUsrA == id);
     if (!u) return;
 
+    modalOriginalUsrA = u.UsrA || '';
     // Asignamos el nombre de usuario al campo del modal
     document.getElementById('UsrA').value = u.UsrA || "";
     
@@ -186,7 +190,16 @@ window.guardarUsuario = async () => {
     }
 
     const id = document.getElementById('IdUsrA').value;
-    const usrNorm = (userInput.value || '').replace(/\s+/g, '').trim().toLowerCase();
+    const raw = (userInput.value || '').trim();
+    if (/\s/.test(raw)) {
+        if (!id) {
+            return (window.mostrarNotificacion || alert)(t.usuario_sin_espacios || 'No se permiten espacios en el nombre de usuario.');
+        }
+        if (raw.toLowerCase() !== (modalOriginalUsrA || '').trim().toLowerCase()) {
+            return (window.mostrarNotificacion || alert)(t.usuario_sin_espacios || 'No se permiten espacios en el nombre de usuario.');
+        }
+    }
+    const usrNorm = raw.toLowerCase();
     userInput.value = usrNorm;
     const data = {
         UsrA: usrNorm,
@@ -211,6 +224,8 @@ window.guardarUsuario = async () => {
             msg = t.user_taken_same_inst || msg;
         } else if (msg === 'username_invalid') {
             msg = t.username_invalid || msg;
+        } else if (msg === 'usuario_sin_espacios') {
+            msg = t.usuario_sin_espacios || msg;
         }
         (window.mostrarNotificacion || alert)(msg);
     }
@@ -360,10 +375,11 @@ let debounceTimer;
 
 document.getElementById('UsrA').addEventListener('input', function() {
     const t = window.txt?.superadmin_usuarios_global || {};
-    let username = (this.value || '').replace(/\s+/g, '').toLowerCase();
-    if (this.value !== username) {
-        this.value = username;
+    const lower = (this.value || '').toLowerCase();
+    if (this.value !== lower) {
+        this.value = lower;
     }
+    const username = this.value;
     const feedback = document.getElementById('user-feedback');
     const icon = document.getElementById('user-status-icon');
     const input = this;
@@ -373,7 +389,7 @@ document.getElementById('UsrA').addEventListener('input', function() {
     input.classList.remove('is-invalid', 'is-valid');
     icon.classList.add('d-none');
 
-    if (username.length < 3) return;
+    if (username.trim().length < 3) return;
 
     const instId = document.getElementById('IdInstitucion').value;
     if (!instId) {
@@ -396,6 +412,12 @@ document.getElementById('UsrA').addEventListener('input', function() {
             if (res.message === 'username_invalid') {
                 input.classList.add('is-invalid');
                 feedback.innerText = '❌ ' + (t.username_invalid || 'Formato inválido');
+                feedback.className = 'form-text smaller fw-bold mt-1 text-danger';
+                return;
+            }
+            if (res.message === 'usuario_sin_espacios') {
+                input.classList.add('is-invalid');
+                feedback.innerText = '❌ ' + (t.usuario_sin_espacios || 'No se permiten espacios en el usuario.');
                 feedback.className = 'form-text smaller fw-bold mt-1 text-danger';
                 return;
             }

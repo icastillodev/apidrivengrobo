@@ -98,6 +98,14 @@ export async function initRegistro() {
                 }
                 errEl?.classList.remove('hidden');
                 okEl?.classList.add('hidden');
+            } else if (res.message === 'usuario_sin_espacios') {
+                isUserValid = false;
+                if (errEl) {
+                    errEl.textContent = tReg.usuario_sin_espacios
+                        || 'No se permiten espacios en el nombre de usuario.';
+                }
+                errEl?.classList.remove('hidden');
+                okEl?.classList.add('hidden');
             } else {
                 isUserValid = res.available === true;
                 if (errEl) {
@@ -203,6 +211,8 @@ export async function initRegistro() {
                     msg = t.username_duplicate_institution;
                 } else if (res.message === 'username_invalid' && t.username_invalid) {
                     msg = t.username_invalid;
+                } else if (res.message === 'usuario_sin_espacios' && t.usuario_sin_espacios) {
+                    msg = t.usuario_sin_espacios;
                 }
                 Swal.fire(t.swal_error || "Error", msg, "error");
             }

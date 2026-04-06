@@ -3672,6 +3672,7 @@ export const es = {
         user_available: "Disponible",
         user_taken_same_inst: "Ya está en uso en esa institución",
         username_invalid: "Solo minúsculas, números, guión y guión bajo (3–64). Sin espacios.",
+        usuario_sin_espacios: "No se permiten espacios en el nombre de usuario.",
         save_error_username: "Corrija el nombre de usuario antes de guardar.",
         institution_required_validation: "Seleccione una institución.",
         btn_eliminacion_total: "Eliminación total",
