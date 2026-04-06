@@ -41,21 +41,34 @@ class AuthModel {
         if ($t === '') {
             return '';
         }
-        return strtolower(preg_replace('/\s+/u', ' ', $t));
+        $collapsed = preg_replace('/\s+/u', ' ', $t);
+
+        return function_exists('mb_strtolower')
+            ? mb_strtolower($collapsed, 'UTF-8')
+            : strtolower($collapsed);
     }
 
     /**
-     * Expresión SQL alineada con normalizeForLogin: sin REGEXP_REPLACE (MySQL 5.7 / MariaDB antiguos).
-     * Colapsa espacios dobles por repetición y trata NBSP UTF-8 (0xC2A0).
+     * Solo para login: minúsculas y quitar todo espacio en blanco (equivale a normalizeForLogin + sin espacios).
+     * Así "Diana Matich", "Diana  Matich" o "DianaMatich" en usuarioe coinciden con lo que escribe la persona.
      */
-    private function sqlLoginUsrNormalizedExpr(string $alias = 'u'): string {
-        $c = "TRIM({$alias}.UsrA)";
-        $x = "REPLACE(REPLACE(REPLACE(REPLACE($c, UNHEX('C2A0'), ' '), CHAR(9), ' '), CHAR(10), ' '), CHAR(13), ' ')";
-        $x = "LOWER($x)";
-        for ($i = 0; $i < 16; $i++) {
-            $x = "REPLACE($x, '  ', ' ')";
+    public static function compactForLoginMatch(string $username): string {
+        $norm = self::normalizeForLogin($username);
+        if ($norm === '') {
+            return '';
         }
-        return "TRIM($x)";
+        return str_replace(' ', '', $norm);
+    }
+
+    /**
+     * Expresión SQL paralela a compactForLoginMatch: LOWER(TRIM(UsrA)), quita NBSP/tab/saltos y luego todos los espacios.
+     */
+    private function sqlLoginUsrCompactExpr(string $alias = 'u'): string {
+        $x = "TRIM({$alias}.UsrA)";
+        $x = "LOWER($x)";
+        $x = "REPLACE(REPLACE(REPLACE(REPLACE($x, UNHEX('C2A0'), ''), CHAR(9), ''), CHAR(10), ''), CHAR(13), '')";
+
+        return "REPLACE($x, ' ', '')";
     }
 
     /**
@@ -69,12 +82,12 @@ class AuthModel {
         if ($institucionId <= 0) {
             return false;
         }
-        $norm = self::normalizeForLogin($username);
-        if ($norm === '') {
+        $compact = self::compactForLoginMatch($username);
+        if ($compact === '') {
             return false;
         }
 
-        $userExpr = $this->sqlLoginUsrNormalizedExpr('u');
+        $userExpr = $this->sqlLoginUsrCompactExpr('u');
         $select = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
                 FROM usuarioe u
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
@@ -83,7 +96,7 @@ class AuthModel {
 
         $sql = "$select WHERE $userExpr = ? AND u.IdInstitucion = ? LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$norm, $institucionId]);
+        $stmt->execute([$compact, $institucionId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
             return $row;
@@ -97,16 +110,16 @@ class AuthModel {
                 WHERE $userExpr = ?
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$norm]);
+        $stmt->execute([$compact]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: false;
     }
 
 public function getSuperAdminByUsername($username) {
-    $norm = self::normalizeForLogin((string) $username);
-    if ($norm === '') {
+    $compact = self::compactForLoginMatch((string) $username);
+    if ($compact === '') {
         return false;
     }
-    $userExpr = $this->sqlLoginUsrNormalizedExpr('u');
+    $userExpr = $this->sqlLoginUsrCompactExpr('u');
     $sql = "SELECT u.IdUsrA, u.UsrA, u.password_secure, t.IdTipousrA as role,
                    COALESCE(p.EmailA, 'admin@admin.com') as EmailA,
                    COALESCE(p.NombreA, 'Super') as NombreA,
@@ -118,7 +131,7 @@ public function getSuperAdminByUsername($username) {
             LIMIT 1";
 
     $stmt = $this->db->prepare($sql);
-    $stmt->execute([$norm]);
+    $stmt->execute([$compact]);
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
