@@ -87,7 +87,11 @@ class AuthController {
         // 2. SI FALLA EL LOGIN, CASTIGAMOS A LA IP
         if (!$res['status']) {
             $this->model->recordFailedLogin($ip); // Sumamos 1 intento fallido
-            echo json_encode(['status' => 'error', 'message' => $res['message']]);
+            $out = ['status' => 'error', 'message' => $res['message']];
+            if (!empty($res['code'])) {
+                $out['code'] = $res['code'];
+            }
+            echo json_encode($out);
             exit;
         }
 

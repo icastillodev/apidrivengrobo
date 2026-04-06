@@ -27,11 +27,19 @@ public function authenticate($user, $pass, $slug) {
 
         $userData = $this->model->getUserByUsernameForInstitutionLogin((string) $user, $instId);
         if (!$userData) {
-            return ['status' => false, 'message' => 'usuario_no_en_institucion'];
+            return [
+                'status' => false,
+                'code' => 'usuario_no_en_institucion',
+                'message' => 'usuario_no_en_institucion',
+            ];
         }
 
         if (!password_verify($pass, $userData['password_secure'])) {
-            return ['status' => false, 'message' => 'Credenciales incorrectas'];
+            return [
+                'status' => false,
+                'code' => 'credenciales_incorrectas',
+                'message' => 'Credenciales incorrectas',
+            ];
         }
 
         // 3. REGLA MAESTRA: Superadmin (Rol 1)

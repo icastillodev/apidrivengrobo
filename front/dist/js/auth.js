@@ -22,17 +22,19 @@ const shouldShowFullName = (short, full) => {
     return full.toLowerCase().trim() !== short.toLowerCase().trim();
 };
 
-/** Mensajes de API de /login mapeados a i18n (window.txt.login). */
-const translateLoginApiMessage = (message) => {
+/** Mensajes de API de /login mapeados a i18n (window.txt.login). Usa `code` si viene en el JSON. */
+const translateLoginApiMessage = (message, code) => {
     const t = window.txt?.login || {};
-    if (message === 'usuario_no_en_institucion') {
+    const c = String(code ?? '').trim().toLowerCase();
+    const m = String(message ?? '').trim().toLowerCase();
+    if (c === 'usuario_no_en_institucion' || m === 'usuario_no_en_institucion') {
         return t.err_usuario_no_institucion
             || 'No hay una cuenta con ese usuario en esta institución. Revise el enlace de la sede o el nombre de usuario.';
     }
-    if (message === 'Credenciales incorrectas') {
-        return t.err_credenciales || message;
+    if (c === 'credenciales_incorrectas' || m === 'credenciales incorrectas') {
+        return t.err_credenciales || 'Credenciales incorrectas';
     }
-    return message || 'Error desconocido';
+    return (typeof message === 'string' && message.trim() !== '') ? message : 'Error desconocido';
 };
 
 export const Auth = {
@@ -250,7 +252,8 @@ async init() {
             } else {
                 window.Swal.close();
                 if (box) {
-                    box.innerText = translateLoginApiMessage(res.message).toUpperCase();
+                    // El contenedor suele llevar clase CSS `uppercase`; no duplicar toUpperCase() en JS.
+                    box.innerText = translateLoginApiMessage(res.message, res.code);
                     box.classList.remove('hidden');
                 }
             }
