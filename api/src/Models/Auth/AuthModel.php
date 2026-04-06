@@ -20,22 +20,35 @@ class AuthModel {
     }
 
     /**
-     * Igual que en login: minúsculas, un solo espacio entre palabras (cuentas con espacios en UsrA).
+     * Misma lógica que el login en PHP: NBSP→espacio, trim, colapsar \s+, minúsculas.
+     * Público para reutilizar en AuthController.
      */
-    private function normalizeLoginUsername(string $username): string {
-        $t = trim($username);
+    public static function normalizeForLogin(string $username): string {
+        $t = trim(str_replace("\xc2\xa0", ' ', $username));
         if ($t === '') {
             return '';
         }
-        $collapsed = preg_replace('/\s+/u', ' ', $t);
-        return strtolower($collapsed);
+        return strtolower(preg_replace('/\s+/u', ' ', $t));
     }
 
     /**
-     * Login en contexto de sede: solo cuenta de esa institución o superadmin (rol 1) que entra desde la sede.
-     * Sin búsqueda global: evita homónimos y mensajes confusos de “credenciales incorrectas”.
-     *
-     * Comparación de UsrA con colapso de espacios (MariaDB / MySQL 8+ REGEXP_REPLACE).
+     * Expresión SQL alineada con normalizeForLogin: sin REGEXP_REPLACE (MySQL 5.7 / MariaDB antiguos).
+     * Colapsa espacios dobles por repetición y trata NBSP UTF-8 (0xC2A0).
+     */
+    private function sqlLoginUsrNormalizedExpr(string $alias = 'u'): string {
+        $c = "TRIM({$alias}.UsrA)";
+        $x = "REPLACE(REPLACE(REPLACE(REPLACE($c, UNHEX('C2A0'), ' '), CHAR(9), ' '), CHAR(10), ' '), CHAR(13), ' ')";
+        $x = "LOWER($x)";
+        for ($i = 0; $i < 16; $i++) {
+            $x = "REPLACE($x, '  ', ' ')";
+        }
+        return "TRIM($x)";
+    }
+
+    /**
+     * Login en contexto de sede: fila de usuarioe con ese UsrA normalizado en ESTA IdInstitucion
+     * (el mismo texto de login puede repetirse en otras sedes: cada una tiene su hash de contraseña).
+     * Luego superadmin (rol 1) entrando desde la sede.
      *
      * @return array|false
      */
@@ -43,12 +56,12 @@ class AuthModel {
         if ($institucionId <= 0) {
             return false;
         }
-        $norm = $this->normalizeLoginUsername($username);
+        $norm = self::normalizeForLogin($username);
         if ($norm === '') {
             return false;
         }
 
-        $userExpr = "LOWER(TRIM(REGEXP_REPLACE(TRIM(u.UsrA), '[[:space:]]+', ' ')))";
+        $userExpr = $this->sqlLoginUsrNormalizedExpr('u');
         $select = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
                 FROM usuarioe u
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
@@ -76,11 +89,11 @@ class AuthModel {
     }
 
 public function getSuperAdminByUsername($username) {
-    $norm = $this->normalizeLoginUsername((string) $username);
+    $norm = self::normalizeForLogin((string) $username);
     if ($norm === '') {
         return false;
     }
-    $userExpr = "LOWER(TRIM(REGEXP_REPLACE(TRIM(u.UsrA), '[[:space:]]+', ' ')))";
+    $userExpr = $this->sqlLoginUsrNormalizedExpr('u');
     $sql = "SELECT u.IdUsrA, u.UsrA, u.password_secure, t.IdTipousrA as role,
                    COALESCE(p.EmailA, 'admin@admin.com') as EmailA,
                    COALESCE(p.NombreA, 'Super') as NombreA,

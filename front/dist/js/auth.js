@@ -22,6 +22,13 @@ const shouldShowFullName = (short, full) => {
     return full.toLowerCase().trim() !== short.toLowerCase().trim();
 };
 
+/** Alineado con AuthModel::normalizeForLogin (NBSP, colapso de espacios, minúsculas). */
+const normalizeLoginUserInput = (raw) => {
+    const s = String(raw ?? '').replace(/\u00A0/g, ' ').trim();
+    if (!s) return '';
+    return s.replace(/\s+/g, ' ').toLowerCase();
+};
+
 /** Mensajes de API de /login mapeados a i18n (window.txt.login). Usa `code` si viene en el JSON. */
 const translateLoginApiMessage = (message, code) => {
     const t = window.txt?.login || {};
@@ -206,7 +213,7 @@ async init() {
         const box = document.getElementById('msg-alert');
         if (box) box.classList.add('hidden');
 
-        const username = (document.getElementById('username').value || '').trim().toLowerCase();
+        const username = normalizeLoginUserInput(document.getElementById('username').value);
         const password = document.getElementById('password').value;
         const remember = document.getElementById('remember-me')?.checked || false;
 

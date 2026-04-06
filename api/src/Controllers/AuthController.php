@@ -72,9 +72,9 @@ class AuthController {
             echo json_encode(['status' => 'error', 'message' => 'Datos incompletos']);
             exit;
         }
-        // Solo bordes + minúsculas: los usuarios históricos con espacios en UsrA deben poder iniciar sesión.
+        // Misma normalización que AuthModel::normalizeForLogin (espacios/NBSP/colapso).
         $data['user'] = is_string($data['user'])
-            ? strtolower(trim($data['user']))
+            ? AuthModel::normalizeForLogin($data['user'])
             : $data['user'];
 
         // Determinar qué tipo de validación hacer según el Slug
