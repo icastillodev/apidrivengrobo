@@ -50,6 +50,19 @@ export function pathnameToMenuPath(pathname) {
     return 'panel/perfil';
   }
 
+  /**
+   * Investigadores y admins usan carpetas distintas bajo paginas/ (panel/ vs usuario/) pero el menú
+   * y capacitación usan rutas tipo panel/… o admin/…. Sin esto, la barra de ayuda y el tour no
+   * aparecen en usuario/misalojamientos, usuario/dashboard, etc.
+   */
+  if (/^usuario\/misalojamientos$/i.test(rel)) return 'panel/misalojamientos';
+  if (/^usuario\/misreservas$/i.test(rel)) return 'panel/misreservas';
+  if (/^usuario\/misformularios$/i.test(rel)) return 'panel/misformularios';
+  if (/^usuario\/dashboard$/i.test(rel)) {
+    const r = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    return [1, 2, 4].includes(r) ? 'admin/dashboard' : 'panel/dashboard';
+  }
+
   /** Misma página `panel/capacitacion`: el hash distingue el tema RED para tour y barra contextual. */
   if (/^panel\/capacitacion$/i.test(rel) && typeof window !== 'undefined' && window.location?.hash) {
     const hm = window.location.hash.match(/[#&]t=([^&]+)/);
@@ -64,6 +77,16 @@ export function pathnameToMenuPath(pathname) {
   }
 
   return rel;
+}
+
+/**
+ * Solo el dashboard (admin o panel) debe disparar el asistente de primera configuración.
+ * @param {string|null} menuPath resultado de pathnameToMenuPath
+ */
+export function isDashboardMenuPath(menuPath) {
+  if (!menuPath) return false;
+  const s = String(menuPath).toLowerCase();
+  return s === 'admin/dashboard' || s === 'panel/dashboard';
 }
 
 /**

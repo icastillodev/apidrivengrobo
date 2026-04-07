@@ -1,5 +1,6 @@
 /**
  * Asistente inicial (primera sesión): idioma (banderas), tema, tamaño de letra, menú arriba o lateral.
+ * Solo se invoca desde el dashboard (capacitacionTourAuto); no en otras pantallas.
  * Al terminar recarga la página para aplicar el diseño del menú; luego el tour de bienvenida arranca solo.
  */
 import { UserPreferences } from './menujs/MenuConfig.js';

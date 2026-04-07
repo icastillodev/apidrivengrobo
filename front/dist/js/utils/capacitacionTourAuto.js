@@ -1,18 +1,19 @@
-import { pathnameToMenuPath } from './capacitacionPaths.js';
-import { getTourStepsForMenuPath } from './capacitacionTours.js';
-import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js';
+import { pathnameToMenuPath, isDashboardMenuPath } from './capacitacionPaths.js?v=20260406';
+import { getTourStepsForMenuPath } from './capacitacionTours.js?v=20260406';
+import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js?v=20260406';
 import {
   isWelcomeTourDone,
   isAutoToursGloballyDisabled,
   isRouteTourSeen,
   isSetupWizardDone,
 } from './capacitacionTourPrefs.js';
-import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js';
+import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js?v=20260406';
 
 const AUTO_DELAY_MS = 1400;
 
 /**
  * Tras cargar menú y barra de ayuda: bienvenida (una vez) o tutorial por ruta (primera visita).
+ * El asistente de primera configuración (idioma/tema/letra/menú) solo se ofrece en el dashboard.
  */
 export function tryAutoStartCapacitacionTour() {
   const pathname = window.location.pathname || '';
@@ -52,6 +53,9 @@ export function tryAutoStartCapacitacionTour() {
   }
 
   if (!isSetupWizardDone()) {
+    if (!isDashboardMenuPath(menuPath)) {
+      return;
+    }
     setTimeout(() => {
       startCapacitacionSetupWizard();
     }, AUTO_DELAY_MS);

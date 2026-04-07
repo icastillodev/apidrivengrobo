@@ -2,10 +2,10 @@ import { Auth } from '../auth.js';
 import { API } from '../api.js';
 import { syncCapUiPrefsToBackend } from '../utils/userCapUiPrefsBackend.js';
 import { filterMenuIdsByModulos, ensureInstModulesLoaded } from '../modulesAccess.js';
-import { pathnameToMenuPath, menuPathToSlug } from '../utils/capacitacionPaths.js';
+import { pathnameToMenuPath, menuPathToSlug } from '../utils/capacitacionPaths.js?v=20260406';
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
-import { collectMenuPathsFromIds, expandFacturacionPathsIfAllowed } from '../utils/capacitacionMenuPaths.js';
-import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js';
+import { collectMenuPathsFromIds, expandFacturacionPathsIfAllowed } from '../utils/capacitacionMenuPaths.js?v=20260406';
+import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260406';
 
 export const FAB_HIDDEN_KEY = 'gecko_hide_capacitacion_fab';
 

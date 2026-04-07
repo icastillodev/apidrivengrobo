@@ -12,12 +12,12 @@ import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle, translatePage } from '../utils/i18n.js';
 import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
-import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js';
+import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20260406';
 import {
   initCapacitacionPageHelpDelegation,
   initGeckoHelpMenuDropdownActions,
-} from './CapacitacionPageHelpMenu.js';
-import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js';
+} from './CapacitacionPageHelpMenu.js?v=20260406';
+import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js?v=20260406';
 
 export { refreshMenuNotifications }; 
 
@@ -120,7 +120,7 @@ try {
             updateBreadcrumbInstitution();
 
             initCapacitacionModalHelpDelegation();
-            initCapacitacionHelpFab().catch(() => {});
+            await initCapacitacionHelpFab().catch(() => {});
             tryAutoStartCapacitacionTour();
 
             if (localStorage.getItem('gecko_ok') == 1) {
