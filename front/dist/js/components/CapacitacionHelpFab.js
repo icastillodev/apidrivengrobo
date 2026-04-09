@@ -2,10 +2,14 @@ import { Auth } from '../auth.js';
 import { API } from '../api.js';
 import { syncCapUiPrefsToBackend } from '../utils/userCapUiPrefsBackend.js';
 import { filterMenuIdsByModulos, ensureInstModulesLoaded } from '../modulesAccess.js';
-import { pathnameToMenuPath, menuPathToSlug } from '../utils/capacitacionPaths.js?v=20260408';
+import {
+  pathnameToMenuPath,
+  menuPathToSlug,
+  isCapacitacionAppPath,
+} from '../utils/capacitacionPaths.js?v=20260409';
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
-import { collectMenuPathsFromIds, expandFacturacionPathsIfAllowed } from '../utils/capacitacionMenuPaths.js?v=20260408';
-import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260408';
+import { collectMenuPathsFromIds, expandFacturacionPathsIfAllowed } from '../utils/capacitacionMenuPaths.js?v=20260409';
+import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260409';
 
 export const FAB_HIDDEN_KEY = 'gecko_hide_capacitacion_fab';
 
@@ -196,12 +200,12 @@ export async function initCapacitacionHelpFab() {
   ensureFabStyles();
 
   const pathname = window.location.pathname || '';
-  if (!pathname.toLowerCase().includes('/paginas/')) return;
-  if (pathname.toLowerCase().includes('capacitacion.html')) return;
+  if (!isCapacitacionAppPath(pathname)) return;
   if (isCapacitacionFabHidden()) return;
 
   const menuPath = pathnameToMenuPath(pathname);
   if (!menuPath) return;
+  if (menuPath === 'panel/capacitacion') return;
 
   const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
   if (!roleId || Number.isNaN(roleId)) return;

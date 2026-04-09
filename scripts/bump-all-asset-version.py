@@ -2,14 +2,15 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "front"
-OLD_V = "?v=20260406"
-NEW_V = "?v=20260408"
+# Próximo bump: p.ej. 20260409 -> 20260410
+OLD_V = "?v=20260409"
+NEW_V = "?v=20260410"
 
 
 def bump_text(t: str) -> str:
     t = t.replace(OLD_V, NEW_V)
-    t = t.replace("ASSET_VERSION = '20260406'", "ASSET_VERSION = '20260408'")
-    t = t.replace("buscar 20260406", "buscar 20260408")
+    t = t.replace("ASSET_VERSION = '20260409'", "ASSET_VERSION = '20260410'")
+    t = t.replace("buscar 20260409", "buscar 20260410")
     return t
 
 

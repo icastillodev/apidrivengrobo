@@ -1,4 +1,4 @@
-import { API } from './api.js?v=20260408';
+import { API } from './api.js?v=20260409';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
 import { setInstModulesSnapshot } from './modulesAccess.js';
 import {

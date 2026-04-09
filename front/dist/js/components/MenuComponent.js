@@ -12,12 +12,12 @@ import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle, translatePage } from '../utils/i18n.js';
 import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
-import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20260408';
+import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20260409';
 import {
   initCapacitacionPageHelpDelegation,
   initGeckoHelpMenuDropdownActions,
-} from './CapacitacionPageHelpMenu.js?v=20260408';
-import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js?v=20260408';
+} from './CapacitacionPageHelpMenu.js?v=20260409';
+import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js?v=20260409';
 
 export { refreshMenuNotifications }; 
 

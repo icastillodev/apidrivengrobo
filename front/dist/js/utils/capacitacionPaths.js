@@ -1,52 +1,82 @@
 /**
+ * Rutas donde aplica la barra de ayuda / tours (HTML bajo /paginas/ o URLs limpias en producción).
+ */
+export function isCapacitacionAppPath(pathname) {
+  const p = String(pathname || '').toLowerCase();
+  if (p.includes('/paginas/')) return true;
+  return /^\/(panel|admin|superadmin|usuario)(\/|$)/.test(String(pathname || ''));
+}
+
+/**
  * Convierte la URL actual (pathname) en la ruta de menú usada por capacitación / deep links.
+ * Soporta `/paginas/...` (local o rutas directas) y URLs limpias `/panel/...`, `/admin/...`, etc.
  * @param {string} pathname window.location.pathname
  * @returns {string|null}
- *
- * Notas checklist §9 (extras):
- * - **Configuración:** cualquier `admin/configuracion/*` se mapea al hub `admin/configuracion/config`
- *   (un solo capítulo en el manual). Subpantallas no tienen slug propio en capacitación.
- * - **Superadmin / rutas fuera de panel estándar:** si `pathname` no contiene `/paginas/`, devuelve `null`;
- *   la barra inferior de ayuda no enlazará al manual hasta haber mapeo explícito (documentar en §9 si se amplía).
- * - **QR / salas:** si la URL no pasa por `/paginas/...` típico, mismo criterio: ampliar aquí cuando haya ruta estable.
  */
 export function pathnameToMenuPath(pathname) {
   if (!pathname) return null;
   const raw = String(pathname).replace(/\\/g, '/');
   const lower = raw.toLowerCase();
-  const idx = lower.indexOf('/paginas/');
-  if (idx === -1) return null;
 
-  let rel = raw.slice(idx + '/paginas/'.length).replace(/\.html$/i, '');
+  let rel = null;
+  const pIdx = lower.indexOf('/paginas/');
+  if (pIdx !== -1) {
+    rel = raw.slice(pIdx + '/paginas/'.length).replace(/\.html$/i, '');
+  } else {
+    const parts = raw.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+    const top = parts[0].toLowerCase();
+    if (!['panel', 'admin', 'superadmin', 'usuario'].includes(top)) return null;
+    if (parts.length === 1) {
+      if (top === 'panel') rel = 'panel/dashboard';
+      else if (top === 'admin') rel = 'admin/dashboard';
+      else if (top === 'superadmin') rel = 'superadmin/dashboard';
+      else return null;
+    } else {
+      rel = parts.join('/').replace(/\.html$/i, '');
+    }
+  }
+
   rel = rel.replace(/^\/+/, '').replace(/\/+$/, '');
   if (!rel) return null;
 
-  if (lower.includes('/paginas/admin/facturacion/')) {
+  if (rel.startsWith('admin/facturacion/') || lower.includes('/paginas/admin/facturacion/')) {
     const m = rel.match(/^admin\/facturacion\/([^/]+)$/i);
     const seg = (m ? m[1] : 'index').toLowerCase();
     const sub = ['depto', 'investigador', 'protocolo', 'institucion', 'org'];
     if (sub.includes(seg)) return `admin/facturacion/${seg}`;
     return 'admin/facturacion/index';
   }
-  if (lower.includes('/paginas/admin/configuracion/')) {
+  if (rel.startsWith('admin/configuracion/') || lower.includes('/paginas/admin/configuracion/')) {
     return 'admin/configuracion/config';
   }
-  if (lower.includes('/paginas/usuario/formularios')) {
+  if (
+    /^usuario\/formularios/i.test(rel) ||
+    /^panel\/formularios/i.test(rel) ||
+    lower.includes('/paginas/usuario/formularios')
+  ) {
     return 'panel/formularios';
   }
-  if (lower.includes('/paginas/usuario/misprotocolos')) {
+  if (/^usuario\/misprotocolos/i.test(rel) || /^panel\/misprotocolos/i.test(rel) || lower.includes('/paginas/usuario/misprotocolos')) {
     return 'panel/misprotocolos';
   }
   if (
+    /^usuario\/mensajes_institucion/i.test(rel) ||
+    /^panel\/mensajes_institucion/i.test(rel) ||
     lower.includes('/paginas/usuario/mensajes_institucion') ||
     lower.includes('/paginas/panel/mensajes_institucion')
   ) {
     return 'panel/mensajes_institucion';
   }
-  if (lower.includes('/paginas/usuario/mensajes') || lower.includes('/paginas/panel/mensajes')) {
+  if (
+    /^usuario\/mensajes/i.test(rel) ||
+    /^panel\/mensajes/i.test(rel) ||
+    lower.includes('/paginas/usuario/mensajes') ||
+    lower.includes('/paginas/panel/mensajes')
+  ) {
     return 'panel/mensajes';
   }
-  if (lower.includes('/paginas/usuario/perfil')) {
+  if (/^usuario\/perfil/i.test(rel) || /^panel\/perfil/i.test(rel) || lower.includes('/paginas/usuario/perfil')) {
     return 'panel/perfil';
   }
 

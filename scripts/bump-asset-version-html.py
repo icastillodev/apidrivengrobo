@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "front"
-V = "20260408"
+V = "20260409"
 
 
 def main() -> None:

@@ -1,13 +1,13 @@
-import { pathnameToMenuPath, isDashboardMenuPath } from './capacitacionPaths.js?v=20260408';
-import { getTourStepsForMenuPath } from './capacitacionTours.js?v=20260408';
-import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js?v=20260408';
+import { pathnameToMenuPath, isDashboardMenuPath, isCapacitacionAppPath } from './capacitacionPaths.js?v=20260409';
+import { getTourStepsForMenuPath } from './capacitacionTours.js?v=20260409';
+import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js?v=20260409';
 import {
   isWelcomeTourDone,
   isAutoToursGloballyDisabled,
   isRouteTourSeen,
   isSetupWizardDone,
 } from './capacitacionTourPrefs.js';
-import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js?v=20260408';
+import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js?v=20260409';
 
 const AUTO_DELAY_MS = 1400;
 
@@ -17,8 +17,7 @@ const AUTO_DELAY_MS = 1400;
  */
 export function tryAutoStartCapacitacionTour() {
   const pathname = window.location.pathname || '';
-  if (!pathname.toLowerCase().includes('/paginas/')) return;
-  if (pathname.toLowerCase().includes('capacitacion.html')) return;
+  if (!isCapacitacionAppPath(pathname)) return;
 
   const secModal = document.getElementById('modal-security-check');
   if (secModal?.classList.contains('show')) {
@@ -34,6 +33,7 @@ export function tryAutoStartCapacitacionTour() {
 
   const menuPath = pathnameToMenuPath(pathname);
   if (!menuPath) return;
+  if (menuPath === 'panel/capacitacion') return;
 
   const stepsThisRoute = getTourStepsForMenuPath(menuPath);
   const hasRouteSteps = !!(stepsThisRoute && stepsThisRoute.length > 0);
