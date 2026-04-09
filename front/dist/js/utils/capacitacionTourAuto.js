@@ -1,13 +1,13 @@
-import { pathnameToMenuPath, isDashboardMenuPath } from './capacitacionPaths.js?v=20260406';
-import { getTourStepsForMenuPath } from './capacitacionTours.js?v=20260406';
-import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js?v=20260406';
+import { pathnameToMenuPath, isDashboardMenuPath } from './capacitacionPaths.js?v=20260408';
+import { getTourStepsForMenuPath } from './capacitacionTours.js?v=20260408';
+import { startCapacitacionInteractiveTour } from '../components/CapacitacionInteractiveTour.js?v=20260408';
 import {
   isWelcomeTourDone,
   isAutoToursGloballyDisabled,
   isRouteTourSeen,
   isSetupWizardDone,
 } from './capacitacionTourPrefs.js';
-import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js?v=20260406';
+import { startCapacitacionSetupWizard } from '../components/CapacitacionSetupWizard.js?v=20260408';
 
 const AUTO_DELAY_MS = 1400;
 

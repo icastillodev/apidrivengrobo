@@ -1,5 +1,5 @@
-import { getTourStepsForMenuPath } from '../utils/capacitacionTours.js?v=20260406';
-import { menuPathToSlug, pathnameToMenuPath } from '../utils/capacitacionPaths.js?v=20260406';
+import { getTourStepsForMenuPath } from '../utils/capacitacionTours.js?v=20260408';
+import { menuPathToSlug, pathnameToMenuPath } from '../utils/capacitacionPaths.js?v=20260408';
 import { Auth } from '../auth.js';
 import {
   markWelcomeTourDone,
