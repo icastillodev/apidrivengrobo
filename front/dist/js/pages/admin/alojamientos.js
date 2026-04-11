@@ -16,15 +16,22 @@ import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 // Base Path dinámico para compatibilidad Local / Producción
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
+function resolveAlojamientosInstId() {
+    const raw = localStorage.getItem('instId') || sessionStorage.getItem('instId');
+    const n = parseInt(String(raw || ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : NaN;
+}
+
 // --- ESTADO GLOBAL (Fuente de Verdad) ---
 export const AlojamientoState = {
     dataFull: [],
     currentHistoryData: [],
-    instId: parseInt(localStorage.getItem('instId'))
+    instId: resolveAlojamientosInstId()
 };
 if (typeof window !== 'undefined') window.__AlojamientoState = AlojamientoState;
 
 export async function initAlojamientosPage() {
+    AlojamientoState.instId = resolveAlojamientosInstId();
     TableUI.init();
     HistorialUI.init();
     TramosUI.init();
@@ -47,6 +54,7 @@ export async function initAlojamientosPage() {
 export async function loadAlojamientos() {
     try {
         showLoader();
+        AlojamientoState.instId = resolveAlojamientosInstId();
         const rawInst = AlojamientoState.instId;
         const inst = (typeof rawInst === 'number' && Number.isFinite(rawInst) && rawInst > 0) ? rawInst : null;
         const url = inst != null ? `/alojamiento/list?inst=${inst}` : '/alojamiento/list';
@@ -60,6 +68,11 @@ export async function loadAlojamientos() {
             AlojamientoState.dataFull = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
         } else {
             AlojamientoState.dataFull = [];
+            const t = window.txt?.alojamientos;
+            const msg = (res.message && String(res.message).trim()) || t?.err_carga_lista || '';
+            if (msg && typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'warning', text: msg });
+            }
         }
 
             TableUI.poblarFiltroEspecies?.();
@@ -68,6 +81,10 @@ export async function loadAlojamientos() {
     } catch (e) {
         console.error("Error cargando alojamientos:", e);
         AlojamientoState.dataFull = [];
+        const t = window.txt?.alojamientos;
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'error', text: t?.err_carga_lista || '' });
+        }
             TableUI.poblarFiltroEspecies?.();
         TableUI.render();
     } finally {

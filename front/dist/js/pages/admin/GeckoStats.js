@@ -79,6 +79,9 @@ export async function initStatsPage() {
 
     loadInstitutionFlags();
     wireStatsScopeTabs();
+
+    // Carga inicial de la pestaña Sede (antes había que pulsar Actualizar a ciegas).
+    await loadStats();
 }
 
 function wireStatsScopeTabs() {
@@ -160,7 +163,9 @@ async function loadInstitutionFlags() {
     try {
         const res = await API.request('/stats/institution-flags');
         const wrap = document.getElementById('stats-scope-wrap');
-        if (res.status === 'success' && res.data && res.data.madre_grupo == 1 && (res.data.instituciones_en_red || 0) > 1) {
+        const mg = Number(res.data?.madre_grupo);
+        const nRed = Number(res.data?.instituciones_en_red);
+        if (res.status === 'success' && res.data && mg === 1 && nRed > 1) {
             if (wrap) wrap.classList.remove('d-none');
         } else if (wrap) {
             wrap.classList.add('d-none');

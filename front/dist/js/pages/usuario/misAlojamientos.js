@@ -11,9 +11,13 @@ let allHousings = [];
 let currentPage = 1;
 const rowsPerPage = 10;
 
+function sessionInstId() {
+    return (localStorage.getItem('instId') || sessionStorage.getItem('instId') || '').trim();
+}
+
 export async function initMisAlojamientos() {
     const userId = localStorage.getItem('userId');
-    const instId = localStorage.getItem('instId');
+    const instId = sessionInstId();
 
     document.getElementById('btn-export-excel').onclick = openExcelModal;
 
@@ -49,6 +53,7 @@ export async function initMisAlojamientos() {
 
 /* --- MODAL FICHA DE ALOJAMIENTO (CON TRAZABILIDAD) --- */
 window.openDetailModal = async (id) => {
+    const ma = window.txt?.misalojamientos || {};
     const modal = new bootstrap.Modal(document.getElementById('modal-visor'));
     const body = document.getElementById('modal-visor-body');
     const actions = document.getElementById('modal-actions');
@@ -162,7 +167,9 @@ window.openDetailModal = async (id) => {
 
             body.innerHTML = html;
         }
-    } catch (e) { body.innerHTML = `<div class="alert alert-danger">Error cargando detalles: ${e.message}</div>`; }
+    } catch (e) {
+        body.innerHTML = `<div class="alert alert-danger">${ma.err_carga_detalle || 'Error al cargar los detalles:'} ${e.message}</div>`;
+    }
 };
 
 /* --- FILTROS Y TABLA --- */
@@ -220,7 +227,7 @@ function renderTable() {
             <td class="text-center fw-bold text-dark">$ ${h.CostoTotal}</td>
             <td class="text-center">${badge}</td>
             <td class="text-end pe-3">
-                <button class="btn btn-sm btn-outline-danger fw-bold px-2 py-1 shadow-sm" onclick="window.downloadPDF(${h.IdHistoria})" title="Descargar Ficha">
+                <button class="btn btn-sm btn-outline-danger fw-bold px-2 py-1 shadow-sm" onclick="window.downloadPDF(${h.IdHistoria})" title="${(window.txt?.misalojamientos?.tooltip_descargar_ficha || 'Descargar ficha').replace(/"/g, '&quot;')}">
                     <i class="bi bi-file-earmark-pdf"></i>
                 </button>
             </td>
@@ -234,8 +241,9 @@ function renderTable() {
 function updateCounter(data) {
     const total = data.length;
     const uniqueInst = [...new Set(data.map(h => h.Institucion))].length;
-    let text = `${total} Registros`;
-    if (uniqueInst > 1) text += ` en ${uniqueInst} Instituciones`;
+    const ma = window.txt?.misalojamientos || {};
+    let text = (ma.counter_line || '{n} registros').replace('{n}', String(total));
+    if (uniqueInst > 1) text += (ma.counter_inst || ' en {n} instituciones').replace('{n}', String(uniqueInst));
     document.getElementById('dynamic-counter').innerText = text;
 }
 
@@ -264,28 +272,29 @@ function renderPagination(total) {
 
 /* --- PDF GENERATOR AVANZADO --- */
 window.downloadPDF = async (id) => {
+    const t = window.txt?.misalojamientos || {};
     const rolePdf = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '3', 10);
     const canPdfTraz = hasTrazabilidadAlojamientosForUser(rolePdf);
 
     // 1. PREGUNTAR QUÉ INCLUIR EN EL PDF
     const { value: options } = await Swal.fire({
-        title: 'Exportar Ficha PDF',
+        title: t.pdf_export_title || 'Exportar ficha PDF',
         html: `
             <div class="text-start p-3 bg-light border rounded">
-                <p class="small text-muted mb-3">Seleccione qué información incluir:</p>
+                <p class="small text-muted mb-3">${t.pdf_export_intro || 'Seleccione qué información incluir:'}</p>
                 <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" id="chk-aloj" checked>
-                    <label class="form-check-label fw-bold small">Tramos de Alojamiento (Contabilidad)</label>
+                    <label class="form-check-label fw-bold small">${t.pdf_opt_aloj || 'Tramos de alojamiento (contabilidad)'}</label>
                 </div>
                 ${canPdfTraz ? `
                 <div class="form-check form-switch">
                     <input class="form-check-input border-primary" type="checkbox" id="chk-traz" checked>
-                    <label class="form-check-label fw-bold small text-primary">Trazabilidad y Clínica de los Animales</label>
+                    <label class="form-check-label fw-bold small text-primary">${t.pdf_opt_traz || 'Trazabilidad y clínica de los animales'}</label>
                 </div>` : ''}
             </div>
         `,
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-file-pdf"></i> Generar Documento',
+        confirmButtonText: `<i class="bi bi-file-pdf"></i> ${t.pdf_btn_generar || 'Generar documento'}`,
         confirmButtonColor: '#dc3545',
         preConfirm: () => ({
             aloj: document.getElementById('chk-aloj').checked,
@@ -295,42 +304,50 @@ window.downloadPDF = async (id) => {
 
     if (!options) return;
     if (!options.aloj && !options.traz) {
-        return Swal.fire('Atención', 'Debe seleccionar al menos una opción para exportar.', 'warning');
+        return Swal.fire(t.swal_atencion || 'Atención', t.pdf_export_need_option || 'Debe seleccionar al menos una opción para exportar.', 'warning');
     }
 
     // 2. RECOPILAR DATOS Y ARMAR PLANTILLA
     try {
-        Swal.fire({ title: 'Generando PDF...', text: 'Recopilando datos...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-        
+        Swal.fire({
+            title: t.pdf_generando_title || 'Generando PDF...',
+            text: t.pdf_recopilando_text || 'Recopilando datos...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
+
         const res = await API.request(`/user/housing-detail/${id}`);
-        if (res.status !== 'success') throw new Error('Error al traer detalles de la base de datos.');
+        if (res.status !== 'success') throw new Error(t.err_housing_detail || 'Error al obtener los detalles.');
 
         const h = res.data.header;
         const rows = res.data.rows;
-        const instId = localStorage.getItem('instId');
+        const instId = sessionInstId();
 
         // A. CONSTRUIR TABLA DE ALOJAMIENTOS
         let tableAlojHtml = '';
         if (options.aloj) {
+            const vig = t.vigente || 'Vigente';
+            const gr = t.pdf_caja_gr || 'Gr';
+            const ch = t.pdf_caja_ch || 'Ch';
             const trs = rows.map(r => `
                 <tr>
                     <td style="border:1px solid #ddd;padding:5px;">#${r.IdAlojamiento}</td>
                     <td style="border:1px solid #ddd;padding:5px;">${r.fechavisado}</td>
-                    <td style="border:1px solid #ddd;padding:5px;">${r.hastafecha || 'Vigente'}</td>
-                    <td style="border:1px solid #ddd;padding:5px;text-align:center;">${r.totalcajagrande > 0 ? r.totalcajagrande + ' Gr' : r.totalcajachica + ' Ch'}</td>
+                    <td style="border:1px solid #ddd;padding:5px;">${r.hastafecha || vig}</td>
+                    <td style="border:1px solid #ddd;padding:5px;text-align:center;">${r.totalcajagrande > 0 ? `${r.totalcajagrande} ${gr}` : `${r.totalcajachica} ${ch}`}</td>
                     <td style="border:1px solid #ddd;padding:5px;text-align:center;">${r.totaldiasdefinidos}</td>
                 </tr>
             `).join('');
             tableAlojHtml = `
-                <h4 style="border-bottom:1px solid #ccc;margin-bottom:10px;font-size:12px;">DETALLE DE MOVIMIENTOS</h4>
+                <h4 style="border-bottom:1px solid #ccc;margin-bottom:10px;font-size:12px;">${t.pdf_sec_movimientos || 'Detalle de movimientos'}</h4>
                 <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:20px;">
                     <thead style="background:#f0f0f0;">
                         <tr>
-                            <th style="border:1px solid #ddd;padding:5px;">ID</th>
-                            <th style="border:1px solid #ddd;padding:5px;">Desde</th>
-                            <th style="border:1px solid #ddd;padding:5px;">Hasta</th>
-                            <th style="border:1px solid #ddd;padding:5px;">Cajas</th>
-                            <th style="border:1px solid #ddd;padding:5px;">Días</th>
+                            <th style="border:1px solid #ddd;padding:5px;">${t.pdf_th_id || 'ID'}</th>
+                            <th style="border:1px solid #ddd;padding:5px;">${t.desde || 'Desde'}</th>
+                            <th style="border:1px solid #ddd;padding:5px;">${t.hasta || 'Hasta'}</th>
+                            <th style="border:1px solid #ddd;padding:5px;">${t.cajas || 'Cajas'}</th>
+                            <th style="border:1px solid #ddd;padding:5px;">${t.dias || 'Días'}</th>
                         </tr>
                     </thead>
                     <tbody>${trs}</tbody>
@@ -349,8 +366,11 @@ window.downloadPDF = async (id) => {
                     const resTraz = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${tramo.IdAlojamiento}&idEspecie=${espId}&instId=${instId}`);
                     if (resTraz.status === 'success' && resTraz.data && resTraz.data.cajas && resTraz.data.cajas.length > 0) {
                         let hasObsInTramo = false;
+                        const tramoTit = (t.pdf_tramo_bloque || 'Tramo #{id} (desde: {fecha})')
+                            .replace('{id}', String(tramo.IdAlojamiento))
+                            .replace('{fecha}', new Date(tramo.fechavisado).toLocaleDateString());
                         let tramoHtml = `<div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">TRAMO #${tramo.IdAlojamiento} (Desde: ${new Date(tramo.fechavisado).toLocaleDateString()})</h5>`;
+                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">${tramoTit}</h5>`;
                         
                         resTraz.data.cajas.forEach(caja => {
                             let cajaHtml = `<div style="margin-left: 5px; margin-bottom: 10px;">
@@ -362,11 +382,11 @@ window.downloadPDF = async (id) => {
                                     if (u.observaciones_pivot && u.observaciones_pivot.length > 0) {
                                         hasObsInTramo = true;
                                         hasObsInCaja = true;
-                                        cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
+                                            cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
                                             <span style="font-size: 10px; color: #198754; font-weight: bold;">🐾 ${u.NombreEspecieAloj}</span>
                                             <table style="width: 100%; border-collapse: collapse; margin-top: 3px; font-size: 9px; text-align: center;">
                                                 <tr style="background-color: #f9f9f9;">
-                                                    <th style="border: 1px solid #ccc; padding: 4px;">Fecha</th>`;
+                                                    <th style="border: 1px solid #ccc; padding: 4px;">${t.pdf_th_fecha || 'Fecha'}</th>`;
                                         
                                         resTraz.data.categorias.forEach(cat => {
                                             cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${cat.NombreCatAlojUnidad}</th>`;
@@ -395,12 +415,12 @@ window.downloadPDF = async (id) => {
             }
 
             if (trazabilidadHtml === '') {
-                trazabilidadHtml = '<p style="font-size: 11px; font-style: italic; color: #888;">Los animales de esta historia no tienen variables clínicas registradas.</p>';
+                trazabilidadHtml = `<p style="font-size: 11px; font-style: italic; color: #888;">${t.pdf_sin_clinica || 'Los animales de esta historia no tienen variables clínicas registradas.'}</p>`;
             } else {
                 trazabilidadHtml = `
                 <div style="border-top: 2px solid #eee; padding-top: 15px;">
                     <p style="font-size: 13px; font-weight: bold; color: #0d6efd; border-bottom: 1px solid #0d6efd; padding-bottom: 5px; margin-bottom: 15px;">
-                        TRAZABILIDAD Y CONSTANTES CLÍNICAS:
+                        ${t.pdf_traz_header || 'Trazabilidad y constantes clínicas:'}
                     </p>
                     ${trazabilidadHtml}
                 </div>`;
@@ -408,42 +428,48 @@ window.downloadPDF = async (id) => {
         }
 
         // C. ENSAMBLAR PDF COMPLETO
+        const piePdf = (t.pdf_generado_por || 'Generado por GROBO el {fecha}').replace('{fecha}', new Date().toLocaleString());
+        const subFicha = (t.pdf_ficha_subtitulo || 'Ficha de alojamiento — Historia #{id}').replace('{id}', String(h.IdHistoria));
         const template = `
             <div style="font-family:Arial;padding:20px;color:#333;font-size:12px;">
                 <div style="text-align:center;border-bottom:2px solid #1a5d3b;padding-bottom:10px;margin-bottom:15px;">
                     <h2 style="color:#1a5d3b;margin:0;font-size:18px;">${h.Institucion.toUpperCase()}</h2>
-                    <h3 style="margin:5px 0;font-size:14px;">FICHA DE ALOJAMIENTO - HISTORIA #${h.IdHistoria}</h3>
+                    <h3 style="margin:5px 0;font-size:14px;">${subFicha}</h3>
                 </div>
 
                 <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:11px;">
                     <tr style="background:#f8f9fa;">
-                        <td style="border:1px solid #ddd;padding:8px;"><strong>INVESTIGADOR:</strong><br>${h.Investigador}</td>
-                        <td style="border:1px solid #ddd;padding:8px;"><strong>PROTOCOLO:</strong><br>${h.Protocolo}</td>
-                        <td style="border:1px solid #ddd;padding:8px;"><strong>ESPECIE:</strong><br>${h.Especie}</td>
-                        <td style="border:1px solid #ddd;padding:8px;"><strong>TOTAL DÍAS:</strong><br>${h.TotalDias}</td>
+                        <td style="border:1px solid #ddd;padding:8px;"><strong>${t.pdf_investigador || 'INVESTIGADOR:'}</strong><br>${h.Investigador}</td>
+                        <td style="border:1px solid #ddd;padding:8px;"><strong>${t.pdf_protocolo_label || 'PROTOCOLO:'}</strong><br>${h.Protocolo}</td>
+                        <td style="border:1px solid #ddd;padding:8px;"><strong>${t.pdf_especie_label || 'ESPECIE:'}</strong><br>${h.Especie}</td>
+                        <td style="border:1px solid #ddd;padding:8px;"><strong>${t.pdf_total_dias || 'TOTAL DÍAS:'}</strong><br>${h.TotalDias}</td>
                     </tr>
                 </table>
 
                 ${tableAlojHtml}
                 ${trazabilidadHtml}
                 
-                <div style="margin-top:20px;font-size:10px;color:#777;text-align:center;">Generado por GROBO el ${new Date().toLocaleString()}</div>
+                <div style="margin-top:20px;font-size:10px;color:#777;text-align:center;">${piePdf}</div>
             </div>`;
 
         Swal.close();
         html2pdf().set({ margin: [18, 18, 18, 18], filename: `Alojamiento_${h.IdHistoria}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
         
     } catch (e) {
-        Swal.fire('Error', e.message || 'No se pudo generar PDF', 'error');
+        Swal.fire(
+            window.txt?.generales?.error || 'Error',
+            e.message || t.err_pdf_ficha || 'No se pudo generar el PDF.',
+            'error',
+        );
     }
 };
 
 /* --- CONTACTAR SEDE --- */
 window.openContactModal = (infoStr) => {
     const info = JSON.parse(decodeURIComponent(infoStr));
-    const correo = info.InstCorreo || '';
-    const telefono = info.InstContacto || 'No registrado';
     const ma = window.txt?.misalojamientos || {};
+    const correo = info.InstCorreo || '';
+    const telefono = info.InstContacto || ma.contact_sin_telefono || 'No registrado';
     const iid = parseInt(String(info.IdInstitucion || ''), 10);
     const hrefMsg =
         iid > 0 && isInvestigatorRole()
@@ -460,19 +486,19 @@ window.openContactModal = (infoStr) => {
         : '';
 
     Swal.fire({
-        title: `<h5 class="fw-bold m-0 text-dark">CONTACTAR AL BIOTERIO</h5><span class="text-success small">${info.NombreInst.toUpperCase()}</span>`,
+        title: `<h5 class="fw-bold m-0 text-dark">${ma.contact_modal_titulo || 'Contactar al bioterio'}</h5><span class="text-success small">${info.NombreInst.toUpperCase()}</span>`,
         html: `
             <div class="d-flex flex-column gap-3 mt-3 px-2">
                 <div class="p-3 bg-light border border-success rounded text-center shadow-sm">
                     <i class="bi bi-telephone-fill text-success fs-2 d-block mb-1"></i>
-                    <span class="small text-muted text-uppercase fw-bold d-block">Línea Directa</span>
+                    <span class="small text-muted text-uppercase fw-bold d-block">${ma.contact_linea_directa || 'Línea directa'}</span>
                     <strong class="fs-4 text-dark">${telefono}</strong>
                 </div>
                 ${correo ? `
                     <a href="mailto:${correo}" class="btn btn-primary fw-bold shadow-sm py-2 text-uppercase" style="letter-spacing: 1px;">
-                        <i class="bi bi-envelope-at-fill me-2"></i> Enviar Correo
+                        <i class="bi bi-envelope-at-fill me-2"></i> ${ma.contact_btn_correo || 'Enviar correo'}
                     </a>
-                ` : `<div class="alert alert-warning small py-2">La sede no registró un correo electrónico.</div>`}
+                ` : `<div class="alert alert-warning small py-2">${ma.contact_sin_correo || 'La sede no registró un correo electrónico.'}</div>`}
                 ${btnMsg}
             </div>
         `,
@@ -485,16 +511,42 @@ window.openContactModal = (infoStr) => {
 function openExcelModal() { new bootstrap.Modal(document.getElementById('modal-excel')).show(); }
 
 window.processExcelExport = () => {
+    const ma = window.txt?.misalojamientos || {};
     const start = document.getElementById('excel-start').value;
     const end = document.getElementById('excel-end').value;
-    if (!start || !end) return Swal.fire('Info', 'Seleccione fechas', 'info');
-    
-    const data = allHousings.filter(h => h.FechaInicio >= start && h.FechaInicio <= end);
-    if (!data.length) return Swal.fire('Info', 'No hay datos', 'info');
+    if (!start || !end) {
+        return Swal.fire(ma.swal_info || 'Información', ma.excel_sel_fechas || 'Seleccione las fechas.', 'info');
+    }
 
-    const headers = ["Historia", "Institucion", "Protocolo", "Especie", "Inicio", "Fin", "Costo", "Estado"];
-    const rows = [headers.join(";")];
-    data.forEach(h => rows.push(Object.values(h).map(v => String(v).replace(/;/g,',')).join(";")));
+    const data = allHousings.filter(h => h.FechaInicio >= start && h.FechaInicio <= end);
+    if (!data.length) {
+        return Swal.fire(ma.swal_info || 'Información', ma.excel_sin_datos || 'No hay datos en el rango.', 'info');
+    }
+
+    const headers = [
+        ma.col_historia || 'Historia',
+        ma.col_institucion || 'Institución',
+        ma.col_protocolo || 'Protocolo',
+        ma.col_especie || 'Especie',
+        ma.col_inicio || 'Inicio',
+        ma.col_fin || 'Fin',
+        ma.col_costo || 'Costo total',
+        ma.col_estado || 'Estado',
+    ];
+    const rows = [headers.join(';')];
+    data.forEach((h) => {
+        const vals = [
+            h.IdHistoria,
+            h.Institucion,
+            h.Protocolo,
+            h.Especie,
+            h.FechaInicio,
+            h.FechaFin,
+            h.CostoTotal,
+            h.Estado,
+        ].map((v) => String(v ?? '').replace(/;/g, ','));
+        rows.push(vals.join(';'));
+    });
     
     const blob = new Blob(["\uFEFF"+rows.join("\r\n")], {type:'text/csv;charset=utf-8;'});
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "Alojamientos.csv";

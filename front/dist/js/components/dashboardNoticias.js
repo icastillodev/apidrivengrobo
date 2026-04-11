@@ -25,8 +25,10 @@ function portalHref() {
 
 const refreshBound = new Set();
 
+const DASH_NOTICIAS_PAGE_SIZE = 3;
+
 /**
- * Inyecta bloque de noticias en dashboards: última noticia local con texto completo + enlaces al portal.
+ * Inyecta bloque de noticias en dashboards: hasta 3 noticias locales + enlaces al portal.
  * @param {string} mountId
  * @param {{ silent?: boolean }} [options] — silent: no vacía el bloque ni muestra "cargando" si ya hay contenido (refresco al volver a la pestaña).
  */
@@ -43,7 +45,7 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     }
 
     const loc = await API.request(
-        '/comunicacion/noticias?alcance=local&page=1&pageSize=1&fullCuerpo=1',
+        `/comunicacion/noticias?alcance=local&page=1&pageSize=${DASH_NOTICIAS_PAGE_SIZE}&fullCuerpo=1`,
         'GET'
     );
 
@@ -54,23 +56,24 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     }
 
     const rowsLoc = (loc?.data?.rows) ? loc.data.rows : [];
-    const first = rowsLoc[0];
-    const titulo = first ? escapeHtml(first.Titulo || '—') : '';
-    const fp = first ? (first.FechaPublicacion || first.FechaCreacion || '') : '';
-    const cuerpoRaw = first ? (first.Cuerpo || first.CuerpoResumen || '') : '';
-    const cuerpoHtml = escapeHtml(cuerpoRaw);
-    const idNoticia = first ? parseInt(first.IdNoticia, 10) : 0;
 
-    const bloqueLocal = first
-        ? `
-            <div class="border rounded-3 p-3 bg-white shadow-sm">
+    const bloqueLocal = rowsLoc.length
+        ? rowsLoc.map((row) => {
+            const titulo = escapeHtml(row.Titulo || '—');
+            const fp = row.FechaPublicacion || row.FechaCreacion || '';
+            const cuerpoRaw = row.Cuerpo || row.CuerpoResumen || '';
+            const cuerpoHtml = escapeHtml(cuerpoRaw);
+            const idNoticia = parseInt(row.IdNoticia, 10) || 0;
+            return `
+            <div class="border rounded-3 p-3 bg-white shadow-sm mb-3">
                 <div class="d-flex flex-wrap align-items-center gap-2 small text-muted text-uppercase mb-1" style="font-size:10px;">
-                    <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(first)}
+                    <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(row)}
                 </div>
                 <h6 class="fw-bold mb-2">${titulo}</h6>
-                <div class="small text-dark" style="white-space: pre-wrap;">${cuerpoHtml}</div>
+                <div class="small text-dark dash-noticia-cuerpo" style="white-space: pre-wrap; max-height: 140px; overflow-y: auto;">${cuerpoHtml}</div>
                 ${idNoticia ? `<a href="${portalHref()}?id=${encodeURIComponent(String(idNoticia))}" class="d-inline-block mt-2 small text-success fw-semibold">${escapeHtml(t.dash_abrir_noticia || t.ver_mas || '')}</a>` : ''}
-            </div>`
+            </div>`;
+        }).join('')
         : `<div class="border rounded-3 p-3 bg-white shadow-sm"><p class="text-muted small mb-0">${escapeHtml(t.dash_sin_noticias || '')}</p></div>`;
 
     mount.innerHTML = `

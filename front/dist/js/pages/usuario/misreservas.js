@@ -7,7 +7,8 @@ const state = {
   month: null, // 1-12
   bundle: null,
   selectedDate: null, // YYYY-MM-DD
-  selectedSlot: null, // { start:'HH:MM', end:'HH:MM', available:true }
+  /** Franjas atómicas elegidas (30m/1h); deben formar un bloque contiguo. */
+  selectedSlots: [],
   instrumentos: [],
   selectedInstrumentoIds: new Set()
 };
@@ -182,7 +183,7 @@ function renderCalendar() {
 
 function selectDay(dateStr) {
   state.selectedDate = dateStr;
-  state.selectedSlot = null;
+  state.selectedSlots = [];
   state.instrumentos = [];
   state.selectedInstrumentoIds = new Set();
   document.getElementById('selected-day-title').textContent = dateStr;
@@ -212,23 +213,45 @@ function renderSlots() {
   slots.forEach(s => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'btn btn-sm slot-btn ' + (state.selectedSlot && sameSlot(state.selectedSlot, s) ? 'btn-success' : 'btn-outline-success');
+    const sel = state.selectedSlots.some(x => sameSlot(x, s));
+    btn.className = 'btn btn-sm slot-btn ' + (sel ? 'btn-success' : 'btn-outline-success');
     btn.textContent = `${s.start} - ${s.end}`;
-    btn.onclick = () => selectSlot(s);
+    btn.onclick = () => toggleSlot(s);
     list.appendChild(btn);
   });
 }
 
-async function selectSlot(slot) {
-  state.selectedSlot = slot;
+function toggleSlot(slot) {
+  const t = window.txt?.misreservas || {};
+  const idx = state.selectedSlots.findIndex(x => sameSlot(x, slot));
+  let next;
+  if (idx >= 0) {
+    next = state.selectedSlots.filter((_, i) => i !== idx);
+    next = longestContiguousRun(sortSlotsByStart(next));
+  } else {
+    next = sortSlotsByStart([...state.selectedSlots, slot]);
+    if (!areSlotsContiguous(next)) {
+      Swal.fire(t.swal_error || 'Error', t.slots_contiguous || 'Elegí franjas consecutivas (una que termine cuando empieza la siguiente).', 'info');
+      return;
+    }
+  }
+  state.selectedSlots = next;
   state.selectedInstrumentoIds = new Set();
   renderSlots();
   renderInstrumentos();
   updateReserveButton();
   scheduleRepeatValidation();
+  void loadInstrumentosForMergedRange();
+}
 
-  if (!state.salaId || !state.selectedDate || !state.selectedSlot) return;
-  const url = `/user/reservas/instrumentos/slot?IdSalaReserva=${state.salaId}&date=${state.selectedDate}&start=${state.selectedSlot.start}&end=${state.selectedSlot.end}`;
+async function loadInstrumentosForMergedRange() {
+  const merged = getMergedRangeFromSlots();
+  if (!state.salaId || !state.selectedDate || !merged) {
+    state.instrumentos = [];
+    renderInstrumentos();
+    return;
+  }
+  const url = `/user/reservas/instrumentos/slot?IdSalaReserva=${state.salaId}&date=${state.selectedDate}&start=${merged.start}&end=${merged.end}`;
   const res = await API.request(url, 'GET');
   state.instrumentos = (res?.status === 'success' && Array.isArray(res.data)) ? res.data : [];
   renderInstrumentos();
@@ -239,7 +262,7 @@ function renderInstrumentos() {
   const empty = document.getElementById('inst-empty');
   cont.innerHTML = '';
 
-  if (!state.selectedSlot) {
+  if (!getMergedRangeFromSlots()) {
     empty.classList.remove('d-none');
     empty.textContent = window.txt?.misreservas?.msg_sel_horario || 'Seleccione un horario para ver instrumentos disponibles.';
     return;
@@ -275,12 +298,12 @@ function renderInstrumentos() {
 
 function updateReserveButton() {
   const btn = document.getElementById('btn-reservar');
-  btn.disabled = !(state.salaId && state.selectedDate && state.selectedSlot);
+  btn.disabled = !(state.salaId && state.selectedDate && state.selectedSlots.length > 0);
 }
 
 function clearSelection() {
   state.selectedDate = null;
-  state.selectedSlot = null;
+  state.selectedSlots = [];
   state.instrumentos = [];
   state.selectedInstrumentoIds = new Set();
   document.getElementById('selected-day-title').textContent = '—';
@@ -317,7 +340,7 @@ async function runRepeatValidation() {
   const t = window.txt?.misreservas || {};
   const box = document.getElementById('repeat-validacion');
   const chk = document.getElementById('chk-repeat-weekly');
-  if (!box || !chk?.checked || !state.salaId || !state.selectedDate || !state.selectedSlot) {
+  if (!box || !chk?.checked || !state.salaId || !state.selectedDate || !getMergedRangeFromSlots()) {
     if (box) box.classList.add('d-none');
     return;
   }
@@ -345,7 +368,8 @@ async function runRepeatValidation() {
     return;
   }
 
-  const res = await validateSerieDisponibilidad(state.salaId, state.selectedDate, until, dias, state.selectedSlot, getSelectedInstrumentoIds());
+  const merged = getMergedRangeFromSlots();
+  const res = await validateSerieDisponibilidad(state.salaId, state.selectedDate, until, dias, merged, getSelectedInstrumentoIds());
   box.classList.remove('d-none');
   if (res.ok) {
     box.classList.remove('text-danger');
@@ -390,14 +414,24 @@ function computeSerieFechas(fechaIni, fechaFin, diasSemana) {
   return out;
 }
 
-function slotMatches(slots, start, end) {
-  if (!Array.isArray(slots)) return false;
-  return slots.some(s => s.start === start && s.end === end);
+/** El rango [merged.start, merged.end] está cubierto por franjas atómicas consecutivas del día. */
+function daySlotsCoverMerged(daySlots, merged) {
+  if (!merged || !Array.isArray(daySlots) || !daySlots.length) return false;
+  let cur = merged.start;
+  const sorted = sortSlotsByStart(daySlots);
+  while (cur !== merged.end) {
+    const next = sorted.find(s => s.start === cur);
+    if (!next) return false;
+    cur = next.end;
+  }
+  return true;
 }
 
-async function validateSerieDisponibilidad(salaId, fechaIni, fechaFin, diasSemana, slot, instrumentoIds = []) {
+async function validateSerieDisponibilidad(salaId, fechaIni, fechaFin, diasSemana, merged, instrumentoIds = []) {
   const t = window.txt?.misreservas || {};
   const ids = Array.isArray(instrumentoIds) ? instrumentoIds.map(id => parseInt(id, 10)).filter(id => id > 0) : [];
+  if (!merged?.start || !merged?.end) return { ok: false, total: 0, texto: t.repeat_slot_no || 'no hay ese horario libre' };
+
   const fechas = computeSerieFechas(fechaIni, fechaFin, diasSemana);
   if (!fechas.length) return { ok: false, total: 0, texto: t.repeat_sin_fechas || 'No hay fechas en el rango.' };
 
@@ -414,13 +448,13 @@ async function validateSerieDisponibilidad(salaId, fechaIni, fechaFin, diasSeman
       continue;
     }
     const slots = slotsByDay[f];
-    if (!slotMatches(slots, slot.start, slot.end)) {
+    if (!daySlotsCoverMerged(slots, merged)) {
       problemas.push(`${f}: ${t.repeat_slot_no || 'no hay ese horario libre'}`);
       continue;
     }
     if (ids.length) {
       const instRes = await API.request(
-        `/user/reservas/instrumentos/slot?IdSalaReserva=${salaId}&date=${f}&start=${slot.start}&end=${slot.end}`,
+        `/user/reservas/instrumentos/slot?IdSalaReserva=${salaId}&date=${f}&start=${merged.start}&end=${merged.end}`,
         'GET'
       );
       const rows = (instRes?.status === 'success' && Array.isArray(instRes.data)) ? instRes.data : [];
@@ -446,7 +480,8 @@ async function validateSerieDisponibilidad(salaId, fechaIni, fechaFin, diasSeman
 }
 
 async function reservar() {
-  if (!state.salaId || !state.selectedDate || !state.selectedSlot) return;
+  const merged = getMergedRangeFromSlots();
+  if (!state.salaId || !state.selectedDate || !merged) return;
 
   const chkRepeat = document.getElementById('chk-repeat-weekly');
   const repeatUntil = document.getElementById('repeat-until');
@@ -465,7 +500,7 @@ async function reservar() {
       Swal.fire(t.swal_error || 'Error', t.repeat_bad_range || 'La fecha hasta debe ser posterior al día elegido.', 'warning');
       return;
     }
-    const v = await validateSerieDisponibilidad(state.salaId, state.selectedDate, fin, diasSemana, state.selectedSlot, getSelectedInstrumentoIds());
+    const v = await validateSerieDisponibilidad(state.salaId, state.selectedDate, fin, diasSemana, merged, getSelectedInstrumentoIds());
     if (!v.ok) {
       Swal.fire(t.repeat_bloqueo_titulo || 'Sin disponibilidad', v.texto || t.repeat_problemas || 'Revisá los días.', 'warning');
       return;
@@ -475,14 +510,16 @@ async function reservar() {
   const payload = {
     IdSalaReserva: state.salaId,
     fechaini: state.selectedDate,
-    Horacomienzo: state.selectedSlot.start,
-    Horafin: state.selectedSlot.end,
+    Horacomienzo: merged.start,
+    Horafin: merged.end,
     instrumentos: Array.from(state.selectedInstrumentoIds)
   };
 
+  const rangoTxt = `${merged.start} – ${merged.end}`;
+  const confirmTextSimple = (t.confirm_texto_rango || t.confirm_texto || '¿Deseas confirmar esta reserva?').replace(/\{rango\}/g, rangoTxt);
   const confirm = await Swal.fire({
     title: t.confirm_titulo || 'Confirmar reserva',
-    text: doRepeat ? (t.confirm_texto_serie || '¿Deseas solicitar esta reserva en serie?') : (t.confirm_texto || '¿Deseas confirmar esta reserva?'),
+    text: doRepeat ? (t.confirm_texto_serie || '¿Deseas solicitar esta reserva en serie?') : confirmTextSimple,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: t.btn_confirmar || 'Confirmar',
@@ -497,8 +534,8 @@ async function reservar() {
       const fin = untilDate || addMonthsISO(state.selectedDate, 1);
       const seriePayload = {
         IdSalaReserva: state.salaId,
-        HoraInicio: state.selectedSlot.start,
-        HoraFin: state.selectedSlot.end,
+        HoraInicio: merged.start,
+        HoraFin: merged.end,
         FechaInicio: state.selectedDate,
         FechaFin: fin,
         TipoRepeat: 1,
@@ -553,6 +590,44 @@ function endOfMonth(year, month) {
 
 function sameSlot(a, b) {
   return a && b && a.start === b.start && a.end === b.end;
+}
+
+function sortSlotsByStart(slots) {
+  return [...(slots || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+}
+
+function areSlotsContiguous(sorted) {
+  if (!sorted.length) return false;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].end !== sorted[i + 1].start) return false;
+  }
+  return true;
+}
+
+/** Mayor subsecuencia contigua (por tiempo) dentro de la lista ordenada por inicio. */
+function longestContiguousRun(sortedInput) {
+  const sorted = sortSlotsByStart(sortedInput);
+  if (!sorted.length) return [];
+  let best = [];
+  let cur = [];
+  for (const s of sorted) {
+    if (!cur.length) {
+      cur = [s];
+    } else if (cur[cur.length - 1].end === s.start) {
+      cur.push(s);
+    } else {
+      if (cur.length > best.length) best = cur;
+      cur = [s];
+    }
+  }
+  if (cur.length > best.length) best = cur;
+  return best;
+}
+
+function getMergedRangeFromSlots() {
+  const sorted = sortSlotsByStart(state.selectedSlots);
+  if (!sorted.length || !areSlotsContiguous(sorted)) return null;
+  return { start: sorted[0].start, end: sorted[sorted.length - 1].end };
 }
 
 function escapeHtml(str) {

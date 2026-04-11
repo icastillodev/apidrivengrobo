@@ -94,10 +94,41 @@ export async function initMensajes(opts = {}) {
         sel.innerHTML = opts.map((o) => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.l)}</option>`).join('');
     }
 
+    function fillInvestigadoresInstSelect() {
+        const sel = document.getElementById('nuevo-inst-inv');
+        if (!sel) return;
+        const prev = sel.value;
+        const optTodos = t.msg_inst_inv_opcion_todos || '';
+        sel.innerHTML = `<option value="0">${escapeHtml(optTodos)}</option>`;
+        investigadoresInstCache.forEach((u) => {
+            const opt = document.createElement('option');
+            opt.value = String(u.IdUsrA);
+            opt.textContent = formatDestinatarioLabel(u);
+            sel.appendChild(opt);
+        });
+        if (prev && [...sel.options].some((o) => o.value === prev)) {
+            sel.value = prev;
+        } else {
+            sel.value = '0';
+        }
+    }
+
+    function refreshInstInvBlockVisibility() {
+        const block = document.getElementById('msg-nuevo-inst-inv-block');
+        if (!block || !instMode) return;
+        const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+        const staff = [1, 2, 4, 5, 6].includes(role);
+        const tipo = document.getElementById('nuevo-inst-tipo')?.value || '';
+        const show = staff && tipo === 'consulta_institucion';
+        block.classList.toggle('d-none', !show);
+    }
+
     let currentHiloId = null;
 
     /** Cache para filtrar destinatarios sin volver a pedir la API */
     let destinatariosCache = { local: [], red: [] };
+    /** Investigadores de la sede (buzón institucional: consulta dirigida) */
+    let investigadoresInstCache = [];
 
     function destinatarioHaystack(u) {
         return [
@@ -402,6 +433,20 @@ export async function initMensajes(opts = {}) {
             fillCategoriaNuevo();
         } else {
             fillInstTipoSelect();
+            const roleOpenInst = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+            if ([1, 2, 4, 5, 6].includes(roleOpenInst)) {
+                const resInv = await API.request('/comunicacion/mensajes/destinatarios', 'GET');
+                if (resInv.status === 'success' && resInv.data && Array.isArray(resInv.data.investigadores)) {
+                    investigadoresInstCache = resInv.data.investigadores;
+                } else {
+                    investigadoresInstCache = [];
+                }
+                fillInvestigadoresInstSelect();
+            } else {
+                investigadoresInstCache = [];
+                fillInvestigadoresInstSelect();
+            }
+            refreshInstInvBlockVisibility();
         }
         modal?.show();
     });
@@ -418,13 +463,22 @@ export async function initMensajes(opts = {}) {
                 return;
             }
             const tipoInst = document.getElementById('nuevo-inst-tipo')?.value || 'consulta_institucion';
-            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
+            const roleSend = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+            const payloadInst = {
                 EsInstitucional: true,
                 Asunto: asunto,
                 Cuerpo: cuerpo,
                 OrigenTipo: tipoInst
-            });
+            };
+            if ([1, 2, 4, 5, 6].includes(roleSend) && tipoInst === 'consulta_institucion') {
+                const invSel = parseInt(document.getElementById('nuevo-inst-inv')?.value || '0', 10);
+                if (invSel > 0) {
+                    payloadInst.IdInvestigadorDestino = invSel;
+                }
+            }
+            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payloadInst);
             if (res.status === 'success') {
+                avisoCorreoMensajeSiFallo(res);
                 const hid = res.data?.IdMensajeHilo;
                 modal?.hide();
                 const a = document.getElementById('nuevo-asunto');
@@ -496,6 +550,10 @@ export async function initMensajes(opts = {}) {
     if (instMode) {
         fillInstTipoSelect();
     }
+
+    document.getElementById('nuevo-inst-tipo')?.addEventListener('change', () => {
+        refreshInstInvBlockVisibility();
+    });
 
     async function applyMsgNuevoDeepLink() {
         const sp = new URLSearchParams(window.location.search);

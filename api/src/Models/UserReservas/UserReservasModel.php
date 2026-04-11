@@ -67,6 +67,12 @@ class UserReservasModel {
     }
 
     public function getInstrumentosDisponiblesSlot($instId, $salaId, $date, $start, $end) {
+        $start = $this->normalizeTimeHm($start);
+        $end = $this->normalizeTimeHm($end);
+        if (!$date || $start === null || $end === null) {
+            return [];
+        }
+
         $stmt = $this->db->prepare("
             SELECT 
                 ri.IdReservaInstrumento,
@@ -141,6 +147,12 @@ class UserReservasModel {
             return ['status' => 'error', 'message' => 'Usuario inválido'];
         }
 
+        $horaIni = $this->normalizeTimeHm($horaIni);
+        $horaFin = $this->normalizeTimeHm($horaFin);
+        if ($horaIni === null || $horaFin === null) {
+            return ['status' => 'error', 'message' => 'Horario inválido'];
+        }
+
         // Validar sala
         $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
         $salaStmt->execute([$instId, $salaId]);
@@ -153,7 +165,17 @@ class UserReservasModel {
         $horStmt->execute([$salaId, $dow]);
         $h = $horStmt->fetch(PDO::FETCH_ASSOC);
         if (!$h) return ['status' => 'error', 'message' => 'La sala no tiene horarios para ese día'];
-        if (!($horaIni >= substr($h['HoraIni'], 0, 5) && $horaFin <= substr($h['HoraFin'], 0, 5) && $horaIni < $horaFin)) {
+        $winIni = $this->normalizeTimeHm($h['HoraIni'] ?? '');
+        $winFin = $this->normalizeTimeHm($h['HoraFin'] ?? '');
+        if ($winIni === null || $winFin === null) {
+            return ['status' => 'error', 'message' => 'La sala no tiene horarios válidos para ese día'];
+        }
+        $mReqIni = $this->timeStringToMinutes($horaIni);
+        $mReqFin = $this->timeStringToMinutes($horaFin);
+        $mWinIni = $this->timeStringToMinutes($winIni);
+        $mWinFin = $this->timeStringToMinutes($winFin);
+        if ($mReqIni === null || $mReqFin === null || $mWinIni === null || $mWinFin === null
+            || $mReqIni < $mWinIni || $mReqFin > $mWinFin || $mReqIni >= $mReqFin) {
             return ['status' => 'error', 'message' => 'Horario fuera de disponibilidad'];
         }
 
@@ -162,9 +184,9 @@ class UserReservasModel {
             SELECT COUNT(*) AS c
             FROM reserva
             WHERE IdInstitucion = ? AND IdSalaReserva = ? AND fechaini = ?
-              AND NOT (Horafin <= ? OR Horacomienzo >= ?)
+              AND NOT (TIME(Horafin) <= TIME(?) OR TIME(Horacomienzo) >= TIME(?))
         ");
-        $confStmt->execute([$instId, $salaId, $fechaini, $horaIni, $horaFin]);
+        $confStmt->execute([$instId, $salaId, $fechaini, $horaIni . ':00', $horaFin . ':00']);
         $c = (int)($confStmt->fetch(PDO::FETCH_ASSOC)['c'] ?? 0);
         if ($c > 0) return ['status' => 'error', 'message' => 'La sala ya está reservada en ese horario'];
 
@@ -251,9 +273,36 @@ class UserReservasModel {
     }
 
     private function diffMinutes($horaIni, $horaFin) {
-        $a = new \DateTime("1970-01-01 $horaIni:00");
-        $b = new \DateTime("1970-01-01 $horaFin:00");
+        $a = new \DateTime('1970-01-01 ' . $horaIni . ':00');
+        $b = new \DateTime('1970-01-01 ' . $horaFin . ':00');
         return (int)(($b->getTimestamp() - $a->getTimestamp()) / 60);
+    }
+
+    /**
+     * Normaliza a "HH:MM" (24h) desde string tipo 9:00, 09:00 o 09:00:00.
+     */
+    private function normalizeTimeHm($t) {
+        if ($t === null || $t === '') {
+            return null;
+        }
+        $t = trim((string) $t);
+        if (!preg_match('/^(\d{1,2}):(\d{2})/', $t, $m)) {
+            return null;
+        }
+        $h = (int) $m[1];
+        $min = (int) $m[2];
+        if ($h < 0 || $h > 23 || $min < 0 || $min > 59) {
+            return null;
+        }
+        return sprintf('%02d:%02d', $h, $min);
+    }
+
+    /** Minutos desde medianoche para "HH:MM" normalizado. */
+    private function timeStringToMinutes($hm) {
+        if ($hm === null || !preg_match('/^(\d{2}):(\d{2})$/', $hm, $m)) {
+            return null;
+        }
+        return (int) $m[1] * 60 + (int) $m[2];
     }
 }
 

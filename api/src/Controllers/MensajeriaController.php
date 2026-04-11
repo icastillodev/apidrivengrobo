@@ -64,7 +64,12 @@ class MensajeriaController {
                 ];
             }
 
-            $this->json(['status' => 'success', 'data' => ['local' => $local, 'red' => $red]]);
+            $investigadores = [];
+            if ($this->model->esRolStaffInstitucional($role)) {
+                $investigadores = $this->model->listInvestigadoresInstitucionParaMensaje($instId, $uid);
+            }
+
+            $this->json(['status' => 'success', 'data' => ['local' => $local, 'red' => $red, 'investigadores' => $investigadores]]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
@@ -179,22 +184,30 @@ class MensajeriaController {
                 if ($code === 200) {
                     $hRow = $this->model->getHiloRow($idHilo, $uid, $instId, $role);
                     if ($hRow) {
-                        $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
-                        $pb = (int) ($hRow['IdUsrParticipanteB'] ?? 0);
-                        $destMsg = ($pb > 0) ? (($pa === $uid) ? $pb : $pa) : 0;
                         $asuntoHilo = trim((string) ($hRow['Asunto'] ?? ''));
                         $hiloInst = (int) ($hRow['IdInstitucion'] ?? $instId);
-                        if ($destMsg > 0 && $asuntoHilo !== '') {
-                            $cuerpoT = trim(strip_tags($cuerpo));
-                            if ($cuerpoT !== '') {
-                                $emailInfo = $this->notificarCorreoPorMensajeInterno(
-                                    $hiloInst,
-                                    $destMsg,
-                                    $uid,
-                                    $asuntoHilo,
-                                    $cuerpoT
-                                );
+                        $cuerpoT = trim(strip_tags($cuerpo));
+                        if ($asuntoHilo !== '' && $cuerpoT !== '') {
+                            $esInstH = (int) ($hRow['EsInstitucional'] ?? 0) === 1;
+                            if ($esInstH) {
+                                $idsMail = $this->idsDestinatariosEmailRespuestaInstitucional($hRow, $uid);
+                                $emailInfo = $this->notificarCorreoVariosUsuarios($hiloInst, $idsMail, $uid, $asuntoHilo, $cuerpoT);
                                 $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
+                            } else {
+                                $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
+                                $pbRaw = $hRow['IdUsrParticipanteB'] ?? null;
+                                $pb = ($pbRaw !== null && $pbRaw !== '') ? (int) $pbRaw : 0;
+                                $destMsg = ($pb > 0) ? (($pa === $uid) ? $pb : $pa) : 0;
+                                if ($destMsg > 0) {
+                                    $emailInfo = $this->notificarCorreoPorMensajeInterno(
+                                        $hiloInst,
+                                        $destMsg,
+                                        $uid,
+                                        $asuntoHilo,
+                                        $cuerpoT
+                                    );
+                                    $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
+                                }
                             }
                         }
                     }
@@ -219,6 +232,7 @@ class MensajeriaController {
                     $origenEtiqueta = null;
                 }
                 $instDestinoId = isset($input['IdInstitucionDestino']) ? (int)$input['IdInstitucionDestino'] : null;
+                $idInvDest = isset($input['IdInvestigadorDestino']) ? (int) $input['IdInvestigadorDestino'] : 0;
 
                 $out = $this->model->crearHiloInstitucional(
                     $instId,
@@ -229,9 +243,31 @@ class MensajeriaController {
                     $origenId,
                     $origenEtiqueta,
                     $role,
-                    $instDestinoId
+                    $instDestinoId > 0 ? $instDestinoId : null,
+                    $idInvDest > 0 ? $idInvDest : null
                 );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
+                if ($code === 200) {
+                    $hid = (int) ($out['data']['IdMensajeHilo'] ?? 0);
+                    if ($hid > 0) {
+                        $hRow = $this->model->getHiloRow($hid, $uid, $instId, $role);
+                        if ($hRow) {
+                            $asuntoT = trim(strip_tags($asunto));
+                            $cuerpoT = trim(strip_tags($cuerpo));
+                            if ($asuntoT !== '' && $cuerpoT !== '') {
+                                $idsMail = $this->idsDestinatariosEmailNuevoHiloInstitucional($hRow, $uid);
+                                $emailInfo = $this->notificarCorreoVariosUsuarios(
+                                    (int) ($hRow['IdInstitucion'] ?? $instId),
+                                    $idsMail,
+                                    $uid,
+                                    $asuntoT,
+                                    $cuerpoT
+                                );
+                                $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
+                            }
+                        }
+                    }
+                }
                 $this->json($out, $code);
             }
 
@@ -343,5 +379,127 @@ class MensajeriaController {
         );
 
         return ['ok' => $ok, 'codigo' => $ok ? 'ok' : 'smtp_error'];
+    }
+
+    /**
+     * @param int[] $destinatarioIds
+     * @return array{ok: bool, codigo: string, enviados?: int}
+     */
+    private function notificarCorreoVariosUsuarios(
+        int $instIdContexto,
+        array $destinatarioIds,
+        int $remitenteId,
+        string $asunto,
+        string $cuerpo
+    ): array {
+        $destinatarioIds = array_values(array_unique(array_filter(array_map('intval', $destinatarioIds), static fn ($v) => $v > 0)));
+        if ($destinatarioIds === []) {
+            return ['ok' => true, 'codigo' => 'sin_destinos', 'enviados' => 0];
+        }
+        $okAll = true;
+        $sinEmail = false;
+        $n = 0;
+        foreach ($destinatarioIds as $did) {
+            if ($did === $remitenteId) {
+                continue;
+            }
+            $one = $this->notificarCorreoPorMensajeInterno($instIdContexto, $did, $remitenteId, $asunto, $cuerpo);
+            if (($one['codigo'] ?? '') === 'sin_email') {
+                $sinEmail = true;
+            }
+            if (!($one['ok'] ?? false)) {
+                $okAll = false;
+            } else {
+                $n++;
+            }
+        }
+        $codigo = $okAll ? 'ok' : ($sinEmail ? 'sin_email' : 'smtp_error');
+
+        return ['ok' => $okAll, 'codigo' => $codigo, 'enviados' => $n];
+    }
+
+    /**
+     * @return int[]
+     */
+    private function idsDestinatariosEmailNuevoHiloInstitucional(array $h, int $remitenteId): array {
+        $inst = (int) ($h['IdInstitucion'] ?? 0);
+        $t = strtolower(trim((string) ($h['OrigenTipo'] ?? '')));
+        $a = (int) ($h['IdUsrParticipanteA'] ?? 0);
+        $bRaw = $h['IdUsrParticipanteB'] ?? null;
+        $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+
+        if ($t === 'institucional_comunicado') {
+            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [3]);
+
+            return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+        }
+
+        if ($t === 'consulta_institucion' || $t === 'institucional') {
+            if ($b > 0) {
+                $out = [];
+                if ($a > 0 && $a !== $remitenteId) {
+                    $out[] = $a;
+                }
+                if ($b > 0 && $b !== $remitenteId) {
+                    $out[] = $b;
+                }
+
+                return array_values(array_unique($out));
+            }
+            if ($this->model->usuarioEsInvestigadorEnInstitucion($inst, $remitenteId)) {
+                $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+
+                return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+            }
+            // Consulta abierta por personal (sin investigador concreto): avisar al resto del personal de la sede del hilo
+            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+
+            return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+        }
+
+        return [];
+    }
+
+    /**
+     * @return int[]
+     */
+    private function idsDestinatariosEmailRespuestaInstitucional(array $h, int $remitenteId): array {
+        $inst = (int) ($h['IdInstitucion'] ?? 0);
+        $t = strtolower(trim((string) ($h['OrigenTipo'] ?? '')));
+        $a = (int) ($h['IdUsrParticipanteA'] ?? 0);
+        $bRaw = $h['IdUsrParticipanteB'] ?? null;
+        $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+
+        if ($t === 'institucional_comunicado') {
+            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [3]);
+
+            return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+        }
+
+        if ($t === 'consulta_institucion' || $t === 'institucional') {
+            if ($b > 0) {
+                if ($remitenteId === $a) {
+                    return ($b > 0 && $b !== $remitenteId) ? [$b] : [];
+                }
+                if ($remitenteId === $b) {
+                    return ($a > 0 && $a !== $remitenteId) ? [$a] : [];
+                }
+
+                return [];
+            }
+            if ($remitenteId === $a) {
+                $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+
+                return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+            }
+
+            if ($a > 0 && $a !== $remitenteId) {
+                return [$a];
+            }
+
+            return [];
+        }
+
+        return [];
     }
 }

@@ -37,8 +37,17 @@ class MensajeriaModel {
         }
         $t = $this->origenTipoInstitucionalNormalizado($row);
         if ($t === self::ORIGEN_INST_CONSULTA) {
-            return $this->esRolStaffInstitucional($role)
-                || (int) ($row['IdUsrParticipanteA'] ?? 0) === $userId;
+            if ($this->esRolStaffInstitucional($role)) {
+                return true;
+            }
+            $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
+            $bRaw = $row['IdUsrParticipanteB'] ?? null;
+            $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+            if ($userId === $a) {
+                return true;
+            }
+
+            return $b > 0 && $userId === $b;
         }
 
         return true;
@@ -53,8 +62,17 @@ class MensajeriaModel {
         }
         $t = $this->origenTipoInstitucionalNormalizado($row);
         if ($t === self::ORIGEN_INST_CONSULTA) {
-            return $this->esRolStaffInstitucional($role)
-                || (int) ($row['IdUsrParticipanteA'] ?? 0) === $userId;
+            if ($this->esRolStaffInstitucional($role)) {
+                return true;
+            }
+            $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
+            $bRaw = $row['IdUsrParticipanteB'] ?? null;
+            $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+            if ($userId === $a) {
+                return true;
+            }
+
+            return $b > 0 && $userId === $b;
         }
         if ($t === self::ORIGEN_INST_COMUNICADO) {
             return $this->esRolStaffInstitucional($role);
@@ -222,6 +240,7 @@ class MensajeriaModel {
                 LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
                 OR :isStaff = 1
                 OR h.IdUsrParticipanteA = :uid3
+                OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
               )
             ORDER BY COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) DESC, h.IdMensajeHilo DESC
             LIMIT {$limit} OFFSET {$offset}
@@ -231,6 +250,7 @@ class MensajeriaModel {
             ':uid1' => $userId,
             ':uid2' => $userId,
             ':uid3' => $userId,
+            ':uid4' => $userId,
             ':iid' => $instId,
             ':isStaff' => $isStaff,
         ]);
@@ -280,6 +300,7 @@ class MensajeriaModel {
                 LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
                 OR :isStaff = 1
                 OR h.IdUsrParticipanteA = :uid3
+                OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
               )
               AND m.IdUsrRemitente <> :uid
               AND NOT EXISTS (
@@ -293,6 +314,7 @@ class MensajeriaModel {
             ':uid' => $userId,
             ':uid2' => $userId,
             ':uid3' => $userId,
+            ':uid4' => $userId,
             ':isStaff' => $isStaff,
         ]);
         return (int) $stmt->fetchColumn();
@@ -394,6 +416,86 @@ class MensajeriaModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Investigadores (rol 3) de la institución, para destino en consultas institucionales.
+     */
+    public function listInvestigadoresInstitucionParaMensaje(int $instId, int $excludeUserId): array {
+        $stmt = $this->db->prepare("
+            SELECT DISTINCT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA,
+                   u.IdInstitucion, i.NombreInst AS NombreInstitucion
+            FROM usuarioe u
+            JOIN personae p ON u.IdUsrA = p.IdUsrA
+            JOIN institucion i ON i.IdInstitucion = u.IdInstitucion
+            INNER JOIN tienetipor t ON t.IdUsrA = u.IdUsrA AND t.IdTipousrA = 3
+            WHERE u.IdInstitucion = ? AND u.IdUsrA <> ?
+            ORDER BY p.ApellidoA ASC, p.NombreA ASC
+        ");
+        $stmt->execute([$instId, $excludeUserId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @param int[] $tipos IdTipousrA (p. ej. staff 1,2,4,5,6 o investigador 3)
+     * @return int[]
+     */
+    public function listIdsUsuariosConTiposInstitucion(int $instId, array $tipos): array {
+        $tipos = array_values(array_filter(array_map('intval', $tipos), static fn ($v) => $v > 0));
+        if ($tipos === [] || $instId <= 0) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($tipos), '?'));
+        $sql = "
+            SELECT DISTINCT u.IdUsrA
+            FROM usuarioe u
+            INNER JOIN tienetipor t ON t.IdUsrA = u.IdUsrA AND t.IdTipousrA IN ($ph)
+            WHERE u.IdInstitucion = ?
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(array_merge($tipos, [$instId]));
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['IdUsrA'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    public function usuarioEsInvestigadorEnInstitucion(int $instId, int $userId): bool {
+        if ($instId <= 0 || $userId <= 0) {
+            return false;
+        }
+        $stmt = $this->db->prepare('
+            SELECT 1 FROM usuarioe u
+            INNER JOIN tienetipor t ON t.IdUsrA = u.IdUsrA AND t.IdTipousrA = 3
+            WHERE u.IdInstitucion = ? AND u.IdUsrA = ?
+            LIMIT 1
+        ');
+        $stmt->execute([$instId, $userId]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Titular del formulario en una sede (validación de destinatario en popups).
+     */
+    public function getTitularFormularioInstitucion(int $formId, int $instId): ?int {
+        if ($formId <= 0 || $instId <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT IdUsrA FROM formularioe WHERE idformA = ? AND IdInstitucion = ? LIMIT 1');
+        $stmt->execute([$formId, $instId]);
+        $v = $stmt->fetchColumn();
+        if ($v === false) {
+            return null;
+        }
+        $n = (int) $v;
+
+        return $n > 0 ? $n : null;
+    }
+
     public function listInstitucionesRedMismaDependencia(int $instId): array {
         $stmt = $this->db->prepare("
             SELECT i.IdInstitucion, i.NombreInst
@@ -463,6 +565,16 @@ class MensajeriaModel {
         }
         if (!$this->destinatarioPermitidoParaMensaje($instId, $destinatarioId, $origenTipo, $origenId)) {
             return ['status' => 'error', 'message' => 'Destinatario inválido para esta institución o red.'];
+        }
+        $otNorm = strtolower(trim((string) $origenTipo));
+        if (in_array($otNorm, ['formulario', 'notificacion'], true) && $origenId !== null && $origenId > 0) {
+            $titular = $this->getTitularFormularioInstitucion($origenId, $instId);
+            if ($titular === null) {
+                return ['status' => 'error', 'message' => 'Formulario no encontrado en esta institución.'];
+            }
+            if ($titular !== $destinatarioId) {
+                return ['status' => 'error', 'message' => 'El destinatario no coincide con el titular del formulario enlazado.'];
+            }
         }
         $asunto = trim(strip_tags($asunto));
         $cuerpo = trim(strip_tags($cuerpo));
@@ -611,7 +723,8 @@ class MensajeriaModel {
         ?int $origenId,
         ?string $origenEtiqueta,
         int $role = 0,
-        ?int $instDestinoId = null
+        ?int $instDestinoId = null,
+        ?int $idInvestigadorDestino = null
     ): array {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
             return ['status' => 'error', 'message' => 'El buzón institucional no está disponible. Ejecute la migración de base de datos.'];
@@ -638,18 +751,38 @@ class MensajeriaModel {
             return ['status' => 'error', 'message' => 'Institución destino no válida para su red.'];
         }
 
+        $idInvDest = $idInvestigadorDestino !== null && $idInvestigadorDestino > 0 ? (int) $idInvestigadorDestino : 0;
+        $partA = $remitenteId;
+        $partB = null;
+        if ($idInvDest > 0) {
+            if ($tipoGuardar !== self::ORIGEN_INST_CONSULTA) {
+                return ['status' => 'error', 'message' => 'Solo las consultas pueden dirigirse a un investigador concreto.'];
+            }
+            if (!$this->esRolStaffInstitucional($role)) {
+                return ['status' => 'error', 'message' => 'No tiene permiso para dirigir la consulta a un investigador.'];
+            }
+            if (!$this->usuarioEsInvestigadorEnInstitucion($targetInst, $idInvDest)) {
+                return ['status' => 'error', 'message' => 'Investigador destino inválido para esa sede.'];
+            }
+            if ($idInvDest === $remitenteId) {
+                return ['status' => 'error', 'message' => 'El investigador destino no puede ser usted mismo.'];
+            }
+            [$partA, $partB] = $this->normalizeParticipantes($remitenteId, $idInvDest);
+        }
+
         $this->db->beginTransaction();
         try {
             $stmt = $this->db->prepare("
                 INSERT INTO mensaje_hilo
                 (IdInstitucion, Asunto, IdUsrParticipanteA, IdUsrParticipanteB, FechaCreacion, FechaUltimoMensaje,
                  OrigenTipo, OrigenId, OrigenEtiqueta, EsInstitucional)
-                VALUES (?, ?, ?, NULL, NOW(), NOW(), ?, ?, ?, 1)
+                VALUES (?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, 1)
             ");
             $stmt->execute([
                 $targetInst,
                 $asunto,
-                $remitenteId,
+                $partA,
+                $partB,
                 $tipoGuardar,
                 $origenId,
                 $origenEtiqueta,

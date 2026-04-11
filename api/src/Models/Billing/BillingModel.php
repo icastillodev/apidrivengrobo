@@ -761,7 +761,9 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     fd.estado_destino,
                     COALESCE(tf_dest.nombreTipo, tf.nombreTipo, '-') as nombre_tipo,
                     COALESCE(tf_dest.categoriaformulario, tf.categoriaformulario, ffd.tipo_formulario, '-') as categoria,
-                    CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador
+                    CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador_solicitante,
+                    CONCAT(COALESCE(po.NombreA, ''), ' ', COALESCE(po.ApellidoA, '')) as investigador_origen_pedido,
+                    CONCAT(COALESCE(pd.NombreA, ''), ' ', COALESCE(pd.ApellidoA, '')) as investigador_responsable_destino
                 FROM facturacion_formulario_derivado ffd
                 LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
                 LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
@@ -770,6 +772,8 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA AND tf.IdInstitucion = COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)
                 LEFT JOIN tipoformularios tf_dest ON tf_dest.IdTipoFormulario = fd.tipoA_destino AND tf_dest.IdInstitucion = ffd.IdInstitucionCobradora
                 LEFT JOIN personae p ON p.IdUsrA = ffd.IdUsrSolicitante
+                LEFT JOIN personae po ON po.IdUsrA = fd.IdUsrOrigen
+                LEFT JOIN personae pd ON pd.IdUsrA = fd.IdUsrDestinoResponsable
                 WHERE ffd.IdInstitucionCobradora = ?
                   AND COALESCE(f.estado, '') = 'Entregado'";
         $params = [(int)$instId];
@@ -816,6 +820,12 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             $mPagado = (float)$r['monto_pagado'];
             $mDebe = max(0, $mTotal - $mPagado);
 
+            $sol = trim((string)($r['investigador_solicitante'] ?? ''));
+            $orig = trim((string)($r['investigador_origen_pedido'] ?? ''));
+            $dest = trim((string)($r['investigador_responsable_destino'] ?? ''));
+            $inicial = $orig !== '' ? $orig : $sol;
+            $invInst = $dest !== '' ? $dest : '-';
+
             $item = [
                 'idFacturacionDerivada' => (int)$r['IdFacturacionFormularioDerivado'],
                 'idformA' => (int)$r['idformA'],
@@ -831,7 +841,9 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 'estadoDestino' => $r['estado_destino'] ?? null,
                 'nombreTipo' => $r['nombre_tipo'],
                 'categoria' => $r['categoria'],
-                'investigador' => trim((string)$r['investigador']) !== '' ? trim((string)$r['investigador']) : '-',
+                'investigador' => $sol !== '' ? $sol : '-',
+                'investigadorInicial' => $inicial !== '' ? $inicial : '-',
+                'investigadorInstitucion' => $invInst,
                 'institucionOrigen' => trim((string)($r['institucion_solicitante'] ?? '')) !== '' ? trim((string)$r['institucion_solicitante']) : '-',
                 'institucionDestino' => trim((string)($r['institucion_cobradora'] ?? '')) !== '' ? trim((string)$r['institucion_cobradora']) : '-'
             ];

@@ -1572,10 +1572,25 @@ window.downloadAnimalPDF = async (id) => {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
+    const g = window.txt?.generales || {};
+    if (typeof html2pdf !== 'function') {
+        if (window.Swal) Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
+        return;
+    }
+    const wrap = document.createElement('div');
+    wrap.style.position = 'absolute';
+    wrap.style.left = '-9999px';
+    wrap.style.top = '0';
+    wrap.style.width = '210mm';
+    wrap.innerHTML = pdfTemplate;
+    document.body.appendChild(wrap);
     try {
-        await html2pdf().set(opt).from(pdfTemplate).save();
+        await html2pdf().set(opt).from(wrap).save();
     } catch (error) {
-        console.error("Error al generar PDF:", error);
+        console.error('Error al generar PDF:', error);
+        if (window.Swal) Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
+    } finally {
+        wrap.remove();
     }
 };
 

@@ -159,20 +159,40 @@ class StatisticsModel {
     }
 
     /**
-     * Ids de instituciones que pertenecen a la misma red (mismo valor 'red' no vacío). Incluye la propia institución.
+     * Ids de instituciones de la misma red: primero por campo `red` (texto); si está vacío, por `DependenciaInstitucion` (misma dependencia que mensajería).
+     * Incluye la propia institución.
      */
     public function getInstitutionIdsInNetwork($instId) {
-        $stmt = $this->db->prepare("SELECT red FROM institucion WHERE IdInstitucion = ?");
+        $stmt = $this->db->prepare('SELECT TRIM(COALESCE(red, \'\')) AS red, TRIM(COALESCE(DependenciaInstitucion, \'\')) AS dep FROM institucion WHERE IdInstitucion = ?');
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        $red = $row && !empty(trim($row['red'] ?? '')) ? trim($row['red']) : null;
-        if ($red === null) {
+        if (!$row) {
             return [$instId];
         }
-        $stmt2 = $this->db->prepare("SELECT IdInstitucion FROM institucion WHERE TRIM(COALESCE(red, '')) = ?");
-        $stmt2->execute([$red]);
-        $ids = $stmt2->fetchAll(\PDO::FETCH_COLUMN);
-        return $ids ?: [$instId];
+        $red = $row['red'] !== '' ? $row['red'] : null;
+        if ($red !== null) {
+            $stmt2 = $this->db->prepare('SELECT IdInstitucion FROM institucion WHERE TRIM(COALESCE(red, \'\')) = ?');
+            $stmt2->execute([$red]);
+            $ids = $stmt2->fetchAll(\PDO::FETCH_COLUMN);
+
+            return $ids ?: [$instId];
+        }
+        $dep = $row['dep'] !== '' ? $row['dep'] : null;
+        if ($dep !== null) {
+            $stmt3 = $this->db->prepare("
+                SELECT i.IdInstitucion FROM institucion i
+                INNER JOIN institucion mi ON mi.IdInstitucion = ?
+                WHERE mi.DependenciaInstitucion IS NOT NULL AND TRIM(mi.DependenciaInstitucion) <> ''
+                  AND i.DependenciaInstitucion IS NOT NULL AND TRIM(i.DependenciaInstitucion) <> ''
+                  AND TRIM(i.DependenciaInstitucion) = TRIM(mi.DependenciaInstitucion)
+            ");
+            $stmt3->execute([$instId]);
+            $idsDep = $stmt3->fetchAll(\PDO::FETCH_COLUMN);
+
+            return $idsDep ?: [$instId];
+        }
+
+        return [$instId];
     }
 
     /**
@@ -193,7 +213,8 @@ class StatisticsModel {
             (SELECT COUNT(*) FROM formularioe f JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario WHERE f.IdInstitucion IN ($placeholders) AND f.estado = 'Entregado' AND t.categoriaformulario = 'Insumos' AND f.fechainicioA BETWEEN ? AND ?) as total_insumos,
             (SELECT COUNT(*) FROM protocoloexpe pe WHERE pe.IdInstitucion IN ($placeholders) AND pe.FechaFinProtA >= CURDATE() AND (NOT EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA) OR EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA AND sp.Aprobado = 1))) as total_protocolos,
             (SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion IN ($placeholders) AND a.finalizado = 0) as total_alojamientos";
-        $paramsG = array_merge($ids, $ids, [$from, $to], $ids, [$from, $to], $ids, [$from, $to], $ids, $ids);
+        // 5× IN(?) + 3× BETWEEN: n + 2 + n + 2 + n + 2 + n + n = 5n + 6 (no duplicar el primer bloque de ids)
+        $paramsG = array_merge($ids, [$from, $to], $ids, [$from, $to], $ids, [$from, $to], $ids, $ids);
         $stmtG = $this->db->prepare($sqlG);
         $stmtG->execute($paramsG);
         $res['globales'] = $stmtG->fetch(\PDO::FETCH_ASSOC);
