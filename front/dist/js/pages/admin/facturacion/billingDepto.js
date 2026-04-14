@@ -163,6 +163,9 @@ function renderizarResultados(data) {
             html += `
                 <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
                     ${header}
+                    <div class="collapse" id="saldo-hist-${prot.idProt}">
+                        <div class="border-top bg-light p-2" id="saldo-hist-inner-${prot.idProt}" style="font-size: 11px;"></div>
+                    </div>
                     <div class="card-body p-3">
                         ${formsTable}
                         ${alojTable}
@@ -211,7 +214,7 @@ function getHeaderHTML(prot) {
                             <span class="badge bg-light text-success border fs-6 fw-bold">$ ${formatBillingMoney(parseFloat(prot.saldoInv))}</span>
                         </div>
                         <div class="d-flex justify-content-end mb-1">
-                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.openSaldoHistorialPopup({ idUsr: ${prot.idUsr}, scope: 'depto', refId: ${parseInt(document.getElementById('sel-depto')?.value || '0', 10) || 0} })">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" title="${String(tf.saldo_hist_sub || '').replace(/"/g, '&quot;')}" onclick="window.toggleDeptoSaldoHistorialPanel(${prot.idProt}, ${prot.idUsr})">
                                 <i class="bi bi-clock-history me-1"></i>${tf.saldo_hist_btn || 'Historial'}
                             </button>
                         </div>

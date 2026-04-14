@@ -1,4 +1,5 @@
 // dist/js/utils/i18n.js
+import './stripCloudflareInsights.js';
 
 /**
  * Obtiene el idioma preferido del usuario desde la BD si hay sesión activa.

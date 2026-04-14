@@ -63,6 +63,22 @@ class UserFormsController {
         exit;
     }
 
+    public function getMyPaymentsHistory() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $list = $this->model->getMyPaymentsHistory((int)$sesion['userId']);
+            echo json_encode(['status' => 'success', 'data' => $list]);
+        } catch (\Exception $e) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function getProtocolsUsedInForms() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

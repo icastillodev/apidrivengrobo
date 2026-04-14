@@ -75,6 +75,7 @@ $router->get('/users/list-investigators', 'UserController@listInvestigators'); /
 // SECCIÓN: Mis Formularios (Visor Unificado Investigador)
 // ============================================================
 $router->get('/user/my-forms', 'UserFormsController@getMyForms');
+$router->get('/user/my-payments-history', 'UserFormsController@getMyPaymentsHistory');
 $router->get('/user/form-detail/:id', 'UserFormsController@getFormDetail');
 $router->get('/user/protocols-used-in-forms', 'UserFormsController@getProtocolsUsedInForms');
 $router->get('/user/insumos-pedidos', 'UserFormsController@getInsumosPedidos');

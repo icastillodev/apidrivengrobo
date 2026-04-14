@@ -1,4 +1,5 @@
 // front/dist/js/components/LoaderComponent.js
+import '../utils/stripCloudflareInsights.js';
 
 let loaderStartTime = 0;
 

@@ -21,6 +21,51 @@ function formatMoneyMisForm(value) {
     }).format(v);
 }
 
+const PAGO_EPS = 0.005;
+
+/** @returns {{ total: number, pag: number, falta: number, exento: boolean }} */
+function getFormPaymentTotals(f) {
+    const exento = Number(f.exento_form) === 1;
+    const total = Number(f.monto_total_facturado ?? 0);
+    const pag = Number(f.monto_pagado ?? 0);
+    let falta = f.falta_pagar != null ? Number(f.falta_pagar) : NaN;
+    if (Number.isNaN(falta)) {
+        falta = exento ? 0 : Math.max(0, total - pag);
+    }
+    return { total, pag, falta, exento };
+}
+
+/** Badge HTML: verde completo / amarillo incompleto / rojo sin abonar / gris sin cargo */
+function getFormPaymentStatusBadgeHtml(f) {
+    const tmf = window.txt?.misformularios || {};
+    const { total, pag, falta, exento } = getFormPaymentTotals(f);
+    const cls = 'badge text-wrap d-inline-block';
+    const style = 'max-width: 118px; font-size: 9px; line-height: 1.2;';
+    if (exento) {
+        return `<span class="${cls} bg-success" style="${style}">${String(tmf.pago_completo_badge || '').replace(/</g, '&lt;')}</span>`;
+    }
+    if (total <= PAGO_EPS) {
+        return `<span class="${cls} bg-secondary" style="${style}">${String(tmf.pago_sin_cargo_badge || '').replace(/</g, '&lt;')}</span>`;
+    }
+    if (pag <= PAGO_EPS) {
+        return `<span class="${cls} bg-danger" style="${style}">${String(tmf.pago_sin_abonar_badge || '').replace(/</g, '&lt;')}</span>`;
+    }
+    if (falta > PAGO_EPS) {
+        return `<span class="${cls} bg-warning text-dark" style="${style}">${String(tmf.pago_incompleto_badge || '').replace(/</g, '&lt;')}</span>`;
+    }
+    return `<span class="${cls} bg-success" style="${style}">${String(tmf.pago_completo_badge || '').replace(/</g, '&lt;')}</span>`;
+}
+
+function getFormPaymentStatusExcelLabel(f) {
+    const tmf = window.txt?.misformularios || {};
+    const { total, pag, falta, exento } = getFormPaymentTotals(f);
+    if (exento) return tmf.pago_completo_badge || '';
+    if (total <= PAGO_EPS) return tmf.pago_sin_cargo_badge || '';
+    if (pag <= PAGO_EPS) return tmf.pago_sin_abonar_badge || '';
+    if (falta > PAGO_EPS) return tmf.pago_incompleto_badge || '';
+    return tmf.pago_completo_badge || '';
+}
+
 export async function initMisFormularios() {
     const userId = localStorage.getItem('userId');
     const instId = localStorage.getItem('instId');
@@ -33,6 +78,8 @@ export async function initMisFormularios() {
     if (btnInsumosPedidos) btnInsumosPedidos.onclick = openInsumosPedidosModal;
     const btnInsumosExpPedidos = document.getElementById('btn-insumos-exp-pedidos');
     if (btnInsumosExpPedidos) btnInsumosExpPedidos.onclick = openInsumosExpPedidosModal;
+    const btnPaymentsHistory = document.getElementById('btn-payments-history');
+    if (btnPaymentsHistory) btnPaymentsHistory.onclick = openMyPaymentsHistoryModal;
     const btnConfirmDerive = document.getElementById('btn-confirm-derive');
     if (btnConfirmDerive) btnConfirmDerive.onclick = confirmDeriveForm;
 
@@ -117,11 +164,12 @@ function renderTable() {
             ? f.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
             : (f.NombreInstitucion || '—');
         const tmf = window.txt?.misformularios || {};
-        const exentoRow = Number(f.exento_form) === 1;
+        const { exento } = getFormPaymentTotals(f);
         const pagadoCell = formatMoneyMisForm(f.monto_pagado ?? 0);
-        const faltaCell = exentoRow
-            ? `<span class="badge bg-secondary" title="${tmf.pagos_exento_badge || ''}">${tmf.pagos_exento_badge || '—'}</span>`
+        const faltaCell = exento
+            ? `<span title="${String(tmf.pagos_exento_badge || '').replace(/"/g, '&quot;')}">${formatMoneyMisForm(0)}</span>`
             : formatMoneyMisForm(f.falta_pagar ?? 0);
+        const estadoPagoBadge = getFormPaymentStatusBadgeHtml(f);
         tr.innerHTML = `
             <td class="ps-3 fw-bold text-muted small">#${f.idformA}</td>
             <td><span class="inst-badge" title="${instParticipantes}">${instParticipantes}</span></td>
@@ -133,6 +181,7 @@ function renderTable() {
             <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
             <td class="text-end small text-nowrap">${pagadoCell}</td>
             <td class="text-end small text-nowrap">${faltaCell}</td>
+            <td class="text-center align-middle">${estadoPagoBadge}</td>
             <td class="text-center">${getStatusWithWorkflow(f)}</td>
             <td class="text-end pe-3">
                 ${actions}
@@ -1022,6 +1071,63 @@ window.openInsumosExpPedidosModal = async () => {
     }
 };
 
+/* --- HISTORIAL GLOBAL DE PAGOS (liquidaciones, sin movimientos de saldo) --- */
+window.openMyPaymentsHistoryModal = async () => {
+    const listEl = document.getElementById('payments-history-list');
+    if (!listEl) return;
+    const tmf = window.txt?.misformularios || {};
+    const errMsg = tmf.historial_pagos_error || 'Error';
+    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-dark"></div><p class="mt-2 text-muted small">${tmf.cargando || '…'}</p></div>`;
+    const modal = new bootstrap.Modal(document.getElementById('modal-payments-history'));
+    modal.show();
+    try {
+        const res = await API.request('/user/my-payments-history');
+        if (res.status !== 'success' || !Array.isArray(res.data)) {
+            listEl.innerHTML = `<div class="p-4 text-center text-danger">${errMsg}</div>`;
+            return;
+        }
+        if (!res.data.length) {
+            listEl.innerHTML = `<div class="p-4 text-center text-muted">${tmf.historial_pagos_vacio || ''}</div>`;
+            return;
+        }
+        const sample = res.data[0] || {};
+        const showRef = Object.prototype.hasOwnProperty.call(sample, 'IdentificadorTransferencia');
+        const showCom = Object.prototype.hasOwnProperty.call(sample, 'Comentario');
+        const headRef = showRef ? `<th class="small">${tmf.historial_pagos_col_ref || ''}</th>` : '';
+        const headCom = showCom ? `<th class="small">${tmf.historial_pagos_col_comentario || ''}</th>` : '';
+        const body = res.data.map((ln) => {
+            const refCell = showRef ? `<td class="small">${String(ln.IdentificadorTransferencia ?? '').replace(/</g, '&lt;') || '—'}</td>` : '';
+            const comCell = showCom ? `<td class="small">${String(ln.Comentario ?? '').replace(/</g, '&lt;') || '—'}</td>` : '';
+            return `<tr>
+                <td class="small text-nowrap">${ln.fecha ?? '—'}</td>
+                <td class="text-end small fw-bold">${formatMoneyMisForm(ln.Monto)}</td>
+                <td class="small"><code class="small">${String(ln.TipoHistorial ?? '').replace(/</g, '&lt;')}</code></td>
+                <td class="small fw-bold">#${ln.IdFormA ?? '—'}</td>
+                <td class="small">${String(ln.NombreInstitucion ?? '').replace(/</g, '&lt;') || '—'}</td>
+                <td class="small text-truncate" style="max-width: 140px;" title="${String(ln.nprotA ?? '').replace(/"/g, '&quot;')}">${String(ln.nprotA ?? '').replace(/</g, '&lt;') || '—'}</td>
+                ${refCell}${comCell}
+            </tr>`;
+        }).join('');
+        listEl.innerHTML = `
+            <table class="table table-sm table-hover mb-0" style="font-size: 11px;">
+                <thead class="table-light text-uppercase">
+                    <tr>
+                        <th class="small">${tmf.historial_pagos_col_fecha || ''}</th>
+                        <th class="text-end small">${tmf.historial_pagos_col_monto || ''}</th>
+                        <th class="small">${tmf.historial_pagos_col_tipo || ''}</th>
+                        <th class="small">${tmf.historial_pagos_col_form || ''}</th>
+                        <th class="small">${tmf.historial_pagos_col_inst || ''}</th>
+                        <th class="small">${tmf.historial_pagos_col_prot || ''}</th>
+                        ${headRef}${headCom}
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+            </table>`;
+    } catch (e) {
+        listEl.innerHTML = `<div class="p-4 text-center text-danger">${errMsg}</div>`;
+    }
+};
+
 window.processExcelExport = () => {
     const start = document.getElementById('excel-start').value;
     const end = document.getElementById('excel-end').value;
@@ -1042,6 +1148,7 @@ window.processExcelExport = () => {
         ex.col_organizacion || 'Organización',
         ex.col_pagado || 'Pagado',
         ex.col_falta_pagar || 'Falta pagar',
+        ex.col_estado_pago || 'Estado pago',
         ex.col_estado || 'Estado',
     ];
     const rows = [headers.join(";")];
@@ -1049,10 +1156,10 @@ window.processExcelExport = () => {
         const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
             ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
             : (r.NombreInstitucion || '');
-        const exentoRow = Number(r.exento_form) === 1;
         const pagadoStr = formatMoneyMisForm(r.monto_pagado ?? 0);
-        const faltaStr = exentoRow ? (ex.pagos_exento_badge || 'Exento') : formatMoneyMisForm(r.falta_pagar ?? 0);
-        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, r.estado];
+        const faltaStr = formatMoneyMisForm(r.falta_pagar ?? 0);
+        const estadoPagoStr = getFormPaymentStatusExcelLabel(r);
+        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, estadoPagoStr, r.estado];
         rows.push(row.map(v => String(v).replace(/;/g, ',')).join(";"));
     });
     const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });

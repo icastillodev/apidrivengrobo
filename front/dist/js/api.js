@@ -1,3 +1,4 @@
+import './utils/stripCloudflareInsights.js';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
 import {
     snapshotGroboPersistentUiPrefs,

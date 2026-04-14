@@ -320,6 +320,40 @@ class UserFormsModel {
         return $out;
     }
 
+    /**
+     * Movimientos de pago del usuario (liquidaciones sobre formularios), sin movimientos de saldo CARGA_SALDO.
+     */
+    public function getMyPaymentsHistory(int $userId): array {
+        if (!$this->hasTable('historialpago')) {
+            return [];
+        }
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $cols = 'h.IdHistoPago, h.fecha, h.Monto, h.TipoHistorial, h.IdFormA, h.IdInstitucion,
+                  COALESCE(i.NombreInst, \'\' ) AS NombreInstitucion,
+                  COALESCE(px.nprotA, \'\' ) AS nprotA';
+        if ($hasTransfer) {
+            $cols .= ', h.IdentificadorTransferencia';
+        }
+        if ($hasComment) {
+            $cols .= ', h.Comentario';
+        }
+        $sql = "SELECT {$cols}
+                FROM historialpago h
+                LEFT JOIN institucion i ON i.IdInstitucion = h.IdInstitucion
+                LEFT JOIN formularioe f ON f.idformA = h.IdFormA
+                LEFT JOIN protformr pfr ON f.idformA = pfr.idformA
+                LEFT JOIN protocoloexpe px ON pfr.idprotA = px.idprotA
+                WHERE h.IdUsrA = ?
+                  AND h.TipoHistorial <> 'CARGA_SALDO'
+                  AND COALESCE(h.IdFormA, 0) > 0
+                ORDER BY h.fecha DESC, h.IdHistoPago DESC
+                LIMIT 500";
+        $st = $this->db->prepare($sql);
+        $st->execute([$userId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     private function fetchHistorialPagosFormulario(int $idformA): array {
         if (!$this->hasTable('historialpago')) {
             return [];
