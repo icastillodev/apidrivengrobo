@@ -90,6 +90,16 @@ class MenuController {
                     }
                 }
             }
+
+            // 206 (portal de noticias en panel): visible para investigadores/asistente/lab; por defecto ON si no hay fila; Activo = 2 desactiva.
+            if (!in_array(206, $ids)) {
+                $activo206 = $this->model->getMenudistrActivo($instId, $r, 206);
+                if ($activo206 === null || $activo206 === 1) {
+                    if ($r >= 3 && $r <= 6) {
+                        $ids[] = 206;
+                    }
+                }
+            }
         }
 
         $ids = array_values(array_unique($ids));

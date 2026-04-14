@@ -162,6 +162,9 @@ function renderizarResultados(data) {
                     <small class="text-muted fw-bold d-block uppercase" style="font-size: 9px;">${saldoLbl}</small>
                     <span class="badge bg-success fs-5 shadow-sm" id="investigador-saldo-global">$ ${formatBillingMoney(saldo)}</span>
                 </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.openSaldoHistorialPopup({ idUsr: ${idUsr}, scope: 'investigador' })">
+                    <i class="bi bi-clock-history me-1"></i>${tf.saldo_hist_btn || 'Historial'}
+                </button>
                 <div class="input-group input-group-sm shadow-sm" style="width: 210px;">
                     <input type="number" id="inp-saldo-${idUsr}" class="form-control border-primary" placeholder="${phMonto}...">
                     <button type="button" class="btn btn-success" onclick="window.updateBalance(${idUsr}, 'add', false)"><i class="bi bi-plus-lg"></i></button>

@@ -11,6 +11,16 @@ class BillingModel {
         $this->db = $db;
     }
 
+    private function hasColumn(string $table, string $column): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+            $stmt->execute([$column]);
+            return (bool) $stmt->fetchColumn();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
     // ... [TODO EL BLOQUE DE GETTERS SE MANTIENE EXACTAMENTE IGUAL HASTA "updateBalance"] ...
     public function getProtocolosByDepto($deptoId) {
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
@@ -213,7 +223,7 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
     // LOGICA TRANSACCIONAL: ACTUALIZACIÓN DE SALDOS Y PAGOS
     // ========================================================
 
-public function updateBalance($idUsr, $inst, $monto, $adminId) {
+public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transferId = null, ?string $comment = null) {
         $check = $this->db->prepare("SELECT IdDinero FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ?");
         $check->execute([$idUsr, $inst]);
         $exists = $check->fetch();
@@ -228,12 +238,124 @@ public function updateBalance($idUsr, $inst, $monto, $adminId) {
 
         Auditoria::log($this->db, 'FINANCIERO', 'dinero', "Ajuste de Saldo: $$monto al usuario ID: $idUsr");
         
-        // CORREGIDO: IdFormA en lugar de IdFromA
-        $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                            VALUES (?, ?, ?, 0, CURDATE(), 'CARGA_SALDO', ?)")
-                 ->execute([$adminId, $monto, $idUsr, $inst]);
+        $transferId = $transferId !== null ? trim($transferId) : null;
+        $comment = $comment !== null ? trim($comment) : null;
+        if ($transferId === '') $transferId = null;
+        if ($comment === '') $comment = null;
+
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $cols = "IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion";
+        $vals = "?, ?, ?, 0, CURDATE(), 'CARGA_SALDO', ?";
+        $params = [$adminId, $monto, $idUsr, $inst];
+        if ($hasTransfer) {
+            $cols .= ", IdentificadorTransferencia";
+            $vals .= ", ?";
+            $params[] = $transferId;
+        }
+        if ($hasComment) {
+            $cols .= ", Comentario";
+            $vals .= ", ?";
+            $params[] = $comment;
+        }
+        $this->db->prepare("INSERT INTO historialpago ($cols) VALUES ($vals)")->execute($params);
 
         return $res;
+    }
+
+    /**
+     * Historial para popup: movimientos de saldo (CARGA_SALDO) y pagos (otros tipos) separados.
+     * scope: investigador | depto | protocolo
+     */
+    public function getSaldoHistorialSplit(int $instId, int $idUsr, ?string $from, ?string $to, string $scope = 'investigador', ?int $refId = null): array {
+        $instId = (int) $instId;
+        $idUsr = (int) $idUsr;
+        $scope = strtolower(trim($scope));
+        if (!in_array($scope, ['investigador', 'depto', 'protocolo'], true)) {
+            $scope = 'investigador';
+        }
+        $refId = $refId !== null ? (int) $refId : null;
+
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $selExtra = '';
+        if ($hasTransfer) $selExtra .= ", h.IdentificadorTransferencia";
+        else $selExtra .= ", NULL as IdentificadorTransferencia";
+        if ($hasComment) $selExtra .= ", h.Comentario";
+        else $selExtra .= ", NULL as Comentario";
+
+        $dateWhere = '';
+        $paramsBase = [$instId, $idUsr];
+        if ($from && $to) {
+            $dateWhere = " AND h.fecha BETWEEN ? AND ? ";
+            $paramsBase[] = $from;
+            $paramsBase[] = $to;
+        }
+
+        // Movimientos de saldo: solo CARGA_SALDO (suma/resta según signo de Monto)
+        $sqlSaldo = "SELECT h.IdHistoPago, h.fecha, h.Monto, h.TipoHistorial,
+                            CONCAT(a.NombreA, ' ', a.ApellidoA) as AdminCompleto
+                            {$selExtra}
+                     FROM historialpago h
+                     LEFT JOIN personae a ON h.IdUsrAAdmin = a.IdUsrA
+                     WHERE h.IdInstitucion = ? AND h.IdUsrA = ? AND h.TipoHistorial = 'CARGA_SALDO'
+                     {$dateWhere}
+                     ORDER BY h.fecha DESC, h.IdHistoPago DESC";
+        $stmtS = $this->db->prepare($sqlSaldo);
+        $stmtS->execute($paramsBase);
+        $movSaldo = $stmtS->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        // Pagos: todo lo que NO sea CARGA_SALDO, filtrable por depto/protocolo
+        $join = '';
+        $whereExtra = '';
+        $paramsPagos = [$instId, $idUsr];
+        if ($from && $to) {
+            $paramsPagos[] = $from;
+            $paramsPagos[] = $to;
+        }
+
+        if ($scope === 'protocolo' && $refId && $refId > 0) {
+            // h.IdFormA puede ser idformA (formularios/insumos) o historia (alojamientos)
+            $join = "
+                LEFT JOIN protformr pfr ON pfr.idformA = h.IdFormA AND pfr.idprotA = ?
+                LEFT JOIN alojamiento alo ON alo.historia = h.IdFormA AND alo.idprotA = ? AND alo.IdInstitucion = h.IdInstitucion
+            ";
+            $whereExtra = " AND (pfr.idprotA IS NOT NULL OR alo.idprotA IS NOT NULL) ";
+            $paramsPagos[] = $refId;
+            $paramsPagos[] = $refId;
+        } elseif ($scope === 'depto' && $refId && $refId > 0) {
+            // Filtrar por depto en formularios o por depto del protocolo en alojamientos
+            $join = "
+                LEFT JOIN formularioe f ON f.idformA = h.IdFormA AND f.IdInstitucion = h.IdInstitucion
+                LEFT JOIN protformr pfr2 ON pfr2.idformA = f.idformA
+                LEFT JOIN protocoloexpe p2 ON p2.idprotA = pfr2.idprotA
+                LEFT JOIN alojamiento alo2 ON alo2.historia = h.IdFormA AND alo2.IdInstitucion = h.IdInstitucion
+                LEFT JOIN protocoloexpe pAlo ON pAlo.idprotA = alo2.idprotA
+            ";
+            $whereExtra = " AND ( (f.depto = ?) OR (p2.departamento = ?) OR (pAlo.departamento = ?) ) ";
+            $paramsPagos[] = $refId;
+            $paramsPagos[] = $refId;
+            $paramsPagos[] = $refId;
+        }
+
+        $sqlPagos = "SELECT h.IdHistoPago, h.fecha, h.Monto, h.IdFormA, h.TipoHistorial,
+                            CONCAT(a.NombreA, ' ', a.ApellidoA) as AdminCompleto
+                            {$selExtra}
+                     FROM historialpago h
+                     LEFT JOIN personae a ON h.IdUsrAAdmin = a.IdUsrA
+                     {$join}
+                     WHERE h.IdInstitucion = ? AND h.IdUsrA = ? AND h.TipoHistorial <> 'CARGA_SALDO'
+                     {$dateWhere}
+                     {$whereExtra}
+                     ORDER BY h.fecha DESC, h.IdHistoPago DESC";
+        $stmtP = $this->db->prepare($sqlPagos);
+        $stmtP->execute($paramsPagos);
+        $pagos = $stmtP->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'movimientos_saldo' => $movSaldo,
+            'pagos' => $pagos,
+        ];
     }
 public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
         try {
@@ -702,7 +824,12 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         return $res ? (float)$res['saldo'] : 0.0;
     }
     public function getFinancialAudit($instId) {
-        $sql = "SELECT h.IdHistoPago, h.Monto, h.IdFormA, h.fecha, h.TipoHistorial,
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $selExtra = '';
+        if ($hasTransfer) $selExtra .= ", h.IdentificadorTransferencia";
+        if ($hasComment) $selExtra .= ", h.Comentario";
+        $sql = "SELECT h.IdHistoPago, h.Monto, h.IdFormA, h.fecha, h.TipoHistorial{$selExtra},
                        CONCAT(a.NombreA, ' ', a.ApellidoA) as AdminCompleto,
                        CONCAT(u.NombreA, ' ', u.ApellidoA) as UsrCompleto
                 FROM historialpago h

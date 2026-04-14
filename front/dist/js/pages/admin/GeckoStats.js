@@ -139,6 +139,8 @@ async function loadStats() {
             renderGlobalCards('sede');
             renderAlojamientoTrazabilidadSection('sede');
             renderSpeciesCounters('sede');
+            renderStrainCounters('sede');
+            renderCategoriasSection('sede');
             renderTable('sede');
             renderTableOrganizacion('sede');
             renderMainChart('sede');
@@ -195,6 +197,8 @@ async function loadStatsRedFull() {
             renderGlobalCards('red');
             renderAlojamientoTrazabilidadSection('red');
             renderSpeciesCounters('red');
+            renderStrainCounters('red');
+            renderCategoriasSection('red');
             renderTable('red');
             renderTableOrganizacion('red');
             renderMainChart('red');
@@ -272,6 +276,29 @@ function exportToExcelRed() {
             Tramos: e.tramos
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(atEsp), 'Aloj_por_especie_Red');
+    }
+
+    if (Array.isArray(redRawData.categorias_formularios) && redRawData.categorias_formularios.length) {
+        const cat = redRawData.categorias_formularios.map(c => ({
+            Categoria: c.categoria,
+            Cantidad: c.cantidad
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cat), 'Categorias_Red');
+    }
+    if (Array.isArray(redRawData.ranking_cepas) && redRawData.ranking_cepas.length) {
+        const cep = redRawData.ranking_cepas.map(c => ({
+            Cepa: c.cepa,
+            Cantidad: c.cantidad_animales
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cep), 'Top_Cepas_Red');
+    }
+    if (Array.isArray(redRawData.detalle_cepas) && redRawData.detalle_cepas.length) {
+        const det = redRawData.detalle_cepas.map(c => ({
+            Departamento: c.departamento,
+            Cepa: c.cepa,
+            Cantidad: c.cantidad_animales
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), 'Detalle_Cepas_Red');
     }
     const rank = (redRawData.ranking_especies || []).map(r => ({ Especie: r.etiqueta_especie, Cantidad: r.cantidad }));
     if (rank.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rank), 'Ranking_especies_Red');
@@ -706,14 +733,17 @@ function renderDetailsSection(scope = 'sede') {
     const container = document.getElementById(containerId);
     const data = scope === 'red' ? redRawData : rawData;
     if (!container || !data?.por_departamento) return;
+    const t = window.txt?.admin_estadisticas || {};
+    const gen = window.txt?.generales || {};
     container.innerHTML = '';
     const deptos = data.por_departamento.map(d => d.departamento);
 
     deptos.forEach(depto => {
         const especies = (data.detalle_especies || []).filter(x => x.departamento === depto);
         const protocolos = (data.detalle_protocolos || []).filter(x => x.departamento === depto);
+        const cepas = (data.detalle_cepas || []).filter(x => x.departamento === depto);
 
-        if (especies.length === 0 && protocolos.length === 0) return;
+        if (especies.length === 0 && protocolos.length === 0 && cepas.length === 0) return;
 
         const col = document.createElement('div');
         col.className = 'col-lg-4 col-md-6';
@@ -730,9 +760,9 @@ function renderDetailsSection(scope = 'sede') {
             const vencimiento = new Date(p.FechaFinProtA);
             const hoy = new Date();
             const isVencido = vencimiento < hoy;
-            const badge = isVencido 
-                ? `<span class="badge bg-danger" style="font-size:9px">Vencido (${p.FechaFinProtA})</span>` 
-                : `<span class="badge bg-success" style="font-size:9px">Vigente</span>`;
+            const badge = isVencido
+                ? `<span class="badge bg-danger" style="font-size:9px">${t.det_prot_vencido || 'Vencido'} (${p.FechaFinProtA})</span>`
+                : `<span class="badge bg-success" style="font-size:9px">${t.det_prot_vigente || 'Vigente'}</span>`;
             
             return `
             <li class="list-group-item px-0 py-2 border-bottom">
@@ -744,22 +774,98 @@ function renderDetailsSection(scope = 'sede') {
             </li>`;
         }).join('');
 
+        // Render Cepas
+        let htmlCep = cepas.map(c => `
+            <li class="list-group-item d-flex justify-content-between px-0 py-1 border-bottom">
+                <span>${c.cepa}</span>
+                <span class="fw-bold text-primary">${c.cantidad_animales}</span>
+            </li>`).join('');
+
         col.innerHTML = `
             <div class="card h-100 shadow-sm border-0 border-top border-3 border-success">
                 <div class="card-header bg-white fw-bold text-success text-uppercase small">${depto}</div>
                 <div class="card-body p-3 pt-0">
                     <div class="mb-3">
-                        <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-heptagon-half"></i> ESPECIES</h6>
-                        <ul class="list-group list-group-flush small">${htmlEsp || '<li class="text-muted small fst-italic">Sin datos</li>'}</ul>
+                        <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-heptagon-half"></i> ${(t.det_especies || 'Especies').toUpperCase()}</h6>
+                        <ul class="list-group list-group-flush small">${htmlEsp || `<li class="text-muted small fst-italic">${t.det_sin_datos || gen.no_data || 'Sin datos'}</li>`}</ul>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-diagram-3"></i> ${(t.det_cepas || 'Cepas').toUpperCase()}</h6>
+                        <ul class="list-group list-group-flush small">${htmlCep || `<li class="text-muted small fst-italic">${t.det_sin_datos || gen.no_data || 'Sin datos'}</li>`}</ul>
                     </div>
                     <div>
-                        <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-journal-check"></i> PROTOCOLOS</h6>
-                        <ul class="list-group list-group-flush small">${htmlProt || '<li class="text-muted small fst-italic">Sin datos</li>'}</ul>
+                        <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-journal-check"></i> ${(t.det_protocolos || 'Protocolos').toUpperCase()}</h6>
+                        <ul class="list-group list-group-flush small">${htmlProt || `<li class="text-muted small fst-italic">${t.det_sin_datos || gen.no_data || 'Sin datos'}</li>`}</ul>
                     </div>
                 </div>
             </div>`;
         container.appendChild(col);
     });
+}
+
+function renderStrainCounters(scope = 'sede') {
+    const isRed = scope === 'red';
+    const containerId = isRed ? 'red-strain-counters-container' : 'strain-counters-container';
+    const container = document.getElementById(containerId);
+    const src = isRed ? redRawData : rawData;
+    if (!container || !src) return;
+
+    const list = Array.isArray(src.ranking_cepas) ? src.ranking_cepas : [];
+    const top = list.slice(0, 12);
+    if (!top.length) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = top.map((r) => {
+        const label = String(r.cepa ?? '').trim() || '—';
+        const qty = Number(r.cantidad_animales ?? 0) || 0;
+        return `
+            <div class="col-6 col-md-4 col-xl-3">
+                <div class="card shadow-sm border-0 p-3 h-100">
+                    <div class="small text-muted fw-bold text-uppercase">${label}</div>
+                    <div class="fs-4 fw-bold text-primary">${qty}</div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function renderCategoriasSection(scope = 'sede') {
+    const isRed = scope === 'red';
+    const topId = isRed ? 'red-categories-top-container' : 'categories-top-container';
+    const listId = isRed ? 'red-categories-list' : 'categories-list';
+    const topEl = document.getElementById(topId);
+    const listEl = document.getElementById(listId);
+    const src = isRed ? redRawData : rawData;
+    if (!src) return;
+
+    const cats = Array.isArray(src.categorias_formularios) ? src.categorias_formularios : [];
+    const top = cats.slice(0, 6);
+
+    if (topEl) {
+        topEl.innerHTML = top.map((c) => {
+            const label = String(c.categoria ?? '').trim() || '—';
+            const qty = Number(c.cantidad ?? 0) || 0;
+            return `
+                <div class="col-6">
+                    <div class="border rounded p-2 bg-light h-100">
+                        <div class="small text-muted fw-bold text-uppercase">${label}</div>
+                        <div class="fw-bold">${qty}</div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    if (listEl) {
+        listEl.innerHTML = cats.map((c) => {
+            const label = String(c.categoria ?? '').trim() || '—';
+            const qty = Number(c.cantidad ?? 0) || 0;
+            return `
+                <li class="list-group-item d-flex justify-content-between px-0 py-1 border-bottom">
+                    <span>${label}</span>
+                    <span class="fw-bold">${qty}</span>
+                </li>`;
+        }).join('') || '';
+    }
 }
 
 // ==========================================
@@ -854,6 +960,29 @@ function exportToExcel() {
             "Tramos": e.tramos
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(atEsp), "Alojamiento por especie");
+    }
+
+    if (Array.isArray(rawData.categorias_formularios) && rawData.categorias_formularios.length) {
+        const cat = rawData.categorias_formularios.map(c => ({
+            "Categoria": c.categoria,
+            "Cantidad": c.cantidad
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cat), "Categorias");
+    }
+    if (Array.isArray(rawData.ranking_cepas) && rawData.ranking_cepas.length) {
+        const cep = rawData.ranking_cepas.map(c => ({
+            "Cepa": c.cepa,
+            "Cantidad": c.cantidad_animales
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cep), "Top Cepas");
+    }
+    if (Array.isArray(rawData.detalle_cepas) && rawData.detalle_cepas.length) {
+        const det = rawData.detalle_cepas.map(c => ({
+            "Departamento": c.departamento,
+            "Cepa": c.cepa,
+            "Cantidad": c.cantidad_animales
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), "Detalle Cepas");
     }
 
     XLSX.writeFile(wb, `Reporte_GROBO_${new Date().toISOString().slice(0,10)}.xlsx`);

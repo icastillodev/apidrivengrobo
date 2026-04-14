@@ -11,6 +11,16 @@ let protocolsUsedCache = [];
 const rowsPerPage = 12;
 let derivationTargets = [];
 
+function formatMoneyMisForm(value) {
+    const v = Number(value);
+    if (Number.isNaN(v)) return '—';
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 2,
+    }).format(v);
+}
+
 export async function initMisFormularios() {
     const userId = localStorage.getItem('userId');
     const instId = localStorage.getItem('instId');
@@ -106,6 +116,12 @@ function renderTable() {
         const instParticipantes = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
             ? f.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
             : (f.NombreInstitucion || '—');
+        const tmf = window.txt?.misformularios || {};
+        const exentoRow = Number(f.exento_form) === 1;
+        const pagadoCell = formatMoneyMisForm(f.monto_pagado ?? 0);
+        const faltaCell = exentoRow
+            ? `<span class="badge bg-secondary" title="${tmf.pagos_exento_badge || ''}">${tmf.pagos_exento_badge || '—'}</span>`
+            : formatMoneyMisForm(f.falta_pagar ?? 0);
         tr.innerHTML = `
             <td class="ps-3 fw-bold text-muted small">#${f.idformA}</td>
             <td><span class="inst-badge" title="${instParticipantes}">${instParticipantes}</span></td>
@@ -115,6 +131,8 @@ function renderTable() {
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Protocolo}">${f.Protocolo}</td>
             <td class="text-truncate small" style="max-width: 120px;" title="${f.Departamento}">${f.Departamento}</td>
             <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
+            <td class="text-end small text-nowrap">${pagadoCell}</td>
+            <td class="text-end small text-nowrap">${faltaCell}</td>
             <td class="text-center">${getStatusWithWorkflow(f)}</td>
             <td class="text-end pe-3">
                 ${actions}
@@ -313,6 +331,54 @@ window.openDetailModal = async (id) => {
                             </div>
                         </div>
                     </div>`;
+            }
+
+            const pay = res.data.payments;
+            const tmfPay = window.txt?.misformularios || {};
+            if (pay && typeof pay === 'object') {
+                const exento = !!pay.exento;
+                const lines = Array.isArray(pay.lines) ? pay.lines : [];
+                const sample = lines[0] || {};
+                const showRef = Object.prototype.hasOwnProperty.call(sample, 'IdentificadorTransferencia');
+                const showCom = Object.prototype.hasOwnProperty.call(sample, 'Comentario');
+                let histRows = '';
+                if (!lines.length) {
+                    histRows = `<p class="text-muted small mb-0">${tmfPay.pagos_vacio || ''}</p>`;
+                } else {
+                    const headExtra = `${showRef ? `<th class="small">${tmfPay.pagos_col_ref || 'Ref.'}</th>` : ''}${showCom ? `<th class="small">${tmfPay.pagos_col_comentario || ''}</th>` : ''}`;
+                    histRows = lines.map((ln) => {
+                        const refCell = showRef ? `<td class="small">${String(ln.IdentificadorTransferencia ?? '').replace(/</g, '&lt;') || '—'}</td>` : '';
+                        const comCell = showCom ? `<td class="small">${String(ln.Comentario ?? '').replace(/</g, '&lt;') || '—'}</td>` : '';
+                        return `<tr>
+                            <td class="small text-nowrap">${ln.fecha ?? '—'}</td>
+                            <td class="text-end small fw-bold">${formatMoneyMisForm(ln.Monto)}</td>
+                            <td class="small"><code class="small">${String(ln.TipoHistorial ?? '').replace(/</g, '&lt;')}</code></td>
+                            ${refCell}${comCell}
+                        </tr>`;
+                    }).join('');
+                    histRows = `<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0" style="font-size: 11px;">
+                        <thead class="table-light"><tr>
+                            <th class="small">${tmfPay.pagos_col_fecha || 'Fecha'}</th>
+                            <th class="text-end small">${tmfPay.pagos_col_monto || ''}</th>
+                            <th class="small">${tmfPay.pagos_col_tipo || ''}</th>
+                            ${headExtra}
+                        </tr></thead><tbody>${histRows}</tbody></table></div>`;
+                }
+                contentHtml += `
+                    <hr class="my-4">
+                    <div class="card border-0 bg-light mb-3">
+                        <div class="card-body py-3">
+                            <h6 class="fw-bold text-success text-uppercase mb-2"><i class="bi bi-cash-coin me-2"></i>${tmfPay.pagos_resumen_title || ''}</h6>
+                            ${exento ? `<div class="mb-2"><span class="badge bg-secondary">${tmfPay.pagos_exento_badge || ''}</span></div>` : ''}
+                            <div class="row g-2 small">
+                                <div class="col-md-4"><span class="text-muted">${tmfPay.pagos_label_total || ''}:</span> <strong>${formatMoneyMisForm(pay.total_facturado)}</strong></div>
+                                <div class="col-md-4"><span class="text-muted">${tmfPay.pagos_label_pagado || ''}:</span> <strong>${formatMoneyMisForm(pay.pagado)}</strong></div>
+                                <div class="col-md-4"><span class="text-muted">${tmfPay.pagos_label_debe || ''}:</span> <strong class="text-danger">${formatMoneyMisForm(pay.falta_pagar)}</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <h6 class="fw-bold text-dark text-uppercase mb-2"><i class="bi bi-receipt me-2"></i>${tmfPay.pagos_historial_title || ''}</h6>
+                    ${histRows}`;
             }
 
             body.innerHTML = contentHtml;
@@ -963,13 +1029,30 @@ window.processExcelExport = () => {
     if (!start || !end) return Swal.fire('Atención', 'Seleccione fechas.', 'warning');
     const data = allForms.filter(r => { const f = r.Inicio || '0000-00-00'; return f >= start && f <= end; });
     if (data.length === 0) return Swal.fire('Sin datos', 'No hay registros.', 'info');
-    const headers = ["ID", "Institución", "Categoría", "Tipo", "Inicio", "Retiro", "Protocolo", "Departamento", "Organización", "Estado"];
+    const ex = window.txt?.misformularios || {};
+    const headers = [
+        ex.col_id || 'ID',
+        ex.col_institucion || 'Institución',
+        ex.label_categoria || 'Categoría',
+        ex.label_tipo || 'Tipo',
+        ex.col_inicio || 'Inicio',
+        ex.col_retiro || 'Retiro',
+        ex.col_protocolo || 'Protocolo',
+        ex.col_departamento || 'Departamento',
+        ex.col_organizacion || 'Organización',
+        ex.col_pagado || 'Pagado',
+        ex.col_falta_pagar || 'Falta pagar',
+        ex.col_estado || 'Estado',
+    ];
     const rows = [headers.join(";")];
     data.forEach(r => {
         const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
             ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
             : (r.NombreInstitucion || '');
-        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', r.estado];
+        const exentoRow = Number(r.exento_form) === 1;
+        const pagadoStr = formatMoneyMisForm(r.monto_pagado ?? 0);
+        const faltaStr = exentoRow ? (ex.pagos_exento_badge || 'Exento') : formatMoneyMisForm(r.falta_pagar ?? 0);
+        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, r.estado];
         rows.push(row.map(v => String(v).replace(/;/g, ',')).join(";"));
     });
     const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });

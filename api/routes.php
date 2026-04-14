@@ -394,6 +394,7 @@ $router->post('/admin/reservas/series/cancel-one', 'AdminReservasSeriesControlle
 
 // Ruta para extraer el historial contable / financiero (Auditoría específica)
 $router->get('/billing/audit-history', 'BillingController@getAuditHistory');
+$router->get('/billing/saldo-historial', 'BillingController@getSaldoHistorial');
 
 // ============================================================
 // SECCIÓN: Auxiliares y Selectores

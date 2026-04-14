@@ -210,6 +210,11 @@ function getHeaderHTML(prot) {
                             <small class="text-muted fw-bold uppercase" style="font-size: 10px;">${tf.saldo_actual || 'Saldo Actual:'}</small>
                             <span class="badge bg-light text-success border fs-6 fw-bold">$ ${formatBillingMoney(parseFloat(prot.saldoInv))}</span>
                         </div>
+                        <div class="d-flex justify-content-end mb-1">
+                            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.openSaldoHistorialPopup({ idUsr: ${prot.idUsr}, scope: 'depto', refId: ${parseInt(document.getElementById('sel-depto')?.value || '0', 10) || 0} })">
+                                <i class="bi bi-clock-history me-1"></i>${tf.saldo_hist_btn || 'Historial'}
+                            </button>
+                        </div>
                         <div class="input-group input-group-sm shadow-sm" style="width: 210px;">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-pencil-square"></i></span>
                             <input type="number" id="inp-saldo-prot-${prot.idProt}" class="form-control border-start-0 border-end-0 border-primary" placeholder="${tf.monto_ajustar || 'Monto a ajustar...'}">

@@ -389,7 +389,9 @@ class BillingController {
         $f = $this->getRequestData();
         try {
             $sesion = Auditoria::getDatosSesion(); // Extraemos del Token
-            $res = $this->model->updateBalance($f['idUsr'], $sesion['instId'], $f['monto'], $sesion['userId']);
+            $transferId = $f['transferId'] ?? null;
+            $comment = $f['comment'] ?? null;
+            $res = $this->model->updateBalance($f['idUsr'], $sesion['instId'], $f['monto'], $sesion['userId'], $transferId, $comment);
             if($res) $this->sendSuccess("Saldo actualizado");
             else $this->sendError("No se pudo actualizar");
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
@@ -629,6 +631,38 @@ class BillingController {
             $sesion = Auditoria::getDatosSesion(); // Seguridad: Solo el admin de esta inst ve esto
             $data = $this->model->getFinancialAudit($sesion['instId']);
             $this->jsonResponse('success', $data);
+        } catch (\Exception $e) {
+            $this->jsonResponse('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Popup historial de saldo: movimientos de saldo (CARGA_SALDO) vs pagos (liquidaciones/ajustes) separados.
+     * GET /billing/saldo-historial?idUsr=..&from=YYYY-MM-DD&to=YYYY-MM-DD&scope=investigador|depto|protocolo&refId=..
+     */
+    public function getSaldoHistorial() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int) $sesion['instId'];
+
+            $idUsr = isset($_GET['idUsr']) ? (int) $_GET['idUsr'] : 0;
+            if ($idUsr <= 0) {
+                $this->jsonResponse('error', 'Usuario inválido.');
+            }
+            $from = !empty($_GET['from']) ? (string) $_GET['from'] : null;
+            $to = !empty($_GET['to']) ? (string) $_GET['to'] : null;
+            $scope = !empty($_GET['scope']) ? (string) $_GET['scope'] : 'investigador';
+            $refId = isset($_GET['refId']) && $_GET['refId'] !== '' ? (int) $_GET['refId'] : null;
+
+            $split = $this->model->getSaldoHistorialSplit($instId, $idUsr, $from, $to, $scope, $refId);
+            $saldo = $this->model->getSaldoByInvestigador($idUsr, $instId);
+            $this->jsonResponse('success', [
+                'saldo' => $saldo,
+                'movimientos_saldo' => $split['movimientos_saldo'] ?? [],
+                'pagos' => $split['pagos'] ?? [],
+            ]);
         } catch (\Exception $e) {
             $this->jsonResponse('error', $e->getMessage());
         }

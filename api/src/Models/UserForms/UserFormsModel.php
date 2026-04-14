@@ -51,6 +51,19 @@ class UserFormsModel {
                (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
             : "";
 
+        $hasPrecioTables = $this->hasTable('precioformulario') && $this->hasTable('precioinsumosformulario');
+        $paySelect = $hasPrecioTables
+            ? "COALESCE(prc.precioformulario, 0) + COALESCE(pri.preciototal, 0) AS monto_total_facturado,
+                    COALESCE(prc.totalpago, 0) + COALESCE(pri.totalpago, 0) AS monto_pagado,
+                    COALESCE(tf.exento, 0) AS exento_form,"
+            : "0 AS monto_total_facturado,
+                    0 AS monto_pagado,
+                    COALESCE(tf.exento, 0) AS exento_form,";
+        $payJoin = $hasPrecioTables
+            ? "LEFT JOIN precioformulario prc ON f.idformA = prc.idformA
+                LEFT JOIN precioinsumosformulario pri ON f.idformA = pri.idformA"
+            : "";
+
         $sql = "SELECT
                     f.idformA,
                     f.fechainicioA as Inicio,
@@ -66,6 +79,7 @@ class UserFormsModel {
                     COALESCE(px.nprotA, 'N/A') as Protocolo,
                     COALESCE(d.NombreDeptoA, dp.NombreDeptoA, '---') as Departamento,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
+                    {$paySelect}
                     {$ownerSelect}
                     {$derivEstadoSelect}
                 FROM formularioe f
@@ -74,6 +88,7 @@ class UserFormsModel {
                 {$ownerJoin}
                 {$originJoin}
                 {$actualInstJoin}
+                {$payJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
@@ -111,7 +126,12 @@ class UserFormsModel {
                 if (!empty($orig['Departamento'])) $row['Departamento'] = $orig['Departamento'];
                 if (isset($orig['Organizacion']) && $orig['Organizacion'] !== null && $orig['Organizacion'] !== '') $row['Organizacion'] = $orig['Organizacion'];
             }
+            $total = (float)($row['monto_total_facturado'] ?? 0);
+            $pag = (float)($row['monto_pagado'] ?? 0);
+            $exento = (int)($row['exento_form'] ?? 0) === 1;
+            $row['falta_pagar'] = $exento ? 0.0 : max(0.0, $total - $pag);
         }
+        unset($row);
         return ['info_inst' => $institucion, 'list' => $list];
     }
 
@@ -252,8 +272,75 @@ class UserFormsModel {
 
         return [
             'header' => $head,
-            'details' => $details
+            'details' => $details,
+            'payments' => $this->buildPaymentsPayloadForForm((int)$id),
         ];
+    }
+
+    /**
+     * Totales de facturación del formulario + líneas de historial de pago (excluye movimientos de saldo CARGA_SALDO).
+     */
+    private function buildPaymentsPayloadForForm(int $idformA): array {
+        $out = [
+            'total_facturado' => 0.0,
+            'pagado' => 0.0,
+            'falta_pagar' => 0.0,
+            'exento' => false,
+            'lines' => [],
+        ];
+        $hasWorkflow = $this->hasColumn('formularioe', 'EstadoWorkflow') && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $idInstTipo = $hasWorkflow ? 'COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)' : 'f.IdInstitucion';
+
+        if ($this->hasTable('precioformulario') && $this->hasTable('precioinsumosformulario')) {
+            $sql = "SELECT
+                        COALESCE(prc.precioformulario, 0) + COALESCE(pri.preciototal, 0) AS total_facturado,
+                        COALESCE(prc.totalpago, 0) + COALESCE(pri.totalpago, 0) AS pagado,
+                        COALESCE(tf_pay.exento, 0) AS exento
+                    FROM formularioe f
+                    LEFT JOIN precioformulario prc ON f.idformA = prc.idformA
+                    LEFT JOIN precioinsumosformulario pri ON f.idformA = pri.idformA
+                    LEFT JOIN tipoformularios tf_pay ON f.tipoA = tf_pay.IdTipoFormulario AND tf_pay.IdInstitucion = ({$idInstTipo})
+                    WHERE f.idformA = ?
+                    LIMIT 1";
+            $st = $this->db->prepare($sql);
+            $st->execute([$idformA]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $total = (float)($row['total_facturado'] ?? 0);
+                $pag = (float)($row['pagado'] ?? 0);
+                $exento = (int)($row['exento'] ?? 0) === 1;
+                $out['total_facturado'] = $total;
+                $out['pagado'] = $pag;
+                $out['exento'] = $exento;
+                $out['falta_pagar'] = $exento ? 0.0 : max(0.0, $total - $pag);
+            }
+        }
+
+        $out['lines'] = $this->fetchHistorialPagosFormulario($idformA);
+        return $out;
+    }
+
+    private function fetchHistorialPagosFormulario(int $idformA): array {
+        if (!$this->hasTable('historialpago')) {
+            return [];
+        }
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $cols = 'h.IdHistoPago, h.Monto, h.fecha, h.TipoHistorial, h.IdFormA';
+        if ($hasTransfer) {
+            $cols .= ', h.IdentificadorTransferencia';
+        }
+        if ($hasComment) {
+            $cols .= ', h.Comentario';
+        }
+        $sql = "SELECT {$cols}
+                FROM historialpago h
+                WHERE h.IdFormA = ? AND h.TipoHistorial <> 'CARGA_SALDO'
+                ORDER BY h.fecha DESC, h.IdHistoPago DESC
+                LIMIT 300";
+        $st = $this->db->prepare($sql);
+        $st->execute([$idformA]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**

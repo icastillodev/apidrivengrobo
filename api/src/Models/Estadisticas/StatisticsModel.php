@@ -102,6 +102,13 @@ class StatisticsModel {
         // 7. ESTADÍSTICAS AMPLIADAS ALOJAMIENTO / TRAZABILIDAD
         $res['alojamiento_trazabilidad'] = $this->getAlojamientoTrazabilidadStats($instId);
 
+        // 8. CATEGORÍAS DE FORMULARIOS (listar todas + top en el front)
+        $res['categorias_formularios'] = $this->getCategoriasFormularios((int)$instId, (string)$from, (string)$to);
+
+        // 9. CEPAS (ranking + detalle por departamento)
+        $res['ranking_cepas'] = $this->getRankingCepas((int)$instId, (string)$from, (string)$to);
+        $res['detalle_cepas'] = $this->getDetalleCepas((int)$instId, (string)$from, (string)$to);
+
         return $res;
     }
 
@@ -140,6 +147,195 @@ class StatisticsModel {
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         $row['total_alojamientos'] = 0; // opcional: alojamientos por org se puede añadir después
         return $row;
+    }
+
+    /**
+     * Conteo de formularios entregados por categoría (`tipoformularios.categoriaformulario`) en el rango.
+     * @return array<int, array{categoria: string, cantidad: int}>
+     */
+    private function getCategoriasFormularios(int $instId, string $from, string $to): array {
+        if ($instId <= 0) return [];
+        $stmt = $this->db->prepare("
+            SELECT
+                COALESCE(NULLIF(TRIM(tf.categoriaformulario), ''), 'Sin categoría') AS categoria,
+                COUNT(*) AS cantidad
+            FROM formularioe f
+            INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            WHERE f.IdInstitucion = ?
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY categoria
+            ORDER BY cantidad DESC, categoria ASC
+        ");
+        $stmt->execute([$instId, $from, $to]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'categoria' => (string)($r['categoria'] ?? ''),
+                'cantidad' => (int)($r['cantidad'] ?? 0),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * Ranking de cepas (suma de animales: sexoe.totalA) en formularios entregados en el rango.
+     * @return array<int, array{cepa: string, cantidad_animales: int}>
+     */
+    private function getRankingCepas(int $instId, string $from, string $to): array {
+        if ($instId <= 0) return [];
+        $stmt = $this->db->prepare("
+            SELECT
+                COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
+                IFNULL(SUM(s.totalA), 0) AS cantidad_animales
+            FROM formularioe f
+            INNER JOIN sexoe s ON f.idformA = s.idformA
+            LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+            WHERE f.IdInstitucion = ?
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY cepa
+            ORDER BY cantidad_animales DESC, cepa ASC
+        ");
+        $stmt->execute([$instId, $from, $to]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'cepa' => (string)($r['cepa'] ?? ''),
+                'cantidad_animales' => (int)($r['cantidad_animales'] ?? 0),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * Detalle de cepas por departamento (suma de animales: sexoe.totalA) en el rango.
+     * @return array<int, array{departamento: string, cepa: string, cantidad_animales: int}>
+     */
+    private function getDetalleCepas(int $instId, string $from, string $to): array {
+        if ($instId <= 0) return [];
+        $stmt = $this->db->prepare("
+            SELECT
+                d.NombreDeptoA AS departamento,
+                COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
+                IFNULL(SUM(s.totalA), 0) AS cantidad_animales
+            FROM formularioe f
+            INNER JOIN sexoe s ON f.idformA = s.idformA
+            INNER JOIN protformr pfr ON f.idformA = pfr.idformA
+            INNER JOIN protdeptor pdr ON pfr.idprotA = pdr.idprotA
+            INNER JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA
+            LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+            WHERE f.IdInstitucion = ?
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY d.NombreDeptoA, cepa
+            ORDER BY d.NombreDeptoA ASC, cantidad_animales DESC, cepa ASC
+        ");
+        $stmt->execute([$instId, $from, $to]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'departamento' => (string)($r['departamento'] ?? ''),
+                'cepa' => (string)($r['cepa'] ?? ''),
+                'cantidad_animales' => (int)($r['cantidad_animales'] ?? 0),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @param int[] $ids
+     * @return array<int, array{categoria: string, cantidad: int}>
+     */
+    private function getCategoriasFormulariosRed(array $ids, string $from, string $to): array {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
+        if ($ids === []) return [];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("
+            SELECT
+                COALESCE(NULLIF(TRIM(tf.categoriaformulario), ''), 'Sin categoría') AS categoria,
+                COUNT(*) AS cantidad
+            FROM formularioe f
+            INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            WHERE f.IdInstitucion IN ($ph)
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY categoria
+            ORDER BY cantidad DESC, categoria ASC
+        ");
+        $stmt->execute(array_merge($ids, [$from, $to]));
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'categoria' => (string)($r['categoria'] ?? ''),
+                'cantidad' => (int)($r['cantidad'] ?? 0),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @param int[] $ids
+     * @return array<int, array{cepa: string, cantidad_animales: int}>
+     */
+    private function getRankingCepasRed(array $ids, string $from, string $to): array {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
+        if ($ids === []) return [];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("
+            SELECT
+                COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
+                IFNULL(SUM(s.totalA), 0) AS cantidad_animales
+            FROM formularioe f
+            INNER JOIN sexoe s ON f.idformA = s.idformA
+            LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+            WHERE f.IdInstitucion IN ($ph)
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY cepa
+            ORDER BY cantidad_animales DESC, cepa ASC
+        ");
+        $stmt->execute(array_merge($ids, [$from, $to]));
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'cepa' => (string)($r['cepa'] ?? ''),
+                'cantidad_animales' => (int)($r['cantidad_animales'] ?? 0),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @param int[] $ids
+     * @return array<int, array{departamento: string, cepa: string, cantidad_animales: int}>
+     */
+    private function getDetalleCepasRed(array $ids, string $from, string $to): array {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
+        if ($ids === []) return [];
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("
+            SELECT
+                CONCAT(inst.NombreInst, ' – ', d.NombreDeptoA) AS departamento,
+                COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
+                IFNULL(SUM(s.totalA), 0) AS cantidad_animales
+            FROM formularioe f
+            INNER JOIN institucion inst ON inst.IdInstitucion = f.IdInstitucion
+            INNER JOIN sexoe s ON f.idformA = s.idformA
+            INNER JOIN protformr pfr ON f.idformA = pfr.idformA
+            INNER JOIN protdeptor pdr ON pfr.idprotA = pdr.idprotA
+            INNER JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA
+            LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
+            WHERE f.IdInstitucion IN ($ph)
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY inst.NombreInst, d.NombreDeptoA, cepa
+            ORDER BY inst.NombreInst ASC, d.NombreDeptoA ASC, cantidad_animales DESC, cepa ASC
+        ");
+        $stmt->execute(array_merge($ids, [$from, $to]));
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        return array_map(static function ($r) {
+            return [
+                'departamento' => (string)($r['departamento'] ?? ''),
+                'cepa' => (string)($r['cepa'] ?? ''),
+                'cantidad_animales' => (int)($r['cantidad_animales'] ?? 0),
+            ];
+        }, $rows);
     }
 
     /**
@@ -291,6 +487,13 @@ class StatisticsModel {
 
         // 7. ALOJAMIENTO TRAZABILIDAD (agregado)
         $res['alojamiento_trazabilidad'] = $this->getAlojamientoTrazabilidadStatsRed($ids);
+
+        // 8. CATEGORÍAS DE FORMULARIOS (red)
+        $res['categorias_formularios'] = $this->getCategoriasFormulariosRed($ids, (string)$from, (string)$to);
+
+        // 9. CEPAS (red)
+        $res['ranking_cepas'] = $this->getRankingCepasRed($ids, (string)$from, (string)$to);
+        $res['detalle_cepas'] = $this->getDetalleCepasRed($ids, (string)$from, (string)$to);
 
         return $res;
     }

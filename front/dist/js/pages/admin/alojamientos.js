@@ -112,6 +112,13 @@ function resolveHistoriaIdForQR(explicit) {
     const modal = document.getElementById('modal-historial');
     id = toPosInt(modal?.dataset?.historia ?? modal?.getAttribute?.('data-historia'));
     if (id) return id;
+    // Fallback extra: si por algún motivo no se seteó dataset/historiaContextoQR,
+    // intentamos leer el # de historia desde el resumen renderizado en el modal.
+    const badge = document.querySelector('#historial-summary .badge');
+    const badgeTxt = (badge?.textContent || '').trim();
+    // Ej: "#123" -> 123
+    id = toPosInt(badgeTxt.replace(/[^0-9]/g, ''));
+    if (id) return id;
     const row = AlojamientoState.currentHistoryData?.[0];
     if (row && typeof row === 'object') {
         id = toPosInt(

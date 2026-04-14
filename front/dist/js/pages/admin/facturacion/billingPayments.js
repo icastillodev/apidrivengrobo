@@ -23,11 +23,48 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
     if (action === 'sub') monto = monto * -1;
 
     try {
+        const tf = txF();
+        let transferId = null;
+        let comment = null;
+        if (typeof Swal !== 'undefined') {
+            const title = (action === 'sub')
+                ? (tf.saldo_ajuste_restar_title || 'Restar saldo')
+                : (tf.saldo_ajuste_sumar_title || 'Sumar saldo');
+            const r = await Swal.fire({
+                title,
+                html: `
+                    <div class="text-start">
+                        <label class="form-label small mb-1">${tf.saldo_transfer_id_label || 'Identificador de transferencia'}</label>
+                        <input id="swal-saldo-transfer" class="form-control form-control-sm mb-2" maxlength="120" placeholder="${tf.saldo_transfer_id_ph || 'Ej.: TRANSF-123 / comprobante…'}">
+                        <label class="form-label small mb-1">${tf.saldo_comentario_label || 'Comentario'}</label>
+                        <input id="swal-saldo-comment" class="form-control form-control-sm" maxlength="255" placeholder="${tf.saldo_comentario_ph || 'Ej.: ajuste, reintegro, origen…'}">
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: tf.saldo_ajuste_confirm || 'Confirmar',
+                cancelButtonText: tf.btn_cancelar_swal || 'Cancelar',
+                confirmButtonColor: '#1a5d3b',
+                preConfirm: () => {
+                    const c = Swal.getHtmlContainer();
+                    return {
+                        transferId: c?.querySelector('#swal-saldo-transfer')?.value || '',
+                        comment: c?.querySelector('#swal-saldo-comment')?.value || '',
+                    };
+                }
+            });
+            if (!r.isConfirmed) return;
+            transferId = (r.value?.transferId || '').trim() || null;
+            comment = (r.value?.comment || '').trim() || null;
+        }
+
         showLoader();
         const res = await API.request('/billing/balance', 'POST', {
             idUsr: idUsr,
             instId: localStorage.getItem('instId') || 1,
-            monto: monto
+            monto: monto,
+            transferId,
+            comment
         });
 
         if (res.status === 'success') {
@@ -53,6 +90,121 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
             });
         }
     } catch (e) { console.error(e); } finally { hideLoader(); }
+};
+
+window.openSaldoHistorialPopup = async (opts) => {
+    const tf = txF();
+    const gen = window.txt?.generales || {};
+    const idUsr = parseInt(opts?.idUsr, 10) || 0;
+    const scope = (opts?.scope || 'investigador').toString();
+    const refId = opts?.refId != null ? parseInt(opts.refId, 10) : null;
+    const from = opts?.from || document.getElementById('f-desde')?.value || null;
+    const to = opts?.to || document.getElementById('f-hasta')?.value || null;
+    if (!idUsr) return;
+
+    try {
+        showLoader();
+        const qs = new URLSearchParams();
+        qs.set('idUsr', String(idUsr));
+        if (from) qs.set('from', String(from));
+        if (to) qs.set('to', String(to));
+        qs.set('scope', scope);
+        if (refId && refId > 0) qs.set('refId', String(refId));
+
+        const res = await API.request(`/billing/saldo-historial?${qs.toString()}`, 'GET');
+        if (res.status !== 'success') {
+            Swal.fire(gen.error || 'Error', res.message || '', 'error');
+            return;
+        }
+        const data = res.data || {};
+        const saldo = parseFloat(data.saldo || 0);
+        const mov = Array.isArray(data.movimientos_saldo) ? data.movimientos_saldo : [];
+        const pagos = Array.isArray(data.pagos) ? data.pagos : [];
+
+        const fmtMonto = (m) => {
+            const v = parseFloat(m || 0);
+            const cls = v < 0 ? 'text-danger' : 'text-success';
+            const sign = v < 0 ? '−' : '+';
+            return `<span class="fw-bold ${cls}">${sign} $ ${formatBillingMoney(Math.abs(v))}</span>`;
+        };
+        const fmtFecha = (f) => (f ? String(f) : '—');
+        const empty = (tf.saldo_hist_empty || 'Sin movimientos.');
+
+        const htmlMov = mov.length ? mov.map((r) => `
+            <tr>
+                <td class="text-muted small">#${r.IdHistoPago}</td>
+                <td class="small">${fmtFecha(r.fecha)}</td>
+                <td>${fmtMonto(r.Monto)}</td>
+                <td class="small text-muted">${(r.IdentificadorTransferencia || '—')}</td>
+                <td class="small">${(r.Comentario || '—')}</td>
+            </tr>
+        `).join('') : `<tr><td colspan="5" class="text-center text-muted small py-3">${empty}</td></tr>`;
+
+        const htmlPagos = pagos.length ? pagos.map((r) => `
+            <tr>
+                <td class="text-muted small">#${r.IdHistoPago}</td>
+                <td class="small">${fmtFecha(r.fecha)}</td>
+                <td class="small"><span class="badge bg-secondary">${r.TipoHistorial}</span></td>
+                <td class="small text-muted">${(r.IdFormA && String(r.IdFormA) !== '0') ? '#' + r.IdFormA : '—'}</td>
+                <td>${fmtMonto(0 - Math.abs(parseFloat(r.Monto || 0)))}</td>
+            </tr>
+        `).join('') : `<tr><td colspan="5" class="text-center text-muted small py-3">${empty}</td></tr>`;
+
+        await Swal.fire({
+            title: tf.saldo_hist_title || 'Historial de saldo',
+            width: 980,
+            html: `
+                <div class="text-start">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="small text-muted">${tf.saldo_hist_sub || 'Movimientos de saldo vs pagos'}</div>
+                        <div class="fw-bold">${tf.saldo_actual || 'Saldo Actual:'} <span class="badge bg-success">$ ${formatBillingMoney(saldo)}</span></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="fw-bold mb-1">${tf.saldo_hist_mov_lbl || 'Movimientos (suma / resta)'}</div>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm mb-0 align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>${gen.fecha || 'Fecha'}</th>
+                                            <th>${tf.total || 'Total'}</th>
+                                            <th>${tf.saldo_transfer_id_label || 'Transferencia'}</th>
+                                            <th>${tf.saldo_comentario_label || 'Comentario'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${htmlMov}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="fw-bold mb-1">${tf.saldo_hist_pagos_lbl || 'Pagos (gastos)'}</div>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm mb-0 align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>${gen.fecha || 'Fecha'}</th>
+                                            <th>${tf.hist_tipo || 'Tipo'}</th>
+                                            <th>${tf.hist_ref || 'Ref.'}</th>
+                                            <th>${tf.pago || 'Pago'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${htmlPagos}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: gen.cerrar || 'Cerrar',
+        });
+    } catch (e) {
+        console.error(e);
+    } finally {
+        hideLoader();
+    }
 };
 
 window.procesarPagoProtocolo = async (idProt) => {
