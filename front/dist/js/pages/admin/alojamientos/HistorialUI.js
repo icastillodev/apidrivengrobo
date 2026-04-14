@@ -7,6 +7,10 @@ import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
 
 export const HistorialUI = {
     init() {
+        document.getElementById('modal-historial')?.addEventListener('hidden.bs.modal', () => {
+            AlojamientoState.historiaContextoQR = null;
+        });
+
         window.verHistorial = this.verHistorial.bind(this);
         window.confirmarFinalizarRango = this.confirmarFinalizarRango.bind(this);
         window.confirmarDesfinalizar = this.confirmarDesfinalizar.bind(this);
@@ -41,6 +45,14 @@ export const HistorialUI = {
             if (res.status === 'success') {
                 AlojamientoState.currentHistoryData = res.data; 
                 if (AlojamientoState.currentHistoryData.length === 0) return;
+
+                const hid = parseInt(String(historiaId).trim(), 10);
+                if (Number.isFinite(hid) && hid > 0) {
+                    AlojamientoState.historiaContextoQR = hid;
+                }
+
+                const modalHost = document.getElementById('modal-historial');
+                if (modalHost) modalHost.dataset.historia = String(historiaId);
 
                 this.renderSummary(historiaId);
                 this.renderTable();

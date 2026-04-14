@@ -75,60 +75,61 @@ export async function initMensajes(opts = {}) {
     const destBlock = document.getElementById('msg-nuevo-dest-block');
     const catBlock = document.getElementById('msg-nuevo-cat-block');
     if (instMode) {
-        if (destBlock) destBlock.classList.add('d-none');
+        if (destBlock) destBlock.classList.remove('d-none');
         if (catBlock) catBlock.classList.add('d-none');
         const instTipoBlock = document.getElementById('msg-nuevo-inst-tipo-block');
         if (instTipoBlock) instTipoBlock.classList.remove('d-none');
+        const instInvBlock = document.getElementById('msg-nuevo-inst-inv-block');
+        if (instInvBlock) instInvBlock.classList.add('d-none');
     }
 
     function fillInstTipoSelect() {
         const sel = document.getElementById('nuevo-inst-tipo');
         if (!sel) return;
-        const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-        const staff = [1, 2, 4, 5, 6].includes(role);
-        const opts = [];
-        if (staff) {
-            opts.push({ v: 'institucional_comunicado', l: t.msg_inst_tipo_comunicado || '' });
-        }
-        opts.push({ v: 'consulta_institucion', l: t.msg_inst_tipo_consulta || '' });
-        sel.innerHTML = opts.map((o) => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.l)}</option>`).join('');
+        sel.innerHTML = [
+            { v: 'usuario_institucion', l: t.msg_inst_tipo_user_inst || '' },
+            { v: 'instituciones_red', l: t.msg_inst_tipo_inst_red || '' },
+        ].map((o) => `<option value="${escapeHtml(o.v)}">${escapeHtml(o.l)}</option>`).join('');
     }
 
-    function fillInvestigadoresInstSelect() {
-        const sel = document.getElementById('nuevo-inst-inv');
+    function renderDestinatariosSelectInstMode(query) {
+        const tipo = document.getElementById('nuevo-inst-tipo')?.value || 'usuario_institucion';
+        const sel = document.getElementById('nuevo-dest');
         if (!sel) return;
-        const prev = sel.value;
-        const optTodos = t.msg_inst_inv_opcion_todos || '';
-        sel.innerHTML = `<option value="0">${escapeHtml(optTodos)}</option>`;
-        investigadoresInstCache.forEach((u) => {
-            const opt = document.createElement('option');
-            opt.value = String(u.IdUsrA);
-            opt.textContent = formatDestinatarioLabel(u);
-            sel.appendChild(opt);
-        });
-        if (prev && [...sel.options].some((o) => o.value === prev)) {
-            sel.value = prev;
-        } else {
-            sel.value = '0';
+
+        // Reutilizamos el render existente, pero filtrando el cache según el tipo elegido.
+        if (tipo === 'instituciones_red') {
+            // Solo instituciones de la red (opciones inst-*)
+            const localBk = destinatariosCache.local;
+            const redBk = destinatariosCache.red;
+            destinatariosCache = { local: [], red: redBk.filter((u) => u && u.isInstitution) };
+            renderDestinatariosSelect(query);
+            destinatariosCache = { local: localBk, red: redBk };
+            return;
         }
+
+        // Usuario institución: usuarios locales (sin instituciones)
+        const localBk = destinatariosCache.local;
+        const redBk = destinatariosCache.red;
+        destinatariosCache = { local: localBk.filter((u) => u && !u.isInstitution), red: [] };
+        renderDestinatariosSelect(query);
+        destinatariosCache = { local: localBk, red: redBk };
     }
 
-    function refreshInstInvBlockVisibility() {
-        const block = document.getElementById('msg-nuevo-inst-inv-block');
-        if (!block || !instMode) return;
-        const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-        const staff = [1, 2, 4, 5, 6].includes(role);
-        const tipo = document.getElementById('nuevo-inst-tipo')?.value || '';
-        const show = staff && tipo === 'consulta_institucion';
-        block.classList.toggle('d-none', !show);
+    function refreshInstDestHelpText() {
+        if (!instMode) return;
+        const tipo = document.getElementById('nuevo-inst-tipo')?.value || 'usuario_institucion';
+        const lbl = document.querySelector('#msg-nuevo-dest-block [data-i18n="comunicacion.msg_destinatario"]');
+        if (!lbl) return;
+        lbl.textContent = tipo === 'instituciones_red'
+            ? (t.msg_inst_dest_institucion || t.msg_destinatario || '')
+            : (t.msg_inst_dest_usuario || t.msg_destinatario || '');
     }
 
     let currentHiloId = null;
 
     /** Cache para filtrar destinatarios sin volver a pedir la API */
     let destinatariosCache = { local: [], red: [] };
-    /** Investigadores de la sede (buzón institucional: consulta dirigida) */
-    let investigadoresInstCache = [];
 
     function destinatarioHaystack(u) {
         return [
@@ -268,7 +269,7 @@ export async function initMensajes(opts = {}) {
             const active = currentHiloId === parseInt(h.IdMensajeHilo, 10) ? ' active' : '';
             const ot = String(h.OrigenTipo || '').trim();
             const tipoBadge =
-                instMode && (ot === 'institucional_comunicado' || ot === 'consulta_institucion')
+                instMode && (ot === 'consulta_institucion' || ot === 'institucional')
                     ? ` <span class="badge bg-secondary rounded-pill">${escapeHtml(labelOrigenTipo(ot))}</span>`
                     : '';
             return `
@@ -396,7 +397,10 @@ export async function initMensajes(opts = {}) {
         const fil = document.getElementById('nuevo-dest-filter');
         if (fil) fil.value = '';
 
-        const res = await API.request('/comunicacion/mensajes/destinatarios', 'GET');
+        const destUrl = instMode
+            ? '/comunicacion/mensajes/destinatarios'
+            : '/comunicacion/mensajes/destinatarios?solo_red=1';
+        const res = await API.request(destUrl, 'GET');
         if (res.status !== 'success' || !res.data) {
             destinatariosCache = { local: [], red: [] };
             renderDestinatariosSelect('');
@@ -413,40 +417,31 @@ export async function initMensajes(opts = {}) {
     }
 
     document.getElementById('nuevo-dest-filter')?.addEventListener('input', (e) => {
-        renderDestinatariosSelect(e.target?.value || '');
+        if (instMode) {
+            renderDestinatariosSelectInstMode(e.target?.value || '');
+        } else {
+            renderDestinatariosSelect(e.target?.value || '');
+        }
     });
 
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
         const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
         const avisoInv = document.getElementById('msg-investigador-aviso');
         if (avisoInv) {
-            avisoInv.classList.toggle('d-none', instMode || roleOpen !== 3);
+            avisoInv.classList.toggle('d-none', instMode);
         }
         const filPh = document.getElementById('nuevo-dest-filter');
         if (filPh && !instMode) {
-            filPh.placeholder = roleOpen === 3
-                ? (t.msg_dest_filtro_ph_inv || t.msg_dest_filtro_ph || '')
-                : (t.msg_dest_filtro_ph || '');
+            filPh.placeholder = t.msg_dest_filtro_ph_inv || t.msg_dest_filtro_ph || '';
         }
         if (!instMode) {
             await fillDestinatarios();
             fillCategoriaNuevo();
         } else {
             fillInstTipoSelect();
-            const roleOpenInst = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-            if ([1, 2, 4, 5, 6].includes(roleOpenInst)) {
-                const resInv = await API.request('/comunicacion/mensajes/destinatarios', 'GET');
-                if (resInv.status === 'success' && resInv.data && Array.isArray(resInv.data.investigadores)) {
-                    investigadoresInstCache = resInv.data.investigadores;
-                } else {
-                    investigadoresInstCache = [];
-                }
-                fillInvestigadoresInstSelect();
-            } else {
-                investigadoresInstCache = [];
-                fillInvestigadoresInstSelect();
-            }
-            refreshInstInvBlockVisibility();
+            await fillDestinatarios();
+            refreshInstDestHelpText();
+            renderDestinatariosSelectInstMode('');
         }
         modal?.show();
     });
@@ -462,20 +457,37 @@ export async function initMensajes(opts = {}) {
                 }
                 return;
             }
-            const tipoInst = document.getElementById('nuevo-inst-tipo')?.value || 'consulta_institucion';
-            const roleSend = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-            const payloadInst = {
-                EsInstitucional: true,
-                Asunto: asunto,
-                Cuerpo: cuerpo,
-                OrigenTipo: tipoInst
-            };
-            if ([1, 2, 4, 5, 6].includes(roleSend) && tipoInst === 'consulta_institucion') {
-                const invSel = parseInt(document.getElementById('nuevo-inst-inv')?.value || '0', 10);
-                if (invSel > 0) {
-                    payloadInst.IdInvestigadorDestino = invSel;
+            const tipoInst = document.getElementById('nuevo-inst-tipo')?.value || 'usuario_institucion';
+            const destStr = document.getElementById('nuevo-dest')?.value || '';
+
+            let payloadInst = null;
+
+            if (tipoInst === 'instituciones_red') {
+                if (!destStr.startsWith('inst-')) {
+                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'warning', text: t.msg_inst_err_sel_inst || t.msg_sel_dest || '' });
+                    return;
                 }
+                payloadInst = {
+                    EsInstitucional: true,
+                    Asunto: asunto,
+                    Cuerpo: cuerpo,
+                    OrigenTipo: 'consulta_institucion',
+                    IdInstitucionDestino: parseInt(destStr.replace('inst-', ''), 10)
+                };
+            } else {
+                const dest = parseInt(destStr, 10);
+                if (!dest || dest <= 0) {
+                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'warning', text: t.msg_inst_err_sel_usr || t.msg_sel_dest || '' });
+                    return;
+                }
+                payloadInst = {
+                    Asunto: asunto,
+                    Cuerpo: cuerpo,
+                    OrigenTipo: 'institucional',
+                    IdDestinatario: dest
+                };
             }
+
             const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payloadInst);
             if (res.status === 'success') {
                 avisoCorreoMensajeSiFallo(res);
@@ -549,11 +561,13 @@ export async function initMensajes(opts = {}) {
 
     if (instMode) {
         fillInstTipoSelect();
+        document.getElementById('nuevo-inst-tipo')?.addEventListener('change', () => {
+            const fil = document.getElementById('nuevo-dest-filter');
+            if (fil) fil.value = '';
+            refreshInstDestHelpText();
+            renderDestinatariosSelectInstMode('');
+        });
     }
-
-    document.getElementById('nuevo-inst-tipo')?.addEventListener('change', () => {
-        refreshInstInvBlockVisibility();
-    });
 
     async function applyMsgNuevoDeepLink() {
         const sp = new URLSearchParams(window.location.search);

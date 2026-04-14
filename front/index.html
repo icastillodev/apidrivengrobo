@@ -90,12 +90,18 @@
                             <a id="inst-web-link" href="#" target="_blank" class="text-green-700 font-bold text-[11px] uppercase transition-colors tracking-tighter italic" data-i18n="login.regresar_web">&#8617; regresar web</a>
                         </div>
                         
-                        <button id="btn-opciones" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-700 rounded-full transition-all text-[10px] font-bold uppercase tracking-widest ml-auto">
+                        <div class="flex flex-col items-end gap-1 ml-auto">
+                            <button id="btn-opciones" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-700 rounded-full transition-all text-[10px] font-bold uppercase tracking-widest">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                             </svg>
                             <span data-i18n="login.opciones_acceso">Opciones de acceso</span>
-                        </button>
+                            </button>
+                            <button id="btn-crear-acceso-directo" type="button" class="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-amber-700 hover:text-amber-800 bg-transparent p-0">
+                                <span class="text-amber-600">●</span>
+                                <span data-i18n="login.crear_acceso_hint">Crear acceso directo</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="flex-1 flex flex-col justify-center px-4 sm:px-8 pb-6 sm:pb-8">
@@ -232,6 +238,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const btnOpciones = document.getElementById('btn-opciones');
+            const btnCrearAccesoDirecto = document.getElementById('btn-crear-acceso-directo');
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             const isDesktop = !isIOS && !/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent);
@@ -386,6 +393,13 @@
                             }
                         }
                     });
+                });
+            }
+
+            if (btnCrearAccesoDirecto) {
+                btnCrearAccesoDirecto.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    btnOpciones?.click();
                 });
             }
         });

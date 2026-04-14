@@ -15,6 +15,10 @@ export function getMenuTemplates(roleId = 0) {
     const helpGroupChildren = [
         { label: window.txt.menu.help_capacitacion || 'Capacitación', path: 'panel/capacitacion' },
         {
+            label: window.txt.menu.help_create_shortcut || 'Crear acceso directo',
+            geckoAction: 'pwa_shortcut',
+        },
+        {
             label: window.txt.menu.help_interactive_screen || 'Tutorial interactivo (esta pantalla)',
             geckoAction: 'cap_interactive_tour',
         },

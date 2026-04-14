@@ -138,6 +138,14 @@ window.confirmarDescargaPDF = async () => {
     if (txt) doc.text(txt, midX, 15, { align: 'center' });
 
     try {
+        if (!historiaId || parseInt(String(historiaId), 10) <= 0) {
+            Swal.fire({
+                icon: 'info',
+                text: window.txt?.alojamientos?.qr_sin_historia || 'Espere a que cargue la ficha o vuelva a abrir el enlace del QR.',
+            });
+            return;
+        }
+
         Swal.fire({ title: (window.txt?.alojamientos?.qr_swal_etiqueta_title || 'Generando Etiqueta Segura...'), didOpen: () => Swal.showLoading() });
 
         // 1. Pedimos al Backend que genere (o recupere) el Token random de 6 letras

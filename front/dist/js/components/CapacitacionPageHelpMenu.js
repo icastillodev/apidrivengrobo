@@ -11,6 +11,96 @@ import { clearRouteTourSeen } from '../utils/capacitacionTourPrefs.js';
 
 const MENU_ID = 'gecko-cap-page-help-popover';
 
+let pwaDeferredPrompt = null;
+let pwaInstallListenerBound = false;
+
+function ensurePwaInstallListener() {
+  if (pwaInstallListenerBound) return;
+  pwaInstallListenerBound = true;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    pwaDeferredPrompt = e;
+  });
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent);
+}
+
+function showPwaShortcutModal() {
+  ensurePwaInstallListener();
+  const title = t('pwa.shortcut_title', 'Crear acceso directo');
+  const intro = t('pwa.shortcut_intro', 'Agregue GROBO como acceso directo con el logo en su dispositivo.');
+
+  let body = '';
+  if (isIOS()) {
+    body = `
+      <p class="small text-muted mb-2">${t('pwa.ios_intro', 'En iPhone/iPad (Safari):')}</p>
+      <ol class="small text-start mb-0">
+        <li>${t('pwa.ios_step_1', 'Toque “Compartir”.')}</li>
+        <li>${t('pwa.ios_step_2', 'Elija “Agregar a inicio”.')}</li>
+      </ol>
+    `;
+  } else if (pwaDeferredPrompt) {
+    body = `
+      <p class="small text-muted mb-3">${t(
+        'pwa.install_supported',
+        'Su navegador permite instalar la app. Así se crea el acceso con el logo de GROBO.'
+      )}</p>
+      <button type="button" id="gecko-pwa-install-btn" class="btn btn-success w-100">
+        ${t('pwa.install_btn', 'Instalar / Crear acceso directo')}
+      </button>
+    `;
+  } else if (isAndroid()) {
+    body = `
+      <p class="small text-muted mb-2">${t('pwa.android_intro', 'En Android:')}</p>
+      <ol class="small text-start mb-0">
+        <li>${t('pwa.android_step_1', 'Abra el menú del navegador (⋮).')}</li>
+        <li>${t('pwa.android_step_2', 'Seleccione “Añadir a pantalla de inicio” o “Instalar app”.')}</li>
+      </ol>
+    `;
+  } else {
+    body = `
+      <p class="small text-muted mb-2">${t('pwa.desktop_intro', 'En computadora:')}</p>
+      <ol class="small text-start mb-0">
+        <li>${t('pwa.desktop_step_1', 'En Chrome/Edge: menú (⋯) → “Instalar aplicación”.')}</li>
+        <li>${t('pwa.desktop_step_2', 'Si no aparece, use Favoritos para un acceso rápido.')}</li>
+      </ol>
+    `;
+  }
+
+  if (typeof Swal === 'undefined') return;
+
+  Swal.fire({
+    title: `<div class="d-flex align-items-center gap-2 justify-content-center">
+      <img src="dist/multimedia/imagenes/grobo/png logo sin fondo.png" alt="GROBO" style="width:28px;height:28px;object-fit:contain" />
+      <span>${title}</span>
+    </div>`,
+    html: `<div class="text-start">
+      <p class="small mb-3">${intro}</p>
+      ${body}
+    </div>`,
+    showCloseButton: true,
+    showConfirmButton: false,
+  }).then(() => {});
+
+  setTimeout(() => {
+    const btn = document.getElementById('gecko-pwa-install-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      if (!pwaDeferredPrompt) return;
+      pwaDeferredPrompt.prompt();
+      await pwaDeferredPrompt.userChoice.catch(() => null);
+      pwaDeferredPrompt = null;
+      Swal.close();
+    });
+  }, 0);
+}
+
 function t(k, fb) {
   const parts = k.split('.');
   let o = window.txt;
@@ -159,6 +249,7 @@ let helpMenuDropdownBound = false;
 export function initGeckoHelpMenuDropdownActions() {
   if (helpMenuDropdownBound) return;
   helpMenuDropdownBound = true;
+  ensurePwaInstallListener();
   document.addEventListener(
     'click',
     (e) => {
@@ -190,6 +281,11 @@ export function initGeckoHelpMenuDropdownActions() {
           return;
         }
         startCapacitacionInteractiveTour(mp, { manual: true, hostMenuPath: mp });
+        return;
+      }
+
+      if (action === 'pwa_shortcut') {
+        showPwaShortcutModal();
         return;
       }
 

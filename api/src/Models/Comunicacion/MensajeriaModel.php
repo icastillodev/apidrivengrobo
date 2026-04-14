@@ -213,36 +213,49 @@ class MensajeriaModel {
     }
 
     /**
-     * Hilos del buzón institucional: comunicados visibles para toda la sede;
-     * consultas solo para staff y el usuario que las abrió.
+     * Hilos del buzón institucional: comunicados a la sede; consultas institucionales solo si participa
+     * (no todo el historial de consultas de terceros). Además incluye hilos personales propios (1:1)
+     * de la misma sede para contestar desde un solo lugar, sin mezclar conversaciones ajenas.
      */
     public function getHilosInstitucionales(int $instId, int $userId, int $role, int $page, int $limit): array {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
             return [];
         }
         $offset = max(0, ($page - 1) * $limit);
-        $isStaff = $this->esRolStaffInstitucional($role) ? 1 : 0;
+        $ct = self::ORIGEN_INST_CONSULTA;
+        $sel = "
+            h.*,
+            (SELECT m.Cuerpo FROM mensaje m
+             WHERE m.IdMensajeHilo = h.IdMensajeHilo
+             ORDER BY m.FechaEnvio DESC LIMIT 1) AS UltimoCuerpoPreview,
+            (SELECT COUNT(*) FROM mensaje m
+             WHERE m.IdMensajeHilo = h.IdMensajeHilo
+               AND m.IdUsrRemitente <> :uid1
+               AND NOT EXISTS (
+                 SELECT 1 FROM mensaje_leido ml
+                 WHERE ml.IdMensaje = m.IdMensaje AND ml.IdUsrLector = :uid2
+               )) AS NoLeidos,
+            COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) AS _sort_ts
+        ";
+        $whereInst = "
+            h.IdInstitucion = :iid AND h.EsInstitucional = 1
+            AND (
+              LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
+              OR h.IdUsrParticipanteA = :uid3
+              OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+            )
+        ";
+        $wherePer = "
+            h.IdInstitucion = :iid2 AND COALESCE(h.EsInstitucional, 0) = 0
+            AND (h.IdUsrParticipanteA = :uid5 OR h.IdUsrParticipanteB = :uid6)
+        ";
         $sql = "
-            SELECT h.*,
-              (SELECT m.Cuerpo FROM mensaje m
-               WHERE m.IdMensajeHilo = h.IdMensajeHilo
-               ORDER BY m.FechaEnvio DESC LIMIT 1) AS UltimoCuerpoPreview,
-              (SELECT COUNT(*) FROM mensaje m
-               WHERE m.IdMensajeHilo = h.IdMensajeHilo
-                 AND m.IdUsrRemitente <> :uid1
-                 AND NOT EXISTS (
-                   SELECT 1 FROM mensaje_leido ml
-                   WHERE ml.IdMensaje = m.IdMensaje AND ml.IdUsrLector = :uid2
-                 )) AS NoLeidos
-            FROM mensaje_hilo h
-            WHERE h.IdInstitucion = :iid AND h.EsInstitucional = 1
-              AND (
-                LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
-                OR :isStaff = 1
-                OR h.IdUsrParticipanteA = :uid3
-                OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
-              )
-            ORDER BY COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) DESC, h.IdMensajeHilo DESC
+            SELECT * FROM (
+                SELECT {$sel} FROM mensaje_hilo h WHERE {$whereInst}
+                UNION ALL
+                SELECT {$sel} FROM mensaje_hilo h WHERE {$wherePer}
+            ) u
+            ORDER BY u._sort_ts DESC, u.IdMensajeHilo DESC
             LIMIT {$limit} OFFSET {$offset}
         ";
         $stmt = $this->db->prepare($sql);
@@ -252,9 +265,17 @@ class MensajeriaModel {
             ':uid3' => $userId,
             ':uid4' => $userId,
             ':iid' => $instId,
-            ':isStaff' => $isStaff,
+            ':iid2' => $instId,
+            ':uid5' => $userId,
+            ':uid6' => $userId,
         ]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            unset($r['_sort_ts']);
+        }
+        unset($r);
+
+        return $rows;
     }
 
     /** @deprecated usar getHilosPersonal */
@@ -291,21 +312,29 @@ class MensajeriaModel {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
             return 0;
         }
-        $isStaff = $this->esRolStaffInstitucional($role) ? 1 : 0;
+        $ct = self::ORIGEN_INST_CONSULTA;
         $sql = "
             SELECT COUNT(*) FROM mensaje m
             INNER JOIN mensaje_hilo h ON h.IdMensajeHilo = m.IdMensajeHilo
-            WHERE h.IdInstitucion = :iid AND h.EsInstitucional = 1
-              AND (
-                LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '" . self::ORIGEN_INST_CONSULTA . "'
-                OR :isStaff = 1
-                OR h.IdUsrParticipanteA = :uid3
-                OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
-              )
+            WHERE h.IdInstitucion = :iid
               AND m.IdUsrRemitente <> :uid
               AND NOT EXISTS (
                 SELECT 1 FROM mensaje_leido ml
                 WHERE ml.IdMensaje = m.IdMensaje AND ml.IdUsrLector = :uid2
+              )
+              AND (
+                (
+                  h.EsInstitucional = 1
+                  AND (
+                    LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
+                    OR h.IdUsrParticipanteA = :uid3
+                    OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+                  )
+                )
+                OR (
+                  COALESCE(h.EsInstitucional, 0) = 0
+                  AND (h.IdUsrParticipanteA = :uid5 OR h.IdUsrParticipanteB = :uid6)
+                )
               )
         ";
         $stmt = $this->db->prepare($sql);
@@ -315,8 +344,10 @@ class MensajeriaModel {
             ':uid2' => $userId,
             ':uid3' => $userId,
             ':uid4' => $userId,
-            ':isStaff' => $isStaff,
+            ':uid5' => $userId,
+            ':uid6' => $userId,
         ]);
+
         return (int) $stmt->fetchColumn();
     }
 

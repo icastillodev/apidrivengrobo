@@ -103,7 +103,7 @@ export const TableUI = {
         let data = dataFull.filter(a => {
             const nprot = (a.nprotA || '').toString().toLowerCase();
             const inv = (a.Investigador || '').toString().toLowerCase();
-            const hist = String(a.historia || '');
+            const hist = String(a.historia ?? a.Historia ?? a.HISTORIA ?? a.idHistoria ?? '');
             const termLower = term.toLowerCase();
             const matchesSearch = !termLower || nprot.includes(termLower) || inv.includes(termLower) || hist.includes(termLower);
             const isFinalizado = (a.finalizado == 1 || a.finalizado === "1");
@@ -133,6 +133,9 @@ export const TableUI = {
         }
 
         tbody.innerHTML = pageData.map(a => {
+            const hidRaw = a.historia ?? a.Historia ?? a.HISTORIA ?? a.idHistoria;
+            const hid = parseInt(String(hidRaw ?? '').trim(), 10);
+            const hidNum = Number.isFinite(hid) && hid > 0 ? hid : null;
             const isFinalizado = (a.finalizado == 1 || a.finalizado === "1");
             const nombreTipo = (a.NombreTipoAlojamiento || txt?.box_name || 'Caja').toString();
             const infoCajas = `${a.CantidadCaja ?? 0} ${nombreTipo}`;
@@ -142,8 +145,8 @@ export const TableUI = {
             const textStatus = (isFinalizado ? (txt?.status_finished || 'Finalizado') : (txt?.status_active || 'Vigente')).toString();
 
             return `
-            <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" onclick="window.verHistorial(${a.historia}, event)">
-                <td><span class="badge bg-dark">#${a.historia}</span></td>
+            <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" ${hidNum == null ? '' : `onclick="window.verHistorial(${hidNum}, event)"`}>
+                <td><span class="badge bg-dark">#${hidNum ?? '—'}</span></td>
                 <td class="small fw-bold text-secondary">${fechavisado || '---'}</td> 
                 <td><div class="fw-bold">${(a.nprotA || '').toString()}</div><small class="text-muted">${(a.tituloA || '---').toString().replace(/</g, '&lt;')}</small></td>
                 <td>${(a.Investigador || '---').toString().replace(/</g, '&lt;')}</td>
@@ -154,9 +157,9 @@ export const TableUI = {
                 <td><span class="badge ${badgeStatus}">${textStatus.toUpperCase()}</span></td>
                 <td class="text-end" onclick="event.stopPropagation()">
                     <div class="btn-group shadow-sm">
-                        ${!isFinalizado ? `<button type="button" class="btn btn-xs btn-success" title="${txt?.btn_update_stay || 'Actualizar'}" onclick="event.stopPropagation(); event.preventDefault(); window.openModalActualizar(${a.historia})"><i class="bi bi-arrow-repeat"></i></button>` : ''}
-                        <button class="btn btn-xs btn-light border" title="${txt?.btn_qr || 'QR'}" onclick="window.verPaginaQR(${a.historia})"><i class="bi bi-qr-code"></i></button>
-                        <button class="btn btn-xs btn-light border" title="${txt?.btn_history || 'Historial'}" onclick="window.verHistorial(${a.historia})"><i class="bi bi-clock-history"></i></button>
+                        ${!isFinalizado && hidNum != null ? `<button type="button" class="btn btn-xs btn-success" title="${txt?.btn_update_stay || 'Actualizar'}" onclick="event.stopPropagation(); event.preventDefault(); window.openModalActualizar(${hidNum})"><i class="bi bi-arrow-repeat"></i></button>` : ''}
+                        <button type="button" class="btn btn-xs btn-light border" title="${txt?.btn_qr || 'QR'}" onclick="window.verPaginaQR(${hidNum == null ? 'null' : hidNum})" ${hidNum == null ? 'disabled' : ''}><i class="bi bi-qr-code"></i></button>
+                        <button type="button" class="btn btn-xs btn-light border" title="${txt?.btn_history || 'Historial'}" onclick="window.verHistorial(${hidNum}, event)" ${hidNum == null ? 'disabled' : ''}><i class="bi bi-clock-history"></i></button>
                     </div>
                 </td>
             </tr>`;

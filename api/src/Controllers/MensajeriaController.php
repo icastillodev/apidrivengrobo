@@ -38,12 +38,13 @@ class MensajeriaController {
             $instId = $this->requireInst($sesion);
             $uid = (int)$sesion['userId'];
             $role = (int)($sesion['role'] ?? 0);
+            $soloRed = isset($_GET['solo_red']) && (string)$_GET['solo_red'] === '1';
 
             $local = [];
             $red = [];
 
-            if ($role === 3) {
-                // Role 3 solo puede enviar a su institución o a otras de la red (como institución)
+            if ($role === 3 || $soloRed) {
+                // Investigador o «Mis mensajes» en modo red: solo institución local + sedes de la red (como institución)
                 $local[] = [
                     'isInstitution' => true,
                     'IdInstitucion' => $instId,

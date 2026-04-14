@@ -26,7 +26,9 @@ function resolveAlojamientosInstId() {
 export const AlojamientoState = {
     dataFull: [],
     currentHistoryData: [],
-    instId: resolveAlojamientosInstId()
+    instId: resolveAlojamientosInstId(),
+    /** Última historia con modal de ficha abierta correctamente (para QR / PDF sin pasar ID en onclick). */
+    historiaContextoQR: null
 };
 if (typeof window !== 'undefined') window.__AlojamientoState = AlojamientoState;
 
@@ -97,10 +99,45 @@ window.toggleTrazabilidad = (idAlojamiento, idEspecie) => {
     TrazabilidadUI.toggleRow(idAlojamiento, idEspecie);
 };
 
+/** ID de historia positivo para QR (argumento, contexto de modal, dataset, último historial cargado). */
+function resolveHistoriaIdForQR(explicit) {
+    const toPosInt = (v) => {
+        const n = parseInt(String(v ?? '').trim(), 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    let id = toPosInt(explicit);
+    if (id) return id;
+    id = toPosInt(AlojamientoState.historiaContextoQR);
+    if (id) return id;
+    const modal = document.getElementById('modal-historial');
+    id = toPosInt(modal?.dataset?.historia ?? modal?.getAttribute?.('data-historia'));
+    if (id) return id;
+    const row = AlojamientoState.currentHistoryData?.[0];
+    if (row && typeof row === 'object') {
+        id = toPosInt(
+            row.historia ??
+                row.Historia ??
+                row.HISTORIA ??
+                row.idHistoria ??
+                row.IdHistoria ??
+                row.id_historia
+        );
+    }
+    return id;
+}
+
 // Función auxiliar global para el QR
 window.verPaginaQR = async (historiaId = null) => {
-    const id = historiaId || (AlojamientoState.currentHistoryData[0]?.historia);
-    if (!id) return console.error("Sin ID de historia para QR.");
+    const id = resolveHistoriaIdForQR(historiaId);
+    if (!id) {
+        const t = window.txt?.alojamientos;
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'info', text: t?.qr_sin_historia || 'Abra primero el historial de una estadía o use el botón QR en la tabla.' });
+        } else {
+            console.error('Sin ID de historia para QR.');
+        }
+        return;
+    }
     
     try {
         // 1. Mostramos un pequeño loading porque vamos a hablar con el Backend
