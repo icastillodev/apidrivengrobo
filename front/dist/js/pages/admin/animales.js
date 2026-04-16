@@ -6,6 +6,7 @@ import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
+import { translatePage } from '../../utils/i18n.js';
 
 let allAnimals = [];
 let currentPage = 1;
@@ -13,6 +14,16 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedAnimalFromUrl = false;
+
+function formatAnimalFechaPrecioRef(iso) {
+    if (!iso || String(iso).trim() === '') return '—';
+    const d = String(iso).trim().slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const [y, m, day] = d.split('-');
+        return `${day}/${m}/${y}`;
+    }
+    return iso;
+}
 
 function getI18nValue(path) {
     if (!path) return '';
@@ -311,6 +322,11 @@ function getFilteredAndSortedData() {
  * 2. MODAL DE DETALLE (CORREGIDO)
  */
 window.openAnimalModal = async (a) => {
+    window._animalModalFrozenSubesp = (a.idsubespA != null && a.idsubespA !== '') ? String(a.idsubespA) : null;
+    window._animalModalFrozenPrecioUnit = (a.PrecioUnit != null && a.PrecioUnit !== '') ? String(a.PrecioUnit) : null;
+    window._animalModalFrozenFechaPrecio = (a.FechaPrecioReferencia != null && String(a.FechaPrecioReferencia).trim() !== '')
+        ? String(a.FechaPrecioReferencia).trim().slice(0, 10) : '';
+
     const instId = localStorage.getItem('instId');
     const container = document.getElementById('modal-content-animal');
     const btnPdfFoot = document.getElementById('btn-modal-animal-pdf');
@@ -358,6 +374,7 @@ window.openAnimalModal = async (a) => {
     html += renderOrderModificationSection(a, sex, formDataCache);
 
     container.innerHTML = html;
+    if (typeof translatePage === 'function') translatePage();
     if (btnPdfFoot) btnPdfFoot.disabled = false;
 
     // Actualizar org/ámbito al cambiar departamento
@@ -727,14 +744,18 @@ function renderOrderModificationSection(a, sex, cache) {
             </div>
 
             <div class="col-md-6 mt-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Precio Unitario (BD)</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1" data-i18n="form_animales.precio_unitario_referencia">Precio unitario (referencia)</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light fw-bold">$</span>
                     <input type="text" id="price-unit-modal" class="form-control bg-light text-end" value="${emptyEditable ? 0 : (a.PrecioUnit || 0)}" readonly>
                 </div>
+                <div id="animal-precio-ref-fecha-wrap" class="small text-muted mt-1 ${(!a.FechaPrecioReferencia || String(a.FechaPrecioReferencia).trim() === '') ? 'd-none' : ''}">
+                    <span data-i18n="form_animales.fecha_precio_referencia">Fecha de referencia del precio</span>:
+                    <span id="animal-precio-ref-fecha-val">${a.FechaPrecioReferencia ? formatAnimalFechaPrecioRef(a.FechaPrecioReferencia) : '—'}</span>
+                </div>
             </div>
             <div class="col-md-6 mt-3">
-                <label class="form-label small fw-bold uppercase text-muted mb-1">Precio Final</label>
+                <label class="form-label small fw-bold uppercase text-muted mb-1" data-i18n="form_animales.precio_final">Precio final</label>
                 <div id="discount-alert" class="small text-danger fw-bold mb-1" style="display:none;"></div>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text alert-success border-success fw-bold">$</span>
@@ -986,7 +1007,32 @@ window.updateSpeciesPrice = (select) => {
     const sel = select || document.getElementById('select-categoria-modal');
     const selected = sel && sel.options[sel.selectedIndex];
     const priceUnit = document.getElementById('price-unit-modal');
-    if (priceUnit) priceUnit.value = (selected && selected.value && (selected.dataset.price || 0)) || 0;
+    const catId = selected?.value || '';
+    const catalogPrice = (selected && selected.value && (selected.dataset.price || 0)) || 0;
+    const frozenSub = window._animalModalFrozenSubesp;
+    const frozenUnit = window._animalModalFrozenPrecioUnit;
+    const matchFrozenCat = frozenSub != null && catId && String(catId) === String(frozenSub);
+    if (priceUnit) {
+        if (matchFrozenCat && frozenUnit != null && frozenUnit !== '') {
+            priceUnit.value = frozenUnit;
+        } else {
+            priceUnit.value = catalogPrice;
+        }
+    }
+    const wrap = document.getElementById('animal-precio-ref-fecha-wrap');
+    const fechaVal = document.getElementById('animal-precio-ref-fecha-val');
+    const tx = window.txt?.form_animales || {};
+    if (wrap && fechaVal) {
+        if (matchFrozenCat && (window._animalModalFrozenFechaPrecio || '').trim() !== '') {
+            wrap.classList.remove('d-none');
+            fechaVal.textContent = formatAnimalFechaPrecioRef(window._animalModalFrozenFechaPrecio);
+        } else if (matchFrozenCat) {
+            wrap.classList.add('d-none');
+        } else {
+            wrap.classList.remove('d-none');
+            fechaVal.textContent = tx.precio_ref_guardar_categoria || 'La fecha de referencia se actualizará al guardar si cambió la categoría.';
+        }
+    }
     window.calculateAnimalTotals();
     const idespA = document.getElementById('select-especie-modal');
     const idespVal = idespA && idespA.value ? idespA.value : null;

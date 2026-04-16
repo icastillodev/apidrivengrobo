@@ -2,13 +2,16 @@
 namespace App\Controllers;
 
 use App\Models\Comunicacion\MensajeriaModel;
+use App\Models\Admin\UsuarioModel;
 use App\Models\Services\MailService;
 use App\Utils\Auditoria;
 
 class MensajeriaController {
     private $model;
+    private $db;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new MensajeriaModel($db);
     }
 
@@ -128,6 +131,13 @@ class MensajeriaController {
             if (!$hilo) {
                 $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
             }
+            // Datos de participantes para título/meta en UI.
+            $hilo['ParticipanteA'] = $this->model->getUsuarioResumen((int)($hilo['IdUsrParticipanteA'] ?? 0), $instId);
+            $pbRaw = $hilo['IdUsrParticipanteB'] ?? null;
+            $pb = ($pbRaw !== null && $pbRaw !== '') ? (int)$pbRaw : 0;
+            $hilo['ParticipanteB'] = $pb > 0 ? $this->model->getUsuarioResumen($pb, $instId) : null;
+            $hilo['InterlocutorDetalle'] = $this->model->getResumenInterlocutorHilo((array) $hilo, $uid, $instId);
+
             $mensajes = $this->model->getMensajesHilo($hiloId);
             if (!empty($_GET['markRead']) && $_GET['markRead'] === '1') {
                 $this->model->markHiloLeido($hiloId, $uid);
@@ -141,6 +151,122 @@ class MensajeriaController {
                     'puedeResponder' => $puedeResponder,
                 ],
             ]);
+        } catch (\Exception $e) {
+            $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Vista previa + envío de código por email para eliminación total de un hilo.
+     * Requiere rol staff institucional (no investigador).
+     */
+    public function getDeletePreviewHilo($id) {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $uid = (int)$sesion['userId'];
+            $role = (int) ($sesion['role'] ?? 0);
+            if (!$this->model->esRolStaffInstitucional($role)) {
+                $this->json(['status' => 'error', 'message' => 'No tiene permiso.'], 403);
+            }
+            $hiloId = (int)$id;
+            if ($hiloId <= 0) {
+                $this->json(['status' => 'error', 'message' => 'ID inválido.'], 400);
+            }
+            $preview = $this->model->getDeletePreviewHilo($hiloId, $uid, $instId, $role);
+            if (!$preview) {
+                $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
+            }
+
+            $code = (string) random_int(100000, 999999);
+            UsuarioModel::storeVerificationCode($hiloId, $uid, $code);
+
+            $adminInfo = $this->model->getPersonaCorreoParaNotificacion($uid, $instId);
+            $adminEmail = $adminInfo['EmailA'] ?? null;
+            $adminName = trim((string)(($adminInfo['NombreA'] ?? '') . ' ' . ($adminInfo['ApellidoA'] ?? '')));
+            if ($adminName === '') $adminName = 'Administrador';
+            $lang = $sesion['idioma'] ?? 'es';
+
+            $mail = new MailService();
+            $sent = false;
+            if ($adminEmail) {
+                $sent = (bool) $mail->sendThreadDeleteVerificationCode(
+                    (string)$adminEmail,
+                    $adminName,
+                    $code,
+                    $hiloId,
+                    (string)($preview['Asunto'] ?? ''),
+                    (string)($this->model->getNombreInstitucion((int)($preview['IdInstitucion'] ?? $instId))),
+                    $lang
+                );
+            }
+
+            $this->json([
+                'status' => 'success',
+                'data' => array_merge($preview, ['code_sent' => $sent]),
+            ]);
+        } catch (\Exception $e) {
+            $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Eliminación total de hilo (mensajes + leído), con contraseña del admin + código por email.
+     */
+    public function deleteHiloFull($id) {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $uid = (int)$sesion['userId'];
+            $role = (int) ($sesion['role'] ?? 0);
+            if (!$this->model->esRolStaffInstitucional($role)) {
+                $this->json(['status' => 'error', 'message' => 'No tiene permiso.'], 403);
+            }
+            $hiloId = (int)$id;
+            $input = json_decode(file_get_contents('php://input'), true);
+            $password = trim((string)($input['password'] ?? ''));
+            $code = trim((string)($input['code'] ?? ''));
+            if ($hiloId <= 0 || $password === '' || $code === '') {
+                $this->json(['status' => 'error', 'message' => 'Faltan contraseña o código.'], 400);
+            }
+
+            $st = $this->db->prepare("SELECT password_secure FROM usuarioe WHERE IdUsrA = ? LIMIT 1");
+            $st->execute([$uid]);
+            $row = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$row || !password_verify($password, (string)$row['password_secure'])) {
+                $this->json(['status' => 'error', 'message' => 'Contraseña incorrecta.'], 400);
+            }
+            if (!UsuarioModel::validateVerificationCode($hiloId, $uid, $code)) {
+                $this->json(['status' => 'error', 'message' => 'Código inválido o expirado.'], 400);
+            }
+
+            $preview = $this->model->getDeletePreviewHilo($hiloId, $uid, $instId, $role);
+            if (!$preview) {
+                $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
+            }
+
+            $this->model->deleteHiloCascade($hiloId);
+            Auditoria::logManual($this->db, $uid, 'DELETE_THREAD_FULL', 'mensaje_hilo', "Eliminación total hilo #{$hiloId} | Asunto: " . ($preview['Asunto'] ?? ''));
+
+            $adminInfo = $this->model->getPersonaCorreoParaNotificacion($uid, $instId);
+            $adminEmail = $adminInfo['EmailA'] ?? null;
+            $adminName = trim((string)(($adminInfo['NombreA'] ?? '') . ' ' . ($adminInfo['ApellidoA'] ?? '')));
+            if ($adminName === '') $adminName = 'Administrador';
+            $lang = $sesion['idioma'] ?? 'es';
+            if ($adminEmail) {
+                $mail = new MailService();
+                $mail->sendThreadDeleteSummary(
+                    (string)$adminEmail,
+                    $adminName,
+                    $code,
+                    $hiloId,
+                    (string)($preview['Asunto'] ?? ''),
+                    (string)($this->model->getNombreInstitucion((int)($preview['IdInstitucion'] ?? $instId))),
+                    $lang
+                );
+            }
+
+            $this->json(['status' => 'success', 'message' => 'Hilo eliminado.']);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
@@ -168,7 +294,10 @@ class MensajeriaController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
             $uid = (int)$sesion['userId'];
-            if (!$this->model->usuarioEnInstitucion($instId, $uid)) {
+            $role = (int) ($sesion['role'] ?? 0);
+            // Staff institucional puede operar en el contexto de sede aunque no exista fila usuarioe exacta (casos legacy / tokens).
+            // Investigadores sí requieren pertenencia estricta a la institución.
+            if (!$this->model->esRolStaffInstitucional($role) && !$this->model->usuarioEnInstitucion($instId, $uid)) {
                 $this->json(['status' => 'error', 'message' => 'Usuario no válido.'], 403);
             }
             $input = json_decode(file_get_contents('php://input'), true);
@@ -176,7 +305,6 @@ class MensajeriaController {
                 $input = [];
             }
 
-            $role = (int) ($sesion['role'] ?? 0);
             $idHilo = isset($input['IdMensajeHilo']) ? (int)$input['IdMensajeHilo'] : 0;
             if ($idHilo > 0) {
                 $cuerpo = (string)($input['Cuerpo'] ?? '');

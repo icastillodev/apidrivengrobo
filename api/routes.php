@@ -126,6 +126,8 @@ $router->get('/comunicacion/mensajes/hilos', 'MensajeriaController@getHilos');
 $router->get('/comunicacion/mensajes/no-leidos', 'MensajeriaController@getUnreadCount');
 $router->get('/comunicacion/mensajes/hilo/:id', 'MensajeriaController@getHilo');
 $router->post('/comunicacion/mensajes/hilo/:id/leer', 'MensajeriaController@markHiloRead');
+$router->get('/comunicacion/mensajes/hilo/:id/delete-preview', 'MensajeriaController@getDeletePreviewHilo');
+$router->post('/comunicacion/mensajes/hilo/:id/delete-full', 'MensajeriaController@deleteHiloFull');
 $router->post('/comunicacion/mensajes/enviar', 'MensajeriaController@enviar');
 
 // Tickets de soporte Gecko (turnos 1:1, correo a soporte@appgrobo.com)

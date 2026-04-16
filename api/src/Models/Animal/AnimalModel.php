@@ -156,7 +156,8 @@ class AnimalModel {
                     COALESCE(c.CepaNombreA, '') as CepaNombre,
                     COALESCE(s.machoA, 0) as machoA, COALESCE(s.hembraA, 0) as hembraA, 
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
-                    se.Psubanimal as PrecioUnit,
+                    COALESCE(pfx.precioanimalmomento, se.Psubanimal) as PrecioUnit,
+                    pfx.fechaIniForm as FechaPrecioReferencia,
                     (
                         SELECT 
                             CASE 
@@ -189,6 +190,7 @@ class AnimalModel {
                 LEFT JOIN departamentoe d ON COALESCE({$deptoExpr}, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
+                LEFT JOIN precioformulario pfx ON f.idformA = pfx.idformA
                 WHERE {$whereInst} 
                   {$legacyCopyExclusion}
                   AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause} {$derivOrigenAndClause})
@@ -506,6 +508,7 @@ public function updateStatus($data) {
         $stmtOld = $this->db->prepare("SELECT
                                             f.fechainicioA as oldInicio,
                                             f.fecRetiroA as oldRetiro,
+                                            f.idsubespA as oldIdSubesp,
                                             (SELECT machoA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldMacho,
                                             (SELECT hembraA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldHembra,
                                             (SELECT indistintoA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldIndistinto,
@@ -640,11 +643,27 @@ public function updateStatus($data) {
                         $idDeriv
                     ]);
 
-                // Recalcular facturación derivada (proveedor→cliente) sin tocar precioformulario original.
-                $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
-                $stmtPrecio->execute([$subespDestino]);
-                $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
-                $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                // Facturación derivada: solo recalcular desde tarifario si cambió la categoría (subespecie destino) o es primera configuración.
+                $oldSubDest = (int)($cfgActual['idsubespA_destino'] ?? 0);
+                $cambioCatDest = ($subespDestino !== $oldSubDest);
+                if ($cambioCatDest || $oldSubDest <= 0) {
+                    $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+                    $stmtPrecio->execute([$subespDestino]);
+                    $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+                    $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                } else {
+                    $stmtM = $this->db->prepare("SELECT monto_total FROM facturacion_formulario_derivado WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ? LIMIT 1");
+                    $stmtM->execute([$idDeriv, $instIdRequest]);
+                    $prevMonto = (float)($stmtM->fetchColumn() ?: 0);
+                    if ($prevMonto > 0) {
+                        $nuevoCostoTotal = $prevMonto;
+                    } else {
+                        $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+                        $stmtPrecio->execute([$subespDestino]);
+                        $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+                        $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                    }
+                }
                 if ($this->hasTable('facturacion_formulario_derivado')) {
                     $this->db->prepare("UPDATE facturacion_formulario_derivado
                                         SET monto_total = ?
@@ -726,10 +745,25 @@ public function updateStatus($data) {
             $sqlSexo = "UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?";
             $this->db->prepare($sqlSexo)->execute([$data['machoA'] ?? 0, $data['hembraA'] ?? 0, $data['indistintoA'] ?? 0, $newTotal, $id]);
 
-            // 🚀 RECALCULAR FACTURACIÓN
-            $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
-            $stmtPrecio->execute([$idSubesp]);
-            $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+            // Precio congelado: solo tomar tarifario actual si cambió la categoría (subespecie); si no, mantener precioanimalmomento y recalcular total = unitario × cantidad.
+            $idSubespNorm = (int)($idSubesp ?: 0);
+            $oldSubespNorm = (int)($old['oldIdSubesp'] ?? 0);
+            $cambioCategoria = ($idSubespNorm !== $oldSubespNorm);
+
+            if ($cambioCategoria) {
+                $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+                $stmtPrecio->execute([$idSubesp]);
+                $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+            } else {
+                $stmtPf = $this->db->prepare("SELECT precioanimalmomento FROM precioformulario WHERE idformA = ? LIMIT 1");
+                $stmtPf->execute([$id]);
+                $nuevoPrecioUnitario = (float)($stmtPf->fetchColumn() ?: 0);
+                if ($nuevoPrecioUnitario <= 0 && $idSubespNorm > 0) {
+                    $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
+                    $stmtPrecio->execute([$idSubesp]);
+                    $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+                }
+            }
             $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
 
             if ($esDerivadoEnDestino) {
@@ -743,9 +777,13 @@ public function updateStatus($data) {
                         ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
                 }
             } else {
-                // Formulario normal: actualizar precioformulario
-                $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?")
-                    ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+                if ($cambioCategoria) {
+                    $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ?, fechaIniForm = CURDATE() WHERE idformA = ?")
+                        ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+                } else {
+                    $this->db->prepare("UPDATE precioformulario SET precioformulario = ? WHERE idformA = ?")
+                        ->execute([$nuevoCostoTotal, $id]);
+                }
             }
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);

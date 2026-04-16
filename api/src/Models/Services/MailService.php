@@ -480,6 +480,59 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
     }
 
     /**
+     * Envía el código de verificación para eliminación total de un hilo de mensajería.
+     */
+    public function sendThreadDeleteVerificationCode(
+        string $to,
+        string $adminName,
+        string $code,
+        int $hiloId,
+        string $asunto,
+        string $instName,
+        string $lang = 'es'
+    ): bool {
+        $t = MailLang::get($lang);
+        $subject = ($t['thread_delete_code_subject'] ?? 'Código de verificación - Eliminación de conversación') . ' - GROBO';
+        $asunto = trim((string) $asunto);
+        $hiloLabel = ($t['thread_delete_code_hilo'] ?? 'Hilo') . ' #' . (int) $hiloId;
+        $msg = ($t['delete_code_hello'] ?? 'Hola') . ' <b>' . htmlspecialchars($adminName) . '</b>,<br><br>'
+            . ($t['thread_delete_code_intro'] ?? 'Has solicitado la eliminación total de una conversación interna.') . '<br><br>'
+            . '<strong>' . htmlspecialchars($hiloLabel) . '</strong><br>'
+            . (($asunto !== '') ? ('<strong>' . htmlspecialchars($t['thread_delete_code_asunto'] ?? 'Asunto') . ':</strong> ' . htmlspecialchars($asunto) . '<br>') : '')
+            . '<br>'
+            . '<p style="font-size: 18px; font-weight: bold; letter-spacing: 4px; color: #1a5d3b;">' . htmlspecialchars($code) . '</p>'
+            . '<p style="color: #666;">' . htmlspecialchars($t['delete_code_code'] ?? 'Tu código de verificación es:') . '</p>'
+            . '<p style="font-size: 12px; color: #999;">' . htmlspecialchars($t['delete_code_expires'] ?? 'Válido por 10 minutos.') . '</p>';
+        $body = $this->getTemplate(($t['thread_delete_code_title'] ?? 'Código de verificación'), $msg, '', '', $instName ?: 'GROBO', $lang);
+        return $this->executeSend($to, $subject, $body);
+    }
+
+    /**
+     * Envía resumen tras eliminación total del hilo.
+     */
+    public function sendThreadDeleteSummary(
+        string $to,
+        string $adminName,
+        string $code,
+        int $hiloId,
+        string $asunto,
+        string $instName,
+        string $lang = 'es'
+    ): bool {
+        $t = MailLang::get($lang);
+        $subject = ($t['thread_delete_summary_subject'] ?? 'Eliminación de conversación confirmada') . ' - GROBO';
+        $asunto = trim((string) $asunto);
+        $hiloLabel = ($t['thread_delete_code_hilo'] ?? 'Hilo') . ' #' . (int) $hiloId;
+        $msg = ($t['delete_code_hello'] ?? 'Hola') . ' <b>' . htmlspecialchars($adminName) . '</b>,<br><br>'
+            . ($t['thread_delete_summary_intro'] ?? 'Se eliminó la conversación interna solicitada.') . '<br><br>'
+            . '<strong>' . htmlspecialchars($hiloLabel) . '</strong><br>'
+            . (($asunto !== '') ? ('<strong>' . htmlspecialchars($t['thread_delete_code_asunto'] ?? 'Asunto') . ':</strong> ' . htmlspecialchars($asunto) . '<br>') : '')
+            . '<strong>' . htmlspecialchars($t['thread_delete_summary_code'] ?? 'Código') . ':</strong> ' . htmlspecialchars($code);
+        $body = $this->getTemplate(($t['thread_delete_summary_title'] ?? 'Eliminación confirmada'), $msg, '', '', $instName ?: 'GROBO', $lang);
+        return $this->executeSend($to, $subject, $body);
+    }
+
+    /**
      * Notificación por correo de cada mensaje interno (nuevo hilo o respuesta).
      *
      * @param string $lang es|en|pt
@@ -505,7 +558,8 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
             . htmlspecialchars($nombreRemitente, ENT_QUOTES, 'UTF-8') . '<br><br>'
             . '<b>' . htmlspecialchars($t['msg_int_subject_label'], ENT_QUOTES, 'UTF-8') . '</b> '
             . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8') . '<br><br>'
-            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;">'
+            . '<b>' . htmlspecialchars($t['msg_int_message_label'] ?? 'Mensaje:', ENT_QUOTES, 'UTF-8') . '</b><br>'
+            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;margin-top:4px;">'
             . $cuerpoHtml . '</div>';
 
         $body = $this->getTemplate($t['msg_int_title'], $mensajeCompleto, '', '', $instName, $lang);

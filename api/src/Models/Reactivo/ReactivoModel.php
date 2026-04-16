@@ -374,6 +374,7 @@ class ReactivoModel {
             SELECT 
                 f.fechainicioA as oldInicio,
                 f.fecRetiroA as oldRetiro,
+                f.reactivo as oldReactivo,
                 (SELECT organo FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldOrgano,
                 (SELECT totalA FROM sexoe WHERE idformA = f.idformA LIMIT 1) as oldTotal,
                 (SELECT idprotA FROM protformr WHERE idformA = f.idformA LIMIT 1) as oldProt
@@ -447,10 +448,24 @@ class ReactivoModel {
             $this->db->prepare("UPDATE sexoe SET organo = ?, totalA = ? WHERE idformA = ?")
                     ->execute([$nuevaCantidadReactivo, $newTotal, $id]);
 
-            // RECALCULAR FACTURACIÓN
-            $stmtPrecio = $this->db->prepare("SELECT PrecioInsumo FROM insumoexperimental WHERE IdInsumoexp = ?");
-            $stmtPrecio->execute([$idInsumoReactivo]);
-            $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+            // Precio congelado: solo tarifario vigente si cambió el reactivo/insumo; si no, mantener unitario guardado.
+            $oldReactivo = $old['oldReactivo'] ?? null;
+            $cambioReactivo = ((int)$idInsumoReactivo) !== ((int)($oldReactivo ?? 0));
+
+            if ($cambioReactivo) {
+                $stmtPrecio = $this->db->prepare("SELECT PrecioInsumo FROM insumoexperimental WHERE IdInsumoexp = ?");
+                $stmtPrecio->execute([$idInsumoReactivo]);
+                $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+            } else {
+                $stmtPf = $this->db->prepare("SELECT precioanimalmomento FROM precioformulario WHERE idformA = ? LIMIT 1");
+                $stmtPf->execute([$id]);
+                $nuevoPrecioUnitario = (float)($stmtPf->fetchColumn() ?: 0);
+                if ($nuevoPrecioUnitario <= 0) {
+                    $stmtPrecio = $this->db->prepare("SELECT PrecioInsumo FROM insumoexperimental WHERE IdInsumoexp = ?");
+                    $stmtPrecio->execute([$idInsumoReactivo]);
+                    $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
+                }
+            }
             $nuevoCostoTotal = $nuevoPrecioUnitario * $nuevaCantidadReactivo;
 
             if ($esDerivadoEnDestino) {
@@ -464,8 +479,13 @@ class ReactivoModel {
                         ->execute([$nuevoCostoTotal, $idDeriv, $instIdRequest]);
                 }
             } else {
-                $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ? WHERE idformA = ?")
-                    ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+                if ($cambioReactivo) {
+                    $this->db->prepare("UPDATE precioformulario SET precioanimalmomento = ?, precioformulario = ?, fechaIniForm = CURDATE() WHERE idformA = ?")
+                        ->execute([$nuevoPrecioUnitario, $nuevoCostoTotal, $id]);
+                } else {
+                    $this->db->prepare("UPDATE precioformulario SET precioformulario = ? WHERE idformA = ?")
+                        ->execute([$nuevoCostoTotal, $id]);
+                }
             }
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")

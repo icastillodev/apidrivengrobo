@@ -69,6 +69,8 @@ function fillCategoriaNuevo() {
 export async function initMensajes(opts = {}) {
     const t = window.txt?.comunicacion || {};
     const uid = parseInt(sessionStorage.getItem('userId') || '0', 10);
+    const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    const isStaff = [1, 2, 4, 5, 6].includes(role);
     const alcance = opts.alcance === 'institucional' ? 'institucional' : 'personal';
     const instMode = alcance === 'institucional';
 
@@ -130,6 +132,98 @@ export async function initMensajes(opts = {}) {
 
     /** Cache para filtrar destinatarios sin volver a pedir la API */
     let destinatariosCache = { local: [], red: [] };
+
+    let nuevoMensajeEnviando = false;
+    let replyEnviando = false;
+    let deleteHiloEnviando = false;
+
+    function setDeleteHiloButtonLoading(on) {
+        const btn = document.getElementById('btn-hilo-delete');
+        if (!btn) return;
+        const txt = escapeHtml(t.msg_delete_hilo_loading || t.msg_cargando || '…');
+        if (on) {
+            if (!btn.dataset._delSaveHtml) {
+                btn.dataset._delSaveHtml = btn.innerHTML;
+            }
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span><span>${txt}</span>`;
+        } else {
+            btn.removeAttribute('aria-busy');
+            if (btn.dataset._delSaveHtml) {
+                btn.innerHTML = btn.dataset._delSaveHtml;
+                delete btn.dataset._delSaveHtml;
+            }
+            btn.disabled = !isStaff;
+        }
+    }
+
+    function setReplyEnviando(on) {
+        const panel = document.getElementById('panel-hilo-cont');
+        const btnReply = document.getElementById('btn-reply');
+        const el = document.getElementById('reply-text');
+        const delBtn = document.getElementById('btn-hilo-delete');
+        const txtEnviando = escapeHtml(t.msg_enviando || t.msg_cargando || '…');
+        if (on) {
+            if (panel) {
+                panel.classList.add('pe-none', 'opacity-75');
+            }
+            if (btnReply) {
+                btnReply.disabled = true;
+                btnReply.setAttribute('aria-busy', 'true');
+                btnReply.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span>${txtEnviando}</span>`;
+            }
+            if (el) el.disabled = true;
+            if (delBtn) {
+                delBtn.dataset._msgReplyDelWas = delBtn.disabled ? '1' : '0';
+                delBtn.disabled = true;
+            }
+        } else {
+            if (panel) {
+                panel.classList.remove('pe-none', 'opacity-75');
+            }
+            if (btnReply) {
+                btnReply.disabled = false;
+                btnReply.removeAttribute('aria-busy');
+                btnReply.textContent = t.msg_responder || '';
+            }
+            if (el) el.disabled = false;
+            if (delBtn) {
+                delBtn.disabled = delBtn.dataset._msgReplyDelWas === '1';
+                delete delBtn.dataset._msgReplyDelWas;
+            }
+        }
+    }
+
+    function setModalNuevoEnviando(on) {
+        const modal = document.getElementById('modal-nuevo');
+        const btnEnviar = document.getElementById('btn-enviar-nuevo');
+        if (!modal || !btnEnviar) return;
+        const body = modal.querySelector('.modal-body');
+        const interactive = modal.querySelectorAll('input, select, textarea, button.btn-close');
+        const txtEnviando = escapeHtml(t.msg_enviando || t.msg_cargando || '…');
+        if (on) {
+            btnEnviar.disabled = true;
+            btnEnviar.setAttribute('aria-busy', 'true');
+            btnEnviar.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span>${txtEnviando}</span>`;
+            if (body) body.classList.add('pe-none', 'opacity-75');
+            interactive.forEach((el) => {
+                if (el.id === 'btn-enviar-nuevo') return;
+                el.dataset._msgPrevDisabled = el.disabled ? '1' : '0';
+                el.disabled = true;
+            });
+        } else {
+            btnEnviar.removeAttribute('aria-busy');
+            btnEnviar.disabled = false;
+            btnEnviar.textContent = t.msg_enviar || '';
+            if (body) body.classList.remove('pe-none', 'opacity-75');
+            interactive.forEach((el) => {
+                if (el.id === 'btn-enviar-nuevo') return;
+                el.disabled = el.dataset._msgPrevDisabled === '1';
+                delete el.dataset._msgPrevDisabled;
+            });
+        }
+    }
 
     function destinatarioHaystack(u) {
         return [
@@ -211,26 +305,21 @@ export async function initMensajes(opts = {}) {
                 const bb = `${(b.ApellidoA || '').trim()} ${(b.NombreA || '').trim()}`.trim().toLowerCase();
                 return aa.localeCompare(bb, undefined, { sensitivity: 'base' });
             });
-            const hdr = document.createElement('option');
-            hdr.disabled = true;
-            hdr.value = '';
-            hdr.textContent = ` ${g.label} `;
-            hdr.className = 'mensajes-dest-inst-banner';
-            sel.appendChild(hdr);
+            const og = document.createElement('optgroup');
+            og.label = g.label;
             g.users.forEach((u) => {
+                const opt = document.createElement('option');
                 if (u.isInstitution) {
-                    const opt = document.createElement('option');
                     opt.value = `inst-${u.IdInstitucion}`;
                     const pref = (t.msg_dest_inst_badge || '').trim();
-                    opt.textContent = `\u00A0\u00A0${pref ? `${pref} ` : ''}${u.NombreInstitucion || ''}`;
-                    sel.appendChild(opt);
+                    opt.textContent = `${pref ? `${pref} ` : ''}${u.NombreInstitucion || ''}`;
                 } else {
-                    const opt = document.createElement('option');
                     opt.value = String(u.IdUsrA);
-                    opt.textContent = `\u00A0\u00A0${formatDestinatarioLabel(u)}`;
-                    sel.appendChild(opt);
+                    opt.textContent = formatDestinatarioLabel(u);
                 }
+                og.appendChild(opt);
             });
+            sel.appendChild(og);
         }
 
         if (prevVal && [...sel.options].some((o) => o.value === prevVal)) {
@@ -238,6 +327,42 @@ export async function initMensajes(opts = {}) {
         } else {
             sel.value = '';
         }
+        updateDestEmailHint();
+    }
+
+    function updateDestEmailHint() {
+        const hint = document.getElementById('msg-dest-email-hint');
+        if (!hint) return;
+        const sel = document.getElementById('nuevo-dest');
+        if (!sel) return;
+        const v = String(sel.value || '').trim();
+        if (!v || v.startsWith('inst-')) {
+            hint.textContent = '';
+            return;
+        }
+        const id = parseInt(v, 10);
+        if (!id) { hint.textContent = ''; return; }
+        const all = [...(destinatariosCache.local || []), ...(destinatariosCache.red || [])];
+        const u = all.find(x => parseInt(x?.IdUsrA || 0, 10) === id);
+        const email = u && u.EmailA ? String(u.EmailA).trim() : '';
+        const lbl = t.msg_dest_email_label || 'Aviso por email a';
+        const no = t.msg_dest_email_none || 'Sin email registrado';
+        hint.textContent = `${lbl}: ${email || no}`;
+    }
+
+    /** Línea secundaria en lista izquierda: nombre apellido · usuario · ID (sin correo ni teléfono; eso solo al abrir el hilo). */
+    function formatListaInterlocutorLine(h) {
+        const nom = String(h.ListaInterNombre || '').trim();
+        const ape = String(h.ListaInterApellido || '').trim();
+        const usr = String(h.ListaInterUsuario || '').trim();
+        const idn = parseInt(h.ListaInterId || 0, 10);
+        const idShort = t.msg_dest_id_short || 'ID';
+        const full = [nom, ape].filter(Boolean).join(' ').trim();
+        const parts = [];
+        if (full) parts.push(full);
+        if (usr) parts.push(usr);
+        if (idn > 0) parts.push(`${idShort} ${idn}`);
+        return parts.join(' · ');
     }
 
     async function loadHilos(options = {}) {
@@ -264,18 +389,28 @@ export async function initMensajes(opts = {}) {
         }
 
         list.innerHTML = hilos.map((h) => {
-            const unread = parseInt(h.NoLeidos || 0, 10) > 0;
-            const badge = unread ? ' <span class="badge bg-danger rounded-pill">!</span>' : '';
+            const nUnread = parseInt(h.NoLeidos || 0, 10);
+            const badge = nUnread > 0 ? ` <span class="badge bg-danger rounded-pill">${escapeHtml(String(nUnread))}</span>` : '';
             const active = currentHiloId === parseInt(h.IdMensajeHilo, 10) ? ' active' : '';
             const ot = String(h.OrigenTipo || '').trim();
-            const tipoBadge =
-                instMode && (ot === 'consulta_institucion' || ot === 'institucional')
-                    ? ` <span class="badge bg-secondary rounded-pill">${escapeHtml(labelOrigenTipo(ot))}</span>`
-                    : '';
+            const hInst = parseInt(h.EsInstitucional || 0, 10) === 1;
+            const showTipo = (instMode || hInst) && ot !== '';
+            const tipoBadge = showTipo
+                ? ` <span class="badge bg-secondary rounded-pill">${escapeHtml(labelOrigenTipo(ot))}</span>`
+                : '';
+            const interLine = formatListaInterlocutorLine(h);
+            const interHtml = interLine
+                ? `<div class="text-muted text-break mt-1" style="font-size:11px;line-height:1.35;">${escapeHtml(interLine)}</div>`
+                : '';
             return `
-                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start text-start${active}" data-hilo="${h.IdMensajeHilo}">
-                    <span class="text-truncate me-2 small">${escapeHtml(h.Asunto || '—')}${tipoBadge}${badge}</span>
-                    <small class="text-muted text-nowrap">${escapeHtml(formatDate(h.FechaUltimoMensaje || h.FechaCreacion))}</small>
+                <button type="button" class="list-group-item list-group-item-action text-start w-100${active}" data-hilo="${h.IdMensajeHilo}">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="small flex-grow-1" style="min-width:0">
+                            <div class="text-break"><span class="fw-medium">${escapeHtml(h.Asunto || (t.msg_hilo_sin_asunto || '—'))}</span>${tipoBadge}${badge}</div>
+                            ${interHtml}
+                        </div>
+                        <small class="text-muted text-nowrap flex-shrink-0">${escapeHtml(formatDate(h.FechaUltimoMensaje || h.FechaCreacion))}</small>
+                    </div>
                 </button>`;
         }).join('');
 
@@ -310,21 +445,109 @@ export async function initMensajes(opts = {}) {
         if (replyWrap) replyWrap.classList.toggle('d-none', !puedeResponder);
         if (soloLec) soloLec.classList.toggle('d-none', puedeResponder);
 
+        const ts = hilo.FechaUltimoMensaje || hilo.FechaCreacion || '';
+        const fecha = formatDateTime(ts);
+        const asuntoTxt = String(hilo.Asunto || '').trim();
         const asuntoEl = document.getElementById('hilo-asunto');
-        if (asuntoEl) asuntoEl.textContent = hilo.Asunto || '';
+        if (asuntoEl) {
+            const sin = t.msg_hilo_sin_asunto || '—';
+            asuntoEl.textContent = asuntoTxt ? (fecha ? `${asuntoTxt} · ${fecha}` : asuntoTxt) : (fecha ? `${sin} · ${fecha}` : sin);
+        }
+
+        const pA = hilo.ParticipanteA || null;
+        const pB = hilo.ParticipanteB || null;
+        const idA = parseInt(hilo.IdUsrParticipanteA || 0, 10);
+        const idBRaw = hilo.IdUsrParticipanteB;
+        const idB = idBRaw !== null && idBRaw !== undefined && idBRaw !== '' ? parseInt(idBRaw, 10) : 0;
+        const otherId = idA === uid ? idB : idA;
+        const other = (pA && parseInt(pA.IdUsrA || 0, 10) === otherId) ? pA
+            : (pB && parseInt(pB.IdUsrA || 0, 10) === otherId) ? pB
+                : null;
+
+        /** Interlocutor para cabecera (prioriza participantes API; si no, primer mensaje). */
+        let interlocutor = null;
+        if (other && parseInt(String(other.IdUsrA || 0), 10) > 0) {
+            interlocutor = {
+                IdUsrA: parseInt(other.IdUsrA, 10),
+                NombreA: String(other.NombreA || '').trim(),
+                ApellidoA: String(other.ApellidoA || '').trim(),
+                Usuario: String(other.Usuario || '').trim()
+            };
+        } else if (mensajes.length > 0) {
+            const m0 = mensajes[0];
+            const rid = parseInt(m0.IdUsrRemitente || 0, 10);
+            if (rid > 0) {
+                interlocutor = {
+                    IdUsrA: rid,
+                    NombreA: String(m0.RemitenteNombre || '').trim(),
+                    ApellidoA: String(m0.RemitenteApellido || '').trim(),
+                    Usuario: String(m0.RemitenteUsuario || '').trim()
+                };
+            }
+        }
+
+        const otherName = other ? `${(other.NombreA || '').trim()} ${(other.ApellidoA || '').trim()}`.trim() : '';
+        const otherUsr = other ? String(other.Usuario || '').trim() : '';
+        const otherIdTxt = interlocutor && interlocutor.IdUsrA > 0
+            ? String(interlocutor.IdUsrA)
+            : (other ? String(other.IdUsrA || otherId || '') : String(otherId || ''));
 
         const metaEl = document.getElementById('hilo-meta');
+        const interlocutorEl = document.getElementById('hilo-meta-interlocutor');
         if (metaEl) {
             const ot = String(hilo.OrigenTipo || '').trim();
             const extra = ot ? ` · ${labelOrigenTipo(ot)}` : '';
-            if (instMode || parseInt(hilo.EsInstitucional || 0, 10) === 1) {
-                metaEl.textContent = `${t.msg_hilo_inst || ''}${extra}`;
-            } else {
-                const other = parseInt(hilo.IdUsrParticipanteA, 10) === uid
-                    ? parseInt(hilo.IdUsrParticipanteB, 10)
-                    : parseInt(hilo.IdUsrParticipanteA, 10);
-                metaEl.textContent = `${t.msg_hilo || ''} · ID ${other}${extra}`;
+            const base = (instMode || parseInt(hilo.EsInstitucional || 0, 10) === 1)
+                ? (t.msg_hilo_inst || '')
+                : (t.msg_hilo || '');
+            const whoParts = [];
+            if (!isStaff) {
+                if (otherName) whoParts.push(otherName);
+                if (otherUsr) whoParts.push(otherUsr);
+                if (otherIdTxt) whoParts.push(`${t.msg_dest_id_short || 'ID'} ${otherIdTxt}`);
             }
+            metaEl.textContent = `${base}${whoParts.length ? ` · ${whoParts.join(' · ')}` : ''}${extra}`;
+        }
+        if (interlocutorEl) {
+            const det = hilo.InterlocutorDetalle || null;
+            const srcStaff = det || interlocutor;
+            if (isStaff && srcStaff && (parseInt(String(srcStaff.IdUsrA || 0), 10) > 0 || srcStaff.NombreA || srcStaff.ApellidoA || srcStaff.Usuario)) {
+                interlocutorEl.classList.remove('d-none');
+                const dash = escapeHtml(t.msg_hilo_admin_sin_dato || '—');
+                const idLbl = t.msg_dest_id_short || 'ID';
+                const row = (lbl, val) => {
+                    const v = val !== undefined && val !== null ? String(val).trim() : '';
+                    const show = v ? escapeHtml(v) : dash;
+                    return `<div><span class="text-muted">${escapeHtml(lbl)}:</span> ${show}</div>`;
+                };
+                const rowIfVal = (lbl, val) => {
+                    const v = val !== undefined && val !== null ? String(val).trim() : '';
+                    if (!v) return '';
+                    return `<div><span class="text-muted">${escapeHtml(lbl)}:</span> ${escapeHtml(v)}</div>`;
+                };
+                const tit = escapeHtml(t.msg_hilo_admin_interlocutor || '');
+                const nomApe = [srcStaff.NombreA, srcStaff.ApellidoA].filter(Boolean).join(' ').trim();
+                const tel = String(srcStaff.TelefonoA || '').trim();
+                const cel = String(srcStaff.CelularA || '').trim();
+                const contacto = [tel, cel].filter(Boolean).join(' · ');
+                interlocutorEl.innerHTML =
+                    `<div class="fw-semibold text-secondary mb-1">${tit}</div>` +
+                    row(t.msg_hilo_admin_nombre_completo || '', nomApe) +
+                    row(t.msg_hilo_admin_usuario || '', srcStaff.Usuario) +
+                    row(idLbl, parseInt(String(srcStaff.IdUsrA || 0), 10) > 0 ? String(srcStaff.IdUsrA) : '') +
+                    rowIfVal(t.msg_hilo_admin_email || '', srcStaff.EmailA) +
+                    rowIfVal(t.msg_hilo_admin_contacto || '', contacto);
+            } else {
+                interlocutorEl.classList.add('d-none');
+                interlocutorEl.innerHTML = '';
+            }
+        }
+
+        const delBtn = document.getElementById('btn-hilo-delete');
+        if (delBtn) {
+            // Eliminar requiere rol staff institucional.
+            delBtn.classList.toggle('d-none', !isStaff);
+            delBtn.disabled = !isStaff;
         }
 
         const box = document.getElementById('hilo-mensajes');
@@ -333,8 +556,24 @@ export async function initMensajes(opts = {}) {
                 const mine = parseInt(m.IdUsrRemitente, 10) === uid;
                 const bubble = mine ? 'bg-primary text-white' : 'bg-white border';
                 const align = mine ? 'text-end' : '';
+                const yo = t.msg_yo || 'Yo';
+                const nom = String(m.RemitenteNombre || '').trim();
+                const ape = String(m.RemitenteApellido || '').trim();
+                const usr = String(m.RemitenteUsuario || '').trim();
+                const nombreCompleto = [nom, ape].filter(Boolean).join(' ').trim();
+                const idRem = parseInt(m.IdUsrRemitente || 0, 10);
+                const idShort = t.msg_dest_id_short || 'ID';
+                let remitente = yo;
+                if (!mine) {
+                    const partes = [];
+                    if (nombreCompleto) partes.push(nombreCompleto);
+                    if (usr) partes.push(usr);
+                    if (idRem > 0) partes.push(`${idShort} ${idRem}`);
+                    remitente = partes.length ? partes.join(' · ') : `ID ${idRem || ''}`.trim();
+                }
                 return `
                     <div class="mb-2 ${align}">
+                        <div class="small ${mine ? 'text-primary' : 'text-muted'}">${escapeHtml(remitente)}</div>
                         <div class="d-inline-block px-2 py-1 rounded small ${bubble}" style="max-width:85%;text-align:left;">
                             ${escapeHtml(m.Cuerpo || '')}
                         </div>
@@ -352,24 +591,118 @@ export async function initMensajes(opts = {}) {
         }
     }
 
+    async function deleteCurrentHilo() {
+        if (!currentHiloId || !isStaff) return;
+        if (deleteHiloEnviando) return;
+        const id = currentHiloId;
+        const delBtnEl = document.getElementById('btn-hilo-delete');
+        deleteHiloEnviando = true;
+        setDeleteHiloButtonLoading(true);
+        try {
+            const prev = await API.request(`/comunicacion/mensajes/hilo/${id}/delete-preview`, 'GET');
+            if (prev?.status !== 'success' || !prev.data) {
+                if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: prev?.message || t.err_generico || '' });
+                return;
+            }
+            const p = prev.data;
+            const codeSent = !!p.code_sent;
+            const asunto = String(p.Asunto || '').trim();
+            const msgCount = parseInt(p.mensajes || 0, 10);
+            const warn = codeSent ? (t.msg_delete_hilo_code_sent || '') : (t.msg_delete_hilo_code_not_sent || '');
+
+            setDeleteHiloButtonLoading(false);
+            if (delBtnEl) delBtnEl.disabled = true;
+
+            const html = `
+                <div class="text-start small">
+                    <div class="mb-2"><b>${escapeHtml(t.msg_delete_hilo_hilo || 'Hilo')} #${escapeHtml(String(id))}</b></div>
+                    ${asunto ? `<div class="mb-2"><b>${escapeHtml(t.msg_asunto || 'Asunto')}:</b> ${escapeHtml(asunto)}</div>` : ``}
+                    <div class="mb-2"><b>${escapeHtml(t.msg_delete_hilo_cant || 'Mensajes')}:</b> ${escapeHtml(String(msgCount))}</div>
+                    ${warn ? `<div class="alert alert-warning py-2 mb-2">${escapeHtml(warn)}</div>` : ``}
+                    <label class="form-label small mb-1">${escapeHtml(t.msg_delete_hilo_password || 'Contraseña')}</label>
+                    <input id="swal-del-pass" type="password" class="form-control form-control-sm mb-2">
+                    <label class="form-label small mb-1">${escapeHtml(t.msg_delete_hilo_code || 'Código')}</label>
+                    <input id="swal-del-code" type="text" inputmode="numeric" maxlength="6" class="form-control form-control-sm">
+                </div>
+            `;
+
+            const res = await Swal.fire({
+                icon: 'warning',
+                title: t.msg_delete_hilo_title || '',
+                html,
+                showCancelButton: true,
+                confirmButtonText: t.msg_delete_hilo_confirm || '',
+                cancelButtonText: t.msg_delete_hilo_cancel || '',
+                preConfirm: async () => {
+                    const password = document.getElementById('swal-del-pass')?.value?.trim() || '';
+                    const code = document.getElementById('swal-del-code')?.value?.trim() || '';
+                    if (!password || !code) {
+                        Swal.showValidationMessage(t.msg_delete_hilo_validation || t.err_generico || '');
+                        return false;
+                    }
+                    const confirmBtn = typeof Swal.getConfirmButton === 'function' ? Swal.getConfirmButton() : null;
+                    if (confirmBtn) confirmBtn.disabled = true;
+                    Swal.showLoading();
+                    try {
+                        const del = await API.request(`/comunicacion/mensajes/hilo/${id}/delete-full`, 'POST', { password, code });
+                        if (del?.status !== 'success') {
+                            Swal.showValidationMessage(del?.message || t.err_generico || '');
+                            return false;
+                        }
+                        return true;
+                    } catch (err) {
+                        console.error(err);
+                        Swal.showValidationMessage(t.err_generico || '');
+                        return false;
+                    } finally {
+                        Swal.hideLoading();
+                        if (confirmBtn) confirmBtn.disabled = false;
+                    }
+                }
+            });
+            if (!res.isConfirmed) return;
+            await Swal.fire({ icon: 'success', title: t.msg_delete_hilo_success || '', timer: 1500, showConfirmButton: false });
+            currentHiloId = null;
+            document.getElementById('panel-hilo-cont')?.classList.add('d-none');
+            document.getElementById('panel-hilo-placeholder')?.classList.remove('d-none');
+            await loadHilos();
+            if (window.NotificationManager?.check) window.NotificationManager.check();
+        } catch (e) {
+            console.error(e);
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: t.err_generico || '' });
+        } finally {
+            deleteHiloEnviando = false;
+            setDeleteHiloButtonLoading(false);
+            if (delBtnEl) delBtnEl.disabled = !isStaff;
+        }
+    }
+
     async function sendReply() {
+        if (replyEnviando) return;
         const wrap = document.getElementById('hilo-reply-wrap');
-        if (wrap?.classList.contains('d-none')) return;
+        if (wrap?.classList?.contains('d-none')) return;
         const el = document.getElementById('reply-text');
         const txt = el?.value?.trim();
         if (!currentHiloId || !txt) return;
 
-        const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
-            IdMensajeHilo: currentHiloId,
-            Cuerpo: txt
-        });
+        replyEnviando = true;
+        setReplyEnviando(true);
+        try {
+            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
+                IdMensajeHilo: currentHiloId,
+                Cuerpo: txt
+            });
 
-        if (res.status === 'success') {
-            el.value = '';
-            avisoCorreoMensajeSiFallo(res);
-            await openHilo(currentHiloId);
-        } else if (typeof Swal !== 'undefined') {
-            Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            if (res.status === 'success') {
+                if (el) el.value = '';
+                avisoCorreoMensajeSiFallo(res);
+                await openHilo(currentHiloId);
+            } else if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            }
+        } finally {
+            replyEnviando = false;
+            setReplyEnviando(false);
         }
     }
 
@@ -380,25 +713,37 @@ export async function initMensajes(opts = {}) {
         replyTa.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
+                if (replyEnviando) return;
                 sendReply();
             }
         });
     }
 
     document.getElementById('btn-reply')?.addEventListener('click', () => sendReply());
+    document.getElementById('btn-hilo-delete')?.addEventListener('click', () => deleteCurrentHilo());
 
     const modalEl = document.getElementById('modal-nuevo');
     let modal = null;
     if (modalEl && window.bootstrap) {
         modal = new window.bootstrap.Modal(modalEl);
+        modalEl.addEventListener('hide.bs.modal', (e) => {
+            if (nuevoMensajeEnviando) {
+                e.preventDefault();
+            }
+        });
     }
 
     async function fillDestinatarios() {
         const fil = document.getElementById('nuevo-dest-filter');
         if (fil) fil.value = '';
 
+        const chkPersonal = document.getElementById('chk-msg-personal');
+        const asPersonal = instMode && isStaff && !!chkPersonal?.checked;
+        // En institucional:
+        // - normal: selector institucional (usuarios+red como instituciones)
+        // - "personal": enviar como hilo personal (solo usuarios; no instituciones)
         const destUrl = instMode
-            ? '/comunicacion/mensajes/destinatarios'
+            ? (asPersonal ? '/comunicacion/mensajes/destinatarios' : '/comunicacion/mensajes/destinatarios')
             : '/comunicacion/mensajes/destinatarios?solo_red=1';
         const res = await API.request(destUrl, 'GET');
         if (res.status !== 'success' || !res.data) {
@@ -410,8 +755,9 @@ export async function initMensajes(opts = {}) {
         const red = Array.isArray(res.data.red) ? res.data.red : [];
 
         destinatariosCache = {
+            // En "personal" dentro de institucional, solo usuarios (no instituciones red).
             local: local.filter((u) => parseInt(u.IdUsrA, 10) !== uid),
-            red
+            red: (instMode && isStaff && !!document.getElementById('chk-msg-personal')?.checked) ? [] : red
         };
         renderDestinatariosSelect('');
     }
@@ -423,6 +769,7 @@ export async function initMensajes(opts = {}) {
             renderDestinatariosSelect(e.target?.value || '');
         }
     });
+    document.getElementById('nuevo-dest')?.addEventListener('change', () => updateDestEmailHint());
 
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
         const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
@@ -430,6 +777,11 @@ export async function initMensajes(opts = {}) {
         if (avisoInv) {
             avisoInv.classList.toggle('d-none', instMode);
         }
+        const scopeBlock = document.getElementById('msg-nuevo-scope-block');
+        const chkPersonal = document.getElementById('chk-msg-personal');
+        if (scopeBlock) scopeBlock.classList.toggle('d-none', !(instMode && isStaff));
+        if (chkPersonal) chkPersonal.checked = false;
+
         const filPh = document.getElementById('nuevo-dest-filter');
         if (filPh && !instMode) {
             filPh.placeholder = t.msg_dest_filtro_ph_inv || t.msg_dest_filtro_ph || '';
@@ -443,14 +795,35 @@ export async function initMensajes(opts = {}) {
             refreshInstDestHelpText();
             renderDestinatariosSelectInstMode('');
         }
+        if (chkPersonal && instMode && isStaff) {
+            chkPersonal.onchange = async () => {
+                const asPersonal = !!chkPersonal.checked;
+                const instTipoBlock = document.getElementById('msg-nuevo-inst-tipo-block');
+                const catBlock = document.getElementById('msg-nuevo-cat-block');
+                if (instTipoBlock) instTipoBlock.classList.toggle('d-none', asPersonal);
+                if (catBlock) catBlock.classList.toggle('d-none', !asPersonal);
+                // Re-cargar destinatarios y refrescar render.
+                await fillDestinatarios();
+                if (asPersonal) {
+                    fillCategoriaNuevo();
+                    renderDestinatariosSelect('');
+                } else {
+                    fillInstTipoSelect();
+                    refreshInstDestHelpText();
+                    renderDestinatariosSelectInstMode('');
+                }
+            };
+        }
         modal?.show();
     });
 
     document.getElementById('btn-enviar-nuevo')?.addEventListener('click', async () => {
+        if (nuevoMensajeEnviando) return;
         const asunto = document.getElementById('nuevo-asunto')?.value?.trim() || '';
         const cuerpo = document.getElementById('nuevo-cuerpo')?.value?.trim() || '';
 
-        if (instMode) {
+        const asPersonalInInst = instMode && isStaff && !!document.getElementById('chk-msg-personal')?.checked;
+        if (instMode && !asPersonalInInst) {
             if (!asunto || !cuerpo) {
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({ icon: 'warning', text: t.msg_requiere_asunto_cuerpo || '' });
@@ -481,29 +854,37 @@ export async function initMensajes(opts = {}) {
                     return;
                 }
                 payloadInst = {
+                    EsInstitucional: true,
                     Asunto: asunto,
                     Cuerpo: cuerpo,
-                    OrigenTipo: 'institucional',
-                    IdDestinatario: dest
+                    OrigenTipo: 'consulta_institucion',
+                    IdInvestigadorDestino: dest
                 };
             }
 
-            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payloadInst);
-            if (res.status === 'success') {
-                avisoCorreoMensajeSiFallo(res);
-                const hid = res.data?.IdMensajeHilo;
-                modal?.hide();
-                const a = document.getElementById('nuevo-asunto');
-                const c = document.getElementById('nuevo-cuerpo');
-                if (a) a.value = '';
-                if (c) c.value = '';
-                await loadHilos();
-                if (hid) await openHilo(hid);
-                if (window.NotificationManager?.check) {
-                    window.NotificationManager.check();
+            nuevoMensajeEnviando = true;
+            setModalNuevoEnviando(true);
+            try {
+                const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payloadInst);
+                if (res.status === 'success') {
+                    avisoCorreoMensajeSiFallo(res);
+                    const hid = res.data?.IdMensajeHilo;
+                    modal?.hide();
+                    const a = document.getElementById('nuevo-asunto');
+                    const c = document.getElementById('nuevo-cuerpo');
+                    if (a) a.value = '';
+                    if (c) c.value = '';
+                    await loadHilos();
+                    if (hid) await openHilo(hid);
+                    if (window.NotificationManager?.check) {
+                        window.NotificationManager.check();
+                    }
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
                 }
-            } else if (typeof Swal !== 'undefined') {
-                Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            } finally {
+                nuevoMensajeEnviando = false;
+                setModalNuevoEnviando(false);
             }
             return;
         }
@@ -532,20 +913,27 @@ export async function initMensajes(opts = {}) {
             }
         }
 
-        const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payload);
+        nuevoMensajeEnviando = true;
+        setModalNuevoEnviando(true);
+        try {
+            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payload);
 
-        if (res.status === 'success') {
-            const hid = res.data?.IdMensajeHilo;
-            modal?.hide();
-            const a = document.getElementById('nuevo-asunto');
-            const c = document.getElementById('nuevo-cuerpo');
-            if (a) a.value = '';
-            if (c) c.value = '';
-            avisoCorreoMensajeSiFallo(res);
-            await loadHilos();
-            if (hid) await openHilo(hid);
-        } else if (typeof Swal !== 'undefined') {
-            Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            if (res.status === 'success') {
+                const hid = res.data?.IdMensajeHilo;
+                modal?.hide();
+                const a = document.getElementById('nuevo-asunto');
+                const c = document.getElementById('nuevo-cuerpo');
+                if (a) a.value = '';
+                if (c) c.value = '';
+                avisoCorreoMensajeSiFallo(res);
+                await loadHilos();
+                if (hid) await openHilo(hid);
+            } else if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
+            }
+        } finally {
+            nuevoMensajeEnviando = false;
+            setModalNuevoEnviando(false);
         }
     });
 

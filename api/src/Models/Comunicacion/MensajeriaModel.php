@@ -209,7 +209,9 @@ class MensajeriaModel {
             ':uid3' => $userId,
             ':uid4' => $userId,
         ]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $this->enrichListaInterlocutor($rows, $userId);
     }
 
     /**
@@ -218,7 +220,11 @@ class MensajeriaModel {
      * de la misma sede para contestar desde un solo lugar, sin mezclar conversaciones ajenas.
      */
     public function getHilosInstitucionales(int $instId, int $userId, int $role, int $page, int $limit): array {
-        if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
+        if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
+            return [];
+        }
+        // Misma regla que envío: staff de sede puede operar sin fila usuarioe en esa institución (legacy/tokens).
+        if (!$this->esRolStaffInstitucional($role) && !$this->usuarioEnInstitucion($instId, $userId)) {
             return [];
         }
         $offset = max(0, ($page - 1) * $limit);
@@ -237,6 +243,7 @@ class MensajeriaModel {
                )) AS NoLeidos,
             COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) AS _sort_ts
         ";
+        // Buzón local (sede actual): comunicados + consultas (las consultas se listan si participa).
         $whereInst = "
             h.IdInstitucion = :iid AND h.EsInstitucional = 1
             AND (
@@ -245,10 +252,9 @@ class MensajeriaModel {
               OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
             )
         ";
-        $wherePer = "
-            h.IdInstitucion = :iid2 AND COALESCE(h.EsInstitucional, 0) = 0
-            AND (h.IdUsrParticipanteA = :uid5 OR h.IdUsrParticipanteB = :uid6)
-        ";
+        // En vista institucional, también incluimos los hilos personales propios del usuario (para contestar desde un solo lugar).
+        $wherePer = "h.IdInstitucion = :iid2 AND COALESCE(h.EsInstitucional, 0) = 0
+            AND (h.IdUsrParticipanteA = :uid5 OR h.IdUsrParticipanteB = :uid6)";
         $sql = "
             SELECT * FROM (
                 SELECT {$sel} FROM mensaje_hilo h WHERE {$whereInst}
@@ -259,7 +265,7 @@ class MensajeriaModel {
             LIMIT {$limit} OFFSET {$offset}
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
+        $params = [
             ':uid1' => $userId,
             ':uid2' => $userId,
             ':uid3' => $userId,
@@ -268,14 +274,15 @@ class MensajeriaModel {
             ':iid2' => $instId,
             ':uid5' => $userId,
             ':uid6' => $userId,
-        ]);
+        ];
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             unset($r['_sort_ts']);
         }
         unset($r);
 
-        return $rows;
+        return $this->enrichListaInterlocutor($rows, $userId);
     }
 
     /** @deprecated usar getHilosPersonal */
@@ -309,7 +316,10 @@ class MensajeriaModel {
     }
 
     public function countUnreadInstitucional(int $userId, int $instId, int $role): int {
-        if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional') || !$this->usuarioEnInstitucion($instId, $userId)) {
+        if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
+            return 0;
+        }
+        if (!$this->esRolStaffInstitucional($role) && !$this->usuarioEnInstitucion($instId, $userId)) {
             return 0;
         }
         $ct = self::ORIGEN_INST_CONSULTA;
@@ -338,7 +348,7 @@ class MensajeriaModel {
               )
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([
+        $params = [
             ':iid' => $instId,
             ':uid' => $userId,
             ':uid2' => $userId,
@@ -346,7 +356,8 @@ class MensajeriaModel {
             ':uid4' => $userId,
             ':uid5' => $userId,
             ':uid6' => $userId,
-        ]);
+        ];
+        $stmt->execute($params);
 
         return (int) $stmt->fetchColumn();
     }
@@ -355,21 +366,23 @@ class MensajeriaModel {
      * Acceso a un hilo: personal (A/B) o institucional (según tipo: comunicado sede / consulta privada a staff).
      */
     public function getHiloAccesible(int $hiloId, int $userId, int $instId, int $role = 0): ?array {
-        $stmt = $this->db->prepare('
-            SELECT * FROM mensaje_hilo
-            WHERE IdMensajeHilo = ? AND IdInstitucion = ?
-            LIMIT 1
-        ');
-        $stmt->execute([$hiloId, $instId]);
+        $stmt = $this->db->prepare('SELECT * FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1');
+        $stmt->execute([$hiloId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             return null;
         }
         if ($this->hiloEsInstitucional($row)) {
-            if (!$this->usuarioEnInstitucion($instId, $userId)) {
+            $hInst = (int) ($row['IdInstitucion'] ?? 0);
+            $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
+            $bRaw = $row['IdUsrParticipanteB'] ?? null;
+            $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+            if ($hInst !== $instId) {
                 return null;
             }
-
+            if (!$this->esRolStaffInstitucional($role) && !$this->usuarioEnInstitucion($instId, $userId)) {
+                return null;
+            }
             return $this->puedeVerHiloInstitucional($row, $userId, $role) ? $row : null;
         }
         $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
@@ -380,6 +393,111 @@ class MensajeriaModel {
         }
 
         return $userId === $a ? $row : null;
+    }
+
+    /**
+     * Resumen de usuario para UI (nombre/apellido/usuario/id/institución, email y teléfonos desde personae).
+     * Prioriza fila usuarioe de la institución de contexto si existe.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getUsuarioResumen(int $idUsrA, int $instIdContexto): ?array {
+        if ($idUsrA <= 0) return null;
+        // personae obligatorio; usuarioe opcional (staff puede ver interlocutor aunque no tenga sede en usuarioe).
+        $stmt = $this->db->prepare("
+            SELECT p.IdUsrA,
+                   COALESCE(NULLIF(TRIM(u.UsrA), ''), '') AS Usuario,
+                   COALESCE(p.NombreA,'') AS NombreA,
+                   COALESCE(p.ApellidoA,'') AS ApellidoA,
+                   COALESCE(NULLIF(TRIM(p.EmailA), ''), '') AS EmailA,
+                   COALESCE(NULLIF(TRIM(p.TelefonoA), ''), '') AS TelefonoA,
+                   COALESCE(NULLIF(TRIM(p.CelularA), ''), '') AS CelularA,
+                   COALESCE(u.IdInstitucion, 0) AS IdInstitucion
+            FROM personae p
+            LEFT JOIN usuarioe u ON u.IdUsrA = p.IdUsrA
+            WHERE p.IdUsrA = ?
+            ORDER BY CASE WHEN u.IdInstitucion = ? THEN 0 ELSE 1 END, u.IdInstitucion ASC
+            LIMIT 1
+        ");
+        $stmt->execute([$idUsrA, $instIdContexto]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        return [
+            'IdUsrA' => (int) ($row['IdUsrA'] ?? 0),
+            'Usuario' => (string) ($row['Usuario'] ?? ''),
+            'NombreA' => (string) ($row['NombreA'] ?? ''),
+            'ApellidoA' => (string) ($row['ApellidoA'] ?? ''),
+            'EmailA' => trim((string) ($row['EmailA'] ?? '')),
+            'TelefonoA' => trim((string) ($row['TelefonoA'] ?? '')),
+            'CelularA' => trim((string) ($row['CelularA'] ?? '')),
+            'IdInstitucion' => (int) ($row['IdInstitucion'] ?? 0),
+        ];
+    }
+
+    /**
+     * Resumen del interlocutor del hilo (el otro participante o autor del primer mensaje).
+     *
+     * @param array<string,mixed> $hiloRow
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getResumenInterlocutorHilo(array $hiloRow, int $viewerUserId, int $instId): ?array {
+        $uidOther = $this->resolveListaInterlocutorUserId($hiloRow, $viewerUserId);
+        if ($uidOther <= 0) {
+            $uidOther = $this->getPrimerRemitenteMensajeHilo((int) ($hiloRow['IdMensajeHilo'] ?? 0));
+        }
+
+        return $uidOther > 0 ? $this->getUsuarioResumen($uidOther, $instId) : null;
+    }
+
+    /**
+     * Vista previa para eliminación total de un hilo: valida acceso y devuelve datos mínimos.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getDeletePreviewHilo(int $hiloId, int $userId, int $instId, int $role): ?array {
+        $h = $this->getHiloRow($hiloId, $userId, $instId, $role);
+        if (!$h) return null;
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM mensaje WHERE IdMensajeHilo = ?");
+        $stmt->execute([$hiloId]);
+        $cant = (int) $stmt->fetchColumn();
+        return [
+            'IdMensajeHilo' => (int) ($h['IdMensajeHilo'] ?? $hiloId),
+            'IdInstitucion' => (int) ($h['IdInstitucion'] ?? 0),
+            'EsInstitucional' => (int) ($h['EsInstitucional'] ?? 0),
+            'OrigenTipo' => (string) ($h['OrigenTipo'] ?? ''),
+            'Asunto' => (string) ($h['Asunto'] ?? ''),
+            'FechaCreacion' => (string) ($h['FechaCreacion'] ?? ''),
+            'FechaUltimoMensaje' => (string) ($h['FechaUltimoMensaje'] ?? ''),
+            'IdUsrParticipanteA' => (int) ($h['IdUsrParticipanteA'] ?? 0),
+            'IdUsrParticipanteB' => ($h['IdUsrParticipanteB'] ?? null),
+            'mensajes' => $cant,
+        ];
+    }
+
+    /**
+     * Eliminación total de un hilo + mensajes + marcas de leído.
+     */
+    public function deleteHiloCascade(int $hiloId): void {
+        $hiloId = (int) $hiloId;
+        if ($hiloId <= 0) return;
+        $this->db->beginTransaction();
+        try {
+            // Borrar leídos primero (FK por IdMensaje)
+            if ($this->hasColumn('mensaje_leido', 'IdMensaje')) {
+                $this->db->prepare("
+                    DELETE ml FROM mensaje_leido ml
+                    INNER JOIN mensaje m ON m.IdMensaje = ml.IdMensaje
+                    WHERE m.IdMensajeHilo = ?
+                ")->execute([$hiloId]);
+            }
+            $this->db->prepare("DELETE FROM mensaje WHERE IdMensajeHilo = ?")->execute([$hiloId]);
+            $this->db->prepare("DELETE FROM mensaje_hilo WHERE IdMensajeHilo = ?")->execute([$hiloId]);
+            $this->db->commit();
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function getHiloRow(int $hiloId, int $userId, int $instId = 0, int $role = 0): ?array {
@@ -407,7 +525,14 @@ class MensajeriaModel {
 
     public function getMensajesHilo(int $hiloId): array {
         $stmt = $this->db->prepare("
-            SELECT m.* FROM mensaje m
+            SELECT
+                m.*,
+                COALESCE(p.NombreA, '') AS RemitenteNombre,
+                COALESCE(p.ApellidoA, '') AS RemitenteApellido,
+                COALESCE(u.UsrA, '') AS RemitenteUsuario
+            FROM mensaje m
+            LEFT JOIN personae p ON p.IdUsrA = m.IdUsrRemitente
+            LEFT JOIN usuarioe u ON u.IdUsrA = m.IdUsrRemitente
             WHERE m.IdMensajeHilo = ?
             ORDER BY m.FechaEnvio ASC, m.IdMensaje ASC
         ");
@@ -435,7 +560,7 @@ class MensajeriaModel {
      */
     public function listUsuariosInstitucionParaMensaje(int $instId, int $excludeUserId): array {
         $stmt = $this->db->prepare("
-            SELECT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA,
+            SELECT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA, p.EmailA,
                    u.IdInstitucion, i.NombreInst AS NombreInstitucion
             FROM usuarioe u
             JOIN personae p ON u.IdUsrA = p.IdUsrA
@@ -452,7 +577,7 @@ class MensajeriaModel {
      */
     public function listInvestigadoresInstitucionParaMensaje(int $instId, int $excludeUserId): array {
         $stmt = $this->db->prepare("
-            SELECT DISTINCT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA,
+            SELECT DISTINCT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA, p.EmailA,
                    u.IdInstitucion, i.NombreInst AS NombreInstitucion
             FROM usuarioe u
             JOIN personae p ON u.IdUsrA = p.IdUsrA
@@ -760,7 +885,9 @@ class MensajeriaModel {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
             return ['status' => 'error', 'message' => 'El buzón institucional no está disponible. Ejecute la migración de base de datos.'];
         }
-        if (!$this->usuarioEnInstitucion($instId, $remitenteId)) {
+        // Staff institucional puede operar en contexto de sede aunque no exista fila usuarioe exacta (casos legacy / tokens).
+        // Investigador requiere pertenencia estricta.
+        if (!$this->esRolStaffInstitucional($role) && !$this->usuarioEnInstitucion($instId, $remitenteId)) {
             return ['status' => 'error', 'message' => 'Usuario no válido para esta institución.'];
         }
         $asunto = trim(strip_tags($asunto));
@@ -777,26 +904,40 @@ class MensajeriaModel {
             return ['status' => 'error', 'message' => $resTipo['message'] ?? 'No se pudo crear el mensaje.'];
         }
         $tipoGuardar = (string) $resTipo['tipo'];
-        $targetInst = $instDestinoId > 0 ? $instDestinoId : $instId;
-        if ($targetInst !== $instId && !$this->institucionEnMismaRed($instId, $targetInst)) {
+        $destInst = ($instDestinoId !== null && (int)$instDestinoId > 0) ? (int)$instDestinoId : null;
+        if ($destInst !== null && $destInst !== $instId && !$this->institucionEnMismaRed($instId, $destInst)) {
             return ['status' => 'error', 'message' => 'Institución destino no válida para su red.'];
+        }
+        // Regla: el hilo institucional siempre queda en la sede remitente (instId).
+        // Si hay institución destino (red), se guarda como referencia (OrigenId/Etiqueta) sin cambiar la propiedad del hilo.
+        if ($destInst !== null) {
+            if ($origenId === null || (int)$origenId <= 0) {
+                $origenId = $destInst;
+            }
+            if ($origenEtiqueta === null || trim((string)$origenEtiqueta) === '') {
+                $origenEtiqueta = $this->getNombreInstitucion($destInst);
+            }
         }
 
         $idInvDest = $idInvestigadorDestino !== null && $idInvestigadorDestino > 0 ? (int) $idInvestigadorDestino : 0;
         $partA = $remitenteId;
         $partB = null;
         if ($idInvDest > 0) {
+            // Hilo dirigido a una persona: siempre debe ser una consulta (respondible), nunca un comunicado de solo lectura.
+            $tipoGuardar = self::ORIGEN_INST_CONSULTA;
             if ($tipoGuardar !== self::ORIGEN_INST_CONSULTA) {
                 return ['status' => 'error', 'message' => 'Solo las consultas pueden dirigirse a un investigador concreto.'];
             }
             if (!$this->esRolStaffInstitucional($role)) {
                 return ['status' => 'error', 'message' => 'No tiene permiso para dirigir la consulta a un investigador.'];
             }
-            if (!$this->usuarioEsInvestigadorEnInstitucion($targetInst, $idInvDest)) {
-                return ['status' => 'error', 'message' => 'Investigador destino inválido para esa sede.'];
+            $instValidarInv = $destInst !== null ? $destInst : $instId;
+            // En mensajería institucional, el destino puede ser cualquier usuario de la sede (no solo investigador).
+            if (!$this->usuarioEnInstitucion($instValidarInv, $idInvDest)) {
+                return ['status' => 'error', 'message' => 'Destinatario inválido para esa sede.'];
             }
             if ($idInvDest === $remitenteId) {
-                return ['status' => 'error', 'message' => 'El investigador destino no puede ser usted mismo.'];
+                return ['status' => 'error', 'message' => 'El destinatario no puede ser usted mismo.'];
             }
             [$partA, $partB] = $this->normalizeParticipantes($remitenteId, $idInvDest);
         }
@@ -810,7 +951,7 @@ class MensajeriaModel {
                 VALUES (?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, 1)
             ");
             $stmt->execute([
-                $targetInst,
+                $instId,
                 $asunto,
                 $partA,
                 $partB,
@@ -845,5 +986,62 @@ class MensajeriaModel {
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Id del autor del primer mensaje del hilo (fallback cuando no hay segundo participante).
+     */
+    private function getPrimerRemitenteMensajeHilo(int $hiloId): int {
+        if ($hiloId <= 0) {
+            return 0;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT IdUsrRemitente FROM mensaje WHERE IdMensajeHilo = ? ORDER BY FechaEnvio ASC, IdMensaje ASC LIMIT 1'
+        );
+        $stmt->execute([$hiloId]);
+        $v = $stmt->fetchColumn();
+
+        return $v !== false ? (int) $v : 0;
+    }
+
+    /**
+     * El «otro» participante 1:1; 0 si el visitante es único referido y B es null.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function resolveListaInterlocutorUserId(array $row, int $viewerUserId): int {
+        $idA = (int) ($row['IdUsrParticipanteA'] ?? 0);
+        $rawB = $row['IdUsrParticipanteB'] ?? null;
+        $idB = ($rawB !== null && $rawB !== '') ? (int) $rawB : 0;
+        if ($idA === $viewerUserId) {
+            return $idB > 0 ? $idB : 0;
+        }
+
+        return $idA > 0 ? $idA : 0;
+    }
+
+    /**
+     * Datos de persona para fila de lista (izquierda) sin abrir el hilo.
+     *
+     * @param list<array<string,mixed>> $rows
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function enrichListaInterlocutor(array $rows, int $viewerUserId): array {
+        foreach ($rows as &$r) {
+            $instCtx = (int) ($r['IdInstitucion'] ?? 0);
+            $uid = $this->resolveListaInterlocutorUserId($r, $viewerUserId);
+            if ($uid <= 0) {
+                $uid = $this->getPrimerRemitenteMensajeHilo((int) ($r['IdMensajeHilo'] ?? 0));
+            }
+            $sum = ($uid > 0) ? $this->getUsuarioResumen($uid, $instCtx) : null;
+            $r['ListaInterId'] = $sum ? (int) ($sum['IdUsrA'] ?? $uid) : ($uid > 0 ? $uid : 0);
+            $r['ListaInterNombre'] = $sum ? trim((string) ($sum['NombreA'] ?? '')) : '';
+            $r['ListaInterApellido'] = $sum ? trim((string) ($sum['ApellidoA'] ?? '')) : '';
+            $r['ListaInterUsuario'] = $sum ? trim((string) ($sum['Usuario'] ?? '')) : '';
+        }
+        unset($r);
+
+        return $rows;
     }
 }

@@ -80,8 +80,16 @@
                 <div class="card shadow-sm border-0" id="panel-hilo-wrap">
                     <div class="card-body text-muted small" id="panel-hilo-placeholder" data-i18n="comunicacion.msg_hilos_vacio"></div>
                     <div class="card-body d-none" id="panel-hilo-cont">
-                        <div class="fw-bold mb-2" id="hilo-asunto"></div>
-                        <div class="small text-muted mb-3" id="hilo-meta"></div>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div class="flex-grow-1">
+                                <div class="fw-bold" id="hilo-asunto"></div>
+                                <div class="small text-muted" id="hilo-meta"></div>
+                                <div id="hilo-meta-interlocutor" class="small mt-1 pt-1 border-top text-body-secondary d-none" style="line-height: 1.35;"></div>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm fw-bold d-none" id="btn-hilo-delete">
+                                <i class="bi bi-trash3 me-1"></i><span data-i18n="comunicacion.msg_eliminar_hilo"></span>
+                            </button>
+                        </div>
                         <div id="hilo-mensajes" class="border rounded p-2 mb-3 bg-light" style="max-height: 360px; overflow-y: auto;"></div>
                         <p id="hilo-solo-lectura" class="small text-muted d-none mb-2" data-i18n="comunicacion.msg_inst_solo_lectura"></p>
                         <div id="hilo-reply-wrap" class="d-flex gap-2">
@@ -131,6 +139,13 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="msg-nuevo-scope-block" class="mb-2 d-none">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="chk-msg-personal">
+                            <label class="form-check-label small fw-bold" for="chk-msg-personal" data-i18n="comunicacion.msg_enviar_como_personal"></label>
+                        </div>
+                        <small class="text-muted d-block mt-1" data-i18n="comunicacion.msg_enviar_como_personal_help"></small>
+                    </div>
                     <div id="msg-nuevo-inst-tipo-block" class="mb-3 d-none">
                         <label class="form-label small fw-bold" data-i18n="comunicacion.msg_inst_tipo_label"></label>
                         <select class="form-select form-select-sm" id="nuevo-inst-tipo"></select>
@@ -145,7 +160,8 @@
                         <label class="form-label small fw-bold" data-i18n="comunicacion.msg_destinatario"></label>
                         <label for="nuevo-dest-filter" class="form-label small text-muted mb-0" data-i18n="comunicacion.msg_dest_filtro"></label>
                         <input type="search" class="form-control form-control-sm mb-1" id="nuevo-dest-filter" autocomplete="off" data-i18n="comunicacion.msg_dest_filtro_ph">
-                        <select class="form-select mb-2" id="nuevo-dest" size="8" style="max-height: 220px;"></select>
+                        <select class="form-select mb-2" id="nuevo-dest"></select>
+                        <small id="msg-dest-email-hint" class="text-muted d-block" style="font-size: 11px;"></small>
                     </div>
                     <label class="form-label small fw-bold" data-i18n="comunicacion.msg_asunto"></label>
                     <input type="text" class="form-control mb-2" id="nuevo-asunto" maxlength="255">
