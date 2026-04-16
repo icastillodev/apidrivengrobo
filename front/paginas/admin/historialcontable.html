@@ -90,6 +90,25 @@
                 </button>
             </div>
 
+            <div class="card border shadow-sm mb-4" id="panel-investigadores-historial">
+                <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 border-bottom">
+                    <div>
+                        <h6 class="fw-bold text-success mb-0 text-uppercase small" data-i18n="admin_historialcontable.panel_inv_title"></h6>
+                        <p class="text-muted small mb-0 mt-1" data-i18n="admin_historialcontable.panel_inv_subtitle"></p>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <input type="search" id="inv-hist-search" class="form-control form-control-sm" style="min-width: 160px; max-width: 220px;" data-i18n="admin_historialcontable.ph_buscar_inv" placeholder="">
+                        <button type="button" id="btn-inv-ver-todos" class="btn btn-outline-secondary btn-sm fw-bold">
+                            <span data-i18n="admin_historialcontable.btn_ver_todos_mov"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0" style="max-height: 320px; overflow-y: auto;">
+                    <div id="lista-invest-historial" class="list-group list-group-flush"></div>
+                    <p id="lista-invest-historial-empty" class="text-muted small mb-0 d-none text-center py-4 px-3" data-i18n="admin_historialcontable.empty_inv"></p>
+                </div>
+            </div>
+
             <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="input-group shadow-sm" style="max-width: 950px;">
                     <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="admin_historialcontable.operacion"></span>

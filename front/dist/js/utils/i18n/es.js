@@ -2890,10 +2890,21 @@ export const es = {
             "Registro de movimientos contables (cargas, liquidaciones, pagos, devoluciones) para auditoría y conciliación.",
         help_s2_title: "2. Filtros y búsqueda",
         help_s2_text:
-            "Elija tipo de operación, campo y texto; use Buscar para refrescar la grilla. Exporte a Excel cuando necesite trabajar fuera del sistema.",
+            "Elija tipo de operación, campo y texto; use Buscar para refrescar la grilla. En el panel superior puede filtrar por investigador o ir a facturación/saldo. Exporte a Excel cuando necesite trabajar fuera del sistema.",
         help_s3_title: "3. Tabla y paginación",
         help_s3_text:
             "Cada fila resume un movimiento; use la paginación inferior para recorrer lotes grandes.",
+        panel_inv_title: "Investigadores con saldo en esta sede",
+        panel_inv_subtitle:
+            "Misma lista que en facturación por investigador. Pulse «Historial en tabla» para ver solo sus movimientos aquí; «Facturación» abre carga y ajustes de saldo.",
+        ph_buscar_inv: "Buscar por nombre o ID…",
+        btn_ver_todos_mov: "Ver todos en la tabla",
+        btn_ver_historial_tabla: "Historial en tabla",
+        btn_ir_facturacion: "Facturación",
+        empty_inv: "No hay investigadores activos con entregas en esta sede.",
+        sin_registros: "No se encontraron registros.",
+        info_cero: "0 registros",
+        table_info: "Mostrando {a} a {b} de {total} registros",
     },
     admin_config: {
         bread_grobo: "GROBO",

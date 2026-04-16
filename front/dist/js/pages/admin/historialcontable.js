@@ -6,30 +6,107 @@ export const HistorialState = {
     dataFiltered: [],
     currentPage: 1,
     itemsPerPage: 15,
-    maxVisiblePages: 6 // El máximo de botones de paginación solicitados
+    maxVisiblePages: 6, // El máximo de botones de paginación solicitados
+    /** Filtro por investigador afectado (`historialpago.IdUsrA`); null = todos */
+    filterIdUsr: null
 };
 
+let investigadoresHistorialCache = [];
+
+function txHist() {
+    return window.txt?.admin_historialcontable || {};
+}
+
 export async function initHistorialContable() {
+    const params = new URLSearchParams(window.location.search);
+    const urlIdUsr = params.get('idUsr');
+    if (urlIdUsr) {
+        const n = parseInt(String(urlIdUsr), 10);
+        HistorialState.filterIdUsr = Number.isFinite(n) ? n : null;
+    }
     setupListeners();
-    await loadData();
+    try {
+        showLoader();
+        await Promise.all([loadData(), loadInvestigatorsList()]);
+    } finally {
+        hideLoader();
+    }
 }
 
 async function loadData() {
     try {
-        showLoader();
-        // Llamada a la API blindada
         const res = await API.request('/billing/audit-history');
         if (res.status === 'success') {
             HistorialState.dataFull = res.data || [];
-            HistorialState.dataFiltered = [...HistorialState.dataFull];
             HistorialState.currentPage = 1;
-            renderTable();
+            filterData();
         }
     } catch (e) {
         console.error("Error cargando historial contable:", e);
-    } finally {
-        hideLoader();
     }
+}
+
+async function loadInvestigatorsList() {
+    const instId = localStorage.getItem('instId') || 1;
+    try {
+        const res = await API.request(`/users/list-investigators?inst=${instId}`);
+        if (res.status === 'success' && Array.isArray(res.data)) {
+            investigadoresHistorialCache = res.data;
+        } else {
+            investigadoresHistorialCache = [];
+        }
+    } catch (e) {
+        console.error('Error cargando investigadores (historial contable):', e);
+        investigadoresHistorialCache = [];
+    }
+    renderInvestigatorsPanel();
+}
+
+function renderInvestigatorsPanel() {
+    const container = document.getElementById('lista-invest-historial');
+    const emptyEl = document.getElementById('lista-invest-historial-empty');
+    if (!container || !emptyEl) return;
+
+    const q = (document.getElementById('inv-hist-search')?.value || '').trim().toLowerCase();
+    let list = investigadoresHistorialCache;
+    if (q) {
+        list = list.filter((u) => {
+            const nom = `${u.ApellidoA || ''} ${u.NombreA || ''}`.toLowerCase();
+            return nom.includes(q) || String(u.IdUsrA).includes(q);
+        });
+    }
+
+    container.innerHTML = '';
+    if (!list.length) {
+        emptyEl.classList.remove('d-none');
+        return;
+    }
+    emptyEl.classList.add('d-none');
+
+    const sel = HistorialState.filterIdUsr;
+    const fmt = (n) => `$${Number(n || 0).toFixed(2)}`;
+    const lblHist = txHist().btn_ver_historial_tabla || 'Historial';
+    const lblFact = txHist().btn_ir_facturacion || 'Facturación';
+
+    list.forEach((u) => {
+        const active = sel != null && Number(sel) === Number(u.IdUsrA);
+        const item = document.createElement('div');
+        item.className = `list-group-item list-group-item-action d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 ${active ? 'bg-light border-start border-success border-4' : ''}`;
+        item.innerHTML = `
+            <div class="flex-grow-1" style="min-width: 140px;">
+                <div class="fw-bold small">${(u.ApellidoA || '')} ${(u.NombreA || '')}</div>
+                <div class="text-muted" style="font-size: 10px;">ID ${u.IdUsrA}</div>
+            </div>
+            <div class="text-end">
+                <span class="badge bg-secondary">${fmt(u.SaldoDinero)}</span>
+            </div>
+            <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-success btn-sm fw-bold btn-inv-filter" data-id="${u.IdUsrA}">${lblHist}</button>
+                <a class="btn btn-outline-primary btn-sm fw-bold" href="facturacion/investigador.html?idUsr=${encodeURIComponent(u.IdUsrA)}">${lblFact}</a>
+            </div>
+        `;
+        container.appendChild(item);
+    });
 }
 
 function setupListeners() {
@@ -38,6 +115,24 @@ function setupListeners() {
         if(e.key === 'Enter') filterData();
     });
     document.getElementById('filter-type').addEventListener('change', filterData);
+
+    document.getElementById('btn-inv-ver-todos')?.addEventListener('click', () => {
+        HistorialState.filterIdUsr = null;
+        renderInvestigatorsPanel();
+        filterData();
+    });
+    document.getElementById('inv-hist-search')?.addEventListener('input', () => {
+        renderInvestigatorsPanel();
+    });
+
+    document.getElementById('lista-invest-historial')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-inv-filter');
+        if (!btn || !btn.dataset.id) return;
+        const n = parseInt(String(btn.dataset.id), 10);
+        HistorialState.filterIdUsr = Number.isFinite(n) ? n : null;
+        renderInvestigatorsPanel();
+        filterData();
+    });
 }
 
 function filterData() {
@@ -46,6 +141,11 @@ function filterData() {
     const type = document.getElementById('filter-type').value;
 
     HistorialState.dataFiltered = HistorialState.dataFull.filter(row => {
+        if (HistorialState.filterIdUsr != null && HistorialState.filterIdUsr !== '') {
+            const rid = row.IdUsrA != null && row.IdUsrA !== '' ? Number(row.IdUsrA) : NaN;
+            if (rid !== Number(HistorialState.filterIdUsr)) return false;
+        }
+
         // 1. Filtro por Tipo de Operación
         if (type !== 'all' && row.TipoHistorial !== type) return false;
 
@@ -78,8 +178,9 @@ function renderTable() {
     const paginatedItems = HistorialState.dataFiltered.slice(start, end);
 
     if (paginatedItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron registros.</td></tr>`;
-        info.innerText = "0 registros";
+        const emptyMsg = txHist().sin_registros || 'No se encontraron registros.';
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${emptyMsg}</td></tr>`;
+        info.innerText = txHist().info_cero || '0 registros';
         renderPagination(0);
         return;
     }
@@ -106,7 +207,11 @@ function renderTable() {
         tbody.appendChild(tr);
     });
 
-    info.innerText = `Mostrando ${start + 1} a ${Math.min(end, HistorialState.dataFiltered.length)} de ${HistorialState.dataFiltered.length} registros`;
+    const tpl = txHist().table_info || 'Mostrando {a} a {b} de {total} registros';
+    info.innerText = tpl
+        .replace('{a}', String(start + 1))
+        .replace('{b}', String(Math.min(end, HistorialState.dataFiltered.length)))
+        .replace('{total}', String(HistorialState.dataFiltered.length));
     renderPagination(HistorialState.dataFiltered.length);
 }
 

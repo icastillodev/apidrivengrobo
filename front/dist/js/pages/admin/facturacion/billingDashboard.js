@@ -49,6 +49,12 @@ export function renderInvestigadoresTable(data) {
     const tbody = document.getElementById('tbody-investigadores');
     if (!tbody) return;
 
+    /** Tabla solo en facturación por departamento: historial de saldo acotado al depto seleccionado. */
+    const deptoScopeEl = document.getElementById('sel-depto');
+    const isDeptoSaldoHistorial = !!deptoScopeEl;
+    const tf = window.txt?.facturacion || {};
+    const histLabel = tf.saldo_hist_btn || 'Historial';
+
     const invMap = {};
 
     // 1. Mapeamos Insumos
@@ -91,6 +97,14 @@ export function renderInvestigadoresTable(data) {
 
     tbody.innerHTML = Object.keys(invMap).map(uid => {
         const i = invMap[uid];
+        const histCell = isDeptoSaldoHistorial
+            ? `<td class="text-center">
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold btn-saldo-historial-depto" data-idusr="${uid}" title="${histLabel}">
+                        <i class="bi bi-clock-history me-1"></i><span class="d-none d-xl-inline">${histLabel}</span>
+                    </button>
+               </td>`
+            : '';
+
         return `
             <tr class="text-center align-middle">
                 <td class="text-start ps-4">
@@ -103,6 +117,7 @@ export function renderInvestigadoresTable(data) {
                            value="$ ${formatBillingMoney(i.saldo)}" 
                            readonly style="width: 130px; margin: 0 auto;">
                 </td>
+                ${histCell}
                 <td>
                     <div class="input-group input-group-sm shadow-sm" style="width: 220px; margin: 0 auto;">
                         <input type="number" id="inp-saldo-${uid}" class="form-control border-primary" placeholder="${window.txt?.facturacion?.inv_placeholder_monto || 'Monto'}">
@@ -112,4 +127,16 @@ export function renderInvestigadoresTable(data) {
                 </td>
             </tr>`;
     }).join('');
+
+    if (isDeptoSaldoHistorial && typeof window.openSaldoHistorialPopup === 'function') {
+        tbody.querySelectorAll('.btn-saldo-historial-depto').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const idUsr = parseInt(String(btn.getAttribute('data-idusr') || '0'), 10) || 0;
+                const refId = parseInt(String(deptoScopeEl.value || '0'), 10) || 0;
+                window.openSaldoHistorialPopup({ idUsr, scope: 'depto', refId });
+            });
+        });
+    }
 }

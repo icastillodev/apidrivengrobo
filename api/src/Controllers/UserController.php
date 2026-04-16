@@ -718,7 +718,7 @@ class UserController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $billingModel = new \App\Models\Billing\BillingModel($this->db);
-            $data = $billingModel->getActiveInvestigators($sesion['instId']); 
+            $data = $billingModel->getActiveInvestigatorsWithSaldo($sesion['instId']); 
             
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {

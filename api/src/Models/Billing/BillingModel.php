@@ -798,6 +798,36 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $sql = "SELECT DISTINCT u.IdUsrA, u.ApellidoA, u.NombreA FROM personae u WHERE u.IdUsrA IN ( SELECT p.IdUsrA FROM protocoloexpe p JOIN protformr pf ON p.idprotA = pf.idprotA JOIN formularioe f ON pf.idformA = f.idformA WHERE f.estado = 'Entregado' AND p.IdInstitucion = ? UNION SELECT p.IdUsrA FROM protocoloexpe p JOIN alojamiento a ON p.idprotA = a.idprotA WHERE p.IdInstitucion = ? UNION SELECT f.IdUsrA FROM formularioe f WHERE f.estado = 'Entregado' AND f.IdInstitucion = ? AND f.tipoA IN (SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario LIKE '%insumo%') ) ORDER BY u.ApellidoA ASC";
         $stmt = $this->db->prepare($sql); $stmt->execute([$idInst, $idInst, $idInst]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /** Misma lista que `getActiveInvestigators` con saldo de billetera en la sede (para facturación / historial). */
+    public function getActiveInvestigatorsWithSaldo($idInst) {
+        $idInst = (int) $idInst;
+        $sql = "SELECT DISTINCT u.IdUsrA, u.ApellidoA, u.NombreA, COALESCE(d.SaldoDinero, 0) AS SaldoDinero
+                FROM personae u
+                LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND d.IdInstitucion = ?
+                WHERE u.IdUsrA IN (
+                    SELECT p.IdUsrA FROM protocoloexpe p
+                    JOIN protformr pf ON p.idprotA = pf.idprotA
+                    JOIN formularioe f ON pf.idformA = f.idformA
+                    WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
+                    UNION
+                    SELECT p.IdUsrA FROM protocoloexpe p
+                    JOIN alojamiento a ON p.idprotA = a.idprotA
+                    WHERE p.IdInstitucion = ?
+                    UNION
+                    SELECT f.IdUsrA FROM formularioe f
+                    WHERE f.estado = 'Entregado' AND f.IdInstitucion = ?
+                      AND f.tipoA IN (SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario LIKE '%insumo%')
+                )
+                ORDER BY u.ApellidoA ASC, u.NombreA ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idInst, $idInst, $idInst, $idInst]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $r['SaldoDinero'] = isset($r['SaldoDinero']) ? (float) $r['SaldoDinero'] : 0.0;
+        }
+        return $rows;
+    }
     public function getActiveProtocols($idInst) {
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador FROM protocoloexpe p INNER JOIN personae u ON p.IdUsrA = u.IdUsrA INNER JOIN protformr pf ON p.idprotA = pf.idprotA INNER JOIN formularioe f ON pf.idformA = f.idformA WHERE p.IdInstitucion = ? AND f.estado = 'Entregado' ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql); $stmt->execute([$idInst]); return $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -829,7 +859,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $selExtra = '';
         if ($hasTransfer) $selExtra .= ", h.IdentificadorTransferencia";
         if ($hasComment) $selExtra .= ", h.Comentario";
-        $sql = "SELECT h.IdHistoPago, h.Monto, h.IdFormA, h.fecha, h.TipoHistorial{$selExtra},
+        $sql = "SELECT h.IdHistoPago, h.IdUsrA, h.Monto, h.IdFormA, h.fecha, h.TipoHistorial{$selExtra},
                        CONCAT(a.NombreA, ' ', a.ApellidoA) as AdminCompleto,
                        CONCAT(u.NombreA, ' ', u.ApellidoA) as UsrCompleto
                 FROM historialpago h

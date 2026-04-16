@@ -2879,10 +2879,21 @@ alojamientos: {
             "Registo de movimentos contabilísticos (cargas, liquidações, pagamentos, devoluções) para auditoria e reconciliação.",
         help_s2_title: "2. Filtros e pesquisa",
         help_s2_text:
-            "Escolha o tipo de operação, o campo e o texto; use Buscar para atualizar a grelha. Exporte para Excel quando precisar de trabalhar fora do sistema.",
+            "Escolha o tipo de operação, o campo e o texto; use Buscar para atualizar a grelha. No painel superior pode filtrar por investigador ou ir à faturação/saldo. Exporte para Excel quando precisar de trabalhar fora do sistema.",
         help_s3_title: "3. Tabela e paginação",
         help_s3_text:
             "Cada linha resume um movimento; use a paginação inferior para percorrer lotes grandes.",
+        panel_inv_title: "Investigadores com saldo nesta sede",
+        panel_inv_subtitle:
+            "Mesma lista que na faturação por investigador. Use «Histórico na tabela» para ver apenas os movimentos dessa pessoa aqui; «Faturação» abre cargas e ajustes de saldo.",
+        ph_buscar_inv: "Pesquisar por nome ou ID…",
+        btn_ver_todos_mov: "Ver todos na tabela",
+        btn_ver_historial_tabla: "Histórico na tabela",
+        btn_ir_facturacion: "Faturação",
+        empty_inv: "Sem investigadores ativos com entregas nesta sede.",
+        sin_registros: "Não foram encontrados registos.",
+        info_cero: "0 registos",
+        table_info: "A mostrar {a} a {b} de {total} registos",
     },
     admin_config: {
         bread_grobo: "GROBO",

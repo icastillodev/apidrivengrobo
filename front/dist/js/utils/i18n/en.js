@@ -2878,10 +2878,21 @@ alojamientos: {
             "Log of accounting movements (top-ups, settlements, payments, refunds) for audit and reconciliation.",
         help_s2_title: "2. Filters and search",
         help_s2_text:
-            "Choose operation type, field, and text; use Search to refresh the grid. Export to Excel when you need to work outside the system.",
+            "Choose operation type, field, and text; use Search to refresh the grid. In the top panel you can filter by investigator or open billing/balance. Export to Excel when you need to work outside the system.",
         help_s3_title: "3. Table and pagination",
         help_s3_text:
             "Each row summarizes one movement; use the bottom pagination to browse large batches.",
+        panel_inv_title: "Investigators with balance at this site",
+        panel_inv_subtitle:
+            "Same list as per-investigator billing. Use “History in table” to filter movements here; “Billing” opens top-ups and balance adjustments.",
+        ph_buscar_inv: "Search by name or ID…",
+        btn_ver_todos_mov: "Show everyone in the table",
+        btn_ver_historial_tabla: "History in table",
+        btn_ir_facturacion: "Billing",
+        empty_inv: "No active investigators with deliveries at this site.",
+        sin_registros: "No records found.",
+        info_cero: "0 records",
+        table_info: "Showing {a} to {b} of {total} records",
     },
     admin_config: {
         bread_grobo: "GROBO",
