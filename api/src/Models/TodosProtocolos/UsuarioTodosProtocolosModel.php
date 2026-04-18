@@ -48,6 +48,36 @@ class UsuarioTodosProtocolosModel {
         ];
     }
 
+    /**
+     * Al menos un protocolo del usuario titular aprobado y vigente (coherente con el modal de ayuda en formularios).
+     */
+    public function userHasApprovedVigentProtocol($userId) {
+        $uid = (int)$userId;
+        if ($uid <= 0) {
+            return false;
+        }
+        $sql = "SELECT 1 AS ok
+                FROM protocoloexpe p
+                LEFT JOIN solicitudprotocolo sp ON sp.idSolicitudProtocolo = (
+                    SELECT MAX(s1.idSolicitudProtocolo)
+                    FROM solicitudprotocolo s1
+                    WHERE s1.idprotA = p.idprotA
+                      AND s1.TipoPedido = 1
+                )
+                WHERE p.IdUsrA = ?
+                  AND (CASE WHEN sp.idSolicitudProtocolo IS NULL THEN 1 ELSE sp.Aprobado END) = 1
+                  AND (
+                     p.FechaFinProtA IS NULL
+                     OR TRIM(p.FechaFinProtA) = ''
+                     OR p.FechaFinProtA = '0000-00-00'
+                     OR DATE(p.FechaFinProtA) >= CURDATE()
+                  )
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$uid]);
+        return (bool)$stmt->fetchColumn();
+    }
+
     // --- QUERY BASE ---
     private function getCommonFields() {
         return "p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, p.FechaIniProtA as FechaInicio, p.FechaFinProtA as Vencimiento, 

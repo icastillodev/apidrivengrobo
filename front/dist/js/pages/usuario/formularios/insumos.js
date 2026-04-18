@@ -54,47 +54,41 @@ export async function initInsumosForm() {
     };
 
     try {
-        // 2. Carga de datos con el ID correcto
-        const res = await API.request(`/insumos-form/init?inst=${instId}`);
-        
+        const [res, resConfig, resProt] = await Promise.all([
+            API.request(`/insumos-form/init?inst=${instId}`),
+            API.request(`/user/protocols/config?inst=${instId}`),
+            API.request(`/animals/search-protocols?inst=${instId}&user=${userId}`)
+        ]);
+
         if (res.status === 'success') {
             const data = res.data;
             deptosList = data.departamentos || [];
             catalogInsumos = data.insumos;
-            dataFull = data; // Guardamos todo para el PDF
+            dataFull = data;
 
-            // --- CORRECCIÓN VISUAL ---
-            // Actualizamos el nombre con el que vino de la API (la institución target)
             if (data.institucion && data.institucion.NombreInst) {
-                if(lblInst) lblInst.innerText = data.institucion.NombreInst;
+                if (lblInst) lblInst.innerText = data.institucion.NombreInst;
             }
 
             document.getElementById('id-tipo-form').value = data.id_tipo_default;
-            
+
             setupPDFButton();
         }
-    } catch (e) { console.error("Error en init:", e); }
 
-    try {
-        // Configuración de protocolos e información de ayuda (igual que animales/reactivos)
-        const resProt = await API.request(`/animals/search-protocols?inst=${instId}`);
-        if (resProt && resProt.status === 'success' && resProt.data) {
-            const { config, protocols } = resProt.data;
-            protocolosList = Array.isArray(protocols) ? protocols : [];
-            protocolHelpConfig.has_approved_vigent = protocolosList.length > 0;
-            // otrosceuas viene en config, por si en el futuro se usa
-        }
-
-        // Info de red (misma fuente que otros módulos)
-        const resConfig = await API.request(`/user/protocols/config?inst=${instId}`);
         if (resConfig && resConfig.status === 'success' && resConfig.data) {
             protocolHelpConfig.has_network = !!resConfig.data.has_network;
+            protocolHelpConfig.has_approved_vigent = !!resConfig.data.has_approved_vigent;
+        }
+
+        if (resProt && resProt.status === 'success' && resProt.data) {
+            const { protocols } = resProt.data;
+            protocolosList = Array.isArray(protocols) ? protocols : [];
         }
 
         setupProtocolSearch();
         setupProtocolHelpModal();
     } catch (e) {
-        console.error("Error cargando protocolos para insumos:", e);
+        console.error("Error en init insumos:", e);
     }
 
     document.getElementById('btn-add-row').onclick = () => {
@@ -127,7 +121,7 @@ function setupProtocolSearch() {
             item.className = "list-group-item list-group-item-action result-item p-3";
             const numero = p.nprotA ? `#${p.nprotA} - ` : '';
             const titulo = p.tituloA || '';
-            const resp = p.ResponsableName || '';
+            const resp = p.ResponsableName || p.Responsable || '';
             const depto = p.DeptoFormat || '';
 
             item.innerHTML = `
@@ -179,15 +173,23 @@ function setupProtocolSearch() {
 
     input.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase().trim();
+        if (term.length < 1) {
+            list.innerHTML = '';
+            list.classList.add('d-none');
+            return;
+        }
         const filtered = protocolosList.filter(p =>
             String(p.nprotA || '').toLowerCase().includes(term) ||
             String(p.tituloA || '').toLowerCase().includes(term) ||
-            String(p.ResponsableName || '').toLowerCase().includes(term)
+            String(p.ResponsableName || p.Responsable || '').toLowerCase().includes(term)
         );
         renderList(filtered);
     });
 
-    input.addEventListener('focus', () => renderList(protocolosList));
+    input.addEventListener('focus', () => {
+        list.innerHTML = '';
+        list.classList.add('d-none');
+    });
 
     document.addEventListener('click', (e) => {
         if (!input.contains(e.target) && !list.contains(e.target)) list.classList.add('d-none');

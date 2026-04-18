@@ -36,28 +36,27 @@ export async function initReactivosForm() {
     };
 
     try {
-        // 2. Cargar Data para PDF con el ID correcto
-        const resPDF = await API.request(`/reactivos/pdf-data?inst=${instId}`);
-        if(resPDF.status === 'success') {
+        const [resPDF, res, resConfig] = await Promise.all([
+            API.request(`/reactivos/pdf-data?inst=${instId}`),
+            API.request(`/reactivos/init?inst=${instId}&user=${userId}`),
+            API.request(`/user/protocols/config?inst=${instId}`)
+        ]);
+
+        if (resPDF.status === 'success') {
             dataFull = resPDF.data;
             setupPDFButton();
-
-            // --- CORRECCIÓN VISUAL ---
-            // Actualizamos el nombre con el que vino de la API
             if (dataFull.institucion && dataFull.institucion.NombreInst) {
-                if(lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
+                if (lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
             }
         }
 
-        // 3. Cargar Datos Iniciales (Protocolos e Insumos) con el ID correcto
-        const res = await API.request(`/reactivos/init?inst=${instId}&user=${userId}`);
         if (res.status === 'success') {
             const data = res.data;
             protocolsList = data.protocols;
-            insumosList = data.insumos; 
+            insumosList = data.insumos;
             userEmail = data.user_email;
-            
-            if(data.id_tipo_default) {
+
+            if (data.id_tipo_default) {
                 document.getElementById('id-tipo-form').value = data.id_tipo_default;
             }
 
@@ -65,16 +64,9 @@ export async function initReactivosForm() {
             setupInsumosDropdown();
         }
 
-        const resConfig = await API.request(`/user/protocols/config?inst=${instId}`);
         if (resConfig && resConfig.status === 'success' && resConfig.data) {
             protocolHelpConfig.has_network = !!resConfig.data.has_network;
-        }
-        const resLists = await API.request(`/user/protocols/all-lists?inst=${instId}&uid=${userId}`);
-        if (resLists && resLists.status === 'success' && resLists.data && Array.isArray(resLists.data.my)) {
-            const today = new Date().toISOString().split('T')[0];
-            protocolHelpConfig.has_approved_vigent = resLists.data.my.some(p =>
-                p.Aprobado == 1 && (!p.Vencimiento || p.Vencimiento >= today)
-            );
+            protocolHelpConfig.has_approved_vigent = !!resConfig.data.has_approved_vigent;
         }
         setupProtocolHelpModal();
     } catch (e) { console.error("Error init:", e); }
@@ -174,7 +166,11 @@ function setupSearch() {
 
     input.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase().trim();
-        if(!term) return render(protocolsList); 
+        if (term.length < 1) {
+            list.innerHTML = '';
+            list.classList.add('d-none');
+            return;
+        }
         const filtered = protocolsList.filter(p => {
             const nprot = (p.nprotA || '').toLowerCase();
             const titulo = (p.tituloA || '').toLowerCase();
@@ -190,7 +186,10 @@ function setupSearch() {
         render(filtered);
     });
 
-    input.addEventListener('focus', () => render(protocolsList));
+    input.addEventListener('focus', () => {
+        list.innerHTML = '';
+        list.classList.add('d-none');
+    });
     document.addEventListener('click', (e) => {
         if (!input.contains(e.target) && !list.contains(e.target)) list.classList.add('d-none');
     });

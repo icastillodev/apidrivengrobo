@@ -18,6 +18,7 @@ class ControllerusuarioTodosProtocolos {
         try {
             $sesion = Auditoria::getDatosSesion();
             $data = $this->model->getConfig($sesion['instId']);
+            $data['has_approved_vigent'] = $this->model->userHasApprovedVigentProtocol((int)($sesion['userId'] ?? 0));
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);

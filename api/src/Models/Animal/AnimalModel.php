@@ -954,9 +954,10 @@ public function updateStatus($data) {
                         )
                     )
                   )
+                  AND COALESCE(pr.IdUsrA, p.IdUsrA) = ?
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
+        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId, (int)$userId]);
         
         // C. Email Usuario
         $stmtUser = $this->db->prepare("SELECT EmailA FROM personae WHERE IdUsrA = ?");
@@ -1249,9 +1250,15 @@ public function saveOrder($data) {
             $stmtEsp->execute([$instId]);
             $especies = $stmtEsp->fetchAll(\PDO::FETCH_ASSOC);
 
-            // 3. Subespecies (Hijos)
-            $stmtSub = $this->db->prepare("SELECT idsubespA, idespA, SubEspeNombreA, Psubanimal, Existe FROM subespecie WHERE Existe != 2");
-            $stmtSub->execute(); // Traemos todas y filtramos en JS o filtramos por JOIN si prefieres optimizar
+            // 3. Subespecies (solo de especies de esta institución; antes se traían todas las filas de subespecie)
+            $stmtSub = $this->db->prepare(
+                "SELECT s.idsubespA, s.idespA, s.SubEspeNombreA, s.Psubanimal, s.Existe
+                 FROM subespecie s
+                 INNER JOIN especiee e ON e.idespA = s.idespA AND e.IdInstitucion = ?
+                 WHERE s.Existe != 2
+                 ORDER BY e.EspeNombreA, s.SubEspeNombreA"
+            );
+            $stmtSub->execute([$instId]);
             $subespecies = $stmtSub->fetchAll(\PDO::FETCH_ASSOC);
 
             // 4. Insumos Experimentales

@@ -40,29 +40,27 @@ export async function initAnimalForm() {
     };
 
     try {
-        // 2. Llamamos a la API con el ID correcto
-        const resPDF = await API.request(`/animals/pdf-data?inst=${instId}`);
-        
+        const [resPDF, resProt, resConfig] = await Promise.all([
+            API.request(`/animals/pdf-data?inst=${instId}`),
+            API.request(`/animals/search-protocols?inst=${instId}&user=${userId}`),
+            API.request(`/user/protocols/config?inst=${instId}`)
+        ]);
+
         if (resPDF && resPDF.status === 'success') {
             dataFull = resPDF.data;
             setupPDFButton();
-
-            // --- CORRECCIÓN VISUAL ---
-            // Actualizamos el nombre con el que vino REALMENTE de la base de datos
             if (dataFull.institucion && dataFull.institucion.NombreInst) {
-                if(lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
+                if (lblInst) lblInst.innerText = dataFull.institucion.NombreInst;
             }
         }
 
-        const resProt = await API.request(`/animals/search-protocols?inst=${instId}&user=${userId}`);
         if (resProt && resProt.status === 'success') {
-            const { config, protocols, user_email, form_types } = resProt.data;
+            const { protocols, user_email, form_types } = resProt.data;
             protocolsList = protocols;
-            if(user_email) currentUserEmail = user_email;
+            if (user_email) currentUserEmail = user_email;
 
-            // LLENAR SELECTOR DE TIPOS
             const typeSel = document.getElementById('select-tipo-form');
-            if(typeSel) {
+            if (typeSel) {
                 typeSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.seleccione_tipo || 'Seleccione tipo...') + '</option>';
                 if (form_types && form_types.length > 0) {
                     form_types.forEach(t => {
@@ -81,16 +79,9 @@ export async function initAnimalForm() {
             setupSearch();
         }
 
-        const resConfig = await API.request(`/user/protocols/config?inst=${instId}`);
         if (resConfig && resConfig.status === 'success' && resConfig.data) {
             protocolHelpConfig.has_network = !!resConfig.data.has_network;
-        }
-        const resLists = await API.request(`/user/protocols/all-lists?inst=${instId}&uid=${userId}`);
-        if (resLists && resLists.status === 'success' && resLists.data && Array.isArray(resLists.data.my)) {
-            const today = new Date().toISOString().split('T')[0];
-            protocolHelpConfig.has_approved_vigent = resLists.data.my.some(p =>
-                p.Aprobado == 1 && (!p.Vencimiento || p.Vencimiento >= today)
-            );
+            protocolHelpConfig.has_approved_vigent = !!resConfig.data.has_approved_vigent;
         }
         setupProtocolHelpModal();
     } catch (e) { console.error("Error init:", e); }
@@ -251,8 +242,9 @@ function setupSearch() {
 
     const handleInput = () => {
         const term = input.value.toLowerCase().trim();
-        if (term === '') {
-            renderList(protocolsList);
+        if (term.length < 1) {
+            list.innerHTML = '';
+            list.classList.add('d-none');
             return;
         }
         const filtered = protocolsList.filter(p => {

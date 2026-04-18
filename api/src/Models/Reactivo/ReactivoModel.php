@@ -606,8 +606,9 @@ class ReactivoModel {
                                                 )
                                             )
                                           )
+                                          AND COALESCE(pr.IdUsrA, p.IdUsrA) = ?
                                         ORDER BY p.nprotA DESC");
-        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
+        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId, (int)$userId]);
 
         $stmtIns = $this->db->prepare("SELECT IdInsumoexp, NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);
@@ -724,8 +725,14 @@ class ReactivoModel {
         $stmtEsp = $this->db->prepare("SELECT idespA, EspeNombreA, Panimal, PalojamientoChica, PalojamientoGrande FROM especiee WHERE IdInstitucion = ? ORDER BY EspeNombreA");
         $stmtEsp->execute([$instId]);
 
-        $stmtSub = $this->db->prepare("SELECT idsubespA, idespA, SubEspeNombreA, Psubanimal, Existe FROM subespecie WHERE Existe != 2");
-        $stmtSub->execute();
+        $stmtSub = $this->db->prepare(
+            "SELECT s.idsubespA, s.idespA, s.SubEspeNombreA, s.Psubanimal, s.Existe
+             FROM subespecie s
+             INNER JOIN especiee e ON e.idespA = s.idespA AND e.IdInstitucion = ?
+             WHERE s.Existe != 2
+             ORDER BY e.EspeNombreA, s.SubEspeNombreA"
+        );
+        $stmtSub->execute([$instId]);
 
         $stmtInsExp = $this->db->prepare("SELECT NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1");
         $stmtInsExp->execute([$instId]);

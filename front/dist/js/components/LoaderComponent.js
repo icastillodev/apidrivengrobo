@@ -3,7 +3,8 @@ import '../utils/stripCloudflareInsights.js';
 
 let loaderStartTime = 0;
 let phraseIntervalId = null;
-let phraseFadeToken = 0;
+/** Se incrementa al detener el loader o al remontar uno: invalida timeouts de frases en curso. */
+let loaderPhraseGen = 0;
 
 /** Frases de estado (≥40), tono institucional / bioterio / datos seguros. */
 const LOADER_PHRASES_ES = [
@@ -73,33 +74,36 @@ function getPhraseQueue() {
     return shuffleCopy(base);
 }
 
-function clearPhraseRotation() {
+function stopLoaderPhraseRotation() {
     if (phraseIntervalId) {
         clearInterval(phraseIntervalId);
         phraseIntervalId = null;
     }
-    phraseFadeToken += 1;
+    loaderPhraseGen += 1;
 }
 
-function startPhraseRotation(loaderEl, textColor) {
-    clearPhraseRotation();
+function startPhraseRotation(loaderEl) {
+    stopLoaderPhraseRotation();
     const phraseEl = loaderEl.querySelector('[data-gecko-loader-phrase]');
     const subEl = loaderEl.querySelector('[data-gecko-loader-sub]');
     if (!phraseEl) return;
 
     const queue = getPhraseQueue();
     let idx = 0;
+    phraseEl.style.opacity = '1';
     phraseEl.textContent = queue[idx % queue.length];
     if (subEl) subEl.style.color = '#888';
 
     const fadeMs = 420;
-    const holdMs = 2800;
+    const holdMs = 2600;
+    const genAtMount = loaderPhraseGen;
 
     phraseIntervalId = window.setInterval(() => {
-        const my = ++phraseFadeToken;
+        if (genAtMount !== loaderPhraseGen) return;
+        const tickGen = loaderPhraseGen;
         phraseEl.style.opacity = '0';
         window.setTimeout(() => {
-            if (my !== phraseFadeToken) return;
+            if (tickGen !== loaderPhraseGen) return;
             idx = (idx + 1) % queue.length;
             phraseEl.textContent = queue[idx];
             void phraseEl.offsetWidth;
@@ -123,7 +127,7 @@ export function showLoader() {
 
     document.body.classList.remove('gecko-loaded');
     loaderStartTime = Date.now();
-    clearPhraseRotation();
+    stopLoaderPhraseRotation();
 
     const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark' || localStorage.getItem('theme') === 'dark';
 
@@ -207,6 +211,12 @@ export function showLoader() {
                 justify-content: center;
                 text-align: center;
                 line-height: 1.35;
+                opacity: 1;
+                visibility: visible;
+            }
+            #global-loader .gecko-loader-dots,
+            #global-loader .gecko-loader-dot {
+                visibility: visible !important;
             }
         `;
         document.head.appendChild(style);
@@ -228,6 +238,8 @@ export function showLoader() {
         backgroundColor: bgColor,
         zIndex: '2147483647',
         transition: 'opacity 0.55s ease',
+        visibility: 'visible',
+        opacity: '1',
     });
 
     const dotColor = textColor;
@@ -319,7 +331,7 @@ export function showLoader() {
     `;
 
     document.body.prepend(loader);
-    startPhraseRotation(loader, textColor);
+    startPhraseRotation(loader);
 }
 
 /**
@@ -331,7 +343,7 @@ export function hideLoader(opts = {}) {
     const remainingTime = Math.max(0, minVisibleMs - (Date.now() - loaderStartTime));
 
     window.setTimeout(() => {
-        clearPhraseRotation();
+        stopLoaderPhraseRotation();
         document.body.classList.add('gecko-loaded');
         const loader = document.getElementById('global-loader');
         if (loader) {
