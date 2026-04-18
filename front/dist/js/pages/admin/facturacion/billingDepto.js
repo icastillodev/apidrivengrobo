@@ -2,7 +2,7 @@ import { API } from '../../../api.js';
 import { hideLoader, showLoader } from '../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../components/MenuComponent.js';
 import { renderDashboard } from './billingDashboard.js';
-import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal } from './billingLocale.js';
+import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe } from './billingLocale.js';
 import './billingPayments.js';
 
 import './modals/manager.js' ;
@@ -245,6 +245,8 @@ function getHeaderHTML(prot) {
 function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
     const bd = txBD();
+    const bi = txBI();
+    const exL = bi.pdf_monto_exento || 'Exento';
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">${bd.sec_pedidos_formularios || 'Pedidos (Formularios)'}</h6>
         <div class="table-responsive">
@@ -265,7 +267,7 @@ function getFormsTableHTML(formularios, idProt) {
                 </thead>
                 <tbody>
                     ${formularios.map(f => {
-                        const isExento = (f.is_exento == 1 || f.exento == 1);
+                        const isExento = billingTipoExento(f);
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
@@ -307,9 +309,7 @@ function getFormsTableHTML(formularios, idProt) {
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
                                 <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
                                 <td>${cantidadDisplay}</td>
-                                <td class="text-end fw-bold text-dark">$ ${formatBillingMoney(total)}</td>
-                                <td class="text-end text-success fw-bold">$ ${formatBillingMoney(pagado)}</td>
-                                <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(debe)}</td>
+                                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
                             </tr>`;
                     }).join('')}
                 </tbody>
@@ -471,34 +471,35 @@ function getInsumosGeneralesTableHTML(insumos) {
     if (!insumos || insumos.length === 0) return '';
     const bd = txBD();
     const tf = txF();
+    const bi = txBI();
+    const exL = bi.pdf_monto_exento || 'Exento';
     let sumTotal = 0, sumPagado = 0, sumDebe = 0;
 
     const filas = insumos.map(i => {
         const total = parseFloat(i.total_item || 0);
         const pagado = parseFloat(i.pagado || 0);
-        const isExento = (i.is_exento == 1); 
+        const isExento = billingTipoExento(i);
         const debe = isExento ? 0 : Math.max(0, total - pagado);
         
         sumTotal += total; sumPagado += pagado; sumDebe += debe;
         
-        let badge = (debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` : 
+        let badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
+            ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
                     (pagado > 0 ? `<span class="badge bg-warning text-dark">${tf.estado_cobro_parcial || 'PARCIAL'}</span>` : 
-                    `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`);
+                    `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`));
 
         const detalleHTML = i.detalle_completo.split(' | ').map(item => `• ${item}`).join('<br>');
-        const rowStyle = (debe <= 0) ? 'background-color: #f0fff4 !important;' : '';
+        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f0fff4 !important;' : '';
 
         return `
             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${debe <= 0 ? 'disabled' : ''}></td>
+                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
                 <td class="small text-muted">${i.id}</td>
                 <td>${badge}</td>
                 <td>${i.solicitante}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
-                <td class="text-end fw-bold">$ ${formatBillingMoney(total)}</td>
-                <td class="text-end text-success">$ ${formatBillingMoney(pagado)}</td>
-                <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(debe)}</td>
+                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
             </tr>`;
     }).join('');
 
@@ -764,7 +765,7 @@ window.downloadProtocoloPDF = async (idProt) => {
         if (prot.formularios && prot.formularios.length > 0) {
             const exL = bi.pdf_monto_exento || 'Exento';
             const bodyForms = prot.formularios.map(f => {
-                const isEx = (f.is_exento == 1 || f.exento == 1);
+                const isEx = billingTipoExento(f);
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
@@ -880,7 +881,7 @@ window.downloadInsumosPDF = async () => {
 
     const exL = bi.pdf_monto_exento || 'Exento';
     const body = insumos.map(i => {
-        const m = pdfColsPrecioDebePagoTotal(false, i.total_item || 0, i.pagado || 0, exL);
+        const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), i.total_item || 0, i.pagado || 0, exL);
         return [i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), m[0], m[1], m[2]];
     });
 
@@ -968,7 +969,7 @@ window.downloadGlobalPDF = async () => {
 
         if (prot.formularios?.length > 0) {
             const bodyForms = prot.formularios.map(f => {
-                const isExento = (f.is_exento == 1 || f.exento == 1);
+                const isExento = billingTipoExento(f);
                 const isRea = f.categoria?.toLowerCase().includes('reactivo');
                 const esp = f.nombre_especie || '---';
                 const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';

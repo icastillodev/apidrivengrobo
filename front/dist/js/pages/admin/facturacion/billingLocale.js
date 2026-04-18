@@ -64,3 +64,29 @@ export function pdfColsPrecioDebePagoTotal(isExento, total, pagado, exentoLabel)
     const debe = Math.max(0, tot - pag);
     return [precio, `$ ${formatBillingMoney(debe)}`, `$ ${formatBillingMoney(pag)}`];
 }
+
+/**
+ * Detecta fila exenta desde distintos formatos de API (`is_exento` boolean/1, `exento` legacy).
+ * @param {Record<string, unknown>|null|undefined} row
+ */
+export function billingTipoExento(row) {
+    if (!row || typeof row !== 'object') return false;
+    const v = row.is_exento;
+    if (v === true || v === 1 || v === '1') return true;
+    const e = row.exento;
+    return e === 1 || e === '1' || e === true;
+}
+
+/**
+ * Tres celdas HTML: Total (precio) | Pagado | Debe — en exento, pagado y debe muestran la etiqueta.
+ * @param {boolean} isExento
+ * @param {number|string} total
+ * @param {number|string} pagado
+ * @param {string} [exentoLabel]
+ */
+export function billingTdTotalPagadoDebe(isExento, total, pagado, exentoLabel) {
+    const m = pdfColsPrecioDebePagoTotal(isExento, total, pagado, exentoLabel);
+    const clsPag = isExento ? 'text-end fw-bold text-secondary' : 'text-end text-success fw-bold';
+    const clsDeb = isExento ? 'text-end fw-bold text-secondary' : 'text-end text-danger fw-bold';
+    return `<td class="text-end fw-bold text-dark">${m[0]}</td><td class="${clsPag}">${m[2]}</td><td class="${clsDeb}">${m[1]}</td>`;
+}
