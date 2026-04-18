@@ -163,6 +163,7 @@ export const openAnimalModal = async (idformA) => {
                                         <span class="fw-bold text-muted small uppercase">${t.lbl_pagado_actualmente || 'PAGADO ACTUALMENTE:'}</span>
                                         <span class="fs-3 fw-bold text-success" id="mdl-ani-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
                                         <input type="hidden" id="mdl-ani-pagado-val" value="${pagado}">
+                                        <input type="hidden" id="mdl-ani-exento" value="${(d.is_exento === true || d.is_exento == 1) ? '1' : '0'}">
                                     </div>
 
                                     <div class="input-group">

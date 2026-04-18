@@ -115,6 +115,7 @@ export const openReactiveModal = async (idformA) => {
                                         <span class="fw-bold text-muted small uppercase">${t.lbl_pagado_uc || 'PAGADO:'}</span>
                                         <span class="fs-3 fw-bold text-success" id="mdl-rea-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
                                         <input type="hidden" id="mdl-rea-pagado-val" value="${pagado}">
+                                        <input type="hidden" id="mdl-rea-exento" value="${(d.is_exento === true || d.is_exento == 1) ? '1' : '0'}">
                                     </div>
                                     <div class="input-group">
                                         <input type="number" id="mdl-rea-monto-accion" class="form-control" placeholder="${t.ph_monto || 'Monto...'}">

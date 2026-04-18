@@ -592,12 +592,32 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
         doc.setFont('helvetica', 'normal'); doc.text(item.investigadorInstitucion || '-', 52, M + 40);
         doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, M + 46);
         doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, M + 46);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_total', 'Total:'), M, M + 52);
-        doc.setFont('helvetica', 'normal'); doc.text(`$ ${formatBillingMoney(item.montoTotal || 0)}`, 50, M + 52);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_pagado', 'Pagado:'), M, M + 58);
-        doc.setFont('helvetica', 'normal'); doc.text(`$ ${formatBillingMoney(item.montoPagado || 0)}`, 50, M + 58);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_debe', 'Debe:'), M, M + 64);
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(item.montoDebe || 0)}`, 50, M + 64);
+        const tp = tInvPdf();
+        const tm = window.txt?.facturacion?.billing_modal || {};
+        const exL = tp.pdf_monto_exento || 'Exento';
+        const isExInst = item.is_exento == 1 || item.exento == 1;
+        const mFila = pdfColsPrecioDebePagoTotal(
+            !!isExInst,
+            item.montoTotal || 0,
+            item.montoPagado || 0,
+            exL
+        );
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
+        doc.text(tm.pdf_control_fin || 'CONTROL FINANCIERO', M, M + 54);
+        doc.autoTable({
+            startY: M + 56,
+            margin: { left: M, right: M },
+            head: [[
+                tp.pdf_col_precio || 'Precio',
+                tp.pdf_col_debe || 'Debe',
+                tp.pdf_col_pago_total || 'Pago total'
+            ]],
+            body: [[mFila[0], mFila[1], mFila[2]]],
+            theme: 'grid',
+            headStyles: { fillColor: violeta },
+            styles: { fontSize: 10 },
+            columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+        });
 
         doc.save(`Ficha_Form_${item.idformA}_Inst.pdf`);
     } catch (e) {

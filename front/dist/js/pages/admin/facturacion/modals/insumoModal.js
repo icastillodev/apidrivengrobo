@@ -71,6 +71,7 @@ export const openInsumoModal = async (idformA) => {
                                         <span class="small fw-bold text-muted">${t.lbl_pagado_line || 'PAGADO:'}</span>
                                         <span class="fw-bold text-success" id="mdl-ins-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
                                         <input type="hidden" id="mdl-ins-pagado-val" value="${pagado}">
+                                        <input type="hidden" id="mdl-ins-exento" value="${(d.is_exento === true || d.is_exento == 1 || d.exento == 1) ? '1' : '0'}">
                                     </div>
                                     <input type="number" id="mdl-ins-monto-accion" class="form-control mb-2" placeholder="${t.ph_monto || 'Monto...'}">
                                     <div class="d-grid gap-2">

@@ -111,7 +111,7 @@ export const es = {
         dash_sin_noticias: "No hay noticias publicadas.",
         dash_mensajes_titulo: "Mensajes sin leer",
         dash_mensajes_ver_todos: "Ir a mensajes",
-        dash_mensajes_sin_nuevos: "No tiene conversaciones con mensajes sin leer.",
+        dash_mensajes_sin_nuevos: "No tiene mensajes en el buzón.",
         dash_noticias_error: "No se pudieron cargar las noticias del panel. Intente más tarde.",
         portal_titulo: "Noticias",
         portal_sub: "Institución y red",

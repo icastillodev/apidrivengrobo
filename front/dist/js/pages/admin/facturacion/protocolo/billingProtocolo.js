@@ -529,14 +529,15 @@ window.downloadProtocoloPDF = async (idProt) => {
 
         doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
         doc.setFontSize(9); doc.setTextColor(100);
-        doc.text(bi.pdf_subtotal_protocolo || 'SUBTOTAL PROTOCOLO:', 125, currentY + 7);
-        doc.text(bi.pdf_box_tot_pag || 'TOTAL PAGADO (+EX):', 125, currentY + 13);
-        doc.text(bi.pdf_box_deuda || 'DEUDA PENDIENTE:', 125, currentY + 19);
-        
+        const precioProt = (parseFloat(totales.deudaTotal) || 0) + (parseFloat(totales.totalPagado) || 0);
+        doc.text(`${bi.pdf_col_precio || 'Precio'}:`, 125, currentY + 7);
+        doc.text(`${bi.pdf_col_debe || 'Debe'}:`, 125, currentY + 13);
+        doc.text(`${bi.pdf_col_pago_total || 'Pago total'}:`, 125, currentY + 19);
+
         doc.setFont("helvetica", "bold"); doc.setTextColor(0);
-        doc.text(`$ ${formatBillingMoney(totales.deudaTotal + totales.totalPagado)}`, 185, currentY + 7, { align: "right" });
-        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.text(`$ ${formatBillingMoney(totales.totalPagado)}`, 185, currentY + 13, { align: "right" });
-        doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(totales.deudaTotal)}`, 185, currentY + 19, { align: "right" });
+        doc.text(`$ ${formatBillingMoney(precioProt)}`, 185, currentY + 7, { align: "right" });
+        doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(totales.deudaTotal)}`, 185, currentY + 13, { align: "right" });
+        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.text(`$ ${formatBillingMoney(totales.totalPagado)}`, 185, currentY + 19, { align: "right" });
 
         doc.save(`Ficha_Financiera_Prot_${info.nprotA}.pdf`);
     } catch (e) {

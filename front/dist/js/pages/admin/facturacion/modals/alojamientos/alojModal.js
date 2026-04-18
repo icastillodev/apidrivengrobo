@@ -176,6 +176,7 @@ function renderGestionCobros(historiaId, dias, total, pagado, t) {
             <span class="fw-bold text-muted small uppercase">${t.aloj_lbl_total_pagado_uc || 'TOTAL PAGADO:'}</span>
             <span class="fs-3 fw-bold text-success" id="mdl-aloj-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
             <input type="hidden" id="mdl-aloj-pagado-val" value="${pagado}">
+            <input type="hidden" id="mdl-aloj-exento" value="0">
         </div>
         <div class="input-group">
             <input type="number" id="mdl-aloj-monto-accion" class="form-control form-control-lg" placeholder="${t.ph_monto || 'Monto...'}">

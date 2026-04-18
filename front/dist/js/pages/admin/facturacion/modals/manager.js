@@ -8,9 +8,10 @@ import { openAnimalModal } from './animalModal.js';
 import { openAlojModal } from './alojamientos/alojModal.js';
 import { openReactiveModal } from './reactiveModal.js';
 import { openInsumoModal } from './insumoModal.js';
-import { formatBillingMoney } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal } from '../billingLocale.js';
 
 const txBM = () => window.txt?.facturacion?.billing_modal || {};
+const txBIPdf = () => window.txt?.facturacion?.billing_investigador || {};
 function bmTpl(str, map) {
     if (!str) return '';
     return str.replace(/\{(\w+)\}/g, (_, k) => (map[k] != null ? String(map[k]) : `{${k}}`));
@@ -507,7 +508,11 @@ window.descargarFichaPDF = async (id, tipo) => {
     const total = counts[3]?.innerText || '0';
 
     const costoTotalNum = parseFloat(document.getElementById('mdl-ani-total')?.value || 0);
-    const pagado = document.getElementById('mdl-ani-pagado-txt')?.innerText || `$ ${formatBillingMoney(0)}`;
+    const pagadoNum = parseFloat(document.getElementById('mdl-ani-pagado-val')?.value || 0);
+    const isExAnimal = document.getElementById('mdl-ani-exento')?.value === '1';
+    const biPdf = txBIPdf();
+    const exL = biPdf.pdf_monto_exento || 'Exento';
+    const montosRow = pdfColsPrecioDebePagoTotal(isExAnimal, costoTotalNum, pagadoNum, exL);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
@@ -548,17 +553,25 @@ window.descargarFichaPDF = async (id, tipo) => {
         theme: 'grid'
     });
 
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(20, finalY, 170, 25, 'F');
-    
-    doc.setFont("helvetica", "bold");
-    doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', 25, finalY + 8);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${tx.pdf_costo_final_form || 'Costo Final del Formulario:'} $ ${formatBillingMoney(costoTotalNum)}`, 25, finalY + 15);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`${tx.pdf_total_abonado_fecha || 'Total Abonado a la Fecha:'} ${pagado}`, 25, finalY + 21);
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', M, finalY);
+    doc.autoTable({
+        startY: finalY + 4,
+        margin: { left: M, right: M },
+        head: [[
+            biPdf.pdf_col_precio || 'Precio',
+            biPdf.pdf_col_debe || 'Debe',
+            biPdf.pdf_col_pago_total || 'Pago total'
+        ]],
+        body: [[montosRow[0], montosRow[1], montosRow[2]]],
+        theme: 'grid',
+        headStyles: { fillColor: [26, 93, 59] },
+        styles: { fontSize: 9 },
+        columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+    });
 
     const footerY = 265;
     doc.setDrawColor(150);
@@ -590,7 +603,11 @@ window.descargarFichaAlojPDF = async (historiaId) => {
     const protocolo = getTxt('pdf-aloj-prot');
     const totalDias = getTxt('pdf-aloj-dias');
     const costoTotalNum = parseFloat(getVal('mdl-aloj-total')) || 0;
-    const pagadoTxt = getTxt('mdl-aloj-pagado-txt');
+    const pagadoNum = parseFloat(document.getElementById('mdl-aloj-pagado-val')?.value || 0);
+    const isExAloj = document.getElementById('mdl-aloj-exento')?.value === '1';
+    const biPdf = txBIPdf();
+    const exL = biPdf.pdf_monto_exento || 'Exento';
+    const montosAloj = pdfColsPrecioDebePagoTotal(isExAloj, costoTotalNum, pagadoNum, exL);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
@@ -632,13 +649,25 @@ window.descargarFichaAlojPDF = async (historiaId) => {
         theme: 'grid'
     });
 
-    const finalY = doc.lastAutoTable.finalY + 12;
-    doc.setFillColor(245, 245, 245);
-    doc.rect(20, finalY, 170, 22, 'F');
-    doc.setFont("helvetica", "bold");
-    doc.text(`${tx.pdf_ficha_aloj_costo_total_hist || 'COSTO TOTAL DE LA HISTORIA:'} $ ${formatBillingMoney(costoTotalNum)}`, 25, finalY + 8);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`${tx.pdf_ficha_aloj_total_abonado || 'TOTAL ABONADO A LA FECHA:'} ${pagadoTxt}`, 25, finalY + 16);
+    const finalY = doc.lastAutoTable.finalY + 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', 20, finalY);
+    doc.autoTable({
+        startY: finalY + 4,
+        margin: { left: 20, right: 20 },
+        head: [[
+            biPdf.pdf_col_precio || 'Precio',
+            biPdf.pdf_col_debe || 'Debe',
+            biPdf.pdf_col_pago_total || 'Pago total'
+        ]],
+        body: [[montosAloj[0], montosAloj[1], montosAloj[2]]],
+        theme: 'grid',
+        headStyles: { fillColor: [26, 93, 59] },
+        styles: { fontSize: 9 },
+        columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+    });
 
     doc.save(`Ficha_Alojamiento_${historiaId}.pdf`);
 };
@@ -659,8 +688,10 @@ window.descargarFichaReaPDF = async (idformA) => {
 
         const total = parseFloat(d.total_calculado || 0);
         const pagado = parseFloat(d.totalpago || 0);
-        const debe = Math.max(0, total - pagado);
         const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+        const biPdf = txBIPdf();
+        const exL = biPdf.pdf_monto_exento || 'Exento';
+        const montosRea = pdfColsPrecioDebePagoTotal(d.is_exento == 1, total, pagado, exL);
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         const M = 18;
@@ -730,22 +761,24 @@ window.descargarFichaReaPDF = async (idformA) => {
             y += 4;
         }
 
-        const boxY = y;
-        const boxH = d.is_exento == 1 ? 24 : 31;
-        doc.setDrawColor(200);
-        doc.setFillColor(245, 245, 245);
-        doc.rect(M, boxY, right - M, boxH, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', M + 5, boxY + 8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${tx.pdf_costo_final_form || 'Costo Final del Formulario:'} $ ${formatBillingMoney(total)}`, M + 5, boxY + 15);
-        doc.setTextColor(26, 93, 59);
-        doc.text(`${tx.pdf_total_abonado_fecha || 'Total Abonado a la Fecha:'} $ ${formatBillingMoney(pagado)}`, M + 5, boxY + 22);
-        if (d.is_exento != 1) {
-            doc.setTextColor(200, 0, 0);
-            doc.text(`${tx.pdf_rea_debe_lbl || 'Deuda pendiente:'} $ ${formatBillingMoney(debe)}`, M + 5, boxY + 29);
-        }
+        doc.setFontSize(9);
         doc.setTextColor(0);
+        doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', M, y);
+        doc.autoTable({
+            startY: y + 4,
+            margin: { left: M, right: M },
+            head: [[
+                biPdf.pdf_col_precio || 'Precio',
+                biPdf.pdf_col_debe || 'Debe',
+                biPdf.pdf_col_pago_total || 'Pago total'
+            ]],
+            body: [[montosRea[0], montosRea[1], montosRea[2]]],
+            theme: 'grid',
+            headStyles: { fillColor: [26, 93, 59] },
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+        });
 
         const footerY = 265;
         doc.setDrawColor(150);
@@ -781,8 +814,10 @@ window.descargarFichaInsPDF = async (idformA) => {
         const total = parseFloat(d.total_item || 0);
         const pagado = parseFloat(d.pagado || 0);
         const saldo = parseFloat(d.saldoInv || 0);
-        const debe = Math.max(0, total - pagado);
         const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+        const biPdf = txBIPdf();
+        const exL = biPdf.pdf_monto_exento || 'Exento';
+        const montosIns = pdfColsPrecioDebePagoTotal(d.is_exento == 1, total, pagado, exL);
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         const M = 18;
@@ -820,21 +855,26 @@ window.descargarFichaInsPDF = async (idformA) => {
         doc.text(detLines, M, y);
         y += detLines.length * 5 + 8;
 
-        const boxY = y;
-        const boxH = 40;
-        doc.setDrawColor(200);
-        doc.setFillColor(245, 245, 245);
-        doc.rect(M, boxY, right - M, boxH, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', M + 5, boxY + 8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${tx.lbl_saldo_disponible_uc || 'SALDO DISPONIBLE'}: $ ${formatBillingMoney(saldo)}`, M + 5, boxY + 15);
-        doc.text(`${tx.pdf_costo_final_form || 'Costo Final del Formulario:'} $ ${formatBillingMoney(total)}`, M + 5, boxY + 22);
-        doc.setTextColor(26, 93, 59);
-        doc.text(`${tx.pdf_total_abonado_fecha || 'Total Abonado a la Fecha:'} $ ${formatBillingMoney(pagado)}`, M + 5, boxY + 29);
-        doc.setTextColor(200, 0, 0);
-        doc.text(`${tx.pdf_ins_debe_lbl || 'Deuda pendiente:'} $ ${formatBillingMoney(debe)}`, M + 5, boxY + 36);
+        doc.setFontSize(9);
         doc.setTextColor(0);
+        doc.text(`${tx.lbl_saldo_disponible_uc || 'SALDO DISPONIBLE'}: $ ${formatBillingMoney(saldo)}`, M, y);
+        y += 6;
+        doc.text(tx.pdf_control_fin || 'CONTROL FINANCIERO', M, y);
+        doc.autoTable({
+            startY: y + 4,
+            margin: { left: M, right: M },
+            head: [[
+                biPdf.pdf_col_precio || 'Precio',
+                biPdf.pdf_col_debe || 'Debe',
+                biPdf.pdf_col_pago_total || 'Pago total'
+            ]],
+            body: [[montosIns[0], montosIns[1], montosIns[2]]],
+            theme: 'grid',
+            headStyles: { fillColor: [26, 93, 59] },
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+        });
 
         const footerY = 265;
         doc.setDrawColor(150);

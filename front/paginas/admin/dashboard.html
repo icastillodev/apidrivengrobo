@@ -29,27 +29,17 @@
 <body class="bg-gray-50 font-sans">
 
     <main class="container mx-auto mt-6 p-6">
-        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6" id="dashboard-welcome">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                <div class="max-w-3xl flex-grow-1">
-                    <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                        <span data-i18n="admin_dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Colega</span>, <span data-i18n="admin_dashboard.bienvenido_grobo">Bienvenido a GROBO</span>
-                    </h1>
-                    <p class="text-gray-500 font-medium leading-relaxed mb-0" data-i18n="admin_dashboard.panel_desc">
-                        Panel de gestión institucional <strong>GROBO</strong>. Utilice el menú de navegación para gestionar protocolos, revisar solicitudes y administrar la plataforma de manera integral.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    id="btn-ayuda-dashboard-admin"
-                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
-                    data-gecko-cap-help="admin/dashboard"
-                    data-gecko-cap-modal="#modal-admin-dashboard-help"
-                >
-                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_dashboard.btn_ayuda">Ayuda</span>
-                </button>
-            </div>
-        </section>
+        <div class="d-flex justify-content-end mb-3">
+            <button
+                type="button"
+                id="btn-ayuda-dashboard-admin"
+                class="btn btn-outline-secondary btn-sm fw-bold shadow-sm"
+                data-gecko-cap-help="admin/dashboard"
+                data-gecko-cap-modal="#modal-admin-dashboard-help"
+            >
+                <i class="bi bi-question-circle me-1"></i> <span data-i18n="admin_dashboard.btn_ayuda">Ayuda</span>
+            </button>
+        </div>
 
         <div class="container-fluid px-0 mb-4">
             <div class="row g-3" id="dashboard-noticias-mount"></div>
@@ -146,14 +136,7 @@
                 await ensureFirstRunLanguagePick(loadLanguage, translatePage);
                 if (window.txt) translatePage();
 
-                const userName = localStorage.getItem('userName');
                 const instId = localStorage.getItem('instId');
-
-                const welcomeSpan = document.getElementById('welcome-name');
-                if (welcomeSpan) {
-                    const primerNombre = userName ? userName.split(' ')[0] : 'Admin';
-                    welcomeSpan.innerText = primerNombre;
-                }
 
                 // 🚀 FIX: INYECTAMOS LA VALIDACIÓN DEL ESCUDO
                 const secRes = await API.request('/auth/security-check', 'GET');

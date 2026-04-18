@@ -111,7 +111,7 @@ export const en = {
         dash_sin_noticias: "No published news.",
         dash_mensajes_titulo: "Unread messages",
         dash_mensajes_ver_todos: "Open messages",
-        dash_mensajes_sin_nuevos: "You have no conversations with unread messages.",
+        dash_mensajes_sin_nuevos: "No messages in your inbox.",
         dash_noticias_error: "Could not load dashboard news. Please try again later.",
         portal_titulo: "News",
         portal_sub: "Institution and network",

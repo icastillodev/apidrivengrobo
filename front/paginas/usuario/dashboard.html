@@ -28,27 +28,17 @@
 <body class="bg-gray-50 font-sans">
 
     <main class="container mx-auto mt-6 p-6">
-        <section class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 mb-6" id="dashboard-welcome">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                <div class="max-w-3xl flex-grow-1">
-                    <h1 class="text-3xl font-black text-gray-900 italic tracking-tighter mb-2">
-                        <span data-i18n="dashboard.hola">Hola</span> <span id="welcome-name" class="text-primary">Investigador</span><span data-i18n="dashboard.bienvenido">, Bienvenido al Bioterio</span>
-                    </h1>
-                    <p class="text-gray-500 font-medium leading-relaxed mb-0">
-                        <span data-i18n="dashboard.panel_desc">Panel de investigador</span> <strong data-i18n="dashboard.grobo">GROBO</strong><span data-i18n="dashboard.panel_uso">. Utilice el menú de navegación para iniciar nuevas solicitudes, revisar el estado de sus formularios y gestionar sus protocolos activos.</span>
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    id="btn-ayuda-dashboard-investigador"
-                    class="btn btn-outline-secondary btn-sm fw-bold shadow-sm align-self-start"
-                    data-gecko-cap-help="usuario/dashboard"
-                    data-gecko-cap-modal="#modal-investigador-dashboard-help"
-                >
-                    <i class="bi bi-question-circle me-1"></i> <span data-i18n="dashboard.btn_ayuda">Ayuda</span>
-                </button>
-            </div>
-        </section>
+        <div class="d-flex justify-content-end mb-3">
+            <button
+                type="button"
+                id="btn-ayuda-dashboard-investigador"
+                class="btn btn-outline-secondary btn-sm fw-bold shadow-sm"
+                data-gecko-cap-help="usuario/dashboard"
+                data-gecko-cap-modal="#modal-investigador-dashboard-help"
+            >
+                <i class="bi bi-question-circle me-1"></i> <span data-i18n="dashboard.btn_ayuda">Ayuda</span>
+            </button>
+        </div>
 
         <div class="container-fluid px-0 mb-4">
             <div class="row g-3" id="dashboard-noticias-mount"></div>
@@ -144,14 +134,6 @@
                 Auth.checkAccess([3, 5, 6]);
                 await ensureFirstRunLanguagePick(loadLanguage, translatePage);
                 if (window.txt) translatePage();
-
-                const userName = localStorage.getItem('userName');
-                const welcomeSpan = document.getElementById('welcome-name');
-                if (welcomeSpan) {
-                    const t = window.txt?.dashboard;
-                    const primerNombre = userName ? userName.split(' ')[0] : (t?.hola || 'Investigador');
-                    welcomeSpan.innerText = primerNombre;
-                }
 
                 // 🚀 FIX: INYECTAMOS LA VALIDACIÓN DEL ESCUDO
                 const secRes = await API.request('/auth/security-check', 'GET');

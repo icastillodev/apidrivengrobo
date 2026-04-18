@@ -111,7 +111,7 @@ export const pt = {
         dash_sin_noticias: "Não há notícias publicadas.",
         dash_mensajes_titulo: "Mensagens não lidas",
         dash_mensajes_ver_todos: "Ir às mensagens",
-        dash_mensajes_sin_nuevos: "Não há conversas com mensagens não lidas.",
+        dash_mensajes_sin_nuevos: "Não há mensagens na caixa de entrada.",
         dash_noticias_error: "Não foi possível carregar as notícias do painel. Tente novamente mais tarde.",
         portal_titulo: "Notícias",
         portal_sub: "Instituição e rede",
