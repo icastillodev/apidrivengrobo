@@ -3,6 +3,7 @@ import '../utils/stripCloudflareInsights.js';
 
 let loaderStartTime = 0;
 let phraseIntervalId = null;
+let progressIntervalId = null;
 /** Se incrementa al detener el loader o al remontar uno: invalida timeouts de frases en curso. */
 let loaderPhraseGen = 0;
 
@@ -79,35 +80,65 @@ function stopLoaderPhraseRotation() {
         clearInterval(phraseIntervalId);
         phraseIntervalId = null;
     }
+    if (progressIntervalId) {
+        clearInterval(progressIntervalId);
+        progressIntervalId = null;
+    }
     loaderPhraseGen += 1;
 }
 
+/** Puntos 1…5: avanza con el tiempo; el activo tintinea (5 = casi listo). */
+function applyProgressDots(loaderEl, step, dotColor) {
+    const dots = loaderEl.querySelectorAll('[data-gecko-loader-progress] .gecko-progress-dot');
+    const n = dots.length;
+    if (!n) return;
+    const s = Math.min(Math.max(Number(step) || 1, 1), n);
+    dots.forEach((dot, i) => {
+        const k = i + 1;
+        dot.classList.remove('gecko-dot-done', 'gecko-dot-active', 'gecko-dot-todo');
+        dot.style.background = dotColor;
+        if (k < s) dot.classList.add('gecko-dot-done');
+        else if (k === s) dot.classList.add('gecko-dot-active');
+        else dot.classList.add('gecko-dot-todo');
+    });
+}
+
+function startProgressSteps(loaderEl, dotColor) {
+    const genAtMount = loaderPhraseGen;
+    let step = 1;
+    applyProgressDots(loaderEl, step, dotColor);
+    progressIntervalId = window.setInterval(() => {
+        if (genAtMount !== loaderPhraseGen) return;
+        if (step < 5) step += 1;
+        applyProgressDots(loaderEl, step, dotColor);
+    }, 720);
+}
+
 function startPhraseRotation(loaderEl) {
-    stopLoaderPhraseRotation();
-    const phraseEl = loaderEl.querySelector('[data-gecko-loader-phrase]');
+    const phraseTextEl = loaderEl.querySelector('[data-gecko-loader-phrase-text]');
     const subEl = loaderEl.querySelector('[data-gecko-loader-sub]');
-    if (!phraseEl) return;
+    if (!phraseTextEl) return;
 
     const queue = getPhraseQueue();
     let idx = 0;
-    phraseEl.style.opacity = '1';
-    phraseEl.textContent = queue[idx % queue.length];
+    phraseTextEl.style.opacity = '1';
+    phraseTextEl.textContent = queue[idx % queue.length];
     if (subEl) subEl.style.color = '#888';
 
-    const fadeMs = 420;
-    const holdMs = 2600;
+    const fadeMs = 380;
+    const holdMs = 2800;
     const genAtMount = loaderPhraseGen;
 
     phraseIntervalId = window.setInterval(() => {
         if (genAtMount !== loaderPhraseGen) return;
         const tickGen = loaderPhraseGen;
-        phraseEl.style.opacity = '0';
+        phraseTextEl.style.opacity = '0';
         window.setTimeout(() => {
             if (tickGen !== loaderPhraseGen) return;
             idx = (idx + 1) % queue.length;
-            phraseEl.textContent = queue[idx];
-            void phraseEl.offsetWidth;
-            phraseEl.style.opacity = '1';
+            phraseTextEl.textContent = queue[idx];
+            void phraseTextEl.offsetWidth;
+            phraseTextEl.style.opacity = '1';
         }, fadeMs);
     }, holdMs + fadeMs);
 }
@@ -133,14 +164,12 @@ export function showLoader() {
 
     const bgColor = isDark ? '#121212' : '#f4f7f6';
     const textColor = isDark ? '#4ade80' : '#1a5d3b';
+    const phraseMuted = isDark ? '#9ca3af' : '#5c5c5c';
 
     const dropShadow = isDark ? 'drop-shadow(0px 6px 10px rgba(74, 222, 128, 0.4))' : 'drop-shadow(0px 8px 12px rgba(0,0,0,0.25))';
 
     const styleId = 'grobo-loader-style';
-    if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.innerHTML = `
+    const styleCss = `
             .gecko-3d-universe {
                 position: relative;
                 width: 212px;
@@ -178,49 +207,79 @@ export function showLoader() {
                 0%   { transform: rotateZ(0deg) rotateX(-60deg); }
                 100% { transform: rotateZ(-360deg) rotateX(-60deg); }
             }
-            .gecko-loader-dots {
+            .gecko-loader-phrase-row {
                 display: flex;
+                flex-direction: row;
                 align-items: center;
                 justify-content: center;
-                gap: 12px;
+                flex-wrap: wrap;
+                gap: 8px 10px;
                 margin-top: 22px;
+                max-width: min(92vw, 440px);
+                padding: 0 18px;
+                box-sizing: border-box;
+                min-height: 3em;
             }
-            .gecko-loader-dot {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                opacity: 0.28;
-                transform: scale(1);
-                animation: gecko-dot-pulse 1.4s ease-in-out infinite;
+            .gecko-loader-phrase-wrap {
+                flex: 1 1 200px;
+                min-width: 0;
+                text-align: center;
             }
-            @keyframes gecko-dot-pulse {
-                0%, 100% { opacity: 0.28; transform: scale(1); }
-                35% { opacity: 1; transform: scale(1.35); }
-                70% { opacity: 0.45; transform: scale(1.08); }
+            .gecko-loader-phrase-text {
+                display: inline;
+                transition: opacity 0.32s ease;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                font-family: sans-serif;
+                line-height: 1.4;
+                will-change: opacity;
             }
-            .gecko-loader-dot:nth-child(1) { animation-delay: 0s; }
-            .gecko-loader-dot:nth-child(2) { animation-delay: 0.12s; }
-            .gecko-loader-dot:nth-child(3) { animation-delay: 0.24s; }
-            .gecko-loader-dot:nth-child(4) { animation-delay: 0.36s; }
-            .gecko-loader-dot:nth-child(5) { animation-delay: 0.48s; }
-            [data-gecko-loader-phrase] {
-                transition: opacity 0.42s ease;
-                min-height: 2.6em;
-                display: flex;
+            .gecko-loader-progress {
+                display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                text-align: center;
-                line-height: 1.35;
-                opacity: 1;
-                visibility: visible;
+                gap: 5px;
+                flex: 0 0 auto;
+                padding: 2px 0 0 2px;
             }
-            #global-loader .gecko-loader-dots,
-            #global-loader .gecko-loader-dot {
+            .gecko-progress-dot {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                flex-shrink: 0;
+                transition: opacity 0.2s ease, transform 0.2s ease;
+            }
+            .gecko-progress-dot.gecko-dot-done {
+                opacity: 0.92;
+                transform: scale(1);
+                animation: none;
+            }
+            .gecko-progress-dot.gecko-dot-todo {
+                opacity: 0.16;
+                transform: scale(0.92);
+                animation: none;
+            }
+            .gecko-progress-dot.gecko-dot-active {
+                animation: gecko-dot-twinkle 0.9s ease-in-out infinite;
+            }
+            @keyframes gecko-dot-twinkle {
+                0%, 100% { opacity: 0.28; transform: scale(0.88); }
+                50% { opacity: 1; transform: scale(1.25); }
+            }
+            #global-loader .gecko-loader-progress,
+            #global-loader .gecko-progress-dot {
                 visibility: visible !important;
             }
         `;
-        document.head.appendChild(style);
+    let styleEl = document.getElementById(styleId);
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
     }
+    styleEl.textContent = styleCss;
 
     const loader = document.createElement('div');
     loader.id = 'global-loader';
@@ -315,23 +374,24 @@ export function showLoader() {
                     SISTEMA ERP DE BIOTERIOS
                 </p>
             </div>
-            <div style="margin-top: 26px; max-width: min(92vw, 420px); padding: 0 16px;">
-                <p data-gecko-loader-phrase style="color: #666; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-family: sans-serif; margin: 0;">
-                    …
-                </p>
-            </div>
-            <div class="gecko-loader-dots" aria-hidden="true">
-                <span class="gecko-loader-dot" style="background:${dotColor};"></span>
-                <span class="gecko-loader-dot" style="background:${dotColor};"></span>
-                <span class="gecko-loader-dot" style="background:${dotColor};"></span>
-                <span class="gecko-loader-dot" style="background:${dotColor};"></span>
-                <span class="gecko-loader-dot" style="background:${dotColor};"></span>
+            <div class="gecko-loader-phrase-row">
+                <div class="gecko-loader-phrase-wrap">
+                    <span data-gecko-loader-phrase-text class="gecko-loader-phrase-text" style="color: ${phraseMuted};">…</span>
+                </div>
+                <span class="gecko-loader-progress" data-gecko-loader-progress aria-hidden="true">
+                    <span class="gecko-progress-dot"></span>
+                    <span class="gecko-progress-dot"></span>
+                    <span class="gecko-progress-dot"></span>
+                    <span class="gecko-progress-dot"></span>
+                    <span class="gecko-progress-dot"></span>
+                </span>
             </div>
         </div>
     `;
 
     document.body.prepend(loader);
     startPhraseRotation(loader);
+    startProgressSteps(loader, dotColor);
 }
 
 /**
