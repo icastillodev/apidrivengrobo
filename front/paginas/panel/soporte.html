@@ -25,7 +25,7 @@
                 /* Investigador (3): sin menú Ticket/Contacto; no exponer la ruta por URL. */
                 Auth.checkAccess([1, 2, 4, 5, 6]);
                 if (window.txt) {
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
                     initSupportSoporte();
                 }

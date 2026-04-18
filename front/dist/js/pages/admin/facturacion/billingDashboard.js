@@ -1,4 +1,4 @@
-import { formatBillingMoney } from './billingLocale.js';
+import { formatBillingMoney, billingTipoExento } from './billingLocale.js';
 
 /**
  * Orquestador del Dashboard
@@ -70,7 +70,9 @@ export function renderInvestigadoresTable(data) {
             }
             if (uid) {
                 invMap[uid].deuda += parseFloat(ins.debe || 0);
-                invMap[uid].pagado += parseFloat(ins.pagado || 0); // SUMAMOS LO PAGADO EN INSUMOS
+                if (!billingTipoExento(ins)) {
+                    invMap[uid].pagado += parseFloat(ins.pagado || 0);
+                }
             }
         });
     }
@@ -88,9 +90,13 @@ export function renderInvestigadoresTable(data) {
         invMap[uid].deuda += (parseFloat(p.deudaAnimales || 0) + parseFloat(p.deudaAlojamiento || 0) + parseFloat(p.deudaReactivos || 0) + parseFloat(p.deudaInsumos || 0));
         
         let pagadoProt = 0;
-        (p.formularios || []).forEach(f => pagadoProt += parseFloat(f.pagado || 0));
+        (p.formularios || []).forEach(f => {
+            if (!billingTipoExento(f)) pagadoProt += parseFloat(f.pagado || 0);
+        });
         (p.alojamientos || []).forEach(a => pagadoProt += parseFloat(a.pagado || 0));
-        (p.insumos || []).forEach(i => pagadoProt += parseFloat(i.pagado || 0));
+        (p.insumos || []).forEach(i => {
+            if (!billingTipoExento(i)) pagadoProt += parseFloat(i.pagado || 0);
+        });
         
         invMap[uid].pagado += pagadoProt;
     });

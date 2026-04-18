@@ -125,8 +125,14 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         const hrefBandeja = getCorrectPath('panel/mensajes');
         if (!unreadHilos.length) {
             return `
-        <div class="col-12 mb-3">
-            <p class="text-muted small mb-0">${sinNuevos}</p>
+        <div class="col-12 mb-4">
+            <div class="border rounded-3 overflow-hidden bg-white shadow-sm">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-bottom bg-light">
+                    <div class="fw-black text-uppercase small text-muted mb-0">${tit}</div>
+                    <a href="${hrefBandeja}" class="btn btn-sm btn-success fw-bold">${verTodos}</a>
+                </div>
+                <div class="px-3 py-4 text-center text-muted small mb-0">${sinNuevos}</div>
+            </div>
         </div>`;
         }
         const lines = unreadHilos.map((h) => {

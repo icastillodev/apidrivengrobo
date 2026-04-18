@@ -2,6 +2,16 @@
  * Locales para montos y fechas en facturación (alineado con `document.documentElement.lang` / `loadLanguage`).
  */
 
+/** Nombre de la sede para cabeceras PDF (`NombreInst` en localStorage). */
+export function getBillingNombreInstitucion() {
+    try {
+        const raw = localStorage.getItem('NombreInst');
+        return raw != null ? String(raw).trim() : '';
+    } catch {
+        return '';
+    }
+}
+
 export function getBillingLocale() {
     const raw = (document.documentElement.lang || localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es').slice(0, 2).toLowerCase();
     if (raw === 'en') return 'en-US';
@@ -66,6 +76,16 @@ export function pdfColsPrecioDebePagoTotal(isExento, total, pagado, exentoLabel)
 }
 
 /**
+ * Reordena la salida de {@link pdfColsPrecioDebePagoTotal} para columnas PDF de estado de cuenta:
+ * Total (precio) | Pagado | Debe.
+ * @param {[string, string, string]} m
+ * @returns {[string, string, string]}
+ */
+export function pdfColsPdfOrdenTotalPagadoDebe(m) {
+    return [m[0], m[2], m[1]];
+}
+
+/**
  * Detecta fila exenta desde distintos formatos de API (`is_exento` boolean/1, `exento` legacy).
  * @param {Record<string, unknown>|null|undefined} row
  */
@@ -75,6 +95,58 @@ export function billingTipoExento(row) {
     if (v === true || v === 1 || v === '1') return true;
     const e = row.exento;
     return e === 1 || e === '1' || e === true;
+}
+
+/**
+ * Suma total/pagado/debe solo de formularios no exentos (valores informativos en fila exenta no entran al acumulado).
+ * @param {unknown[]|null|undefined} formularios
+ * @returns {{ total: number, pagado: number, debe: number }}
+ */
+export function billingSumFormulariosCobrable(formularios) {
+    const acc = { total: 0, pagado: 0, debe: 0 };
+    for (const f of formularios || []) {
+        if (billingTipoExento(f)) continue;
+        const t = Number(f.total || 0);
+        const p = Number(f.pagado || 0);
+        acc.total += Number.isFinite(t) ? t : 0;
+        acc.pagado += Number.isFinite(p) ? p : 0;
+        acc.debe += Math.max(0, (Number.isFinite(t) ? t : 0) - (Number.isFinite(p) ? p : 0));
+    }
+    return acc;
+}
+
+/**
+ * @param {unknown[]|null|undefined} insumos filas con total_item / pagado
+ */
+export function billingSumInsumosCobrable(insumos) {
+    const acc = { total: 0, pagado: 0, debe: 0 };
+    for (const i of insumos || []) {
+        if (billingTipoExento(i)) continue;
+        const t = Number(i.total_item || 0);
+        const p = Number(i.pagado || 0);
+        acc.total += Number.isFinite(t) ? t : 0;
+        acc.pagado += Number.isFinite(p) ? p : 0;
+        acc.debe += Math.max(0, (Number.isFinite(t) ? t : 0) - (Number.isFinite(p) ? p : 0));
+    }
+    return acc;
+}
+
+/**
+ * @param {unknown[]|null|undefined} alojamientos
+ */
+export function billingSumAlojamientos(alojamientos) {
+    const acc = { total: 0, pagado: 0, debe: 0 };
+    for (const a of alojamientos || []) {
+        const t = Number(a.total || 0);
+        const p = Number(a.pagado || 0);
+        let d = a.debe;
+        if (d == null || d === '') d = Math.max(0, t - p);
+        d = Number(d);
+        acc.total += Number.isFinite(t) ? t : 0;
+        acc.pagado += Number.isFinite(p) ? p : 0;
+        acc.debe += Number.isFinite(d) ? d : 0;
+    }
+    return acc;
 }
 
 /**

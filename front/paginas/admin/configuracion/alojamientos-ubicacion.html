@@ -32,7 +32,7 @@
                 const bread = document.getElementById('institucionbread');
                 if (bread) bread.innerText = instName;
                 if (window.txt) {
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
                     await initConfigAlojamientoUbicacion();
                     translatePage();

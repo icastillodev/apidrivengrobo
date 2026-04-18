@@ -33,7 +33,7 @@
             // 3. INICIALIZACIÓN DE COMPONENTES
             // Solo si el idioma cargó correctamente para evitar errores de traducción
             if (window.txt) {
-                initMenu();
+                await initMenu();
                 NotificationManager.init();
                 
                 // Inicialización específica de la página de protocolos

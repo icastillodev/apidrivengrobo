@@ -781,6 +781,13 @@ function getDarkModeStyles() {
             border-top-color: #4ade80; 
         }
 
+        body:not(.gecko-loaded):has(#global-loader)::before,
+        body:not(.gecko-loaded):has(#global-loader)::after {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+
         @keyframes gecko-global-spin { to { transform: rotate(360deg); } }
         /* Hover sutil para las filas de la tabla en modo oscuro */
 [data-bs-theme="dark"] .table tbody tr {

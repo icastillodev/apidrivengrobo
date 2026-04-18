@@ -111,7 +111,7 @@ export const en = {
         dash_sin_noticias: "No published news.",
         dash_mensajes_titulo: "Unread messages",
         dash_mensajes_ver_todos: "Open messages",
-        dash_mensajes_sin_nuevos: "No messages in your inbox.",
+        dash_mensajes_sin_nuevos: "You have no messages in your inbox.",
         dash_noticias_error: "Could not load dashboard news. Please try again later.",
         portal_titulo: "News",
         portal_sub: "Institution and network",
@@ -1309,6 +1309,7 @@ alojamientos: {
             btn_estado_cuenta: "ACCOUNT STATEMENT",
             seleccion_liquidar: "Selected to settle:",
             fecha_rango_sep: " to ",
+            pdf_inst_generica: "INSTITUTION",
             pdf_cuenta_integral: "FULL ACCOUNT STATEMENT",
             pdf_investigador_upper: "RESEARCHER",
             pdf_rango_filtrado: "FILTERED RANGE:",
@@ -1909,7 +1910,15 @@ alojamientos: {
             "Edit name, email, and phone; click “Save changes” to persist. Follow any validation messages your site requires.",
         cap_help_s3_title: "Password",
         cap_help_s3_text:
-            "To change your password enter your current one, the new password twice, and confirm. Use a strong password and do not share it."
+            "To change your password enter your current one, the new password twice, and confirm. Use a strong password and do not share it.",
+        billing_titulo: "Account statement (PDF)",
+        billing_desc:
+            "Download the same full account statement as in billing, for the date range you choose (includes animals and supplies).",
+        billing_desde: "From",
+        billing_hasta: "To",
+        billing_btn_pdf: "Download PDF",
+        billing_swal_no_jspdf: "The PDF engine failed to load. Please refresh the page.",
+        billing_swal_error_pdf: "Could not generate the account statement PDF."
     },
     form_animales: {
         titulo: "Animal request",

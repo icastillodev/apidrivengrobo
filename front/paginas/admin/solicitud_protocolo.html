@@ -40,7 +40,7 @@
                     translatePage();
                     const instBread = document.getElementById('institucionbread');
                     if (instBread) instBread.textContent = Auth.getVal('NombreInst') || '';
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
                     initAdminRequests();
                     console.log("✅ Admin Solicitudes inicializado.");

@@ -176,9 +176,10 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
                 MAX(d.SaldoDinero) as saldoInv, 
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
-                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado 
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
                 FROM formularioe f JOIN personae u ON f.IdUsrA = u.IdUsrA
                 LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion
+                JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
                 JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
                 JOIN insumo i ON fi.IdInsumo = i.idInsumo 
@@ -186,8 +187,9 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         
         $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
-            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
-            $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
+            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado'];
+            $r['is_exento'] = ((int)($r['exento'] ?? 0) === 1);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
         }
         return $rows;
     }
@@ -199,7 +201,7 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
     public function getInsumosByProtocolo($idProt, $desde = null, $hasta = null) {
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
-                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
                 FROM formularioe f
                 JOIN protformr pf ON f.idformA = pf.idformA AND pf.idprotA = ?
                 JOIN personae u ON f.IdUsrA = u.IdUsrA
@@ -214,7 +216,8 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado'];
-            $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
+            $r['is_exento'] = ((int)($r['exento'] ?? 0) === 1);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
         }
         return $rows;
     }
@@ -788,9 +791,11 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $sql .= " GROUP BY f.idformA";
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        foreach ($rows as &$r) { 
-            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado']; 
-            $r['debe'] = ($r['is_exento'] == 1) ? 0 : max(0, $r['total_item'] - $r['pagado']); 
+        foreach ($rows as &$r) {
+            $r['total_item'] = (float)$r['total_item'];
+            $r['pagado'] = (float)$r['pagado'];
+            $r['is_exento'] = ((int)($r['is_exento'] ?? 0) === 1);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
         }
         return $rows;
     }

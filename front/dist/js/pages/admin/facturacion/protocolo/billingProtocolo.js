@@ -5,7 +5,18 @@ import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe } from '../billingLocale.js';
+import {
+    formatBillingMoney,
+    formatBillingDateTime,
+    pdfColsPrecioDebePagoTotal,
+    pdfColsPdfOrdenTotalPagadoDebe,
+    billingTipoExento,
+    billingTdTotalPagadoDebe,
+    getBillingNombreInstitucion,
+    billingSumFormulariosCobrable,
+    billingSumAlojamientos,
+    billingSumInsumosCobrable
+} from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';  
 
@@ -398,7 +409,6 @@ window.downloadProtocoloPDF = async (idProt) => {
 
     const data = window.currentReportData.protocolos[0];
     const info = data.info;
-    const totales = data.totales;
 
     if (!info) return Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_info_no_encontrada || 'No se encontró la información.', 'error');
 
@@ -408,12 +418,15 @@ window.downloadProtocoloPDF = async (idProt) => {
         const bi = txBI();
         const bp = txBP();
         const bd = txBD();
+        const lblTotPdf = bi.pdf_col_total || bi.pdf_col_precio || 'Total';
+        const lblPagPdf = bi.pdf_col_pagado || bi.pdf_col_pago_total || 'Pagado';
+        const lblDebPdf = bi.pdf_col_debe || 'Debe';
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         const M = 18;
         const pageW = doc.internal.pageSize.getWidth();
         const right = pageW - M;
-        const inst = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
+        const inst = (getBillingNombreInstitucion() || bi.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
         const verdeGecko = [25, 135, 84];
         const rangoFechas = getSelectedDateRangeLabelProt();
 
@@ -445,11 +458,12 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
+                const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
                     isEx ? `#${f.id} (EX)` : `#${f.id}`,
                     f.nombre_especie,
                     (f.detalle_display || '').replace(/<[^>]*>/g, ""),
-                    m[0], m[1], m[2]
+                    c[0], c[1], c[2]
                 ];
             });
 
@@ -460,9 +474,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                     bi.pdf_col_id || 'ID',
                     bi.pdf_col_especie || 'Especie',
                     bi.pdf_col_concepto || 'Concepto',
-                    bi.pdf_col_precio || 'Precio',
-                    bi.pdf_col_debe || 'Debe',
-                    bi.pdf_col_pago_total || 'Pago total'
+                    lblTotPdf,
+                    lblPagPdf,
+                    lblDebPdf
                 ]],
                 body: bodyForms,
                 theme: 'grid', headStyles: { fillColor: verdeGecko }, styles: { fontSize: 8 },
@@ -475,8 +489,9 @@ window.downloadProtocoloPDF = async (idProt) => {
             const prefAloj = (bp.pdf_pref_aloj_periodo || 'Alojamiento:').replace(/\s*:?\s*$/, '');
             const exL = bi.pdf_monto_exento || 'Exento';
             const bodyAloj = data.alojamientos.map(a => {
-                const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
-                return [`H-${a.historia}`, a.especie, `${prefAloj}: ${a.periodo}`, m[0], m[1], m[2]];
+                const m = pdfColsPrecioDebePagoTotal(billingTipoExento(a), a.total, a.pagado || 0, exL);
+                const c = pdfColsPdfOrdenTotalPagadoDebe(m);
+                return [`H-${a.historia}`, a.especie, `${prefAloj}: ${a.periodo}`, c[0], c[1], c[2]];
             });
 
             doc.autoTable({
@@ -486,9 +501,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                     bp.pdf_th_hist_abrev || 'Hist.',
                     bi.pdf_col_especie || 'Especie',
                     bp.pdf_col_periodo_aloj || 'Periodo alojamiento',
-                    bi.pdf_col_precio || 'Precio',
-                    bi.pdf_col_debe || 'Debe',
-                    bi.pdf_col_pago_total || 'Pago total'
+                    lblTotPdf,
+                    lblPagPdf,
+                    lblDebPdf
                 ]],
                 body: bodyAloj,
                 theme: 'grid', headStyles: { fillColor: [40, 40, 40] }, styles: { fontSize: 8 },
@@ -505,7 +520,8 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const pagado = parseFloat(i.pagado || 0);
                 const detalle = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 60);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL2);
-                return [`#${i.id}`, (i.solicitante || '').substring(0, 25), detalle, m[0], m[1], m[2]];
+                const c = pdfColsPdfOrdenTotalPagadoDebe(m);
+                return [`#${i.id}`, (i.solicitante || '').substring(0, 25), detalle, c[0], c[1], c[2]];
             });
             doc.autoTable({
                 startY: currentY,
@@ -514,9 +530,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                     bi.pdf_col_id || 'ID',
                     bd.th_solicitante || 'Solicitante',
                     bi.pdf_col_concepto || 'Concepto',
-                    bi.pdf_col_precio || 'Precio',
-                    bi.pdf_col_debe || 'Debe',
-                    bi.pdf_col_pago_total || 'Pago total'
+                    lblTotPdf,
+                    lblPagPdf,
+                    lblDebPdf
                 ]],
                 body: bodyIns,
                 theme: 'grid', headStyles: { fillColor: [80, 80, 80] }, styles: { fontSize: 7 },
@@ -527,17 +543,23 @@ window.downloadProtocoloPDF = async (idProt) => {
 
         if (currentY > 250) { doc.addPage(); currentY = M; }
 
+        const sF = billingSumFormulariosCobrable(data.formularios);
+        const sA = billingSumAlojamientos(data.alojamientos || []);
+        const sI = billingSumInsumosCobrable(data.insumos || []);
+        const precioProt = sF.total + sA.total + sI.total;
+        const pagadoProt = sF.pagado + sA.pagado + sI.pagado;
+        const debeProt = sF.debe + sA.debe + sI.debe;
+
         doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
         doc.setFontSize(9); doc.setTextColor(100);
-        const precioProt = (parseFloat(totales.deudaTotal) || 0) + (parseFloat(totales.totalPagado) || 0);
-        doc.text(`${bi.pdf_col_precio || 'Precio'}:`, 125, currentY + 7);
-        doc.text(`${bi.pdf_col_debe || 'Debe'}:`, 125, currentY + 13);
-        doc.text(`${bi.pdf_col_pago_total || 'Pago total'}:`, 125, currentY + 19);
+        doc.text(`${lblTotPdf}:`, 125, currentY + 7);
+        doc.text(`${lblPagPdf}:`, 125, currentY + 13);
+        doc.text(`${lblDebPdf}:`, 125, currentY + 19);
 
         doc.setFont("helvetica", "bold"); doc.setTextColor(0);
         doc.text(`$ ${formatBillingMoney(precioProt)}`, 185, currentY + 7, { align: "right" });
-        doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(totales.deudaTotal)}`, 185, currentY + 13, { align: "right" });
-        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.text(`$ ${formatBillingMoney(totales.totalPagado)}`, 185, currentY + 19, { align: "right" });
+        doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]); doc.text(`$ ${formatBillingMoney(pagadoProt)}`, 185, currentY + 13, { align: "right" });
+        doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(debeProt)}`, 185, currentY + 19, { align: "right" });
 
         doc.save(`Ficha_Financiera_Prot_${info.nprotA}.pdf`);
     } catch (e) {

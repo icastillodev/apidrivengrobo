@@ -1,4 +1,38 @@
 import { API } from '../../api.js';
+import { translatePage } from '../../utils/i18n.js';
+
+async function descargarEstadoCuentaPdfPerfil() {
+    const t = window.txt?.perfil || {};
+    const userId = localStorage.getItem('userId');
+    const desde = document.getElementById('perfil-billing-desde')?.value || '';
+    const hasta = document.getElementById('perfil-billing-hasta')?.value || '';
+
+    if (!window.jspdf?.jsPDF) {
+        return Swal.fire(t.swal_atencion || 'Atención', t.billing_swal_no_jspdf || 'No se pudo cargar el generador PDF. Recargue la página.', 'warning');
+    }
+
+    try {
+        const res = await API.request('/billing/investigador-report', 'POST', {
+            idUsr: userId,
+            desde,
+            hasta,
+            chkAni: true,
+            chkIns: true
+        });
+        if (res.status !== 'success') {
+            return Swal.fire(t.swal_error || 'Error', res.message || '', 'error');
+        }
+        window.currentReportData = res.data;
+        await import('../admin/facturacion/investigador/billingInvestigador.js');
+        if (typeof window.downloadGlobalPDF !== 'function') {
+            return Swal.fire(t.swal_error || 'Error', t.billing_swal_error_pdf || 'No se pudo iniciar la exportación PDF.', 'error');
+        }
+        await window.downloadGlobalPDF();
+    } catch (e) {
+        console.error('Error estado de cuenta perfil:', e);
+        Swal.fire(t.swal_error || 'Error', t.billing_swal_error_pdf || 'No se pudo generar el PDF.', 'error');
+    }
+}
 
 export async function initProfile() {
     const userId = localStorage.getItem('userId');
@@ -19,10 +53,24 @@ export async function initProfile() {
             document.getElementById('input-apellido').value = d.ApellidoA;
             document.getElementById('input-email').value = d.EmailA;
             document.getElementById('input-celular').value = d.CelularA || '';
+
+            const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+            const cardBilling = document.getElementById('perfil-card-billing');
+            if (cardBilling && role === 3) {
+                const hoy = new Date();
+                const fd = document.getElementById('perfil-billing-desde');
+                const fh = document.getElementById('perfil-billing-hasta');
+                if (fd) fd.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+                if (fh) fh.value = hoy.toISOString().split('T')[0];
+                cardBilling.classList.remove('d-none');
+                translatePage();
+            }
         }
     } catch (e) {
         console.error("Error cargando perfil:", e);
     }
+
+    document.getElementById('btn-perfil-estado-cuenta-pdf')?.addEventListener('click', descargarEstadoCuentaPdfPerfil);
 
     // 2. Manejo Formulario Datos Personales
     document.getElementById('form-personal').onsubmit = async (e) => {

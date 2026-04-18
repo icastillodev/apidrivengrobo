@@ -111,7 +111,7 @@ export const pt = {
         dash_sin_noticias: "Não há notícias publicadas.",
         dash_mensajes_titulo: "Mensagens não lidas",
         dash_mensajes_ver_todos: "Ir às mensagens",
-        dash_mensajes_sin_nuevos: "Não há mensagens na caixa de entrada.",
+        dash_mensajes_sin_nuevos: "Não tem mensagens na caixa de entrada.",
         dash_noticias_error: "Não foi possível carregar as notícias do painel. Tente novamente mais tarde.",
         portal_titulo: "Notícias",
         portal_sub: "Instituição e rede",
@@ -1310,6 +1310,7 @@ alojamientos: {
             btn_estado_cuenta: "ESTADO DE CONTA",
             seleccion_liquidar: "Selecionado para liquidar:",
             fecha_rango_sep: " a ",
+            pdf_inst_generica: "INSTITUIÇÃO",
             pdf_cuenta_integral: "ESTADO DE CONTA INTEGRAL",
             pdf_investigador_upper: "INVESTIGADOR",
             pdf_rango_filtrado: "INTERVALO FILTRADO:",
@@ -1910,7 +1911,15 @@ alojamientos: {
             "Edite nome, apelido, e-mail e telefone; prima «Guardar alterações» para gravar. Siga as mensagens de validação do sistema quando existirem.",
         cap_help_s3_title: "Palavra-passe",
         cap_help_s3_text:
-            "Para alterar a palavra-passe indique a atual, a nova duas vezes e confirme. Use uma palavra-passe forte e não a partilhe."
+            "Para alterar a palavra-passe indique a atual, a nova duas vezes e confirme. Use uma palavra-passe forte e não a partilhe.",
+        billing_titulo: "Extrato de conta (PDF)",
+        billing_desc:
+            "Descarregue o mesmo extrato integral que em facturação, para o intervalo de datas que escolher (inclui animais e insumos).",
+        billing_desde: "Desde",
+        billing_hasta: "Até",
+        billing_btn_pdf: "Descarregar PDF",
+        billing_swal_no_jspdf: "Não foi possível carregar o motor PDF. Recarregue a página.",
+        billing_swal_error_pdf: "Não foi possível gerar o PDF do extrato de conta."
     },
     form_animales: {
         titulo: "Pedido de animais",

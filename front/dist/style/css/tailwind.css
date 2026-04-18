@@ -1,6 +1,12 @@
 /* ========================================================================== */
 /* LOADER CRÍTICO: ocultar contenido hasta que la página cargue (gecko-loaded)  */
 /* ========================================================================== */
+html {
+    background-color: #f4f7f6;
+}
+[data-bs-theme="dark"] html {
+    background-color: #121212;
+}
 body:not(.gecko-loaded) {
     overflow: hidden !important;
 }
@@ -39,6 +45,13 @@ body:not(.gecko-loaded)::after {
 [data-bs-theme="dark"] body:not(.gecko-loaded)::after {
     border: 4px solid #333;
     border-top: 4px solid #28a745;
+}
+/* Cuando ya está el loader JS, ocultar el spinner/reserva CSS para no duplicar */
+body:not(.gecko-loaded):has(#global-loader)::before,
+body:not(.gecko-loaded):has(#global-loader)::after {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 /* ========================================================================== */
 

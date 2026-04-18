@@ -211,12 +211,14 @@
                 }
 
                 if (window.txt) {
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
-                    
-                    import(`../../dist/js/pages/admin/dashboard.js?v=${Date.now()}`)
-                        .then(module => module.DashboardUI.init())
-                        .catch(e => console.error("Error al arrancar el motor del Dashboard:", e));
+                    try {
+                        const { DashboardUI } = await import('../../dist/js/pages/admin/dashboard.js');
+                        await DashboardUI.init();
+                    } catch (e) {
+                        console.error("Error al arrancar el motor del Dashboard:", e);
+                    }
                 }
 
             } catch (error) {

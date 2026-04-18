@@ -14,6 +14,24 @@ class BillingController {
         $this->model = new BillingModel($db);
     }
 
+    /** Formulario exento (tipo de formulario): no entra al total pagado global ni a subtotales cobrables. */
+    private function billingFormularioEsExento(array $f): bool {
+        $ie = $f['is_exento'] ?? null;
+        if ($ie === true || $ie === 1 || $ie === '1') {
+            return true;
+        }
+        return (int)($f['exento'] ?? 0) === 1;
+    }
+
+    /** Pedido de insumo exento: mismo criterio que formularios. */
+    private function billingInsumoEsExento(array $ins): bool {
+        $v = $ins['is_exento'] ?? $ins['exento'] ?? null;
+        if ($v === true || $v === 1 || $v === '1') {
+            return true;
+        }
+        return (int)($v ?? 0) === 1;
+    }
+
     public function getDeptoReport() {
         if (ob_get_length()) ob_clean();
         $f = json_decode(file_get_contents('php://input'), true);
@@ -34,8 +52,15 @@ class BillingController {
                 $ins['saldoInv'] = (float)($mapaSaldos[$uid] ?? 0);
             }
             
-            $deudaInsumos = array_sum(array_column($insumosGenerales, 'debe'));
-            $pagadoInsumos = array_sum(array_column($insumosGenerales, 'pagado'));
+            $deudaInsumos = 0.0;
+            $pagadoInsumos = 0.0;
+            foreach ($insumosGenerales as $insRow) {
+                if ($this->billingInsumoEsExento($insRow)) {
+                    continue;
+                }
+                $deudaInsumos += (float)($insRow['debe'] ?? 0);
+                $pagadoInsumos += (float)($insRow['pagado'] ?? 0);
+            }
 
             $protocolosRaw = $this->model->getProtocolosByDepto($deptoId);
             $reporte = [];
@@ -47,6 +72,9 @@ class BillingController {
             if (!empty($pedidosSinProt)) {
                 $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
                 foreach ($pedidosSinProt as $form) {
+                    if ($this->billingFormularioEsExento($form)) {
+                        continue;
+                    }
                     $cat = strtolower($form['categoria'] ?? '');
                     $montoDebe = (float)$form['debe'];
                     if (strpos($cat, 'reactivo') !== false) {
@@ -83,6 +111,9 @@ class BillingController {
                     $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
 
                     foreach ($formularios as $form) {
+                        if ($this->billingFormularioEsExento($form)) {
+                            continue;
+                        }
                         $cat = strtolower($form['categoria'] ?? '');
                         $montoDebe = (float)$form['debe'];
                         
@@ -270,11 +301,17 @@ class BillingController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $sesion['instId'];
             
-            $idUsr  = $input['idUsr']  ?? 0;
+            $idUsr  = (int)($input['idUsr']  ?? 0);
             $desde  = $input['desde']  ?? null;
             $hasta  = $input['hasta']  ?? null;
 
             if (!$idUsr) $this->jsonResponse('error', 'ID de investigador no proporcionado.');
+
+            $role = (int)($sesion['role'] ?? 0);
+            $sessionUserId = (int)($sesion['userId'] ?? 0);
+            if ($role === 3 && $idUsr !== $sessionUserId) {
+                $this->jsonResponse('error', 'No tiene permisos para consultar la facturación de otro usuario.');
+            }
 
             $perfil = $this->model->getBasicUserInfo($idUsr, $instId);
             $protocolosRaw = $this->model->getProtocolosByInvestigador($idUsr, $instId);
@@ -296,8 +333,15 @@ class BillingController {
                 }
                 unset($ins);
 
-                $sumDebeInsProt = array_sum(array_column($insumosProt, 'debe'));
-                $sumPagadoInsProt = array_sum(array_column($insumosProt, 'pagado'));
+                $sumDebeInsProt = 0.0;
+                $sumPagadoInsProt = 0.0;
+                foreach ($insumosProt as $insP) {
+                    if ($this->billingInsumoEsExento($insP)) {
+                        continue;
+                    }
+                    $sumDebeInsProt += (float)($insP['debe'] ?? 0);
+                    $sumPagadoInsProt += (float)($insP['pagado'] ?? 0);
+                }
 
                 // Los insumos de pedido (misma consulta que getInsumosByProtocolo) se listan en la tarjeta del protocolo.
                 // Excluir por id de formulario — no por texto en categoria (evita falsos positivos si "insumo" aparece en el nombre del tipo).
@@ -322,12 +366,14 @@ class BillingController {
                     $montoPagado = (float)$f['pagado'];
                     $cat = strtolower($f['categoria'] ?? '');
 
-                    if (strpos($cat, 'reactivo') !== false) {
-                        $sumDebeRea += $montoDebe;
-                    } else {
-                        $sumDebeAni += $montoDebe;
+                    if (!$this->billingFormularioEsExento($f)) {
+                        if (strpos($cat, 'reactivo') !== false) {
+                            $sumDebeRea += $montoDebe;
+                        } else {
+                            $sumDebeAni += $montoDebe;
+                        }
+                        $sumPagadoProt += $montoPagado;
                     }
-                    $sumPagadoProt += $montoPagado;
                     $formulariosFiltrados[] = $f;
                 }
 
@@ -365,9 +411,17 @@ class BillingController {
             // Solo pedidos de insumo sin vínculo a protocolo (depto 0 / NULL); los de protocolo van en cada tarjeta.
             $insumosGenerales = array_values($insumosGeneralesDirectos);
 
-            $deudaInsDirectos = array_sum(array_column($insumosGenerales, 'debe'));
+            $deudaInsDirectos = 0.0;
+            $pagadoInsGenerales = 0.0;
+            foreach ($insumosGenerales as $ig) {
+                if ($this->billingInsumoEsExento($ig)) {
+                    continue;
+                }
+                $deudaInsDirectos += (float)($ig['debe'] ?? 0);
+                $pagadoInsGenerales += (float)($ig['pagado'] ?? 0);
+            }
             $deudaInsGlobal = $deudaInsDirectos + $deudaInsumosProtAcum;
-            $totalPagadoGlobal += array_sum(array_column($insumosGenerales, 'pagado'));
+            $totalPagadoGlobal += $pagadoInsGenerales;
 
             $this->jsonResponse('success', [
                 'perfil' => $perfil,

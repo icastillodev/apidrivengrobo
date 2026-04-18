@@ -58,7 +58,7 @@
                     const roleEl = document.getElementById('role-bread');
                     if (roleEl) roleEl.innerText = getRoleName(Auth.getVal('userLevel')) || 'Rol';
 
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
                     initPreciosPage();
                 } else {

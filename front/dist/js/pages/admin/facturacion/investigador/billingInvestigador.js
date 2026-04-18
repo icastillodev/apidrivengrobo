@@ -5,7 +5,7 @@ import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 
@@ -396,7 +396,9 @@ function getInsumosGeneralesTableHTML(insumos) {
         const isExento = billingTipoExento(i);
         const debe = isExento ? 0 : Math.max(0, total - pagado);
 
-        sumTotal += total; sumPagado += pagado; sumDebe += debe;
+        if (!isExento) {
+            sumTotal += total; sumPagado += pagado; sumDebe += debe;
+        }
 
         let badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
             ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
@@ -476,14 +478,17 @@ function getFooterHTML(prot) {
     const bi = txBI();
     const tf = txF();
     const mn = window.txt?.menu || {};
-    const totAni = (prot.formularios || []).filter(f => !f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
-    const totRea = (prot.formularios || []).filter(f => f.categoria?.toLowerCase().includes('reactivo')).reduce((s, f) => s + parseFloat(f.total || 0), 0);
+    const totAni = (prot.formularios || []).filter(f => !f.categoria?.toLowerCase().includes('reactivo') && !billingTipoExento(f)).reduce((s, f) => s + parseFloat(f.total || 0), 0);
+    const totRea = (prot.formularios || []).filter(f => f.categoria?.toLowerCase().includes('reactivo') && !billingTipoExento(f)).reduce((s, f) => s + parseFloat(f.total || 0), 0);
     const totAlo = (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
-    const totIns = (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
+    const totIns = (prot.insumos || []).filter(i => !billingTipoExento(i)).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
     
     const numTotal = totAni + totRea + totAlo + totIns;
     const numDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
-    const numPago = numTotal - numDebe;
+    const sForm = billingSumFormulariosCobrable(prot.formularios);
+    const sAloj = billingSumAlojamientos(prot.alojamientos);
+    const sIns = billingSumInsumosCobrable(prot.insumos);
+    const numPago = sForm.pagado + sAloj.pagado + sIns.pagado;
     const lblTot = tf.total || 'Total';
     const lblAloj = mn.accommodations || 'Alojamiento';
     const lblAni = mn.animals || 'Animales';
@@ -594,8 +599,12 @@ function aplicarEstilosTablas() {
 
 function getSelectedDateRangeLabelInv() {
     const sep = txBI().fecha_rango_sep || ' a ';
-    const desde = document.getElementById('f-desde')?.value || '';
-    const hasta = document.getElementById('f-hasta')?.value || '';
+    let desde = document.getElementById('f-desde')?.value || '';
+    let hasta = document.getElementById('f-hasta')?.value || '';
+    if (!desde && !hasta) {
+        desde = document.getElementById('perfil-billing-desde')?.value || '';
+        hasta = document.getElementById('perfil-billing-hasta')?.value || '';
+    }
     if (!desde && !hasta) return '-';
     if (desde && hasta) return `${desde}${sep}${hasta}`;
     return desde || hasta;
@@ -620,21 +629,25 @@ window.downloadGlobalPDF = async () => {
     const azulGecko = [13, 110, 253];
     const rangoFechas = getSelectedDateRangeLabelInv();
     const invPfx = ((bi.lbl_investigador_colon || 'Investigador:').replace(/\s*:?\s*$/, '') || 'Investigador').toUpperCase();
+    const instLine = (getBillingNombreInstitucion() || bi.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
 
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(45, 45, 45);
+    doc.text(instLine, 148, M, { align: "center" });
     doc.setFontSize(20);
     doc.setTextColor(azulGecko[0], azulGecko[1], azulGecko[2]);
-    doc.text(bi.pdf_cuenta_integral || 'ESTADO DE CUENTA INTEGRAL', 148, M, { align: "center" });
+    doc.text(bi.pdf_cuenta_integral || 'ESTADO DE CUENTA INTEGRAL', 148, M + 7, { align: "center" });
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text(`${invPfx}: ${invNombre.toUpperCase()}`, 148, M + 7, { align: "center" });
+    doc.text(`${invPfx}: ${invNombre.toUpperCase()}`, 148, M + 14, { align: "center" });
     doc.setFontSize(10);
-    doc.text(`${bi.pdf_rango_filtrado || 'RANGO FILTRADO:'} ${rangoFechas}`, 148, M + 12, { align: "center" });
-    doc.line(M, M + 15, right, M + 15);
+    doc.text(`${bi.pdf_rango_filtrado || 'RANGO FILTRADO:'} ${rangoFechas}`, 148, M + 19, { align: "center" });
+    doc.line(M, M + 22, right, M + 22);
 
     const t = window.currentReportData.totales;
     doc.autoTable({
-        startY: M + 20, margin: { left: M, right: M },
+        startY: M + 26, margin: { left: M, right: M },
         head: [[
             bi.pdf_deu_animales || 'DEUDA ANIMALES',
             bi.pdf_deu_reactivos || 'DEUDA REACTIVOS',
@@ -657,7 +670,15 @@ window.downloadGlobalPDF = async () => {
     let currentY = doc.lastAutoTable.finalY + 10;
 
     (window.currentReportData.protocolos || []).forEach((prot) => {
-        if (currentY > 160) { doc.addPage(); currentY = M; }
+        if (currentY > 160) {
+            doc.addPage();
+            currentY = M;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(80, 80, 80);
+            doc.text(instLine, 148, currentY + 4, { align: 'center' });
+            currentY += 8;
+        }
 
         doc.setFillColor(245, 245, 245);
         doc.rect(M, currentY, right - M, 8, 'F');
@@ -670,9 +691,13 @@ window.downloadGlobalPDF = async () => {
         const pIns = (bi.pdf_prefijo_insumo || 'Insumo:').replace(/\s*:?\s*$/, '');
         const exL = bi.pdf_monto_exento || 'Exento';
 
+        const lblTotPdf = bi.pdf_col_total || bi.pdf_col_precio || 'Total';
+        const lblPagPdf = bi.pdf_col_pagado || bi.pdf_col_pago_total || 'Pagado';
+        const lblDebPdf = bi.pdf_col_debe || 'Debe';
+
         const bodyItems = [
             ...(prot.formularios || []).map(f => {
-                const isEx = (f.is_exento == 1 || f.exento == 1);
+                const isEx = billingTipoExento(f);
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
@@ -682,19 +707,19 @@ window.downloadGlobalPDF = async () => {
                     f.fecha,
                     f.nombre_especie,
                     f.detalle_display.replace(/<[^>]*>/g, ""),
-                    m[0], m[1], m[2]
+                    m[0], m[2], m[1]
                 ];
             }),
             ...(prot.alojamientos || []).map(a => {
                 const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
-                return [a.historia, a.periodo, a.especie, `${pAloj} (${a.caja || pEstr})`, m[0], m[1], m[2]];
+                return [a.historia, a.periodo, a.especie, `${pAloj} (${a.caja || pEstr})`, m[0], m[2], m[1]];
             }),
             ...(prot.insumos || []).map(i => {
                 const total = parseFloat(i.total_item || 0);
                 const pagado = parseFloat(i.pagado || 0);
                 const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
-                const m = pdfColsPrecioDebePagoTotal(false, total, pagado, exL);
-                return [`I-${i.id}`, '-', `${pIns}: ${det}`, m[0], m[1], m[2]];
+                const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
+                return [`I-${i.id}`, '-', `${pIns}: ${det}`, m[0], m[2], m[1]];
             })
         ];
 
@@ -705,9 +730,9 @@ window.downloadGlobalPDF = async () => {
                 bi.pdf_col_fecha || 'Fecha',
                 bi.pdf_col_especie || 'Especie',
                 bi.pdf_col_detalle || 'Detalle',
-                bi.pdf_col_precio || 'Precio',
-                bi.pdf_col_debe || 'Debe',
-                bi.pdf_col_pago_total || 'Pago total'
+                lblTotPdf,
+                lblPagPdf,
+                lblDebPdf
             ]],
             body: bodyItems,
             theme: 'striped',
@@ -716,26 +741,27 @@ window.downloadGlobalPDF = async () => {
             columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
         });
 
-        const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0)
-            + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
-            + (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
-        const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
-        const pPago = pTotal - pDebe;
+        const sF = billingSumFormulariosCobrable(prot.formularios);
+        const sA = billingSumAlojamientos(prot.alojamientos);
+        const sI = billingSumInsumosCobrable(prot.insumos);
+        const pTotal = sF.total + sA.total + sI.total;
+        const pPago = sF.pagado + sA.pagado + sI.pagado;
+        const pDebe = sF.debe + sA.debe + sI.debe;
 
         currentY = doc.lastAutoTable.finalY;
         doc.setFontSize(7); doc.setTextColor(100);
         const ySum = currentY + 5;
-        doc.text(`${bi.pdf_col_precio || 'Precio'}:`, 120, ySum);
+        doc.text(`${lblTotPdf}:`, 120, ySum);
         doc.setTextColor(0); doc.setFont('helvetica', 'bold');
         doc.text(`$ ${formatBillingMoney(pTotal)}`, 155, ySum, { align: 'right' });
         doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
-        doc.text(`${bi.pdf_col_debe || 'Debe'}:`, 165, ySum);
-        doc.setTextColor(200, 0, 0); doc.setFont('helvetica', 'bold');
-        doc.text(`$ ${formatBillingMoney(pDebe)}`, 205, ySum, { align: 'right' });
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
-        doc.text(`${bi.pdf_col_pago_total || 'Pago total'}:`, 215, ySum);
+        doc.text(`${lblPagPdf}:`, 165, ySum);
         doc.setTextColor(26, 93, 59); doc.setFont('helvetica', 'bold');
-        doc.text(`$ ${formatBillingMoney(pPago)}`, 275, ySum, { align: 'right' });
+        doc.text(`$ ${formatBillingMoney(pPago)}`, 205, ySum, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+        doc.text(`${lblDebPdf}:`, 215, ySum);
+        doc.setTextColor(200, 0, 0); doc.setFont('helvetica', 'bold');
+        doc.text(`$ ${formatBillingMoney(pDebe)}`, 275, ySum, { align: 'right' });
         doc.setFont('helvetica', 'normal'); doc.setTextColor(0);
 
         currentY += 15;
@@ -757,15 +783,15 @@ window.downloadProtocoloPDF = async (idProt) => {
     const M = 18;
     const pageW = doc.internal.pageSize.getWidth();
     const right = pageW - M;
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+    const inst = (getBillingNombreInstitucion() || bi.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
     const invNombre = window.currentReportData.perfil?.NombreCompleto || bi.pdf_investigador_upper || 'INVESTIGADOR';
     const rangoFechas = getSelectedDateRangeLabelInv();
     const pEstr = bi.pdf_aloj_estructura || 'Estructura';
     const alojAb = bi.pdf_aloj_abrev || 'Aloj.';
     const pIns = (bi.pdf_prefijo_insumo || 'Insumo:').replace(/\s*:?\s*$/, '');
 
-    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, M, { align: "center" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(26, 93, 59);
+    doc.text(inst, 105, M, { align: "center" });
 
     doc.setFontSize(11); doc.setTextColor(100);
     doc.text(bi.pdf_cuenta_individual_prot || 'ESTADO DE CUENTA INDIVIDUAL POR PROTOCOLO', 105, M + 7, { align: "center" });
@@ -777,9 +803,12 @@ window.downloadProtocoloPDF = async (idProt) => {
     doc.text(`${bi.pdf_lbl_rango || 'Rango filtrado:'} ${rangoFechas}`, M, M + 32);
 
     const exL = bi.pdf_monto_exento || 'Exento';
+    const lblTotPdf = bi.pdf_col_total || bi.pdf_col_precio || 'Total';
+    const lblPagPdf = bi.pdf_col_pagado || bi.pdf_col_pago_total || 'Pagado';
+    const lblDebPdf = bi.pdf_col_debe || 'Debe';
     const bodyAll = [
         ...(prot.formularios || []).map(f => {
-            const isEx = (f.is_exento == 1 || f.exento == 1);
+            const isEx = billingTipoExento(f);
             const total = parseFloat(f.total || 0);
             const pagadoReal = parseFloat(f.pagado || 0);
             const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
@@ -787,19 +816,19 @@ window.downloadProtocoloPDF = async (idProt) => {
                 isEx ? `${f.id} (EX)` : f.id,
                 f.nombre_especie,
                 f.detalle_display.replace(/<[^>]*>/g, ""),
-                m[0], m[1], m[2]
+                m[0], m[2], m[1]
             ];
         }),
         ...(prot.alojamientos || []).map(a => {
             const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
-            return [`H-${a.historia}`, a.especie, `${alojAb} (${a.caja || pEstr})`, m[0], m[1], m[2]];
+            return [`H-${a.historia}`, a.especie, `${alojAb} (${a.caja || pEstr})`, m[0], m[2], m[1]];
         }),
         ...(prot.insumos || []).map(i => {
             const total = parseFloat(i.total_item || 0);
             const pagado = parseFloat(i.pagado || 0);
             const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
-            const m = pdfColsPrecioDebePagoTotal(false, total, pagado, exL);
-            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[1], m[2]];
+            const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
+            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[2], m[1]];
         }),
     ];
 
@@ -808,32 +837,33 @@ window.downloadProtocoloPDF = async (idProt) => {
             bi.pdf_col_id || 'ID',
             bi.pdf_col_especie || 'Especie',
             bi.pdf_col_concepto || 'Concepto',
-            bi.pdf_col_precio || 'Precio',
-            bi.pdf_col_debe || 'Debe',
-            bi.pdf_col_pago_total || 'Pago total'
+            lblTotPdf,
+            lblPagPdf,
+            lblDebPdf
         ]],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
         styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
     });
 
-    const pTotal = (prot.formularios || []).reduce((s, f) => s + parseFloat(f.total || 0), 0)
-        + (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0)
-        + (prot.insumos || []).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
-    const pDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
-    const pPago = pTotal - pDebe;
+    const sFp = billingSumFormulariosCobrable(prot.formularios);
+    const sAp = billingSumAlojamientos(prot.alojamientos);
+    const sIp = billingSumInsumosCobrable(prot.insumos);
+    const pTotal = sFp.total + sAp.total + sIp.total;
+    const pPago = sFp.pagado + sAp.pagado + sIp.pagado;
+    const pDebe = sFp.debe + sAp.debe + sIp.debe;
 
     let currentY = doc.lastAutoTable.finalY + 10;
     if (currentY > 250) { doc.addPage(); currentY = M; }
 
     doc.setDrawColor(200); doc.setFillColor(245, 245, 245); doc.rect(120, currentY, 70, 25, 'FD');
     doc.setFontSize(9); doc.setTextColor(100);
-    doc.text(`${bi.pdf_col_precio || 'Precio'}:`, 125, currentY + 7);
-    doc.text(`${bi.pdf_col_debe || 'Debe'}:`, 125, currentY + 13);
-    doc.text(`${bi.pdf_col_pago_total || 'Pago total'}:`, 125, currentY + 19);
+    doc.text(`${lblTotPdf}:`, 125, currentY + 7);
+    doc.text(`${lblPagPdf}:`, 125, currentY + 13);
+    doc.text(`${lblDebPdf}:`, 125, currentY + 19);
 
     doc.setFont("helvetica", "bold"); doc.setTextColor(0); doc.text(`$ ${formatBillingMoney(pTotal)}`, 185, currentY + 7, { align: "right" });
-    doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(pDebe)}`, 185, currentY + 13, { align: "right" });
-    doc.setTextColor(26, 93, 59); doc.text(`$ ${formatBillingMoney(pPago)}`, 185, currentY + 19, { align: "right" });
+    doc.setTextColor(26, 93, 59); doc.text(`$ ${formatBillingMoney(pPago)}`, 185, currentY + 13, { align: "right" });
+    doc.setTextColor(200, 0, 0); doc.text(`$ ${formatBillingMoney(pDebe)}`, 185, currentY + 19, { align: "right" });
 
     doc.save(`Ficha_Protocolo_${prot.nprotA}.pdf`);
     hideLoader();

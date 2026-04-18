@@ -44,7 +44,7 @@
                     if (roleEl) roleEl.innerText = rolTexto;
                     const instEl = document.getElementById('institucionbread');
                     if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
-                    initMenu();
+                    await initMenu();
                     NotificationManager.init();
                     initInsumosPage();
                     console.log("✅ Administración de Insumos inicializada correctamente.");

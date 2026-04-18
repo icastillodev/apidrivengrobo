@@ -111,7 +111,7 @@ export const es = {
         dash_sin_noticias: "No hay noticias publicadas.",
         dash_mensajes_titulo: "Mensajes sin leer",
         dash_mensajes_ver_todos: "Ir a mensajes",
-        dash_mensajes_sin_nuevos: "No tiene mensajes en el buzón.",
+        dash_mensajes_sin_nuevos: "No tienes mensajes en el buzón.",
         dash_noticias_error: "No se pudieron cargar las noticias del panel. Intente más tarde.",
         portal_titulo: "Noticias",
         portal_sub: "Institución y red",
@@ -1316,6 +1316,7 @@ export const es = {
             btn_estado_cuenta: "ESTADO DE CUENTA",
             seleccion_liquidar: "Seleccionado para liquidar:",
             fecha_rango_sep: " a ",
+            pdf_inst_generica: "INSTITUCIÓN",
             pdf_cuenta_integral: "ESTADO DE CUENTA INTEGRAL",
             pdf_investigador_upper: "INVESTIGADOR",
             pdf_rango_filtrado: "RANGO FILTRADO:",
@@ -1921,7 +1922,15 @@ export const es = {
             "Edite nombre, apellido, correo y teléfono; pulse «Guardar cambios» para persistir. Si la sede exige validaciones adicionales, siga los mensajes del sistema.",
         cap_help_s3_title: "Contraseña",
         cap_help_s3_text:
-            "Para cambiar la clave indique la contraseña actual, la nueva dos veces y confirme. Use una contraseña segura y no la comparta."
+            "Para cambiar la clave indique la contraseña actual, la nueva dos veces y confirme. Use una contraseña segura y no la comparta.",
+        billing_titulo: "Estado de cuenta (PDF)",
+        billing_desc:
+            "Descargue el mismo estado de cuenta integral que ve en facturación, con el rango de fechas que elija (incluye animales e insumos).",
+        billing_desde: "Desde",
+        billing_hasta: "Hasta",
+        billing_btn_pdf: "Descargar PDF",
+        billing_swal_no_jspdf: "No se pudo cargar el generador PDF. Recargue la página.",
+        billing_swal_error_pdf: "No se pudo generar el PDF de estado de cuenta."
     },
     form_animales: {
         titulo: "Pedido de animales",
