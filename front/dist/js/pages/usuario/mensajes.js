@@ -999,5 +999,18 @@ export async function initMensajes(opts = {}) {
     }
 
     await loadHilos();
+
+    async function applyHiloDeepLink() {
+        const sp = new URLSearchParams(window.location.search);
+        const hid = parseInt(sp.get('hilo') || '0', 10);
+        if (!hid) return;
+        await openHilo(hid);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('hilo');
+        const nq = url.searchParams.toString();
+        window.history.replaceState({}, '', url.pathname + (nq ? `?${nq}` : '') + url.hash);
+    }
+
     await applyMsgNuevoDeepLink();
+    await applyHiloDeepLink();
 }

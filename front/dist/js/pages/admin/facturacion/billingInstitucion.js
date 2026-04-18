@@ -3,7 +3,7 @@ import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { openAnimalModal } from './modals/animalModal.js';
 import { openReactiveModal } from './modals/reactiveModal.js';
 import { openInsumoModal } from './modals/insumoModal.js';
-import { formatBillingMoney, formatBillingDateTime } from './billingLocale.js';
+import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal } from './billingLocale.js';
 import './billingPayments.js';
 import './modals/manager.js';
 
@@ -630,9 +630,10 @@ window.downloadInstItemPDF = async (idInstSol) => {
         const hId = tp.pdf_col_id || 'ID';
         const hInv = tf('excel_inv', 'Investigador');
         const hTipo = tf('excel_tipo', 'Tipo');
-        const hTot = tf('excel_total', 'Total');
-        const hPag = tf('excel_pagado', 'Pagado');
-        const hDeb = tf('excel_debe', 'Debe');
+        const hPrecio = tp.pdf_col_precio || 'Precio';
+        const hDeb = tp.pdf_col_debe || 'Debe';
+        const hPagTot = tp.pdf_col_pago_total || 'Pago total';
+        const exL = tp.pdf_monto_exento || 'Exento';
 
         doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
         doc.text(`GROBO - ${instNombre}`, 105, M, { align: 'center' });
@@ -642,18 +643,19 @@ window.downloadInstItemPDF = async (idInstSol) => {
         doc.setFontSize(9); doc.text(`${tf('pdf_rango', 'RANGO:')} ${rango}`, 105, M + 16, { align: 'center' });
         doc.line(M, M + 19, 195, M + 19);
 
-        const body = (inst.items || []).map(i => [
-            `#${i.idformA}`,
-            textoInvestigadoresDerivadosItem(i),
-            (i.nombreTipo || i.categoria || '-').substring(0, 40),
-            `$ ${formatBillingMoney(i.montoTotal || 0)}`,
-            `$ ${formatBillingMoney(i.montoPagado || 0)}`,
-            `$ ${formatBillingMoney(i.montoDebe || 0)}`
-        ]);
+        const body = (inst.items || []).map(i => {
+            const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
+            return [
+                `#${i.idformA}`,
+                textoInvestigadoresDerivadosItem(i),
+                (i.nombreTipo || i.categoria || '-').substring(0, 40),
+                m[0], m[1], m[2]
+            ];
+        });
 
         doc.autoTable({
             startY: M + 24, margin: { left: M, right: M },
-            head: [[hId, hInv, hTipo, hTot, hPag, hDeb]],
+            head: [[hId, hInv, hTipo, hPrecio, hDeb, hPagTot]],
             body, theme: 'grid', headStyles: { fillColor: violeta },
             styles: { fontSize: 8 },
             columnStyles: { 2: { cellWidth: 60 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
@@ -705,8 +707,10 @@ window.downloadInstGlobalPDF = async () => {
         const hId = tp.pdf_col_id || 'ID';
         const hInv = tf('excel_inv', 'Investigador');
         const hTipo = tf('excel_tipo', 'Tipo');
-        const hTot = tf('excel_total', 'Total');
-        const hDeb = tf('excel_debe', 'Debe');
+        const hPrecio = tp.pdf_col_precio || 'Precio';
+        const hDeb = tp.pdf_col_debe || 'Debe';
+        const hPagTot = tp.pdf_col_pago_total || 'Pago total';
+        const exL = tp.pdf_monto_exento || 'Exento';
         const hCant = gen.cantidad || 'Cantidad';
 
         doc.setFont('helvetica', 'bold'); doc.setFontSize(22); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
@@ -731,14 +735,17 @@ window.downloadInstGlobalPDF = async () => {
             doc.text(`${inst.institucion || '-'}`, M + 3, currentY + 6);
             currentY += 12;
 
-            const body = (inst.items || []).map(i => [
-                `#${i.idformA}`, textoInvestigadoresDerivadosItem(i), (i.nombreTipo || i.categoria || '-').substring(0, 35),
-                `$ ${formatBillingMoney(i.montoTotal || 0)}`, `$ ${formatBillingMoney(i.montoDebe || 0)}`
-            ]);
+            const body = (inst.items || []).map(i => {
+                const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
+                return [
+                    `#${i.idformA}`, textoInvestigadoresDerivadosItem(i), (i.nombreTipo || i.categoria || '-').substring(0, 35),
+                    m[0], m[1], m[2]
+                ];
+            });
             if (body.length) {
                 doc.autoTable({
                     startY: currentY, margin: { left: M, right: M },
-                    head: [[hId, hInv, hTipo, hTot, hDeb]],
+                    head: [[hId, hInv, hTipo, hPrecio, hDeb, hPagTot]],
                     body, theme: 'grid', headStyles: { fillColor: violeta },
                     styles: { fontSize: 7 }
                 });

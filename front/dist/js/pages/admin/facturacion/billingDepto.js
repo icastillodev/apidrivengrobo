@@ -2,7 +2,7 @@ import { API } from '../../../api.js';
 import { hideLoader, showLoader } from '../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../components/MenuComponent.js';
 import { renderDashboard } from './billingDashboard.js';
-import { formatBillingMoney, formatBillingDateTime } from './billingLocale.js';
+import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal } from './billingLocale.js';
 import './billingPayments.js';
 
 import './modals/manager.js' ;
@@ -762,18 +762,17 @@ window.downloadProtocoloPDF = async (idProt) => {
         let currentY = M + 46;
 
         if (prot.formularios && prot.formularios.length > 0) {
+            const exL = bi.pdf_monto_exento || 'Exento';
             const bodyForms = prot.formularios.map(f => {
                 const isEx = (f.is_exento == 1 || f.exento == 1);
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
-                
+                const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
                 return [
                     isEx ? `#${f.id} ${marcaEx}` : `#${f.id}`,
                     f.nombre_especie || '---',
                     (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
-                    `$ ${formatBillingMoney(total)}`,
-                    `$ ${formatBillingMoney(isEx ? total : pagadoReal)}`,
-                    `$ ${isEx ? formatBillingMoney(0) : formatBillingMoney(total - pagadoReal)}`
+                    m[0], m[1], m[2]
                 ];
             });
 
@@ -784,9 +783,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                     bi.pdf_col_id || 'ID',
                     bi.pdf_col_especie || 'Especie',
                     bi.pdf_col_concepto || 'Concepto',
-                    bi.pdf_col_total || 'Total',
-                    bi.pdf_col_pagado || 'Pagado',
-                    bi.pdf_col_debe || 'Debe'
+                    bi.pdf_col_precio || 'Precio',
+                    bi.pdf_col_debe || 'Debe',
+                    bi.pdf_col_pago_total || 'Pago total'
                 ]],
                 body: bodyForms,
                 theme: 'grid',
@@ -799,14 +798,11 @@ window.downloadProtocoloPDF = async (idProt) => {
 
         if (prot.alojamientos && prot.alojamientos.length > 0) {
             const tplCajaPer = (caja, periodo) => (be.pdf_periodo_caja_tpl || 'Caja: {caja} | {periodo}').replace(/\{caja\}/g, caja).replace(/\{periodo\}/g, periodo);
-            const bodyAloj = prot.alojamientos.map(a => [
-                `H-${a.historia}`,
-                a.especie,
-                tplCajaPer(a.caja, a.periodo),
-                `$ ${formatBillingMoney(a.total)}`,
-                `$ ${formatBillingMoney(a.pagado)}`,
-                `$ ${formatBillingMoney(a.debe)}`
-            ]);
+            const exLAloj = bi.pdf_monto_exento || 'Exento';
+            const bodyAloj = prot.alojamientos.map(a => {
+                const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exLAloj);
+                return [`H-${a.historia}`, a.especie, tplCajaPer(a.caja, a.periodo), m[0], m[1], m[2]];
+            });
 
             doc.autoTable({
                 startY: currentY,
@@ -815,9 +811,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                     bp.pdf_th_hist_abrev || 'Hist.',
                     bi.pdf_col_especie || 'Especie',
                     bp.pdf_col_periodo_aloj || 'Periodo alojamiento',
-                    bi.pdf_col_total || 'Total',
-                    bi.pdf_col_pagado || 'Pagado',
-                    bi.pdf_col_debe || 'Debe'
+                    bi.pdf_col_precio || 'Precio',
+                    bi.pdf_col_debe || 'Debe',
+                    bi.pdf_col_pago_total || 'Pago total'
                 ]],
                 body: bodyAloj,
                 theme: 'grid',
@@ -882,19 +878,20 @@ window.downloadInsumosPDF = async () => {
     doc.setFontSize(9); doc.text(`${bi.pdf_rango_filtrado || 'RANGO FILTRADO:'} ${rangoFechas}`, 105, M + 16, { align: "center" });
     doc.line(M, M + 19, right, M + 19);
 
-    const body = insumos.map(i => [
-        i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'),
-        `$ ${formatBillingMoney(i.total_item || 0)}`, `$ ${formatBillingMoney(i.pagado || 0)}`, `$ ${formatBillingMoney(i.debe || 0)}`
-    ]);
+    const exL = bi.pdf_monto_exento || 'Exento';
+    const body = insumos.map(i => {
+        const m = pdfColsPrecioDebePagoTotal(false, i.total_item || 0, i.pagado || 0, exL);
+        return [i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), m[0], m[1], m[2]];
+    });
 
     doc.autoTable({
         startY: M + 24, margin: { left: M, right: M }, head: [[
             bi.pdf_col_id || 'ID',
             txBD().th_solicitante || 'Solicitante',
             be.pdf_head_detalle_prod || 'Detalle de Productos / Cantidades',
-            bi.pdf_col_total || 'Total',
-            bi.pdf_col_pagado || 'Pagado',
-            bi.pdf_col_debe || 'Debe'
+            bi.pdf_col_precio || 'Precio',
+            bi.pdf_col_debe || 'Debe',
+            bi.pdf_col_pago_total || 'Pago total'
         ]],
         body: body, theme: 'striped', headStyles: { fillColor: azulInsumos },
         styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
@@ -977,11 +974,15 @@ window.downloadGlobalPDF = async () => {
                 const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
                 const cant = isRea ? `${f.NombreInsumo} (${f.TipoInsumo}) ${f.CantidadInsumo} - ${f.cant_organo} ${unAb}` : `${f.cant_animal} ${unAb}`;
                 const idDisplay = isExento ? `${f.id} ${marcaExFull}` : f.id;
+                const total = parseFloat(f.total || 0);
+                const pagadoReal = parseFloat(f.pagado || 0);
+                const exL = bi.pdf_monto_exento || 'Exento';
+                const m = pdfColsPrecioDebePagoTotal(isExento, total, pagadoReal, exL);
 
                 return [
                     { content: idDisplay, styles: { fontStyle: isExento ? 'bold' : 'normal', textColor: isExento ? [0, 150, 200] : [0, 0, 0] } },
                     f.solicitante, esp + sub, f.detalle_display.replace(/<[^>]*>/g, ""), cant,
-                    `$ ${formatBillingMoney(f.total)}`, isExento ? `$ ${formatBillingMoney(0)}` : `$ ${formatBillingMoney(f.debe)}`
+                    m[0], m[1], m[2]
                 ];
             });
 
@@ -992,8 +993,9 @@ window.downloadGlobalPDF = async () => {
                     bi.pdf_col_especie || 'Especie',
                     bi.pdf_col_detalle || 'Detalle',
                     be.pdf_th_cantidad || 'Cantidad',
-                    bi.pdf_col_total || 'Total',
-                    bi.pdf_col_debe || 'Debe'
+                    bi.pdf_col_precio || 'Precio',
+                    bi.pdf_col_debe || 'Debe',
+                    bi.pdf_col_pago_total || 'Pago total'
                 ]],
                 body: bodyForms, theme: 'grid', headStyles: { fillColor: verdeGrobo },
                 styles: { fontSize: 7 }, columnStyles: { 3: { cellWidth: 50 }, 4: { cellWidth: 55 } }
@@ -1004,10 +1006,11 @@ window.downloadGlobalPDF = async () => {
         if (prot.alojamientos?.length > 0) {
             const alojLine = (esp, caja) => (be.pdf_aloj_linea_tpl || 'Alojamiento Especie: {esp} ({caja})')
                 .replace(/\{esp\}/g, esp).replace(/\{caja\}/g, (caja != null && String(caja).length) ? String(caja) : cajaDef);
-            const bodyAloj = prot.alojamientos.map(a => [
-                a.historia, alojLine(a.especie, a.caja), a.fecha_inicio, a.fecha_fin || enCurso,
-                `$ ${formatBillingMoney(a.total)}`, `$ ${formatBillingMoney(a.debe)}`
-            ]);
+            const exLAlojG = bi.pdf_monto_exento || 'Exento';
+            const bodyAloj = prot.alojamientos.map(a => {
+                const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exLAlojG);
+                return [a.historia, alojLine(a.especie, a.caja), a.fecha_inicio, a.fecha_fin || enCurso, m[0], m[1], m[2]];
+            });
 
             doc.autoTable({
                 startY: currentY, margin: { left: M, right: M }, head: [[
@@ -1015,8 +1018,9 @@ window.downloadGlobalPDF = async () => {
                     be.pdf_th_concepto || 'Concepto',
                     be.pdf_th_ingreso || 'Ingreso',
                     be.pdf_th_salida || 'Salida',
-                    bi.pdf_col_total || 'Total',
-                    bi.pdf_col_debe || 'Debe'
+                    bi.pdf_col_precio || 'Precio',
+                    bi.pdf_col_debe || 'Debe',
+                    bi.pdf_col_pago_total || 'Pago total'
                 ]],
                 body: bodyAloj, theme: 'grid', headStyles: { fillColor: [100, 100, 100] },
                 styles: { fontSize: 7 }

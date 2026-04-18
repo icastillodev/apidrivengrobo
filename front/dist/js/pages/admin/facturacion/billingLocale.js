@@ -40,3 +40,27 @@ export function formatBillingDateTime(date = new Date()) {
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleString(getBillingLocale());
 }
+
+/**
+ * Columnas PDF alineadas a Precio | Debe | Pago total.
+ * Formularios exentos: precio monetario; debe y pago total muestran la etiqueta (p. ej. "Exento").
+ *
+ * @param {boolean} isExento
+ * @param {number|string} total
+ * @param {number|string} pagado
+ * @param {string} [exentoLabel]
+ * @returns {[string, string, string]}
+ */
+export function pdfColsPrecioDebePagoTotal(isExento, total, pagado, exentoLabel) {
+    const t = Number(total);
+    const p = Number(pagado);
+    const tot = Number.isFinite(t) ? t : 0;
+    const pag = Number.isFinite(p) ? p : 0;
+    const precio = `$ ${formatBillingMoney(tot)}`;
+    if (isExento) {
+        const lab = String(exentoLabel || 'Exento').trim() || 'Exento';
+        return [precio, lab, lab];
+    }
+    const debe = Math.max(0, tot - pag);
+    return [precio, `$ ${formatBillingMoney(debe)}`, `$ ${formatBillingMoney(pag)}`];
+}

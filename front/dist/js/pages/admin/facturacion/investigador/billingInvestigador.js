@@ -5,7 +5,7 @@ import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 
@@ -668,37 +668,33 @@ window.downloadGlobalPDF = async () => {
         const pAloj = bi.pdf_prefijo_aloj || 'Alojamiento';
         const pEstr = bi.pdf_aloj_estructura || 'Estructura';
         const pIns = (bi.pdf_prefijo_insumo || 'Insumo:').replace(/\s*:?\s*$/, '');
-        
+        const exL = bi.pdf_monto_exento || 'Exento';
+
         const bodyItems = [
             ...(prot.formularios || []).map(f => {
                 const isEx = (f.is_exento == 1 || f.exento == 1);
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
-                const pagadoMostrar = isEx ? total : pagadoReal;
-                const debeMostrar = isEx ? 0 : (total - pagadoReal);
+                const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
 
                 return [
                     isEx ? `${f.id} (EX)` : f.id,
                     f.fecha,
                     f.nombre_especie,
                     f.detalle_display.replace(/<[^>]*>/g, ""),
-                    `$ ${formatBillingMoney(total)}`,
-                    `$ ${formatBillingMoney(pagadoMostrar)}`,
-                    `$ ${formatBillingMoney(debeMostrar)}`
+                    m[0], m[1], m[2]
                 ];
             }),
-            ...(prot.alojamientos || []).map(a => [
-                a.historia, a.periodo, a.especie, `${pAloj} (${a.caja || pEstr})`, 
-                `$ ${formatBillingMoney(a.total)}`, 
-                `$ ${formatBillingMoney(a.pagado || 0)}`, 
-                `$ ${formatBillingMoney(a.debe)}`
-            ]),
+            ...(prot.alojamientos || []).map(a => {
+                const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
+                return [a.historia, a.periodo, a.especie, `${pAloj} (${a.caja || pEstr})`, m[0], m[1], m[2]];
+            }),
             ...(prot.insumos || []).map(i => {
                 const total = parseFloat(i.total_item || 0);
                 const pagado = parseFloat(i.pagado || 0);
-                const debe = Math.max(0, total - pagado);
                 const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
-                return [`I-${i.id}`, '-', `${pIns}: ${det}`, `$ ${formatBillingMoney(total)}`, `$ ${formatBillingMoney(pagado)}`, `$ ${formatBillingMoney(debe)}`];
+                const m = pdfColsPrecioDebePagoTotal(false, total, pagado, exL);
+                return [`I-${i.id}`, '-', `${pIns}: ${det}`, m[0], m[1], m[2]];
             })
         ];
 
@@ -709,9 +705,9 @@ window.downloadGlobalPDF = async () => {
                 bi.pdf_col_fecha || 'Fecha',
                 bi.pdf_col_especie || 'Especie',
                 bi.pdf_col_detalle || 'Detalle',
-                bi.pdf_col_total || 'Total',
-                bi.pdf_col_pagado || 'Pagado',
-                bi.pdf_col_debe || 'Debe'
+                bi.pdf_col_precio || 'Precio',
+                bi.pdf_col_debe || 'Debe',
+                bi.pdf_col_pago_total || 'Pago total'
             ]],
             body: bodyItems,
             theme: 'striped',
@@ -772,26 +768,30 @@ window.downloadProtocoloPDF = async (idProt) => {
     doc.text(`${bi.pdf_lbl_investigador || 'Investigador:'} ${invNombre}`, M, M + 26);
     doc.text(`${bi.pdf_lbl_rango || 'Rango filtrado:'} ${rangoFechas}`, M, M + 32);
 
+    const exL = bi.pdf_monto_exento || 'Exento';
     const bodyAll = [
         ...(prot.formularios || []).map(f => {
             const isEx = (f.is_exento == 1 || f.exento == 1);
             const total = parseFloat(f.total || 0);
+            const pagadoReal = parseFloat(f.pagado || 0);
+            const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
             return [
                 isEx ? `${f.id} (EX)` : f.id,
                 f.nombre_especie,
                 f.detalle_display.replace(/<[^>]*>/g, ""),
-                `$ ${formatBillingMoney(total)}`,
-                `$ ${formatBillingMoney(isEx ? total : parseFloat(f.pagado || 0))}`,
-                `$ ${isEx ? formatBillingMoney(0) : formatBillingMoney(parseFloat(f.debe || 0))}`
+                m[0], m[1], m[2]
             ];
         }),
-        ...(prot.alojamientos || []).map(a => [`H-${a.historia}`, a.especie, `${alojAb} (${a.caja || pEstr})`, `$ ${formatBillingMoney(a.total)}`, `$ ${formatBillingMoney(a.pagado || 0)}`, `$ ${formatBillingMoney(a.debe)}`]),
+        ...(prot.alojamientos || []).map(a => {
+            const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
+            return [`H-${a.historia}`, a.especie, `${alojAb} (${a.caja || pEstr})`, m[0], m[1], m[2]];
+        }),
         ...(prot.insumos || []).map(i => {
             const total = parseFloat(i.total_item || 0);
             const pagado = parseFloat(i.pagado || 0);
-            const debe = Math.max(0, total - pagado);
             const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
-            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, `$ ${formatBillingMoney(total)}`, `$ ${formatBillingMoney(pagado)}`, `$ ${formatBillingMoney(debe)}`];
+            const m = pdfColsPrecioDebePagoTotal(false, total, pagado, exL);
+            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[1], m[2]];
         }),
     ];
 
@@ -800,9 +800,9 @@ window.downloadProtocoloPDF = async (idProt) => {
             bi.pdf_col_id || 'ID',
             bi.pdf_col_especie || 'Especie',
             bi.pdf_col_concepto || 'Concepto',
-            bi.pdf_col_total || 'Total',
-            bi.pdf_col_pagado || 'Pagado',
-            bi.pdf_col_debe || 'Debe'
+            bi.pdf_col_precio || 'Precio',
+            bi.pdf_col_debe || 'Debe',
+            bi.pdf_col_pago_total || 'Pago total'
         ]],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
         styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
