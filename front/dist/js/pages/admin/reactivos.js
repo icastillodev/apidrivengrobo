@@ -11,6 +11,8 @@ import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifar
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 
 let allReactivos = [];
+/** Total de filas que cumplen filtros (servidor). */
+let totalReactivosList = 0;
 let currentPage = 1;
 const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
@@ -50,78 +52,145 @@ function getI18nValue(path) {
     return (typeof cur === 'string') ? cur : '';
 }
 
+function buildReactivosListQuery(extra = {}) {
+    const instId = localStorage.getItem('instId');
+    const limit = extra.limit != null ? extra.limit : rowsPerPage;
+    const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
+    const p = new URLSearchParams();
+    p.set('inst', instId);
+    p.set('limit', String(limit));
+    p.set('offset', String(offset));
+    Object.keys(extra).forEach((k) => {
+        if (k === 'limit' || k === 'offset') return;
+        if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
+    });
+    const status = document.getElementById('filter-status-reactivo')?.value || 'all';
+    const deriv = document.getElementById('filter-deriv-reactivo')?.value || 'all';
+    const retiro = document.getElementById('filter-retiro-reactivo')?.value || '';
+    const q = document.getElementById('search-input-reactivo')?.value?.trim() || '';
+    const filterCol = document.getElementById('filter-column-reactivo')?.value || 'all';
+    p.set('status', status);
+    p.set('deriv', deriv);
+    if (retiro) p.set('retiro', retiro);
+    if (q) p.set('q', q);
+    p.set('filter_col', filterCol);
+    if (String(filterCol).startsWith('origin::')) {
+        p.set('origin', filterCol);
+    }
+    const { sort_key, sort_dir } = getSortApiParams();
+    p.set('sort_key', sort_key);
+    p.set('sort_dir', sort_dir);
+    return p;
+}
+
+function getSortApiParams() {
+    let key = sortConfig.key || 'idformA';
+    let dir = 'DESC';
+    if (sortConfig.direction === 'asc') dir = 'ASC';
+    if (sortConfig.direction === 'desc') dir = 'DESC';
+    if (sortConfig.direction === 'none') {
+        key = 'idformA';
+        dir = 'DESC';
+    }
+    return { sort_key: key, sort_dir: dir };
+}
+
+async function fetchReactivoRowById(idformA) {
+    const instId = localStorage.getItem('instId');
+    const res = await API.request(`/reactivos/all?inst=${instId}&idformA=${encodeURIComponent(idformA)}&limit=1&offset=0`);
+    if (res?.status === 'success' && Array.isArray(res.data) && res.data[0]) return res.data[0];
+    return null;
+}
+
+async function fetchReactivosList() {
+    const tbody = document.getElementById('table-body-reactivos');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    }
+    try {
+        const res = await API.request(`/reactivos/all?${buildReactivosListQuery().toString()}`);
+        if (res?.status === 'success') {
+            if (typeof res.total === 'number') {
+                allReactivos = Array.isArray(res.data) ? res.data : [];
+                totalReactivosList = res.total;
+            } else {
+                allReactivos = Array.isArray(res.data) ? res.data : [];
+                totalReactivosList = allReactivos.length;
+            }
+            renderTableBody();
+        }
+    } catch (e) {
+        console.error('❌ Error cargando reactivos:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+    }
+}
+
 /**
  * 1. INICIALIZACIÓN DE PÁGINA DE REACTIVOS
  */
 export async function initReactivosPage() {
-    const instId = localStorage.getItem('instId');
-
     // Blindaje de teclado para SweetAlert (evita que Bootstrap robe el foco)
-    // Esto es lo que permite que el cuadro de texto de notificación sea escribible
     document.addEventListener('focusin', (e) => {
         if (e.target.closest(".swal2-container")) {
             e.stopImmediatePropagation();
         }
     }, true);
     const btnExcel = document.getElementById('btn-excel-reactivo');
-        if (btnExcel) {
-            btnExcel.onclick = () => {
-                const modalExcel = new bootstrap.Modal(document.getElementById('modal-excel-reactivo'));
-                modalExcel.show();
-            };
-        }
+    if (btnExcel) {
+        btnExcel.onclick = () => {
+            const modalExcel = new bootstrap.Modal(document.getElementById('modal-excel-reactivo'));
+            modalExcel.show();
+        };
+    }
     try {
-        // Carga inicial de datos de la institución
-        const res = await API.request(`/reactivos/all?inst=${instId}`);
-        
-        if (res && res.status === 'success') {
-            allReactivos = res.data;
-            setupOriginInstitutionFilterReactivo();
-            setupSortHeaders();
-            renderTable();
-            openReactivoFromUrlIfNeeded();
+        await setupOriginInstitutionFilterReactivo();
+        setupSortHeaders();
+        await fetchReactivosList();
+        await openReactivoFromUrlIfNeeded();
 
-            // LÓGICA DE RE-APERTURA POST-RECARGA
-            // Se ejecuta aquí dentro para garantizar que 'allReactivos' ya tiene datos
-            const reopenId = sessionStorage.getItem('reopenReactivoId');
-            if (reopenId) {
-                sessionStorage.removeItem('reopenReactivoId');
-                
-                // Un pequeño delay para asegurar que el DOM y los componentes estén listos
-                setTimeout(() => {
-                    const data = allReactivos.find(r => r.idformA == reopenId);
-                    if (data) {
-                        window.openReactivoModal(data);
-                    }
-                }, 400); 
-            }
+        const reopenId = sessionStorage.getItem('reopenReactivoId');
+        if (reopenId) {
+            sessionStorage.removeItem('reopenReactivoId');
+            setTimeout(async () => {
+                let data = allReactivos.find(r => String(r.idformA) === String(reopenId));
+                if (!data) data = await fetchReactivoRowById(reopenId);
+                if (data) window.openReactivoModal(data);
+            }, 400);
         }
-    } catch (error) { 
-        console.error("❌ Error crítico en API de Reactivos:", error); 
+    } catch (error) {
+        console.error("❌ Error crítico en API de Reactivos:", error);
     }
 
-    // Eventos de búsqueda y filtros
     const btnSearch = document.getElementById('btn-search-reactivo');
     const filterStatus = document.getElementById('filter-status-reactivo');
     const searchInput = document.getElementById('search-input-reactivo');
 
-    if (btnSearch) btnSearch.onclick = () => { currentPage = 1; renderTable(); };
-    if (filterStatus) filterStatus.onchange = () => { currentPage = 1; renderTable(); };
+    if (btnSearch) btnSearch.onclick = () => { currentPage = 1; fetchReactivosList(); };
+    if (filterStatus) filterStatus.onchange = () => { currentPage = 1; fetchReactivosList(); };
     const filterDeriv = document.getElementById('filter-deriv-reactivo');
-    if (filterDeriv) filterDeriv.onchange = () => { currentPage = 1; renderTable(); };
+    if (filterDeriv) filterDeriv.onchange = () => { currentPage = 1; fetchReactivosList(); };
     const filterRetiroReactivo = document.getElementById('filter-retiro-reactivo');
-    if (filterRetiroReactivo) filterRetiroReactivo.onchange = () => { currentPage = 1; renderTable(); };
+    if (filterRetiroReactivo) filterRetiroReactivo.onchange = () => { currentPage = 1; fetchReactivosList(); };
+    const filterColReactivo = document.getElementById('filter-column-reactivo');
+    if (filterColReactivo) filterColReactivo.onchange = () => { currentPage = 1; fetchReactivosList(); };
     if (searchInput) {
-        searchInput.onkeyup = (e) => { 
-            if (e.key === 'Enter') { currentPage = 1; renderTable(); } 
+        searchInput.onkeyup = (e) => {
+            if (e.key === 'Enter') { currentPage = 1; fetchReactivosList(); }
         };
     }
 }
 
-function setupOriginInstitutionFilterReactivo() {
+async function setupOriginInstitutionFilterReactivo() {
     const columnSelect = document.getElementById('filter-column-reactivo');
     if (!columnSelect) return;
-    const values = [...new Set(allReactivos.map(a => (a.InstitucionOrigenNombre || '').trim()).filter(Boolean))].sort();
+    const instId = localStorage.getItem('instId');
+    let values = [];
+    try {
+        const res = await API.request(`/reactivos/filtros-meta?inst=${encodeURIComponent(instId)}`);
+        if (res?.status === 'success' && res.data?.origenes && Array.isArray(res.data.origenes)) {
+            values = res.data.origenes;
+        }
+    } catch (_) { /* dropdown sin origen */ }
 
     Array.from(columnSelect.options)
         .filter(opt => String(opt.value || '').startsWith('origin::'))
@@ -137,14 +206,15 @@ function setupOriginInstitutionFilterReactivo() {
     });
 }
 
-function openReactivoFromUrlIfNeeded() {
+async function openReactivoFromUrlIfNeeded() {
     if (openedReactivoFromUrl) return;
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     const action = (params.get('action') || '').toLowerCase();
     if (!id || (action && action !== 'view' && action !== 'edit')) return;
 
-    const reactivo = allReactivos.find(r => String(r.idformA) === String(id));
+    let reactivo = allReactivos.find(r => String(r.idformA) === String(id));
+    if (!reactivo) reactivo = await fetchReactivoRowById(id);
     if (!reactivo) return;
     openedReactivoFromUrl = true;
     setTimeout(() => window.openReactivoModal(reactivo), 200);
@@ -903,14 +973,9 @@ window.downloadReactivoPDF = async (id) => {
  * AUXILIARES (TABLA)
  */
 async function syncAllData() {
-    const instId = localStorage.getItem('instId');
-    const res = await API.request(`/reactivos/all?inst=${instId}`);
-    if (res && res.status === 'success') {
-        allReactivos = res.data;
-        setupOriginInstitutionFilterReactivo();
-        renderTable(); 
-        refreshMenuNotifications(); 
-    }
+    await setupOriginInstitutionFilterReactivo();
+    await fetchReactivosList();
+    refreshMenuNotifications();
 }
 
 window.adminDeleteFormularioReactivo = async (idformA) => {
@@ -926,14 +991,21 @@ window.adminDeleteFormularioReactivo = async (idformA) => {
     });
 };
 
-function renderTable() {
+function renderTableBody() {
     const tbody = document.getElementById('table-body-reactivos');
-    const data = getFilteredAndSortedData(); 
-    const pageData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+    if (!tbody) return;
+    const data = allReactivos;
     const t = window.txt.reactivos; // Alias corto
 
     tbody.innerHTML = '';
-    pageData.forEach(r => {
+    if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        updateHeaderIcons();
+        renderPagination(totalReactivosList, 'pagination-reactivo', () => fetchReactivosList());
+        hideLoader();
+        return;
+    }
+    data.forEach(r => {
         const tr = document.createElement('tr');
         tr.className = "clickable-row";
         tr.onclick = () => window.openReactivoModal(r);
@@ -977,10 +1049,11 @@ function renderTable() {
     });
 
     updateHeaderIcons();
-    renderPagination(data.length, 'pagination-reactivo', renderTable);
+    renderPagination(totalReactivosList, 'pagination-reactivo', () => fetchReactivosList());
     hideLoader();
 }
-// ... (getStatusBadge, setupSortHeaders, getFilteredAndSortedData, updateHeaderIcons se mantienen iguales al patrón de animales)
+
+// getStatusBadge, setupSortHeaders, updateHeaderIcons (patrón animales)
 
 function getStatusBadge(estado, porInstitucion) {
     const tx = window.txt?.misformularios || {};
@@ -1042,49 +1115,6 @@ function getStatusWithWorkflow(item) {
     return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }
 
-function getFilteredAndSortedData() {
-    const statusFilter = document.getElementById('filter-status-reactivo').value.toLowerCase();
-    const term = document.getElementById('search-input-reactivo').value.toLowerCase().trim();
-    const filterType = document.getElementById('filter-column-reactivo').value;
-    const derivFilter = document.getElementById('filter-deriv-reactivo')?.value || 'all';
-    const retiroEl = document.getElementById('filter-retiro-reactivo');
-    const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
-
-    let data = allReactivos.filter(r => {
-        const isDerived = Number(r.DerivadoActivo || 0) === 1;
-        let eff = r.estado;
-        if (isDerived && (r.estado_origen != null || r.estado_destino != null)) {
-            if (r.estado_destino != null && String(r.estado_destino).trim() !== '') eff = r.estado_destino;
-            else if (r.estado_origen != null && String(r.estado_origen).trim() !== '') eff = r.estado_origen;
-        }
-        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
-        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
-        if (derivFilter === 'derived' && !isDerived) return false;
-        if (derivFilter === 'local' && isDerived) return false;
-        const originName = (r.InstitucionOrigenNombre || '').trim();
-        if (String(filterType).startsWith('origin::')) {
-            const originSelected = String(filterType).slice('origin::'.length);
-            if (originName !== originSelected) return false;
-        }
-        if (retiroVal) {
-            const rRetiro = (r.Retiro || '').toString().substring(0, 10);
-            if (rRetiro !== retiroVal) return false;
-        }
-        if (!term) return true;
-        if (filterType === 'all' || String(filterType).startsWith('origin::')) return JSON.stringify(r).toLowerCase().includes(term);
-        return String(r[filterType] || '').toLowerCase().includes(term);
-    });
-
-    if (sortConfig.direction !== 'none') {
-        data.sort((a, b) => {
-            let valA = a[sortConfig.key] || ''; let valB = b[sortConfig.key] || '';
-            const factor = sortConfig.direction === 'asc' ? 1 : -1;
-            return isNaN(valA) ? valA.toString().localeCompare(valB) * factor : (valA - valB) * factor;
-        });
-    } else { data.sort((a, b) => b.idformA - a.idformA); }
-    return data;
-}
-
 function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const key = th.getAttribute('data-key');
@@ -1112,7 +1142,8 @@ function setupSortHeaders() {
             if (sortConfig.key === key) {
                 sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : (sortConfig.direction === 'desc' ? 'none' : 'asc');
             } else { sortConfig.key = key; sortConfig.direction = 'asc'; }
-            renderTable();
+            currentPage = 1;
+            fetchReactivosList();
         };
     });
 }
@@ -1139,8 +1170,8 @@ function renderPagination(t, c, r) {
  */
 window.changePage = (page) => {
     currentPage = page;
-    renderTable(); // Re-renderiza la tabla con el nuevo índice
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Sube al inicio de la tabla
+    fetchReactivosList();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 /**
  * 2. POPUP DE NOTIFICACIÓN (Con blindaje de foco y validación)
@@ -1202,7 +1233,7 @@ window.openNotifyPopupReactivo = async (idformA) => {
 /**
  * PROCESAR EXPORTACIÓN A EXCEL - REACTIVOS BIOLÓGICOS
  */
-window.processExcelExportReactivos = () => {
+window.processExcelExportReactivos = async () => {
     // 1. Captura de fechas y configuración inicial
     const start = document.getElementById('excel-start-date-reactivo').value;
     const end = document.getElementById('excel-end-date-reactivo').value;
@@ -1214,10 +1245,18 @@ window.processExcelExportReactivos = () => {
         return;
     }
 
-    // 2. Obtención de datos filtrados desde el estado global
-    let data = getFilteredAndSortedData();
+    let data = [];
+    try {
+        const res = await API.request(`/reactivos/all?${buildReactivosListQuery({ limit: 10000, offset: 0 }).toString()}`);
+        if (res?.status === 'success' && Array.isArray(res.data)) {
+            data = res.data;
+        }
+    } catch (e) {
+        console.error(e);
+        window.Swal.fire('Error', window.txt?.generales?.error_carga || 'Error al cargar datos.', 'error');
+        return;
+    }
 
-    // 3. Filtro por rango de fechas basado en la fecha de Inicio
     data = data.filter(r => {
         const fechaPedido = r.Inicio || '0000-00-00';
         return fechaPedido >= start && fechaPedido <= end;

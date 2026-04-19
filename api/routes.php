@@ -190,7 +190,8 @@ $router->get('/admin/requests/attachments/download', 'ControllerAdminSolicitudes
 // ============================================================
 // SECCIÓN: Animales (Pedidos)
 // ============================================================
-$router->get('/animals/all', 'AnimalController@getAll'); 
+$router->get('/animals/all', 'AnimalController@getAll');
+$router->get('/animals/filtros-meta', 'AnimalController@getFiltrosMeta'); 
 $router->get('/animals/form-data', 'AnimalController@getFormData'); 
 $router->get('/animals/last-notification', 'AnimalController@getLastNotification'); 
 $router->post('/animals/update-status', 'AnimalController@updateStatus'); 
@@ -218,8 +219,9 @@ $router->post('/admin/forms/delete', 'AdminFormularioController@delete');
 // ============================================================
 
 // 1. Acciones de Administrador (Bandeja de Entrada)
-$router->get('/reactivos/all', 'ReactivoController@getAll'); 
-$router->get('/reactivos/form-data', 'ReactivoController@getFormData'); 
+$router->get('/reactivos/all', 'ReactivoController@getAll');
+$router->get('/reactivos/filtros-meta', 'ReactivoController@getFiltrosMeta');
+$router->get('/reactivos/form-data', 'ReactivoController@getFormData');
 $router->post('/reactivos/update-status', 'ReactivoController@updateStatus'); 
 $router->post('/reactivos/update-full', 'ReactivoController@updateFull'); 
 $router->get('/reactivos/last-notification', 'ReactivoController@getLastNotification'); 
@@ -237,6 +239,7 @@ $router->get('/reactivos/pdf-data', 'ReactivoController@getPDFData');
 // SECCIÓN: Insumos Experimentales
 // ============================================================
 $router->get('/insumos/all', 'InsumoController@getAll');
+$router->get('/insumos/filtros-meta', 'InsumoController@getFiltrosMeta');
 $router->get('/insumos/form-data', 'InsumoController@getFormData');
 $router->get('/insumos/catalog', 'InsumoController@getCatalog');
 $router->get('/insumos/details', 'InsumoController@getDetails');

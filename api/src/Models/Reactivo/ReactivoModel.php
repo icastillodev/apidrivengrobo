@@ -31,7 +31,14 @@ class ReactivoModel {
         return "({$cat} OR {$porInsumo})";
     }
 
-    public function getAllByInstitution($instId, $categoryName = null) {
+    /**
+     * Listado admin de pedidos Reactivo por institución.
+     *
+     * @param array|null $opts limit, offset, filters (q, status, deriv, retiro, origin, idformA, filter_col, sort_key, sort_dir)
+     * @return array<int, mixed>|array{rows: array, total: int}
+     */
+    public function getAllByInstitution($instId, $categoryName = null, ?array $opts = null) {
+        $opts = $opts ?? [];
         // Segundo parámetro ignorado (compatibilidad); la bandeja usa sqlPredicadoFormularioReactivo().
 
         $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
@@ -122,6 +129,13 @@ class ReactivoModel {
             )";
         }
 
+        $filterAppend = '';
+        $filterParams = [];
+        if (!empty($opts['filters']) && \is_array($opts['filters'])) {
+            $this->applyReactivoAdminListFilters($opts['filters'], (bool)$hasWorkflowCols, $filterAppend, $filterParams);
+        }
+        $orderBySql = $this->resolveReactivoListOrderBy($opts['filters'] ?? []);
+
         $sql = "SELECT 
                     f.idformA, 
                     f.IdUsrA as IdInvestigador,
@@ -171,12 +185,187 @@ class ReactivoModel {
                 WHERE {$whereInst} 
                 {$legacyCopyExclusion}
                 AND (" . self::sqlPredicadoFormularioReactivo('t') . " {$derivDestinoAndClause} {$derivOrigenAndClause})
-                ORDER BY f.idformA DESC";
+                {$filterAppend}
+                ORDER BY {$orderBySql}";
+
+        $limit = isset($opts['limit']) ? (int)$opts['limit'] : 0;
+        $offset = isset($opts['offset']) ? max(0, (int)$opts['offset']) : 0;
+        $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
+        $execParams = array_merge($execParams, $filterParams);
+
+        $total = null;
+        if ($limit > 0) {
+            $countSql = "SELECT COUNT(DISTINCT f.idformA) AS __cnt
+                FROM formularioe f
+                {$redCfgJoin}
+                INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
+                LEFT JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
+                {$ownerJoin}
+                {$currentInstJoin}
+                {$originJoin}
+                LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+                LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
+                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
+                LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
+                LEFT JOIN sexoe sex ON f.idformA = sex.idformA
+                WHERE {$whereInst} 
+                {$legacyCopyExclusion}
+                AND (" . self::sqlPredicadoFormularioReactivo('t') . " {$derivDestinoAndClause} {$derivOrigenAndClause})
+                {$filterAppend}";
+            $stmtCnt = $this->db->prepare($countSql);
+            $stmtCnt->execute($execParams);
+            $total = (int)($stmtCnt->fetch(\PDO::FETCH_ASSOC)['__cnt'] ?? 0);
+            $sql .= ' LIMIT ' . min(10000, $limit) . ' OFFSET ' . $offset;
+        }
 
         $stmt = $this->db->prepare($sql);
-        $execParams = $hasRedCfgCols ? array_merge([(int)$instId], $params) : $params;
         $stmt->execute($execParams);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        if ($limit > 0 && $total !== null) {
+            return ['rows' => $rows, 'total' => $total];
+        }
+
+        return $rows;
+    }
+
+    private function applyReactivoAdminListFilters(array $filters, bool $hasWorkflowCols, string &$append, array &$params): void {
+        $idExact = isset($filters['idformA']) ? (int)$filters['idformA'] : 0;
+        if ($idExact > 0) {
+            $append .= ' AND f.idformA = ?';
+            $params[] = $idExact;
+            return;
+        }
+
+        if ($hasWorkflowCols) {
+            $deriv = $filters['deriv'] ?? 'all';
+            if ($deriv === 'derived') {
+                $append .= ' AND COALESCE(f.DerivadoActivo, 0) = 1';
+            } elseif ($deriv === 'local') {
+                $append .= ' AND COALESCE(f.DerivadoActivo, 0) <> 1';
+            }
+        }
+
+        $status = trim((string)($filters['status'] ?? 'all'));
+        if ($status !== '' && strcasecmp($status, 'all') !== 0) {
+            if (strcasecmp($status, 'sin estado') === 0) {
+                $append .= " AND (f.estado IS NULL OR TRIM(f.estado) = '' OR LOWER(TRIM(f.estado)) = 'sin estado')";
+            } else {
+                $append .= ' AND LOWER(TRIM(COALESCE(f.estado, \'\'))) = LOWER(?)';
+                $params[] = $status;
+            }
+        }
+
+        $retiro = trim((string)($filters['retiro'] ?? ''));
+        if ($retiro !== '') {
+            $append .= ' AND DATE(f.fecRetiroA) = ?';
+            $params[] = $retiro;
+        }
+
+        $origin = trim((string)($filters['origin'] ?? ''));
+        if ($origin !== '' && strpos($origin, 'origin::') === 0 && $hasWorkflowCols) {
+            $name = trim(substr($origin, strlen('origin::')));
+            if ($name !== '') {
+                $append .= ' AND TRIM(COALESCE(io.NombreInst, \'\')) = ?';
+                $params[] = $name;
+            }
+        }
+
+        $q = trim((string)($filters['q'] ?? ''));
+        $col = trim((string)($filters['filter_col'] ?? 'all'));
+        if ($q === '') {
+            return;
+        }
+        $like = '%' . $q . '%';
+        if ($col === 'all' || strpos((string)$col, 'origin::') === 0) {
+            $append .= " AND (
+                CAST(f.idformA AS CHAR) LIKE ? OR
+                CONCAT(COALESCE(p.NombreA,''), ' ', COALESCE(p.ApellidoA,'')) LIKE ? OR
+                COALESCE(px.nprotA,'') LIKE ? OR
+                COALESCE(px.tituloA,'') LIKE ? OR
+                COALESCE(t.nombreTipo,'') LIKE ? OR
+                COALESCE(ins.NombreInsumo,'') LIKE ? OR
+                COALESCE(f.aclaracionadm,'') LIKE ? OR
+                COALESCE(f.quienvisto,'') LIKE ? OR
+                COALESCE(CAST(sex.totalA AS CHAR),'') LIKE ?
+            )";
+            for ($i = 0; $i < 9; $i++) {
+                $params[] = $like;
+            }
+            return;
+        }
+
+        $map = [
+            'idformA' => 'CAST(f.idformA AS CHAR)',
+            'TipoNombre' => 'COALESCE(t.nombreTipo,\'\')',
+            'Investigador' => 'CONCAT(COALESCE(p.NombreA,\'\'), \' \', COALESCE(p.ApellidoA,\'\'))',
+            'NProtocolo' => 'COALESCE(px.nprotA,\'\')',
+            'DeptoExternoFlag' => '(CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END)',
+            'Especie' => '\'\'',
+            'AnimalesUsados' => 'COALESCE(CAST(sex.totalA AS CHAR),\'\')',
+            'Reactivo' => 'COALESCE(ins.NombreInsumo,\'\')',
+            'CantidadReactivo' => 'COALESCE(CAST(sex.organo AS CHAR),\'\')',
+            'Inicio' => 'COALESCE(f.fechainicioA,\'\')',
+            'Retiro' => 'COALESCE(f.fecRetiroA,\'\')',
+            'Aclaracion' => 'COALESCE(f.aclaracionadm,\'\')',
+            'estado' => 'COALESCE(f.estado,\'\')',
+        ];
+        $expr = $map[$col] ?? null;
+        if ($expr === null) {
+            $append .= " AND CONCAT(COALESCE(p.NombreA,''),' ',COALESCE(p.ApellidoA,'')) LIKE ?";
+            $params[] = $like;
+            return;
+        }
+        $append .= " AND ({$expr}) LIKE ?";
+        $params[] = $like;
+    }
+
+    private function resolveReactivoListOrderBy(array $filters): string {
+        $key = $filters['sort_key'] ?? 'idformA';
+        $dir = strtoupper((string)($filters['sort_dir'] ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
+        $deptoExt = '(CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END)';
+        $map = [
+            'idformA' => 'f.idformA',
+            'TipoNombre' => 't.nombreTipo',
+            'Investigador' => 'p.ApellidoA',
+            'NProtocolo' => 'px.nprotA',
+            'DeptoExternoFlag' => $deptoExt,
+            'Especie' => 'f.idformA',
+            'AnimalesUsados' => 'sex.totalA',
+            'Reactivo' => 'ins.NombreInsumo',
+            'CantidadReactivo' => 'sex.organo',
+            'Inicio' => 'f.fechainicioA',
+            'Retiro' => 'f.fecRetiroA',
+            'Aclaracion' => 'f.aclaracionadm',
+            'estado' => 'f.estado',
+        ];
+        $col = $map[$key] ?? 'f.idformA';
+        return "{$col} {$dir}, f.idformA DESC";
+    }
+
+    /** Nombres de institución de origen distintos (dropdown de filtro admin) sin cargar el listado completo. */
+    public function getOrigenLabelsForReactivoForms($instId) {
+        $instId = (int)$instId;
+        $pred = self::sqlPredicadoFormularioReactivo('tf');
+        $sql = "SELECT DISTINCT TRIM(io.NombreInst) AS n
+                FROM formularioe f
+                INNER JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario AND tf.IdInstitucion = f.IdInstitucion
+                LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen
+                WHERE f.IdInstitucion = ?
+                  AND ({$pred})
+                  AND io.NombreInst IS NOT NULL AND TRIM(io.NombreInst) <> ''
+                ORDER BY n ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        $out = [];
+        while ($r = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            if (!empty($r['n'])) {
+                $out[] = $r['n'];
+            }
+        }
+        return $out;
     }
 
     private function hasTable(string $tableName): bool {

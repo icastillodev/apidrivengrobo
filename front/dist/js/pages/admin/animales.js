@@ -1,6 +1,5 @@
 // 1. IMPORTACIONES
 import { API } from '../../api.js';
-import { hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
@@ -9,6 +8,8 @@ import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../.
 import { translatePage } from '../../utils/i18n.js';
 
 let allAnimals = [];
+/** Total de filas que cumplen filtros (servidor). */
+let totalAnimalesList = 0;
 let currentPage = 1;
 const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
@@ -23,6 +24,79 @@ function formatAnimalFechaPrecioRef(iso) {
         return `${day}/${m}/${y}`;
     }
     return iso;
+}
+
+function buildAnimalesListQuery(extra = {}) {
+    const instId = localStorage.getItem('instId');
+    const limit = extra.limit != null ? extra.limit : rowsPerPage;
+    const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
+    const p = new URLSearchParams();
+    p.set('inst', instId);
+    p.set('limit', String(limit));
+    p.set('offset', String(offset));
+    Object.keys(extra).forEach((k) => {
+        if (k === 'limit' || k === 'offset') return;
+        if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
+    });
+    const status = document.getElementById('filter-status-animal')?.value || 'all';
+    const deriv = document.getElementById('filter-deriv-animal')?.value || 'all';
+    const retiro = document.getElementById('filter-retiro-animal')?.value || '';
+    const q = document.getElementById('search-input-animal')?.value?.trim() || '';
+    const filterCol = document.getElementById('filter-column-animal')?.value || 'all';
+    p.set('status', status);
+    p.set('deriv', deriv);
+    if (retiro) p.set('retiro', retiro);
+    if (q) p.set('q', q);
+    p.set('filter_col', filterCol);
+    if (String(filterCol).startsWith('origin::')) {
+        p.set('origin', filterCol);
+    }
+    const { sort_key, sort_dir } = getSortApiParams();
+    p.set('sort_key', sort_key);
+    p.set('sort_dir', sort_dir);
+    return p;
+}
+
+function getSortApiParams() {
+    let key = sortConfig.key || 'idformA';
+    let dir = 'DESC';
+    if (sortConfig.direction === 'asc') dir = 'ASC';
+    if (sortConfig.direction === 'desc') dir = 'DESC';
+    if (sortConfig.direction === 'none') {
+        key = 'idformA';
+        dir = 'DESC';
+    }
+    return { sort_key: key, sort_dir: dir };
+}
+
+async function fetchAnimalRowById(idformA) {
+    const instId = localStorage.getItem('instId');
+    const res = await API.request(`/animals/all?inst=${instId}&idformA=${encodeURIComponent(idformA)}&limit=1&offset=0`);
+    if (res?.status === 'success' && Array.isArray(res.data) && res.data[0]) return res.data[0];
+    return null;
+}
+
+async function fetchAnimalesList() {
+    const tbody = document.getElementById('table-body-animals');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    }
+    try {
+        const res = await API.request(`/animals/all?${buildAnimalesListQuery().toString()}`);
+        if (res?.status === 'success') {
+            if (typeof res.total === 'number') {
+                allAnimals = Array.isArray(res.data) ? res.data : [];
+                totalAnimalesList = res.total;
+            } else {
+                allAnimals = Array.isArray(res.data) ? res.data : [];
+                totalAnimalesList = allAnimals.length;
+            }
+            renderTableBody();
+        }
+    } catch (e) {
+        console.error('❌ Error cargando animales:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+    }
 }
 
 function getI18nValue(path) {
@@ -40,66 +114,65 @@ function getI18nValue(path) {
  * INICIALIZACIÓN DE LA PÁGINA
  */
 export async function initAnimalesPage() {
-    const instId = localStorage.getItem('instId');
-
     try {
-        const res = await API.request(`/animals/all?inst=${instId}`);
-        if (res && res.status === 'success') {
-            allAnimals = res.data;
-            setupOriginInstitutionFilterAnimal();
-            setupSortHeaders();
-            renderTable();
-            openAnimalFromUrlIfNeeded();
-        }
-    } catch (error) { console.error("❌ Error:", error); }
+        await setupOriginInstitutionFilterAnimal();
+        setupSortHeaders();
+        await fetchAnimalesList();
+        await openAnimalFromUrlIfNeeded();
+    } catch (error) {
+        console.error('❌ Error:', error);
+    }
 
-
-    // Botón Excel (Abre el popup de fechas)
     document.getElementById('btn-excel-animal').onclick = () => {
         new bootstrap.Modal(document.getElementById('modal-excel-animal')).show();
     };
 
-
-// LÓGICA DE REAPERTURA AUTOMÁTICA POST-RECARGA
     const reopenId = sessionStorage.getItem('reopenAnimalId');
     if (reopenId) {
-        sessionStorage.removeItem('reopenAnimalId'); // Limpiamos para que no se abra siempre
-        
-        // Esperamos un momento a que la tabla cargue para buscar el objeto
-        setTimeout(() => {
-            const animalData = allAnimals.find(a => a.idformA == reopenId);
-            if (animalData) {
-                window.openAnimalModal(animalData); // Abre el popup que estaba
-            }
-        }, 800); // Ajusta el tiempo según la velocidad de tu API
+        sessionStorage.removeItem('reopenAnimalId');
+        setTimeout(async () => {
+            let animalData = allAnimals.find((a) => String(a.idformA) === String(reopenId));
+            if (!animalData) animalData = await fetchAnimalRowById(reopenId);
+            if (animalData) window.openAnimalModal(animalData);
+        }, 600);
     }
-document.addEventListener('focusin', (e) => {
-    if (e.target.closest(".swal2-container")) {
-        e.stopImmediatePropagation();
-    }
-}, true);
-    document.getElementById('btn-search-animal').onclick = () => { currentPage = 1; renderTable(); };
-    document.getElementById('filter-status-animal').onchange = () => { currentPage = 1; renderTable(); };
+
+    document.addEventListener('focusin', (e) => {
+        if (e.target.closest('.swal2-container')) {
+            e.stopImmediatePropagation();
+        }
+    }, true);
+
+    document.getElementById('btn-search-animal').onclick = () => { currentPage = 1; fetchAnimalesList(); };
+    document.getElementById('filter-status-animal').onchange = () => { currentPage = 1; fetchAnimalesList(); };
     const filterDeriv = document.getElementById('filter-deriv-animal');
-    if (filterDeriv) filterDeriv.onchange = () => { currentPage = 1; renderTable(); };
+    if (filterDeriv) filterDeriv.onchange = () => { currentPage = 1; fetchAnimalesList(); };
     const filterRetiroAnimal = document.getElementById('filter-retiro-animal');
-    if (filterRetiroAnimal) filterRetiroAnimal.onchange = () => { currentPage = 1; renderTable(); };
-    document.getElementById('search-input-animal').onkeyup = (e) => { if (e.key === 'Enter') { currentPage = 1; renderTable(); } };
+    if (filterRetiroAnimal) filterRetiroAnimal.onchange = () => { currentPage = 1; fetchAnimalesList(); };
+    const filterColAnimal = document.getElementById('filter-column-animal');
+    if (filterColAnimal) filterColAnimal.onchange = () => { currentPage = 1; fetchAnimalesList(); };
+    document.getElementById('search-input-animal').onkeyup = (e) => {
+        if (e.key === 'Enter') { currentPage = 1; fetchAnimalesList(); }
+    };
 }
 
-function setupOriginInstitutionFilterAnimal() {
+async function setupOriginInstitutionFilterAnimal() {
     const columnSelect = document.getElementById('filter-column-animal');
     if (!columnSelect) return;
-    const values = [...new Set(allAnimals.map(a => (a.InstitucionOrigenNombre || '').trim()).filter(Boolean))].sort();
+    const instId = localStorage.getItem('instId');
+    let values = [];
+    try {
+        const res = await API.request(`/animals/filtros-meta?inst=${encodeURIComponent(instId)}`);
+        if (res?.status === 'success' && res.data?.origenes && Array.isArray(res.data.origenes)) {
+            values = res.data.origenes;
+        }
+    } catch (_) { /* dropdown sin origen */ }
 
-    // Limpiar opciones previas de origen para no duplicar al recargar.
     Array.from(columnSelect.options)
-        .filter(opt => String(opt.value || '').startsWith('origin::'))
-        .forEach(opt => opt.remove());
+        .filter((opt) => String(opt.value || '').startsWith('origin::'))
+        .forEach((opt) => opt.remove());
 
-    if (!values.length) return;
-
-    values.forEach(v => {
+    values.forEach((v) => {
         const o = document.createElement('option');
         o.value = `origin::${v}`;
         o.textContent = v;
@@ -107,14 +180,15 @@ function setupOriginInstitutionFilterAnimal() {
     });
 }
 
-function openAnimalFromUrlIfNeeded() {
+async function openAnimalFromUrlIfNeeded() {
     if (openedAnimalFromUrl) return;
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     const action = (params.get('action') || '').toLowerCase();
     if (!id || (action && action !== 'view' && action !== 'edit')) return;
 
-    const animal = allAnimals.find(a => String(a.idformA) === String(id));
+    let animal = allAnimals.find((a) => String(a.idformA) === String(id));
+    if (!animal) animal = await fetchAnimalRowById(id);
     if (!animal) return;
     openedAnimalFromUrl = true;
     setTimeout(() => window.openAnimalModal(animal), 200);
@@ -124,14 +198,9 @@ function openAnimalFromUrlIfNeeded() {
  * RECARGA DE DATOS Y SINCRONIZACIÓN TOTAL (TIEMPO REAL)
  */
 async function syncAllData() {
-    const instId = localStorage.getItem('instId');
-    const res = await API.request(`/animals/all?inst=${instId}`);
-    if (res && res.status === 'success') {
-        allAnimals = res.data;
-        setupOriginInstitutionFilterAnimal();
-        renderTable(); 
-        refreshMenuNotifications(); 
-    }
+    await setupOriginInstitutionFilterAnimal();
+    await fetchAnimalesList();
+    refreshMenuNotifications();
 }
 
 window.adminDeleteFormularioAnimal = async (idformA) => {
@@ -163,7 +232,8 @@ function setupSortHeaders() {
             if (sortConfig.key === key) {
                 sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : (sortConfig.direction === 'desc' ? 'none' : 'asc');
             } else { sortConfig.key = key; sortConfig.direction = 'asc'; }
-            renderTable();
+            currentPage = 1;
+            fetchAnimalesList();
         };
     });
 }
@@ -214,13 +284,19 @@ function updateHeaderIcons() {
     });
 }
 
-function renderTable() {
+function renderTableBody() {
     const tbody = document.getElementById('table-body-animals');
-    const data = getFilteredAndSortedData();
-    const pageData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+    if (!tbody) return;
 
     tbody.innerHTML = '';
-    pageData.forEach(a => {
+    if (!allAnimals.length) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        updateHeaderIcons();
+        renderPagination(totalAnimalesList, 'pagination-animal', () => fetchAnimalesList());
+        return;
+    }
+
+    allAnimals.forEach((a) => {
         const tr = document.createElement('tr');
         tr.className = "clickable-row";
         tr.onclick = () => window.openAnimalModal(a);
@@ -271,51 +347,7 @@ function renderTable() {
     });
 
     updateHeaderIcons();
-    renderPagination(data.length, 'pagination-animal', renderTable);
-    hideLoader();
-}
-
-function getFilteredAndSortedData() {
-    const statusFilter = document.getElementById('filter-status-animal').value.toLowerCase();
-    const term = document.getElementById('search-input-animal').value.toLowerCase().trim();
-    const filterType = document.getElementById('filter-column-animal').value;
-    const derivFilter = document.getElementById('filter-deriv-animal')?.value || 'all';
-    const retiroDate = document.getElementById('filter-retiro-animal');
-    const retiroVal = retiroDate ? (retiroDate.value || '').trim() : '';
-
-    let data = allAnimals.filter(a => {
-        const isDerived = Number(a.DerivadoActivo || 0) === 1;
-        let eff = a.estado;
-        if (isDerived && (a.estado_origen != null || a.estado_destino != null)) {
-            if (a.estado_destino != null && String(a.estado_destino).trim() !== '') eff = a.estado_destino;
-            else if (a.estado_origen != null && String(a.estado_origen).trim() !== '') eff = a.estado_origen;
-        }
-        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
-        if (statusFilter !== 'all' && estadoFila !== statusFilter) return false;
-        if (derivFilter === 'derived' && !isDerived) return false;
-        if (derivFilter === 'local' && isDerived) return false;
-        const originName = (a.InstitucionOrigenNombre || '').trim();
-        if (String(filterType).startsWith('origin::')) {
-            const originSelected = String(filterType).slice('origin::'.length);
-            if (originName !== originSelected) return false;
-        }
-        if (retiroVal) {
-            const aRetiro = (a.Retiro || '').toString().substring(0, 10);
-            if (aRetiro !== retiroVal) return false;
-        }
-        if (!term) return true;
-        if (filterType === 'all' || String(filterType).startsWith('origin::')) return JSON.stringify(a).toLowerCase().includes(term);
-        return String(a[filterType] || '').toLowerCase().includes(term);
-    });
-
-    if (sortConfig.direction !== 'none') {
-        data.sort((a, b) => {
-            let valA = a[sortConfig.key] || ''; let valB = b[sortConfig.key] || '';
-            const factor = sortConfig.direction === 'asc' ? 1 : -1;
-            return isNaN(valA) ? valA.toString().localeCompare(valB) * factor : (valA - valB) * factor;
-        });
-    } else { data.sort((a, b) => b.idformA - a.idformA); }
-    return data;
+    renderPagination(totalAnimalesList, 'pagination-animal', () => fetchAnimalesList());
 }
 
 /**
@@ -792,7 +824,8 @@ function renderOrderModificationSection(a, sex, cache) {
 // --- ACTUALIZACIÓN DINÁMICA ---
 window.updateAnimalStatusQuick = async () => {
     const id = document.getElementById('current-idformA').value;
-    const row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    let row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    if (!row) row = await fetchAnimalRowById(id);
     const currentInst = Number(localStorage.getItem('instId') || sessionStorage.getItem('instId') || 0);
     const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
@@ -847,7 +880,7 @@ window.updateAnimalStatusQuick = async () => {
             }
             const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
             document.getElementById('modal-status-badge-container').innerHTML = getStatusBadge(statusSelect.value, porInst);
-            syncAllData();
+            await syncAllData();
         } else {
             const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
             window.Swal.fire(title, res.message || 'No se pudo cambiar el estado.', 'warning');
@@ -1113,7 +1146,8 @@ window.saveFullAnimalForm = async (e) => {
     const fd = new FormData(e.target);
     const instId = localStorage.getItem('instId');
     const id = fd.get('idformA');
-    const row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    let row = allAnimals.find(x => Number(x.idformA) === Number(id));
+    if (!row) row = await fetchAnimalRowById(id);
     const currentInst = Number(instId || sessionStorage.getItem('instId') || 0);
     const isOriginInst = Number(row?.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const isDerivedActive = Number(row?.DerivadoActivo || 0) === 1 && Number(row?.IdFormularioDerivacionActiva || 0) > 0;
@@ -1196,7 +1230,8 @@ window.resolveDerivacionAnimal = async (action, idDerivacion, idformA) => {
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Acción aplicada.', 'success');
             await syncAllData();
-            const a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            let a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            if (!a) a = await fetchAnimalRowById(idformA);
             if (a) window.openAnimalModal(a);
         } else {
             window.Swal.fire('Error', res.message || 'No se pudo procesar.', 'error');
@@ -1267,7 +1302,8 @@ window.deriveFromAdminAnimal = async (idformA) => {
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Formulario derivado correctamente.', 'success');
             await syncAllData();
-            const a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            let a = allAnimals.find(x => Number(x.idformA) === Number(idformA));
+            if (!a) a = await fetchAnimalRowById(idformA);
             if (a) window.openAnimalModal(a);
         } else {
             window.Swal.fire('Error', res.message || 'No se pudo derivar.', 'error');
@@ -1643,7 +1679,7 @@ window.downloadAnimalPDF = async (id) => {
 /**
  * PROCESAR EXPORTACIÓN A EXCEL - GROBO
  */
-window.processExcelExport = () => {
+window.processExcelExport = async () => {
     const start = document.getElementById('excel-start-date').value;
     const end = document.getElementById('excel-end-date').value;
     const nombreInst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
@@ -1653,13 +1689,26 @@ window.processExcelExport = () => {
         return;
     }
 
-    let data = getFilteredAndSortedData();
-
-    // Filtro por rango de fechas
-    data = data.filter(a => {
-        const fechaPedido = a.Inicio || '0000-00-00';
-        return fechaPedido >= start && fechaPedido <= end;
-    });
+    let data = [];
+    try {
+        if (window.Swal) {
+            window.Swal.fire({ title: window.txt?.admin_animales?.exportando || 'Exportando…', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        }
+        const p = buildAnimalesListQuery({
+            limit: 8000,
+            offset: 0,
+            inicio_desde: start,
+            inicio_hasta: end,
+        });
+        const res = await API.request(`/animals/all?${p.toString()}`);
+        if (window.Swal) window.Swal.close();
+        data = Array.isArray(res?.data) ? res.data : [];
+    } catch (e) {
+        if (window.Swal) window.Swal.close();
+        console.error(e);
+        window.Swal.fire('Error', e?.message || 'No se pudo obtener datos para exportar.', 'error');
+        return;
+    }
 
     if (data.length === 0) {
         window.Swal.fire('Sin resultados', 'No hay registros en ese rango.', 'info');

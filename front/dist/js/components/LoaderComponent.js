@@ -148,6 +148,8 @@ function startPhraseRotation(loaderEl) {
  * o al evaluar el módulo si el script va al final de `<body>`).
  */
 export function showLoader() {
+    document.getElementById('gecko-boot-overlay')?.remove();
+
     if (!document.body) {
         document.addEventListener('DOMContentLoaded', () => showLoader(), { once: true });
         return;
@@ -404,6 +406,7 @@ export function hideLoader(opts = {}) {
 
     window.setTimeout(() => {
         stopLoaderPhraseRotation();
+        document.getElementById('gecko-boot-overlay')?.remove();
         document.body.classList.add('gecko-loaded');
         const loader = document.getElementById('global-loader');
         if (loader) {

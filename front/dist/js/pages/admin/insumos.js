@@ -7,8 +7,11 @@ import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 
 let allInsumos = [];
+/** Total de filas que cumplen filtros (servidor). */
+let totalInsumosList = 0;
 let currentPage = 1;
 const rowsPerPage = 15;
+let sortConfig = { key: 'idformA', direction: 'none' };
 window.catalogoInsumos = []; // Global para acceso desde addItemRow
 let openedInsumoFromUrl = false;
 
@@ -34,49 +37,104 @@ window.composeMensajeInsumoInvestigador = async (idInvestigador, idformA) => {
     });
 };
 
+function buildInsumosListQuery(extra = {}) {
+    const instId = localStorage.getItem('instId');
+    const limit = extra.limit != null ? extra.limit : rowsPerPage;
+    const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
+    const p = new URLSearchParams();
+    p.set('inst', instId);
+    p.set('limit', String(limit));
+    p.set('offset', String(offset));
+    Object.keys(extra).forEach((k) => {
+        if (k === 'limit' || k === 'offset') return;
+        if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
+    });
+    const status = document.getElementById('filter-status-insumo')?.value || 'all';
+    const deriv = document.getElementById('filter-deriv-insumo')?.value || 'all';
+    const retiro = document.getElementById('filter-retiro-insumo')?.value || '';
+    const q = document.getElementById('search-input-insumo')?.value?.trim() || '';
+    const filterCol = document.getElementById('filter-column-insumo')?.value || 'all';
+    p.set('status', status);
+    p.set('deriv', deriv);
+    if (retiro) p.set('retiro', retiro);
+    if (q) p.set('q', q);
+    p.set('filter_col', filterCol);
+    if (String(filterCol).startsWith('origin::')) {
+        p.set('origin', filterCol);
+    }
+    let key = sortConfig.key || 'idformA';
+    let dir = 'DESC';
+    if (sortConfig.direction === 'asc') dir = 'ASC';
+    if (sortConfig.direction === 'desc') dir = 'DESC';
+    if (sortConfig.direction === 'none') {
+        key = 'idformA';
+        dir = 'DESC';
+    }
+    p.set('sort_key', key);
+    p.set('sort_dir', dir);
+    return p;
+}
+
+async function fetchInsumoRowById(idformA) {
+    const instId = localStorage.getItem('instId');
+    const res = await API.request(`/insumos/all?inst=${instId}&idformA=${encodeURIComponent(idformA)}&limit=1&offset=0`);
+    if (res?.status === 'success' && Array.isArray(res.data) && res.data[0]) return res.data[0];
+    return null;
+}
+
+async function fetchInsumosList() {
+    const tbody = document.getElementById('table-body-insumos');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    }
+    try {
+        const res = await API.request(`/insumos/all?${buildInsumosListQuery().toString()}`);
+        if (res?.status === 'success') {
+            if (typeof res.total === 'number') {
+                allInsumos = Array.isArray(res.data) ? res.data : [];
+                totalInsumosList = res.total;
+            } else {
+                allInsumos = Array.isArray(res.data) ? res.data : [];
+                totalInsumosList = allInsumos.length;
+            }
+            renderTableBody();
+        }
+    } catch (e) {
+        console.error('Error cargando insumos:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        hideLoader();
+    }
+}
+
 /**
  * 1. INICIALIZACIÓN
  */
 export async function initInsumosPage() {
-    const instId = localStorage.getItem('instId');
-    
-
-// Vinculación del Buscador (Se mantiene con botón o tecla Enter)
     const btnSearch = document.getElementById('btn-search-insumo');
     const inputSearch = document.getElementById('search-input-insumo');
 
-    if(btnSearch) btnSearch.onclick = () => { currentPage = 1; renderTable(); };
-    if(inputSearch) {
-        inputSearch.onkeyup = (e) => { if(e.key === 'Enter') { currentPage = 1; renderTable(); } };
+    if (btnSearch) btnSearch.onclick = () => { currentPage = 1; fetchInsumosList(); };
+    if (inputSearch) {
+        inputSearch.onkeyup = (e) => { if (e.key === 'Enter') { currentPage = 1; fetchInsumosList(); } };
     }
 
-    // FILTROS AUTOMÁTICOS: Se activan al cambiar la selección
     const filterStatus = document.getElementById('filter-status-insumo');
     const filterColumn = document.getElementById('filter-column-insumo');
     const filterDeriv = document.getElementById('filter-deriv-insumo');
 
-    if(filterStatus) {
-        filterStatus.onchange = () => { 
-            currentPage = 1; 
-            renderTable(); // Filtra automáticamente al tocar el estado
-        };
+    if (filterStatus) {
+        filterStatus.onchange = () => { currentPage = 1; fetchInsumosList(); };
     }
 
-    if(filterColumn) {
-        filterColumn.onchange = () => { 
-            currentPage = 1; 
-            renderTable(); // Opcional: También filtra automático al cambiar la columna
-        };
+    if (filterColumn) {
+        filterColumn.onchange = () => { currentPage = 1; fetchInsumosList(); };
     }
     if (filterDeriv) {
-        filterDeriv.onchange = () => {
-            currentPage = 1;
-            renderTable();
-        };
+        filterDeriv.onchange = () => { currentPage = 1; fetchInsumosList(); };
     }
 
     const filterRetiroInsumo = document.getElementById('filter-retiro-insumo');
-    if (filterRetiroInsumo) filterRetiroInsumo.onchange = () => { currentPage = 1; renderTable(); };
+    if (filterRetiroInsumo) filterRetiroInsumo.onchange = () => { currentPage = 1; fetchInsumosList(); };
 
     document.addEventListener('focusin', (e) => {
         if (e.target.closest(".swal2-container")) e.stopImmediatePropagation();
@@ -84,32 +142,29 @@ export async function initInsumosPage() {
 
     try {
         showLoader();
-        const res = await API.request(`/insumos/all?inst=${instId}`);
-        if (res && res.status === 'success') {
-            allInsumos = res.data;
-            setupOriginInstitutionFilterInsumo();
-            renderTable();
-            openInsumoFromUrlIfNeeded();
-        }
-    } catch (error) { 
-        console.error("Error cargando insumos:", error); 
+        await setupOriginInstitutionFilterInsumo();
+        await fetchInsumosList();
+        await openInsumoFromUrlIfNeeded();
+    } catch (error) {
+        console.error("Error cargando insumos:", error);
         hideLoader();
     }
 
-
-
-    // Vinculación de botones de la interfaz
-
-    if(btnSearch) btnSearch.onclick = () => { currentPage = 1; renderTable(); };
-    
     const btnExcel = document.getElementById('btn-excel-insumo');
-    if(btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
+    if (btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
 }
 
-function setupOriginInstitutionFilterInsumo() {
+async function setupOriginInstitutionFilterInsumo() {
     const columnSelect = document.getElementById('filter-column-insumo');
     if (!columnSelect) return;
-    const values = [...new Set(allInsumos.map(a => (a.InstitucionOrigenNombre || '').trim()).filter(Boolean))].sort();
+    const instId = localStorage.getItem('instId');
+    let values = [];
+    try {
+        const res = await API.request(`/insumos/filtros-meta?inst=${encodeURIComponent(instId)}`);
+        if (res?.status === 'success' && res.data?.origenes && Array.isArray(res.data.origenes)) {
+            values = res.data.origenes;
+        }
+    } catch (_) { /* dropdown sin origen */ }
 
     Array.from(columnSelect.options)
         .filter(opt => String(opt.value || '').startsWith('origin::'))
@@ -125,28 +180,24 @@ function setupOriginInstitutionFilterInsumo() {
     });
 }
 
-function openInsumoFromUrlIfNeeded() {
+async function openInsumoFromUrlIfNeeded() {
     if (openedInsumoFromUrl) return;
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     const action = (params.get('action') || '').toLowerCase();
     if (!id || (action && action !== 'view' && action !== 'edit')) return;
 
-    const insumo = allInsumos.find(i => String(i.idformA) === String(id));
+    let insumo = allInsumos.find(i => String(i.idformA) === String(id));
+    if (!insumo) insumo = await fetchInsumoRowById(id);
     if (!insumo) return;
     openedInsumoFromUrl = true;
     setTimeout(() => window.openInsumoModal(insumo), 200);
 }
 
 async function syncAllInsumosData() {
-    const instId = localStorage.getItem('instId');
-    const res = await API.request(`/insumos/all?inst=${instId}`);
-    if (res && res.status === 'success') {
-        allInsumos = res.data;
-        setupOriginInstitutionFilterInsumo();
-        renderTable();
-        refreshMenuNotifications();
-    }
+    await setupOriginInstitutionFilterInsumo();
+    await fetchInsumosList();
+    refreshMenuNotifications();
 }
 
 window.adminDeleteFormularioInsumo = async (idformA) => {
@@ -165,15 +216,22 @@ window.adminDeleteFormularioInsumo = async (idformA) => {
 /**
  * 3. RENDERIZADO DE TABLA Y PAGINACIÓN
  */
-function renderTable() {
+function renderTableBody() {
     const tbody = document.getElementById('table-body-insumos');
     if (!tbody) return;
 
-    const data = getFilteredAndSortedData(); 
+    const data = allInsumos;
     tbody.innerHTML = '';
 
-    const start = (currentPage - 1) * rowsPerPage;
-    data.slice(start, start + rowsPerPage).forEach(f => {
+    if (!data.length) {
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        updateHeaderIcons();
+        renderPagination(totalInsumosList, 'pagination-insumo', () => fetchInsumosList());
+        hideLoader();
+        return;
+    }
+
+    data.forEach(f => {
         const tr = document.createElement('tr');
         tr.className = "clickable-row";
         tr.onclick = () => window.openInsumoModal(f);
@@ -211,8 +269,8 @@ function renderTable() {
         tbody.appendChild(tr);
     });
 
-    updateHeaderIcons(); // Actualiza flechas de orden
-    renderPagination(data.length, 'pagination-insumo', renderTable); // Paginación reactiva
+    updateHeaderIcons();
+    renderPagination(totalInsumosList, 'pagination-insumo', () => fetchInsumosList());
     hideLoader();
 }
 /**
@@ -690,10 +748,7 @@ window.updateInsumoStatusQuick = async (id) => {
             }
             const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status, porInst);
-            const r = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
-            allInsumos = r.data;
-            setupOriginInstitutionFilterInsumo();
-            renderTable();
+            await fetchInsumosList();
         } else {
             const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
             window.Swal.fire(title, res.message || 'No se pudo cambiar el estado.', 'warning');
@@ -763,10 +818,7 @@ window.resolveDerivacionInsumo = async (action, idDerivacion, idformA) => {
         const res = await API.request(endpoint, 'POST', { idDerivacion, mensaje, instId: Number(instActiva || 0) });
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Acción aplicada.', 'success');
-            const rr = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
-            allInsumos = rr.data || [];
-            setupOriginInstitutionFilterInsumo();
-            renderTable();
+            await fetchInsumosList();
             const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
             if (f) window.openInsumoModal(f);
         } else {
@@ -837,10 +889,7 @@ window.deriveFromAdminInsumo = async (idformA) => {
         });
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Formulario derivado correctamente.', 'success');
-            const rr = await API.request(`/insumos/all?inst=${localStorage.getItem('instId')}`);
-            allInsumos = rr.data || [];
-            setupOriginInstitutionFilterInsumo();
-            renderTable();
+            await fetchInsumosList();
             const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
             if (f) window.openInsumoModal(f);
         } else {
@@ -884,82 +933,6 @@ window.showDerivHistoryInsumo = async (idformA) => {
     }
 };
 
-
-
-/**
- * LÓGICA DE FILTRADO Y ORDENAMIENTO (ESTILO GROBO 2026)
- * Optimizada para búsqueda en tiempo real y filtrado por columnas.
- */
-function getFilteredAndSortedData() {
-    // 1. Captura de filtros desde el DOM
-    const statusFilter = document.getElementById('filter-status-insumo').value.toLowerCase().trim();
-    const term = document.getElementById('search-input-insumo').value.toLowerCase().trim();
-    const filterType = document.getElementById('filter-column-insumo').value;
-    const derivFilter = document.getElementById('filter-deriv-insumo')?.value || 'all';
-    const retiroEl = document.getElementById('filter-retiro-insumo');
-    const retiroVal = retiroEl ? (retiroEl.value || '').trim() : '';
-
-    let data = allInsumos.filter(f => {
-        const isDerived = Number(f.DerivadoActivo || 0) === 1;
-        let eff = f.estado;
-        if (isDerived && (f.estado_origen != null || f.estado_destino != null)) {
-            if (f.estado_destino != null && String(f.estado_destino).trim() !== '') eff = f.estado_destino;
-            else if (f.estado_origen != null && String(f.estado_origen).trim() !== '') eff = f.estado_origen;
-        }
-        const estadoFila = (eff || 'sin estado').toString().toLowerCase().trim();
-        const matchStatus = statusFilter === 'all' || estadoFila === statusFilter;
-        if (!matchStatus) return false;
-        if (derivFilter === 'derived' && !isDerived) return false;
-        if (derivFilter === 'local' && isDerived) return false;
-        const originName = (f.InstitucionOrigenNombre || '').trim();
-        if (String(filterType).startsWith('origin::')) {
-            const originSelected = String(filterType).slice('origin::'.length);
-            if (originName !== originSelected) return false;
-        }
-        // Filtro por fecha de retiro
-        if (retiroVal) {
-            const fRetiro = (f.Retiro || '').toString().substring(0, 10);
-            if (fRetiro !== retiroVal) return false;
-        }
-        
-        // B. Validación de Búsqueda (Texto en tiempo real)
-        let matchSearch = true;
-        if (term) {
-            if (filterType === 'all' || String(filterType).startsWith('origin::')) {
-                // Búsqueda global robusta (ID, Investigador, Depto e Insumos)
-                matchSearch = String(f.idformA || '').includes(term) || 
-                              String(f.Investigador || '').toLowerCase().includes(term) || 
-                              String(f.Departamento || '').toLowerCase().includes(term) ||
-                              String(f.ResumenInsumos || '').toLowerCase().includes(term);
-            } else {
-                // Búsqueda específica por columna
-                matchSearch = String(f[filterType] || '').toLowerCase().includes(term);
-            }
-        }
-
-        return matchStatus && matchSearch;
-    });
-
-    // 2. Lógica de Ordenamiento Dinámico
-    if (typeof sortConfig !== 'undefined' && sortConfig.direction !== 'none') {
-        data.sort((a, b) => {
-            let valA = a[sortConfig.key] || ''; 
-            let valB = b[sortConfig.key] || '';
-            const factor = sortConfig.direction === 'asc' ? 1 : -1;
-
-            // Si los valores son numéricos, restamos; si no, comparamos como texto
-            if (!isNaN(valA) && !isNaN(valB) && valA !== '' && valB !== '') {
-                return (Number(valA) - Number(valB)) * factor;
-            }
-            return valA.toString().localeCompare(valB.toString()) * factor;
-        });
-    } else { 
-        // Orden por defecto: ID de formulario descendente (# más alto primero)
-        data.sort((a, b) => (Number(b.idformA) || 0) - (Number(a.idformA) || 0)); 
-    }
-
-    return data;
-}
 
 // Stubs para evitar errores de referencia
 window.downloadInsumoPDF = (id) => { console.log("Generando PDF para ID:", id); };
@@ -1068,7 +1041,8 @@ function setupSortHeaders() {
                 sortConfig.key = key; 
                 sortConfig.direction = 'asc'; 
             }
-            renderTable();
+            currentPage = 1;
+            fetchInsumosList();
         };
     });
 }
@@ -1263,8 +1237,7 @@ window.downloadInsumoPDF = async (id) => {
 /**
  * PROCESAR EXPORTACIÓN A EXCEL - INSUMOS EXPERIMENTALES
  */
-window.processExcelExportInsumos = () => {
-    // 1. Captura de fechas y configuración inicial
+window.processExcelExportInsumos = async () => {
     const start = document.getElementById('excel-start-date-insumo').value;
     const end = document.getElementById('excel-end-date-insumo').value;
     const nombreInst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
@@ -1274,10 +1247,18 @@ window.processExcelExportInsumos = () => {
         return;
     }
 
-    // 2. Obtención de datos filtrados desde el estado global de insumos
-    let data = getFilteredAndSortedData();
+    let data = [];
+    try {
+        const res = await API.request(`/insumos/all?${buildInsumosListQuery({ limit: 10000, offset: 0 }).toString()}`);
+        if (res?.status === 'success' && Array.isArray(res.data)) {
+            data = res.data;
+        }
+    } catch (e) {
+        console.error(e);
+        window.Swal.fire('Error', window.txt?.generales?.error_carga || 'Error al cargar datos.', 'error');
+        return;
+    }
 
-    // 3. Filtro por rango de fechas basado en la fecha de Inicio
     data = data.filter(r => {
         const fechaPedido = r.Inicio || '0000-00-00';
         return fechaPedido >= start && fechaPedido <= end;
