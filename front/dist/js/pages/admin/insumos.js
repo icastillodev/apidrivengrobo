@@ -1,6 +1,6 @@
 import { API } from '../../api.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
-import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
@@ -82,10 +82,12 @@ async function fetchInsumoRowById(idformA) {
     return null;
 }
 
-async function fetchInsumosList() {
+async function fetchInsumosList(opts = {}) {
+    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     const tbody = document.getElementById('table-body-insumos');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    if (loading === 'inline' && tbody) {
+        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
         const res = await API.request(`/insumos/all?${buildInsumosListQuery().toString()}`);
@@ -102,7 +104,6 @@ async function fetchInsumosList() {
     } catch (e) {
         console.error('Error cargando insumos:', e);
         if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
-        hideLoader();
     }
 }
 
@@ -141,12 +142,19 @@ export async function initInsumosPage() {
     }, true);
 
     try {
-        showLoader();
-        await setupOriginInstitutionFilterInsumo();
-        await fetchInsumosList();
+        showLoader({
+            staticPhrase: window.txt?.admin_insumos?.cargando_lista || 'Cargando pedidos…',
+            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
+            upgradeOnly: true,
+        });
+        await Promise.all([
+            setupOriginInstitutionFilterInsumo(),
+            fetchInsumosList({ loading: 'none' }),
+        ]);
         await openInsumoFromUrlIfNeeded();
     } catch (error) {
         console.error("Error cargando insumos:", error);
+    } finally {
         hideLoader();
     }
 

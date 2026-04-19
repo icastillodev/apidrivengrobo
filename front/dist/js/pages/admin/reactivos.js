@@ -4,7 +4,7 @@
  */
 import { API } from '../../api.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
-import { hideLoader } from '../../components/LoaderComponent.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
@@ -102,10 +102,12 @@ async function fetchReactivoRowById(idformA) {
     return null;
 }
 
-async function fetchReactivosList() {
+async function fetchReactivosList(opts = {}) {
+    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     const tbody = document.getElementById('table-body-reactivos');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    if (loading === 'inline' && tbody) {
+        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
         const res = await API.request(`/reactivos/all?${buildReactivosListQuery().toString()}`);
@@ -143,9 +145,16 @@ export async function initReactivosPage() {
         };
     }
     try {
-        await setupOriginInstitutionFilterReactivo();
+        showLoader({
+            staticPhrase: window.txt?.admin_reactivos?.cargando_lista || window.txt?.reactivos?.cargando_lista || 'Cargando pedidos…',
+            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
+            upgradeOnly: true,
+        });
+        await Promise.all([
+            setupOriginInstitutionFilterReactivo(),
+            fetchReactivosList({ loading: 'none' }),
+        ]);
         setupSortHeaders();
-        await fetchReactivosList();
         await openReactivoFromUrlIfNeeded();
 
         const reopenId = sessionStorage.getItem('reopenReactivoId');
@@ -159,6 +168,8 @@ export async function initReactivosPage() {
         }
     } catch (error) {
         console.error("❌ Error crítico en API de Reactivos:", error);
+    } finally {
+        hideLoader();
     }
 
     const btnSearch = document.getElementById('btn-search-reactivo');

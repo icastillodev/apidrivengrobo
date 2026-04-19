@@ -6,6 +6,7 @@ import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifar
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { translatePage } from '../../utils/i18n.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -76,10 +77,12 @@ async function fetchAnimalRowById(idformA) {
     return null;
 }
 
-async function fetchAnimalesList() {
+async function fetchAnimalesList(opts = {}) {
+    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     const tbody = document.getElementById('table-body-animals');
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5"><div class="spinner-border text-success" role="status"></div><div class="small text-muted mt-2">${window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…'}</div></td></tr>`;
+    if (loading === 'inline' && tbody) {
+        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
         const res = await API.request(`/animals/all?${buildAnimalesListQuery().toString()}`);
@@ -115,12 +118,21 @@ function getI18nValue(path) {
  */
 export async function initAnimalesPage() {
     try {
-        await setupOriginInstitutionFilterAnimal();
+        showLoader({
+            staticPhrase: window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…',
+            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
+            upgradeOnly: true,
+        });
+        await Promise.all([
+            setupOriginInstitutionFilterAnimal(),
+            fetchAnimalesList({ loading: 'none' }),
+        ]);
         setupSortHeaders();
-        await fetchAnimalesList();
         await openAnimalFromUrlIfNeeded();
     } catch (error) {
         console.error('❌ Error:', error);
+    } finally {
+        hideLoader();
     }
 
     document.getElementById('btn-excel-animal').onclick = () => {

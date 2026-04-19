@@ -20,7 +20,7 @@
     </style>
 
     <script type="module">
-        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js?v=20260420';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js?v=20260422';
         import { Auth } from '../../dist/js/auth.js?v=20260409';
         import { API } from '../../dist/js/api.js';
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260409';
@@ -46,7 +46,7 @@
                     if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';
                     await initMenu();
                     NotificationManager.init();
-                    initInsumosPage();
+                    await initInsumosPage();
                     console.log("✅ Administración de Insumos inicializada correctamente.");
                 } else {
                     throw new Error("El objeto de idioma window.txt no se generó.");
@@ -54,7 +54,6 @@
                 setTimeout(() => { checkUrlParamsAndOpen(); }, 300);
             } catch (error) {
                 console.error("❌ Fallo en inicialización de página de Insumos:", error);
-            } finally {
                 hideLoader();
             }
         });

@@ -22,33 +22,11 @@ body:not(.gecko-loaded)::before {
     background-color: #f4f7f6;
     z-index: 999998;
 }
-body:not(.gecko-loaded)::after {
-    content: "";
-    position: fixed;
-    top: calc(50% - 25px);
-    left: calc(50% - 25px);
-    width: 50px;
-    height: 50px;
-    border: 4px solid #dee2e6;
-    border-top: 4px solid #1a5d3b;
-    border-radius: 50%;
-    z-index: 999999;
-    animation: gecko-spin 1s linear infinite;
-}
-@keyframes gecko-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 [data-bs-theme="dark"] body:not(.gecko-loaded)::before {
     background-color: #121212;
 }
-[data-bs-theme="dark"] body:not(.gecko-loaded)::after {
-    border: 4px solid #333;
-    border-top: 4px solid #28a745;
-}
-/* Cuando ya está el loader JS, ocultar el spinner/reserva CSS para no duplicar */
-body:not(.gecko-loaded):has(#global-loader)::before,
-body:not(.gecko-loaded):has(#global-loader)::after {
+/* Sin ::after spinner: el círculo CSS competía con el loader GROBO. Tapiz hasta que monte #global-loader */
+body:not(.gecko-loaded):has(#global-loader)::before {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;

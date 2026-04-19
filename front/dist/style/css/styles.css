@@ -20,28 +20,13 @@ body:not(.gecko-loaded) > *:not(#global-loader) {
     pointer-events: none !important;
 }
 
-/* 3. Pantalla de fondo que tapa todo el HTML crudo */
+/* 3. Pantalla de fondo que tapa el HTML crudo hasta el loader JS (sin spinner CSS: evita círculo “duplicado”) */
 body:not(.gecko-loaded)::before {
     content: "";
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
     background-color: #f4f7f6;
     z-index: 999998;
-}
-
-/* 4. Spinner CSS Puro en el centro (Verde GROBO) */
-body:not(.gecko-loaded)::after {
-    content: "";
-    position: fixed;
-    top: calc(50% - 25px);
-    left: calc(50% - 25px);
-    width: 50px;
-    height: 50px;
-    border: 4px solid #dee2e6; /* Borde gris claro */
-    border-top: 4px solid #1a5d3b; /* Borde verde principal */
-    border-radius: 50%;
-    z-index: 999999;
-    animation: gecko-spin 1s linear infinite;
 }
 
 [data-bs-theme="dark"] .clickable-row:hover{
@@ -73,23 +58,13 @@ body:not(.gecko-loaded)::after {
     color: #ffffff !important;
 }
 
-/* 4. Animación del giro */
-@keyframes gecko-spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* 5. Fondo oscuro si está activado el dark mode */
+/* 4. Fondo oscuro si está activado el dark mode */
 [data-bs-theme="dark"] body:not(.gecko-loaded)::before {
     background-color: #121212; 
 }
-[data-bs-theme="dark"] body:not(.gecko-loaded)::after {
-    border: 4px solid #333;
-    border-top: 4px solid #28a745;
-}
 
-body:not(.gecko-loaded):has(#global-loader)::before,
-body:not(.gecko-loaded):has(#global-loader)::after {
+/* 5. Cuando ya montó el loader JS, ocultar el tapiz CSS (el loader trae su propio fondo) */
+body:not(.gecko-loaded):has(#global-loader)::before {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;

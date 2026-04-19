@@ -75,11 +75,16 @@ function getPhraseQueue() {
     return shuffleCopy(base);
 }
 
-function stopLoaderPhraseRotation() {
+/** Solo detiene la rotación de frases (no invalida el progreso de puntos ni remonta el loader). */
+function stopPhraseIntervalOnly() {
     if (phraseIntervalId) {
         clearInterval(phraseIntervalId);
         phraseIntervalId = null;
     }
+}
+
+function stopLoaderPhraseRotation() {
+    stopPhraseIntervalOnly();
     if (progressIntervalId) {
         clearInterval(progressIntervalId);
         progressIntervalId = null;
@@ -125,33 +130,55 @@ function startPhraseRotation(loaderEl) {
     phraseTextEl.textContent = queue[idx % queue.length];
     if (subEl) subEl.style.color = '#888';
 
-    const fadeMs = 380;
-    const holdMs = 2800;
+    const holdMs = 3200;
     const genAtMount = loaderPhraseGen;
 
     phraseIntervalId = window.setInterval(() => {
         if (genAtMount !== loaderPhraseGen) return;
-        const tickGen = loaderPhraseGen;
-        phraseTextEl.style.opacity = '0';
-        window.setTimeout(() => {
-            if (tickGen !== loaderPhraseGen) return;
-            idx = (idx + 1) % queue.length;
-            phraseTextEl.textContent = queue[idx];
-            void phraseTextEl.offsetWidth;
-            phraseTextEl.style.opacity = '1';
-        }, fadeMs);
-    }, holdMs + fadeMs);
+        idx = (idx + 1) % queue.length;
+        phraseTextEl.textContent = queue[idx];
+        phraseTextEl.classList.remove('gecko-loader-phrase-pulse');
+        void phraseTextEl.offsetWidth;
+        phraseTextEl.classList.add('gecko-loader-phrase-pulse');
+    }, holdMs);
 }
 
 /**
  * Muestra el loader a pantalla completa. Debe llamarse lo antes posible (p. ej. al inicio del handler de DOMContentLoaded
  * o al evaluar el módulo si el script va al final de `<body>`).
+ *
+ * @param {{ staticPhrase?: string, subMessage?: string, upgradeOnly?: boolean }} [opts]
+ * - `staticPhrase`: texto fijo (sin rotar frases). Útil p. ej. "Cargando pedidos…".
+ * - `upgradeOnly`: si ya existe `#global-loader`, solo actualiza textos (no desmonta el Gecko ni reinicia animaciones).
  */
-export function showLoader() {
+export function showLoader(opts = {}) {
+    const upgradeOnly = Boolean(opts && opts.upgradeOnly);
+    const existingLoader = document.getElementById('global-loader');
+    if (upgradeOnly && existingLoader) {
+        stopPhraseIntervalOnly();
+        const phraseTextEl = existingLoader.querySelector('[data-gecko-loader-phrase-text]');
+        const subEl = existingLoader.querySelector('[data-gecko-loader-sub]');
+        const sp = typeof opts.staticPhrase === 'string' ? opts.staticPhrase.trim() : '';
+        const muted = existingLoader.dataset.geckoPhraseMuted || '';
+        if (phraseTextEl && sp) {
+            phraseTextEl.textContent = sp;
+            phraseTextEl.style.opacity = '1';
+            if (muted) phraseTextEl.style.color = muted;
+            phraseTextEl.classList.remove('gecko-loader-phrase-pulse');
+            void phraseTextEl.offsetWidth;
+            phraseTextEl.classList.add('gecko-loader-phrase-pulse');
+        }
+        if (subEl && typeof opts.subMessage === 'string' && opts.subMessage.trim() !== '') {
+            subEl.textContent = opts.subMessage.trim();
+            subEl.style.color = '#888';
+        }
+        return;
+    }
+
     document.getElementById('gecko-boot-overlay')?.remove();
 
     if (!document.body) {
-        document.addEventListener('DOMContentLoaded', () => showLoader(), { once: true });
+        document.addEventListener('DOMContentLoaded', () => showLoader(opts), { once: true });
         return;
     }
 
@@ -228,8 +255,8 @@ export function showLoader() {
                 text-align: center;
             }
             .gecko-loader-phrase-text {
-                display: inline;
-                transition: opacity 0.32s ease;
+                display: inline-block;
+                transition: opacity 0.2s ease;
                 font-size: 10px;
                 font-weight: 700;
                 letter-spacing: 0.1em;
@@ -270,6 +297,13 @@ export function showLoader() {
                 0%, 100% { opacity: 0.28; transform: scale(0.88); }
                 50% { opacity: 1; transform: scale(1.25); }
             }
+            @keyframes gecko-loader-phrase-pulse {
+                0% { opacity: 0.62; transform: translateY(3px); }
+                100% { opacity: 1; transform: translateY(0); }
+            }
+            .gecko-loader-phrase-text.gecko-loader-phrase-pulse {
+                animation: gecko-loader-phrase-pulse 0.42s ease-out;
+            }
             #global-loader .gecko-loader-progress,
             #global-loader .gecko-progress-dot {
                 visibility: visible !important;
@@ -285,6 +319,7 @@ export function showLoader() {
 
     const loader = document.createElement('div');
     loader.id = 'global-loader';
+    loader.dataset.geckoPhraseMuted = phraseMuted;
 
     Object.assign(loader.style, {
         position: 'fixed',
@@ -392,7 +427,24 @@ export function showLoader() {
     `;
 
     document.body.prepend(loader);
-    startPhraseRotation(loader);
+    const phraseTextEl = loader.querySelector('[data-gecko-loader-phrase-text]');
+    const subEl = loader.querySelector('[data-gecko-loader-sub]');
+    const staticPhrase = typeof opts.staticPhrase === 'string' && opts.staticPhrase.trim() !== ''
+        ? opts.staticPhrase.trim()
+        : '';
+    if (staticPhrase) {
+        if (phraseTextEl) {
+            phraseTextEl.textContent = staticPhrase;
+            phraseTextEl.style.opacity = '1';
+            phraseTextEl.style.color = phraseMuted;
+        }
+        if (typeof opts.subMessage === 'string' && opts.subMessage.trim() !== '' && subEl) {
+            subEl.textContent = opts.subMessage.trim();
+            subEl.style.color = '#888';
+        }
+    } else {
+        startPhraseRotation(loader);
+    }
     startProgressSteps(loader, dotColor);
 }
 
