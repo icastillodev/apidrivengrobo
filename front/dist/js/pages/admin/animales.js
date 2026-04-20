@@ -122,11 +122,7 @@ function getI18nValue(path) {
 export async function initAnimalesPage() {
     animalesListBootLocked = true;
     try {
-        showLoader({
-            staticPhrase: window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…',
-            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
-            upgradeOnly: true,
-        });
+        showLoader({ upgradeOnly: true });
         await Promise.all([
             setupOriginInstitutionFilterAnimal(),
             fetchAnimalesList({ loading: 'none' }),

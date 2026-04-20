@@ -149,11 +149,7 @@ export async function initReactivosPage() {
         };
     }
     try {
-        showLoader({
-            staticPhrase: window.txt?.admin_reactivos?.cargando_lista || window.txt?.reactivos?.cargando_lista || 'Cargando pedidos…',
-            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
-            upgradeOnly: true,
-        });
+        showLoader({ upgradeOnly: true });
         await Promise.all([
             setupOriginInstitutionFilterReactivo(),
             fetchReactivosList({ loading: 'none' }),

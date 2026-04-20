@@ -8,57 +8,83 @@ let progressIntervalId = null;
 let loaderPhraseGen = 0;
 
 /** Frases de estado (≥40), tono institucional / bioterio / datos seguros. */
-const LOADER_PHRASES_ES = [
-    'Conectando con entorno seguro',
-    'Verificando credenciales de acceso',
-    'Estableciendo canal cifrado con el servidor',
-    'Sincronizando preferencias de su sesión',
-    'Cargando políticas de la institución',
-    'Preparando su espacio de trabajo',
-    'Validando permisos del rol asignado',
-    'Aplicando aislamiento multi-institución',
-    'Comprobando integridad de la sesión',
-    'Recuperando módulos habilitados para su sede',
-    'Consultando configuración regional',
-    'Inicializando componentes de navegación',
-    'Cargando menú y accesos autorizados',
-    'Sincronizando notificaciones pendientes',
-    'Preparando vistas de facturación y saldos',
-    'Verificando estado de protocolos activos',
-    'Cargando datos de bioterio y especies',
-    'Alineando formularios con el tarifario vigente',
-    'Revisando reservas y alojamientos en curso',
-    'Actualizando bandeja de mensajes institucionales',
-    'Protegiendo datos personales y clínicos',
-    'Aplicando trazas de auditoría cuando corresponde',
-    'Optimizando caché de textos e idioma',
-    'Cargando ayudas contextuales del sistema',
-    'Verificando mantenimientos programados',
-    'Comprobando versión de la aplicación',
-    'Preparando tableros y métricas del panel',
-    'Sincronizando insumos y pedidos recientes',
-    'Cargando historial contable autorizado',
-    'Validando cupos y límites de protocolo',
-    'Asegurando rutas de solo lectura donde aplique',
-    'Preparando exportaciones y reportes seguros',
-    'Cargando departamentos y responsables',
-    'Verificando vínculos usuario–institución',
-    'Aplicando tema y accesibilidad guardados',
-    'Inicializando búsqueda global segura',
-    'Cargando capacitación y tours guiados',
-    'Sincronizando preferencias de voz y UI',
-    'Comprobando alertas de seguridad de cuenta',
-    'Finalizando arranque del entorno GROBO',
-    'Un momento: estamos casi listos',
-    'Últimos ajustes antes de mostrar la página',
-    'Cerrando el círculo de verificación del cliente',
-    'Listo para mostrar sus datos autorizados',
-    'Resolviendo dependencias de la interfaz',
-    'Chequeando tokens y expiración de sesión',
-    'Asentando filtros de mensajería interna',
-    'Activando atajos y preferencias guardadas',
-    'Sincronizando avisos de mantenimiento del sistema',
-];
+const LOADER_PHRASES = {
+    es: [
+        'Poniéndonos a trabajar',
+        'Preparando batas y guantes',
+        'Un buen día para la ciencia',
+        'Calculando raciones',
+        'Revisando el inventario',
+        'Preparando el café matutino',
+        'Llenando los bebederos',
+        'Acondicionando las salas',
+        'Verificando el bienestar animal',
+        'Ajustando temperatura y humedad',
+        'Desinfectando el área',
+        'Organizando las cajas',
+        'Preparando jaulas limpias',
+        'Anotando las observaciones',
+        'Activando los flujos laminares',
+        'Contando las nuevas crías',
+        'Registrando la actividad del día',
+        'Preparando los insumos',
+        'Ordenando las planillas',
+        'Todo listo para investigar',
+        'Haciendo un poco de magia de laboratorio',
+        'Conectando los equipos',
+        'Alineando las pipetas'
+    ],
+    en: [
+        'Getting to work',
+        'Preparing lab coats and gloves',
+        'A good day for science',
+        'Calculating rations',
+        'Checking the inventory',
+        'Brewing morning coffee',
+        'Filling the water bottles',
+        'Conditioning the rooms',
+        'Checking animal welfare',
+        'Adjusting temperature and humidity',
+        'Disinfecting the area',
+        'Organizing the boxes',
+        'Preparing clean cages',
+        'Taking note of observations',
+        'Activating laminar flows',
+        'Counting the new litters',
+        'Logging daily activities',
+        'Preparing supplies',
+        'Sorting the spreadsheets',
+        'All set to research',
+        'Doing a bit of lab magic',
+        'Connecting the equipment',
+        'Aligning the pipettes'
+    ],
+    pt: [
+        'Começando os trabalhos',
+        'Preparando jalecos e luvas',
+        'Um bom dia para a ciência',
+        'Calculando porções',
+        'Verificando o estoque',
+        'Preparando o café da manhã',
+        'Enchendo os bebedouros',
+        'Climatizando as salas',
+        'Verificando o bem-estar animal',
+        'Ajustando a temperatura e umidade',
+        'Desinfetando a área',
+        'Organizando as caixas',
+        'Preparando gaiolas limpas',
+        'Anotando as observações',
+        'Ativando os fluxos laminares',
+        'Contando os novos filhotes',
+        'Registrando as atividades do dia',
+        'Preparando os insumos',
+        'Organizando as planilhas',
+        'Tudo pronto para pesquisar',
+        'Fazendo um pouco de mágica de laboratório',
+        'Conectando os equipamentos',
+        'Alinhando as pipetas'
+    ]
+};
 
 function shuffleCopy(arr) {
     const a = arr.slice();
@@ -70,9 +96,11 @@ function shuffleCopy(arr) {
 }
 
 function getPhraseQueue() {
+    const lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
+    const base = LOADER_PHRASES[lang] || LOADER_PHRASES['es'];
     const extra = window.txt?.loader?.frases;
-    const base = Array.isArray(extra) && extra.length ? [...LOADER_PHRASES_ES, ...extra] : LOADER_PHRASES_ES;
-    return shuffleCopy(base);
+    const combined = Array.isArray(extra) && extra.length ? [...base, ...extra] : base;
+    return shuffleCopy(combined);
 }
 
 /** Solo detiene la rotación de frases (no invalida el progreso de puntos ni remonta el loader). */
@@ -167,10 +195,6 @@ export function showLoader(opts = {}) {
             phraseTextEl.classList.remove('gecko-loader-phrase-pulse');
             void phraseTextEl.offsetWidth;
             phraseTextEl.classList.add('gecko-loader-phrase-pulse');
-        }
-        if (subEl && typeof opts.subMessage === 'string' && opts.subMessage.trim() !== '') {
-            subEl.textContent = opts.subMessage.trim();
-            subEl.style.color = '#888';
         }
         return;
     }
@@ -437,10 +461,6 @@ export function showLoader(opts = {}) {
             phraseTextEl.textContent = staticPhrase;
             phraseTextEl.style.opacity = '1';
             phraseTextEl.style.color = phraseMuted;
-        }
-        if (typeof opts.subMessage === 'string' && opts.subMessage.trim() !== '' && subEl) {
-            subEl.textContent = opts.subMessage.trim();
-            subEl.style.color = '#888';
         }
     } else {
         startPhraseRotation(loader);

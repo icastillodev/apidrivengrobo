@@ -55,12 +55,10 @@ export async function initAlojamientosPage() {
 // Función global exportada para que otros módulos puedan recargar la grilla
 export async function loadAlojamientos() {
     try {
-        const phrase = window.txt?.alojamientos?.cargando_lista || 'Cargando alojamientos…';
-        const sub = window.txt?.admin_animales?.cargando_lista_sub || 'Obteniendo datos autorizados para su sede';
         const hasGlobal = !!document.getElementById('global-loader');
-        showLoader(hasGlobal
-            ? { upgradeOnly: true, staticPhrase: phrase, subMessage: sub }
-            : { staticPhrase: phrase, subMessage: sub });
+        if (!hasGlobal) {
+            showLoader();
+        }
         AlojamientoState.instId = resolveAlojamientosInstId();
         const rawInst = AlojamientoState.instId;
         const inst = (typeof rawInst === 'number' && Number.isFinite(rawInst) && rawInst > 0) ? rawInst : null;

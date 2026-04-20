@@ -141,11 +141,7 @@ async function _initUsuariosPage() {
 
     usuariosListBootLocked = true;
     try {
-        showLoader({
-            staticPhrase: window.txt?.admin_usuarios?.cargando_lista || 'Cargando usuarios…',
-            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el directorio)',
-            upgradeOnly: true,
-        });
+        showLoader({ upgradeOnly: true });
         await fetchUsuariosList({ loading: 'none' });
         setupSortHeaders();
         await new Promise((resolve) => {
