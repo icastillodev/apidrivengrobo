@@ -14,6 +14,8 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 window.catalogoInsumos = []; // Global para acceso desde addItemRow
 let openedInsumoFromUrl = false;
+/** Primera carga: evita spinner en tabla si un `change` del filtro se dispara al poblar orígenes. */
+let insumosListBootLocked = false;
 
 window.composeMensajeInsumoInvestigador = async (idInvestigador, idformA) => {
     const id = parseInt(idInvestigador, 10);
@@ -83,7 +85,8 @@ async function fetchInsumoRowById(idformA) {
 }
 
 async function fetchInsumosList(opts = {}) {
-    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    if (insumosListBootLocked) loading = 'none';
     const tbody = document.getElementById('table-body-insumos');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
@@ -111,6 +114,32 @@ async function fetchInsumosList(opts = {}) {
  * 1. INICIALIZACIÓN
  */
 export async function initInsumosPage() {
+    insumosListBootLocked = true;
+
+    document.addEventListener('focusin', (e) => {
+        if (e.target.closest(".swal2-container")) e.stopImmediatePropagation();
+    }, true);
+
+    try {
+        showLoader({
+            staticPhrase: window.txt?.admin_insumos?.cargando_lista || 'Cargando pedidos…',
+            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
+            upgradeOnly: true,
+        });
+        await Promise.all([
+            setupOriginInstitutionFilterInsumo(),
+            fetchInsumosList({ loading: 'none' }),
+        ]);
+        await openInsumoFromUrlIfNeeded();
+        await new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
+    } catch (error) {
+        console.error("Error cargando insumos:", error);
+    } finally {
+        hideLoader();
+    }
+
     const btnSearch = document.getElementById('btn-search-insumo');
     const inputSearch = document.getElementById('search-input-insumo');
 
@@ -137,29 +166,10 @@ export async function initInsumosPage() {
     const filterRetiroInsumo = document.getElementById('filter-retiro-insumo');
     if (filterRetiroInsumo) filterRetiroInsumo.onchange = () => { currentPage = 1; fetchInsumosList(); };
 
-    document.addEventListener('focusin', (e) => {
-        if (e.target.closest(".swal2-container")) e.stopImmediatePropagation();
-    }, true);
-
-    try {
-        showLoader({
-            staticPhrase: window.txt?.admin_insumos?.cargando_lista || 'Cargando pedidos…',
-            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el listado)',
-            upgradeOnly: true,
-        });
-        await Promise.all([
-            setupOriginInstitutionFilterInsumo(),
-            fetchInsumosList({ loading: 'none' }),
-        ]);
-        await openInsumoFromUrlIfNeeded();
-    } catch (error) {
-        console.error("Error cargando insumos:", error);
-    } finally {
-        hideLoader();
-    }
-
     const btnExcel = document.getElementById('btn-excel-insumo');
     if (btnExcel) btnExcel.onclick = () => new bootstrap.Modal(document.getElementById('modal-excel-insumo')).show();
+
+    insumosListBootLocked = false;
 }
 
 async function setupOriginInstitutionFilterInsumo() {

@@ -44,6 +44,131 @@ class UserModel {
     }
 
     /**
+     * Listado paginado por institución (admin / usuarios). Respeta IdInstitucion.
+     * @param array{limit?:int,offset?:int,q?:string,filter_col?:string,sort_key?:string,sort_dir?:string} $opts
+     * @return array{rows: array<int, array<string,mixed>>, total: int}
+     */
+    public function getUsersByInstitutionPaged(int $instId, array $opts): array {
+        $limit = isset($opts['limit']) ? (int) $opts['limit'] : 15;
+        if ($limit < 1) {
+            $limit = 15;
+        }
+        if ($limit > 5000) {
+            $limit = 5000;
+        }
+        $offset = isset($opts['offset']) ? max(0, (int) $opts['offset']) : 0;
+        $q = isset($opts['q']) ? trim((string) $opts['q']) : '';
+        $filterCol = isset($opts['filter_col']) ? trim((string) $opts['filter_col']) : 'all';
+        $sortKey = isset($opts['sort_key']) ? trim((string) $opts['sort_key']) : 'IdUsrA';
+        $sortDir = strtoupper((string) ($opts['sort_dir'] ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
+
+        $deptoSortExpr = 'COALESCE(NULLIF(TRIM(d.NombreDeptoA), \'\'), NULLIF(TRIM(p.LabA), \'\'), \'\')';
+
+        $allowedSort = [
+            'IdUsrA' => 'u.IdUsrA',
+            'Usuario' => 'u.UsrA',
+            'ApellidoA' => 'p.ApellidoA',
+            'NombreA' => 'p.NombreA',
+            'CelularA' => 'p.CelularA',
+            'Correo' => 'p.EmailA',
+            'Laboratorio' => $deptoSortExpr,
+        ];
+        $orderExpr = $allowedSort[$sortKey] ?? 'u.IdUsrA';
+
+        $paramsCount = [$instId];
+        $paramsData = [$instId];
+        $searchSql = '1=1';
+        if ($q !== '') {
+            $pat = '%' . $q . '%';
+            switch ($filterCol) {
+                case 'IdUsrA':
+                    $searchSql = 'CAST(u.IdUsrA AS CHAR) LIKE ?';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'Usuario':
+                    $searchSql = 'LOWER(u.UsrA) LIKE LOWER(?)';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'ApellidoA':
+                    $searchSql = 'LOWER(p.ApellidoA) LIKE LOWER(?)';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'NombreA':
+                    $searchSql = 'LOWER(p.NombreA) LIKE LOWER(?)';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'CelularA':
+                    $searchSql = 'LOWER(COALESCE(p.CelularA, \'\')) LIKE LOWER(?)';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'Correo':
+                    $searchSql = 'LOWER(COALESCE(p.EmailA, \'\')) LIKE LOWER(?)';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                case 'Laboratorio':
+                    $searchSql = '(LOWER(COALESCE(d.NombreDeptoA, \'\')) LIKE LOWER(?) OR LOWER(COALESCE(TRIM(p.LabA), \'\')) LIKE LOWER(?))';
+                    $paramsCount[] = $pat;
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+                default:
+                    $searchSql = '(LOWER(CONCAT_WS(\' \', u.UsrA, p.ApellidoA, p.NombreA, COALESCE(p.EmailA, \'\'), COALESCE(p.CelularA, \'\'), CAST(u.IdUsrA AS CHAR), COALESCE(d.NombreDeptoA, \'\'), COALESCE(TRIM(p.LabA), \'\'))) LIKE LOWER(?))';
+                    $paramsCount[] = $pat;
+                    $paramsData[] = $pat;
+                    break;
+            }
+        }
+
+        $fromSql = "FROM usuarioe u
+                JOIN personae p ON u.IdUsrA = p.IdUsrA
+                LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
+                LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
+                LEFT JOIN departamentoe d ON d.IdInstitucion = u.IdInstitucion
+                    AND d.iddeptoA = CAST(NULLIF(NULLIF(TRIM(p.LabA), ''), 'null') AS UNSIGNED)
+                WHERE u.IdInstitucion = ? AND ($searchSql)";
+
+        $sqlCount = "SELECT COUNT(*) AS c $fromSql";
+        $stCount = $this->db->prepare($sqlCount);
+        $stCount->execute($paramsCount);
+        $total = (int) ($stCount->fetchColumn() ?: 0);
+
+        $selectSql = "SELECT 
+                    u.IdUsrA,
+                    u.UsrA as Usuario,
+                    p.NombreA,
+                    p.ApellidoA,
+                    p.CelularA,
+                    p.EmailA as Correo,
+                    p.LabA as iddeptoA,
+                    COALESCE(NULLIF(TRIM(d.NombreDeptoA), ''), NULLIF(TRIM(p.LabA), ''), '') AS Laboratorio,
+                    (SELECT COUNT(*)
+                    FROM formularioe f
+                    JOIN protformr pf ON f.idformA = pf.idformA
+                    JOIN protocoloexpe pe ON pf.idprotA = pe.idprotA
+                    WHERE f.IdUsrA = u.IdUsrA) as OtrosCeuaCount,
+                    (SELECT COUNT(*) FROM protocoloexpe WHERE IdUsrA = u.IdUsrA AND IdInstitucion = u.IdInstitucion) as ProtocolCount,
+                    COALESCE(a.ActivoA, 1) as ActivoA,
+                    t.IdTipousrA,
+                    (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
+                $fromSql
+                ORDER BY $orderExpr $sortDir, u.IdUsrA DESC
+                LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
+
+        $stData = $this->db->prepare($selectSql);
+        $stData->execute($paramsData);
+        $rows = $stData->fetchAll(PDO::FETCH_ASSOC);
+
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    /**
      * Usuario de login: minúsculas, sin espacios, [a-z0-9] inicial y luego [a-z0-9_-], 3–64 caracteres.
      */
     public function isValidUsernameFormat(string $user): bool {

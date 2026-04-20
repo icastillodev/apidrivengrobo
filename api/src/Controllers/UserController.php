@@ -31,8 +31,27 @@ class UserController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $users = $this->model->getUsersByInstitution($sesion['instId']);
-            echo json_encode(['status' => 'success', 'data' => $users]);
+            $instId = (int) ($sesion['instId'] ?? 0);
+            $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 0;
+            if ($limit > 0) {
+                $offset = isset($_GET['offset']) ? max(0, (int) $_GET['offset']) : 0;
+                $result = $this->model->getUsersByInstitutionPaged($instId, [
+                    'limit' => $limit,
+                    'offset' => $offset,
+                    'q' => isset($_GET['q']) ? (string) $_GET['q'] : '',
+                    'filter_col' => isset($_GET['filter_col']) ? (string) $_GET['filter_col'] : 'all',
+                    'sort_key' => isset($_GET['sort_key']) ? (string) $_GET['sort_key'] : 'IdUsrA',
+                    'sort_dir' => isset($_GET['sort_dir']) ? (string) $_GET['sort_dir'] : 'DESC',
+                ]);
+                echo json_encode([
+                    'status' => 'success',
+                    'data' => $result['rows'],
+                    'total' => $result['total'],
+                ]);
+            } else {
+                $users = $this->model->getUsersByInstitution($instId);
+                echo json_encode(['status' => 'success', 'data' => $users]);
+            }
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

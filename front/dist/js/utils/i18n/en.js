@@ -2425,6 +2425,7 @@ alojamientos: {
         bread_admin: "Admin",
         bread_gestion: "User Management",
         titulo: "User Directory",
+        cargando_lista: "Loading user directory…",
         filtrar: "Filter:",
         filter_todos: "ALL",
         filter_id: "ID",

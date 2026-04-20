@@ -16,6 +16,8 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedAnimalFromUrl = false;
+/** Mientras es true, el listado no usa spinner en tabla (solo loader global en la primera carga). */
+let animalesListBootLocked = false;
 
 function formatAnimalFechaPrecioRef(iso) {
     if (!iso || String(iso).trim() === '') return '—';
@@ -78,7 +80,8 @@ async function fetchAnimalRowById(idformA) {
 }
 
 async function fetchAnimalesList(opts = {}) {
-    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    if (animalesListBootLocked) loading = 'none';
     const tbody = document.getElementById('table-body-animals');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
@@ -117,6 +120,7 @@ function getI18nValue(path) {
  * INICIALIZACIÓN DE LA PÁGINA
  */
 export async function initAnimalesPage() {
+    animalesListBootLocked = true;
     try {
         showLoader({
             staticPhrase: window.txt?.admin_animales?.cargando_lista || 'Cargando pedidos…',
@@ -129,6 +133,9 @@ export async function initAnimalesPage() {
         ]);
         setupSortHeaders();
         await openAnimalFromUrlIfNeeded();
+        await new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
     } catch (error) {
         console.error('❌ Error:', error);
     } finally {
@@ -166,6 +173,8 @@ export async function initAnimalesPage() {
     document.getElementById('search-input-animal').onkeyup = (e) => {
         if (e.key === 'Enter') { currentPage = 1; fetchAnimalesList(); }
     };
+
+    animalesListBootLocked = false;
 }
 
 async function setupOriginInstitutionFilterAnimal() {

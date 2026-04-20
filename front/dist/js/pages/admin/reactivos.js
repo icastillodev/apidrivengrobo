@@ -18,6 +18,8 @@ const rowsPerPage = 15;
 let sortConfig = { key: 'idformA', direction: 'none' };
 let formDataCache = null;
 let openedReactivoFromUrl = false;
+/** Primera carga: sin spinner en tabla hasta terminar el arranque de la página. */
+let reactivosListBootLocked = false;
 
 window.composeMensajeReactivoInvestigador = async (idInvestigador, idformA) => {
     const id = parseInt(idInvestigador, 10);
@@ -103,7 +105,8 @@ async function fetchReactivoRowById(idformA) {
 }
 
 async function fetchReactivosList(opts = {}) {
-    const loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    if (reactivosListBootLocked) loading = 'none';
     const tbody = document.getElementById('table-body-reactivos');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
@@ -131,6 +134,7 @@ async function fetchReactivosList(opts = {}) {
  * 1. INICIALIZACIÓN DE PÁGINA DE REACTIVOS
  */
 export async function initReactivosPage() {
+    reactivosListBootLocked = true;
     // Blindaje de teclado para SweetAlert (evita que Bootstrap robe el foco)
     document.addEventListener('focusin', (e) => {
         if (e.target.closest(".swal2-container")) {
@@ -166,6 +170,9 @@ export async function initReactivosPage() {
                 if (data) window.openReactivoModal(data);
             }, 400);
         }
+        await new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
     } catch (error) {
         console.error("❌ Error crítico en API de Reactivos:", error);
     } finally {
@@ -189,6 +196,8 @@ export async function initReactivosPage() {
             if (e.key === 'Enter') { currentPage = 1; fetchReactivosList(); }
         };
     }
+
+    reactivosListBootLocked = false;
 }
 
 async function setupOriginInstitutionFilterReactivo() {

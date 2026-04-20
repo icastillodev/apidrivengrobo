@@ -2437,6 +2437,7 @@ export const es = {
         bread_admin: "Admin",
         bread_gestion: "Gestión Usuarios",
         titulo: "Directorio de Usuarios",
+        cargando_lista: "Cargando directorio de usuarios…",
         filtrar: "Filtrar:",
         filter_todos: "TODOS",
         filter_id: "ID",

@@ -5,13 +5,89 @@ import { Auth } from '../../auth.js';
 import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
+import { showLoader } from '../../components/LoaderComponent.js';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
 
-let allUsers = [];
+/** Filas de la página actual (servidor). */
+let pageUsers = [];
+/** Total de usuarios que cumplen filtros (servidor). */
+let totalUsuariosList = 0;
 let currentPage = 1;
 const rowsPerPage = 15;
-let sortConfig = { key: 'IdUsrA', direction: 'none' }; 
+let sortConfig = { key: 'IdUsrA', direction: 'none' };
+/** Primera carga: sin spinner en tabla; solo loader global. */
+let usuariosListBootLocked = false;
+
+function getSortApiParams() {
+    let key = sortConfig.key || 'IdUsrA';
+    let dir = 'DESC';
+    if (sortConfig.direction === 'asc') dir = 'ASC';
+    if (sortConfig.direction === 'desc') dir = 'DESC';
+    if (sortConfig.direction === 'none') {
+        key = 'IdUsrA';
+        dir = 'DESC';
+    }
+    return { sort_key: key, sort_dir: dir };
+}
+
+function buildUsersListQuery() {
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
+    const limit = rowsPerPage;
+    const offset = (currentPage - 1) * rowsPerPage;
+    const p = new URLSearchParams();
+    p.set('inst', instId);
+    p.set('limit', String(limit));
+    p.set('offset', String(offset));
+    const term = document.getElementById('search-input')?.value?.trim() || '';
+    const filterType = document.getElementById('filter-type')?.value || 'all';
+    if (term) p.set('q', term);
+    p.set('filter_col', filterType);
+    const { sort_key, sort_dir } = getSortApiParams();
+    p.set('sort_key', sort_key);
+    p.set('sort_dir', sort_dir);
+    return p;
+}
+
+async function fetchUsuariosList(opts = {}) {
+    const tbody = document.getElementById('table-body');
+    let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
+    if (usuariosListBootLocked) loading = 'none';
+    if (loading === 'inline' && tbody) {
+        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+    }
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
+    if (!instId) {
+        console.error('❌ Error crítico: No se identificó la institución en la sesión.');
+        return;
+    }
+    try {
+        const res = await API.request(`/users/institution?${buildUsersListQuery().toString()}`);
+        if (res?.status === 'success') {
+            if (typeof res.total === 'number') {
+                pageUsers = Array.isArray(res.data) ? res.data : [];
+                totalUsuariosList = res.total;
+            } else {
+                pageUsers = Array.isArray(res.data) ? res.data : [];
+                totalUsuariosList = pageUsers.length;
+            }
+            if (pageUsers.length === 0 && totalUsuariosList > 0 && currentPage > 1) {
+                currentPage = 1;
+                await fetchUsuariosList(opts);
+                return;
+            }
+            window.allUsers = pageUsers;
+            window._allUsersForRouter = pageUsers;
+            renderTable();
+        }
+    } catch (error) {
+        console.error('❌ Error cargando usuarios:', error);
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        }
+    }
+}
 
 function getFormPageByCategoria(categoria = '') {
     const cat = String(categoria || '').toLowerCase();
@@ -57,66 +133,58 @@ export async function initUsuariosPage() {
 
 async function _initUsuariosPage() {
     console.log('[usuarios] _initUsuariosPage inicio');
-    // 1. OBTENCIÓN ROBUSTA DE ID (Corrección del error null)
     const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
-    
-    console.log("🚀 Iniciando carga de usuarios para Inst:", instId);
-    
-    // Si no hay ID, detenemos para evitar llamada rota a la API
     if (!instId) {
-        console.error("❌ Error crítico: No se identificó la institución en la sesión.");
+        console.error('❌ Error crítico: No se identificó la institución en la sesión.');
         return;
     }
-    
-    try {
-        // Llamada a la API
-        const res = await API.request(`/users/institution?inst=${instId}`);
-        console.log("📦 Respuesta recibida:", res);
-        
-        if (res && res.status === 'success') {
-            // Guardamos y ordenamos los datos
-            allUsers = res.data.sort((a, b) => a.IdUsrA - b.IdUsrA);
-            
-            // Debug global
-            window.allUsers = allUsers; 
-            console.log("✅ Datos procesados. Total:", allUsers.length);
 
-            // Renderizado inicial
-            setupSortHeaders();
-            renderTable();
-        } else {
-            console.error("❌ La API no devolvió éxito:", res ? res.message : "Sin respuesta");
-        }
+    usuariosListBootLocked = true;
+    try {
+        showLoader({
+            staticPhrase: window.txt?.admin_usuarios?.cargando_lista || 'Cargando usuarios…',
+            subMessage: window.txt?.admin_animales?.cargando_lista_sub || 'Solo la página actual (no se descarga todo el directorio)',
+            upgradeOnly: true,
+        });
+        await fetchUsuariosList({ loading: 'none' });
+        setupSortHeaders();
+        await new Promise((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
     } catch (error) {
-        console.error("❌ Error crítico al inicializar página:", error);
+        console.error('❌ Error crítico al inicializar página:', error);
     }
 
-    // 2. CONFIGURACIÓN DE EVENTOS
-    // Buscador
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('search-input');
     if (btnSearch) {
         btnSearch.onclick = () => {
             currentPage = 1;
-            renderTable();
+            fetchUsuariosList();
         };
     }
     if (searchInput) {
         searchInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
                 currentPage = 1;
-                renderTable();
+                fetchUsuariosList();
             }
         });
     }
 
-    // Botón Excel
+    const filterType = document.getElementById('filter-type');
+    if (filterType) {
+        filterType.onchange = () => {
+            currentPage = 1;
+            fetchUsuariosList();
+        };
+    }
+
     const btnExcel = document.getElementById('btn-excel');
     if (btnExcel) {
         btnExcel.onclick = exportToExcel;
     }
 
-    // Delegación de clic para botones "Abrir formulario", "Abrir protocolo", "Abrir alojamiento" y "PDF" en la ficha (evita inyectar datos en onclick)
     const modalUser = document.getElementById('modal-user');
     if (modalUser) {
         modalUser.addEventListener('click', (e) => {
@@ -146,8 +214,8 @@ async function _initUsuariosPage() {
         });
     }
 
-    // Inicializar modal de ayuda
     initAyuda();
+    usuariosListBootLocked = false;
 }
 
 // --- LÓGICA DE TABLA Y FILTROS ---
@@ -171,65 +239,30 @@ function handleSort(key) {
         sortConfig.key = key;
         sortConfig.direction = 'desc';
     }
-    renderTable();
-}
-
-function getFilteredAndSortedData() {
-    const searchInput = document.getElementById('search-input');
-    const filterSelect = document.getElementById('filter-type');
-    
-    const term = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    const filterType = filterSelect ? filterSelect.value : 'all';
-
-    let data = allUsers.filter(u => {
-        if (!term) return true;
-
-        // Búsqueda general o por columna
-        const val = filterType === 'all'
-            ? `${u.Usuario} ${u.ApellidoA} ${u.NombreA} ${u.Correo}`.toLowerCase() 
-            : String(u[filterType] || '').toLowerCase();
-            
-        return val.includes(term);
-    });
-
-    if (sortConfig.direction === 'none') {
-        data.sort((a, b) => a.IdUsrA - b.IdUsrA);
-    } else {
-        data.sort((a, b) => {
-            let valA = a[sortConfig.key] || '';
-            let valB = b[sortConfig.key] || '';
-            return sortConfig.direction === 'asc' 
-                ? (typeof valA === 'string' ? valA.localeCompare(valB) : valA - valB)
-                : (typeof valA === 'string' ? valB.localeCompare(valA) : valB - valA);
-        });
-    }
-    return data;
+    currentPage = 1;
+    fetchUsuariosList();
 }
 
 function renderTable() {
     const tbody = document.getElementById('table-body');
     if (!tbody) return;
 
-    const data = getFilteredAndSortedData();
-    const pageData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-
+    const data = pageUsers;
     tbody.innerHTML = '';
     const colCount = 6;
 
-    if (pageData.length === 0) {
+    if (data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center py-4 text-muted">${(window.txt?.admin_usuarios?.empty_usuarios || 'No se encontraron usuarios')}</td></tr>`;
-        // IMPORTANTE: Incluso si no hay datos, debemos limpiar la paginación
-        const pagContainer = document.getElementById('pagination');
-        if(pagContainer) pagContainer.innerHTML = '';
+        renderPagination(totalUsuariosList, 'pagination', () => fetchUsuariosList());
         return;
     }
 
-    pageData.forEach(u => {
+    data.forEach((u) => {
         const tr = document.createElement('tr');
-        tr.className = "clickable-row";
+        tr.className = 'clickable-row';
         tr.onclick = () => openUserModal(u);
         const fullNombre = `${u.ApellidoA || ''} ${u.NombreA || ''}`.trim();
-        
+
         tr.innerHTML = `
             <td class="py-3 px-3">${u.IdUsrA}</td>
             <td class="py-3 px-3 text-muted">${u.Usuario || '-'}</td>
@@ -242,14 +275,7 @@ function renderTable() {
     });
 
     updateHeaderIcons();
-    
-    // ***************************************************
-    // FIX: PASAR ARGUMENTOS FALTANTES
-    // ***************************************************
-    renderPagination(data.length, 'pagination', renderTable);
-    
-    // Ocultamos el loader si existe (opcional pero recomendado)
-    if (typeof hideLoader === 'function') hideLoader();
+    renderPagination(totalUsuariosList, 'pagination', () => fetchUsuariosList());
 }
 function updateHeaderIcons() {
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
@@ -267,6 +293,7 @@ function updateHeaderIcons() {
 
 function renderPagination(totalRows, containerId, targetRenderTable) {
     const pagination = document.getElementById(containerId);
+    if (!pagination) return;
     const totalPages = Math.ceil(totalRows / rowsPerPage);
     pagination.innerHTML = '';
     if (totalPages <= 1) return;
@@ -482,8 +509,7 @@ window.saveUserData = async (id) => {
     
     if (res.status === 'success') {
         alert(window.txt?.admin_usuarios?.saved_ok || "¡Datos actualizados con éxito!");
-        // Refrescamos la tabla para que se vean los cambios
-        initUsuariosPage(); 
+        await fetchUsuariosList();
         
         // Cerramos el modal usando Bootstrap
         const modalEl = document.getElementById('modal-user');
@@ -587,7 +613,7 @@ window.deleteUser = async (id) => {
             const res = await API.request('/users/delete', 'POST', { id, password });
             if (res.status === 'success') {
                 alert(res.message || 'Usuario eliminado.');
-                initUsuariosPage();
+                await fetchUsuariosList();
             } else alert('Error: ' + (res.message || 'No se pudo eliminar'));
         } catch (e) {
             console.error(e);
@@ -629,7 +655,7 @@ window.deleteUser = async (id) => {
         const res = await API.request('/users/delete', 'POST', { id, password: formValues });
         if (res.status === 'success') {
             await Swal.fire('Listo', res.message || 'Usuario eliminado correctamente.', 'success');
-            initUsuariosPage();
+            await fetchUsuariosList();
             return;
         }
         const d = res.details || {};
@@ -771,7 +797,7 @@ window.confirmarEliminacionTotalAdmin = async function() {
             if (modalDelEl && bootstrap.Modal.getInstance(modalDelEl)) bootstrap.Modal.getInstance(modalDelEl).hide();
             adminDeletePreviewUserId = null;
             adminDeletePreviewData = null;
-            await initUsuariosPage();
+            await fetchUsuariosList();
             (window.mostrarNotificacion || alert)(t.delete_success || res.message);
         } else {
             (window.mostrarNotificacion || alert)(res.message || (t.delete_error || 'Error'));
@@ -958,13 +984,47 @@ window.downloadPDF = async (id, mode = 'total') => {
     }
 };
 
-function exportToExcel() {
-    const dataToExport = getFilteredAndSortedData();
-    const excelRows = dataToExport.map(u => ({ "ID": u.IdUsrA, "Usuario": u.Usuario, "Apellido": u.ApellidoA, "Nombre": u.NombreA, "Correo": u.Correo, "Laboratorio": u.Laboratorio }));
-    const worksheet = XLSX.utils.json_to_sheet(excelRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Usuarios");
-    XLSX.writeFile(workbook, `Reporte_Usuarios.xlsx`);
+async function exportToExcel() {
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
+    if (!instId) return;
+    const p = new URLSearchParams();
+    p.set('inst', instId);
+    p.set('limit', '5000');
+    p.set('offset', '0');
+    const term = document.getElementById('search-input')?.value?.trim() || '';
+    const filterType = document.getElementById('filter-type')?.value || 'all';
+    if (term) p.set('q', term);
+    p.set('filter_col', filterType);
+    const { sort_key, sort_dir } = getSortApiParams();
+    p.set('sort_key', sort_key);
+    p.set('sort_dir', sort_dir);
+    try {
+        const res = await API.request(`/users/institution?${p.toString()}`);
+        if (res?.status !== 'success' || !Array.isArray(res.data)) {
+            if (typeof window.Swal !== 'undefined') {
+                window.Swal.fire('Aviso', window.txt?.generales?.error_carga || 'No se pudo obtener el listado.', 'warning');
+            }
+            return;
+        }
+        const dataToExport = res.data;
+        const excelRows = dataToExport.map((u) => ({
+            ID: u.IdUsrA,
+            Usuario: u.Usuario,
+            Apellido: u.ApellidoA,
+            Nombre: u.NombreA,
+            Correo: u.Correo,
+            Laboratorio: u.Laboratorio,
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(excelRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Usuarios');
+        XLSX.writeFile(workbook, 'Reporte_Usuarios.xlsx');
+    } catch (e) {
+        console.error(e);
+        if (typeof window.Swal !== 'undefined') {
+            window.Swal.fire('Error', window.txt?.generales?.error_carga || 'Error al exportar.', 'error');
+        }
+    }
 }
 
 
