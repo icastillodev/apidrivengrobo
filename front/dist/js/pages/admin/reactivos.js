@@ -149,7 +149,7 @@ export async function initReactivosPage() {
         };
     }
     try {
-        showLoader({ upgradeOnly: true });
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
         await Promise.all([
             setupOriginInstitutionFilterReactivo(),
             fetchReactivosList({ loading: 'none' }),

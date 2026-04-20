@@ -121,7 +121,7 @@ export async function initInsumosPage() {
     }, true);
 
     try {
-        showLoader({ upgradeOnly: true });
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
         await Promise.all([
             setupOriginInstitutionFilterInsumo(),
             fetchInsumosList({ loading: 'none' }),

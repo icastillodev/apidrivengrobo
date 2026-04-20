@@ -58,6 +58,8 @@ export async function loadAlojamientos() {
         const hasGlobal = !!document.getElementById('global-loader');
         if (!hasGlobal) {
             showLoader();
+        } else {
+            showLoader({ upgradeOnly: true, staticPhrase: '' });
         }
         AlojamientoState.instId = resolveAlojamientosInstId();
         const rawInst = AlojamientoState.instId;

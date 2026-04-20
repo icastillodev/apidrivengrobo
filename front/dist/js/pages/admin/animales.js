@@ -122,7 +122,7 @@ function getI18nValue(path) {
 export async function initAnimalesPage() {
     animalesListBootLocked = true;
     try {
-        showLoader({ upgradeOnly: true });
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
         await Promise.all([
             setupOriginInstitutionFilterAnimal(),
             fetchAnimalesList({ loading: 'none' }),

@@ -141,7 +141,7 @@ async function _initUsuariosPage() {
 
     usuariosListBootLocked = true;
     try {
-        showLoader({ upgradeOnly: true });
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
         await fetchUsuariosList({ loading: 'none' });
         setupSortHeaders();
         await new Promise((resolve) => {
