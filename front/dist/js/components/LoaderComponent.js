@@ -32,7 +32,26 @@ const LOADER_PHRASES = {
         'Todo listo para investigar',
         'Haciendo un poco de magia de laboratorio',
         'Conectando los equipos',
-        'Alineando las pipetas'
+        'Alineando las pipetas',
+        'Calibrando las balanzas',
+        'Preparando la dieta especial',
+        'Buscando las llaves del bioterio',
+        'Leyendo el último protocolo',
+        'Poniendo música relajante',
+        'Esperando que se seque el piso',
+        'Alimentando a los pequeños',
+        'Conversando con los investigadores',
+        'Chequeando los filtros de aire',
+        'Acomodando los estantes',
+        'Preparando las etiquetas nuevas',
+        'Sacando brillo a las mesadas',
+        'Actualizando el censo diario',
+        'Armando el kit quirúrgico',
+        'Contando los días del experimento',
+        'Recibiendo las muestras',
+        'Cambiando el chip a modo investigación',
+        'Abriendo los manuales de procedimiento',
+        'Cargando de energía el laboratorio'
     ],
     en: [
         'Getting to work',
@@ -57,7 +76,26 @@ const LOADER_PHRASES = {
         'All set to research',
         'Doing a bit of lab magic',
         'Connecting the equipment',
-        'Aligning the pipettes'
+        'Aligning the pipettes',
+        'Calibrating the scales',
+        'Prepping the special diet',
+        'Looking for the vivarium keys',
+        'Reading the latest protocol',
+        'Playing some relaxing music',
+        'Waiting for the floor to dry',
+        'Feeding the little ones',
+        'Chatting with researchers',
+        'Checking the air filters',
+        'Arranging the shelves',
+        'Printing the new labels',
+        'Polishing the benches',
+        'Updating the daily census',
+        'Assembling the surgical kit',
+        'Counting experiment days',
+        'Receiving the samples',
+        'Switching to research mode',
+        'Opening procedure manuals',
+        'Powering up the lab'
     ],
     pt: [
         'Começando os trabalhos',
@@ -82,7 +120,26 @@ const LOADER_PHRASES = {
         'Tudo pronto para pesquisar',
         'Fazendo um pouco de mágica de laboratório',
         'Conectando os equipamentos',
-        'Alinhando as pipetas'
+        'Alinhando as pipetas',
+        'Calibrando as balanças',
+        'Preparando a dieta especial',
+        'Procurando as chaves do biotério',
+        'Lendo o último protocolo',
+        'Colocando uma música relaxante',
+        'Esperando o chão secar',
+        'Alimentando os pequeninos',
+        'Conversando com os pesquisadores',
+        'Checando os filtros de ar',
+        'Arrumando as prateleiras',
+        'Imprimindo as novas etiquetas',
+        'Limpando as bancadas',
+        'Atualizando o censo diário',
+        'Montando o kit cirúrgico',
+        'Contando os dias do experimento',
+        'Recebendo as amostras',
+        'Mudando para o modo pesquisa',
+        'Abrindo os manuais de procedimento',
+        'Dando energia ao laboratório'
     ]
 };
 
@@ -158,7 +215,7 @@ function startPhraseRotation(loaderEl) {
     phraseTextEl.textContent = queue[idx % queue.length];
     if (subEl) subEl.style.color = '#888';
 
-    const holdMs = 3200;
+    const holdMs = 5000;
     const genAtMount = loaderPhraseGen;
 
     phraseIntervalId = window.setInterval(() => {
@@ -265,18 +322,17 @@ export function showLoader(opts = {}) {
                 flex-direction: row;
                 align-items: center;
                 justify-content: center;
-                flex-wrap: wrap;
-                gap: 8px 10px;
+                flex-wrap: nowrap;
+                white-space: nowrap;
+                gap: 8px;
                 margin-top: 22px;
-                max-width: min(92vw, 440px);
+                max-width: 95vw;
                 padding: 0 18px;
                 box-sizing: border-box;
-                min-height: 3em;
+                min-height: 2em;
             }
             .gecko-loader-phrase-wrap {
-                flex: 1 1 200px;
-                min-width: 0;
-                text-align: center;
+                text-align: right;
             }
             .gecko-loader-phrase-text {
                 display: inline-block;
@@ -286,10 +342,16 @@ export function showLoader(opts = {}) {
                 letter-spacing: 0.1em;
                 text-transform: uppercase;
                 font-family: sans-serif;
-                line-height: 1.4;
+                white-space: nowrap;
                 will-change: opacity;
             }
             .gecko-loader-progress {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;

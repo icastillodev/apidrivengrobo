@@ -198,18 +198,19 @@ class ReactivoModel {
             $countSql = "SELECT COUNT(DISTINCT f.idformA) AS __cnt
                 FROM formularioe f
                 {$redCfgJoin}
-                INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 LEFT JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
-                LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 {$ownerJoin}
-                {$currentInstJoin}
                 {$originJoin}
+                " . ($filterAppend ? "
+                INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
+                LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
                 LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
                 LEFT JOIN sexoe sex ON f.idformA = sex.idformA
+                " : "") . "
                 WHERE {$whereInst} 
                 {$legacyCopyExclusion}
                 AND (" . self::sqlPredicadoFormularioReactivo('t') . " {$derivDestinoAndClause} {$derivOrigenAndClause})

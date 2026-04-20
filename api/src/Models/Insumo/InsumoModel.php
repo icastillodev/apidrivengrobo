@@ -160,8 +160,11 @@ class InsumoModel {
             $countSql = "SELECT COUNT(DISTINCT f.idformA) AS __cnt
                 FROM formularioe f
                 {$redCfgJoin}
-                INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 LEFT JOIN tipoformularios t ON {$tipoExpr} = t.IdTipoFormulario
+                {$ownerJoin}
+                {$originJoin}
+                " . ($filterAppend ? "
+                INNER JOIN personae p ON f.IdUsrA = p.IdUsrA
                 LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
@@ -169,9 +172,7 @@ class InsumoModel {
                 LEFT JOIN departamentoe pdpto ON pd.iddeptoA = pdpto.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
-                {$ownerJoin}
-                {$currentInstJoin}
-                {$originJoin}
+                " : "") . "
                 WHERE {$whereInst} {$legacyCopyExclusion} AND (t.categoriaformulario = 'insumos' {$derivDestinoAndClause} {$derivOrigenAndClause})
                 {$filterAppend}";
             $stmtCnt = $this->db->prepare($countSql);

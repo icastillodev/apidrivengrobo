@@ -222,20 +222,18 @@ class AnimalModel {
                 FROM formularioe f
                 {$redCfgJoin}
                 LEFT JOIN tipoformularios tf ON {$tipoExpr} = tf.IdTipoFormulario
+                {$ownerJoin}
+                {$currentInstJoin}
+                {$originJoin}
+                " . ($filterAppend ? "
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
                 LEFT JOIN subespecie se ON {$subespExpr} = se.idsubespA 
                 LEFT JOIN especiee e ON se.idespA = e.idespA
                 LEFT JOIN cepa c ON {$cepaExpr} = c.idcepaA
-                {$ownerJoin}
-                {$currentInstJoin}
-                {$originJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe d ON COALESCE({$deptoExpr}, pd.iddeptoA) = d.iddeptoA
-                LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
-                LEFT JOIN sexoe s ON f.idformA = s.idformA
-                LEFT JOIN precioformulario pfx ON f.idformA = pfx.idformA
+                " : "") . "
                 WHERE {$whereInst} 
                   {$legacyCopyExclusion}
                   AND (tf.categoriaformulario IN ('Animal', 'Animal vivo') {$derivDestinoAndClause} {$derivOrigenAndClause})
