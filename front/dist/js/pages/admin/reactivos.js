@@ -9,6 +9,7 @@ import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 
 let allReactivos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -60,10 +61,12 @@ function buildReactivosListQuery(extra = {}) {
     const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
     const p = new URLSearchParams();
     p.set('inst', instId);
-    p.set('limit', String(limit));
-    p.set('offset', String(offset));
+    if (!extra.fullLoad) {
+        p.set('limit', String(limit));
+        p.set('offset', String(offset));
+    }
     Object.keys(extra).forEach((k) => {
-        if (k === 'limit' || k === 'offset') return;
+        if (k === 'limit' || k === 'offset' || k === 'fullLoad') return;
         if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
     });
     const status = document.getElementById('filter-status-reactivo')?.value || 'all';
@@ -84,6 +87,8 @@ function buildReactivosListQuery(extra = {}) {
     p.set('sort_dir', sort_dir);
     return p;
 }
+
+const reactivosPageCacheApi = createAdminListPageCache(rowsPerPage, buildReactivosListQuery, '/reactivos/all');
 
 function getSortApiParams() {
     let key = sortConfig.key || 'idformA';
@@ -107,13 +112,22 @@ async function fetchReactivoRowById(idformA) {
 async function fetchReactivosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (reactivosListBootLocked) loading = 'none';
+
+    const prefetchGen = reactivosPageCacheApi.syncFiltersKey();
+
+    if (reactivosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
+        allReactivos = reactivosPageCacheApi.pageCache.get(currentPage);
+        renderTableBody(allReactivos);
+        return;
+    }
+
     const tbody = document.getElementById('table-body-reactivos');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
         tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
-        const res = await API.request(`/reactivos/all?${buildReactivosListQuery().toString()}`);
+        const res = await reactivosPageCacheApi.fetchPage(currentPage);
         if (res?.status === 'success') {
             if (typeof res.total === 'number') {
                 allReactivos = Array.isArray(res.data) ? res.data : [];
@@ -122,7 +136,12 @@ async function fetchReactivosList(opts = {}) {
                 allReactivos = Array.isArray(res.data) ? res.data : [];
                 totalReactivosList = allReactivos.length;
             }
-            renderTableBody();
+            reactivosPageCacheApi.pageCache.set(currentPage, [...allReactivos]);
+            renderTableBody(allReactivos);
+
+            if (!opts.skipFullLoad && totalReactivosList > rowsPerPage) {
+                reactivosPageCacheApi.schedulePrefetchAround(totalReactivosList, currentPage, prefetchGen);
+            }
         }
     } catch (e) {
         console.error('❌ Error cargando reactivos:', e);
@@ -990,6 +1009,7 @@ window.downloadReactivoPDF = async (id) => {
  */
 async function syncAllData() {
     await setupOriginInstitutionFilterReactivo();
+    reactivosPageCacheApi.bustPages();
     await fetchReactivosList();
     refreshMenuNotifications();
 }
@@ -1007,10 +1027,19 @@ window.adminDeleteFormularioReactivo = async (idformA) => {
     });
 };
 
-function renderTableBody() {
+function renderTableBody(pageDataOverride = null) {
     const tbody = document.getElementById('table-body-reactivos');
     if (!tbody) return;
-    const data = allReactivos;
+
+    let data = [];
+    if (pageDataOverride) {
+        data = pageDataOverride;
+    } else if (reactivosPageCacheApi.pageCache.has(currentPage)) {
+        data = reactivosPageCacheApi.pageCache.get(currentPage);
+    } else {
+        data = allReactivos;
+    }
+
     const t = window.txt.reactivos; // Alias corto
 
     tbody.innerHTML = '';

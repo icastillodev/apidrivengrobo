@@ -28,7 +28,7 @@ class InsumoFormularioModel {
         $stmtIns = $this->db->prepare("SELECT idInsumo, NombreInsumo, CantidadInsumo, TipoInsumo, PrecioInsumo FROM insumo WHERE IdInstitucion = ? AND Existencia != 2 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);
 
-        // 4. Protocolos vigentes (para flujo nuevo por protocolo)
+        // 4. Protocolos: institución (+ red aprobada); excluye vencidos y cupo de animales agotado (CantidadAniA <= 0).
         $stmtProt = $this->db->prepare("
             SELECT DISTINCT
                 p.idprotA,
@@ -51,21 +51,10 @@ class InsumoFormularioModel {
             LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
             LEFT JOIN protdeptor pd ON p.idprotA = pd.idprotA
             LEFT JOIN departamentoe d ON d.iddeptoA = COALESCE(pr.iddeptoA, pd.iddeptoA, p.departamento)
-            WHERE p.FechaFinProtA >= CURDATE()
+            WHERE NOT (p.FechaFinProtA IS NOT NULL AND p.FechaFinProtA < CURDATE())
+              AND NOT (p.CantidadAniA IS NOT NULL AND p.CantidadAniA <= 0)
               AND (
-                (
-                    p.IdInstitucion = ?
-                    AND (
-                        NOT EXISTS (
-                            SELECT 1 FROM solicitudprotocolo s0
-                            WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
-                        )
-                        OR EXISTS (
-                            SELECT 1 FROM solicitudprotocolo s1
-                            WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
-                        )
-                    )
-                )
+                (p.IdInstitucion = ?)
                 OR
                 (
                     pi.IdInstitucion = ?

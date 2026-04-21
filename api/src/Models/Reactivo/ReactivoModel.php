@@ -414,24 +414,14 @@ class ReactivoModel {
     }
 
     public function getAvailableProtocols($instId) {
+        // Listado: todos los de la institución (y red aprobada) excepto vencidos y saldo de animales agotado (CantidadAniA <= 0).
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA
                 FROM protocoloexpe p
                 LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
-                WHERE p.FechaFinProtA >= CURDATE()
+                WHERE NOT (p.FechaFinProtA IS NOT NULL AND p.FechaFinProtA < CURDATE())
+                  AND NOT (p.CantidadAniA IS NOT NULL AND p.CantidadAniA <= 0)
                   AND (
-                    (
-                        p.IdInstitucion = ?
-                        AND (
-                            NOT EXISTS (
-                                SELECT 1 FROM solicitudprotocolo s0
-                                WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
-                            )
-                            OR EXISTS (
-                                SELECT 1 FROM solicitudprotocolo s1
-                                WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
-                            )
-                        )
-                    )
+                    (p.IdInstitucion = ?)
                     OR
                     (
                         pi.IdInstitucion = ?
@@ -752,6 +742,7 @@ class ReactivoModel {
         $stmtUser->execute([$userId]);
         $userEmail = $stmtUser->fetchColumn();
 
+        // Misma regla que getAvailableProtocols: sin vencidos ni cupo de animales agotado (CantidadAniA <= 0).
         $stmtProt = $this->db->prepare("SELECT DISTINCT
                                             p.idprotA, p.nprotA, p.tituloA,
                                             p.IdInstitucion as OwnerInstId,
@@ -768,21 +759,10 @@ class ReactivoModel {
                                         LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
                                         LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
                                         LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
-                                        WHERE p.FechaFinProtA >= CURDATE()
+                                        WHERE NOT (p.FechaFinProtA IS NOT NULL AND p.FechaFinProtA < CURDATE())
+                                          AND NOT (p.CantidadAniA IS NOT NULL AND p.CantidadAniA <= 0)
                                           AND (
-                                            (
-                                                p.IdInstitucion = ?
-                                                AND (
-                                                    NOT EXISTS (
-                                                        SELECT 1 FROM solicitudprotocolo s0
-                                                        WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
-                                                    )
-                                                    OR EXISTS (
-                                                        SELECT 1 FROM solicitudprotocolo s1
-                                                        WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
-                                                    )
-                                                )
-                                            )
+                                            (p.IdInstitucion = ?)
                                             OR
                                             (
                                                 pi.IdInstitucion = ?
@@ -796,9 +776,8 @@ class ReactivoModel {
                                                 )
                                             )
                                           )
-                                          AND COALESCE(pr.IdUsrA, p.IdUsrA) = ?
                                         ORDER BY p.nprotA DESC");
-        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId, (int)$userId]);
+        $stmtProt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
 
         $stmtIns = $this->db->prepare("SELECT IdInsumoexp, NombreInsumo, PrecioInsumo, CantidadInsumo, TipoInsumo FROM insumoexperimental WHERE IdInstitucion = ? AND habilitado = 1 ORDER BY NombreInsumo ASC");
         $stmtIns->execute([$instId]);

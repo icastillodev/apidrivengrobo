@@ -49,12 +49,12 @@ class UserModel {
      * @return array{rows: array<int, array<string,mixed>>, total: int}
      */
     public function getUsersByInstitutionPaged(int $instId, array $opts): array {
-        $limit = isset($opts['limit']) ? (int) $opts['limit'] : 15;
-        if ($limit < 1) {
-            $limit = 15;
+        $limit = isset($opts['limit']) ? (int) $opts['limit'] : 0;
+        if ($limit < 0) {
+            $limit = 0;
         }
-        if ($limit > 5000) {
-            $limit = 5000;
+        if ($limit > 10000) {
+            $limit = 10000;
         }
         $offset = isset($opts['offset']) ? max(0, (int) $opts['offset']) : 0;
         $q = isset($opts['q']) ? trim((string) $opts['q']) : '';
@@ -158,8 +158,11 @@ class UserModel {
                     t.IdTipousrA,
                     (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
                 $fromSql
-                ORDER BY $orderExpr $sortDir, u.IdUsrA DESC
-                LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
+                ORDER BY $orderExpr $sortDir, u.IdUsrA DESC";
+        
+        if ((int)$limit > 0) {
+            $selectSql .= " LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
+        }
 
         $stData = $this->db->prepare($selectSql);
         $stData->execute($paramsData);

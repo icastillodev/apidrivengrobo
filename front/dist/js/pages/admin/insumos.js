@@ -5,6 +5,7 @@ import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 
 let allInsumos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -45,10 +46,12 @@ function buildInsumosListQuery(extra = {}) {
     const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
     const p = new URLSearchParams();
     p.set('inst', instId);
-    p.set('limit', String(limit));
-    p.set('offset', String(offset));
+    if (!extra.fullLoad) {
+        p.set('limit', String(limit));
+        p.set('offset', String(offset));
+    }
     Object.keys(extra).forEach((k) => {
-        if (k === 'limit' || k === 'offset') return;
+        if (k === 'limit' || k === 'offset' || k === 'fullLoad') return;
         if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
     });
     const status = document.getElementById('filter-status-insumo')?.value || 'all';
@@ -77,6 +80,8 @@ function buildInsumosListQuery(extra = {}) {
     return p;
 }
 
+const insumosPageCacheApi = createAdminListPageCache(rowsPerPage, buildInsumosListQuery, '/insumos/all');
+
 async function fetchInsumoRowById(idformA) {
     const instId = localStorage.getItem('instId');
     const res = await API.request(`/insumos/all?inst=${instId}&idformA=${encodeURIComponent(idformA)}&limit=1&offset=0`);
@@ -87,13 +92,22 @@ async function fetchInsumoRowById(idformA) {
 async function fetchInsumosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (insumosListBootLocked) loading = 'none';
+
+    const prefetchGen = insumosPageCacheApi.syncFiltersKey();
+
+    if (insumosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
+        allInsumos = insumosPageCacheApi.pageCache.get(currentPage);
+        renderTableBody(allInsumos);
+        return;
+    }
+
     const tbody = document.getElementById('table-body-insumos');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
         tbody.innerHTML = `<tr><td colspan="11" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
-        const res = await API.request(`/insumos/all?${buildInsumosListQuery().toString()}`);
+        const res = await insumosPageCacheApi.fetchPage(currentPage);
         if (res?.status === 'success') {
             if (typeof res.total === 'number') {
                 allInsumos = Array.isArray(res.data) ? res.data : [];
@@ -102,7 +116,12 @@ async function fetchInsumosList(opts = {}) {
                 allInsumos = Array.isArray(res.data) ? res.data : [];
                 totalInsumosList = allInsumos.length;
             }
-            renderTableBody();
+            insumosPageCacheApi.pageCache.set(currentPage, [...allInsumos]);
+            renderTableBody(allInsumos);
+
+            if (!opts.skipFullLoad && totalInsumosList > rowsPerPage) {
+                insumosPageCacheApi.schedulePrefetchAround(totalInsumosList, currentPage, prefetchGen);
+            }
         }
     } catch (e) {
         console.error('Error cargando insumos:', e);
@@ -210,6 +229,7 @@ async function openInsumoFromUrlIfNeeded() {
 
 async function syncAllInsumosData() {
     await setupOriginInstitutionFilterInsumo();
+    insumosPageCacheApi.bustPages();
     await fetchInsumosList();
     refreshMenuNotifications();
 }
@@ -230,11 +250,19 @@ window.adminDeleteFormularioInsumo = async (idformA) => {
 /**
  * 3. RENDERIZADO DE TABLA Y PAGINACIÓN
  */
-function renderTableBody() {
+function renderTableBody(pageDataOverride = null) {
     const tbody = document.getElementById('table-body-insumos');
     if (!tbody) return;
 
-    const data = allInsumos;
+    let data = [];
+    if (pageDataOverride) {
+        data = pageDataOverride;
+    } else if (insumosPageCacheApi.pageCache.has(currentPage)) {
+        data = insumosPageCacheApi.pageCache.get(currentPage);
+    } else {
+        data = allInsumos;
+    }
+    
     tbody.innerHTML = '';
 
     if (!data.length) {
@@ -762,6 +790,7 @@ window.updateInsumoStatusQuick = async (id) => {
             }
             const porInst = (row && Number(row.DerivadoActivo || 0) === 1 && (row.InstitucionActualNombre || '').trim()) ? row.InstitucionActualNombre.trim() : undefined;
             if (badgeContainer) badgeContainer.innerHTML = getStatusBadge(status, porInst);
+            insumosPageCacheApi.bustPages();
             await fetchInsumosList();
         } else {
             const title = window.txt?.misformularios?.derivacion_actualizar_formulario || 'Actualizar formulario para la aplicación';
@@ -832,6 +861,7 @@ window.resolveDerivacionInsumo = async (action, idDerivacion, idformA) => {
         const res = await API.request(endpoint, 'POST', { idDerivacion, mensaje, instId: Number(instActiva || 0) });
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Acción aplicada.', 'success');
+            insumosPageCacheApi.bustPages();
             await fetchInsumosList();
             const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
             if (f) window.openInsumoModal(f);
@@ -903,6 +933,7 @@ window.deriveFromAdminInsumo = async (idformA) => {
         });
         if (res.status === 'success') {
             window.Swal.fire('OK', tx.derivar_ok || 'Formulario derivado correctamente.', 'success');
+            insumosPageCacheApi.bustPages();
             await fetchInsumosList();
             const f = allInsumos.find(x => Number(x.idformA) === Number(idformA));
             if (f) window.openInsumoModal(f);

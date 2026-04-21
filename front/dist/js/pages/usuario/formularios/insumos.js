@@ -174,8 +174,7 @@ function setupProtocolSearch() {
     input.addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase().trim();
         if (term.length < 1) {
-            list.innerHTML = '';
-            list.classList.add('d-none');
+            renderList(protocolosList);
             return;
         }
         const filtered = protocolosList.filter(p =>
@@ -187,8 +186,17 @@ function setupProtocolSearch() {
     });
 
     input.addEventListener('focus', () => {
-        list.innerHTML = '';
-        list.classList.add('d-none');
+        if (input.value.trim() === '') {
+            renderList(protocolosList);
+        } else {
+            const term = input.value.toLowerCase().trim();
+            const filtered = protocolosList.filter(p =>
+                String(p.nprotA || '').toLowerCase().includes(term) ||
+                String(p.tituloA || '').toLowerCase().includes(term) ||
+                String(p.ResponsableName || p.Responsable || '').toLowerCase().includes(term)
+            );
+            renderList(filtered);
+        }
     });
 
     document.addEventListener('click', (e) => {

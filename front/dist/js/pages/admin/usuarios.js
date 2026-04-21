@@ -11,6 +11,7 @@ console.log('[usuarios.js] módulo cargado (parse OK)');
 
 /** Filas de la página actual (servidor). */
 let pageUsers = [];
+let pageUsersFull = null; // Guardará todos los datos en memoria
 /** Total de usuarios que cumplen filtros (servidor). */
 let totalUsuariosList = 0;
 let currentPage = 1;
@@ -31,14 +32,16 @@ function getSortApiParams() {
     return { sort_key: key, sort_dir: dir };
 }
 
-function buildUsersListQuery() {
+function buildUsersListQuery(extra = {}) {
     const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
-    const limit = rowsPerPage;
-    const offset = (currentPage - 1) * rowsPerPage;
+    const limit = extra.limit != null ? extra.limit : rowsPerPage;
+    const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
     const p = new URLSearchParams();
     p.set('inst', instId);
-    p.set('limit', String(limit));
-    p.set('offset', String(offset));
+    if (!extra.fullLoad) {
+        p.set('limit', String(limit));
+        p.set('offset', String(offset));
+    }
     const term = document.getElementById('search-input')?.value?.trim() || '';
     const filterType = document.getElementById('filter-type')?.value || 'all';
     if (term) p.set('q', term);
@@ -53,6 +56,12 @@ async function fetchUsuariosList(opts = {}) {
     const tbody = document.getElementById('table-body');
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (usuariosListBootLocked) loading = 'none';
+
+    if (pageUsersFull && !opts.forceServer) {
+        renderTable();
+        return;
+    }
+
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
@@ -79,7 +88,13 @@ async function fetchUsuariosList(opts = {}) {
             }
             window.allUsers = pageUsers;
             window._allUsersForRouter = pageUsers;
-            renderTable();
+            renderTable(pageUsers);
+
+            if (!opts.skipFullLoad && totalUsuariosList > rowsPerPage) {
+                triggerFullLoad();
+            } else if (totalUsuariosList <= rowsPerPage) {
+                pageUsersFull = pageUsers;
+            }
         }
     } catch (error) {
         console.error('❌ Error cargando usuarios:', error);
@@ -87,6 +102,16 @@ async function fetchUsuariosList(opts = {}) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
         }
     }
+}
+
+function triggerFullLoad() {
+    const q = buildUsersListQuery({ fullLoad: true });
+    API.request(`/users/institution?${q.toString()}`).then(res => {
+        if (res?.status === 'success') {
+            pageUsersFull = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+            totalUsuariosList = pageUsersFull.length;
+        }
+    }).catch(e => console.error("Error bg load usuarios:", e));
 }
 
 function getFormPageByCategoria(categoria = '') {
@@ -156,6 +181,7 @@ async function _initUsuariosPage() {
     if (btnSearch) {
         btnSearch.onclick = () => {
             currentPage = 1;
+            pageUsersFull = null;
             fetchUsuariosList();
         };
     }
@@ -163,6 +189,7 @@ async function _initUsuariosPage() {
         searchInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
                 currentPage = 1;
+                pageUsersFull = null;
                 fetchUsuariosList();
             }
         });
@@ -172,6 +199,7 @@ async function _initUsuariosPage() {
     if (filterType) {
         filterType.onchange = () => {
             currentPage = 1;
+            pageUsersFull = null;
             fetchUsuariosList();
         };
     }
@@ -236,14 +264,24 @@ function handleSort(key) {
         sortConfig.direction = 'desc';
     }
     currentPage = 1;
+    pageUsersFull = null;
     fetchUsuariosList();
 }
 
-function renderTable() {
+function renderTable(pageDataOverride = null) {
     const tbody = document.getElementById('table-body');
     if (!tbody) return;
 
-    const data = pageUsers;
+    let data = [];
+    if (pageDataOverride) {
+        data = pageDataOverride;
+    } else if (pageUsersFull) {
+        const start = (currentPage - 1) * rowsPerPage;
+        data = pageUsersFull.slice(start, start + rowsPerPage);
+    } else {
+        data = pageUsers;
+    }
+
     tbody.innerHTML = '';
     const colCount = 6;
 

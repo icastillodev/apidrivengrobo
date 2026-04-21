@@ -46,10 +46,23 @@ class AnimalModel {
             ? "LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen"
             : "";
         $hasDerivEstadoCols = $this->hasTable('formulario_derivacion') && $this->hasColumn('formulario_derivacion', 'estado_origen');
-        $derivEstadoSelect = $hasDerivEstadoCols
-            ? ", (SELECT fd2.estado_origen FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_origen,
-               (SELECT fd2.estado_destino FROM formulario_derivacion fd2 WHERE fd2.idformA = f.idformA ORDER BY fd2.IdFormularioDerivacion DESC LIMIT 1) as estado_destino"
-            : "";
+        // Última derivación por formulario (una sola pasada; evita 2 subconsultas correlacionadas por fila).
+        $derivEstadoJoin = '';
+        $derivEstadoSelect = '';
+        if ($hasDerivEstadoCols) {
+            $derivEstadoJoin = "
+                LEFT JOIN (
+                    SELECT x.idformA, x.estado_origen, x.estado_destino
+                    FROM formulario_derivacion x
+                    INNER JOIN (
+                        SELECT idformA, MAX(IdFormularioDerivacion) AS idmx
+                        FROM formulario_derivacion
+                        GROUP BY idformA
+                    ) xm ON xm.idformA = x.idformA AND xm.idmx = x.IdFormularioDerivacion
+                ) fd_last ON fd_last.idformA = f.idformA
+            ";
+            $derivEstadoSelect = ', fd_last.estado_origen, fd_last.estado_destino';
+        }
         $hasRedCfgCols = $this->hasTable('formulario_derivacion')
             && $this->hasColumn('formulario_derivacion', 'tipoA_destino')
             && $this->hasColumn('formulario_derivacion', 'depto_destino')
@@ -172,24 +185,15 @@ class AnimalModel {
                     COALESCE(s.indistintoA, 0) as indistintoA, COALESCE(s.totalA, 0) as CantAnimal,
                     COALESCE(pfx.precioanimalmomento, se.Psubanimal) as PrecioUnit,
                     pfx.fechaIniForm as FechaPrecioReferencia,
-                    (
-                        SELECT 
-                            CASE 
-                                WHEN d2.externodepto = 2 OR (d2.externodepto IS NULL AND o2.externoorganismo = 2) THEN 2
-                                ELSE 1
-                            END
-                        FROM protformr pf2
-                        JOIN protocoloexpe px2 ON pf2.idprotA = px2.idprotA
-                        LEFT JOIN protdeptor pd2 ON px2.idprotA = pd2.idprotA
-                        LEFT JOIN departamentoe d2 ON COALESCE(f.depto, pd2.iddeptoA) = d2.iddeptoA
-                        LEFT JOIN organismoe o2 ON d2.organismopertenece = o2.IdOrganismo
-                        WHERE pf2.idformA = f.idformA
-                        LIMIT 1
-                    ) as DeptoExternoFlag
+                    (CASE
+                        WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2
+                        ELSE 1
+                    END) as DeptoExternoFlag
                     {$legacyDerivSelect}
                     {$derivEstadoSelect}
                 FROM formularioe f
                 {$redCfgJoin}
+                {$derivEstadoJoin}
                 LEFT JOIN tipoformularios tf ON {$tipoExpr} = tf.IdTipoFormulario
                 INNER JOIN personae pe ON f.IdUsrA = pe.IdUsrA
                 LEFT JOIN subespecie se ON {$subespExpr} = se.idsubespA 
@@ -447,7 +451,7 @@ class AnimalModel {
             'Edad' => 'f.edadA',
             'Peso' => 'f.pesoA',
             'CantAnimal' => 's.totalA',
-            'DeptoExternoFlag' => 'f.idformA',
+            'DeptoExternoFlag' => '(CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END)',
             'Inicio' => 'f.fechainicioA',
             'Retiro' => 'f.fecRetiroA',
             'estado' => 'f.estado',
@@ -1103,7 +1107,7 @@ public function updateStatus($data) {
         $stmtConfig->execute([$instId]);
         $config = $stmtConfig->fetch(\PDO::FETCH_ASSOC);
 
-        // B. Protocolos
+        // B. Protocolos: sin vencidos ni cupo de animales agotado (CantidadAniA <= 0); NULL en fecha/cupo no cuenta como vencido ni agotado.
         $sql = "SELECT DISTINCT
                     p.idprotA, p.nprotA, p.tituloA,
                     p.IdInstitucion as OwnerInstId,
@@ -1120,22 +1124,10 @@ public function updateStatus($data) {
                 LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
                 LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
                 LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
-                WHERE p.FechaFinProtA >= CURDATE()
-                  AND p.CantidadAniA > 0
+                WHERE NOT (p.FechaFinProtA IS NOT NULL AND p.FechaFinProtA < CURDATE())
+                  AND NOT (p.CantidadAniA IS NOT NULL AND p.CantidadAniA <= 0)
                   AND (
-                    (
-                        p.IdInstitucion = ?
-                        AND (
-                            NOT EXISTS (
-                                SELECT 1 FROM solicitudprotocolo s0
-                                WHERE s0.idprotA = p.idprotA AND s0.TipoPedido = 1
-                            )
-                            OR EXISTS (
-                                SELECT 1 FROM solicitudprotocolo s1
-                                WHERE s1.idprotA = p.idprotA AND s1.TipoPedido = 1 AND s1.Aprobado = 1
-                            )
-                        )
-                    )
+                    (p.IdInstitucion = ?)
                     OR
                     (
                         pi.IdInstitucion = ?
@@ -1149,10 +1141,9 @@ public function updateStatus($data) {
                         )
                     )
                   )
-                  AND COALESCE(pr.IdUsrA, p.IdUsrA) = ?
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId, (int)$userId]);
+        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId]);
         
         // C. Email Usuario
         $stmtUser = $this->db->prepare("SELECT EmailA FROM personae WHERE IdUsrA = ?");

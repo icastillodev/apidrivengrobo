@@ -243,8 +243,7 @@ function setupSearch() {
     const handleInput = () => {
         const term = input.value.toLowerCase().trim();
         if (term.length < 1) {
-            list.innerHTML = '';
-            list.classList.add('d-none');
+            renderList(protocolsList);
             return;
         }
         const filtered = protocolsList.filter(p => {

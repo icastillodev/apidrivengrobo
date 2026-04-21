@@ -7,6 +7,7 @@ import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -35,10 +36,12 @@ function buildAnimalesListQuery(extra = {}) {
     const offset = extra.offset != null ? extra.offset : (currentPage - 1) * rowsPerPage;
     const p = new URLSearchParams();
     p.set('inst', instId);
-    p.set('limit', String(limit));
-    p.set('offset', String(offset));
+    if (!extra.fullLoad) {
+        p.set('limit', String(limit));
+        p.set('offset', String(offset));
+    }
     Object.keys(extra).forEach((k) => {
-        if (k === 'limit' || k === 'offset') return;
+        if (k === 'limit' || k === 'offset' || k === 'fullLoad') return;
         if (extra[k] != null && extra[k] !== '') p.set(k, String(extra[k]));
     });
     const status = document.getElementById('filter-status-animal')?.value || 'all';
@@ -72,6 +75,8 @@ function getSortApiParams() {
     return { sort_key: key, sort_dir: dir };
 }
 
+const animalesPageCacheApi = createAdminListPageCache(rowsPerPage, buildAnimalesListQuery, '/animals/all');
+
 async function fetchAnimalRowById(idformA) {
     const instId = localStorage.getItem('instId');
     const res = await API.request(`/animals/all?inst=${instId}&idformA=${encodeURIComponent(idformA)}&limit=1&offset=0`);
@@ -82,13 +87,22 @@ async function fetchAnimalRowById(idformA) {
 async function fetchAnimalesList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (animalesListBootLocked) loading = 'none';
+
+    const prefetchGen = animalesPageCacheApi.syncFiltersKey();
+
+    if (animalesPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
+        allAnimals = animalesPageCacheApi.pageCache.get(currentPage);
+        renderTableBody(allAnimals);
+        return;
+    }
+
     const tbody = document.getElementById('table-body-animals');
     if (loading === 'inline' && tbody) {
         const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
         tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     try {
-        const res = await API.request(`/animals/all?${buildAnimalesListQuery().toString()}`);
+        const res = await animalesPageCacheApi.fetchPage(currentPage);
         if (res?.status === 'success') {
             if (typeof res.total === 'number') {
                 allAnimals = Array.isArray(res.data) ? res.data : [];
@@ -97,7 +111,12 @@ async function fetchAnimalesList(opts = {}) {
                 allAnimals = Array.isArray(res.data) ? res.data : [];
                 totalAnimalesList = allAnimals.length;
             }
-            renderTableBody();
+            animalesPageCacheApi.pageCache.set(currentPage, [...allAnimals]);
+            renderTableBody(allAnimals);
+
+            if (!opts.skipFullLoad && totalAnimalesList > rowsPerPage) {
+                animalesPageCacheApi.schedulePrefetchAround(totalAnimalesList, currentPage, prefetchGen);
+            }
         }
     } catch (e) {
         console.error('❌ Error cargando animales:', e);
@@ -216,6 +235,7 @@ async function openAnimalFromUrlIfNeeded() {
  */
 async function syncAllData() {
     await setupOriginInstitutionFilterAnimal();
+    animalesPageCacheApi.bustPages();
     await fetchAnimalesList();
     refreshMenuNotifications();
 }
@@ -301,19 +321,29 @@ function updateHeaderIcons() {
     });
 }
 
-function renderTableBody() {
+function renderTableBody(pageDataOverride = null) {
     const tbody = document.getElementById('table-body-animals');
     if (!tbody) return;
 
     tbody.innerHTML = '';
-    if (!allAnimals.length) {
+    
+    let pageData = [];
+    if (pageDataOverride) {
+        pageData = pageDataOverride;
+    } else if (animalesPageCacheApi.pageCache.has(currentPage)) {
+        pageData = animalesPageCacheApi.pageCache.get(currentPage);
+    } else {
+        pageData = allAnimals;
+    }
+
+    if (!pageData.length) {
         tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
         updateHeaderIcons();
         renderPagination(totalAnimalesList, 'pagination-animal', () => fetchAnimalesList());
         return;
     }
 
-    allAnimals.forEach((a) => {
+    pageData.forEach((a) => {
         const tr = document.createElement('tr');
         tr.className = "clickable-row";
         tr.onclick = () => window.openAnimalModal(a);
