@@ -133,42 +133,146 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         return $rows;
     }
 
-// 1. ALOJAMIENTOS: Ajustado el alias y preparado para el nombre de la estructura
+// 1. ALOJAMIENTOS: periodos facturables (excluye tramos en stand by: CantidadCaja = 0)
     public function getAlojamientosProtocolo($idProt, $desde = null, $hasta = null) {
-        $sql = "SELECT MAX(a.IdAlojamiento) as last_id, a.historia, MAX(e.EspeNombreA) as especie, 
-                MAX(COALESCE(ta.NombreTipoAlojamiento, 'Estructura')) as caja, 
-                MAX(a.PrecioCajaMomento) as p_caja,
-                MAX(a.CantidadCaja) as cant_caja,
-                MIN(a.fechavisado) as fecha_inicio, MAX(IFNULL(a.hastafecha, CURDATE())) as fecha_fin,
-                SUM(DATEDIFF(IFNULL(a.hastafecha, CURDATE()), a.fechavisado)) as dias, 
-                SUM(a.cuentaapagar) as total_guardado,
-                SUM(a.totalpago) as pagado, MAX(p.IdUsrA) as IdUsrA,
-                MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as TitularProtocolo
-                FROM alojamiento a 
+        $sql = "SELECT a.IdAlojamiento, a.historia, a.fechavisado, a.hastafecha, a.finalizado,
+                a.CantidadCaja, a.PrecioCajaMomento, a.cuentaapagar, a.totalpago,
+                e.EspeNombreA as especie,
+                COALESCE(ta.NombreTipoAlojamiento, 'Estructura') as caja
+                FROM alojamiento a
                 LEFT JOIN especiee e ON a.TipoAnimal = e.idespA
                 LEFT JOIN tipoalojamiento ta ON a.IdTipoAlojamiento = ta.IdTipoAlojamiento
-                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA 
-                LEFT JOIN personae u ON p.IdUsrA = u.IdUsrA
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 WHERE a.idprotA = ? AND a.historia IS NOT NULL";
-        
-        $params = [$idProt];
-        if ($desde && $hasta) { $sql .= " AND a.fechavisado BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
-        $sql .= " GROUP BY a.historia";
-        
-        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        foreach ($rows as &$r) {
-            $dias = (int)$r['dias'];
-            $precio = (float)$r['p_caja'];
-            $cant = (int)$r['cant_caja'];
-            $totalCalc = $dias * $precio * $cant;
-            
-            $r['total'] = (float)$r['total_guardado'] > 0 ? (float)$r['total_guardado'] : $totalCalc;
-            $r['pagado'] = (float)$r['pagado'];
-            $r['debe'] = max(0, $r['total'] - $r['pagado']);
-            $r['periodo'] = date("d/m", strtotime($r['fecha_inicio'])) . " - " . date("d/m", strtotime($r['fecha_fin']));
+        $params = [$idProt];
+        if ($desde && $hasta) {
+            $sql .= " AND a.fechavisado BETWEEN ? AND ?";
+            array_push($params, $desde, $hasta);
         }
-        return $rows;
+        $sql .= " ORDER BY a.historia ASC, a.fechavisado ASC, a.IdAlojamiento ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $all = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $byHist = [];
+        foreach ($all as $row) {
+            $h = (int) ($row['historia'] ?? 0);
+            if ($h <= 0) {
+                continue;
+            }
+            if (!isset($byHist[$h])) {
+                $byHist[$h] = [];
+            }
+            $byHist[$h][] = $row;
+        }
+
+        $hoy = date('Y-m-d');
+        $stmtT = $this->db->prepare("SELECT p.IdUsrA, CONCAT(u.ApellidoA, ', ', u.NombreA) as TitularProtocolo
+                FROM protocoloexpe p LEFT JOIN personae u ON p.IdUsrA = u.IdUsrA
+                WHERE p.idprotA = ? LIMIT 1");
+        $stmtT->execute([(int) $idProt]);
+        $trProt = $stmtT->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $idUsrTit = isset($trProt['IdUsrA']) ? (int) $trProt['IdUsrA'] : null;
+        $titularProt = (string) ($trProt['TitularProtocolo'] ?? '');
+
+        $out = [];
+        foreach ($byHist as $historia => $rows) {
+            $lastId = 0;
+            $sumCuenta = 0.0;
+            $sumPagado = 0.0;
+            $sumCalc = 0.0;
+            $especie = '';
+            $caja = '';
+
+            $payRanges = [];
+            $n = count($rows);
+            for ($i = 0; $i < $n; $i++) {
+                $r = $rows[$i];
+                $lastId = max($lastId, (int) ($r['IdAlojamiento'] ?? 0));
+                $sumCuenta += (float) ($r['cuentaapagar'] ?? 0);
+                $sumPagado = max($sumPagado, (float) ($r['totalpago'] ?? 0));
+
+                if (!empty($r['especie'])) {
+                    $especie = (string) $r['especie'];
+                }
+                if (!empty($r['caja'])) {
+                    $caja = (string) $r['caja'];
+                }
+
+                $qty = (int) ($r['CantidadCaja'] ?? 0);
+                $precio = (float) ($r['PrecioCajaMomento'] ?? 0);
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $next = $rows[$i + 1] ?? null;
+                if ($next !== null) {
+                    $end = (string) ($next['fechavisado'] ?? '');
+                } elseif ((int) ($r['finalizado'] ?? 0) === 1 && !empty($r['hastafecha'])) {
+                    $end = (string) $r['hastafecha'];
+                } else {
+                    $end = $hoy;
+                }
+                $start = (string) ($r['fechavisado'] ?? '');
+                if ($start === '' || $end === '') {
+                    continue;
+                }
+                $tsS = strtotime($start);
+                $tsE = strtotime($end);
+                if ($tsS === false || $tsE === false) {
+                    continue;
+                }
+                $dias = max(0, (int) floor(($tsE - $tsS) / 86400));
+                $sumCalc += $dias * $precio * $qty;
+                $payRanges[] = [
+                    'desde' => $start,
+                    'hasta' => $end,
+                    'dias' => $dias,
+                ];
+            }
+
+            $totalGuardado = $sumCuenta;
+            $total = $totalGuardado > 0 ? $totalGuardado : $sumCalc;
+            $pagado = $sumPagado;
+            $debe = max(0, $total - $pagado);
+
+            $diasPay = 0;
+            foreach ($payRanges as $pr) {
+                $diasPay += (int) ($pr['dias'] ?? 0);
+            }
+
+            $parts = [];
+            foreach ($payRanges as $pr) {
+                $d0 = date('d/m/Y', strtotime($pr['desde']));
+                $d1 = date('d/m/Y', strtotime($pr['hasta']));
+                $parts[] = $d0 . ' – ' . $d1;
+            }
+            $periodoTxt = $parts !== [] ? implode('; ', $parts) : '-';
+
+            $fechaInicioRes = $payRanges !== [] ? (string) $payRanges[0]['desde'] : null;
+            $fechaFinRes = $payRanges !== [] ? (string) $payRanges[count($payRanges) - 1]['hasta'] : null;
+
+            $out[] = [
+                'last_id' => $lastId,
+                'historia' => $historia,
+                'especie' => $especie !== '' ? $especie : '-',
+                'caja' => $caja !== '' ? $caja : 'Estructura',
+                'total' => $total,
+                'pagado' => $pagado,
+                'debe' => $debe,
+                'dias' => $diasPay,
+                'fecha_inicio' => $fechaInicioRes,
+                'fecha_fin' => $fechaFinRes,
+                'periodo' => $periodoTxt,
+                'periodos_facturables' => $payRanges,
+                'IdUsrA' => $idUsrTit,
+                'TitularProtocolo' => $titularProt,
+            ];
+        }
+
+        return $out;
     }
 
 // 2. INSUMOS POR DEPARTAMENTO: Matemática detallada en el texto
@@ -925,12 +1029,21 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     COALESCE(tf_dest.categoriaformulario, tf.categoriaformulario, ffd.tipo_formulario, '-') as categoria,
                     CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador_solicitante,
                     CONCAT(COALESCE(po.NombreA, ''), ' ', COALESCE(po.ApellidoA, '')) as investigador_origen_pedido,
-                    CONCAT(COALESCE(pd.NombreA, ''), ' ', COALESCE(pd.ApellidoA, '')) as investigador_responsable_destino
+                    CONCAT(COALESCE(pd.NombreA, ''), ' ', COALESCE(pd.ApellidoA, '')) as investigador_responsable_destino,
+                    d_o.NombreDeptoA AS depto_original_form,
+                    pe_o.nprotA AS nprot_original_form,
+                    pe_o.tituloA AS titulo_protocolo_original,
+                    TRIM(CONCAT(COALESCE(in_o.NombreA, ''), ' ', COALESCE(in_o.ApellidoA, ''))) AS inv_original_form
                 FROM facturacion_formulario_derivado ffd
                 LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
                 LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
                 LEFT JOIN formularioe f ON f.idformA = ffd.idformA
                 LEFT JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion
+                LEFT JOIN formularioe fo ON fo.idformA = COALESCE(NULLIF(fd.idformAOrigen, 0), ffd.idformA)
+                LEFT JOIN departamentoe d_o ON d_o.iddeptoA = fo.depto
+                LEFT JOIN protformr pf_o ON pf_o.idformA = fo.idformA
+                LEFT JOIN protocoloexpe pe_o ON pe_o.idprotA = pf_o.idprotA
+                LEFT JOIN personae in_o ON in_o.IdUsrA = fo.IdUsrA
                 LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA AND tf.IdInstitucion = COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)
                 LEFT JOIN tipoformularios tf_dest ON tf_dest.IdTipoFormulario = fd.tipoA_destino AND tf_dest.IdInstitucion = ffd.IdInstitucionCobradora
                 LEFT JOIN personae p ON p.IdUsrA = ffd.IdUsrSolicitante
@@ -988,6 +1101,21 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             $inicial = $orig !== '' ? $orig : $sol;
             $invInst = $dest !== '' ? $dest : '-';
 
+            $io = trim((string) ($r['institucion_solicitante'] ?? ''));
+            $sufOrigen = $io !== '' ? ' (' . $io . ')' : '';
+            $deptoO = trim((string) ($r['depto_original_form'] ?? ''));
+            $nprotO = trim((string) ($r['nprot_original_form'] ?? ''));
+            $titO = trim((string) ($r['titulo_protocolo_original'] ?? ''));
+            $invO = trim((string) ($r['inv_original_form'] ?? ''));
+            $protoLine = $nprotO;
+            if ($titO !== '') {
+                $protoLine = ($protoLine !== '' ? $protoLine . ' — ' : '') . $titO;
+            }
+            $protoLine = trim((string) $protoLine);
+            if ($invO === '') {
+                $invO = $inicial;
+            }
+
             $item = [
                 'idFacturacionDerivada' => (int)$r['IdFacturacionFormularioDerivado'],
                 'idformA' => (int)$r['idformA'],
@@ -1007,7 +1135,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 'investigadorInicial' => $inicial !== '' ? $inicial : '-',
                 'investigadorInstitucion' => $invInst,
                 'institucionOrigen' => trim((string)($r['institucion_solicitante'] ?? '')) !== '' ? trim((string)$r['institucion_solicitante']) : '-',
-                'institucionDestino' => trim((string)($r['institucion_cobradora'] ?? '')) !== '' ? trim((string)$r['institucion_cobradora']) : '-'
+                'institucionDestino' => trim((string)($r['institucion_cobradora'] ?? '')) !== '' ? trim((string)$r['institucion_cobradora']) : '-',
+                'departamentoPedidoOriginal' => ($deptoO !== '' ? $deptoO : '-') . $sufOrigen,
+                'protocoloPedidoOriginal' => ($protoLine !== '' ? $protoLine : '-') . $sufOrigen,
+                'investigadorPedidoOriginal' => ($invO !== '' ? $invO : '-') . $sufOrigen
             ];
 
             $out['instituciones'][$idInstSol]['items'][] = $item;

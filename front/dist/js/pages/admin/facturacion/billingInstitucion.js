@@ -22,16 +22,6 @@ function tInvPdf() {
     return window.txt?.facturacion?.billing_investigador || {};
 }
 
-/** PDF/Excel: ambos investigadores en derivación institucional. */
-function textoInvestigadoresDerivadosItem(item) {
-    const t = window.txt?.facturacion?.billing_institucion || {};
-    const ini = String(item.investigadorInicial || item.investigador || '-').trim();
-    const inst = String(item.investigadorInstitucion != null ? item.investigadorInstitucion : '-').trim();
-    const li = t.excel_lbl_inv_inicial || t.lbl_inv_pedido_inicial || 'Pedido inicial:';
-    const ld = t.excel_lbl_inv_inst || t.lbl_inv_institucion || 'Inst. destino:';
-    return `${li} ${ini} | ${ld} ${inst}`;
-}
-
 export async function initBillingInstitucion() {
     const hoy = new Date();
     const fDesde = document.getElementById('f-desde-inst');
@@ -195,8 +185,9 @@ async function renderResultadosInstitucion(data) {
                                     <th style="width:3%"><input type="checkbox" class="check-all-inst" data-inst="${inst.idInstitucionSolicitante}"></th>
                                     <th style="width:5%">ID</th>
                                     <th style="width:8%">${t.facturacion?.filtro_estado_cobro || 'ESTADO'}</th>
-                                    <th style="width:14%">${tf('th_investigadores_derivacion', t.generales?.investigador || 'INVESTIGADORES')}</th>
-                                    <th style="width:14%">${t.facturacion?.col_instituciones_derivado || 'INSTITUCIONES'}</th>
+                                    <th style="width:12%">${tf('th_depto_pedido_orig', 'Departamento (pedido origen)')}</th>
+                                    <th style="width:14%">${tf('th_proto_pedido_orig', 'Protocolo (pedido origen)')}</th>
+                                    <th style="width:12%">${tf('th_inv_pedido_orig', 'Investigador (pedido origen)')}</th>
                                     <th style="width:10%">${t.generales?.especie || 'TIPO'}</th>
                                     <th style="width:14%">${t.facturacion?.col_formulario || 'DETALLE'}</th>
                                     <th style="width:8%">${t.facturacion?.total || 'TOTAL'}</th>
@@ -291,15 +282,6 @@ async function hydrateInvestigadoresSaldosInst(instituciones) {
     }
 }
 
-function htmlInvestigadoresDerivadosCell(item) {
-    const tx = window.txt?.facturacion?.billing_institucion || {};
-    const ini = escapeHtml(item.investigadorInicial || item.investigador || '-');
-    const inst = escapeHtml(item.investigadorInstitucion != null && String(item.investigadorInstitucion).trim() !== '' ? item.investigadorInstitucion : '-');
-    const lblI = escapeHtml(tx.lbl_inv_pedido_inicial || 'Pedido inicial:');
-    const lblD = escapeHtml(tx.lbl_inv_institucion || 'Institución (destino):');
-    return `<div class="small text-start ps-2"><div class="mb-1"><span class="text-muted">${lblI}</span> <span class="fw-bold">${ini}</span></div><div><span class="text-muted">${lblD}</span> <span class="fw-bold">${inst}</span></div></div>`;
-}
-
 function renderTipoSectionRows(grouped, fmt, inst, t) {
     const sections = [
         { key: 'animal', label: getTipoSectionLabel('animal', t) },
@@ -311,7 +293,7 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
     sections.forEach((section) => {
         const list = grouped[section.key] || [];
         if (!list.length) return;
-        rows.push(`<tr class="table-secondary"><td colspan="11" class="text-start fw-bold uppercase" style="font-size:10px; letter-spacing:.5px;">${escapeHtml(section.label)}</td></tr>`);
+        rows.push(`<tr class="table-secondary"><td colspan="12" class="text-start fw-bold uppercase" style="font-size:10px; letter-spacing:.5px;">${escapeHtml(section.label)}</td></tr>`);
         list.forEach((item) => {
             const debe = parseFloat(item.montoDebe || 0);
             const estadoBadge = estadoWorkflowCell(item, t);
@@ -326,8 +308,9 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
                     <td><input type="checkbox" class="check-item-inst" data-inst="${inst.idInstitucionSolicitante}" data-id="${idFact}" data-idusr="${idInv}" data-monto="${debe}" ${chkDisabled}></td>
                     <td class="small text-muted fw-bold">#${item.idformA}</td>
                     <td>${estadoBadge}</td>
-                    <td class="align-top">${htmlInvestigadoresDerivadosCell(item)}</td>
-                    <td class="small text-start ps-2" title="${escapeHtml((item.institucionOrigen || '') + ' → ' + (item.institucionDestino || ''))}">${escapeHtml((item.institucionOrigen || '-') + ' → ' + (item.institucionDestino || '-'))}</td>
+                    <td class="small text-start align-top">${escapeHtml(item.departamentoPedidoOriginal || '-')}</td>
+                    <td class="small text-start align-top">${escapeHtml(item.protocoloPedidoOriginal || '-')}</td>
+                    <td class="small text-start align-top">${escapeHtml(item.investigadorPedidoOriginal || '-')}</td>
                     <td class="small text-secondary">${escapeHtml(item.nombreTipo || getTipoSectionLabel(tipoKey, t) || '-')}</td>
                     <td class="text-start ps-3 small">${escapeHtml(item.nombreTipo || item.categoria || '-')}</td>
                     <td class="text-end fw-bold text-dark">${fmt(item.montoTotal)}</td>
@@ -586,12 +569,14 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
         doc.setFont('helvetica', 'normal'); doc.text(`#${item.idformA}`, 50, M + 22);
         doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_institucion', 'Institución:'), M, M + 28);
         doc.setFont('helvetica', 'normal'); doc.text(inst.institucion || '-', 50, M + 28);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_inv_inicial', 'Pedido inicial:'), M, M + 34);
-        doc.setFont('helvetica', 'normal'); doc.text(item.investigadorInicial || item.investigador || '-', 52, M + 34);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_inv_institucion', 'Institución (destino):'), M, M + 40);
-        doc.setFont('helvetica', 'normal'); doc.text(item.investigadorInstitucion || '-', 52, M + 40);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, M + 46);
-        doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, M + 46);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_depto_orig', 'Departamento (pedido):'), M, M + 34);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.departamentoPedidoOriginal || '-').substring(0, 95), 52, M + 34);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_proto_orig', 'Protocolo (pedido):'), M, M + 40);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.protocoloPedidoOriginal || '-').substring(0, 95), 52, M + 40);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_inv_orig', 'Investigador (pedido):'), M, M + 46);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.investigadorPedidoOriginal || '-').substring(0, 95), 52, M + 46);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, M + 52);
+        doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, M + 52);
         const tp = tInvPdf();
         const tm = window.txt?.facturacion?.billing_modal || {};
         const exL = tp.pdf_monto_exento || 'Exento';
@@ -603,9 +588,9 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
             exL
         );
         doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
-        doc.text(tm.pdf_control_fin || 'CONTROL FINANCIERO', M, M + 54);
+        doc.text(tm.pdf_control_fin || 'CONTROL FINANCIERO', M, M + 60);
         doc.autoTable({
-            startY: M + 56,
+            startY: M + 62,
             margin: { left: M, right: M },
             head: [[
                 tp.pdf_col_precio || 'Precio',
@@ -648,7 +633,9 @@ window.downloadInstItemPDF = async (idInstSol) => {
 
         const tp = tInvPdf();
         const hId = tp.pdf_col_id || 'ID';
-        const hInv = tf('excel_inv', 'Investigador');
+        const hDep = tf('th_depto_pedido_orig', 'Depto. origen');
+        const hProt = tf('th_proto_pedido_orig', 'Protocolo');
+        const hInvO = tf('th_inv_pedido_orig', 'Investigador');
         const hTipo = tf('excel_tipo', 'Tipo');
         const hPrecio = tp.pdf_col_precio || 'Precio';
         const hDeb = tp.pdf_col_debe || 'Debe';
@@ -667,18 +654,29 @@ window.downloadInstItemPDF = async (idInstSol) => {
             const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
             return [
                 `#${i.idformA}`,
-                textoInvestigadoresDerivadosItem(i),
-                (i.nombreTipo || i.categoria || '-').substring(0, 40),
+                String(i.departamentoPedidoOriginal || '-').substring(0, 32),
+                String(i.protocoloPedidoOriginal || '-').substring(0, 36),
+                String(i.investigadorPedidoOriginal || '-').substring(0, 28),
+                (i.nombreTipo || i.categoria || '-').substring(0, 28),
                 m[0], m[1], m[2]
             ];
         });
 
         doc.autoTable({
             startY: M + 24, margin: { left: M, right: M },
-            head: [[hId, hInv, hTipo, hPrecio, hDeb, hPagTot]],
+            head: [[hId, hDep, hProt, hInvO, hTipo, hPrecio, hDeb, hPagTot]],
             body, theme: 'grid', headStyles: { fillColor: violeta },
-            styles: { fontSize: 8 },
-            columnStyles: { 2: { cellWidth: 60 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+            styles: { fontSize: 7 },
+            columnStyles: {
+                0: { cellWidth: 14 },
+                1: { cellWidth: 28 },
+                2: { cellWidth: 32 },
+                3: { cellWidth: 28 },
+                4: { cellWidth: 24 },
+                5: { halign: 'right' },
+                6: { halign: 'right' },
+                7: { halign: 'right', fontStyle: 'bold' }
+            }
         });
 
         const ti = inst.totales || {};
@@ -725,7 +723,9 @@ window.downloadInstGlobalPDF = async () => {
         const gen = window.txt?.generales || {};
         const f = window.txt?.facturacion || {};
         const hId = tp.pdf_col_id || 'ID';
-        const hInv = tf('excel_inv', 'Investigador');
+        const hDep = tf('th_depto_pedido_orig', 'Depto. origen');
+        const hProt = tf('th_proto_pedido_orig', 'Protocolo');
+        const hInvO = tf('th_inv_pedido_orig', 'Investigador');
         const hTipo = tf('excel_tipo', 'Tipo');
         const hPrecio = tp.pdf_col_precio || 'Precio';
         const hDeb = tp.pdf_col_debe || 'Debe';
@@ -758,16 +758,20 @@ window.downloadInstGlobalPDF = async () => {
             const body = (inst.items || []).map(i => {
                 const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
                 return [
-                    `#${i.idformA}`, textoInvestigadoresDerivadosItem(i), (i.nombreTipo || i.categoria || '-').substring(0, 35),
+                    `#${i.idformA}`,
+                    String(i.departamentoPedidoOriginal || '-').substring(0, 28),
+                    String(i.protocoloPedidoOriginal || '-').substring(0, 32),
+                    String(i.investigadorPedidoOriginal || '-').substring(0, 26),
+                    (i.nombreTipo || i.categoria || '-').substring(0, 24),
                     m[0], m[1], m[2]
                 ];
             });
             if (body.length) {
                 doc.autoTable({
                     startY: currentY, margin: { left: M, right: M },
-                    head: [[hId, hInv, hTipo, hPrecio, hDeb, hPagTot]],
+                    head: [[hId, hDep, hProt, hInvO, hTipo, hPrecio, hDeb, hPagTot]],
                     body, theme: 'grid', headStyles: { fillColor: violeta },
-                    styles: { fontSize: 7 }
+                    styles: { fontSize: 6.5 }
                 });
                 currentY = doc.lastAutoTable.finalY + 8;
             }
@@ -820,7 +824,9 @@ window.exportExcelInstGlobal = () => {
     const slug = getInstSlugArchivo();
     const kInst = tf('excel_inst', 'Institución');
     const kId = tf('excel_id_form', 'ID Formulario');
-    const kInv = tf('excel_inv', 'Investigador');
+    const kDep = tf('th_depto_pedido_orig', 'Departamento (pedido origen)');
+    const kProt = tf('th_proto_pedido_orig', 'Protocolo (pedido origen)');
+    const kInv = tf('th_inv_pedido_orig', 'Investigador (pedido origen)');
     const kTipo = tf('excel_tipo', 'Tipo');
     const kCat = tf('excel_categoria', 'Categoría');
     const kTot = tf('excel_total', 'Total');
@@ -833,7 +839,9 @@ window.exportExcelInstGlobal = () => {
             dataMatrix.push({
                 [kInst]: inst.institucion || '-',
                 [kId]: item.idformA,
-                [kInv]: textoInvestigadoresDerivadosItem(item),
+                [kDep]: item.departamentoPedidoOriginal || '-',
+                [kProt]: item.protocoloPedidoOriginal || '-',
+                [kInv]: item.investigadorPedidoOriginal || '-',
                 [kTipo]: item.nombreTipo || item.categoria || '-',
                 [kCat]: item.categoria || '-',
                 [kTot]: parseFloat(item.montoTotal || 0),
