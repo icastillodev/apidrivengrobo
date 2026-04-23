@@ -162,7 +162,7 @@ class StatisticsModel {
             $pInstF, [$from, $to],
             $pInstF, [$from, $to],
             [$instId],
-            [$instId, $instId]
+            [$instId]
         );
         $stmtG->execute($paramsG);
         $res['globales'] = $stmtG->fetch(\PDO::FETCH_ASSOC);
@@ -528,64 +528,59 @@ class StatisticsModel {
     }
 
     /**
-     * Columna física madre del grupo (MadreGrupo o madre_grupo según la BD).
+     * Valor de columna madre del grupo leyendo la fila con claves en cualquier casing (PDO/MariaDB).
      */
-    private function resolveMadreGrupoPhysicalColumn(): ?string {
-        static $loaded = false;
-        static $value = null;
-        if ($loaded) {
-            return $value;
-        }
-        $loaded = true;
-        try {
-            $stmt = $this->db->query('SHOW COLUMNS FROM `institucion`');
-            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-            foreach ($rows as $r) {
-                $field = (string)($r['Field'] ?? '');
-                if ($field !== '' && strcasecmp($field, 'MadreGrupo') === 0) {
-                    $value = $field;
-
-                    return $value;
-                }
+    private function pickMadreGrupoFromInstitucionRow(array $row): int {
+        foreach ($row as $k => $v) {
+            if (!\is_string($k)) {
+                continue;
             }
-            foreach ($rows as $r) {
-                $field = (string)($r['Field'] ?? '');
-                if ($field !== '' && strcasecmp($field, 'madre_grupo') === 0) {
-                    $value = $field;
-
-                    return $value;
-                }
+            if (preg_match('/^madre(_?grupo)?$/i', $k)) {
+                return (int) $v;
             }
-        } catch (\Throwable $e) {
-            $value = null;
         }
 
-        return $value;
+        return 0;
+    }
+
+    private function pickStringFromRowCi(array $row, string $name): string {
+        foreach ($row as $k => $v) {
+            if (\is_string($k) && strcasecmp($k, $name) === 0) {
+                return trim((string) $v);
+            }
+        }
+
+        return '';
     }
 
     /**
-     * Devuelve flags para estadísticas de red/grupo: MadreGrupo (expuesto como madre_grupo en JSON)
-     * y DependenciaInstitucion (expuesto como red para compatibilidad con el front).
+     * Devuelve flags para estadísticas de red/grupo: madre_grupo y red/dependencia_grupo siempre en camel/snake esperado por el front.
      */
     public function getInstitutionFlags($instId) {
-        $mgCol = $this->resolveMadreGrupoPhysicalColumn();
-        if ($mgCol !== null && preg_match('/^[a-zA-Z0-9_]+$/', $mgCol)) {
-            $stmt = $this->db->prepare("SELECT COALESCE(`{$mgCol}`, 0) as madre_grupo, TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
-        } else {
-            $stmt = $this->db->prepare("SELECT TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
+        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $stmt->execute([(int) $instId]);
+        $full = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$full) {
+            return [
+                'madre_grupo' => 0,
+                'red' => '',
+                'dependencia_grupo' => '',
+                'NombreInst' => '',
+                'instituciones_en_red' => 0,
+            ];
         }
-        $stmt->execute([$instId]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$row) {
-            return ['madre_grupo' => 0, 'red' => '', 'NombreInst' => '', 'instituciones_en_red' => 0];
-        }
-        if (!array_key_exists('madre_grupo', $row)) {
-            $row['madre_grupo'] = 0;
-        }
-        $row['madre_grupo'] = (int) $row['madre_grupo'];
+        $mg = $this->pickMadreGrupoFromInstitucionRow($full);
+        $dep = $this->pickStringFromRowCi($full, 'DependenciaInstitucion');
+        $nombre = $this->pickStringFromRowCi($full, 'NombreInst');
         $ids = $this->getInstitutionIdsInNetwork($instId);
-        $row['instituciones_en_red'] = count($ids);
-        return $row;
+
+        return [
+            'madre_grupo' => $mg,
+            'red' => $dep,
+            'dependencia_grupo' => $dep,
+            'NombreInst' => $nombre,
+            'instituciones_en_red' => \count($ids),
+        ];
     }
 
     /**
@@ -605,8 +600,8 @@ class StatisticsModel {
             return [$instId];
         }
         if ($hasRedCol) {
-            $red = ($row['red'] ?? '') !== '' ? $row['red'] : null;
-            if ($red !== null) {
+            $red = $this->pickStringFromRowCi($row, 'red');
+            if ($red !== '') {
                 $stmt2 = $this->db->prepare('SELECT IdInstitucion FROM institucion WHERE TRIM(COALESCE(red, \'\')) = ?');
                 $stmt2->execute([$red]);
                 $ids = $stmt2->fetchAll(\PDO::FETCH_COLUMN);
@@ -614,8 +609,8 @@ class StatisticsModel {
                 return $ids ?: [$instId];
             }
         }
-        $dep = ($row['dep'] ?? '') !== '' ? $row['dep'] : null;
-        if ($dep !== null) {
+        $dep = $this->pickStringFromRowCi($row, 'dep');
+        if ($dep !== '') {
             $stmt3 = $this->db->prepare("
                 SELECT i.IdInstitucion FROM institucion i
                 INNER JOIN institucion mi ON mi.IdInstitucion = ?

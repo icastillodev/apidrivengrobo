@@ -28,15 +28,11 @@ class InstitucionModel {
             $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
             foreach ($rows as $r) {
                 $field = (string)($r['Field'] ?? '');
-                if ($field !== '' && strcasecmp($field, 'MadreGrupo') === 0) {
-                    $this->madreGrupoColumnCache = $field;
-
-                    return $field;
+                if ($field === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $field)) {
+                    continue;
                 }
-            }
-            foreach ($rows as $r) {
-                $field = (string)($r['Field'] ?? '');
-                if ($field !== '' && strcasecmp($field, 'madre_grupo') === 0) {
+                // MadreGrupo, madre_grupo, MADREGRUPO, Madre, etc.
+                if (preg_match('/^madre(_?grupo)?$/i', $field)) {
                     $this->madreGrupoColumnCache = $field;
 
                     return $field;

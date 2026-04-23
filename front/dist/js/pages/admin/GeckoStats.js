@@ -165,9 +165,10 @@ async function loadInstitutionFlags() {
     try {
         const res = await API.request('/stats/institution-flags');
         const wrap = document.getElementById('stats-scope-wrap');
-        const mg = Number(res.data?.madre_grupo);
-        const nRed = Number(res.data?.instituciones_en_red);
-        const redNombre = String(res.data?.red || '').trim();
+        const d = res.data || {};
+        const mg = Number(d.madre_grupo ?? d.MadreGrupo ?? 0);
+        const nRed = Number(d.instituciones_en_red ?? 0);
+        const redNombre = String(d.red ?? d.dependencia_grupo ?? d.DependenciaInstitucion ?? '').trim();
         const puedeRed = mg === 1 && (nRed > 1 || redNombre !== '');
         if (res.status === 'success' && res.data && puedeRed) {
             if (wrap) wrap.classList.remove('d-none');

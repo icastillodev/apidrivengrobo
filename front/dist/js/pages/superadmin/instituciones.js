@@ -29,6 +29,14 @@ async function cargarCatalogoModulos() {
     } catch (e) { console.error("Error al cargar módulos maestros:", e); }
 }
 
+function escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 async function cargarInstituciones() {
     try {
         const res = await API.request('/superadmin/instituciones');
@@ -42,7 +50,7 @@ async function cargarInstituciones() {
 function renderizarTabla(data) {
     const tbody = document.getElementById('tabla-sedes');
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No se encontraron instituciones</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">No se encontraron instituciones</td></tr>`;
         return;
     }
 
@@ -52,6 +60,16 @@ function renderizarTabla(data) {
             : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">INACTIVA</span>';
 
         // LÓGICA DE DIBUJADO DE MÓDULOS EN LA TABLA
+        const depTxt = (inst.DependenciaInstitucion != null ? String(inst.DependenciaInstitucion) : '').trim();
+        const mgRaw = inst.MadreGrupo ?? inst.madre_grupo ?? inst.Madre ?? inst.MADREGRUPO;
+        const esMadre = mgRaw == 1 || mgRaw === '1' || mgRaw === true;
+        const grupoCell = depTxt
+            ? `<span class="badge bg-light text-dark border small">${escHtml(depTxt)}</span>`
+            : '<span class="text-muted small">—</span>';
+        const madreCell = esMadre
+            ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle small">1</span>'
+            : '<span class="text-muted small">0</span>';
+
         let modulosHtml = '';
         if (inst.modulos && inst.modulos.length > 0) {
             const modulosArr = inst.modulos.map(m => {
@@ -84,6 +102,8 @@ function renderizarTabla(data) {
                     <div class="small fw-bold text-dark">Ciclo: ${inst.TipoFacturacion || 1}m</div>
                 </td>
                 <td class="text-center align-middle">${modulosHtml}</td>
+                <td class="text-center small">${grupoCell}</td>
+                <td class="text-center small">${madreCell}</td>
                 <td class="small text-center">
                     <div class="${inst.UltimoPago ? 'text-success' : 'text-danger'} fw-bold">
                         ${inst.UltimoPago || 'PENDIENTE'}
@@ -107,17 +127,32 @@ function setupBusqueda() {
     };
 }
 
-function syncEnRedFromDependencia() {
+/** El switch refleja si hay texto de grupo; al escribir/borrar en dependencia se actualiza solo. */
+function syncEnRedCheckboxFromDep() {
     const dep = document.getElementById('DependenciaInstitucion');
     const enRed = document.getElementById('en_red_check');
-    if (!enRed) return;
-    const has = !!(dep && String(dep.value || '').trim());
-    enRed.checked = has;
+    if (!enRed || !dep) return;
+    enRed.checked = !!String(dep.value || '').trim();
 }
 
 function setupDependenciaEnRedSync() {
     const dep = document.getElementById('DependenciaInstitucion');
-    if (dep) dep.addEventListener('input', syncEnRedFromDependencia);
+    const enRed = document.getElementById('en_red_check');
+    if (dep) {
+        dep.addEventListener('input', syncEnRedCheckboxFromDep);
+        dep.addEventListener('blur', syncEnRedCheckboxFromDep);
+    }
+    if (enRed) {
+        enRed.addEventListener('change', () => {
+            if (!enRed.checked) {
+                if (dep) dep.value = '';
+                return;
+            }
+            if (dep && !String(dep.value || '').trim()) {
+                dep.focus();
+            }
+        });
+    }
 }
 
 function setupGrupoClearButton() {
@@ -126,7 +161,7 @@ function setupGrupoClearButton() {
     btn.addEventListener('click', () => {
         const dep = document.getElementById('DependenciaInstitucion');
         if (dep) dep.value = '';
-        syncEnRedFromDependencia();
+        syncEnRedCheckboxFromDep();
     });
 }
 
@@ -163,7 +198,7 @@ function abrirModalCrear() {
     
     const madreGrupo = document.getElementById('madre_grupo');
     if (madreGrupo) madreGrupo.checked = false;
-    syncEnRedFromDependencia();
+    syncEnRedCheckboxFromDep();
 
     dibujarSelectsModulos([]); 
     modalInst.show();
@@ -193,9 +228,9 @@ function abrirModalEditar(id) {
     document.getElementById('Detalle').value = inst.Detalle || '';
 
     const madreGrupo = document.getElementById('madre_grupo');
-    const mg = inst.MadreGrupo ?? inst.madre_grupo;
-    if (madreGrupo) madreGrupo.checked = (mg == 1 || mg === '1');
-    syncEnRedFromDependencia();
+    const mg = inst.MadreGrupo ?? inst.madre_grupo ?? inst.Madre ?? inst.MADREGRUPO;
+    if (madreGrupo) madreGrupo.checked = (mg == 1 || mg === '1' || mg === true);
+    syncEnRedCheckboxFromDep();
 
     dibujarSelectsModulos(inst.modulos || []);
 
