@@ -9,8 +9,47 @@ use App\Utils\ModulosInstitucion;
 class InstitucionModel {
     private $db;
 
+    /** @var string|false|null false = aún no resuelto; null = no existe columna de madre */
+    private $madreGrupoColumnCache = false;
+
     public function __construct($db) {
         $this->db = $db;
+    }
+
+    /**
+     * Nombre físico de la columna madre del grupo (p. ej. MadreGrupo o madre_grupo).
+     */
+    private function resolveMadreGrupoColumnName(): ?string {
+        if ($this->madreGrupoColumnCache !== false) {
+            return $this->madreGrupoColumnCache;
+        }
+        try {
+            $stmt = $this->db->query('SHOW COLUMNS FROM `institucion`');
+            $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $r) {
+                $field = (string)($r['Field'] ?? '');
+                if ($field !== '' && strcasecmp($field, 'MadreGrupo') === 0) {
+                    $this->madreGrupoColumnCache = $field;
+
+                    return $field;
+                }
+            }
+            foreach ($rows as $r) {
+                $field = (string)($r['Field'] ?? '');
+                if ($field !== '' && strcasecmp($field, 'madre_grupo') === 0) {
+                    $this->madreGrupoColumnCache = $field;
+
+                    return $field;
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->madreGrupoColumnCache = null;
+
+            return null;
+        }
+        $this->madreGrupoColumnCache = null;
+
+        return null;
     }
 
     // Trae los módulos existentes en la app
@@ -59,11 +98,16 @@ class InstitucionModel {
         try {
             $this->db->beginTransaction();
 
+            $mgCol = $this->resolveMadreGrupoColumnName();
+            if ($mgCol === null || !preg_match('/^[a-zA-Z0-9_]+$/', $mgCol)) {
+                throw new Exception('La tabla institucion no tiene columna MadreGrupo ni madre_grupo; no se puede guardar el flag de sede madre.');
+            }
+
             $sql = "INSERT INTO institucion (
                         NombreInst, NombreCompletoInst, InstCorreo, Pais, Localidad, 
                         Moneda, Web, Logo, DependenciaInstitucion, otrosceuas, 
                         TipoApp, Activo, UltimoPago, PrecioJornadaTrabajoExp,
-                        TipoFacturacion, FechaContrato, Detalle, MadreGrupo
+                        TipoFacturacion, FechaContrato, Detalle, `{$mgCol}`
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $this->db->prepare($sql);
@@ -110,13 +154,18 @@ class InstitucionModel {
         try {
             $this->db->beginTransaction();
 
+            $mgCol = $this->resolveMadreGrupoColumnName();
+            if ($mgCol === null || !preg_match('/^[a-zA-Z0-9_]+$/', $mgCol)) {
+                throw new Exception('La tabla institucion no tiene columna MadreGrupo ni madre_grupo; no se puede guardar el flag de sede madre.');
+            }
+
             $sql = "UPDATE institucion SET 
                         NombreInst = ?, NombreCompletoInst = ?, InstCorreo = ?, 
                         Pais = ?, Localidad = ?, Moneda = ?, Web = ?, 
                         Logo = ?, DependenciaInstitucion = ?, otrosceuas = ?, 
                         TipoApp = ?, Activo = ?, UltimoPago = ?,
                         TipoFacturacion = ?, FechaContrato = ?, Detalle = ?,
-                        MadreGrupo = ?
+                        `{$mgCol}` = ?
                     WHERE IdInstitucion = ?";
 
             $this->db->prepare($sql)->execute([

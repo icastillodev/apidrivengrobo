@@ -135,6 +135,11 @@
                                     <button type="button" class="btn btn-outline-secondary" id="btn_vaciar_grupo" data-i18n="superadmin_instituciones.btn_vaciar_grupo">Vaciar grupo</button>
                                 </div>
                                 <p class="small text-muted mt-1 mb-0" data-i18n="superadmin_instituciones.help_grupo_inst">Si está vacío, la sede no pertenece a un grupo. El mismo texto en varias sedes las agrupa para estadísticas.</p>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="en_red_check" disabled aria-readonly="true">
+                                    <label class="form-check-label text-secondary" for="en_red_check"><span data-i18n="superadmin_instituciones.label_en_red">En una red</span></label>
+                                </div>
+                                <p class="small text-muted mb-0" data-i18n="superadmin_instituciones.help_en_red_auto">Se marca automáticamente cuando hay dependencia/grupo (texto no vacío).</p>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_logo">URL del Logo</label>

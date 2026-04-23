@@ -3709,6 +3709,7 @@ export const es = {
         ph_dependencia: "Ej: UDELAR",
         label_madre_red: "Madre de la red",
         label_en_red: "En una red",
+        help_en_red_auto: "Se marca automáticamente cuando hay dependencia/grupo (texto no vacío). No es un dato aparte: coincide con el campo de arriba.",
         ph_nombre_red: "Nombre de la red",
         label_logo: "URL del Logo",
         label_otros_ceuas: "Permitir Otros CEUAS",

@@ -3697,6 +3697,7 @@ alojamientos: {
         ph_dependencia: "E.g. UDELAR",
         label_madre_red: "Mother of the network",
         label_en_red: "In a network",
+        help_en_red_auto: "Checked automatically when dependency/group text is not empty. It is not a separate field—it reflects the value above.",
         ph_nombre_red: "Network name",
         label_logo: "Logo URL",
         label_otros_ceuas: "Allow Other CEUAS",

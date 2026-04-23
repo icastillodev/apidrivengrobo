@@ -3698,6 +3698,7 @@ alojamientos: {
         ph_dependencia: "Ex: UDELAR",
         label_madre_red: "Mãe da rede",
         label_en_red: "Em uma rede",
+        help_en_red_auto: "Marca-se automaticamente quando há dependência/grupo (texto não vazio). Não é um dado separado: coincide com o campo acima.",
         ph_nombre_red: "Nome da rede",
         label_logo: "URL do Logo",
         label_otros_ceuas: "Permitir Outros CEUAS",

@@ -14,6 +14,7 @@ export async function initSuperInstituciones() {
     window.guardarCambios = guardarCambios;
 
     setupGrupoClearButton();
+    setupDependenciaEnRedSync();
     await cargarCatalogoModulos();
     await cargarInstituciones();
     setupBusqueda();
@@ -106,12 +107,26 @@ function setupBusqueda() {
     };
 }
 
+function syncEnRedFromDependencia() {
+    const dep = document.getElementById('DependenciaInstitucion');
+    const enRed = document.getElementById('en_red_check');
+    if (!enRed) return;
+    const has = !!(dep && String(dep.value || '').trim());
+    enRed.checked = has;
+}
+
+function setupDependenciaEnRedSync() {
+    const dep = document.getElementById('DependenciaInstitucion');
+    if (dep) dep.addEventListener('input', syncEnRedFromDependencia);
+}
+
 function setupGrupoClearButton() {
     const btn = document.getElementById('btn_vaciar_grupo');
     if (!btn) return;
     btn.addEventListener('click', () => {
         const dep = document.getElementById('DependenciaInstitucion');
         if (dep) dep.value = '';
+        syncEnRedFromDependencia();
     });
 }
 
@@ -148,7 +163,8 @@ function abrirModalCrear() {
     
     const madreGrupo = document.getElementById('madre_grupo');
     if (madreGrupo) madreGrupo.checked = false;
-    
+    syncEnRedFromDependencia();
+
     dibujarSelectsModulos([]); 
     modalInst.show();
 }
@@ -179,6 +195,7 @@ function abrirModalEditar(id) {
     const madreGrupo = document.getElementById('madre_grupo');
     const mg = inst.MadreGrupo ?? inst.madre_grupo;
     if (madreGrupo) madreGrupo.checked = (mg == 1 || mg === '1');
+    syncEnRedFromDependencia();
 
     dibujarSelectsModulos(inst.modulos || []);
 

@@ -528,15 +528,59 @@ class StatisticsModel {
     }
 
     /**
+     * Columna física madre del grupo (MadreGrupo o madre_grupo según la BD).
+     */
+    private function resolveMadreGrupoPhysicalColumn(): ?string {
+        static $loaded = false;
+        static $value = null;
+        if ($loaded) {
+            return $value;
+        }
+        $loaded = true;
+        try {
+            $stmt = $this->db->query('SHOW COLUMNS FROM `institucion`');
+            $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $r) {
+                $field = (string)($r['Field'] ?? '');
+                if ($field !== '' && strcasecmp($field, 'MadreGrupo') === 0) {
+                    $value = $field;
+
+                    return $value;
+                }
+            }
+            foreach ($rows as $r) {
+                $field = (string)($r['Field'] ?? '');
+                if ($field !== '' && strcasecmp($field, 'madre_grupo') === 0) {
+                    $value = $field;
+
+                    return $value;
+                }
+            }
+        } catch (\Throwable $e) {
+            $value = null;
+        }
+
+        return $value;
+    }
+
+    /**
      * Devuelve flags para estadísticas de red/grupo: MadreGrupo (expuesto como madre_grupo en JSON)
      * y DependenciaInstitucion (expuesto como red para compatibilidad con el front).
      */
     public function getInstitutionFlags($instId) {
-        $stmt = $this->db->prepare("SELECT COALESCE(MadreGrupo, 0) as madre_grupo, TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
+        $mgCol = $this->resolveMadreGrupoPhysicalColumn();
+        if ($mgCol !== null && preg_match('/^[a-zA-Z0-9_]+$/', $mgCol)) {
+            $stmt = $this->db->prepare("SELECT COALESCE(`{$mgCol}`, 0) as madre_grupo, TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
+        } else {
+            $stmt = $this->db->prepare("SELECT TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
+        }
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
             return ['madre_grupo' => 0, 'red' => '', 'NombreInst' => '', 'instituciones_en_red' => 0];
+        }
+        if (!array_key_exists('madre_grupo', $row)) {
+            $row['madre_grupo'] = 0;
         }
         $row['madre_grupo'] = (int) $row['madre_grupo'];
         $ids = $this->getInstitutionIdsInNetwork($instId);
