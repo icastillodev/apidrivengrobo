@@ -167,7 +167,9 @@ async function loadInstitutionFlags() {
         const wrap = document.getElementById('stats-scope-wrap');
         const mg = Number(res.data?.madre_grupo);
         const nRed = Number(res.data?.instituciones_en_red);
-        if (res.status === 'success' && res.data && mg === 1 && nRed > 1) {
+        const redNombre = String(res.data?.red || '').trim();
+        const puedeRed = mg === 1 && (nRed > 1 || redNombre !== '');
+        if (res.status === 'success' && res.data && puedeRed) {
             if (wrap) wrap.classList.remove('d-none');
         } else if (wrap) {
             wrap.classList.add('d-none');
@@ -205,7 +207,7 @@ async function loadStatsRedFull() {
             renderSpeciesChart('red');
             renderDetailsSection('red');
         } else {
-            alert(res.message || 'Error al cargar estadísticas de la red.');
+            alert(res.message || t?.red_sin_permiso || 'Error al cargar estadísticas de la red.');
         }
     } catch (e) {
         console.error(e);

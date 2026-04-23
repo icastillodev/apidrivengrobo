@@ -26,9 +26,13 @@ export async function initBillingInstitucion() {
     const hoy = new Date();
     const fDesde = document.getElementById('f-desde-inst');
     const fHasta = document.getElementById('f-hasta-inst');
+    const selOrigen = document.getElementById('sel-origen-fact');
     if (fDesde && fHasta) {
         fDesde.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
         fHasta.value = hoy.toISOString().split('T')[0];
+    }
+    if (selOrigen) {
+        selOrigen.value = 'todos';
     }
     await cargarListaInstituciones();
     const btn = document.getElementById('btn-cargar-inst');
@@ -51,12 +55,14 @@ async function cargarFacturacionInstitucion() {
     const desde = document.getElementById('f-desde-inst')?.value || null;
     const hasta = document.getElementById('f-hasta-inst')?.value || null;
     const idInst = document.getElementById('sel-inst-solicitante')?.value || null;
+    const origenFacturacion = document.getElementById('sel-origen-fact')?.value || 'todos';
 
     try {
         showLoader();
         const res = await API.request('/billing/institucion-report', 'POST', {
             desde, hasta, estadoCobro: 'all',
-            idInstitucionSolicitante: idInst || undefined
+            idInstitucionSolicitante: idInst || undefined,
+            origenFacturacion
         });
         if (res.status === 'success' && res.data) {
             window.currentReportDataInst = res.data;
@@ -185,7 +191,8 @@ async function renderResultadosInstitucion(data) {
                                     <th style="width:3%"><input type="checkbox" class="check-all-inst" data-inst="${inst.idInstitucionSolicitante}"></th>
                                     <th style="width:5%">ID</th>
                                     <th style="width:8%">${t.facturacion?.filtro_estado_cobro || 'ESTADO'}</th>
-                                    <th style="width:12%">${tf('th_depto_pedido_orig', 'Departamento (pedido origen)')}</th>
+                                    <th style="width:9%">${tf('th_origen_fact', 'Origen cobro')}</th>
+                                    <th style="width:10%">${tf('th_depto_pedido_orig', 'Departamento (pedido origen)')}</th>
                                     <th style="width:14%">${tf('th_proto_pedido_orig', 'Protocolo (pedido origen)')}</th>
                                     <th style="width:12%">${tf('th_inv_pedido_orig', 'Investigador (pedido origen)')}</th>
                                     <th style="width:10%">${t.generales?.especie || 'TIPO'}</th>
@@ -293,13 +300,15 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
     sections.forEach((section) => {
         const list = grouped[section.key] || [];
         if (!list.length) return;
-        rows.push(`<tr class="table-secondary"><td colspan="12" class="text-start fw-bold uppercase" style="font-size:10px; letter-spacing:.5px;">${escapeHtml(section.label)}</td></tr>`);
+        rows.push(`<tr class="table-secondary"><td colspan="13" class="text-start fw-bold uppercase" style="font-size:10px; letter-spacing:.5px;">${escapeHtml(section.label)}</td></tr>`);
         list.forEach((item) => {
             const debe = parseFloat(item.montoDebe || 0);
             const estadoBadge = estadoWorkflowCell(item, t);
             const rowStyle = debe <= 0 ? 'background-color: #f8fff9 !important;' : '';
             const idFact = item.idFacturacionDerivada || item.IdFacturacionFormularioDerivado || 0;
-            const chkDisabled = debe <= 0 ? 'disabled' : '';
+            const esComun = String(item.origenFacturacion || '') === 'comun';
+            const chkDisabled = debe <= 0 || esComun || !idFact ? 'disabled' : '';
+            const origenBadges = origenFacturacionCell(item, t);
             const tipoKey = normalizeTipoFormulario(item.tipoFormulario || item.categoria || item.nombreTipo || '');
             const tipoModal = getTipoModal(tipoKey);
             const idInv = item.idInvestigador != null && item.idInvestigador !== '' ? parseInt(item.idInvestigador, 10) : '';
@@ -308,6 +317,7 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
                     <td><input type="checkbox" class="check-item-inst" data-inst="${inst.idInstitucionSolicitante}" data-id="${idFact}" data-idusr="${idInv}" data-monto="${debe}" ${chkDisabled}></td>
                     <td class="small text-muted fw-bold">#${item.idformA}</td>
                     <td>${estadoBadge}</td>
+                    <td class="small text-start align-top">${origenBadges}</td>
                     <td class="small text-start align-top">${escapeHtml(item.departamentoPedidoOriginal || '-')}</td>
                     <td class="small text-start align-top">${escapeHtml(item.protocoloPedidoOriginal || '-')}</td>
                     <td class="small text-start align-top">${escapeHtml(item.investigadorPedidoOriginal || '-')}</td>
@@ -387,6 +397,10 @@ window.procesarPagoInstitucion = async (idInstSol) => {
     const items = [];
     const porInv = new Map();
     for (const chk of seleccionados) {
+        const idFactPago = parseInt(chk.dataset.id || '0', 10);
+        if (!idFactPago) {
+            continue;
+        }
         const idUsr = parseInt(chk.dataset.idusr || '0', 10);
         const monto = parseFloat(chk.dataset.monto || 0);
         if (!idUsr) {
@@ -396,8 +410,19 @@ window.procesarPagoInstitucion = async (idInstSol) => {
             return;
         }
         totalAPagar += monto;
-        items.push({ idFacturacionDerivada: parseInt(chk.dataset.id, 10), monto_pago: monto });
+        items.push({ idFacturacionDerivada: idFactPago, monto_pago: monto });
         porInv.set(idUsr, (porInv.get(idUsr) || 0) + monto);
+    }
+
+    if (!items.length) {
+        if (window.Swal) {
+            window.Swal.fire(
+                gen.swal_atencion || 'Atención',
+                t.inst_solo_comunes_o_sin_fact || 'Solo hay formularios comunes seleccionables o sin liquidación derivada: pague desde el modal del formulario o la facturación por protocolo.',
+                'info'
+            );
+        }
+        return;
     }
 
     // Misma regla que facturación por protocolo: saldo en billetera de esta institución por investigador.
@@ -475,6 +500,17 @@ window.procesarPagoInstitucion = async (idInstSol) => {
         }
     }
 };
+
+function origenFacturacionCell(item, t) {
+    const o = String(item.origenFacturacion || '').toLowerCase();
+    const isDer = o === 'derivado';
+    const lbl = isDer ? tf('origen_badge_derivado', 'Derivado') : tf('origen_badge_comun', 'Común');
+    const color = isDer ? '#6f42c1' : '#0d6efd';
+    const ext = item.esExternoFacturacion
+        ? `<div class="mt-1"><span class="badge bg-secondary" style="font-size:8px;">${escapeHtml(tf('origen_badge_externo', 'Externo'))}</span></div>`
+        : '';
+    return `<div><span class="badge" style="font-size:9px;background:${color};">${escapeHtml(lbl)}</span>${ext}</div>`;
+}
 
 function estadoCobroBadge(estado) {
     const n = Number(estado);
@@ -561,7 +597,10 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
         doc.text(`GROBO - ${instNombre}`, 105, M, { align: 'center' });
         doc.setFontSize(11); doc.setTextColor(100);
-        doc.text(tf('pdf_titulo_ficha_form', 'FICHA FINANCIERA - FORMULARIO DERIVADO'), 105, M + 7, { align: 'center' });
+        const subTit = String(item.origenFacturacion || '') === 'comun'
+            ? (window.txt?.facturacion?.pdf_titulo_ficha_form_comun || 'FICHA FINANCIERA - FORMULARIO (LOCAL)')
+            : tf('pdf_titulo_ficha_form', 'FICHA FINANCIERA - FORMULARIO DERIVADO');
+        doc.text(subTit, 105, M + 7, { align: 'center' });
         doc.line(M, M + 10, 195, M + 10);
 
         doc.setFontSize(10); doc.setTextColor(0);
@@ -636,6 +675,7 @@ window.downloadInstItemPDF = async (idInstSol) => {
         const hDep = tf('th_depto_pedido_orig', 'Depto. origen');
         const hProt = tf('th_proto_pedido_orig', 'Protocolo');
         const hInvO = tf('th_inv_pedido_orig', 'Investigador');
+        const hOrigen = tf('th_origen_fact', 'Origen');
         const hTipo = tf('excel_tipo', 'Tipo');
         const hPrecio = tp.pdf_col_precio || 'Precio';
         const hDeb = tp.pdf_col_debe || 'Debe';
@@ -652,11 +692,13 @@ window.downloadInstItemPDF = async (idInstSol) => {
 
         const body = (inst.items || []).map(i => {
             const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
+            const oLbl = String(i.origenFacturacion || '') === 'comun' ? 'C' : 'D';
             return [
                 `#${i.idformA}`,
                 String(i.departamentoPedidoOriginal || '-').substring(0, 32),
                 String(i.protocoloPedidoOriginal || '-').substring(0, 36),
                 String(i.investigadorPedidoOriginal || '-').substring(0, 28),
+                oLbl,
                 (i.nombreTipo || i.categoria || '-').substring(0, 28),
                 m[0], m[1], m[2]
             ];
@@ -664,18 +706,19 @@ window.downloadInstItemPDF = async (idInstSol) => {
 
         doc.autoTable({
             startY: M + 24, margin: { left: M, right: M },
-            head: [[hId, hDep, hProt, hInvO, hTipo, hPrecio, hDeb, hPagTot]],
+            head: [[hId, hDep, hProt, hInvO, hOrigen, hTipo, hPrecio, hDeb, hPagTot]],
             body, theme: 'grid', headStyles: { fillColor: violeta },
             styles: { fontSize: 7 },
             columnStyles: {
-                0: { cellWidth: 14 },
-                1: { cellWidth: 28 },
-                2: { cellWidth: 32 },
-                3: { cellWidth: 28 },
-                4: { cellWidth: 24 },
-                5: { halign: 'right' },
+                0: { cellWidth: 12 },
+                1: { cellWidth: 24 },
+                2: { cellWidth: 28 },
+                3: { cellWidth: 24 },
+                4: { cellWidth: 10 },
+                5: { cellWidth: 22 },
                 6: { halign: 'right' },
-                7: { halign: 'right', fontStyle: 'bold' }
+                7: { halign: 'right' },
+                8: { halign: 'right', fontStyle: 'bold' }
             }
         });
 
@@ -726,6 +769,7 @@ window.downloadInstGlobalPDF = async () => {
         const hDep = tf('th_depto_pedido_orig', 'Depto. origen');
         const hProt = tf('th_proto_pedido_orig', 'Protocolo');
         const hInvO = tf('th_inv_pedido_orig', 'Investigador');
+        const hOrigen = tf('th_origen_fact', 'Origen');
         const hTipo = tf('excel_tipo', 'Tipo');
         const hPrecio = tp.pdf_col_precio || 'Precio';
         const hDeb = tp.pdf_col_debe || 'Debe';
@@ -757,11 +801,13 @@ window.downloadInstGlobalPDF = async () => {
 
             const body = (inst.items || []).map(i => {
                 const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
+                const oLbl = String(i.origenFacturacion || '') === 'comun' ? 'C' : 'D';
                 return [
                     `#${i.idformA}`,
                     String(i.departamentoPedidoOriginal || '-').substring(0, 28),
                     String(i.protocoloPedidoOriginal || '-').substring(0, 32),
                     String(i.investigadorPedidoOriginal || '-').substring(0, 26),
+                    oLbl,
                     (i.nombreTipo || i.categoria || '-').substring(0, 24),
                     m[0], m[1], m[2]
                 ];
@@ -769,7 +815,7 @@ window.downloadInstGlobalPDF = async () => {
             if (body.length) {
                 doc.autoTable({
                     startY: currentY, margin: { left: M, right: M },
-                    head: [[hId, hDep, hProt, hInvO, hTipo, hPrecio, hDeb, hPagTot]],
+                    head: [[hId, hDep, hProt, hInvO, hOrigen, hTipo, hPrecio, hDeb, hPagTot]],
                     body, theme: 'grid', headStyles: { fillColor: violeta },
                     styles: { fontSize: 6.5 }
                 });
@@ -827,6 +873,7 @@ window.exportExcelInstGlobal = () => {
     const kDep = tf('th_depto_pedido_orig', 'Departamento (pedido origen)');
     const kProt = tf('th_proto_pedido_orig', 'Protocolo (pedido origen)');
     const kInv = tf('th_inv_pedido_orig', 'Investigador (pedido origen)');
+    const kOrigen = tf('th_origen_fact', 'Origen cobro');
     const kTipo = tf('excel_tipo', 'Tipo');
     const kCat = tf('excel_categoria', 'Categoría');
     const kTot = tf('excel_total', 'Total');
@@ -842,6 +889,7 @@ window.exportExcelInstGlobal = () => {
                 [kDep]: item.departamentoPedidoOriginal || '-',
                 [kProt]: item.protocoloPedidoOriginal || '-',
                 [kInv]: item.investigadorPedidoOriginal || '-',
+                [kOrigen]: String(item.origenFacturacion || '') === 'comun' ? 'Común' : 'Derivado',
                 [kTipo]: item.nombreTipo || item.categoria || '-',
                 [kCat]: item.categoria || '-',
                 [kTot]: parseFloat(item.montoTotal || 0),

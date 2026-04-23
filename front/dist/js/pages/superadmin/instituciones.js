@@ -13,7 +13,7 @@ export async function initSuperInstituciones() {
     window.abrirModalEditar = abrirModalEditar;
     window.guardarCambios = guardarCambios;
 
-    setupRedToggle();
+    setupGrupoClearButton();
     await cargarCatalogoModulos();
     await cargarInstituciones();
     setupBusqueda();
@@ -106,11 +106,13 @@ function setupBusqueda() {
     };
 }
 
-function setupRedToggle() {
-    const check = document.getElementById('en_red_check');
-    const wrap = document.getElementById('wrap_red_input');
-    if (!check || !wrap) return;
-    check.addEventListener('change', () => { wrap.style.display = check.checked ? 'block' : 'none'; });
+function setupGrupoClearButton() {
+    const btn = document.getElementById('btn_vaciar_grupo');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const red = document.getElementById('red');
+        if (red) red.value = '';
+    });
 }
 
 // INYECTA LOS SELECTS DINÁMICOS BASADOS EN catalogoModulos
@@ -145,13 +147,9 @@ function abrirModalCrear() {
     document.getElementById('Moneda').value = 'UYU';
     
     const madreGrupo = document.getElementById('madre_grupo');
-    const enRedCheck = document.getElementById('en_red_check');
     const redInput = document.getElementById('red');
-    const wrapRed = document.getElementById('wrap_red_input');
     if (madreGrupo) madreGrupo.checked = false;
-    if (enRedCheck) enRedCheck.checked = false;
     if (redInput) redInput.value = '';
-    if (wrapRed) wrapRed.style.display = 'none';
     
     dibujarSelectsModulos([]); 
     modalInst.show();
@@ -181,13 +179,9 @@ function abrirModalEditar(id) {
     document.getElementById('Detalle').value = inst.Detalle || '';
 
     const madreGrupo = document.getElementById('madre_grupo');
-    const enRedCheck = document.getElementById('en_red_check');
     const redInput = document.getElementById('red');
-    const wrapRed = document.getElementById('wrap_red_input');
     if (madreGrupo) madreGrupo.checked = (inst.madre_grupo == 1 || inst.madre_grupo === '1');
-    if (enRedCheck) enRedCheck.checked = !!(inst.red && String(inst.red).trim());
-    if (redInput) redInput.value = (inst.red && String(inst.red).trim()) ? inst.red : '';
-    if (wrapRed) wrapRed.style.display = (enRedCheck && enRedCheck.checked) ? 'block' : 'none';
+    if (redInput) redInput.value = (inst.red && String(inst.red).trim()) ? String(inst.red).trim() : '';
 
     dibujarSelectsModulos(inst.modulos || []);
 
@@ -215,8 +209,7 @@ async function guardarCambios() {
         FechaContrato: document.getElementById('FechaContrato').value || null,
         Detalle: document.getElementById('Detalle').value,
         madre_grupo: document.getElementById('madre_grupo') && document.getElementById('madre_grupo').checked ? 1 : 0,
-        red: (document.getElementById('en_red_check') && document.getElementById('en_red_check').checked && document.getElementById('red'))
-            ? (document.getElementById('red').value || '').trim() : '',
+        red: (document.getElementById('red')?.value || '').trim(),
         modulos: [] 
     };
 

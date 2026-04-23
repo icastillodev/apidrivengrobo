@@ -58,6 +58,15 @@ class StatisticsController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = $sesion['instId'];
+            $flags = $this->model->getInstitutionFlags($instId);
+            if ((int)($flags['madre_grupo'] ?? 0) !== 1) {
+                http_response_code(403);
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Solo la sede configurada como madre del grupo (madre_grupo = 1) puede consultar estadísticas agregadas del grupo.',
+                ]);
+                exit;
+            }
             $from = (!empty($_GET['from'])) ? $_GET['from'] : date('Y-m-01');
             $to = (!empty($_GET['to'])) ? $_GET['to'] : date('Y-m-d');
             $data = $this->model->getGeneralStatsRed($instId, $from, $to);

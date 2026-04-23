@@ -268,7 +268,7 @@ class BillingController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int)$sesion['instId'];
-            $list = $this->model->getInstitutionsWithDerivedForms($instId);
+            $list = $this->model->getInstitutionsForInstitutionBillingReport($instId);
             $this->sendSuccess($list);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
@@ -285,8 +285,9 @@ class BillingController {
             $hasta = $f['hasta'] ?? null;
             $estadoCobro = $f['estadoCobro'] ?? 'all';
             $idInstitucionSolicitante = $f['idInstitucionSolicitante'] ?? null;
+            $origenFacturacion = $f['origenFacturacion'] ?? 'todos';
 
-            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro, $idInstitucionSolicitante);
+            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro, $idInstitucionSolicitante, $origenFacturacion);
             $this->sendSuccess($data);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
