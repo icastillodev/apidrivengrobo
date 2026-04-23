@@ -32,7 +32,7 @@ class StatisticsController {
     }
 
     /**
-     * Devuelve madre_grupo y red de la institución actual (para mostrar bloque "Estadísticas de la red").
+     * Devuelve MadreGrupo (como madre_grupo en JSON) y DependenciaInstitucion (como red) para estadísticas de grupo.
      */
     public function getInstitutionFlags() {
         if (ob_get_length()) ob_clean();
@@ -50,7 +50,7 @@ class StatisticsController {
     }
 
     /**
-     * Estadísticas agregadas de todas las instituciones de la red (mismo valor "red").
+     * Estadísticas agregadas del grupo (misma DependenciaInstitucion o columna red legacy).
      */
     public function getStatsRed() {
         if (ob_get_length()) ob_clean();
@@ -63,7 +63,7 @@ class StatisticsController {
                 http_response_code(403);
                 echo json_encode([
                     'status' => 'error',
-                    'message' => 'Solo la sede configurada como madre del grupo (madre_grupo = 1) puede consultar estadísticas agregadas del grupo.',
+                    'message' => 'Solo la sede configurada como madre del grupo (MadreGrupo = 1) puede consultar estadísticas agregadas del grupo.',
                 ]);
                 exit;
             }

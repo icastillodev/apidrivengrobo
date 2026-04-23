@@ -110,8 +110,8 @@ function setupGrupoClearButton() {
     const btn = document.getElementById('btn_vaciar_grupo');
     if (!btn) return;
     btn.addEventListener('click', () => {
-        const red = document.getElementById('red');
-        if (red) red.value = '';
+        const dep = document.getElementById('DependenciaInstitucion');
+        if (dep) dep.value = '';
     });
 }
 
@@ -147,9 +147,7 @@ function abrirModalCrear() {
     document.getElementById('Moneda').value = 'UYU';
     
     const madreGrupo = document.getElementById('madre_grupo');
-    const redInput = document.getElementById('red');
     if (madreGrupo) madreGrupo.checked = false;
-    if (redInput) redInput.value = '';
     
     dibujarSelectsModulos([]); 
     modalInst.show();
@@ -179,9 +177,8 @@ function abrirModalEditar(id) {
     document.getElementById('Detalle').value = inst.Detalle || '';
 
     const madreGrupo = document.getElementById('madre_grupo');
-    const redInput = document.getElementById('red');
-    if (madreGrupo) madreGrupo.checked = (inst.madre_grupo == 1 || inst.madre_grupo === '1');
-    if (redInput) redInput.value = (inst.red && String(inst.red).trim()) ? String(inst.red).trim() : '';
+    const mg = inst.MadreGrupo ?? inst.madre_grupo;
+    if (madreGrupo) madreGrupo.checked = (mg == 1 || mg === '1');
 
     dibujarSelectsModulos(inst.modulos || []);
 
@@ -209,7 +206,6 @@ async function guardarCambios() {
         FechaContrato: document.getElementById('FechaContrato').value || null,
         Detalle: document.getElementById('Detalle').value,
         madre_grupo: document.getElementById('madre_grupo') && document.getElementById('madre_grupo').checked ? 1 : 0,
-        red: (document.getElementById('red')?.value || '').trim(),
         modulos: [] 
     };
 

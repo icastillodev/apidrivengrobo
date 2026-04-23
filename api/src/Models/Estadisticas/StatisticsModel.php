@@ -528,10 +528,11 @@ class StatisticsModel {
     }
 
     /**
-     * Devuelve madre_grupo y red de la institución para mostrar/ocultar bloque "Estadísticas de la red".
+     * Devuelve flags para estadísticas de red/grupo: MadreGrupo (expuesto como madre_grupo en JSON)
+     * y DependenciaInstitucion (expuesto como red para compatibilidad con el front).
      */
     public function getInstitutionFlags($instId) {
-        $stmt = $this->db->prepare("SELECT COALESCE(madre_grupo, 0) as madre_grupo, TRIM(COALESCE(red, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
+        $stmt = $this->db->prepare("SELECT COALESCE(MadreGrupo, 0) as madre_grupo, TRIM(COALESCE(DependenciaInstitucion, '')) as red, NombreInst FROM institucion WHERE IdInstitucion = ?");
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
@@ -544,25 +545,32 @@ class StatisticsModel {
     }
 
     /**
-     * Ids de instituciones de la misma red: primero por campo `red` (texto); si está vacío, por `DependenciaInstitucion` (misma dependencia que mensajería).
+     * Ids de instituciones del mismo grupo: mismo valor en DependenciaInstitucion (texto no vacío).
+     * Si existe columna legacy `red` y está rellena, se usa primero para no romper instalaciones antiguas.
      * Incluye la propia institución.
      */
     public function getInstitutionIdsInNetwork($instId) {
-        $stmt = $this->db->prepare('SELECT TRIM(COALESCE(red, \'\')) AS red, TRIM(COALESCE(DependenciaInstitucion, \'\')) AS dep FROM institucion WHERE IdInstitucion = ?');
+        $hasRedCol = $this->hasColumn('institucion', 'red');
+        $select = $hasRedCol
+            ? 'SELECT TRIM(COALESCE(red, \'\')) AS red, TRIM(COALESCE(DependenciaInstitucion, \'\')) AS dep FROM institucion WHERE IdInstitucion = ?'
+            : 'SELECT TRIM(COALESCE(DependenciaInstitucion, \'\')) AS dep FROM institucion WHERE IdInstitucion = ?';
+        $stmt = $this->db->prepare($select);
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
             return [$instId];
         }
-        $red = $row['red'] !== '' ? $row['red'] : null;
-        if ($red !== null) {
-            $stmt2 = $this->db->prepare('SELECT IdInstitucion FROM institucion WHERE TRIM(COALESCE(red, \'\')) = ?');
-            $stmt2->execute([$red]);
-            $ids = $stmt2->fetchAll(\PDO::FETCH_COLUMN);
+        if ($hasRedCol) {
+            $red = ($row['red'] ?? '') !== '' ? $row['red'] : null;
+            if ($red !== null) {
+                $stmt2 = $this->db->prepare('SELECT IdInstitucion FROM institucion WHERE TRIM(COALESCE(red, \'\')) = ?');
+                $stmt2->execute([$red]);
+                $ids = $stmt2->fetchAll(\PDO::FETCH_COLUMN);
 
-            return $ids ?: [$instId];
+                return $ids ?: [$instId];
+            }
         }
-        $dep = $row['dep'] !== '' ? $row['dep'] : null;
+        $dep = ($row['dep'] ?? '') !== '' ? $row['dep'] : null;
         if ($dep !== null) {
             $stmt3 = $this->db->prepare("
                 SELECT i.IdInstitucion FROM institucion i

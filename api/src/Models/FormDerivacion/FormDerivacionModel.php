@@ -279,10 +279,9 @@ class FormDerivacionModel
 
         $hasRed = $this->columnExists('institucion', 'red');
         $hasDep = $this->columnExists('institucion', 'DependenciaInstitucion');
-        $hasMadreGrupo = $this->columnExists('institucion', 'madre_grupo');
         $hasActivo = $this->columnExists('institucion', 'Activo');
 
-        if (!$hasRed && !$hasDep && !$hasMadreGrupo) {
+        if (!$hasRed && !$hasDep) {
             return [];
         }
 
@@ -293,9 +292,6 @@ class FormDerivacionModel
         if ($hasDep) {
             $fields[] = "TRIM(COALESCE(DependenciaInstitucion, '')) as dep_val";
         }
-        if ($hasMadreGrupo) {
-            $fields[] = "TRIM(COALESCE(madre_grupo, '')) as madre_grupo_val";
-        }
         $sqlMeta = "SELECT " . implode(', ', $fields) . " FROM institucion WHERE IdInstitucion = ? LIMIT 1";
         $stmtMeta = $this->db->prepare($sqlMeta);
         $stmtMeta->execute([$instId]);
@@ -303,7 +299,6 @@ class FormDerivacionModel
 
         $redVal = $hasRed ? trim((string)($meta['red_val'] ?? '')) : '';
         $depVal = $hasDep ? trim((string)($meta['dep_val'] ?? '')) : '';
-        $madreGrupoVal = $hasMadreGrupo ? trim((string)($meta['madre_grupo_val'] ?? '')) : '';
 
         $sql = "SELECT IdInstitucion, NombreInst FROM institucion WHERE IdInstitucion <> ?";
         $params = [$instId];
@@ -314,9 +309,6 @@ class FormDerivacionModel
         } elseif ($depVal !== '') {
             $sql .= " AND TRIM(COALESCE(DependenciaInstitucion, '')) = ?";
             $params[] = $depVal;
-        } elseif ($madreGrupoVal !== '' && $madreGrupoVal !== '0') {
-            $sql .= " AND TRIM(COALESCE(madre_grupo, '')) = ?";
-            $params[] = $madreGrupoVal;
         } else {
             return [];
         }
@@ -856,8 +848,7 @@ class FormDerivacionModel
     {
         $hasRed = $this->columnExists('institucion', 'red');
         $hasDep = $this->columnExists('institucion', 'DependenciaInstitucion');
-        $hasMadreGrupo = $this->columnExists('institucion', 'madre_grupo');
-        if (!$hasRed && !$hasDep && !$hasMadreGrupo) {
+        if (!$hasRed && !$hasDep) {
             throw new Exception("No existe un campo de red en la tabla institucion.");
         }
 
@@ -867,9 +858,6 @@ class FormDerivacionModel
         }
         if ($hasDep) {
             $fields[] = "TRIM(COALESCE(DependenciaInstitucion, '')) as dep_val";
-        }
-        if ($hasMadreGrupo) {
-            $fields[] = "TRIM(COALESCE(madre_grupo, '')) as madre_grupo_val";
         }
         $stmt = $this->db->prepare("SELECT " . implode(', ', $fields) . " FROM institucion WHERE IdInstitucion IN (?, ?)");
         $stmt->execute([(int)$instA, (int)$instB]);
@@ -888,9 +876,6 @@ class FormDerivacionModel
             }
             if ($val === '' && $hasDep) {
                 $val = trim((string)($r['dep_val'] ?? ''));
-            }
-            if (($val === '' || $val === '0') && $hasMadreGrupo) {
-                $val = trim((string)($r['madre_grupo_val'] ?? ''));
             }
             if ((int)$r['IdInstitucion'] === (int)$instA) {
                 $networkA = $val;

@@ -129,26 +129,20 @@
                                 <input type="url" id="Web" class="form-control" data-i18n="superadmin_instituciones.ph_web" placeholder="https://...">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_dependencia">Dependencia (Grupo)</label>
-                                <input type="text" id="DependenciaInstitucion" class="form-control" data-i18n="superadmin_instituciones.ph_dependencia" placeholder="Ej: UDELAR">
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_dependencia_grupo">Dependencia / grupo (DependenciaInstitucion)</label>
+                                <div class="input-group">
+                                    <input type="text" id="DependenciaInstitucion" class="form-control" data-i18n="superadmin_instituciones.ph_dependencia" placeholder="Ej: UDELAR">
+                                    <button type="button" class="btn btn-outline-secondary" id="btn_vaciar_grupo" data-i18n="superadmin_instituciones.btn_vaciar_grupo">Vaciar grupo</button>
+                                </div>
+                                <p class="small text-muted mt-1 mb-0" data-i18n="superadmin_instituciones.help_grupo_inst">Si está vacío, la sede no pertenece a un grupo. El mismo texto en varias sedes las agrupa para estadísticas.</p>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_logo">URL del Logo</label>
                                 <input type="text" id="Logo" class="form-control" placeholder="https://...">
                             </div>
-                            
-                            <div class="col-12 border-top pt-3 mt-2">
-                                <h6 class="fw-bold text-secondary mb-1" data-i18n="superadmin_instituciones.seccion_grupo_titulo">Grupo institucional</h6>
-                                <p class="small text-muted mb-2" data-i18n="superadmin_instituciones.help_grupo_inst">Si este nombre está vacío, la sede no pertenece a un grupo. Todas las sedes con el mismo identificador comparten el grupo.</p>
-                                <label class="form-label fw-bold small" for="red" data-i18n="superadmin_instituciones.label_grupo_nombre">Identificador del grupo</label>
-                                <div class="input-group">
-                                    <input type="text" id="red" class="form-control" data-i18n="superadmin_instituciones.ph_grupo_nombre" placeholder="Ej: Red hospitalaria norte">
-                                    <button type="button" class="btn btn-outline-secondary" id="btn_vaciar_grupo" data-i18n="superadmin_instituciones.btn_vaciar_grupo">Vaciar grupo</button>
-                                </div>
-                            </div>
                             <div class="col-12 border-top pt-3 mt-2">
                                 <h6 class="fw-bold text-secondary mb-1" data-i18n="superadmin_instituciones.label_madre_grupo_stats">Madre del grupo</h6>
-                                <p class="small text-muted mb-2" data-i18n="superadmin_instituciones.help_madre_grupo">Solo la sede marcada como madre (atributo madre_grupo = 1) puede ver en estadísticas los datos agregados de todo el grupo.</p>
+                                <p class="small text-muted mb-2" data-i18n="superadmin_instituciones.help_madre_grupo">Solo la sede con MadreGrupo = 1 puede ver en estadísticas los datos agregados de todo el grupo (misma DependenciaInstitucion).</p>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="madre_grupo" role="switch">
                                     <label class="form-check-label" for="madre_grupo"><span data-i18n="superadmin_instituciones.switch_madre_grupo">Esta sede es madre del grupo (estadísticas agregadas)</span></label>
