@@ -1228,7 +1228,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             if ($io === '') {
                 $io = 'Institución #' . (int) ($r['IdInstitucionSolicitante'] ?? 0);
             }
-            $sufOrigen = ' (' . $io . ')';
+            $sufOrigen = ' --> ' . $io;
             $deptoO = trim((string) ($r['depto_original_form'] ?? ''));
             $nprotO = trim((string) ($r['nprot_original_form'] ?? ''));
             $titO = trim((string) ($r['titulo_protocolo_original'] ?? ''));
@@ -1315,7 +1315,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     $nombreInstDepto = trim((string) ($cr['nombre_inst_depto'] ?? ''));
                     $deptoBase = trim((string) ($cr['nombre_depto'] ?? ''));
                     $sufDept = ($idInstDept > 0 && $idInstDept !== $idInstForm) || $extDept;
-                    $deptoDisp = ($deptoBase !== '' ? $deptoBase : '-') . ($sufDept && $nombreInstDepto !== '' ? ' (' . $nombreInstDepto . ')' : '');
+                    $deptoExterno = ($sufDept && $nombreInstDepto !== '' ? ' (' . $nombreInstDepto . ')' : '');
+                    $nomInstForm = trim((string) ($cr['nombre_inst_form'] ?? ''));
+                    $sufInstForm = ($nomInstForm !== '' ? ' --> ' . $nomInstForm : '');
+                    $deptoDisp = ($deptoBase !== '' ? $deptoBase : '-') . $deptoExterno . $sufInstForm;
 
                     $nprot = trim((string) ($cr['nprot'] ?? ''));
                     $titP = trim((string) ($cr['titulo_prot'] ?? ''));
@@ -1326,10 +1329,11 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     $protoLine = trim((string) $protoLine);
                     $nombreInstProt = trim((string) ($cr['nombre_inst_prot'] ?? ''));
                     $sufProt = $idInstProt > 0 && $idInstProt !== $idInstForm;
-                    $protoDisp = ($protoLine !== '' ? $protoLine : '-') . ($sufProt && $nombreInstProt !== '' ? ' (' . $nombreInstProt . ')' : '');
+                    $protoExterno = ($sufProt && $nombreInstProt !== '' ? ' (' . $nombreInstProt . ')' : '');
+                    $protoDisp = ($protoLine !== '' ? $protoLine : '-') . $protoExterno . $sufInstForm;
 
                     $invBase = trim((string) ($cr['solicitante'] ?? ''));
-                    $invDisp = $invBase !== '' ? $invBase : '-';
+                    $invDisp = ($invBase !== '' ? $invBase : '-') . $sufInstForm;
 
                     $itemC = [
                         'idFacturacionDerivada' => 0,

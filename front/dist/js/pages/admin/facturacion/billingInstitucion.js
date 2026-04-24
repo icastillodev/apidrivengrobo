@@ -34,6 +34,8 @@ export async function initBillingInstitucion() {
     if (selOrigen) {
         selOrigen.value = 'todos';
     }
+    const selEst = document.getElementById('sel-estado-cobro-inst');
+    if (selEst) selEst.value = 'all';
     await cargarListaInstituciones();
     const btn = document.getElementById('btn-cargar-inst');
     if (btn) btn.addEventListener('click', cargarFacturacionInstitucion);
@@ -56,11 +58,12 @@ async function cargarFacturacionInstitucion() {
     const hasta = document.getElementById('f-hasta-inst')?.value || null;
     const idInst = document.getElementById('sel-inst-solicitante')?.value || null;
     const origenFacturacion = document.getElementById('sel-origen-fact')?.value || 'todos';
+    const estadoCobro = document.getElementById('sel-estado-cobro-inst')?.value || 'all';
 
     try {
         showLoader();
         const res = await API.request('/billing/institucion-report', 'POST', {
-            desde, hasta, estadoCobro: 'all',
+            desde, hasta, estadoCobro,
             idInstitucionSolicitante: idInst || undefined,
             origenFacturacion
         });

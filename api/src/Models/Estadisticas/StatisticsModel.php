@@ -105,13 +105,14 @@ class StatisticsModel {
     }
 
     /**
-     * Formularios entregados que deben contarse en una institución: sede propietaria o destino de derivación activa.
+     * Formularios entregados que deben contarse en una institución: sede propietaria (IdInstitucion),
+     * destino de derivación activa, o institución de origen de derivación activa (misma idformA tras aceptar en destino).
      */
     private function sqlFormularioEnInstitucion(string $alias): string {
         if (!$this->hasFormularioDerivacionTable()) {
             return "{$alias}.IdInstitucion = ?";
         }
-        return "(({$alias}.IdInstitucion = ?) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_stats WHERE fdi_stats.idformA = {$alias}.idformA AND fdi_stats.Activo = 1 AND fdi_stats.IdInstitucionDestino = ?))";
+        return "(({$alias}.IdInstitucion = ?) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_stats WHERE fdi_stats.idformA = {$alias}.idformA AND fdi_stats.Activo = 1 AND fdi_stats.IdInstitucionDestino = ?) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_stats_o WHERE fdi_stats_o.idformA = {$alias}.idformA AND fdi_stats_o.Activo = 1 AND fdi_stats_o.IdInstitucionOrigen = ?))";
     }
 
     /**
@@ -126,12 +127,24 @@ class StatisticsModel {
         if (!$this->hasFormularioDerivacionTable()) {
             return "{$alias}.IdInstitucion IN ($ph)";
         }
-        return "(({$alias}.IdInstitucion IN ($ph)) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_rd WHERE fdi_rd.idformA = {$alias}.idformA AND fdi_rd.Activo = 1 AND fdi_rd.IdInstitucionDestino IN ($ph)))";
+        return "(({$alias}.IdInstitucion IN ($ph)) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_rd WHERE fdi_rd.idformA = {$alias}.idformA AND fdi_rd.Activo = 1 AND fdi_rd.IdInstitucionDestino IN ($ph)) OR EXISTS (SELECT 1 FROM formulario_derivacion fdi_rd_o WHERE fdi_rd_o.idformA = {$alias}.idformA AND fdi_rd_o.Activo = 1 AND fdi_rd_o.IdInstitucionOrigen IN ($ph)))";
     }
 
     /** @return int[] */
     private function paramsInstitucionFormulario(int $instId): array {
-        return $this->hasFormularioDerivacionTable() ? [(int) $instId, (int) $instId] : [(int) $instId];
+        return $this->hasFormularioDerivacionTable() ? [(int) $instId, (int) $instId, (int) $instId] : [(int) $instId];
+    }
+
+    /** Parámetros para $wfRed: tres bloques IN (?) alineados con sqlFormularioEnInstitucionesRed. @param int[] $ids */
+    private function paramsIdsFormularioInstitucionesRed(array $ids): array {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
+        if ($ids === []) {
+            return [];
+        }
+        if (!$this->hasFormularioDerivacionTable()) {
+            return $ids;
+        }
+        return array_merge($ids, $ids, $ids);
     }
 
     public function getGeneralStats($instId, $from, $to) {
@@ -431,7 +444,7 @@ class StatisticsModel {
         $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
         if ($ids === []) return [];
         $wf = $this->sqlFormularioEnInstitucionesRed('f', $ids);
-        $dbl = $this->hasFormularioDerivacionTable() ? array_merge($ids, $ids) : $ids;
+        $dbl = $this->paramsIdsFormularioInstitucionesRed($ids);
         $stmt = $this->db->prepare("
             SELECT
                 COALESCE(NULLIF(TRIM(tf.categoriaformulario), ''), 'Sin categoría') AS categoria,
@@ -462,7 +475,7 @@ class StatisticsModel {
         $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
         if ($ids === []) return [];
         $wf = $this->sqlFormularioEnInstitucionesRed('f', $ids);
-        $dbl = $this->hasFormularioDerivacionTable() ? array_merge($ids, $ids) : $ids;
+        $dbl = $this->paramsIdsFormularioInstitucionesRed($ids);
         $stmt = $this->db->prepare("
             SELECT
                 COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
@@ -494,7 +507,7 @@ class StatisticsModel {
         $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
         if ($ids === []) return [];
         $wf = $this->sqlFormularioEnInstitucionesRed('f', $ids);
-        $dbl = $this->hasFormularioDerivacionTable() ? array_merge($ids, $ids) : $ids;
+        $dbl = $this->paramsIdsFormularioInstitucionesRed($ids);
         $placeholdersD = implode(',', array_fill(0, count($ids), '?'));
         $formDeptRed = $this->sqlFormularioAsignadoADeptoRed('f', 'd.iddeptoA', $ids);
         $xdFormRed = $this->paramsFormularioAsignadoADeptoRed($ids);
@@ -502,7 +515,7 @@ class StatisticsModel {
         $deptoPartRed = "CASE WHEN (d.IdInstitucion IS NOT NULL AND d.IdInstitucion <> f.IdInstitucion) OR {$extClauseRed} THEN CONCAT(TRIM(d.NombreDeptoA), ' (', TRIM(COALESCE(insD.NombreInst, '')), ')') ELSE TRIM(d.NombreDeptoA) END";
         $stmt = $this->db->prepare("
             SELECT
-                CONCAT(inst.NombreInst, ' – ', {$deptoPartRed}) AS departamento,
+                CONCAT(inst.NombreInst, ' --> ', {$deptoPartRed}) AS departamento,
                 COALESCE(NULLIF(TRIM(c.CepaNombreA), ''), 'Sin cepa') AS cepa,
                 IFNULL(SUM(s.totalA), 0) AS cantidad_animales
             FROM departamentoe d
@@ -646,7 +659,7 @@ class StatisticsModel {
             (SELECT COUNT(*) FROM formularioe f JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario WHERE $wfRed AND f.estado = 'Entregado' AND t.categoriaformulario = 'Insumos' AND f.fechainicioA BETWEEN ? AND ?) as total_insumos,
             (SELECT COUNT(*) FROM protocoloexpe pe WHERE pe.IdInstitucion IN ($placeholders) AND pe.FechaFinProtA >= CURDATE() AND (NOT EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA) OR EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA AND sp.Aprobado = 1))) as total_protocolos,
             (SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion IN ($placeholders) AND a.finalizado = 0) as total_alojamientos";
-        $dblIds = $this->hasFormularioDerivacionTable() ? array_merge($ids, $ids) : $ids;
+        $dblIds = $this->paramsIdsFormularioInstitucionesRed($ids);
         $paramsG = array_merge(
             $dblIds, [$from, $to],
             $dblIds, [$from, $to],
@@ -687,7 +700,7 @@ class StatisticsModel {
             $instName = $this->getInstitutionName($id);
             foreach ($rows as $r) {
                 $r['institucion'] = $instName;
-                $r['departamento'] = $instName . ' – ' . $r['departamento'];
+                $r['departamento'] = $instName . ' --> ' . $r['departamento'];
                 $res['por_departamento'][] = $r;
             }
         }
@@ -699,7 +712,7 @@ class StatisticsModel {
             $instName = $this->getInstitutionName($id);
             foreach ($orgRows as $r) {
                 $r['institucion'] = $instName;
-                $r['organizacion'] = $instName . ' – ' . ($r['organizacion'] ?? '');
+                $r['organizacion'] = $instName . ' --> ' . ($r['organizacion'] ?? '');
                 $res['por_organizacion'][] = $r;
             }
         }
@@ -720,7 +733,7 @@ class StatisticsModel {
             $stmtA->execute([$id, $id]);
             $instName = $this->getInstitutionName($id);
             foreach ($stmtA->fetchAll(\PDO::FETCH_ASSOC) as $r) {
-                $r['departamento'] = $instName . ' – ' . $r['departamento'];
+                $r['departamento'] = $instName . ' --> ' . $r['departamento'];
                 $res['alojamientos_activos'][] = $r;
             }
         }
@@ -731,7 +744,7 @@ class StatisticsModel {
         $xdFormRed = $this->paramsFormularioAsignadoADeptoRed($ids);
         $extClauseRed = $this->hasColumn('departamentoe', 'externodepto') ? 'IFNULL(d.externodepto, 0) = 2' : '0';
         $deptoPartRed = "CASE WHEN (d.IdInstitucion IS NOT NULL AND d.IdInstitucion <> f.IdInstitucion) OR {$extClauseRed} THEN CONCAT(TRIM(d.NombreDeptoA), ' (', TRIM(COALESCE(insD.NombreInst, '')), ')') ELSE TRIM(d.NombreDeptoA) END";
-        $sqlDetalle = "SELECT CONCAT(inst.NombreInst, ' – ', {$deptoPartRed}) AS departamento, e.EspeNombreA AS especie, sb.SubEspeNombreA AS subespecie, SUM(s.totalA) AS cantidad_animales
+        $sqlDetalle = "SELECT CONCAT(inst.NombreInst, ' --> ', {$deptoPartRed}) AS departamento, e.EspeNombreA AS especie, sb.SubEspeNombreA AS subespecie, SUM(s.totalA) AS cantidad_animales
             FROM departamentoe d
             LEFT JOIN institucion insD ON insD.IdInstitucion = d.IdInstitucion
             INNER JOIN formularioe f ON f.estado = 'Entregado' AND $wfRed AND f.fechainicioA BETWEEN ? AND ?
@@ -750,7 +763,7 @@ class StatisticsModel {
 
         // 6. DETALLE PROTOCOLOS (depto de otra sede / externo: nombre (institución))
         $deptoProtPartRed = "CASE WHEN (d.IdInstitucion IS NOT NULL AND d.IdInstitucion <> pe.IdInstitucion) OR {$extClauseRed} THEN CONCAT(TRIM(d.NombreDeptoA), ' (', TRIM(COALESCE(insD.NombreInst, '')), ')') ELSE TRIM(d.NombreDeptoA) END";
-        $sqlProtUso = "SELECT DISTINCT CONCAT(inst.NombreInst, ' – ', {$deptoProtPartRed}) AS departamento, pe.nprotA, pe.tituloA, pe.FechaFinProtA
+        $sqlProtUso = "SELECT DISTINCT CONCAT(inst.NombreInst, ' --> ', {$deptoProtPartRed}) AS departamento, pe.nprotA, pe.tituloA, pe.FechaFinProtA
             FROM formularioe f JOIN protformr pfr ON f.idformA = pfr.idformA JOIN protocoloexpe pe ON pfr.idprotA = pe.idprotA JOIN protdeptor pdr ON pe.idprotA = pdr.idprotA JOIN departamentoe d ON pdr.iddeptoA = d.iddeptoA LEFT JOIN institucion insD ON insD.IdInstitucion = d.IdInstitucion JOIN institucion inst ON inst.IdInstitucion = pe.IdInstitucion
             WHERE $wfRed AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? ORDER BY inst.NombreInst, departamento, pe.nprotA";
         $stmtP = $this->db->prepare($sqlProtUso);

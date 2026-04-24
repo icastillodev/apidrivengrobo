@@ -94,7 +94,7 @@
             </div>
 
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.inst_solicitante">Institución:</span>
                         <select id="sel-inst-solicitante" class="form-select form-select-sm fw-bold shadow-none" style="border-color: #6f42c1;"></select>
@@ -112,13 +112,25 @@
                         <input type="date" id="f-hasta-inst" class="form-control form-control-sm shadow-none">
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.filtro_origen_fact">Origen</span>
                         <select id="sel-origen-fact" class="form-select form-select-sm shadow-none" style="border-color: #6f42c1;">
                             <option value="todos" data-i18n="facturacion.origen_fact_todos">Todos</option>
                             <option value="derivado" data-i18n="facturacion.origen_fact_derivado">Solo derivados</option>
                             <option value="comun" data-i18n="facturacion.origen_fact_comun">Solo comunes (local)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.filtro_estado_cobro">Estado cobro</span>
+                        <select id="sel-estado-cobro-inst" class="form-select form-select-sm shadow-none" style="border-color: #6f42c1;">
+                            <option value="all" data-i18n="facturacion.estado_cobro_todos">TODOS</option>
+                            <option value="1" data-i18n="facturacion.estado_cobro_pendiente">PENDIENTE</option>
+                            <option value="2" data-i18n="facturacion.estado_cobro_parcial">PARCIAL</option>
+                            <option value="3" data-i18n="facturacion.estado_cobro_pagado">PAGADO</option>
+                            <option value="4" data-i18n="facturacion.estado_cobro_anulado">ANULADO</option>
                         </select>
                     </div>
                 </div>
