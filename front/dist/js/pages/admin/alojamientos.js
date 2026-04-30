@@ -1,5 +1,5 @@
 // dist/js/pages/admin/alojamientos.js
-import { API } from '../../api.js';
+import { API, buildQrAlojamientoPublicPageRelativeUrl } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 
@@ -12,9 +12,6 @@ import { ExportUI } from './alojamientos/ExportUI.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../modulesAccess.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
-
-// Base Path dinámico para compatibilidad Local / Producción
-const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 
 function resolveAlojamientosInstId() {
     const raw = localStorage.getItem('instId') || sessionStorage.getItem('instId');
@@ -52,8 +49,9 @@ export async function initAlojamientosPage() {
     }
 }
 
-// Función global exportada para que otros módulos puedan recargar la grilla
-export async function loadAlojamientos() {
+/** @param {{ resetPagination?: boolean }} [options] Si `resetPagination`, vuelve a la página 1 (útil tras crear una historia nueva). */
+export async function loadAlojamientos(options = {}) {
+    const resetPagination = options.resetPagination === true;
     try {
         const hasGlobal = !!document.getElementById('global-loader');
         if (!hasGlobal) {
@@ -82,6 +80,7 @@ export async function loadAlojamientos() {
             }
         }
 
+            if (resetPagination) TableUI.currentPage = 1;
             TableUI.poblarFiltroEspecies?.();
         TableUI.render();
         if (res.status === 'success') refreshMenuNotifications();
@@ -92,6 +91,7 @@ export async function loadAlojamientos() {
         if (typeof Swal !== 'undefined') {
             Swal.fire({ icon: 'error', text: t?.err_carga_lista || '' });
         }
+            if (resetPagination) TableUI.currentPage = 1;
             TableUI.poblarFiltroEspecies?.();
         TableUI.render();
     } finally {
@@ -162,8 +162,8 @@ window.verPaginaQR = async (historiaId = null) => {
         if (res.status === 'success' && res.codigo) {
             Swal.close();
             
-            // 3. Abrimos la URL limpia, corta y pública (Ej: /qr/a8x2m9)
-            const url = `${basePath}qr/${res.codigo}`;
+            // URL explícita a la página QR (compatible sin rewrite nginx en /qr/:code).
+            const url = buildQrAlojamientoPublicPageRelativeUrl(res.codigo);
             window.open(url, 'Ficha QR', 'width=700,height=700,menubar=no,toolbar=no');
         } else {
             throw new Error(res.message || (t?.qr_error_token || "Error al generar el token de seguridad."));

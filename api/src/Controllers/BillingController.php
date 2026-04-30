@@ -102,10 +102,22 @@ class BillingController {
                 $totalPagadoGlobal += $sumPagadoF;
             }
 
+            $rangoFechas = ($desde && $hasta);
+
             foreach ($protocolosRaw as $p) {
-                $idProt = $p['idprotA'];
-                $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
-                $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                $idProt = (int) $p['idprotA'];
+                if ($rangoFechas) {
+                    $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta);
+                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta);
+                    if (!$hayForms && !$hayAloj) {
+                        continue;
+                    }
+                    $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta) : [];
+                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta) : [];
+                } else {
+                    $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                }
 
                 if (!empty($formularios) || !empty($alojamientos)) {
                     $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
@@ -286,8 +298,22 @@ class BillingController {
             $estadoCobro = $f['estadoCobro'] ?? 'all';
             $idInstitucionSolicitante = $f['idInstitucionSolicitante'] ?? null;
             $origenFacturacion = $f['origenFacturacion'] ?? 'todos';
+            $instPage = isset($f['instPage']) ? (int) $f['instPage'] : 0;
+            $instPerPage = isset($f['instPerPage']) ? (int) $f['instPerPage'] : 0;
+            if ($instPerPage > 0 && $instPage < 1) {
+                $instPage = 1;
+            }
 
-            $data = $this->model->getInstitutionDerivedReport($instId, $desde, $hasta, $estadoCobro, $idInstitucionSolicitante, $origenFacturacion);
+            $data = $this->model->getInstitutionDerivedReport(
+                $instId,
+                $desde,
+                $hasta,
+                $estadoCobro,
+                $idInstitucionSolicitante,
+                $origenFacturacion,
+                $instPerPage > 0 ? $instPage : null,
+                $instPerPage > 0 ? $instPerPage : null
+            );
             $this->sendSuccess($data);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
@@ -441,15 +467,63 @@ class BillingController {
     }
 
     public function updateBalance() {
-        $f = $this->getRequestData();
+        $f = $this->getRequestData() ?: [];
         try {
             $sesion = Auditoria::getDatosSesion(); // Extraemos del Token
+            $idUsr = (int) ($f['idUsr'] ?? 0);
+            $monto = (float) ($f['monto'] ?? 0);
+            if ($idUsr <= 0) {
+                $this->sendError('Usuario inválido.');
+            }
+            if (abs($monto) < 1e-9) {
+                $this->sendError('Monto inválido.');
+            }
             $transferId = $f['transferId'] ?? null;
             $comment = $f['comment'] ?? null;
-            $res = $this->model->updateBalance($f['idUsr'], $sesion['instId'], $f['monto'], $sesion['userId'], $transferId, $comment);
-            if($res) $this->sendSuccess("Saldo actualizado");
-            else $this->sendError("No se pudo actualizar");
-        } catch (\Exception $e) { $this->sendError($e->getMessage()); }
+            $res = $this->model->updateBalance($idUsr, $sesion['instId'], $monto, $sesion['userId'], $transferId, $comment);
+            if ($res) {
+                $this->sendSuccess('Saldo actualizado');
+            } else {
+                $this->sendError('No se pudo actualizar');
+            }
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
+    /**
+     * Compatibilidad: ajuste de saldo vía FormData (POST clásico).
+     * Campos: idUsr, monto (positivo suma / negativo resta), opcional comentario|comment, transferId.
+     */
+    public function ajustarSaldo() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idUsr = isset($_POST['idUsr']) ? (int) $_POST['idUsr'] : 0;
+            $monto = isset($_POST['monto']) ? (float) $_POST['monto'] : 0.0;
+            if ($idUsr <= 0) {
+                $this->sendError('Usuario inválido.');
+            }
+            if (abs($monto) < 1e-9) {
+                $this->sendError('Monto inválido.');
+            }
+            $rawComment = $_POST['comentario'] ?? ($_POST['comment'] ?? '');
+            $comment = is_string($rawComment) ? trim($rawComment) : '';
+            if ($comment === '') {
+                $comment = null;
+            }
+            $rawTid = $_POST['transferId'] ?? '';
+            $transferId = is_string($rawTid) ? trim($rawTid) : '';
+            if ($transferId === '') {
+                $transferId = null;
+            }
+            $res = $this->model->updateBalance($idUsr, $sesion['instId'], $monto, $sesion['userId'], $transferId, $comment);
+            if ($res) {
+                $this->sendSuccess(['ok' => true]);
+            }
+            $this->sendError('No se pudo actualizar el saldo.');
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
     }
 
     public function processPayment() {

@@ -191,6 +191,12 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                 showConfirmButton: false,
                 timer: 2000
             });
+        } else {
+            await Swal.fire(
+                window.txt?.generales?.error || 'Error',
+                res.message || txF().error_balance || 'No se pudo actualizar el saldo.',
+                'error'
+            );
         }
     } catch (e) { console.error(e); } finally { hideLoader(); }
 };
@@ -348,7 +354,6 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
         });
 
         if (res.status === 'success') {
-            hideLoader();
             const tf = txF();
             await Swal.fire(tf.pago_procesado || '¡Pago Procesado!', tf.payment_saldo_actualizado_msg || 'El saldo ha sido actualizado.', 'success');
 
@@ -360,10 +365,12 @@ async function ejecutarPagoFinal(idUsr, monto, items) {
                 await window.cargarFacturacionDepto();
             }
         } else {
-            Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
+            await Swal.fire(window.txt?.generales?.error || 'Error', res.message || txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
         }
     } catch (e) {
         console.error(e);
+        await Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
+    } finally {
         hideLoader();
     }
 }

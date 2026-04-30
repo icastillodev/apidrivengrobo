@@ -8,6 +8,9 @@ import './billingPayments.js';
 import './modals/manager.js';
 
 let currentReportDataInst = null;
+/** Solo se pintan N tarjetas por institución a la vez; los saldos se piden solo para esa página. */
+const INST_BILLING_CARDS_PER_PAGE = 5;
+let instBillingCardsPage = 1;
 
 function tf(key, fb = '') {
     return window.txt?.facturacion?.billing_institucion?.[key] ?? fb;
@@ -53,20 +56,40 @@ async function cargarListaInstituciones() {
     } catch (e) { console.error(e); }
 }
 
-async function cargarFacturacionInstitucion() {
+/**
+ * Cuerpo POST para /billing/institucion-report.
+ * @param {number} instPage Página 1-based (solo aplica si instPerPage > 0).
+ * @param {number} instPerPage Instituciones por página (1–50) o 0 = todas (exportaciones).
+ */
+function buildInstReportBody(instPage = 1, instPerPage = INST_BILLING_CARDS_PER_PAGE) {
     const desde = document.getElementById('f-desde-inst')?.value || null;
     const hasta = document.getElementById('f-hasta-inst')?.value || null;
     const idInst = document.getElementById('sel-inst-solicitante')?.value || null;
     const origenFacturacion = document.getElementById('sel-origen-fact')?.value || 'todos';
     const estadoCobro = document.getElementById('sel-estado-cobro-inst')?.value || 'all';
+    const body = {
+        desde,
+        hasta,
+        estadoCobro,
+        origenFacturacion,
+        instPage,
+        instPerPage
+    };
+    if (idInst) body.idInstitucionSolicitante = idInst;
+    return body;
+}
 
+/** Reporte completo (todas las instituciones) para PDF/Excel global. */
+async function fetchInstitucionReportFullData() {
+    const res = await API.request('/billing/institucion-report', 'POST', buildInstReportBody(1, 0));
+    if (res.status !== 'success' || !res.data) return null;
+    return res.data;
+}
+
+async function cargarFacturacionInstitucion() {
     try {
         showLoader();
-        const res = await API.request('/billing/institucion-report', 'POST', {
-            desde, hasta, estadoCobro,
-            idInstitucionSolicitante: idInst || undefined,
-            origenFacturacion
-        });
+        const res = await API.request('/billing/institucion-report', 'POST', buildInstReportBody(1, INST_BILLING_CARDS_PER_PAGE));
         if (res.status === 'success' && res.data) {
             window.currentReportDataInst = res.data;
             await renderResultadosInstitucion(res.data);
@@ -140,31 +163,65 @@ async function renderResultadosInstitucion(data) {
         }
     }
 
-    if (!instituciones.length) {
+    const metaPg = data.meta?.instPagination;
+    const totalInstitutions = (metaPg && typeof metaPg.totalInstitutions === 'number')
+        ? metaPg.totalInstitutions
+        : instituciones.length;
+
+    if (totalInstitutions <= 0 || !instituciones.length) {
         container.innerHTML = `<div class="alert alert-info">${t.facturacion?.sin_datos_institucion || 'No hay facturación derivada para los filtros seleccionados.'}</div>`;
         return;
     }
 
-    // Tabla formato departamento: ID, Estado, Solicitante, Especie/Tipo, Detalle, Total, Pagado, Debe + PDF por fila
-    let html = '';
-    instituciones.forEach(inst => {
-        const items = inst.items || [];
-        const ti = inst.totales || {};
-        const instNombre = escapeHtml(inst.institucion || '-');
+    instBillingCardsPage = metaPg?.page ?? 1;
+    await paintInstBillingCardsPage(fmt, t, container);
+}
 
-        const grouped = {
-            animal: [],
-            reactivo: [],
-            insumo: [],
-            otros: []
-        };
-        items.forEach((item) => {
-            const tipoKey = normalizeTipoFormulario(item.tipoFormulario || item.categoria || item.nombreTipo || '');
-            if (grouped[tipoKey]) grouped[tipoKey].push(item);
-            else grouped.otros.push(item);
-        });
+/**
+ * Paginación de tarjetas por institución + hidratar saldos solo del lote visible.
+ * Con `meta.instPagination` del API el rango usa `perPage` del servidor.
+ */
+function buildInstBillingPagerHtml(page, totalPages, totalCards, perPage = INST_BILLING_CARDS_PER_PAGE) {
+    if (totalPages <= 1) return '';
+    const gen = window.txt?.generales || {};
+    const tm = window.txt?.facturacion?.billing_institucion || {};
+    const from = (page - 1) * perPage + 1;
+    const to = Math.min(page * perPage, totalCards);
+    const status = (tm.inst_cards_range_tpl || '{a}–{b} / {total}')
+        .replace(/\{a\}/g, String(from))
+        .replace(/\{b\}/g, String(to))
+        .replace(/\{total\}/g, String(totalCards));
+    const prevL = gen.pag_anterior || 'Anterior';
+    const nextL = gen.pag_siguiente || 'Siguiente';
+    return `
+        <nav class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 p-2 bg-white rounded shadow-sm border" data-i18n-ignore="true" aria-label="institution-cards">
+            <span class="small text-muted">${escapeHtml(status)}</span>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" ${page <= 1 ? 'disabled' : ''} onclick="window.goInstBillingCardPage(${page - 1})">${escapeHtml(prevL)}</button>
+                <span class="btn btn-outline-secondary disabled" style="pointer-events:none;opacity:1;">${page} / ${totalPages}</span>
+                <button type="button" class="btn btn-outline-secondary" ${page >= totalPages ? 'disabled' : ''} onclick="window.goInstBillingCardPage(${page + 1})">${escapeHtml(nextL)}</button>
+            </div>
+        </nav>`;
+}
 
-        html += `
+function buildOneInstitucionCardHtml(inst, t, fmt) {
+    const items = inst.items || [];
+    const ti = inst.totales || {};
+    const instNombre = escapeHtml(inst.institucion || '-');
+
+    const grouped = {
+        animal: [],
+        reactivo: [],
+        insumo: [],
+        otros: []
+    };
+    items.forEach((item) => {
+        const tipoKey = normalizeTipoFormulario(item.tipoFormulario || item.categoria || item.nombreTipo || '');
+        if (grouped[tipoKey]) grouped[tipoKey].push(item);
+        else grouped.otros.push(item);
+    });
+
+    return `
             <div class="card card-inst shadow-sm border-0 mb-5" id="card-inst-${inst.idInstitucionSolicitante}">
                 <div class="card-header bg-white py-3 border-bottom">
                     <div class="d-flex justify-content-between align-items-center">
@@ -237,12 +294,95 @@ async function renderResultadosInstitucion(data) {
                     </div>
                 </div>
             </div>`;
+}
+
+async function paintInstBillingCardsPage(fmt, t, container) {
+    const data = window.currentReportDataInst;
+    if (!data) return;
+
+    const metaPg = data.meta?.instPagination;
+    let slice;
+    let totalCards;
+    let totalPages;
+    let displayPage;
+    let perForPager = INST_BILLING_CARDS_PER_PAGE;
+
+    if (metaPg && typeof metaPg.totalInstitutions === 'number') {
+        totalCards = metaPg.totalInstitutions;
+        totalPages = metaPg.totalPages || 1;
+        displayPage = metaPg.page || 1;
+        perForPager = metaPg.perPage || INST_BILLING_CARDS_PER_PAGE;
+        instBillingCardsPage = displayPage;
+        slice = Array.isArray(data.instituciones) ? data.instituciones : [];
+    } else {
+        const all = Array.isArray(data.instituciones) ? data.instituciones : [];
+        totalCards = all.length;
+        totalPages = Math.ceil(totalCards / INST_BILLING_CARDS_PER_PAGE) || 1;
+        if (instBillingCardsPage > totalPages) instBillingCardsPage = totalPages;
+        if (instBillingCardsPage < 1) instBillingCardsPage = 1;
+        displayPage = instBillingCardsPage;
+        const start = (displayPage - 1) * INST_BILLING_CARDS_PER_PAGE;
+        slice = all.slice(start, start + INST_BILLING_CARDS_PER_PAGE);
+    }
+
+    let cardsHtml = '';
+    slice.forEach((inst) => {
+        cardsHtml += buildOneInstitucionCardHtml(inst, t, fmt);
     });
 
-    container.innerHTML = html;
+    const pager = buildInstBillingPagerHtml(displayPage, totalPages, totalCards, perForPager);
+    container.innerHTML = pager + cardsHtml + pager;
     vincularCheckboxesInst();
-    await hydrateInvestigadoresSaldosInst(instituciones);
+    await hydrateInvestigadoresSaldosInst(slice);
 }
+
+window.goInstBillingCardPage = async function goInstBillingCardPage(nextPage) {
+    const data = window.currentReportDataInst;
+    const metaPg = data?.meta?.instPagination;
+
+    if (metaPg && typeof metaPg.totalInstitutions === 'number') {
+        const totalPages = metaPg.totalPages || 1;
+        if (nextPage < 1 || nextPage > totalPages) return;
+        const container = document.getElementById('billing-results-inst');
+        if (!container) return;
+        try {
+            showLoader();
+            const res = await API.request('/billing/institucion-report', 'POST', buildInstReportBody(nextPage, metaPg.perPage || INST_BILLING_CARDS_PER_PAGE));
+            if (res.status === 'success' && res.data) {
+                window.currentReportDataInst = res.data;
+                const t = window.txt || {};
+                const fmt = (v) => `$ ${formatBillingMoney(parseFloat(v || 0))}`;
+                await paintInstBillingCardsPage(fmt, t, container);
+            } else if (window.Swal) {
+                window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || window.txt?.facturacion?.no_se_obtuvieron_datos || 'No se obtuvieron datos.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al cargar el reporte.', 'error');
+        } finally {
+            hideLoader();
+        }
+        try {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (_) { /* IE / permisos */ }
+        return;
+    }
+
+    const all = Array.isArray(data?.instituciones) ? data.instituciones : [];
+    if (!all.length) return;
+    const totalPages = Math.ceil(all.length / INST_BILLING_CARDS_PER_PAGE) || 1;
+    if (nextPage < 1 || nextPage > totalPages) return;
+    instBillingCardsPage = nextPage;
+
+    const container = document.getElementById('billing-results-inst');
+    if (!container) return;
+    const t = window.txt || {};
+    const fmt = (v) => `$ ${formatBillingMoney(parseFloat(v || 0))}`;
+    await paintInstBillingCardsPage(fmt, t, container);
+    try {
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (_) { /* IE / permisos */ }
+};
 
 /**
  * Bloques por investigador: saldo + cargar/quitar (misma lógica que facturación por investigador).
@@ -756,6 +896,18 @@ window.downloadInstGlobalPDF = async () => {
     }
     showLoader();
     try {
+        const exportData = await fetchInstitucionReportFullData();
+        if (!exportData?.instituciones?.length) {
+            if (window.Swal) {
+                window.Swal.fire(
+                    window.txt?.generales?.swal_atencion || 'Atención',
+                    tf('sin_datos_export', 'No hay datos para exportar.'),
+                    'info'
+                );
+            }
+            return;
+        }
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('l', 'mm', 'a4');
         const M = 18;
@@ -786,7 +938,7 @@ window.downloadInstGlobalPDF = async () => {
         doc.setFontSize(10); doc.text(`${tf('pdf_rango', 'RANGO:')} ${rango}`, 148, M + 12, { align: 'center' });
         doc.line(M, M + 15, 277, M + 15);
 
-        const t = window.currentReportDataInst.totales || {};
+        const t = exportData.totales || {};
         doc.autoTable({
             startY: M + 22, margin: { left: M, right: M },
             head: [[(f.total || 'TOTAL'), (f.total_pagado || 'PAGADO'), (f.falta || 'DEBE'), hCant]],
@@ -795,7 +947,7 @@ window.downloadInstGlobalPDF = async () => {
         });
 
         let currentY = doc.lastAutoTable.finalY + 12;
-        (window.currentReportDataInst.instituciones || []).forEach(inst => {
+        (exportData.instituciones || []).forEach(inst => {
             if (currentY > 160) { doc.addPage('l'); currentY = M; }
             doc.setFillColor(245, 245, 245); doc.rect(M, currentY, 259, 8, 'F');
             doc.setFontSize(10); doc.setTextColor(violeta[0], violeta[1], violeta[2]);
@@ -858,7 +1010,7 @@ window.downloadInstGlobalPDF = async () => {
     } finally { hideLoader(); }
 };
 
-window.exportExcelInstGlobal = () => {
+window.exportExcelInstGlobal = async () => {
     if (!window.currentReportDataInst) {
         if (window.Swal) {
             window.Swal.fire(
@@ -869,6 +1021,31 @@ window.exportExcelInstGlobal = () => {
         }
         return;
     }
+    showLoader();
+    let exportData;
+    try {
+        exportData = await fetchInstitucionReportFullData();
+    } catch (e) {
+        console.error(e);
+        if (window.Swal) {
+            window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al cargar el reporte.', 'error');
+        }
+        return;
+    } finally {
+        hideLoader();
+    }
+
+    if (!exportData?.instituciones?.length) {
+        if (window.Swal) {
+            window.Swal.fire(
+                window.txt?.generales?.swal_atencion || 'Atención',
+                tf('sin_datos_export', 'No hay datos para exportar.'),
+                'info'
+            );
+        }
+        return;
+    }
+
     const instNombre = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
     const slug = getInstSlugArchivo();
     const kInst = tf('excel_inst', 'Institución');
@@ -884,7 +1061,7 @@ window.exportExcelInstGlobal = () => {
     const kDeb = tf('excel_debe', 'Debe');
     const dataMatrix = [];
 
-    (window.currentReportDataInst.instituciones || []).forEach(inst => {
+    (exportData.instituciones || []).forEach(inst => {
         (inst.items || []).forEach(item => {
             dataMatrix.push({
                 [kInst]: inst.institucion || '-',

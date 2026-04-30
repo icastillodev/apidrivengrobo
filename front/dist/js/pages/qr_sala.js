@@ -7,7 +7,8 @@ const state = {
   month: null,
   bundle: null,
   selectedDate: null,
-  selectedSlot: null
+  /** Franjas atómicas contiguas; se envían fusionadas como un solo horario */
+  selectedSlots: []
 };
 
 export function initQRSalaPage() {
@@ -213,7 +214,7 @@ function renderCalendar() {
     if (inMonth) {
       div.onclick = () => {
         state.selectedDate = dateStr;
-        state.selectedSlot = null;
+        state.selectedSlots = [];
         renderCalendar();
         renderDayLists();
         updateReserveButton();
@@ -243,13 +244,9 @@ function renderDayLists() {
   slots.forEach(s => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'btn btn-sm slot-btn ' + (state.selectedSlot && sameSlot(state.selectedSlot, s) ? 'btn-success' : 'btn-outline-success');
+    btn.className = 'btn btn-sm slot-btn ' + (state.selectedSlots.some(x => sameSlot(x, s)) ? 'btn-success' : 'btn-outline-success');
     btn.textContent = `${s.start} - ${s.end}`;
-    btn.onclick = () => {
-      state.selectedSlot = s;
-      renderDayLists();
-      updateReserveButton();
-    };
+    btn.onclick = () => toggleQrSlot(s);
     slotsList.appendChild(btn);
   });
 
@@ -264,15 +261,70 @@ function renderDayLists() {
   });
 }
 
+function sortSlotsQr(slots) {
+  return [...(slots || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+}
+
+function areContiguousQr(sorted) {
+  if (!sorted.length) return false;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].end !== sorted[i + 1].start) return false;
+  }
+  return true;
+}
+
+function longestRunQr(sortedInput) {
+  const sorted = sortSlotsQr(sortedInput);
+  if (!sorted.length) return [];
+  let best = [];
+  let cur = [];
+  for (const s of sorted) {
+    if (!cur.length) cur = [s];
+    else if (cur[cur.length - 1].end === s.start) cur.push(s);
+    else {
+      if (cur.length > best.length) best = cur;
+      cur = [s];
+    }
+  }
+  if (cur.length > best.length) best = cur;
+  return best;
+}
+
+function getMergedQr() {
+  const sorted = sortSlotsQr(state.selectedSlots);
+  if (!sorted.length || !areContiguousQr(sorted)) return null;
+  return { start: sorted[0].start, end: sorted[sorted.length - 1].end };
+}
+
+function toggleQrSlot(slot) {
+  const t = window.txt?.qr_sala || {};
+  const idx = state.selectedSlots.findIndex(x => sameSlot(x, slot));
+  let next;
+  if (idx >= 0) {
+    next = state.selectedSlots.filter((_, i) => i !== idx);
+    next = longestRunQr(sortSlotsQr(next));
+  } else {
+    next = sortSlotsQr([...state.selectedSlots, slot]);
+    if (!areContiguousQr(next)) {
+      Swal.fire(t.err || 'Error', t.slots_contiguous || '', 'info');
+      return;
+    }
+  }
+  state.selectedSlots = next;
+  renderDayLists();
+  updateReserveButton();
+}
+
 function updateReserveButton() {
   const btn = document.getElementById('btn-reservar');
   const logged = !!localStorage.getItem('token');
-  btn.disabled = !(logged && state.sala?.IdSalaReserva && state.selectedDate && state.selectedSlot);
+  const merged = getMergedQr();
+  btn.disabled = !(logged && state.sala?.IdSalaReserva && state.selectedDate && merged);
 }
 
 function clearSelection() {
   state.selectedDate = null;
-  state.selectedSlot = null;
+  state.selectedSlots = [];
   renderCalendar();
   renderDayLists();
   updateReserveButton();
@@ -281,20 +333,23 @@ function clearSelection() {
 async function reservar() {
   const logged = !!localStorage.getItem('token');
   if (!logged) return;
-  if (!state.sala?.IdSalaReserva || !state.selectedDate || !state.selectedSlot) return;
+  const merged = getMergedQr();
+  if (!state.sala?.IdSalaReserva || !state.selectedDate || !merged) return;
 
   const payload = {
     IdSalaReserva: parseInt(state.sala.IdSalaReserva, 10),
     fechaini: state.selectedDate,
-    Horacomienzo: state.selectedSlot.start,
-    Horafin: state.selectedSlot.end,
+    Horacomienzo: merged.start,
+    Horafin: merged.end,
     instrumentos: []
   };
 
   const t = window.txt?.qr_sala || {};
+  const rangoTxt = `${merged.start} – ${merged.end}`;
+  const confirmText = (t.confirm_texto_rango || t.confirm_texto || '').replace(/\{rango\}/g, rangoTxt);
   const confirm = await Swal.fire({
     title: t.confirm_titulo || 'Confirmar reserva',
-    text: t.confirm_texto || '¿Deseas reservar este horario?',
+    text: confirmText,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: t.btn_confirmar || 'Confirmar',

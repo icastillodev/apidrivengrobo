@@ -12,7 +12,9 @@ import {
     getBillingNombreInstitucion,
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
-    billingSumInsumosCobrable
+    billingSumInsumosCobrable,
+    billingDerivacionPlainText,
+    billingAlojPeriodoParaInforme
 } from './billingLocale.js';
 import './billingPayments.js';
 
@@ -38,6 +40,102 @@ function txBE() {
 let currentReportData = null;
 /** Lista completa de departamentos (para filtrar por ámbito sin nueva petición) */
 let deptosRaw = [];
+
+/** Tarjetas de protocolo por página (menos DOM cuando hay muchos protocolos). */
+const DEPT_BILLING_PROTOCOLS_PER_PAGE = 8;
+let deptoProtPage = 1;
+
+function escapeHtml(s) {
+    if (s == null || s === '') return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function collectVisibleProtocolsDepto(data, showAni, showAlo) {
+    const list = Array.isArray(data?.protocolos) ? data.protocolos : [];
+    return list.filter((prot) => {
+        const hasVisibleForms = showAni && prot.formularios && prot.formularios.length > 0;
+        const hasVisibleAloj = showAlo && prot.alojamientos && prot.alojamientos.length > 0;
+        return hasVisibleForms || hasVisibleAloj;
+    });
+}
+
+function buildDeptoProtocolPagerHtml(page, totalPages, totalCards) {
+    if (totalPages <= 1) return '';
+    const gen = window.txt?.generales || {};
+    const tm = txBD();
+    const per = DEPT_BILLING_PROTOCOLS_PER_PAGE;
+    const from = (page - 1) * per + 1;
+    const to = Math.min(page * per, totalCards);
+    const status = (tm.prot_cards_range_tpl || '{a}–{b} / {total}')
+        .replace(/\{a\}/g, String(from))
+        .replace(/\{b\}/g, String(to))
+        .replace(/\{total\}/g, String(totalCards));
+    const prevL = gen.pag_anterior || 'Anterior';
+    const nextL = gen.pag_siguiente || 'Siguiente';
+    return `
+        <nav id="depto-prot-pager" class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 p-2 bg-white rounded shadow-sm border" data-i18n-ignore="true" aria-label="protocol-cards">
+            <span class="small text-muted">${escapeHtml(status)}</span>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" ${page <= 1 ? 'disabled' : ''} onclick="window.goDeptoProtocolPage(${page - 1})">${escapeHtml(prevL)}</button>
+                <span class="btn btn-outline-secondary disabled" style="pointer-events:none;opacity:1;">${page} / ${totalPages}</span>
+                <button type="button" class="btn btn-outline-secondary" ${page >= totalPages ? 'disabled' : ''} onclick="window.goDeptoProtocolPage(${page + 1})">${escapeHtml(nextL)}</button>
+            </div>
+        </nav>`;
+}
+
+function buildDeptoProtocolCardsHtml(visibleSlice, showAni, showAlo) {
+    let html = '';
+    visibleSlice.forEach((prot) => {
+        const hasVisibleForms = showAni && prot.formularios && prot.formularios.length > 0;
+        const hasVisibleAloj = showAlo && prot.alojamientos && prot.alojamientos.length > 0;
+        const header = getHeaderHTML(prot);
+        const formsTable = hasVisibleForms ? getFormsTableHTML(prot.formularios, prot.idProt) : '';
+        const alojTable = hasVisibleAloj ? getAlojTableHTML(prot.alojamientos, prot.idProt) : '';
+        const footer = getFooterHTML(prot, showAni, showAlo);
+        html += `
+                <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
+                    ${header}
+                    <div class="collapse" id="saldo-hist-${prot.idProt}">
+                        <div class="border-top bg-light p-2" id="saldo-hist-inner-${prot.idProt}" style="font-size: 11px;"></div>
+                    </div>
+                    <div class="card-body p-3">
+                        ${formsTable}
+                        ${alojTable}
+                    </div>
+                    ${footer}
+                </div>`;
+    });
+    return html;
+}
+
+/** Paginador + tarjetas del lote visible (lee checkboxes del DOM). */
+function buildDeptoProtocolDynamicBlock(data) {
+    const showAni = document.getElementById('chk-animales')?.checked;
+    const showAlo = document.getElementById('chk-alojamiento')?.checked;
+    const visible = collectVisibleProtocolsDepto(data, showAni, showAlo);
+    const totalCards = visible.length;
+    const totalPages = Math.max(1, Math.ceil(totalCards / DEPT_BILLING_PROTOCOLS_PER_PAGE));
+    const page = Math.min(Math.max(1, deptoProtPage), totalPages);
+    deptoProtPage = page;
+    const start = (page - 1) * DEPT_BILLING_PROTOCOLS_PER_PAGE;
+    const slice = visible.slice(start, start + DEPT_BILLING_PROTOCOLS_PER_PAGE);
+    const pager = buildDeptoProtocolPagerHtml(page, totalPages, totalCards);
+    const cards = buildDeptoProtocolCardsHtml(slice, showAni, showAlo);
+    return pager + `<div id="depto-prot-cards-wrap">${cards}</div>`;
+}
+
+window.goDeptoProtocolPage = (newPage) => {
+    deptoProtPage = newPage;
+    const dyn = document.getElementById('depto-prot-dynamic');
+    if (!dyn || !window.currentReportData) return;
+    dyn.innerHTML = buildDeptoProtocolDynamicBlock(window.currentReportData);
+    vincularCheckboxes();
+    vincularChecksPago();
+};
 
 export async function initBillingDepto() {
     try {
@@ -145,48 +243,32 @@ function renderizarResultados(data) {
     const container = document.getElementById('billing-results');
     renderDashboard(data);
 
-    // INYECTAMOS EL TÍTULO DEL DEPARTAMENTO
     const selectEl = document.getElementById('sel-depto');
-    if(selectEl && selectEl.selectedIndex > 0) {
-        document.getElementById('titulo-departamento-dinamico').innerText = selectEl.options[selectEl.selectedIndex].text;
+    if (selectEl && selectEl.selectedIndex > 0) {
+        const titEl = document.getElementById('titulo-departamento-dinamico');
+        if (titEl) titEl.innerText = selectEl.options[selectEl.selectedIndex].text;
     }
 
     const showIns = document.getElementById('chk-insumos').checked;
     const showAni = document.getElementById('chk-animales').checked;
     const showAlo = document.getElementById('chk-alojamiento').checked;
-    
-    let html = '';
 
+    deptoProtPage = 1;
+
+    let html = '';
     if (showIns && data.insumosGenerales) {
         html += getInsumosGeneralesTableHTML(data.insumosGenerales);
     }
 
-    data.protocolos.forEach(prot => {
-        const hasVisibleForms = showAni && prot.formularios && prot.formularios.length > 0;
-        const hasVisibleAloj = showAlo && prot.alojamientos && prot.alojamientos.length > 0;
+    if (collectVisibleProtocolsDepto(data, showAni, showAlo).length > 0) {
+        html += `<div id="depto-prot-dynamic">${buildDeptoProtocolDynamicBlock(data)}</div>`;
+    }
 
-        if (hasVisibleForms || hasVisibleAloj) {
-            const header = getHeaderHTML(prot);
-            const formsTable = hasVisibleForms ? getFormsTableHTML(prot.formularios, prot.idProt) : '';
-            const alojTable = hasVisibleAloj ? getAlojTableHTML(prot.alojamientos, prot.idProt) : '';
-            const footer = getFooterHTML(prot, showAni, showAlo);
+    if (!html) {
+        html = `<div class="alert alert-warning text-center">${txF().sin_movimientos || 'No hay movimientos que coincidan con los filtros seleccionados.'}</div>`;
+    }
 
-            html += `
-                <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
-                    ${header}
-                    <div class="collapse" id="saldo-hist-${prot.idProt}">
-                        <div class="border-top bg-light p-2" id="saldo-hist-inner-${prot.idProt}" style="font-size: 11px;"></div>
-                    </div>
-                    <div class="card-body p-3">
-                        ${formsTable}
-                        ${alojTable}
-                    </div>
-                    ${footer}
-                </div>`;
-        }
-    });
-
-    container.innerHTML = html || `<div class="alert alert-warning text-center">${txF().sin_movimientos || 'No hay movimientos que coincidan con los filtros seleccionados.'}</div>`;
+    container.innerHTML = html;
     vincularCheckboxes();
     vincularChecksPago();
     if (showIns) vincularCheckboxesInsumos();
@@ -268,6 +350,7 @@ function getFormsTableHTML(formularios, idProt) {
                         <th style="width:5%">${bd.th_id || 'ID'}</th>
                         <th style="width:8%">${bd.th_estado || 'ESTADO'}</th> 
                         <th style="width:12%">${bd.th_solicitante || 'SOLICITANTE'}</th>
+                        <th style="width:14%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                         <th style="width:15%">${bd.th_especie_cepa || 'ESPECIE / CEPA'}</th>
                         <th style="width:15%">${bd.th_detalle_concepto || 'DETALLE / CONCEPTO'}</th>
                         <th style="width:18%">${bd.th_cantidad_presentacion || 'CANTIDAD / PRESENTACIÓN'}</th>
@@ -317,6 +400,7 @@ function getFormsTableHTML(formularios, idProt) {
                                 <td class="small text-muted fw-bold">#${f.id}</td>
                                 <td>${estadoBadge}</td>
                                 <td class="small fw-bold">${f.solicitante}</td>
+                                <td class="small text-start text-muted">${billingDerivacionPlainText(f) || '—'}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
                                 <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
                                 <td>${cantidadDisplay}</td>
@@ -515,6 +599,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                 <td class="small text-muted">${i.id}</td>
                 <td>${badge}</td>
                 <td>${i.solicitante}</td>
+                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
             </tr>`;
@@ -534,6 +619,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${window.txt?.generales?.estado || 'Estado'}</th>
                             <th style="width:15%">${bd.th_solicitante || 'Solicitante'}</th>
+                            <th style="width:14%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th> 
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pago'}</th>
@@ -599,6 +685,7 @@ window.exportExcelDeptoGlobal = () => {
         dp: be.excel_depto_prot || 'Departamento / Protocolo',
         iu: be.excel_id_usuario || 'ID Usuario',
         sol: be.excel_solicitante || 'Solicitante',
+        qd: be.excel_quien_derivo || 'Derivado por',
         ti: be.excel_tipo_item || 'Tipo Item',
         ids: be.excel_id_sistema || 'ID Sistema',
         cd: be.excel_concepto_detalle || 'Concepto / Detalle',
@@ -610,7 +697,7 @@ window.exportExcelDeptoGlobal = () => {
     const dataMatrix = [];
     const row = (vals) => {
         const o = {};
-        o[C.dp] = vals.dp; o[C.iu] = vals.iu; o[C.sol] = vals.sol; o[C.ti] = vals.ti;
+        o[C.dp] = vals.dp; o[C.iu] = vals.iu; o[C.sol] = vals.sol; o[C.qd] = vals.qd; o[C.ti] = vals.ti;
         o[C.ids] = vals.ids; o[C.cd] = vals.cd; o[C.ct] = vals.ct; o[C.mp] = vals.mp; o[C.da] = vals.da;
         return o;
     };
@@ -622,6 +709,7 @@ window.exportExcelDeptoGlobal = () => {
                 dp: be.excel_ins_generales || 'INSUMOS GENERALES',
                 iu: i.IdUsrA,
                 sol: i.solicitante,
+                qd: billingDerivacionPlainText(i),
                 ti: be.excel_tipo_insumo || 'INSUMO',
                 ids: i.id,
                 cd: (i.detalle_completo || "").replace(/\|/g, " - "),
@@ -638,6 +726,7 @@ window.exportExcelDeptoGlobal = () => {
                 dp: `PROT: ${prot.nprotA}`,
                 iu: prot.idUsr,
                 sol: f.solicitante || prot.investigador,
+                qd: billingDerivacionPlainText(f),
                 ti: f.categoria?.toLowerCase().includes('reactivo') ? (be.excel_tipo_reactivo || 'REACTIVO') : (be.excel_tipo_animal || 'ANIMAL'),
                 ids: f.id,
                 cd: (f.detalle_display || "").replace(/<[^>]*>/g,''),
@@ -647,13 +736,19 @@ window.exportExcelDeptoGlobal = () => {
             }));
         });
         (prot.alojamientos || []).forEach(a => {
+            const diasU = String(be.excel_aloj_dias_unit || be.pdf_aloj_dias_unit || 'd').trim() || 'd';
+            const perTxt = billingAlojPeriodoParaInforme(a, { diasUnit: diasU, emptyLabel: '' });
+            const cdAloj = perTxt
+                ? `${tplAloj(a.especie, a.caja)} — ${perTxt}`
+                : tplAloj(a.especie, a.caja);
             dataMatrix.push(row({
                 dp: `PROT: ${prot.nprotA}`,
                 iu: prot.idUsr,
                 sol: a.TitularProtocolo || prot.investigador,
+                qd: '',
                 ti: be.excel_tipo_aloj || 'ALOJAMIENTO',
                 ids: a.historia,
-                cd: tplAloj(a.especie, a.caja),
+                cd: cdAloj,
                 ct: parseFloat(a.total || 0),
                 mp: parseFloat(a.pagado || 0),
                 da: parseFloat(a.debe || 0)
@@ -1043,24 +1138,30 @@ window.downloadGlobalPDF = async () => {
             const alojLine = (esp, caja) => (be.pdf_aloj_linea_tpl || 'Alojamiento Especie: {esp} ({caja})')
                 .replace(/\{esp\}/g, esp).replace(/\{caja\}/g, (caja != null && String(caja).length) ? String(caja) : cajaDef);
             const exLAlojG = bi.pdf_monto_exento || 'Exento';
+            const diasPdf = be.pdf_aloj_dias_unit || 'd';
+            const lblPerAloj = be.pdf_th_periodo_aloj_informe || bp.pdf_col_periodo_aloj || 'Periodo alojamiento';
             const bodyAloj = prot.alojamientos.map(a => {
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(a), a.total, a.pagado || 0, exLAlojG);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
-                return [a.historia, alojLine(a.especie, a.caja), a.fecha_inicio, a.fecha_fin || enCurso, c[0], c[1], c[2]];
+                const perTxt = billingAlojPeriodoParaInforme(a, {
+                    diasUnit: diasPdf,
+                    emptyLabel: enCurso,
+                });
+                return [a.historia, alojLine(a.especie, a.caja), perTxt, c[0], c[1], c[2]];
             });
 
             doc.autoTable({
                 startY: currentY, margin: { left: M, right: M }, head: [[
                     be.pdf_th_id_hist || 'ID Historia',
                     be.pdf_th_concepto || 'Concepto',
-                    be.pdf_th_ingreso || 'Ingreso',
-                    be.pdf_th_salida || 'Salida',
+                    lblPerAloj,
                     lblTotPdf,
                     lblPagPdf,
                     lblDebPdf
                 ]],
                 body: bodyAloj, theme: 'grid', headStyles: { fillColor: [100, 100, 100] },
-                styles: { fontSize: 7 }
+                styles: { fontSize: 7 },
+                columnStyles: { 2: { cellWidth: 62 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
             });
             currentY = doc.lastAutoTable.finalY + 12;
         } else {

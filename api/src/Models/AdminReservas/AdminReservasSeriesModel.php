@@ -24,8 +24,8 @@ class AdminReservasSeriesModel {
         $usrCreador = (int)($in['IdUsrCreador'] ?? 0);
         $usrTitular = (int)($in['IdUsrTitular'] ?? 0);
         $salaId = (int)($in['IdSalaReserva'] ?? 0);
-        $horaIni = $in['HoraInicio'] ?? null;
-        $horaFin = $in['HoraFin'] ?? null;
+        $horaIni = $this->normalizeHora($in['HoraInicio'] ?? null);
+        $horaFin = $this->normalizeHora($in['HoraFin'] ?? null);
         $fechaIni = $in['FechaInicio'] ?? null;
         $fechaFin = $in['FechaFin'] ?? null;
         $tipo = (int)($in['TipoRepeat'] ?? 0);
@@ -127,44 +127,81 @@ class AdminReservasSeriesModel {
     }
 
     private function computeDates($fechaIni, $fechaFin, $tipo, $cadaNSem, array $diasSemana, array $fechasEsp) {
-        $out = [];
-        $start = new \DateTime($fechaIni);
-        $end = new \DateTime($fechaFin);
-        $end->setTime(0,0,0);
-
         if ($tipo === 2) {
-            // Días específicos
-            foreach ($fechasEsp as $f) {
-                if (!is_string($f) || strlen($f) < 10) continue;
-                if ($f < $fechaIni || $f > $fechaFin) continue;
-                $out[] = $f;
-            }
-            $out = array_values(array_unique($out));
-            sort($out);
-            return $out;
+            return $this->computeSpecificDates($fechaIni, $fechaFin, $fechasEsp);
         }
+        return $this->computeWeeklyDates($fechaIni, $fechaFin, $cadaNSem, $diasSemana);
+    }
 
-        // Semanal (por defecto)
-        $dias = array_values(array_unique(array_filter(array_map('intval', $diasSemana), fn($d) => $d >= 1 && $d <= 7)));
-        if (!count($dias)) $dias = [(int)$start->format('N')]; // fallback: día de inicio
-
-        // Recorremos por días, pero aplicando cada N semanas por "semana offset"
-        $week0 = (int)$start->format('W');
-        for ($d = clone $start; $d <= $end; $d->modify('+1 day')) {
-            $dow = (int)$d->format('N');
-            if (!in_array($dow, $dias)) continue;
-
-            $w = (int)$d->format('W');
-            $deltaWeeks = ($w - $week0);
-            if ($deltaWeeks < 0) $deltaWeeks = 0; // evita edge de cambio de año (simple)
-            if (($deltaWeeks % $cadaNSem) !== 0) continue;
-
-            $out[] = $d->format('Y-m-d');
+    /** @param list<string|\Stringable> $fechasEsp */
+    private function computeSpecificDates($fechaIni, $fechaFin, array $fechasEsp): array {
+        $out = [];
+        foreach ($fechasEsp as $f) {
+            $sf = trim((string)$f);
+            if (strlen($sf) < 10) continue;
+            if ($sf < $fechaIni || $sf > $fechaFin) continue;
+            $out[] = $sf;
         }
-
         $out = array_values(array_unique($out));
         sort($out);
         return $out;
+    }
+
+    private function computeWeeklyDates($fechaIni, $fechaFin, $cadaNSem, array $diasSemana): array {
+        $start = \DateTime::createFromFormat('Y-m-d', (string)$fechaIni);
+        $end = \DateTime::createFromFormat('Y-m-d', (string)$fechaFin);
+        if (!$start || !$end) return [];
+        $start->setTime(0, 0, 0);
+        $end->setTime(0, 0, 0);
+
+        $dias = array_values(array_unique(array_filter(array_map('intval', $diasSemana), fn($d) => $d >= 1 && $d <= 7)));
+        if (!count($dias)) {
+            $dias = [(int)$start->format('N')];
+        }
+
+        $anchorMonday = clone $start;
+        $anchorN = (int)$anchorMonday->format('N');
+        $anchorMonday->modify('-' . ($anchorN - 1) . ' days');
+        $anchorMonday->setTime(0, 0, 0);
+
+        $step = max(1, (int)$cadaNSem);
+        $out = [];
+
+        for ($d = clone $start; $d <= $end; $d->modify('+1 day')) {
+            $dow = (int)$d->format('N');
+            if (!in_array($dow, $dias)) {
+                continue;
+            }
+            $mon = clone $d;
+            $n = (int)$mon->format('N');
+            $mon->modify('-' . ($n - 1) . ' days');
+            $mon->setTime(0, 0, 0);
+            $weeksApart = (int)floor(($mon->getTimestamp() - $anchorMonday->getTimestamp()) / (7 * 86400));
+            if ($weeksApart < 0) {
+                $weeksApart = 0;
+            }
+            if (($weeksApart % $step) !== 0) {
+                continue;
+            }
+            $out[] = $d->format('Y-m-d');
+        }
+
+        sort($out);
+        return array_values(array_unique($out));
+    }
+
+    private function normalizeHora($raw) {
+        if ($raw === null) {
+            return null;
+        }
+        $t = trim((string)$raw);
+        if ($t === '') {
+            return null;
+        }
+        if (!preg_match('/^(\d{1,2}):(\d{2})(:\d{2})?$/', $t, $m)) {
+            return $t;
+        }
+        return sprintf('%02d:%02d', max(0, min(23, (int)$m[1])), max(0, min(59, (int)$m[2])));
     }
 
     private function isExcluded($idSerie, $fecha, $horaIni, $horaFin) {
@@ -252,8 +289,12 @@ class AdminReservasSeriesModel {
     }
 
     private function diffMinutes($horaIni, $horaFin) {
-        $a = new \DateTime("1970-01-01 $horaIni:00");
-        $b = new \DateTime("1970-01-01 $horaFin:00");
+        $hi = $this->normalizeHora($horaIni);
+        $hf = $this->normalizeHora($horaFin);
+        if (!$hi || !$hf) return 0;
+        $a = \DateTime::createFromFormat('H:i', $hi);
+        $b = \DateTime::createFromFormat('H:i', $hf);
+        if (!$a || !$b) return 0;
         return (int)(($b->getTimestamp() - $a->getTimestamp()) / 60);
     }
 }

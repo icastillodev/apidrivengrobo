@@ -290,7 +290,7 @@ export const RegistroUI = {
                 bootstrap.Modal.getInstance(document.getElementById('modal-registro')).hide();
                 const t = window.txt?.alojamientos || {};
                 Swal.fire({ title: t.reg_exito_title || '¡Éxito!', text: t.reg_exito_msg || 'Alojamiento registrado correctamente.', icon: 'success', timer: 1500, showConfirmButton: false});
-                await loadAlojamientos(); 
+                await loadAlojamientos({ resetPagination: true });
             } else {
                 Swal.fire('Error', res.message, 'error');
             }

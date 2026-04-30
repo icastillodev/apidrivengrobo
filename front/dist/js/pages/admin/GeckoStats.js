@@ -17,6 +17,43 @@ let deptColorsRed = {};
 let currentStatsScope = 'sede';
 let redDataLoaded = false;
 
+/** Alineado con StatisticsController::STATS_MAX_RANGE_DAYS (evita peticiones que suelen provocar 504). */
+const STATS_MAX_RANGE_DAYS = 400;
+const STATS_API_TIMEOUT_MS = 120000;
+
+function txStats() {
+    return window.txt?.admin_estadisticas || {};
+}
+
+function validateStatsDatesForRequest(from, to) {
+    const t = txStats();
+    if (!from || !to) {
+        return { ok: false, message: t.err_fechas_requeridas || 'Indique fechas desde y hasta.' };
+    }
+    const re = /^\d{4}-\d{2}-\d{2}$/;
+    if (!re.test(String(from)) || !re.test(String(to))) {
+        return { ok: false, message: t.err_fechas_invalidas || 'Formato de fecha inválido (AAAA-MM-DD).' };
+    }
+    const d0 = new Date(`${from}T12:00:00`);
+    const d1 = new Date(`${to}T12:00:00`);
+    if (Number.isNaN(d0.getTime()) || Number.isNaN(d1.getTime())) {
+        return { ok: false, message: t.err_fechas_invalidas || 'Formato de fecha inválido (AAAA-MM-DD).' };
+    }
+    let a = d0.getTime();
+    let b = d1.getTime();
+    if (a > b) {
+        const tmp = a;
+        a = b;
+        b = tmp;
+    }
+    const days = Math.ceil((b - a) / 86400000);
+    if (days > STATS_MAX_RANGE_DAYS) {
+        const tpl = t.err_rango_muy_largo || 'Reduzca el periodo: el máximo es {d} días para evitar timeouts.';
+        return { ok: false, message: tpl.replace(/\{d\}/g, String(STATS_MAX_RANGE_DAYS)) };
+    }
+    return { ok: true };
+}
+
 export async function initStatsPage() {
     console.log("GeckoStats: Inicializando...");
     
@@ -120,16 +157,37 @@ async function loadStats() {
     const instId = localStorage.getItem('instId') || '1';
     
     const btn = document.getElementById('btn-update-stats');
-    const t = window.txt?.admin_estadisticas;
+    const t = txStats();
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || 'CARGANDO...'}`;
     }
 
-    try {
-        // ✅ AHORA SÍ FUNCIONARÁ EL MOTOR API.request
-        const res = await API.request(`/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`);
+    const vr = validateStatsDatesForRequest(from, to);
+    if (!vr.ok) {
+        alert(vr.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
+        }
+        return;
+    }
 
+    const ac = new AbortController();
+    const toid = setTimeout(() => ac.abort(), STATS_API_TIMEOUT_MS);
+
+    try {
+        const res = await API.request(
+            `/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`,
+            'GET',
+            null,
+            { signal: ac.signal }
+        );
+
+        if (res.errorKind === 'timeout' || res.message === 'STATS_REQUEST_TIMEOUT') {
+            alert(t.err_timeout_cliente || 'La consulta tardó demasiado. Acorte el rango de fechas o intente de nuevo.');
+            return;
+        }
         if (res.status === 'success') {
             rawData = res.data;
             document.getElementById('stats-content').style.display = 'block';
@@ -148,12 +206,13 @@ async function loadStats() {
             renderDetailsSection('sede');
             
         } else {
-            alert("Error en la respuesta: " + res.message);
+            alert(res.message || t?.err_respuesta || 'Error en la respuesta.');
         }
     } catch (e) {
         console.error("Error de red/servidor:", e);
-        alert("Error de conexión con el servidor.");
+        alert(t?.err_conexion || 'Error de conexión con el servidor.');
     } finally {
+        clearTimeout(toid);
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
@@ -184,13 +243,36 @@ async function loadStatsRedFull() {
     const from = document.getElementById('stats-from')?.value;
     const to = document.getElementById('stats-to')?.value;
     const btn = document.getElementById('btn-update-stats');
-    const t = window.txt?.admin_estadisticas;
+    const t = txStats();
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || 'CARGANDO...'}`;
     }
+
+    const vr = validateStatsDatesForRequest(from, to);
+    if (!vr.ok) {
+        alert(vr.message);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
+        }
+        return;
+    }
+
+    const ac = new AbortController();
+    const toid = setTimeout(() => ac.abort(), STATS_API_TIMEOUT_MS);
+
     try {
-        const res = await API.request(`/stats/dashboard-red?from=${from}&to=${to}&v=${Date.now()}`);
+        const res = await API.request(
+            `/stats/dashboard-red?from=${from}&to=${to}&v=${Date.now()}`,
+            'GET',
+            null,
+            { signal: ac.signal }
+        );
+        if (res.errorKind === 'timeout' || res.message === 'STATS_REQUEST_TIMEOUT') {
+            alert(t.err_timeout_cliente || 'La consulta tardó demasiado. Acorte el rango de fechas o intente de nuevo.');
+            return;
+        }
         if (res.status === 'success') {
             redRawData = res.data;
             redDataLoaded = true;
@@ -212,8 +294,9 @@ async function loadStatsRedFull() {
         }
     } catch (e) {
         console.error(e);
-        alert('Error de conexión.');
+        alert(t?.err_conexion || 'Error de conexión.');
     } finally {
+        clearTimeout(toid);
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';

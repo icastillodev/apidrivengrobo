@@ -1,8 +1,10 @@
-import { API } from '../../api.js';
+import { API, buildQrAlojamientoPublicPageAbsoluteUrl, getGroboFrontBasePath } from '../../api.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
 import { AnimalFichaUI } from './alojamientos/animalFicha.js'; 
 
-let isAdmin = false;
+const QR_STAFF_ROLES = new Set([1, 2, 4, 5, 6]);
+let qrStaff = false;
+let qrTitularPuedeUbicaciones = false;
 let currentHistoryData = [];
 let historiaId = null;
 let tokenQR = null;
@@ -18,17 +20,47 @@ window.cambiarIdiomaQR = (lang) => {
 };
 
 window.cerrarSesionQR = () => {
-    localStorage.removeItem('token'); 
-    localStorage.removeItem('userLevel'); 
-    localStorage.removeItem('userName'); 
+    localStorage.removeItem('token');
+    localStorage.removeItem('userLevel');
+    localStorage.removeItem('userName');
+    try {
+        sessionStorage.removeItem('groboQrAlojInstSlug');
+    } catch (_) { /* noop */ }
     window.location.reload();
 };
 
 window.irALogin = () => {
     localStorage.setItem('redirectAfterLogin', window.location.href);
-    const inst = localStorage.getItem('NombreInst') || '';
-    const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
-    window.location.href = `${basePath}${inst}/`; 
+    const ta = window.txt?.alojamientos || {};
+
+    let slug = '';
+    try {
+        slug = (sessionStorage.getItem('groboQrAlojInstSlug') || localStorage.getItem('NombreInst') || '').trim();
+    } catch (_) {
+        slug = (localStorage.getItem('NombreInst') || '').trim();
+    }
+
+    if (!slug) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'info',
+                title: ta.qr_login_espere_titulo || window.txt?.generales?.swal_atencion || 'Atención',
+                text: ta.qr_login_espere_cuerpo || 'Espere a que cargue la ficha de la historia y vuelva a pulsar «Acceso personal».'
+            });
+        }
+        return;
+    }
+    if (/[/#?\\]/.test(slug)) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                text: ta.qr_login_slug_invalido || 'No se puede abrir el inicio de sesión: institución inválida en esta ficha.'
+            });
+        }
+        return;
+    }
+
+    window.location.href = `${getGroboFrontBasePath()}${encodeURIComponent(slug)}/`;
 };
 
 window.abrirModalPersonalizar = () => { 
@@ -154,8 +186,7 @@ window.confirmarDescargaPDF = async () => {
         if (resToken.status !== 'success') throw new Error(window.txt?.alojamientos?.qr_error_codigo_seguro || "No se pudo generar el código seguro.");
 
         // 2. Armamos la URL corta y pública
-        const basePath = window.location.origin + ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/');
-        const publicUrl = `${basePath}qr/${resToken.codigo}`;
+        const publicUrl = buildQrAlojamientoPublicPageAbsoluteUrl(resToken.codigo);
 
         // 3. Dibujamos el QR en un div temporal e invisible
         const tempDiv = document.createElement('div');
@@ -286,13 +317,13 @@ const ROLE_MAP = {
 export const initQRPage = async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const historiaParam = urlParams.get('historia');
-    tokenQR = urlParams.get('token'); 
+    tokenQR = (urlParams.get('token') || '').trim();
 
-    // 🚀 EL FIX MAESTRO: Atrapa 6 letras/números que estén justo después de "/qr/"
+    /** Compat: enlaces cortos /qr/xxxxxx cuando nginx rewrite esté configurado */
     if (!tokenQR) {
-        const match = window.location.href.match(/\/qr\/([a-zA-Z0-9]{6})/);
+        const match = window.location.href.match(/\/qr\/([a-zA-Z0-9]{6})\b/i);
         if (match) {
-            tokenQR = match[1]; // ¡Atrapado! (ej: wr98ug)
+            tokenQR = match[1].trim().toLowerCase();
         }
     }
     
@@ -310,15 +341,15 @@ export const initQRPage = async () => {
     if(lbl) lbl.innerText = (localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es').toUpperCase();
 
     const token = localStorage.getItem('token');
-    const role = parseInt(localStorage.getItem('userLevel'));
+    const role = parseInt(localStorage.getItem('userLevel'), 10);
     const userName = localStorage.getItem('userName');
-    isAdmin = (token && [1, 2, 4, 5, 6].includes(role));
+    qrStaff = !!(token && QR_STAFF_ROLES.has(Number.isFinite(role) ? role : NaN));
 
-    renderAuthZone(userName, role);
+    renderAuthZone(userName, Number.isFinite(role) ? role : 0);
 
     window.TrazabilidadUI = TrazabilidadUI;
     window.AnimalFichaUI = AnimalFichaUI;
-    window.TrazabilidadUI.isReadOnly = !isAdmin;
+    window.TrazabilidadUI.isReadOnly = true;
 
     await cargarDatosQR(historiaParam, tokenQR);
 };
@@ -336,12 +367,47 @@ function renderAuthZone(name, roleId) {
             <i class="bi bi-person-circle fs-4 text-primary me-2"></i>
             <button onclick="window.cerrarSesionQR()" class="btn btn-xs btn-outline-danger py-0 px-2 shadow-sm"><i class="bi bi-box-arrow-right"></i></button>`;
             
-        if (isAdmin) {
+        if (qrStaff) {
             document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('admin-only', 'd-none'));
         }
     } else {
         zone.innerHTML = `<button onclick="window.irALogin()" class="btn btn-sm btn-outline-primary fw-bold"><i class="bi bi-person-lock me-1"></i> ${txt.qr_login_btn || txt.qr_login || 'ACCESO PERSONAL'}</button>`;
     }
+}
+
+/**
+ * Investigador titular del protocolo + misma sede que la ficha puede editar ubicación en trazabilidad (no las acciones administrativas de tramo).
+ */
+function applyTitularQrUbicaciones(firstRow) {
+    const token = localStorage.getItem('token');
+    const uid = parseInt(localStorage.getItem('userId') || '0', 10) || 0;
+    const role = parseInt(localStorage.getItem('userLevel') || '0', 10) || 0;
+    const sessInst =
+        parseInt(localStorage.getItem('instId') || sessionStorage.getItem('instId') || '0', 10) || 0;
+    const histInst =
+        parseInt(String(firstRow?.IdInstitucion ?? firstRow?.idinstitucion ?? '0'), 10) || 0;
+    const tit =
+        parseInt(String(firstRow?.IdTitularProtocolo ?? firstRow?.idTitularProtocolo ?? '0'), 10) || 0;
+
+    qrTitularPuedeUbicaciones =
+        !!token &&
+        role === 3 &&
+        uid > 0 &&
+        tit > 0 &&
+        uid === tit &&
+        sessInst > 0 &&
+        histInst > 0 &&
+        sessInst === histInst;
+
+    const ubicRw = qrStaff || qrTitularPuedeUbicaciones;
+    if (window.TrazabilidadUI) window.TrazabilidadUI.isReadOnly = !ubicRw;
+}
+
+function memorizarQrInstitutionSlugParaLogin(firstRow) {
+    try {
+        const slug = String(firstRow?.QrNombreInstFolder || firstRow?.qrNombreInstFolder || '').trim();
+        if (slug) sessionStorage.setItem('groboQrAlojInstSlug', slug);
+    } catch (_) { /* noop */ }
 }
 
 async function cargarDatosQR(hParam, tParam) {
@@ -354,8 +420,8 @@ async function cargarDatosQR(hParam, tParam) {
             res = await API.request(`/alojamiento/history?historia=${hParam}`);
             historiaId = hParam;
         } else if (tParam) {
-            // Modo Público (Escaneo QR): Usa la nueva API blindada basada en Token
-            res = await API.request(`/alojamiento/public-history?token=${tParam}`);
+            const tok = encodeURIComponent(String(tParam).trim());
+            res = await API.request(`/alojamiento/public-history?token=${tok}`);
         }
         
         if (res && res.status === 'success' && res.data && res.data.length > 0) {
@@ -367,6 +433,9 @@ async function cargarDatosQR(hParam, tParam) {
 
             // Si entró por QR público, descubrimos qué historia es realmente
             if (tParam) historiaId = first.historia;
+
+            memorizarQrInstitutionSlugParaLogin(first);
+            applyTitularQrUbicaciones(first);
 
             localStorage.setItem('instId_temp_qr', first.IdInstitucion || 1);
 
@@ -433,7 +502,7 @@ async function cargarDatosQR(hParam, tParam) {
                     
                     <td class="small text-muted italic">${h.observaciones || '---'}</td>
                     
-                    <td class="${isAdmin ? '' : 'd-none'}" onclick="event.stopPropagation()">
+                    <td class="${qrStaff ? '' : 'd-none'}" onclick="event.stopPropagation()">
                         <div class="btn-group shadow-sm">
                             <button class="btn btn-xs btn-outline-primary" onclick="window.modificarTramoQR(${h.IdAlojamiento})"><i class="bi bi-pencil"></i></button>
                             <button class="btn btn-xs btn-outline-danger" onclick="window.eliminarTramoQR(${h.IdAlojamiento})"><i class="bi bi-trash"></i></button>
@@ -441,7 +510,7 @@ async function cargarDatosQR(hParam, tParam) {
                     </td>
                 </tr>
                 <tr id="trazabilidad-row-${h.IdAlojamiento}" class="d-none bg-white">
-                    <td colspan="${isAdmin ? 7 : 6}" class="p-0 border-0">
+                    <td colspan="${qrStaff ? 7 : 6}" class="p-0 border-0">
                         <div id="trazabilidad-content-${h.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner bg-light"></div>
                     </td>
                 </tr>`;
@@ -456,12 +525,16 @@ async function cargarDatosQR(hParam, tParam) {
                 badge.className = `badge rounded-pill px-3 py-2 text-uppercase ${isFinalizado ? 'bg-danger' : 'bg-success'}`;
             }
 
-            if (isAdmin) renderFooterQR(isFinalizado);
+            if (qrStaff) renderFooterQR(isFinalizado);
 
             document.getElementById('qr-loader').classList.add('d-none');
             document.getElementById('qr-content').classList.remove('d-none');
         } else {
-            mostrarErrorCritico(txt.qr_error_no_data || "No se encontraron datos para esta historia o enlace revocado.");
+            const tErr = window.txt?.alojamientos || {};
+            const apiMsg = (res && res.message && String(res.message).trim()) || '';
+            mostrarErrorCritico(
+                apiMsg || tErr.qr_error_no_data || 'No se encontraron datos para esta historia o enlace revocado.'
+            );
         }
     } catch (e) {
         console.error(e); mostrarErrorCritico(window.txt?.alojamientos?.qr_error_denied || "Acceso Denegado o Error de conexión.");

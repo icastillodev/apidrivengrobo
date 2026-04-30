@@ -113,7 +113,7 @@ async function fetchReactivosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (reactivosListBootLocked) loading = 'none';
 
-    const prefetchGen = reactivosPageCacheApi.syncFiltersKey();
+    reactivosPageCacheApi.syncFiltersKey();
 
     if (reactivosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allReactivos = reactivosPageCacheApi.pageCache.get(currentPage);
@@ -138,10 +138,6 @@ async function fetchReactivosList(opts = {}) {
             }
             reactivosPageCacheApi.pageCache.set(currentPage, [...allReactivos]);
             renderTableBody(allReactivos);
-
-            if (!opts.skipFullLoad && totalReactivosList > rowsPerPage) {
-                reactivosPageCacheApi.schedulePrefetchAround(totalReactivosList, currentPage, prefetchGen);
-            }
         }
     } catch (e) {
         console.error('❌ Error cargando reactivos:', e);

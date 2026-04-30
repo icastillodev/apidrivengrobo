@@ -88,7 +88,7 @@ async function fetchAnimalesList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (animalesListBootLocked) loading = 'none';
 
-    const prefetchGen = animalesPageCacheApi.syncFiltersKey();
+    animalesPageCacheApi.syncFiltersKey();
 
     if (animalesPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allAnimals = animalesPageCacheApi.pageCache.get(currentPage);
@@ -113,10 +113,6 @@ async function fetchAnimalesList(opts = {}) {
             }
             animalesPageCacheApi.pageCache.set(currentPage, [...allAnimals]);
             renderTableBody(allAnimals);
-
-            if (!opts.skipFullLoad && totalAnimalesList > rowsPerPage) {
-                animalesPageCacheApi.schedulePrefetchAround(totalAnimalesList, currentPage, prefetchGen);
-            }
         }
     } catch (e) {
         console.error('❌ Error cargando animales:', e);

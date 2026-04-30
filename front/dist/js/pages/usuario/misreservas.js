@@ -31,13 +31,17 @@ export function initMisReservas() {
       const wrap = document.getElementById('repeat-dias-wrap');
       if (wrap) wrap.classList.toggle('d-none', !chkRepeat.checked);
       if (!chkRepeat.checked) clearRepeatValidation();
-      if (chkRepeat.checked && !repeatUntil.value && state.selectedDate) {
-        repeatUntil.value = addMonthsISO(state.selectedDate, 1);
+      if (chkRepeat.checked && state.selectedDate) {
+        bindRepeatUntilToUsuarioSerie();
+        if (!repeatUntil.value) repeatUntil.value = usuarioSerieFechaCap(state.selectedDate);
       }
       if (chkRepeat.checked) syncRepeatDiasFromSelectedDay();
       scheduleRepeatValidation();
     };
-    repeatUntil.onchange = () => scheduleRepeatValidation();
+    repeatUntil.onchange = () => {
+      bindRepeatUntilToUsuarioSerie();
+      scheduleRepeatValidation();
+    };
   }
   document.querySelectorAll('#repeat-dias-checks input[type="checkbox"]').forEach(cb => {
     cb.onchange = () => scheduleRepeatValidation();
@@ -196,7 +200,8 @@ function selectDay(dateStr) {
   const repeatUntil = document.getElementById('repeat-until');
   if (chkRepeat && repeatUntil && chkRepeat.checked) {
     repeatUntil.disabled = false;
-    repeatUntil.value = addMonthsISO(dateStr, 1);
+    bindRepeatUntilToUsuarioSerie();
+    repeatUntil.value = usuarioSerieFechaCap(dateStr);
     syncRepeatDiasFromSelectedDay();
   }
   scheduleRepeatValidation();
@@ -321,6 +326,33 @@ function syncRepeatDiasFromSelectedDay() {
   if (el) el.checked = true;
 }
 
+/** Coincide con api UserReservasSeriesModel: FechaFin <= FechaInicio + 1 mes. */
+function usuarioSerieFechaCap(fechaIni) {
+  return addMonthsISO(fechaIni, 1);
+}
+
+function bindRepeatUntilToUsuarioSerie() {
+  const el = document.getElementById('repeat-until');
+  if (!el || !state.selectedDate) return;
+  const cap = usuarioSerieFechaCap(state.selectedDate);
+  el.min = state.selectedDate;
+  el.max = cap;
+  const v = (el.value || '').trim();
+  if (!v || v < state.selectedDate) return;
+  if (v > cap) el.value = cap;
+}
+
+function effectiveUsuarioSerieFechaFinInternal() {
+  if (!state.selectedDate) return null;
+  bindRepeatUntilToUsuarioSerie();
+  const cap = usuarioSerieFechaCap(state.selectedDate);
+  const raw = (document.getElementById('repeat-until')?.value || '').trim();
+  let fin = raw || cap;
+  if (fin < state.selectedDate) fin = state.selectedDate;
+  if (fin > cap) fin = cap;
+  return fin;
+}
+
 let repeatValTimer = null;
 function scheduleRepeatValidation() {
   clearTimeout(repeatValTimer);
@@ -344,7 +376,8 @@ async function runRepeatValidation() {
     if (box) box.classList.add('d-none');
     return;
   }
-  const until = document.getElementById('repeat-until')?.value;
+  bindRepeatUntilToUsuarioSerie();
+  const until = effectiveUsuarioSerieFechaFinInternal();
   if (!until) {
     box.classList.remove('d-none');
     box.classList.remove('text-success');
@@ -484,9 +517,7 @@ async function reservar() {
   if (!state.salaId || !state.selectedDate || !merged) return;
 
   const chkRepeat = document.getElementById('chk-repeat-weekly');
-  const repeatUntil = document.getElementById('repeat-until');
   const doRepeat = !!(chkRepeat && chkRepeat.checked);
-  const untilDate = (repeatUntil && repeatUntil.value) ? repeatUntil.value : null;
   const t = window.txt?.misreservas || {};
 
   if (doRepeat) {
@@ -495,9 +526,10 @@ async function reservar() {
       Swal.fire(t.swal_error || 'Error', t.repeat_need_dias || 'Seleccione al menos un día de la semana.', 'warning');
       return;
     }
-    const fin = untilDate || addMonthsISO(state.selectedDate, 1);
-    if (fin < state.selectedDate) {
-      Swal.fire(t.swal_error || 'Error', t.repeat_bad_range || 'La fecha hasta debe ser posterior al día elegido.', 'warning');
+    bindRepeatUntilToUsuarioSerie();
+    const fin = effectiveUsuarioSerieFechaFinInternal();
+    if (!fin || fin < state.selectedDate) {
+      Swal.fire(t.swal_error || 'Error', t.repeat_bad_range || 'La fecha hasta debe ser igual o posterior al día elegido.', 'warning');
       return;
     }
     const v = await validateSerieDisponibilidad(state.salaId, state.selectedDate, fin, diasSemana, merged, getSelectedInstrumentoIds());
@@ -531,7 +563,8 @@ async function reservar() {
   try {
     let res;
     if (doRepeat) {
-      const fin = untilDate || addMonthsISO(state.selectedDate, 1);
+      bindRepeatUntilToUsuarioSerie();
+      const fin = effectiveUsuarioSerieFechaFinInternal();
       const seriePayload = {
         IdSalaReserva: state.salaId,
         HoraInicio: merged.start,
@@ -548,7 +581,15 @@ async function reservar() {
       res = await API.request('/user/reservas/create', 'POST', payload);
     }
     if (res?.status === 'success') {
-      const msgOk = doRepeat ? (t.ok_texto_serie || 'Tu serie fue solicitada y quedará pendiente de aprobación.') : (t.ok_texto || 'Tu reserva fue creada.');
+      let msgOk = doRepeat ? (t.ok_texto_serie || 'Tu serie fue solicitada y quedará pendiente de aprobación.') : (t.ok_texto || 'Tu reserva fue creada.');
+      if (doRepeat && res.data) {
+        const creadas = parseInt(res.data.creadas, 10) || 0;
+        const omit = parseInt(res.data.omitidas, 10) || 0;
+        if (!creadas && omit > 0) msgOk = t.serie_sin_ocurrencias || msgOk;
+        else if (creadas >= 0 && omit > 0) {
+          msgOk = (t.serie_resumen_partial || '').replace('{c}', String(creadas)).replace('{o}', String(omit)).trim() || msgOk;
+        }
+      }
       Swal.fire(t.ok_titulo || 'Reservado', msgOk, 'success');
       await refreshBundle();
       await loadMisReservas();

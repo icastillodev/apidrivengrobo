@@ -5,13 +5,33 @@ import {
     restoreGroboPersistentUiPrefs,
 } from './utils/groboPersistentUiPrefs.js';
 
+/** Misma base que usan páginas estáticas (local vs producción). */
+export function getGroboFrontBasePath() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? '/URBE-API-DRIVEN/front/'
+        : '/';
+}
+
+/** Ficha QR de alojamiento con `?token=` — no depende del rewrite opcional `/qr/:code`. */
+export function buildQrAlojamientoPublicPageRelativeUrl(code) {
+    const t = encodeURIComponent(String(code ?? '').trim());
+    return `${getGroboFrontBasePath()}paginas/qr-alojamiento.html?token=${t}`;
+}
+
+export function buildQrAlojamientoPublicPageAbsoluteUrl(code) {
+    return window.location.origin + buildQrAlojamientoPublicPageRelativeUrl(code);
+}
+
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO
     urlBase: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? '/URBE-API-DRIVEN/api' 
         : '/api', // <-- ¡CORREGIDO! Nginx ya sabe que /api significa /core-backend-gem
 
-    async request(endpoint, method = 'GET', data = null) {
+    /**
+     * @param {Record<string, unknown>} [fetchOptions] Opciones extra para fetch (p. ej. { signal } para AbortController).
+     */
+    async request(endpoint, method = 'GET', data = null, fetchOptions = null) {
         const url = `${this.urlBase}${endpoint}`;
         const isFormData = data instanceof FormData;
         const isSuperadminPath = window.location.pathname.toLowerCase().includes('superadmin');
@@ -35,6 +55,9 @@ export const API = {
             headers: headers,
             body: data ? (isFormData ? data : JSON.stringify(data)) : null
         };
+        if (fetchOptions && typeof fetchOptions === 'object') {
+            Object.assign(config, fetchOptions);
+        }
 
         try {
             const response = await fetch(url, config);
@@ -108,6 +131,9 @@ export const API = {
             return resData;
         } catch (error) {
             console.error("Fallo de conexión:", error);
+            if (error && error.name === 'AbortError') {
+                return { status: 'error', message: 'STATS_REQUEST_TIMEOUT', errorKind: 'timeout' };
+            }
             return { status: 'error', message: 'Error de conexión con la API' };
         }
     },

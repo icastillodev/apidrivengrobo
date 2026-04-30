@@ -9,7 +9,8 @@ const calState = {
   month: null,
   bundle: null,
   selectedDate: null,
-  selectedSlot: null
+  /** Franjas atómicas (30m/1h); deben ser contiguas; se fusionan en res-hora-ini / res-hora-fin */
+  selectedSlots: []
 };
 
 window.composeMensajeReservaTitular = async (idUsrTitular, idReserva) => {
@@ -69,9 +70,22 @@ export function initAdminReservas() {
 
   document.getElementById('res-modo').onchange = () => toggleSerieUI();
   document.getElementById('serie-tipo').onchange = () => toggleSerieUI();
-  document.getElementById('res-fecha').onchange = () => refreshInstrumentosDisponibles();
-  document.getElementById('res-hora-ini').onchange = () => refreshInstrumentosDisponibles();
-  document.getElementById('res-hora-fin').onchange = () => refreshInstrumentosDisponibles();
+  document.getElementById('res-fecha').onchange = async () => {
+    calState.selectedSlots = [];
+    syncCalToDateInputs();
+    await refreshAdminCalBundle();
+    refreshInstrumentosDisponibles();
+  };
+  document.getElementById('res-hora-ini').onchange = () => {
+    calState.selectedSlots = [];
+    renderAdminSlots();
+    refreshInstrumentosDisponibles();
+  };
+  document.getElementById('res-hora-fin').onchange = () => {
+    calState.selectedSlots = [];
+    renderAdminSlots();
+    refreshInstrumentosDisponibles();
+  };
   document.getElementById('res-sala').onchange = () => {
     syncCalToDateInputs();
     refreshInstrumentosDisponibles();
@@ -464,7 +478,7 @@ function initAdminCal() {
   calState.month = dt.getMonth() + 1;
   calState.bundle = null;
   calState.selectedDate = d || null;
-  calState.selectedSlot = null;
+  calState.selectedSlots = [];
   renderAdminCalendar();
   renderAdminSlots();
 }
@@ -486,7 +500,7 @@ function changeAdminCalMonth(delta) {
   calState.year = y;
   calState.month = m;
   calState.selectedDate = null;
-  calState.selectedSlot = null;
+  calState.selectedSlots = [];
   renderAdminCalendar();
   renderAdminSlots();
   refreshAdminCalBundle();
@@ -505,6 +519,102 @@ async function refreshAdminCalBundle() {
   const res = await API.request(`/user/reservas/sala/bundle?IdSalaReserva=${salaId}&from=${from}&to=${to}`, 'GET');
   calState.bundle = (res?.status === 'success') ? res.data : null;
   renderAdminCalendar();
+  renderAdminSlots();
+  syncAdminSelectedSlotsFromInputs();
+}
+
+function adminSameSlot(a, b) {
+  return a && b && a.start === b.start && a.end === b.end;
+}
+
+function sortSlotsByStartAdmin(slots) {
+  return [...(slots || [])].sort((a, b) => String(a.start).localeCompare(String(b.start)));
+}
+
+function areSlotsContiguousAdmin(sorted) {
+  if (!sorted.length) return false;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].end !== sorted[i + 1].start) return false;
+  }
+  return true;
+}
+
+function longestContiguousRunAdmin(sortedInput) {
+  const sorted = sortSlotsByStartAdmin(sortedInput);
+  if (!sorted.length) return [];
+  let best = [];
+  let cur = [];
+  for (const s of sorted) {
+    if (!cur.length) {
+      cur = [s];
+    } else if (cur[cur.length - 1].end === s.start) {
+      cur.push(s);
+    } else {
+      if (cur.length > best.length) best = cur;
+      cur = [s];
+    }
+  }
+  if (cur.length > best.length) best = cur;
+  return best;
+}
+
+function getMergedRangeFromAdminSelectedSlots() {
+  const sorted = sortSlotsByStartAdmin(calState.selectedSlots);
+  if (!sorted.length || !areSlotsContiguousAdmin(sorted)) return null;
+  return { start: sorted[0].start, end: sorted[sorted.length - 1].end };
+}
+
+/** Cubre exactamente [startStr, endStr) con franjas atómicas consecutivas del día */
+function buildAtomicSlotsCoveringAdmin(daySlots, startStr, endStr) {
+  if (!startStr || !endStr || !(startStr < endStr) || !Array.isArray(daySlots)) return [];
+  const sorted = sortSlotsByStartAdmin(daySlots);
+  const out = [];
+  let cur = startStr;
+  while (cur !== endStr) {
+    const seg = sorted.find(s => s.start === cur);
+    if (!seg || seg.end > endStr) return [];
+    out.push(seg);
+    cur = seg.end;
+  }
+  return out;
+}
+
+function toggleAdminSlot(slot) {
+  const t = window.txt?.admin_reservas || {};
+  const idx = calState.selectedSlots.findIndex(x => adminSameSlot(x, slot));
+  let next;
+  if (idx >= 0) {
+    next = calState.selectedSlots.filter((_, i) => i !== idx);
+    next = longestContiguousRunAdmin(sortSlotsByStartAdmin(next));
+  } else {
+    next = sortSlotsByStartAdmin([...calState.selectedSlots, slot]);
+    if (!areSlotsContiguousAdmin(next)) {
+      Swal.fire(t.swal_error || 'Error', t.slots_contiguous || '', 'info');
+      return;
+    }
+  }
+  calState.selectedSlots = next;
+  const merged = getMergedRangeFromAdminSelectedSlots();
+  if (merged) {
+    document.getElementById('res-hora-ini').value = merged.start;
+    document.getElementById('res-hora-fin').value = merged.end;
+  }
+  renderAdminSlots();
+  refreshInstrumentosDisponibles();
+}
+
+/** Alinea resaltados con ini/fin actuales si coinciden con franjas atómicas del día */
+function syncAdminSelectedSlotsFromInputs() {
+  const date = calState.selectedDate;
+  const daySlots = (calState.bundle?.slotsByDay && date)
+    ? (calState.bundle.slotsByDay[date] || [])
+    : [];
+  const iniEl = document.getElementById('res-hora-ini');
+  const finEl = document.getElementById('res-hora-fin');
+  const ini = iniEl?.value;
+  const fin = finEl?.value;
+  const cov = buildAtomicSlotsCoveringAdmin(daySlots, ini, fin);
+  calState.selectedSlots = cov;
   renderAdminSlots();
 }
 
@@ -549,7 +659,7 @@ function renderAdminCalendar() {
           return;
         }
         calState.selectedDate = dateStr;
-        calState.selectedSlot = null;
+        calState.selectedSlots = [];
         document.getElementById('res-fecha').value = dateStr;
         renderAdminCalendar();
         renderAdminSlots();
@@ -572,16 +682,10 @@ function renderAdminSlots() {
   slots.forEach(s => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    const sel = calState.selectedSlot && calState.selectedSlot.start === s.start && calState.selectedSlot.end === s.end;
+    const sel = calState.selectedSlots.some(x => adminSameSlot(x, s));
     btn.className = 'btn btn-sm adm-slot-btn ' + (sel ? 'btn-success' : 'btn-outline-success');
     btn.textContent = `${s.start} - ${s.end}`;
-    btn.onclick = () => {
-      calState.selectedSlot = s;
-      document.getElementById('res-hora-ini').value = s.start;
-      document.getElementById('res-hora-fin').value = s.end;
-      renderAdminSlots();
-      refreshInstrumentosDisponibles();
-    };
+    btn.onclick = () => toggleAdminSlot(s);
     list.appendChild(btn);
   });
 }

@@ -93,7 +93,7 @@ async function fetchInsumosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (insumosListBootLocked) loading = 'none';
 
-    const prefetchGen = insumosPageCacheApi.syncFiltersKey();
+    insumosPageCacheApi.syncFiltersKey();
 
     if (insumosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allInsumos = insumosPageCacheApi.pageCache.get(currentPage);
@@ -118,10 +118,6 @@ async function fetchInsumosList(opts = {}) {
             }
             insumosPageCacheApi.pageCache.set(currentPage, [...allInsumos]);
             renderTableBody(allInsumos);
-
-            if (!opts.skipFullLoad && totalInsumosList > rowsPerPage) {
-                insumosPageCacheApi.schedulePrefetchAround(totalInsumosList, currentPage, prefetchGen);
-            }
         }
     } catch (e) {
         console.error('Error cargando insumos:', e);

@@ -17,6 +17,70 @@ function txHist() {
     return window.txt?.admin_historialcontable || {};
 }
 
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function exportHistorialCsv() {
+    const t = txHist();
+    const rows = HistorialState.dataFiltered;
+    if (!rows.length) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', t.excel_empty || 'No hay datos para exportar.', 'info');
+        }
+        return;
+    }
+    const sep = ';';
+    const esc = (v) => {
+        const s = String(v ?? '').replace(/"/g, '""');
+        return `"${s}"`;
+    };
+    const headers = [
+        t.col_id_mov || 'ID',
+        t.col_fecha || 'Fecha',
+        t.col_administrador || 'Admin',
+        t.col_investigador || 'Investigador',
+        t.col_tipo_operacion || 'Tipo',
+        t.col_ref_pedido || 'Ref',
+        t.col_transferencia || 'Transferencia',
+        t.col_comentario || 'Comentario',
+        t.col_monto || 'Monto',
+    ];
+    const lines = [headers.map(esc).join(sep)];
+    rows.forEach((row) => {
+        const refTexto =
+            row.IdFormA == 0 || !row.IdFormA ? '' : `#${row.IdFormA}`;
+        lines.push(
+            [
+                row.IdHistoPago,
+                formatDate(row.fecha),
+                row.AdminCompleto,
+                row.UsrCompleto,
+                row.TipoHistorial,
+                refTexto,
+                row.IdentificadorTransferencia,
+                row.Comentario,
+                row.Monto,
+            ]
+                .map(esc)
+                .join(sep)
+        );
+    });
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], {
+        type: 'text/csv;charset=utf-8;',
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${t.excel_filename || 'historial_contable'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
 export async function initHistorialContable() {
     const params = new URLSearchParams(window.location.search);
     const urlIdUsr = params.get('idUsr');
@@ -115,6 +179,7 @@ function setupListeners() {
         if(e.key === 'Enter') filterData();
     });
     document.getElementById('filter-type').addEventListener('change', filterData);
+    document.getElementById('btn-excel')?.addEventListener('click', exportHistorialCsv);
 
     document.getElementById('btn-inv-ver-todos')?.addEventListener('click', () => {
         HistorialState.filterIdUsr = null;
@@ -155,7 +220,17 @@ function filterData() {
             if (column === 'Admin') return row.AdminCompleto?.toLowerCase().includes(text);
             
             // CORRECCIÓN AQUÍ: IdFormA en lugar de IdFromA
-            if (column === 'Ref') return row.IdFormA?.toString().includes(text); 
+            if (column === 'Ref') return row.IdFormA?.toString().includes(text);
+            if (column === 'Transferencia') {
+                return String(row.IdentificadorTransferencia ?? '')
+                    .toLowerCase()
+                    .includes(text);
+            }
+            if (column === 'Comentario') {
+                return String(row.Comentario ?? '')
+                    .toLowerCase()
+                    .includes(text);
+            }
             
             // Si es 'all', busca en todos lados
             const concatData = Object.values(row).join(' ').toLowerCase();
@@ -179,29 +254,42 @@ function renderTable() {
 
     if (paginatedItems.length === 0) {
         const emptyMsg = txHist().sin_registros || 'No se encontraron registros.';
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${emptyMsg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">${emptyMsg}</td></tr>`;
         info.innerText = txHist().info_cero || '0 registros';
         renderPagination(0);
         return;
     }
 
     paginatedItems.forEach(row => {
+        const tipoH = String(row.TipoHistorial || '');
         let badgeColor = 'bg-secondary';
-        if (row.TipoHistorial.includes('PAGO')) badgeColor = 'bg-success';
-        if (row.TipoHistorial === 'CARGA_SALDO') badgeColor = 'bg-primary';
-        if (row.TipoHistorial.includes('DEVOLUCION')) badgeColor = 'bg-danger';
+        if (tipoH.includes('PAGO')) badgeColor = 'bg-success';
+        if (tipoH === 'CARGA_SALDO') badgeColor = 'bg-primary';
+        if (tipoH.includes('DEVOLUCION')) badgeColor = 'bg-danger';
 
         // CORRECCIÓN AQUÍ TAMBIÉN: row.IdFormA
         const refTexto = (row.IdFormA == 0 || !row.IdFormA) ? '---' : '#' + row.IdFormA;
 
+        const transferTxt =
+            row.IdentificadorTransferencia != null &&
+            String(row.IdentificadorTransferencia).trim() !== ''
+                ? escapeHtml(row.IdentificadorTransferencia)
+                : '—';
+        const commentTxt =
+            row.Comentario != null && String(row.Comentario).trim() !== ''
+                ? escapeHtml(row.Comentario)
+                : '—';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="fw-bold text-muted">#${row.IdHistoPago}</td>
-            <td>${formatDate(row.fecha)}</td>
-            <td>${row.AdminCompleto || 'Sistema'}</td>
-            <td class="fw-bold">${row.UsrCompleto || 'Desconocido'}</td>
-            <td><span class="badge ${badgeColor}">${row.TipoHistorial}</span></td>
-            <td class="text-center fw-bold text-primary">${refTexto}</td>
+            <td>${escapeHtml(formatDate(row.fecha))}</td>
+            <td>${escapeHtml(row.AdminCompleto || 'Sistema')}</td>
+            <td class="fw-bold">${escapeHtml(row.UsrCompleto || 'Desconocido')}</td>
+            <td><span class="badge ${badgeColor}">${escapeHtml(tipoH)}</span></td>
+            <td class="text-center fw-bold text-primary">${refTexto === '---' ? '---' : escapeHtml(refTexto)}</td>
+            <td class="text-muted small">${transferTxt}</td>
+            <td class="text-muted small">${commentTxt}</td>
             <td class="text-end fw-bold ${row.Monto < 0 ? 'text-danger' : ''}">$${parseFloat(row.Monto).toFixed(2)}</td>
         `;
         tbody.appendChild(tr);

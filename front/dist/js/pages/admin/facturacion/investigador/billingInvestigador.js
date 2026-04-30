@@ -5,7 +5,7 @@ import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingAlojPeriodoParaInforme } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 
@@ -234,6 +234,7 @@ function getFormsTableHTML(formularios, idProt) {
                         <th style="width:12%">${bi.th_fechas || 'FECHAS'}</th>
                         <th style="width:15%">${bd.th_especie_cepa || 'ESPECIE / TIPO'}</th>
                         <th style="width:15%">${bd.th_detalle_concepto || 'CONCEPTO'}</th>
+                        <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                         <th style="width:18%">${bd.th_cantidad_presentacion || 'CANTIDAD / PRESENTACIÓN'}</th>
                         <th style="width:8%">${bd.th_total_uc || 'TOTAL'}</th>
                         <th style="width:8%">${bd.th_pagado_uc || 'PAGADO'}</th>
@@ -285,6 +286,7 @@ function getFormsTableHTML(formularios, idProt) {
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
                                 <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
+                                <td class="small text-start text-muted">${billingDerivacionPlainText(f) || '—'}</td>
                                 <td>${cantidadDisplay}</td>
                                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
                             </tr>`;
@@ -353,6 +355,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                 <td class="small text-muted">#${i.id}</td>
                 <td>${badge}</td>
                 <td class="small">${i.solicitante || '-'}</td>
+                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
             </tr>`;
@@ -369,6 +372,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${bi.th_estado_cap || 'Estado'}</th>
                             <th style="width:12%">${bi.th_solicitante_cap || 'Solicitante'}</th>
+                            <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pagado'}</th>
@@ -415,6 +419,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                 <td class="small text-muted">${i.id}</td>
                 <td>${badge}</td>
                 <td>${i.solicitante || '-'}</td>
+                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
             </tr>`;
@@ -438,6 +443,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${window.txt?.generales?.estado || 'Estado'}</th>
                             <th style="width:15%">${bd.th_solicitante || 'Solicitante'}</th>
+                            <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th>
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pago'}</th>
@@ -712,7 +718,16 @@ window.downloadGlobalPDF = async () => {
             }),
             ...(prot.alojamientos || []).map(a => {
                 const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
-                return [a.historia, a.periodo, a.especie, `${pAloj} (${a.caja || pEstr})`, m[0], m[2], m[1]];
+                const diasU = window.txt?.facturacion?.billing_depto_export?.pdf_aloj_dias_unit || 'd';
+                return [
+                    a.historia,
+                    billingAlojPeriodoParaInforme(a, { diasUnit: diasU }),
+                    a.especie,
+                    `${pAloj} (${a.caja || pEstr})`,
+                    m[0],
+                    m[2],
+                    m[1],
+                ];
             }),
             ...(prot.insumos || []).map(i => {
                 const total = parseFloat(i.total_item || 0);
@@ -821,7 +836,12 @@ window.downloadProtocoloPDF = async (idProt) => {
         }),
         ...(prot.alojamientos || []).map(a => {
             const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
-            return [`H-${a.historia}`, a.especie, `${alojAb} (${a.caja || pEstr})`, m[0], m[2], m[1]];
+            const diasU = window.txt?.facturacion?.billing_depto_export?.pdf_aloj_dias_unit || 'd';
+            const perInf = billingAlojPeriodoParaInforme(a, { diasUnit: diasU });
+            const concepto =
+                `${alojAb} (${a.caja || pEstr})` +
+                (perInf && perInf !== '—' ? `\n${perInf}` : '');
+            return [`H-${a.historia}`, a.especie, concepto, m[0], m[2], m[1]];
         }),
         ...(prot.insumos || []).map(i => {
             const total = parseFloat(i.total_item || 0);

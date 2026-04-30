@@ -34,12 +34,14 @@ class AlojamientoModel {
     public function getHistory($historiaId) {
         $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
                        a.IdUsrA AS IdUsrResponsableAlojamiento,
+                       ins_bi.NombreInst as QrNombreInstFolder,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador,
                        CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA) as TitularNombre,
                        COALESCE(u_resp.EmailA, u_tit.EmailA, 'No registrado') as EmailInvestigador,
                        COALESCE(u_resp.CelularA, u_tit.CelularA, 'No registrado') as CelularInvestigador
                 FROM alojamiento a
+                LEFT JOIN institucion ins_bi ON ins_bi.IdInstitucion = a.IdInstitucion
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA 
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
@@ -367,19 +369,16 @@ public function recalculateHistory($historiaId) {
     // ==========================================================
 
 public function generarCodigoQR($historiaId, $idUsuario, $instId) {
+        $stmtCheck = $this->db->prepare("SELECT codigo FROM qralojamiento WHERE historia = ? AND IdInstitucion = ?");
+        $stmtCheck->execute([$historiaId, $instId]);
+        $codigoExistente = $stmtCheck->fetchColumn();
+        if ($codigoExistente) {
+            return $codigoExistente;
+        }
+
         $this->db->beginTransaction();
         try {
-            // 1. Verificamos si ya existe y ES de esta institución
-            $stmtCheck = $this->db->prepare("SELECT codigo FROM qralojamiento WHERE historia = ? AND IdInstitucion = ?");
-            $stmtCheck->execute([$historiaId, $instId]);
-            $codigoExistente = $stmtCheck->fetchColumn();
-
-            if ($codigoExistente) {
-                $this->db->rollBack();
-                return $codigoExistente; 
-            }
-
-            // 2. Generamos el código único
+            // 1. Generamos el código único
             $caracteres = '0123456789abcdefghijklmnopqrstuvwxyz';
             $codigo = '';
             $esUnico = false;
@@ -408,12 +407,16 @@ public function generarCodigoQR($historiaId, $idUsuario, $instId) {
     }
 
     public function getHistoryByToken($codigoToken) {
-        // 🚀 EL INNER JOIN CON qralojamiento AHORA TAMBIÉN VALIDA LA INSTITUCIÓN
-        $sql = "SELECT a.*, p.nprotA, p.tituloA, 
+        $codigoToken = strtolower(trim((string)$codigoToken));
+
+        // Inner join qralojamiento + institución (nombre de carpeta login) + titular protocolo
+        $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
+                       ins_bi.NombreInst as QrNombreInstFolder,
                        COALESCE(CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador
                 FROM qralojamiento qr
                 INNER JOIN alojamiento a ON qr.historia = a.historia AND qr.IdInstitucion = a.IdInstitucion
+                LEFT JOIN institucion ins_bi ON ins_bi.IdInstitucion = qr.IdInstitucion
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento

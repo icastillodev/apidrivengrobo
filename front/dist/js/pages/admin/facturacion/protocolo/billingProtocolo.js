@@ -15,7 +15,9 @@ import {
     getBillingNombreInstitucion,
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
-    billingSumInsumosCobrable
+    billingSumInsumosCobrable,
+    billingDerivacionPlainText,
+    billingAlojPeriodoParaInforme
 } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';  
@@ -170,6 +172,7 @@ function getFormsTableHTML(formularios, idProt) {
                         <th style="width:12%">${bi.th_fechas || 'FECHAS'}</th>
                         <th style="width:15%">${bd.th_especie_cepa || 'ESPECIE / TIPO'}</th>
                         <th style="width:15%">${bd.th_detalle_concepto || 'CONCEPTO'}</th>
+                        <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                         <th style="width:18%">${bd.th_cantidad_presentacion || 'CANTIDAD / PRESENTACIÓN'}</th>
                         <th style="width:8%">${bd.th_total_uc || 'TOTAL'}</th>
                         <th style="width:8%">${bd.th_pagado_uc || 'PAGADO'}</th>
@@ -221,6 +224,7 @@ function getFormsTableHTML(formularios, idProt) {
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
                                 <td class="text-start ps-3 small">${(f.detalle_display || '').replace(/<[^>]*>/g, "")} ${dctoHTML}</td>
+                                <td class="small text-start text-muted">${billingDerivacionPlainText(f) || '—'}</td>
                                 <td>${cantidadDisplay}</td>
                                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
                             </tr>`;
@@ -241,14 +245,14 @@ function getAlojTableHTML(alojamientos, idProt) {
             <thead class="table-dark text-center">
                 <tr>
                     <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                    <th>${bi.th_historia || 'HISTORIA'}</th><th>${bp.th_especie || 'ESPECIE'}</th><th>${tf.periodo || 'PERIODO'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
+                    <th>${bi.th_historia || 'HISTORIA'}</th><th>${bp.th_especie || 'ESPECIE'}</th><th>${tf.periodo || 'PERIODO'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
                 </tr>
             </thead>
             <tbody>
                 ${alojamientos.map(a => `
                     <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})">
                         <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
-                        <td>#${a.historia}</td><td>${a.especie}</td><td class="small">${a.periodo}</td>
+                        <td>#${a.historia}</td><td>${a.especie}</td><td class="small">${a.periodo}</td><td class="fw-bold">${a.dias ?? ''}</td>
                         <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                         <td class="text-end text-success">$ ${formatBillingMoney(a.pagado)}</td>
                         <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}</td>
@@ -281,6 +285,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                 <td class="small text-muted">#${i.id}</td>
                 <td>${badge}</td>
                 <td class="small">${i.solicitante}</td>
+                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
                 ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
             </tr>`;
@@ -297,6 +302,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${bi.th_estado_cap || 'Estado'}</th>
                             <th style="width:12%">${bi.th_solicitante_cap || 'Solicitante'}</th>
+                            <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pagado'}</th>
@@ -488,10 +494,12 @@ window.downloadProtocoloPDF = async (idProt) => {
         if (data.alojamientos?.length > 0) {
             const prefAloj = (bp.pdf_pref_aloj_periodo || 'Alojamiento:').replace(/\s*:?\s*$/, '');
             const exL = bi.pdf_monto_exento || 'Exento';
+            const diasU = window.txt?.facturacion?.billing_depto_export?.pdf_aloj_dias_unit || 'd';
             const bodyAloj = data.alojamientos.map(a => {
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(a), a.total, a.pagado || 0, exL);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
-                return [`H-${a.historia}`, a.especie, `${prefAloj}: ${a.periodo}`, c[0], c[1], c[2]];
+                const perInf = billingAlojPeriodoParaInforme(a, { diasUnit: diasU });
+                return [`H-${a.historia}`, a.especie, `${prefAloj}: ${perInf}`, c[0], c[1], c[2]];
             });
 
             doc.autoTable({

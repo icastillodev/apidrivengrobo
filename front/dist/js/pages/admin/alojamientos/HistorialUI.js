@@ -578,8 +578,8 @@ renderTable() {
                 if (res.status === 'success') {
                     bootstrap.Modal.getInstance(document.getElementById('modal-config-historia')).hide();
                     Swal.fire({title: txt.cfg_exito || 'Éxito', text: txt.cfg_reconfigurado || 'Se reconfiguró toda la historia.', icon: 'success', timer: 1500});
-                    this.verHistorial(data.historia); 
-                    loadAlojamientos(); 
+                    await loadAlojamientos();
+                    await this.verHistorial(data.historia);
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }

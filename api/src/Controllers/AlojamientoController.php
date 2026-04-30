@@ -108,7 +108,7 @@ class AlojamientoController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
+            $this->enforceModuloSesionOrInvestigatorLegacyOrExit($sesion, 'alojamientos');
             $res = $this->model->updateRow($data); 
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -131,7 +131,7 @@ class AlojamientoController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
+            $this->enforceModuloSesionOrInvestigatorLegacyOrExit($sesion, 'alojamientos');
             $res = $this->model->deleteRow($data['IdAlojamiento'], $data['historia']);
             echo json_encode(['status' => 'success', 'data' => $res]);
         } catch (\Exception $e) {
@@ -158,7 +158,7 @@ public function save() {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
+            $this->enforceModuloSesionOrInvestigatorLegacyOrExit($sesion, 'alojamientos');
             $data['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId real
             
             // Mandamos a guardar al modelo (el modelo se encarga de crear la historia nueva si no existe)
@@ -242,11 +242,10 @@ public function getTiposPorEspecie() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         
-        // Ahora el frontend nos manda el código token, no el ID de historia
-        $token = $_GET['token'] ?? ''; 
+        $token = strtolower(trim((string)($_GET['token'] ?? '')));
 
         try {
-            if (empty($token) || strlen($token) !== 6) {
+            if ($token === '' || !preg_match('/^[a-z0-9]{6}$/', $token)) {
                 throw new \Exception("Código de etiqueta inválido o corrupto.");
             }
 

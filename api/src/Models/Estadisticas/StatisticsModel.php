@@ -671,6 +671,8 @@ class StatisticsModel {
         $stmtG->execute($paramsG);
         $res['globales'] = $stmtG->fetch(\PDO::FETCH_ASSOC);
 
+        $institutionNames = $this->getInstitutionNamesBatch($ids);
+
         // 2. POR DEPARTAMENTO: una fila por (institución, departamento), con nombre de institución
         $res['por_departamento'] = [];
         $wfxRedLoop = $this->sqlFormularioEnInstitucion('fx');
@@ -697,7 +699,7 @@ class StatisticsModel {
                 [$id]
             ));
             $rows = $stmtD->fetchAll(\PDO::FETCH_ASSOC);
-            $instName = $this->getInstitutionName($id);
+            $instName = $institutionNames[(int) $id] ?? (string) $id;
             foreach ($rows as $r) {
                 $r['institucion'] = $instName;
                 $r['departamento'] = $instName . ' --> ' . $r['departamento'];
@@ -709,7 +711,7 @@ class StatisticsModel {
         $res['por_organizacion'] = [];
         foreach ($ids as $id) {
             $orgRows = $this->getPorOrganizacion($id, $from, $to);
-            $instName = $this->getInstitutionName($id);
+            $instName = $institutionNames[(int) $id] ?? (string) $id;
             foreach ($orgRows as $r) {
                 $r['institucion'] = $instName;
                 $r['organizacion'] = $instName . ' --> ' . ($r['organizacion'] ?? '');
@@ -731,7 +733,7 @@ class StatisticsModel {
         foreach ($ids as $id) {
             $stmtA = $this->db->prepare("SELECT d.NombreDeptoA as departamento, COUNT(a.IdAlojamiento) as cantidad FROM departamentoe d LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ? WHERE d.IdInstitucion = ? GROUP BY d.NombreDeptoA");
             $stmtA->execute([$id, $id]);
-            $instName = $this->getInstitutionName($id);
+            $instName = $institutionNames[(int) $id] ?? (string) $id;
             foreach ($stmtA->fetchAll(\PDO::FETCH_ASSOC) as $r) {
                 $r['departamento'] = $instName . ' --> ' . $r['departamento'];
                 $res['alojamientos_activos'][] = $r;
@@ -790,34 +792,100 @@ class StatisticsModel {
         return $r ? $r['NombreInst'] : (string) $instId;
     }
 
-    private function getAlojamientoTrazabilidadStatsRed(array $instIds) {
-        $placeholders = implode(',', array_fill(0, count($instIds), '?'));
-        $total_historias = 0;
-        $total_cajas = 0;
-        $total_observaciones = 0;
-        $alojamientos_activos = 0;
-        $por_especie = [];
-        foreach ($instIds as $id) {
-            $st = $this->getAlojamientoTrazabilidadStats($id);
-            $total_historias += $st['total_historias'];
-            $total_cajas += $st['total_cajas'];
-            $total_observaciones += $st['total_observaciones_trazabilidad'];
-            $alojamientos_activos += $st['alojamientos_activos'];
-            foreach ($st['por_especie'] as $e) {
-                $key = $e['especie'];
-                if (!isset($por_especie[$key])) {
-                    $por_especie[$key] = ['especie' => $e['especie'], 'historias' => 0, 'tramos' => 0];
-                }
-                $por_especie[$key]['historias'] += (int) $e['historias'];
-                $por_especie[$key]['tramos'] += (int) $e['tramos'];
-            }
+    /**
+     * Nombres de institución en una sola consulta (evita N+1 en estadísticas de red).
+     * @param int[] $ids
+     * @return array<int, string>
+     */
+    private function getInstitutionNamesBatch(array $ids): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0)));
+        if ($ids === []) {
+            return [];
         }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare("SELECT IdInstitucion, NombreInst FROM institucion WHERE IdInstitucion IN ($ph)");
+        $stmt->execute($ids);
+        $out = [];
+        while ($r = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $out[(int) $r['IdInstitucion']] = (string) ($r['NombreInst'] ?? '');
+        }
+
+        return $out;
+    }
+
+    /**
+     * Misma semántica que N llamadas a getAlojamientoTrazabilidadStats, con menos round-trips a la BD.
+     * @param int[] $instIds
+     */
+    private function getAlojamientoTrazabilidadStatsRed(array $instIds): array {
+        $instIds = array_values(array_filter(array_map('intval', $instIds), static fn ($v) => $v > 0));
+        if ($instIds === []) {
+            return [
+                'total_historias' => 0,
+                'total_cajas' => 0,
+                'total_observaciones_trazabilidad' => 0,
+                'alojamientos_activos' => 0,
+                'por_especie' => [],
+            ];
+        }
+        $ph = implode(',', array_fill(0, count($instIds), '?'));
+
+        $stmtH = $this->db->prepare(
+            "SELECT IFNULL(SUM(hc.cnt), 0) FROM (
+                SELECT COUNT(DISTINCT a.historia) AS cnt FROM alojamiento a
+                WHERE a.IdInstitucion IN ($ph) AND a.historia IS NOT NULL GROUP BY a.IdInstitucion
+            ) hc"
+        );
+        $stmtH->execute($instIds);
+        $total_historias = (int) $stmtH->fetchColumn();
+
+        $stmtC = $this->db->prepare(
+            "SELECT COUNT(*) FROM alojamiento_caja ac INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento WHERE a.IdInstitucion IN ($ph)"
+        );
+        $stmtC->execute($instIds);
+        $total_cajas = (int) $stmtC->fetchColumn();
+
+        $stmtO = $this->db->prepare(
+            "SELECT COUNT(*) FROM observacion_alojamiento_unidad o
+             INNER JOIN especie_alojamiento_unidad eu ON o.IdEspecieAlojUnidad = eu.IdEspecieAlojUnidad
+             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE a.IdInstitucion IN ($ph)"
+        );
+        $stmtO->execute($instIds);
+        $total_observaciones = (int) $stmtO->fetchColumn();
+
+        $stmtA = $this->db->prepare(
+            "SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion IN ($ph) AND a.finalizado = 0"
+        );
+        $stmtA->execute($instIds);
+        $alojamientos_activos = (int) $stmtA->fetchColumn();
+
+        $stmtE = $this->db->prepare(
+            "SELECT e.EspeNombreA AS especie,
+                    IFNULL(SUM(x.historias), 0) AS historias,
+                    IFNULL(SUM(x.tramos), 0) AS tramos
+             FROM (
+                 SELECT a.IdInstitucion, a.TipoAnimal,
+                        COUNT(DISTINCT a.historia) AS historias,
+                        COUNT(a.IdAlojamiento) AS tramos
+                 FROM alojamiento a
+                 WHERE a.IdInstitucion IN ($ph)
+                 GROUP BY a.IdInstitucion, a.TipoAnimal
+             ) x
+             INNER JOIN especiee e ON x.TipoAnimal = e.idespA
+             GROUP BY e.EspeNombreA
+             ORDER BY historias DESC"
+        );
+        $stmtE->execute($instIds);
+        $por_especie = $stmtE->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
         return [
             'total_historias' => $total_historias,
             'total_cajas' => $total_cajas,
             'total_observaciones_trazabilidad' => $total_observaciones,
             'alojamientos_activos' => $alojamientos_activos,
-            'por_especie' => array_values($por_especie),
+            'por_especie' => $por_especie,
         ];
     }
 

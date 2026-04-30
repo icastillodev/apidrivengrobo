@@ -16,6 +16,14 @@ function pathMatchesMenuRoute(pathname, menuRelativePath) {
     return re.test(path);
 }
 
+/** Rutas bajo admin/facturacion (índice y subpantallas de liquidación). */
+function pathMatchesAdminFacturacionArea(pathname) {
+    const path = String(pathname || '').split('?')[0].replace(/\\/g, '/');
+    return /(?:^|\/)admin\/facturacion(?:\/|\.html)/i.test(path);
+}
+
+const MENU_ACCOUNTING_GROUP_ID = 202;
+
 function getDashboardPath() {
     const roleId = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0');
     return (roleId === 1 || roleId === 2 || roleId === 4) ? getCorrectPath('admin/dashboard') : getCorrectPath('panel/dashboard');
@@ -279,9 +287,13 @@ function buildMenuItemHTML(id, layout, templates) {
     const labelHTML = `<div class="position-relative d-inline-block"><span class="${isSide ? 'small' : 'menu-label mt-1'}" style="font-weight: 600;">${item.label}</span></div>`;
 
     if (item.isDropdown && item.children) {
-        // Auto-abrir o marcar si uno de sus hijos es la página actual.
-        // Solo resaltamos la fila hija (active-sub-link), no el padre del desplegable.
-        const activeDropClass = ''; 
+        // Resaltar el padre si algún hijo coincide, o (grupo Contable) cualquier pantalla bajo admin/facturacion/.
+        const anyChildPathActive = item.children.some(
+            (ch) => ch.path && pathMatchesMenuRoute(currentPath, ch.path)
+        );
+        const facturacionSection =
+            Number(id) === MENU_ACCOUNTING_GROUP_ID && pathMatchesAdminFacturacionArea(currentPath);
+        const activeDropClass = anyChildPathActive || facturacionSection ? 'active-gecko-link' : '';
         const arrowIcon = `<svg class="ms-1 arrow-icon-gecko" width="12" height="12" viewBox="0 0 16 16" style="fill: currentColor; transition: transform 0.3s ease; flex-shrink: 0;"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
         
         const childrenHTML = item.children.map(child => {
@@ -296,7 +308,12 @@ function buildMenuItemHTML(id, layout, templates) {
                 const liClass = child.geckoAction === 'cap_interactive_modals' ? 'gecko-help-modals-tour-item d-none' : '';
                 return `<li${liClass ? ` class="${liClass}"` : ''}><a href="#" class="dropdown-item-gecko gecko-help-menu-action d-flex align-items-center px-3 py-2 text-decoration-none text-body small" style="font-weight: 600;" data-gecko-action="${child.geckoAction}">${childIcon}<span class="flex-grow-1 text-truncate me-1">${child.label}</span></a></li>`;
             }
-            const isSubActive = pathMatchesMenuRoute(currentPath, child.path);
+            const isSubActive =
+                !!child.path &&
+                (pathMatchesMenuRoute(currentPath, child.path) ||
+                    (Number(id) === MENU_ACCOUNTING_GROUP_ID &&
+                        facturacionSection &&
+                        child.path === 'admin/facturacion/index'));
             const childIcon = (child.svg) ? `<span class="dropdown-child-icon me-2 d-flex align-items-center" style="width: 18px; height: 18px;">${child.svg}</span>` : '';
             const badgeMenuId = child.badgeMenuId != null ? Number(child.badgeMenuId) : null;
             const badgeHtml = badgeMenuId

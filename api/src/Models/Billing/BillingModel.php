@@ -21,6 +21,30 @@ class BillingModel {
         }
     }
 
+    /**
+     * Metadatos de derivación activa por id de formulario (quién derivó + institución origen), sin filtrar por IdInstitucion del pedido.
+     */
+    private function billingSqlDerivacionCamposSelect(string $formIdExpr = 'f.idformA'): string {
+        if (!$this->tableExists('formulario_derivacion')) {
+            return 'NULL AS derivado_por_id, NULL AS derivado_por_nombre, NULL AS derivado_desde_institucion';
+        }
+        $e = $formIdExpr;
+        return "(SELECT fd.IdUsrOrigen FROM formulario_derivacion fd WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1) AS derivado_por_id,
+                (SELECT TRIM(CONCAT(COALESCE(po.NombreA,''), ' ', COALESCE(po.ApellidoA,''))) FROM formulario_derivacion fd INNER JOIN personae po ON po.IdUsrA = fd.IdUsrOrigen WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1) AS derivado_por_nombre,
+                (SELECT COALESCE(io.NombreInst,'') FROM formulario_derivacion fd LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1) AS derivado_desde_institucion";
+    }
+
+    /** Variante con agregados para consultas con GROUP BY f.idformA. */
+    private function billingSqlDerivacionCamposSelectGrouped(string $formIdExpr = 'f.idformA'): string {
+        if (!$this->tableExists('formulario_derivacion')) {
+            return 'NULL AS derivado_por_id, NULL AS derivado_por_nombre, NULL AS derivado_desde_institucion';
+        }
+        $e = $formIdExpr;
+        return "MAX((SELECT fd.IdUsrOrigen FROM formulario_derivacion fd WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)) AS derivado_por_id,
+                MAX((SELECT TRIM(CONCAT(COALESCE(po.NombreA,''), ' ', COALESCE(po.ApellidoA,''))) FROM formulario_derivacion fd INNER JOIN personae po ON po.IdUsrA = fd.IdUsrOrigen WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)) AS derivado_por_nombre,
+                MAX((SELECT COALESCE(io.NombreInst,'') FROM formulario_derivacion fd LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)) AS derivado_desde_institucion";
+    }
+
     // ... [TODO EL BLOQUE DE GETTERS SE MANTIENE EXACTAMENTE IGUAL HASTA "updateBalance"] ...
     public function getProtocolosByDepto($deptoId) {
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
@@ -34,12 +58,14 @@ class BillingModel {
      * Pedidos (formularios) del departamento que NO están vinculados a ningún protocolo (formato viejo).
      */
     public function getPedidosDeptoSinProtocolo($deptoId, $desde = null, $hasta = null) {
+        $dDeriv = $this->billingSqlDerivacionCamposSelect('f.idformA');
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
                 se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
                 tf.nombreTipo as nombre_tipo, tf.exento, tf.descuento, ie.NombreInsumo,
                 ie.CantidadInsumo, ie.TipoInsumo, s.totalA as cant_animal, s.organo as cant_organo,
-                pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado
+                pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado,
+                {$dDeriv}
                 FROM formularioe f
                 LEFT JOIN protformr pf_link ON f.idformA = pf_link.idformA
                 JOIN personae u ON f.IdUsrA = u.IdUsrA JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
@@ -84,12 +110,14 @@ class BillingModel {
     }
 
 public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
+        $dDeriv = $this->billingSqlDerivacionCamposSelect('f.idformA');
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
                 se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
                 tf.nombreTipo as nombre_tipo, tf.exento, tf.descuento, ie.NombreInsumo,
                 ie.CantidadInsumo, ie.TipoInsumo, s.totalA as cant_animal, s.organo as cant_organo,
-                pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado
+                pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado,
+                {$dDeriv}
                 FROM formularioe f
                 JOIN protformr pf_link ON f.idformA = pf_link.idformA
                 JOIN personae u ON f.IdUsrA = u.IdUsrA JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
@@ -131,6 +159,35 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
             $r['taxonomia'] = ($r['nombre_especie'] ?? '-') . ($r['nombre_subespecie'] ? " : {$r['nombre_subespecie']}" : "");
         }
         return $rows;
+    }
+
+    /**
+     * Indica si el protocolo tiene al menos un formulario Entregado vinculado (protformr) en el rango de fechas.
+     * Evita llamadas pesadas a getPedidosProtocolo cuando no hay filas.
+     */
+    public function protocolTienePedidosEntregadosEnRango(int $idProt, string $desde, string $hasta): bool {
+        $sql = "SELECT 1 FROM formularioe f
+                INNER JOIN protformr pf_link ON f.idformA = pf_link.idformA
+                WHERE pf_link.idprotA = ? AND f.estado = 'Entregado'
+                  AND f.fechainicioA BETWEEN ? AND ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idProt, $desde, $hasta]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Indica si hay filas de alojamiento con historia y fechavisado en rango (mismo filtro base que getAlojamientosProtocolo).
+     */
+    public function protocolTieneAlojamientoVisadoEnRango(int $idProt, string $desde, string $hasta): bool {
+        $sql = "SELECT 1 FROM alojamiento a
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                WHERE a.idprotA = ? AND a.historia IS NOT NULL
+                  AND a.fechavisado BETWEEN ? AND ?
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idProt, $desde, $hasta]);
+        return (bool) $stmt->fetchColumn();
     }
 
 // 1. ALOJAMIENTOS: periodos facturables (excluye tramos en stand by: CantidadCaja = 0)
@@ -277,7 +334,9 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
 
 // 2. INSUMOS POR DEPARTAMENTO: Matemática detallada en el texto
     public function getInsumosGenerales($deptoId, $desde, $hasta) {
+        $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
+                {$gDeriv},
                 MAX(d.SaldoDinero) as saldoInv, 
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
@@ -303,7 +362,9 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
      * Misma estructura que getInsumosGenerales para mostrar en facturación por protocolo.
      */
     public function getInsumosByProtocolo($idProt, $desde = null, $hasta = null) {
+        $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
+                {$gDeriv},
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
                 FROM formularioe f
@@ -464,11 +525,53 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             'pagos' => $pagos,
         ];
     }
-public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
+
+    public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
+        $idUsr = (int) $idUsr;
+        $inst = (int) $inst;
+        $adminId = (int) $adminId;
+        $monto = round((float) $monto, 2);
+        if ($idUsr <= 0 || $inst <= 0 || $monto <= 0) {
+            throw new \InvalidArgumentException('Datos de pago inválidos.');
+        }
+        if (!is_array($items) || count($items) === 0) {
+            throw new \InvalidArgumentException('No hay ítems en el pago.');
+        }
+        $sumItems = 0.0;
+        foreach ($items as $item) {
+            $sumItems += round((float) ($item['monto_pago'] ?? 0), 2);
+        }
+        $sumItems = round($sumItems, 2);
+        if (abs($sumItems - $monto) > 0.02) {
+            throw new \RuntimeException('El total enviado no coincide con la suma de los ítems.');
+        }
         try {
             $this->db->beginTransaction();
-            $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-            $this->db->prepare($sqlSaldo)->execute([$monto, $idUsr, $inst]);
+
+            $stmtLock = $this->db->prepare(
+                'SELECT SaldoDinero FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ? FOR UPDATE'
+            );
+            $stmtLock->execute([$idUsr, $inst]);
+            $rowD = $stmtLock->fetch(PDO::FETCH_ASSOC);
+            if (!$rowD) {
+                throw new \RuntimeException(
+                    'No hay billetera de saldo para este investigador en esta institución. Registre saldo antes de liquidar.'
+                );
+            }
+            $saldoAct = round((float) ($rowD['SaldoDinero'] ?? 0), 2);
+            if ($saldoAct + 1e-6 < $monto) {
+                throw new \RuntimeException(
+                    'Saldo insuficiente. Disponible: $' . number_format($saldoAct, 2, ',', '.')
+                    . ' — requerido: $' . number_format($monto, 2, ',', '.') . '.'
+                );
+            }
+            $stmtUp = $this->db->prepare(
+                'UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ? AND SaldoDinero >= ?'
+            );
+            $stmtUp->execute([$monto, $idUsr, $inst, $monto]);
+            if ($stmtUp->rowCount() !== 1) {
+                throw new \RuntimeException('No se pudo debitar el saldo (concurrencia o saldo insuficiente).');
+            }
 
             foreach ($items as $item) {
                 $id = $item['id'];
@@ -497,8 +600,35 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
 
             Auditoria::log($this->db, 'PAGO_MASIVO', 'dinero', "Liquidación de $$monto por Usuario ID: $idUsr");
             $this->db->commit();
+
             return true;
-        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * JOINs SQL para enlazar pedido/e origen → protocolo y titular (cobro = titular protocolo, no sustitutos del derivado).
+     */
+    private function sqlFactDerivadaTitularCobroPieces(): array {
+        $hasO = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $originFormExpr = $hasO ? 'COALESCE(NULLIF(fd.idformAOrigen, 0), ffd.idformA)' : 'ffd.idformA';
+        $idTitExpr = 'COALESCE(NULLIF(pe_o.IdUsrA, 0), NULLIF(fo.IdUsrA, 0), NULLIF(ffd.IdUsrSolicitante, 0))';
+        $joins = '
+            LEFT JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion
+            LEFT JOIN formularioe fo ON fo.idformA = ' . $originFormExpr . '
+            LEFT JOIN protformr pf_o ON pf_o.idformA = fo.idformA
+            LEFT JOIN protocoloexpe pe_o ON pe_o.idprotA = pf_o.idprotA
+            LEFT JOIN personae pt_c ON pt_c.IdUsrA = ' . $idTitExpr . '
+        ';
+        $selectTitular = '
+            ' . $idTitExpr . ' AS IdUsrTitularCobro,
+            TRIM(CONCAT(COALESCE(pt_c.ApellidoA, \'\'), \', \', COALESCE(pt_c.NombreA, \'\'))) AS nombreTitularProtocoloParaCobro
+        ';
+        return ['joins' => trim($joins), 'selectTitular' => trim(preg_replace('/\s+/', ' ', $selectTitular)), 'originFormExpr' => $originFormExpr];
     }
 
     /**
@@ -508,17 +638,28 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
         if (!$this->tableExists('facturacion_formulario_derivado')) {
             return null;
         }
-        $stmt = $this->db->prepare(
-            'SELECT IdFacturacionFormularioDerivado, idformA, monto_total, monto_pagado, estado_cobro, IdUsrSolicitante, IdInstitucionCobradora
-             FROM facturacion_formulario_derivado
-             WHERE idformA = ? AND IdInstitucionCobradora = ?
-             ORDER BY IdFacturacionFormularioDerivado DESC
-             LIMIT 1'
-        );
+        $p = $this->sqlFactDerivadaTitularCobroPieces();
+        $sql = 'SELECT ffd.IdFacturacionFormularioDerivado, ffd.idformA, ffd.monto_total, ffd.monto_pagado, ffd.estado_cobro,
+                       ffd.IdUsrSolicitante, ffd.IdInstitucionCobradora,
+                       ' . $p['selectTitular'] . '
+                FROM facturacion_formulario_derivado ffd
+                ' . $p['joins'] . '
+                WHERE ffd.idformA = ? AND ffd.IdInstitucionCobradora = ?
+                ORDER BY ffd.IdFacturacionFormularioDerivado DESC
+                LIMIT 1';
+        $stmt = $this->db->prepare($sql);
         $stmt->execute([$idformA, $instCobradora]);
         $r = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $r ?: null;
+    }
+
+    private function idUsuarioCobroFromFactDerivadaRow(array $ffd): int {
+        $t = isset($ffd['IdUsrTitularCobro']) ? (int)$ffd['IdUsrTitularCobro'] : 0;
+        if ($t > 0) {
+            return $t;
+        }
+        return (int)($ffd['IdUsrSolicitante'] ?? 0);
     }
 
     /**
@@ -533,7 +674,11 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
         if (!$ffd) {
             return;
         }
-        $idUsr = (int)$ffd['IdUsrSolicitante'];
+        $idUsr = $this->idUsuarioCobroFromFactDerivadaRow($ffd);
+        $nomTit = trim((string) ($ffd['nombreTitularProtocoloParaCobro'] ?? ''));
+        if ($nomTit !== '') {
+            $row['titular_nombre'] = $nomTit;
+        }
         $row['total_calculado'] = (float)$ffd['monto_total'];
         $row['totalpago'] = (float)$ffd['monto_pagado'];
         $row['saldoInv'] = $this->getSaldoByInvestigador($idUsr, $instCobradora);
@@ -550,7 +695,7 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
         if (!$ffd) {
             return;
         }
-        $idUsr = (int)$ffd['IdUsrSolicitante'];
+        $idUsr = $this->idUsuarioCobroFromFactDerivadaRow($ffd);
         $r['total_item'] = (float)$ffd['monto_total'];
         $r['pagado'] = (float)$ffd['monto_pagado'];
         $r['saldoInv'] = $this->getSaldoByInvestigador($idUsr, $instCobradora);
@@ -570,7 +715,10 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
         if (!$ffd) {
             throw new \RuntimeException('No hay facturación derivada para este formulario en su institución.');
         }
-        $idUsr = (int)$ffd['IdUsrSolicitante'];
+        $idUsr = $this->idUsuarioCobroFromFactDerivadaRow($ffd);
+        if ($idUsr <= 0) {
+            throw new \RuntimeException('No se puede registrar el cobro: falta titular de protocolo o investigador original asociado al pedido.');
+        }
         $idFact = (int)$ffd['IdFacturacionFormularioDerivado'];
         $total = round((float)$ffd['monto_total'], 2);
         $pagado = round((float)$ffd['monto_pagado'], 2);
@@ -631,46 +779,80 @@ public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminI
     }
 
     public function procesarAjustePago($id, $monto, $accion, $adminId, $instId = null) {
-        $monto = round((float)$monto, 2);
+        $monto = round((float) $monto, 2);
         if ($monto <= 0) {
-            return false;
+            throw new \InvalidArgumentException('Monto inválido.');
         }
         if ($instId !== null && $this->tableExists('facturacion_formulario_derivado')) {
-            $ffd = $this->findFacturacionDerivadaForForm((int)$id, (int)$instId);
+            $ffd = $this->findFacturacionDerivadaForForm((int) $id, (int) $instId);
             if ($ffd) {
-                return $this->procesarAjustePagoDerivada((int)$id, $monto, $accion, (int)$instId, (int)$adminId);
+                return $this->procesarAjustePagoDerivada((int) $id, $monto, $accion, (int) $instId, (int) $adminId);
             }
         }
         try {
             $this->db->beginTransaction();
-            $sql = "SELECT f.IdUsrA, f.IdInstitucion FROM formularioe f WHERE f.idformA = ?";
+            $sql = 'SELECT f.IdUsrA, f.IdInstitucion FROM formularioe f WHERE f.idformA = ?';
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$id]);
             $data = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$data) {
+                throw new \RuntimeException('Formulario no encontrado.');
+            }
 
             if ($accion === 'PAGAR') {
-                $sqlPago = "UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "PAGO_INDIVIDUAL";
+                $sqlPago = 'UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?';
+                $tipoHist = 'PAGO_INDIVIDUAL';
+            } elseif ($accion === 'QUITAR') {
+                $sqlPago = 'UPDATE precioformulario SET totalpago = totalpago - ? WHERE idformA = ?';
+                $tipoHist = 'DEVOLUCION';
             } else {
-                $sqlPago = "UPDATE precioformulario SET totalpago = totalpago - ? WHERE idformA = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "DEVOLUCION";
+                throw new \InvalidArgumentException('Acción no válida.');
             }
 
             $this->db->prepare($sqlPago)->execute([$monto, $id]);
-            $this->db->prepare($sqlSaldo)->execute([$monto, $data['IdUsrA'], $data['IdInstitucion']]);
+
+            if ($accion === 'PAGAR') {
+                $stmtS = $this->db->prepare(
+                    'UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ? AND SaldoDinero >= ?'
+                );
+                $stmtS->execute([$monto, $data['IdUsrA'], $data['IdInstitucion'], $monto]);
+                if ($stmtS->rowCount() !== 1) {
+                    $chk = $this->db->prepare('SELECT 1 FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ?');
+                    $chk->execute([$data['IdUsrA'], $data['IdInstitucion']]);
+                    if (!$chk->fetch()) {
+                        throw new \RuntimeException(
+                            'No hay billetera de saldo para el titular del formulario en esa institución.'
+                        );
+                    }
+                    throw new \RuntimeException('Saldo insuficiente en la billetera para registrar este pago.');
+                }
+            } else {
+                $stmtS = $this->db->prepare(
+                    'UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?'
+                );
+                $stmtS->execute([$monto, $data['IdUsrA'], $data['IdInstitucion']]);
+                if ($stmtS->rowCount() === 0) {
+                    $this->db->prepare('INSERT INTO dinero (IdUsrA, IdInstitucion, SaldoDinero) VALUES (?, ?, ?)')
+                        ->execute([$data['IdUsrA'], $data['IdInstitucion'], $monto]);
+                }
+            }
 
             Auditoria::log($this->db, $tipoHist, 'precioformulario', "Ajuste $accion de $$monto en Formulario #$id");
-            
-            // CORREGIDO: IdFormA (antes decía IdFromA)
-            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                                VALUES (?, ?, ?, ?, CURDATE(), ?, ?)")
-                     ->execute([$adminId, $monto, $data['IdUsrA'], $id, $tipoHist, $data['IdInstitucion']]);
+
+            $this->db->prepare(
+                'INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
+                                VALUES (?, ?, ?, ?, CURDATE(), ?, ?)'
+            )->execute([$adminId, $monto, $data['IdUsrA'], $id, $tipoHist, $data['IdInstitucion']]);
 
             $this->db->commit();
+
             return true;
-        } catch (\Exception $e) { $this->db->rollBack(); return false; }
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -880,7 +1062,8 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     }
 // 3. INSUMOS POR INVESTIGADOR: Matemática detallada en el texto
     public function getInsumosByUser($idUsr, $idInst, $desde = null, $hasta = null) {
-        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, 
+        $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
+        $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, {$gDeriv}, MAX(d.SaldoDinero) as saldoInv, 
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo, 
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as is_exento 
                 FROM formularioe f 
@@ -966,8 +1149,16 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
         $hasComment = $this->hasColumn('historialpago', 'Comentario');
         $selExtra = '';
-        if ($hasTransfer) $selExtra .= ", h.IdentificadorTransferencia";
-        if ($hasComment) $selExtra .= ", h.Comentario";
+        if ($hasTransfer) {
+            $selExtra .= ", h.IdentificadorTransferencia";
+        } else {
+            $selExtra .= ", NULL as IdentificadorTransferencia";
+        }
+        if ($hasComment) {
+            $selExtra .= ", h.Comentario";
+        } else {
+            $selExtra .= ", NULL as Comentario";
+        }
         $sql = "SELECT h.IdHistoPago, h.IdUsrA, h.Monto, h.IdFormA, h.fecha, h.TipoHistorial{$selExtra},
                        CONCAT(a.NombreA, ' ', a.ApellidoA) as AdminCompleto,
                        CONCAT(u.NombreA, ' ', u.ApellidoA) as UsrCompleto
@@ -1111,23 +1302,156 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     }
 
     /**
-     * Facturación por institución solicitante: derivados (facturacion_formulario_derivado) y/o comunes (precio en sede, sin fila derivada).
-     * @param int|null $idInstitucionSolicitante Si se pasa, filtra solo esa institución.
-     * @param string $origenFacturacion todos|derivado|comun
+     * Reporte por institución con paginación: totales globales vía agregados + detalle solo para instituciones de la página.
+     * Devuelve null para delegar al flujo monolítico (p. ej. filtro una sola institución).
      */
-    public function getInstitutionDerivedReport($instId, $desde = null, $hasta = null, $estadoCobro = 'all', $idInstitucionSolicitante = null, $origenFacturacion = 'todos') {
-        $origenFacturacion = is_string($origenFacturacion) ? strtolower(trim($origenFacturacion)) : 'todos';
-        if (!in_array($origenFacturacion, ['todos', 'derivado', 'comun'], true)) {
-            $origenFacturacion = 'todos';
-        }
-
+    private function getInstitutionDerivedReportPaginatedOptimized(
+        int $instId,
+        $desde,
+        $hasta,
+        $estadoCobro,
+        $idInstitucionSolicitante,
+        string $origenFacturacion,
+        int $instPage,
+        int $instPerPage
+    ): array {
+        $instId = (int) $instId;
+        $hasFfd = $this->tableExists('facturacion_formulario_derivado');
         $empty = [
             'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
             'instituciones' => [],
             'meta' => ['origenFacturacion' => $origenFacturacion],
         ];
-        $hasFfd = $this->tableExists('facturacion_formulario_derivado');
+
+        $solInstFilter = ($idInstitucionSolicitante !== null && $idInstitucionSolicitante !== '' && is_numeric($idInstitucionSolicitante))
+            ? (int) $idInstitucionSolicitante
+            : null;
+
+        $globalTotales = ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0];
+
         if ($hasFfd && ($origenFacturacion === 'todos' || $origenFacturacion === 'derivado')) {
+            $w = 'ffd.IdInstitucionCobradora = ? AND COALESCE(f.estado, \'\') = \'Entregado\'';
+            $pAgg = [$instId];
+            if (!empty($desde) && !empty($hasta)) {
+                $w .= ' AND DATE(ffd.FechaCreado) BETWEEN ? AND ?';
+                $pAgg[] = $desde;
+                $pAgg[] = $hasta;
+            }
+            if ($estadoCobro !== 'all' && $estadoCobro !== '' && is_numeric($estadoCobro)) {
+                $w .= ' AND ffd.estado_cobro = ?';
+                $pAgg[] = (int) $estadoCobro;
+            } else {
+                $w .= ' AND COALESCE(ffd.estado_cobro, 1) <> 4';
+            }
+            $sqlAgg = "SELECT COALESCE(SUM(ffd.monto_total),0) AS mt, COALESCE(SUM(ffd.monto_pagado),0) AS mp,
+                    COALESCE(SUM(GREATEST(0, ffd.monto_total - ffd.monto_pagado)),0) AS md, COUNT(*) AS c
+                FROM facturacion_formulario_derivado ffd
+                LEFT JOIN formularioe f ON f.idformA = ffd.idformA
+                WHERE {$w}";
+            $st = $this->db->prepare($sqlAgg);
+            $st->execute($pAgg);
+            $ag = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+            $globalTotales['montoTotal'] += (float) ($ag['mt'] ?? 0);
+            $globalTotales['montoPagado'] += (float) ($ag['mp'] ?? 0);
+            $globalTotales['montoDebe'] += (float) ($ag['md'] ?? 0);
+            $globalTotales['cantidad'] += (int) ($ag['c'] ?? 0);
+        }
+
+        $rowsComAll = [];
+        if ($origenFacturacion === 'todos' || $origenFacturacion === 'comun') {
+            if ($solInstFilter === null || $solInstFilter === $instId) {
+                $rowsComAll = $this->fetchInstitutionCommonBillingRows($instId, $desde, $hasta, $estadoCobro);
+                foreach ($rowsComAll as $cr) {
+                    $mTotal = (float) ($cr['_monto_total'] ?? 0);
+                    $mPagado = (float) ($cr['_monto_pagado'] ?? 0);
+                    $mDebe = (float) ($cr['_monto_debe'] ?? 0);
+                    $globalTotales['montoTotal'] += $mTotal;
+                    $globalTotales['montoPagado'] += $mPagado;
+                    $globalTotales['montoDebe'] += $mDebe;
+                    $globalTotales['cantidad'] += 1;
+                }
+            }
+        }
+
+        if ($globalTotales['cantidad'] <= 0) {
+            return $empty;
+        }
+
+        $orderedIds = [];
+        if ($hasFfd && ($origenFacturacion === 'todos' || $origenFacturacion === 'derivado')) {
+            $wD = 'ffd.IdInstitucionCobradora = ? AND COALESCE(f.estado, \'\') = \'Entregado\'';
+            $pD = [$instId];
+            if (!empty($desde) && !empty($hasta)) {
+                $wD .= ' AND DATE(ffd.FechaCreado) BETWEEN ? AND ?';
+                $pD[] = $desde;
+                $pD[] = $hasta;
+            }
+            if ($estadoCobro !== 'all' && $estadoCobro !== '' && is_numeric($estadoCobro)) {
+                $wD .= ' AND ffd.estado_cobro = ?';
+                $pD[] = (int) $estadoCobro;
+            } else {
+                $wD .= ' AND COALESCE(ffd.estado_cobro, 1) <> 4';
+            }
+            $sqlIds = "SELECT ffd.IdInstitucionSolicitante AS id,
+                    MIN(COALESCE(i.NombreInst, CONCAT('Institución #', ffd.IdInstitucionSolicitante))) AS nom_sort
+                FROM facturacion_formulario_derivado ffd
+                LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
+                LEFT JOIN formularioe f ON f.idformA = ffd.idformA
+                WHERE {$wD}
+                GROUP BY ffd.IdInstitucionSolicitante
+                ORDER BY nom_sort ASC, ffd.IdInstitucionSolicitante ASC";
+            $stIds = $this->db->prepare($sqlIds);
+            $stIds->execute($pD);
+            foreach ($stIds->fetchAll(PDO::FETCH_ASSOC) as $rId) {
+                $orderedIds[] = (int) $rId['id'];
+            }
+        }
+
+        if (($origenFacturacion === 'todos' || $origenFacturacion === 'comun')
+            && ($solInstFilter === null || $solInstFilter === $instId)
+            && $rowsComAll !== []
+            && !in_array($instId, $orderedIds, true)
+        ) {
+            $orderedIds[] = $instId;
+        }
+
+        $totalInst = count($orderedIds);
+        if ($totalInst === 0) {
+            return $empty;
+        }
+
+        $per = min(50, max(1, (int) $instPerPage));
+        $totalPages = max(1, (int) ceil($totalInst / $per));
+        $page = max(1, (int) $instPage);
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $per;
+        $pageIds = array_slice($orderedIds, $offset, $per);
+        if ($pageIds === []) {
+            return $empty;
+        }
+
+        $out = [
+            'totales' => $globalTotales,
+            'instituciones' => [],
+            'meta' => [
+                'origenFacturacion' => $origenFacturacion,
+                'instPagination' => [
+                    'page' => $page,
+                    'perPage' => $per,
+                    'totalInstitutions' => $totalInst,
+                    'totalPages' => $totalPages,
+                ],
+            ],
+        ];
+
+        $rows = [];
+        if ($hasFfd && ($origenFacturacion === 'todos' || $origenFacturacion === 'derivado')) {
+            $orgFormFo = $this->hasColumn('formulario_derivacion', 'idformAOrigen')
+                ? 'COALESCE(NULLIF(fd.idformAOrigen, 0), ffd.idformA)'
+                : 'ffd.idformA';
+            $idTitCobSql = 'COALESCE(NULLIF(pe_o.IdUsrA, 0), NULLIF(fo.IdUsrA, 0), NULLIF(ffd.IdUsrSolicitante, 0))';
             $sql = "SELECT
                     ffd.IdFacturacionFormularioDerivado,
                     ffd.idformA,
@@ -1152,13 +1476,16 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                     d_o.NombreDeptoA AS depto_original_form,
                     pe_o.nprotA AS nprot_original_form,
                     pe_o.tituloA AS titulo_protocolo_original,
-                    TRIM(CONCAT(COALESCE(in_o.NombreA, ''), ' ', COALESCE(in_o.ApellidoA, ''))) AS inv_original_form
+                    TRIM(CONCAT(COALESCE(in_o.NombreA, ''), ' ', COALESCE(in_o.ApellidoA, ''))) AS inv_original_form,
+                    {$idTitCobSql} AS IdUsrTitularCobro,
+                    TRIM(CONCAT(COALESCE(pt_c.ApellidoA, ''), ', ', COALESCE(pt_c.NombreA, ''))) AS nombre_titular_cobro,
+                    TRIM(CONCAT(COALESCE(pt_c.NombreA, ''), ' ', COALESCE(pt_c.ApellidoA, ''))) AS inv_nombre_protocolo_titular
                 FROM facturacion_formulario_derivado ffd
                 LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
                 LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
                 LEFT JOIN formularioe f ON f.idformA = ffd.idformA
                 LEFT JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion
-                LEFT JOIN formularioe fo ON fo.idformA = COALESCE(NULLIF(fd.idformAOrigen, 0), ffd.idformA)
+                LEFT JOIN formularioe fo ON fo.idformA = {$orgFormFo}
                 LEFT JOIN departamentoe d_o ON d_o.iddeptoA = fo.depto
                 LEFT JOIN protformr pf_o ON pf_o.idformA = fo.idformA
                 LEFT JOIN protocoloexpe pe_o ON pe_o.idprotA = pf_o.idprotA
@@ -1168,6 +1495,317 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 LEFT JOIN personae p ON p.IdUsrA = ffd.IdUsrSolicitante
                 LEFT JOIN personae po ON po.IdUsrA = fd.IdUsrOrigen
                 LEFT JOIN personae pd ON pd.IdUsrA = fd.IdUsrDestinoResponsable
+                LEFT JOIN personae pt_c ON pt_c.IdUsrA = {$idTitCobSql}
+                WHERE ffd.IdInstitucionCobradora = ?
+                  AND COALESCE(f.estado, '') = 'Entregado'";
+            $params = [$instId];
+            if (!empty($desde) && !empty($hasta)) {
+                $sql .= " AND DATE(ffd.FechaCreado) BETWEEN ? AND ?";
+                $params[] = $desde;
+                $params[] = $hasta;
+            }
+            if ($estadoCobro !== 'all' && $estadoCobro !== '' && is_numeric($estadoCobro)) {
+                $sql .= " AND ffd.estado_cobro = ?";
+                $params[] = (int) $estadoCobro;
+            } else {
+                $sql .= " AND COALESCE(ffd.estado_cobro, 1) <> 4";
+            }
+            $inPh = implode(',', array_fill(0, count($pageIds), '?'));
+            $sql .= " AND ffd.IdInstitucionSolicitante IN ({$inPh})";
+            foreach ($pageIds as $pid) {
+                $params[] = (int) $pid;
+            }
+            $sql .= " ORDER BY institucion_solicitante ASC, ffd.FechaCreado DESC, ffd.IdFacturacionFormularioDerivado DESC";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        foreach ($rows as $r) {
+            $idInstSol = (int) $r['IdInstitucionSolicitante'];
+            if (!isset($out['instituciones'][$idInstSol])) {
+                $out['instituciones'][$idInstSol] = [
+                    'idInstitucionSolicitante' => $idInstSol,
+                    'institucion' => $r['institucion_solicitante'],
+                    'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
+                    'items' => [],
+                ];
+            }
+
+            $mTotal = (float) $r['monto_total'];
+            $mPagado = (float) $r['monto_pagado'];
+            $mDebe = max(0, $mTotal - $mPagado);
+
+            $sol = trim((string) ($r['investigador_solicitante'] ?? ''));
+            $orig = trim((string) ($r['investigador_origen_pedido'] ?? ''));
+            $dest = trim((string) ($r['investigador_responsable_destino'] ?? ''));
+            $inicial = $orig !== '' ? $orig : $sol;
+            $invInst = $dest !== '' ? $dest : '-';
+
+            $io = trim((string) ($r['institucion_solicitante'] ?? ''));
+            if ($io === '') {
+                $io = 'Institución #' . (int) ($r['IdInstitucionSolicitante'] ?? 0);
+            }
+            $sufOrigen = ' --> ' . $io;
+            $deptoO = trim((string) ($r['depto_original_form'] ?? ''));
+            $nprotO = trim((string) ($r['nprot_original_form'] ?? ''));
+            $titO = trim((string) ($r['titulo_protocolo_original'] ?? ''));
+            $invO = trim((string) ($r['inv_original_form'] ?? ''));
+            $invProtTit = trim((string) ($r['inv_nombre_protocolo_titular'] ?? ''));
+            $protoLine = $nprotO;
+            if ($titO !== '') {
+                $protoLine = ($protoLine !== '' ? $protoLine . ' — ' : '') . $titO;
+            }
+            $protoLine = trim((string) $protoLine);
+            if ($invProtTit !== '') {
+                $invO = $invProtTit;
+            } elseif ($invO === '') {
+                $invO = $inicial;
+            }
+
+            $idTitularCobro = isset($r['IdUsrTitularCobro']) ? (int) $r['IdUsrTitularCobro'] : 0;
+            if ($idTitularCobro <= 0) {
+                $idTitularCobro = isset($r['IdUsrSolicitante']) ? (int) $r['IdUsrSolicitante'] : 0;
+            }
+            $nomTitCob = trim((string) ($r['nombre_titular_cobro'] ?? ''));
+            if ($nomTitCob === '') {
+                $nomTitCob = $sol !== '' ? $sol : '-';
+            }
+
+            $item = [
+                'idFacturacionDerivada' => (int) $r['IdFacturacionFormularioDerivado'],
+                'idformA' => (int) $r['idformA'],
+                'idInvestigador' => $idTitularCobro > 0 ? $idTitularCobro : null,
+                'tipoFormulario' => $r['tipo_formulario'],
+                'montoTotal' => $mTotal,
+                'montoPagado' => $mPagado,
+                'montoDebe' => $mDebe,
+                'estadoCobro' => (int) $r['estado_cobro'],
+                'fechaCreado' => $r['FechaCreado'],
+                'estadoFormulario' => $r['estado_formulario'],
+                'estadoOrigen' => $r['estado_origen'] ?? null,
+                'estadoDestino' => $r['estado_destino'] ?? null,
+                'nombreTipo' => $r['nombre_tipo'],
+                'categoria' => $r['categoria'],
+                'investigador' => $nomTitCob,
+                'investigadorInicial' => $inicial !== '' ? $inicial : '-',
+                'investigadorInstitucion' => $invInst,
+                'institucionOrigen' => trim((string) ($r['institucion_solicitante'] ?? '')) !== '' ? trim((string) $r['institucion_solicitante']) : '-',
+                'institucionDestino' => trim((string) ($r['institucion_cobradora'] ?? '')) !== '' ? trim((string) $r['institucion_cobradora']) : '-',
+                'departamentoPedidoOriginal' => ($deptoO !== '' ? $deptoO : '-') . $sufOrigen,
+                'protocoloPedidoOriginal' => ($protoLine !== '' ? $protoLine : '-') . $sufOrigen,
+                'investigadorPedidoOriginal' => ($invO !== '' ? $invO : '-') . $sufOrigen,
+                'origenFacturacion' => 'derivado',
+                'esExternoFacturacion' => true,
+            ];
+
+            $out['instituciones'][$idInstSol]['items'][] = $item;
+            $out['instituciones'][$idInstSol]['totales']['montoTotal'] += $mTotal;
+            $out['instituciones'][$idInstSol]['totales']['montoPagado'] += $mPagado;
+            $out['instituciones'][$idInstSol]['totales']['montoDebe'] += $mDebe;
+            $out['instituciones'][$idInstSol]['totales']['cantidad'] += 1;
+        }
+
+        if (($origenFacturacion === 'todos' || $origenFacturacion === 'comun')
+            && ($solInstFilter === null || $solInstFilter === $instId)
+            && in_array($instId, $pageIds, true)
+        ) {
+            foreach ($rowsComAll as $cr) {
+                $idInstSol = (int) ($cr['IdInstitucion'] ?? $instId);
+                if ($solInstFilter !== null && $idInstSol !== $solInstFilter) {
+                    continue;
+                }
+                if (!isset($out['instituciones'][$idInstSol])) {
+                    $nomInst = trim((string) ($cr['nombre_inst_form'] ?? ''));
+                    if ($nomInst === '') {
+                        $nomInst = 'Institución #' . $idInstSol;
+                    }
+                    $out['instituciones'][$idInstSol] = [
+                        'idInstitucionSolicitante' => $idInstSol,
+                        'institucion' => $nomInst,
+                        'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
+                        'items' => [],
+                    ];
+                }
+
+                $mTotal = (float) ($cr['_monto_total'] ?? 0);
+                $mPagado = (float) ($cr['_monto_pagado'] ?? 0);
+                $mDebe = (float) ($cr['_monto_debe'] ?? 0);
+                $idInstForm = (int) ($cr['IdInstitucion'] ?? $instId);
+                $idInstDept = (int) ($cr['id_inst_depto'] ?? 0);
+                $idInstProt = (int) ($cr['id_inst_prot'] ?? 0);
+                $extDept = (int) ($cr['externodepto_val'] ?? 0) === 2;
+                $nombreInstDepto = trim((string) ($cr['nombre_inst_depto'] ?? ''));
+                $deptoBase = trim((string) ($cr['nombre_depto'] ?? ''));
+                $sufDept = ($idInstDept > 0 && $idInstDept !== $idInstForm) || $extDept;
+                $deptoExterno = ($sufDept && $nombreInstDepto !== '' ? ' (' . $nombreInstDepto . ')' : '');
+                $nomInstForm = trim((string) ($cr['nombre_inst_form'] ?? ''));
+                $sufInstForm = ($nomInstForm !== '' ? ' --> ' . $nomInstForm : '');
+                $deptoDisp = ($deptoBase !== '' ? $deptoBase : '-') . $deptoExterno . $sufInstForm;
+
+                $nprot = trim((string) ($cr['nprot'] ?? ''));
+                $titP = trim((string) ($cr['titulo_prot'] ?? ''));
+                $protoLine = $nprot;
+                if ($titP !== '') {
+                    $protoLine = ($protoLine !== '' ? $protoLine . ' — ' : '') . $titP;
+                }
+                $protoLine = trim((string) $protoLine);
+                $nombreInstProt = trim((string) ($cr['nombre_inst_prot'] ?? ''));
+                $sufProt = $idInstProt > 0 && $idInstProt !== $idInstForm;
+                $protoExterno = ($sufProt && $nombreInstProt !== '' ? ' (' . $nombreInstProt . ')' : '');
+                $protoDisp = ($protoLine !== '' ? $protoLine : '-') . $protoExterno . $sufInstForm;
+
+                $invBase = trim((string) ($cr['solicitante'] ?? ''));
+                $invDisp = ($invBase !== '' ? $invBase : '-') . $sufInstForm;
+
+                $itemC = [
+                    'idFacturacionDerivada' => 0,
+                    'idformA' => (int) ($cr['idformA'] ?? 0),
+                    'idInvestigador' => isset($cr['IdUsrA']) ? (int) $cr['IdUsrA'] : null,
+                    'tipoFormulario' => strtolower((string) ($cr['categoriaformulario'] ?? '')),
+                    'montoTotal' => $mTotal,
+                    'montoPagado' => $mPagado,
+                    'montoDebe' => $mDebe,
+                    'estadoCobro' => (int) ($cr['_estado_cobro'] ?? 1),
+                    'fechaCreado' => $cr['fechainicioA'] ?? null,
+                    'estadoFormulario' => 'Entregado',
+                    'estadoOrigen' => null,
+                    'estadoDestino' => null,
+                    'nombreTipo' => $cr['nombreTipo'] ?? '-',
+                    'categoria' => $cr['categoriaformulario'] ?? '-',
+                    'investigador' => $invDisp,
+                    'investigadorInicial' => $invDisp,
+                    'investigadorInstitucion' => $invDisp,
+                    'institucionOrigen' => trim((string) ($cr['nombre_inst_form'] ?? '')) !== '' ? trim((string) $cr['nombre_inst_form']) : '-',
+                    'institucionDestino' => trim((string) ($cr['nombre_inst_form'] ?? '')) !== '' ? trim((string) $cr['nombre_inst_form']) : '-',
+                    'departamentoPedidoOriginal' => $deptoDisp,
+                    'protocoloPedidoOriginal' => $protoDisp,
+                    'investigadorPedidoOriginal' => $invDisp,
+                    'origenFacturacion' => 'comun',
+                    'esExternoFacturacion' => (bool) ($sufDept || $sufProt),
+                    'exento' => !empty($cr['_exento']) ? 1 : 0,
+                    'is_exento' => !empty($cr['_exento']) ? 1 : 0,
+                ];
+
+                $out['instituciones'][$idInstSol]['items'][] = $itemC;
+                $out['instituciones'][$idInstSol]['totales']['montoTotal'] += $mTotal;
+                $out['instituciones'][$idInstSol]['totales']['montoPagado'] += $mPagado;
+                $out['instituciones'][$idInstSol]['totales']['montoDebe'] += $mDebe;
+                $out['instituciones'][$idInstSol]['totales']['cantidad'] += 1;
+            }
+        }
+
+        foreach ($out['instituciones'] as &$grp) {
+            if (!empty($grp['items'])) {
+                usort($grp['items'], static function ($a, $b) {
+                    $ta = strtotime((string) ($a['fechaCreado'] ?? '')) ?: 0;
+                    $tb = strtotime((string) ($b['fechaCreado'] ?? '')) ?: 0;
+                    return $tb <=> $ta;
+                });
+            }
+        }
+        unset($grp);
+
+        $byInstId = [];
+        foreach ($out['instituciones'] as $grp) {
+            $byInstId[(int) ($grp['idInstitucionSolicitante'] ?? 0)] = $grp;
+        }
+        $orderedInst = [];
+        foreach ($pageIds as $pid) {
+            $pid = (int) $pid;
+            if (isset($byInstId[$pid])) {
+                $orderedInst[] = $byInstId[$pid];
+            }
+        }
+        $out['instituciones'] = $orderedInst;
+
+        return $out;
+    }
+
+    /**
+     * Facturación por institución solicitante: derivados (facturacion_formulario_derivado) y/o comunes (precio en sede, sin fila derivada).
+     * @param int|null $idInstitucionSolicitante Si se pasa, filtra solo esa institución.
+     * @param string $origenFacturacion todos|derivado|comun
+     * @param int|null $instPage Página 1-based de tarjetas por institución (solo si $instPerPage > 0).
+     * @param int|null $instPerPage Máx. instituciones por respuesta (1–50). ≤0 = sin paginar (todas).
+     */
+    public function getInstitutionDerivedReport($instId, $desde = null, $hasta = null, $estadoCobro = 'all', $idInstitucionSolicitante = null, $origenFacturacion = 'todos', $instPage = null, $instPerPage = null) {
+        $origenFacturacion = is_string($origenFacturacion) ? strtolower(trim($origenFacturacion)) : 'todos';
+        if (!in_array($origenFacturacion, ['todos', 'derivado', 'comun'], true)) {
+            $origenFacturacion = 'todos';
+        }
+
+        $ipp = $instPerPage !== null ? (int) $instPerPage : 0;
+        $ipg = $instPage !== null ? (int) $instPage : 0;
+        $singleInstFilter = ($idInstitucionSolicitante !== null && $idInstitucionSolicitante !== '' && is_numeric($idInstitucionSolicitante));
+        if ($ipp > 0 && $ipg >= 1 && !$singleInstFilter) {
+            return $this->getInstitutionDerivedReportPaginatedOptimized(
+                (int) $instId,
+                $desde,
+                $hasta,
+                $estadoCobro,
+                $idInstitucionSolicitante,
+                $origenFacturacion,
+                $ipg,
+                $ipp
+            );
+        }
+
+        $empty = [
+            'totales' => ['montoTotal' => 0.0, 'montoPagado' => 0.0, 'montoDebe' => 0.0, 'cantidad' => 0],
+            'instituciones' => [],
+            'meta' => ['origenFacturacion' => $origenFacturacion],
+        ];
+        $hasFfd = $this->tableExists('facturacion_formulario_derivado');
+        if ($hasFfd && ($origenFacturacion === 'todos' || $origenFacturacion === 'derivado')) {
+            $orgFormFo = $this->hasColumn('formulario_derivacion', 'idformAOrigen')
+                ? 'COALESCE(NULLIF(fd.idformAOrigen, 0), ffd.idformA)'
+                : 'ffd.idformA';
+            $idTitCobSql = 'COALESCE(NULLIF(pe_o.IdUsrA, 0), NULLIF(fo.IdUsrA, 0), NULLIF(ffd.IdUsrSolicitante, 0))';
+            $sql = "SELECT
+                    ffd.IdFacturacionFormularioDerivado,
+                    ffd.idformA,
+                    ffd.IdUsrSolicitante,
+                    ffd.IdInstitucionSolicitante,
+                    ffd.IdInstitucionCobradora,
+                    COALESCE(i.NombreInst, CONCAT('Institución #', ffd.IdInstitucionSolicitante)) as institucion_solicitante,
+                    COALESCE(ic.NombreInst, CONCAT('Institución #', ffd.IdInstitucionCobradora)) as institucion_cobradora,
+                    ffd.tipo_formulario,
+                    ffd.monto_total,
+                    ffd.monto_pagado,
+                    ffd.estado_cobro,
+                    ffd.FechaCreado,
+                    f.estado as estado_formulario,
+                    fd.estado_origen,
+                    fd.estado_destino,
+                    COALESCE(tf_dest.nombreTipo, tf.nombreTipo, '-') as nombre_tipo,
+                    COALESCE(tf_dest.categoriaformulario, tf.categoriaformulario, ffd.tipo_formulario, '-') as categoria,
+                    CONCAT(COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, '')) as investigador_solicitante,
+                    CONCAT(COALESCE(po.NombreA, ''), ' ', COALESCE(po.ApellidoA, '')) as investigador_origen_pedido,
+                    CONCAT(COALESCE(pd.NombreA, ''), ' ', COALESCE(pd.ApellidoA, '')) as investigador_responsable_destino,
+                    d_o.NombreDeptoA AS depto_original_form,
+                    pe_o.nprotA AS nprot_original_form,
+                    pe_o.tituloA AS titulo_protocolo_original,
+                    TRIM(CONCAT(COALESCE(in_o.NombreA, ''), ' ', COALESCE(in_o.ApellidoA, ''))) AS inv_original_form,
+                    {$idTitCobSql} AS IdUsrTitularCobro,
+                    TRIM(CONCAT(COALESCE(pt_c.ApellidoA, ''), ', ', COALESCE(pt_c.NombreA, ''))) AS nombre_titular_cobro,
+                    TRIM(CONCAT(COALESCE(pt_c.NombreA, ''), ' ', COALESCE(pt_c.ApellidoA, ''))) AS inv_nombre_protocolo_titular
+                FROM facturacion_formulario_derivado ffd
+                LEFT JOIN institucion i ON i.IdInstitucion = ffd.IdInstitucionSolicitante
+                LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
+                LEFT JOIN formularioe f ON f.idformA = ffd.idformA
+                LEFT JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion
+                LEFT JOIN formularioe fo ON fo.idformA = {$orgFormFo}
+                LEFT JOIN departamentoe d_o ON d_o.iddeptoA = fo.depto
+                LEFT JOIN protformr pf_o ON pf_o.idformA = fo.idformA
+                LEFT JOIN protocoloexpe pe_o ON pe_o.idprotA = pf_o.idprotA
+                LEFT JOIN personae in_o ON in_o.IdUsrA = fo.IdUsrA
+                LEFT JOIN tipoformularios tf ON tf.IdTipoFormulario = f.tipoA AND tf.IdInstitucion = COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)
+                LEFT JOIN tipoformularios tf_dest ON tf_dest.IdTipoFormulario = fd.tipoA_destino AND tf_dest.IdInstitucion = ffd.IdInstitucionCobradora
+                LEFT JOIN personae p ON p.IdUsrA = ffd.IdUsrSolicitante
+                LEFT JOIN personae po ON po.IdUsrA = fd.IdUsrOrigen
+                LEFT JOIN personae pd ON pd.IdUsrA = fd.IdUsrDestinoResponsable
+                LEFT JOIN personae pt_c ON pt_c.IdUsrA = {$idTitCobSql}
                 WHERE ffd.IdInstitucionCobradora = ?
                   AND COALESCE(f.estado, '') = 'Entregado'";
         $params = [(int)$instId];
@@ -1233,19 +1871,31 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             $nprotO = trim((string) ($r['nprot_original_form'] ?? ''));
             $titO = trim((string) ($r['titulo_protocolo_original'] ?? ''));
             $invO = trim((string) ($r['inv_original_form'] ?? ''));
+            $invProtTit = trim((string) ($r['inv_nombre_protocolo_titular'] ?? ''));
             $protoLine = $nprotO;
             if ($titO !== '') {
                 $protoLine = ($protoLine !== '' ? $protoLine . ' — ' : '') . $titO;
             }
             $protoLine = trim((string) $protoLine);
-            if ($invO === '') {
+            if ($invProtTit !== '') {
+                $invO = $invProtTit;
+            } elseif ($invO === '') {
                 $invO = $inicial;
+            }
+
+            $idTitularCobro = isset($r['IdUsrTitularCobro']) ? (int)$r['IdUsrTitularCobro'] : 0;
+            if ($idTitularCobro <= 0) {
+                $idTitularCobro = isset($r['IdUsrSolicitante']) ? (int)$r['IdUsrSolicitante'] : 0;
+            }
+            $nomTitCob = trim((string)($r['nombre_titular_cobro'] ?? ''));
+            if ($nomTitCob === '') {
+                $nomTitCob = $sol !== '' ? $sol : '-';
             }
 
             $item = [
                 'idFacturacionDerivada' => (int)$r['IdFacturacionFormularioDerivado'],
                 'idformA' => (int)$r['idformA'],
-                'idInvestigador' => isset($r['IdUsrSolicitante']) ? (int)$r['IdUsrSolicitante'] : null,
+                'idInvestigador' => $idTitularCobro > 0 ? $idTitularCobro : null,
                 'tipoFormulario' => $r['tipo_formulario'],
                 'montoTotal' => $mTotal,
                 'montoPagado' => $mPagado,
@@ -1257,7 +1907,8 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 'estadoDestino' => $r['estado_destino'] ?? null,
                 'nombreTipo' => $r['nombre_tipo'],
                 'categoria' => $r['categoria'],
-                'investigador' => $sol !== '' ? $sol : '-',
+                /** Billetera / liquidaciones: titular protocolo/original */
+                'investigador' => $nomTitCob,
                 'investigadorInicial' => $inicial !== '' ? $inicial : '-',
                 'investigadorInstitucion' => $invInst,
                 'institucionOrigen' => trim((string)($r['institucion_solicitante'] ?? '')) !== '' ? trim((string)$r['institucion_solicitante']) : '-',
@@ -1393,6 +2044,28 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         if ($out['totales']['cantidad'] <= 0) {
             return $empty;
         }
+
+        $ipp = $instPerPage !== null ? (int) $instPerPage : 0;
+        $ipg = $instPage !== null ? (int) $instPage : 0;
+        if ($ipp > 0 && $ipg >= 1) {
+            $allInst = $out['instituciones'];
+            $totalInst = count($allInst);
+            $per = min(50, max(1, $ipp));
+            $page = max(1, $ipg);
+            $totalPages = max(1, (int) ceil($totalInst / $per));
+            if ($page > $totalPages) {
+                $page = $totalPages;
+            }
+            $offset = ($page - 1) * $per;
+            $out['instituciones'] = array_slice($allInst, $offset, $per);
+            $out['meta']['instPagination'] = [
+                'page' => $page,
+                'perPage' => $per,
+                'totalInstitutions' => $totalInst,
+                'totalPages' => $totalPages,
+            ];
+        }
+
         return $out;
     }
 
@@ -1416,9 +2089,13 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 throw new \Exception('Cada ítem debe tener idFacturacionDerivada y monto_pago válidos.');
             }
 
+            $p = $this->sqlFactDerivadaTitularCobroPieces();
             $stmt = $this->db->prepare(
-                "SELECT IdFacturacionFormularioDerivado, idformA, monto_total, monto_pagado, IdInstitucionCobradora, IdUsrSolicitante
-                 FROM facturacion_formulario_derivado WHERE IdFacturacionFormularioDerivado = ?"
+                'SELECT ffd.IdFacturacionFormularioDerivado, ffd.idformA, ffd.monto_total, ffd.monto_pagado, ffd.IdInstitucionCobradora, ffd.IdUsrSolicitante,
+                        ' . $p['selectTitular'] . '
+                 FROM facturacion_formulario_derivado ffd
+                 ' . $p['joins'] . '
+                 WHERE ffd.IdFacturacionFormularioDerivado = ?'
             );
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -1428,9 +2105,9 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             if ((int)$row['IdInstitucionCobradora'] !== $instCobradora) {
                 throw new \Exception('No autorizado a registrar pago para este ítem.');
             }
-            $idUsr = (int)($row['IdUsrSolicitante'] ?? 0);
+            $idUsr = $this->idUsuarioCobroFromFactDerivadaRow($row);
             if ($idUsr <= 0) {
-                throw new \Exception('El ítem no tiene investigador solicitante asociado.');
+                throw new \Exception('El ítem no tiene titular de cobro asociado (protocolo/original).');
             }
 
             $debe = max(0, round((float)$row['monto_total'] - (float)$row['monto_pagado'], 2));

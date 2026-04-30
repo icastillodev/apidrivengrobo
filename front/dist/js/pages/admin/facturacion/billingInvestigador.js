@@ -98,19 +98,53 @@ function renderizarFicha() {
 
 window.ajustarSaldoPersona = async (accion) => {
     const tf = txF();
-    const monto = parseFloat(document.getElementById('input-ajuste-monto').value);
-    if (!monto || monto <= 0) {
+    const montoAbs = parseFloat(document.getElementById('input-ajuste-monto').value);
+    if (!montoAbs || montoAbs <= 0) {
         return Swal.fire(g().swal_atencion || 'Atención', tf.monto_invalido || 'Ingrese un monto válido.', 'warning');
     }
+    const monto = accion === 'add' ? montoAbs : -montoAbs;
 
-    const fd = new FormData();
-    fd.append('idUsr', currentInvestigadorId);
-    fd.append('monto', accion === 'add' ? monto : -monto);
+    const title =
+        accion === 'sub'
+            ? (tf.saldo_ajuste_restar_title || 'Restar saldo')
+            : (tf.saldo_ajuste_sumar_title || 'Sumar saldo');
+    const r = await Swal.fire({
+        title,
+        html: `
+            <div class="text-start">
+                <label class="form-label small mb-1">${tf.saldo_transfer_id_label || 'Identificador de transferencia'}</label>
+                <input id="swal-saldo-transfer-persona" class="form-control form-control-sm mb-2" maxlength="120" placeholder="${tf.saldo_transfer_id_ph || ''}">
+                <label class="form-label small mb-1">${tf.saldo_comentario_label || 'Comentario'}</label>
+                <input id="swal-saldo-comment-persona" class="form-control form-control-sm" maxlength="255" placeholder="${tf.saldo_comentario_ph || ''}">
+            </div>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: tf.saldo_ajuste_confirm || 'Confirmar',
+        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar',
+        confirmButtonColor: '#1a5d3b',
+        preConfirm: () => {
+            const c = Swal.getHtmlContainer();
+            return {
+                transferId: (c?.querySelector('#swal-saldo-transfer-persona')?.value || '').trim() || null,
+                comment: (c?.querySelector('#swal-saldo-comment-persona')?.value || '').trim() || null,
+            };
+        },
+    });
+    if (!r.isConfirmed) return;
 
-    const res = await API.request('/billing/ajustar-saldo', 'POST', fd);
+    const res = await API.request('/billing/balance', 'POST', {
+        idUsr: parseInt(String(currentInvestigadorId), 10),
+        instId: localStorage.getItem('instId') || 1,
+        monto,
+        transferId: r.value?.transferId || null,
+        comment: r.value?.comment || null,
+    });
     if (res.status === 'success') {
+        document.getElementById('input-ajuste-monto').value = '';
         Swal.fire(tf.exito_titulo || '¡Éxito!', tf.saldo_actualizado_ok || 'Saldo actualizado correctamente', 'success');
         window.cargarFacturacionPersona();
+    } else {
+        Swal.fire(g().error || 'Error', res.message || tf.error_balance || 'No se pudo actualizar el saldo.', 'error');
     }
 };
 

@@ -162,3 +162,42 @@ export function billingTdTotalPagadoDebe(isExento, total, pagado, exentoLabel) {
     const clsDeb = isExento ? 'text-end fw-bold text-secondary' : 'text-end text-danger fw-bold';
     return `<td class="text-end fw-bold text-dark">${m[0]}</td><td class="${clsPag}">${m[2]}</td><td class="${clsDeb}">${m[1]}</td>`;
 }
+
+/**
+ * Derivación activa: nombre de quien derivó + institución origen (texto para tablas / Excel).
+ * @param {Record<string, unknown>|null|undefined} row
+ */
+export function billingDerivacionPlainText(row) {
+    if (!row || typeof row !== 'object') return '';
+    const nom = String(row.derivado_por_nombre ?? '').trim();
+    const inst = String(row.derivado_desde_institucion ?? '').trim();
+    if (!nom && !inst) return '';
+    if (nom && inst) return `${nom} (${inst})`;
+    return nom || inst;
+}
+
+/**
+ * Texto de estadía para informes (PDF/Excel): usa `periodo` del API (tramos unidos) o fallback inicio–fin.
+ * @param {Record<string, unknown>|null|undefined} a fila alojamiento de facturación
+ * @param {{ includeDias?: boolean, diasUnit?: string, emptyLabel?: string }} [opt]
+ */
+export function billingAlojPeriodoParaInforme(a, opt = {}) {
+    const row = a && typeof a === 'object' ? a : {};
+    const includeDias = opt.includeDias !== false;
+    const diasUnit = String(opt.diasUnit ?? 'd').trim() || 'd';
+    const emptyLabel = String(opt.emptyLabel ?? '—').trim() || '—';
+
+    let p = String(row.periodo ?? '').trim();
+    if (!p || p === '-') {
+        const ini = String(row.fecha_inicio ?? '').trim();
+        const fin = String(row.fecha_fin ?? '').trim();
+        if (ini && fin) p = ini === fin ? ini : `${ini} – ${fin}`;
+        else p = ini || fin || '';
+    }
+    const n = Number(row.dias);
+    const hasDias = includeDias && Number.isFinite(n) && n > 0;
+    const dSuf = hasDias ? ` (${n} ${diasUnit})` : '';
+    if (p) return `${p}${dSuf}`;
+    if (hasDias) return `(${n} ${diasUnit})`;
+    return emptyLabel;
+}
