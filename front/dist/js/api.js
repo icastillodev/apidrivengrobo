@@ -1,5 +1,6 @@
 import './utils/stripCloudflareInsights.js';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
+import { getPreservableAppReturnHref } from './utils/loginReturnUrl.js';
 import {
     snapshotGroboPersistentUiPrefs,
     restoreGroboPersistentUiPrefs,
@@ -66,6 +67,9 @@ export const API = {
             let resData;
             try {
                 resData = JSON.parse(text);
+                if (typeof resData === 'object' && resData !== null && resData.http_status === undefined) {
+                    resData.http_status = response.status;
+                }
             } catch (parseErr) {
                 if (response.status === 401 || response.status === 403) {
                     console.warn('🔐 Respuesta no JSON en', response.status, endpoint);
@@ -178,10 +182,23 @@ export const API = {
             slugDestino = '';
         }
 
+        const ret = getPreservableAppReturnHref();
+        let nextQs = '';
+        if (ret && ret.length > 6) {
+            try {
+                const u = new URL(ret);
+                if (u.origin === window.location.origin) {
+                    nextQs = `?next=${encodeURIComponent(ret)}`;
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+
         if (slugDestino && slugDestino !== 'superadmin' && slugDestino !== 'master') {
-            window.location.href = `${basePath}${slugDestino}/`; 
+            window.location.href = `${basePath}${slugDestino}/${nextQs}`;
         } else {
-            window.location.href = basePath; 
+            window.location.href = basePath;
         }
     }
 };

@@ -500,6 +500,13 @@ export const CHAPTERS = {
         h: 'Finalize, reopen, and billing',
         html: '<p><strong>Finalizing</strong> or <strong>reopening</strong> affects how consumption rolls into <strong>billing</strong>. Align with finance before undoing closed periods.</p><ul class="mb-0"><li>History may show messages from housing staff.</li><li><strong>QR</strong> or sheets may show read-only data for visits.</li></ul>',
       },
+      {
+        id: 'trazabilidad_fisica',
+        cat: 'row',
+        icon: 'upc-scan',
+        h: 'Physical traceability (cages and subjects)',
+        html: '<p>In the housing detail or traceability modal, <strong>cages</strong> are often identified with a prefix derived from the protocol type (first letter of the type + <code>A</code> + serial). <strong>Subjects</strong> combine the cage prefix, a <code>S…</code> serial, and a readable <strong>label</strong>.</p><ul class="mb-0"><li><strong>Rename:</strong> only changes the visible label; internal IDs and QR stay tied to the same record.</li><li><strong>Surgery / clinical:</strong> when enabled for the species, it may appear on the animal card and documents (per configuration and database fields).</li><li><strong>Segments (tramos):</strong> when you update a segment and unselect cages, the system no longer auto-adjusts the quantity tied to the cage QR so it does not overwrite a manually edited <strong>Cage quantity</strong>.</li></ul><p class="small text-body-secondary mb-0">The exact variable template is defined under <strong>Settings → Housing & clinic</strong> (types and per-protocol variables).</p>',
+      },
     ],
   },
   admin__estadisticas: {
@@ -575,6 +582,51 @@ export const CHAPTERS = {
         icon: 'journal-text',
         h: 'Good practice',
         html: '<p>Keep an external log (internal wiki) of “what each state means” and who authorized critical changes for audits.</p>',
+      },
+    ],
+  },
+  admin__configuracion__alojamientos: {
+    overview:
+      'Define, per species and per protocol, the allowed housing types and traceability variables (at stay start and during follow-up or “data” visits). You can also import templates from other protocols in the institution without picking a literal source protocol: the system uses an institutional pool and deduplicates by name.\n\nThis screen feeds what facility staff and researchers see on cards, PDFs, and QR. Physical IDs for cages and subjects (prefixes, serials) are covered in the Housing (grid) chapter and in the contextual help of the traceability modal.',
+    summary:
+      'Housing types per species and per-protocol traceability variables; import from the institutional pool.',
+    roles:
+      'Site administrators with access to Settings → Housing & clinic (or the equivalent path in your menu).',
+    blocks: [
+      {
+        id: 'flujo',
+        cat: 'navigation',
+        icon: 'diagram-3',
+        h: 'Workflow on this page',
+        html: '<ol class="mb-0"><li>Pick a <strong>species</strong> in the left list.</li><li>Select the <strong>protocol</strong> whose traceability rules you want to edit (dropdown is filtered by species).</li><li>Use the <strong>Types</strong>, <strong>Traceability start</strong>, and <strong>Traceability data</strong> tabs.</li><li>Save or confirm via the modals; lists refresh after a successful close.</li></ol>',
+      },
+      {
+        id: 'tipos',
+        cat: 'forms',
+        icon: 'box-seam',
+        h: 'Housing types per species',
+        html: '<p>Types are <strong>per species</strong>: when you change species you see another catalogue. You can add type, description, and status. This drives the options shown when registering housing or segments.</p><p class="mb-0 text-body-secondary small">If your institution distinguishes surgery or other clinical nuances, there may be extra columns or flags on the type or animal card depending on configuration and database patches (e.g. <code>con_cirugia</code> on species-housing-unit); your DBA can use the technical SQL reference in the repository docs.</p>',
+      },
+      {
+        id: 'traz_inicio_vs_datos',
+        cat: 'detail',
+        icon: 'clipboard2-data',
+        h: '“Start” traceability vs “data”',
+        html: '<ul class="mb-0"><li><strong>Start:</strong> variables captured or shown when the stay <strong>begins</strong> (initial context).</li><li><strong>Data:</strong> follow-up variables on <strong>later visits or records</strong> (progression).</li><li>Both lists support dependencies between variables and data types; follow the logical order required by server validation.</li></ul>',
+      },
+      {
+        id: 'traer_pool',
+        cat: 'toolbar',
+        icon: 'box-arrow-in-down',
+        h: '“Bring data from other protocols” (pool)',
+        html: '<p>Import buttons open an <strong>institutional list per species</strong>: you can bring in variables or types already used in other protocols <strong>without manually choosing a source protocol</strong>. The backend deduplicates by name to avoid duplicate rows.</p><p class="mb-0">Use this to standardise criteria across studies of the same species. If you see no rows, there is no pool data yet for that species or your user lacks scope.</p>',
+      },
+      {
+        id: 'vinculo_grilla',
+        cat: 'links',
+        icon: 'link-45deg',
+        h: 'Link to the housing grid and QR',
+        html: '<p>What you define here appears when operating housing under <strong>Administration → Housing</strong>: physical traceability (cage prefixes, subjects, renaming only the <strong>visible label</strong> without breaking IDs), segment updates and cage quotas, PDFs, etc.</p><p class="mb-0 small text-body-secondary">When <strong>updating a segment</strong> and unselecting cages, the system no longer auto-adjusts the cage-QR quantity field so it does not overwrite a manually set <strong>Cage quantity</strong>.</p>',
       },
     ],
   },

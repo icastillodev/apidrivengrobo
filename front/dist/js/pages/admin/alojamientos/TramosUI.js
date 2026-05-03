@@ -19,11 +19,9 @@ export const TramosUI = {
                 chk.checked = cajaActiva;
                 chk.disabled = !cajaActiva; 
             });
-            const cajasActivas = document.querySelectorAll('.check-caja-continuidad:checked').length;
-            const inputCant = document.getElementById('reg-cantidad-qr');
-            if (inputCant && parseInt(inputCant.value) > cajasActivas) {
-                inputCant.value = cajasActivas;
-            }
+            // No ajustar reg-cantidad-qr aquí: CantidadCaja es el cupo/límite del tramo (facturación),
+            // no el recuento de cajas físicas marcadas para continuidad. Forzarlo borraba el valor al
+            // desmarcar cajas o al haber menos cajas en el árbol tras trazabilidad.
         };
     },
 

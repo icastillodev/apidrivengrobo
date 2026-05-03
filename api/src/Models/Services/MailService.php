@@ -66,6 +66,62 @@ class MailService {
         return $protocol . '://' . $host;
     }
 
+    private function isLocalHostFront(): bool {
+        $h = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+
+        return strpos($h, 'localhost') !== false || strpos($h, '127.0.0.1') !== false;
+    }
+
+    private function getFrontOrigin(): string {
+        $isLocal = $this->isLocalHostFront();
+        $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
+        $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
+
+        return $protocol . '://' . $host;
+    }
+
+    /**
+     * URL absoluta a una pantalla del front (alineado con getCorrectPath / auth.js).
+     *
+     * @param string $pathQuery ej. "panel/misformularios", "panel/mensajes?alcance=personal&hilo=3"
+     */
+    public function buildFrontAbsoluteUrl(string $pathQuery): string {
+        $origin = $this->getFrontOrigin();
+        $isLocal = $this->isLocalHostFront();
+        $pathQuery = ltrim(trim($pathQuery), '/');
+        $qPos = strpos($pathQuery, '?');
+        $pathOnly = $qPos === false ? $pathQuery : substr($pathQuery, 0, $qPos);
+        $qs = $qPos === false ? '' : substr($pathQuery, $qPos);
+        if ($isLocal) {
+            if (preg_match('#^(panel|admin|usuario|superadmin)/(.+)$#i', $pathOnly, $m)) {
+                $folder = strtolower($m[1]);
+                $rest = $m[2];
+                if (!preg_match('/\.html$/i', $rest)) {
+                    $rest .= '.html';
+                }
+
+                return $origin . '/URBE-API-DRIVEN/front/paginas/' . $folder . '/' . $rest . $qs;
+            }
+
+            return $origin . '/URBE-API-DRIVEN/front/' . $pathOnly . $qs;
+        }
+
+        return $origin . '/' . $pathOnly . $qs;
+    }
+
+    /**
+     * Entrada en la sede con ?next=... para que Auth redirija tras el login (misma lógica que QR).
+     */
+    public function buildInstitutionLoginContinueUrl(?string $instSlug, string $absoluteContinueUrl): string {
+        $slug = $instSlug !== null ? strtolower(trim($instSlug)) : '';
+        $invalid = ['', 'null', 'undefined', '0', 'superadmin', 'sistema global'];
+        if (in_array($slug, $invalid, true)) {
+            return $absoluteContinueUrl;
+        }
+
+        return rtrim($this->getBaseUrl($slug), '/') . '/?next=' . rawurlencode($absoluteContinueUrl);
+    }
+
     public function sendRegistrationEmail($to, $nombre, $username, $token, $instName, $slug, $lang = 'es') {
         $t = MailLang::get($lang);
         $subject = $t['reg_subject'] . " - " . strtoupper($instName);
@@ -228,8 +284,8 @@ public function getTemplate($title, $message, $link = '', $btnText = '', $instNa
 public function sendInsumoNotification($to, $nombre, $idformA, $nota, $estado, $insumosHtml, $instName, $slug = null, $lang = 'es') {
     $t = MailLang::get($lang);
     $subject = $t['insumo_subject'] . " #$idformA - " . strtoupper($instName);
-    $base = $this->getBaseUrl();
-    $link = $base . "/paginas/investigador/mis-pedidos.html" . ($slug ? "?inst=" . urlencode($slug) : "");
+    $dest = $this->buildFrontAbsoluteUrl('panel/misformularios');
+    $link = $this->buildInstitutionLoginContinueUrl($slug !== null && $slug !== '' ? (string) $slug : null, $dest);
 
     $mensajeCompleto = "
         " . $t['insumo_hello'] . " <b>" . htmlspecialchars($nombre) . "</b>,<br><br>
@@ -251,7 +307,7 @@ public function sendInsumoNotification($to, $nombre, $idformA, $nota, $estado, $
      * Recibe un array $data con todos los detalles del formulario
      * @param string $lang Idioma del correo (es, en, pt)
      */
-public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lang = 'es') {
+public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lang = 'es', $instSlug = null) {
         $t = MailLang::get($lang);
         $subject = $t['animal_subject'] . " #" . $data['id'] . " - " . strtoupper($instName);
 
@@ -297,7 +353,9 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
             </div>
         ";
 
-        $body = $this->getTemplate($t['animal_title'], $detalleHtml, "", "", $instName, $lang);
+        $dest = $this->buildFrontAbsoluteUrl('panel/misformularios');
+        $cta = $this->buildInstitutionLoginContinueUrl($instSlug !== null && $instSlug !== '' ? (string) $instSlug : null, $dest);
+        $body = $this->getTemplate($t['animal_title'], $detalleHtml, $cta, $t['mail_btn_mis_formularios'] ?? $t['animal_title'], $instName, $lang);
 
         return $this->executeSend($to, $subject, $body);
     }
@@ -305,7 +363,7 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
      * Envío de confirmación para Reactivos/Insumos
      * @param string $lang Idioma del correo (es, en, pt)
      */
-    public function sendReactivoOrderConfirmation($to, $nombre, $instName, $data, $lang = 'es') {
+    public function sendReactivoOrderConfirmation($to, $nombre, $instName, $data, $lang = 'es', $instSlug = null) {
         $t = MailLang::get($lang);
         $subject = $t['reactivo_subject'] . " #" . $data['id'] . " - " . strtoupper($instName);
 
@@ -341,7 +399,9 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
             </div>
         ";
 
-        $body = $this->getTemplate($t['reactivo_title'], $detalleHtml, "", "", $instName, $lang);
+        $dest = $this->buildFrontAbsoluteUrl('panel/misformularios');
+        $cta = $this->buildInstitutionLoginContinueUrl($instSlug !== null && $instSlug !== '' ? (string) $instSlug : null, $dest);
+        $body = $this->getTemplate($t['reactivo_title'], $detalleHtml, $cta, $t['mail_btn_mis_formularios'] ?? $t['reactivo_title'], $instName, $lang);
 
         return $this->executeSend($to, $subject, $body);
     }
@@ -366,8 +426,8 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
             </tr>";
         }
 
-        $base = $this->getBaseUrl();
-        $loginLink = $base . "/paginas/login.html" . ($slug ? "?inst=" . urlencode($slug) : "");
+        $dest = $this->buildFrontAbsoluteUrl('panel/misformularios');
+        $loginLink = $this->buildInstitutionLoginContinueUrl($slug !== null && $slug !== '' ? (string) $slug : null, $dest);
 
         $deptoName = $data['deptoName'] ?? $t['insumo_exp_sin_depto'];
         $retiro = $data['fecRetiroA'] ?? $t['insumo_exp_a_coordinar'];
@@ -444,7 +504,9 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
                 $htmlContent .= "<p style='color: #777; font-size: 13px;'><i>" . $t['protocol_sin_comentarios'] . "</i></p>";
             }
 
-            $body = $this->getTemplate($t['protocol_title'], $htmlContent, '', '', $instName, $lang);
+            $dest = $this->buildFrontAbsoluteUrl('panel/misprotocolos');
+            $cta = $this->buildInstitutionLoginContinueUrl($slug !== null && $slug !== '' ? (string) $slug : null, $dest);
+            $body = $this->getTemplate($t['protocol_title'], $htmlContent, $cta, $t['mail_btn_mis_protocolos'] ?? $t['protocol_title'], $instName, $lang);
 
             return $this->executeSend($to, $subject, $body);
         }
@@ -544,7 +606,10 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
         string $cuerpoPlano,
         string $instName,
         string $nombreRemitente,
-        string $lang = 'es'
+        string $lang = 'es',
+        ?string $instSlug = null,
+        ?int $hiloId = null,
+        bool $esInstitucional = false
     ): bool {
         $t = MailLang::get($lang);
         $subject = $asunto . ($instName !== '' ? ' — ' . $instName : '');
@@ -562,7 +627,17 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
             . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;margin-top:4px;">'
             . $cuerpoHtml . '</div>';
 
-        $body = $this->getTemplate($t['msg_int_title'], $mensajeCompleto, '', '', $instName, $lang);
+        $hid = ($hiloId !== null && $hiloId > 0) ? (int) $hiloId : 0;
+        if ($esInstitucional) {
+            $path = 'panel/mensajes_institucion' . ($hid > 0 ? ('?hilo=' . $hid) : '');
+        } else {
+            $path = 'panel/mensajes?alcance=personal' . ($hid > 0 ? ('&hilo=' . $hid) : '');
+        }
+        $abs = $this->buildFrontAbsoluteUrl($path);
+        $slugNorm = $instSlug !== null ? strtolower(trim($instSlug)) : '';
+        $cta = $this->buildInstitutionLoginContinueUrl($slugNorm !== '' ? $slugNorm : null, $abs);
+        $btn = htmlspecialchars($t['msg_int_btn'] ?? 'Mensajes', ENT_QUOTES, 'UTF-8');
+        $body = $this->getTemplate($t['msg_int_title'], $mensajeCompleto, $cta, $btn, $instName, $lang);
 
         return $this->executeSend($to, $subject, $body);
     }

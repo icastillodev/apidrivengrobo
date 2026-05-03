@@ -45,6 +45,17 @@ export function expandFacturacionPathsIfAllowed(allowedSet) {
   }
 }
 
+/** Subpantallas de configuración enlazadas desde el hub (no siempre aparecen como `path` propio en el menú lateral). */
+export const CONFIG_SUB_PATHS = ['admin/configuracion/alojamientos'];
+
+/** Si el usuario tiene el hub de configuración, habilita manual/tour en subpantallas habituales. */
+export function expandConfigSubpathsIfAllowed(allowedSet) {
+  if (!allowedSet || typeof allowedSet.has !== 'function') return;
+  if (allowedSet.has('admin/configuracion/config')) {
+    CONFIG_SUB_PATHS.forEach((p) => allowedSet.add(p));
+  }
+}
+
 /** Orden sugerido de secciones en la biblioteca (filtrado por lo que el rol tiene). */
 export const CAPACITACION_PATH_ORDER = [
   'admin/dashboard',
@@ -61,6 +72,7 @@ export const CAPACITACION_PATH_ORDER = [
   'admin/alojamientos',
   'admin/estadisticas',
   'admin/configuracion/config',
+  'admin/configuracion/alojamientos',
   'panel/formularios',
   'panel/misformularios',
   'panel/misalojamientos',

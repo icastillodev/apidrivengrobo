@@ -9,6 +9,7 @@ import { filterMenuIdsByModulos, ensureInstModulesLoaded } from '../../modulesAc
 import {
   CAPACITACION_PATH_ORDER,
   collectMenuPathsFromIds,
+  expandConfigSubpathsIfAllowed,
   expandFacturacionPathsIfAllowed,
 } from '../../utils/capacitacionMenuPaths.js';
 import { menuPathToSlug, slugToMenuPath } from '../../utils/capacitacionPaths.js';
@@ -239,6 +240,7 @@ export async function initCapacitacion() {
   allowed.add('capacitacion/tema/red');
   allowed.add('capacitacion/tema/modales');
   expandFacturacionPathsIfAllowed(allowed);
+  expandConfigSubpathsIfAllowed(allowed);
 
   const ordered = CAPACITACION_PATH_ORDER.filter((p) => allowed.has(p));
   const rest = [...allowed].filter((p) => !ordered.includes(p)).sort();

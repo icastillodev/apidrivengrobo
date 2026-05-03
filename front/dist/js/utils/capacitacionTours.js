@@ -473,6 +473,25 @@ const TOUR_STEPS_ADMIN_CONFIG = [
   },
 ];
 
+/** Configuración Alojamientos & clínica: especie, protocolo, tipos y trazabilidad (inicio / datos), importación pool. */
+const TOUR_STEPS_ADMIN_CONFIG_ALOJ = [
+  {
+    selector: 'nav[aria-label="breadcrumb"]',
+    titleKey: 'tour_config_aloj_s1_title',
+    bodyKey: 'tour_config_aloj_s1_body',
+  },
+  {
+    selector: '#list-species',
+    titleKey: 'tour_config_aloj_s2_title',
+    bodyKey: 'tour_config_aloj_s2_body',
+  },
+  {
+    selector: '#config-aloj-work-col',
+    titleKey: 'tour_config_aloj_s3_title',
+    bodyKey: 'tour_config_aloj_s3_body',
+  },
+];
+
 const TOUR_STEPS_ADMIN_FACTURACION_INDEX = [
   {
     selector: 'nav[aria-label="breadcrumb"]',
@@ -721,6 +740,7 @@ export const CAPACITACION_TOUR_STEPS = {
   'admin/reservas': TOUR_STEPS_ADMIN_RESERVAS,
   'admin/estadisticas': TOUR_STEPS_ADMIN_ESTADISTICAS,
   'admin/configuracion/config': TOUR_STEPS_ADMIN_CONFIG,
+  'admin/configuracion/alojamientos': TOUR_STEPS_ADMIN_CONFIG_ALOJ,
   'admin/facturacion/index': TOUR_STEPS_ADMIN_FACTURACION_INDEX,
   'admin/historialcontable': TOUR_STEPS_ADMIN_HISTORIAL_CONTABLE,
   'admin/comunicacion/noticias': TOUR_STEPS_ADMIN_COMUNICACION_NOTICIAS,

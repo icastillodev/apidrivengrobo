@@ -13,6 +13,7 @@ export const CAPACITACION_MENU_LABEL_KEYS = {
   'admin/alojamientos': 'menu.accommodations',
   'admin/estadisticas': 'menu.stats',
   'admin/configuracion/config': 'menu.admin_config',
+  'admin/configuracion/alojamientos': 'titulos_pagina.alojamientos_config',
   'panel/formularios': 'menu.forms',
   'panel/misformularios': 'menu.my_forms',
   'usuario/misformularios': 'menu.my_forms',

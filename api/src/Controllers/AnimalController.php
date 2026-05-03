@@ -388,7 +388,15 @@ public function getProtocolDetails() {
             ];
 
             $mailService = new \App\Models\Services\MailService();
-            $mailService->sendAnimalOrderConfirmation($userInfo['EmailA'], $userInfo['NombreA'], $userInfo['NombreInst'], $mailData, $data['lang'] ?? $userInfo['idioma_preferido'] ?? 'es');
+            $slug = isset($userInfo['NombreInst']) ? strtolower(trim((string) $userInfo['NombreInst'])) : null;
+            $mailService->sendAnimalOrderConfirmation(
+                $userInfo['EmailA'],
+                $userInfo['NombreA'],
+                $userInfo['NombreInst'],
+                $mailData,
+                $data['lang'] ?? $userInfo['idioma_preferido'] ?? 'es',
+                $slug
+            );
             
             echo json_encode(['status' => 'success', 'id' => $idForm]);
 

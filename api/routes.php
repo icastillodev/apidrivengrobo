@@ -128,6 +128,7 @@ $router->get('/comunicacion/mensajes/hilo/:id', 'MensajeriaController@getHilo');
 $router->post('/comunicacion/mensajes/hilo/:id/leer', 'MensajeriaController@markHiloRead');
 $router->get('/comunicacion/mensajes/hilo/:id/delete-preview', 'MensajeriaController@getDeletePreviewHilo');
 $router->post('/comunicacion/mensajes/hilo/:id/delete-full', 'MensajeriaController@deleteHiloFull');
+$router->get('/comunicacion/mensajes/anexos-contexto', 'MensajeriaController@getAnexosContexto');
 $router->post('/comunicacion/mensajes/enviar', 'MensajeriaController@enviar');
 
 // Tickets de soporte Gecko (turnos 1:1, correo a soporte@appgrobo.com)
@@ -284,10 +285,12 @@ $router->post('/alojamiento/update-config', 'AlojamientoController@updateConfig'
 $router->get('/trazabilidad/get-arbol', 'TrazabilidadController@getArbol');
 $router->get('/trazabilidad/ficha-animal', 'TrazabilidadController@getFichaAnimal');
 $router->post('/trazabilidad/save-observation', 'TrazabilidadController@saveObservation');
+$router->post('/trazabilidad/save-inicio-traz', 'TrazabilidadController@saveInicioTraz');
 $router->post('/trazabilidad/add-caja', 'TrazabilidadController@addCaja');
 
 $router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
 $router->post('/trazabilidad/rename-subject', 'TrazabilidadController@renameSubject');
+$router->post('/trazabilidad/toggle-con-cirugia', 'TrazabilidadController@toggleConCirugia');
 $router->post('/trazabilidad/update-subject-ficha-bio', 'TrazabilidadController@updateSubjectFichaBio');
 
 // ============================================================
@@ -503,6 +506,9 @@ $router->post('/admin/config/depto/delete', 'AdminConfigDeptoController@deleteDe
 
 // ADMIN: ALOJAMIENTOS Y CLINICA
 $router->get('/admin/config/alojamiento/details', 'AdminConfigAlojamientoController@getDetails');
+$router->get('/admin/config/alojamiento/protocolos-por-especie', 'AdminConfigAlojamientoController@getProtocolosPorEspecie');
+$router->post('/admin/config/alojamiento/cat/clone-traz', 'AdminConfigAlojamientoController@cloneCatTraz');
+$router->get('/admin/config/alojamiento/cat/pool-traer', 'AdminConfigAlojamientoController@getPoolCatTraer');
 
 // Tipos
 $router->post('/admin/config/alojamiento/type/save', 'AdminConfigAlojamientoController@saveType');

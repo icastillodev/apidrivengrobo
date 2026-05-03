@@ -43,6 +43,10 @@ function sexoSujetoLabel(code, t) {
 /** Líneas de ficha biológica por fila de unidad (un tramo). */
 function htmlDatosSujetoTramo(row, t) {
     const parts = [];
+    const cx = row.con_cirugia === 1 || row.con_cirugia === '1' || row.con_cirugia === true;
+    if (cx) {
+        parts.push(`<span class="badge bg-warning text-dark me-2">${esc(t.animal_ficha_con_cirugia_badge || '')}</span>`);
+    }
     if (row.PesoSujetoKg !== null && row.PesoSujetoKg !== undefined && String(row.PesoSujetoKg).trim() !== '') {
         parts.push(`<span class="me-2"><strong>${esc(t.animal_ficha_peso || 'Peso')}</strong>: ${esc(String(row.PesoSujetoKg))}</span>`);
     }
@@ -82,13 +86,36 @@ function renderPivotRows(obsPivot, categorias) {
     `).join('');
 }
 
+function htmlValoresInicio(catsInicio, vin, t) {
+    if (!catsInicio || !catsInicio.length) {
+        return '';
+    }
+    const rows = catsInicio
+        .map((c) => {
+            const o = vin[c.IdDatosUnidadAloj] || vin[String(c.IdDatosUnidadAloj)];
+            const v = o && o.Valor != null && o.Valor !== '' ? String(o.Valor) : '';
+            if (!v) {
+                return '';
+            }
+            return `<tr><td class="text-muted small">${esc(c.NombreCatAlojUnidad)}</td><td class="small">${esc(v)}</td></tr>`;
+        })
+        .filter(Boolean)
+        .join('');
+    if (!rows) {
+        return '';
+    }
+    return `<div class="mt-2 mb-3"><h6 class="fw-bold small">${esc(t.animal_ficha_bloque_inicio || '')}</h6><table class="table table-sm table-bordered mb-0" style="font-size:11px">${rows}</table></div>`;
+}
+
 function buildFichaDom(data) {
     const t = window.txt?.alojamientos || {};
     const tm = window.txt?.misalojamientos || {};
     const suj = data.sujeto || {};
     const ult = data.ultimoTramo;
     const tramos = Array.isArray(data.tramos) ? data.tramos : [];
-    const cats = data.categorias || [];
+    const cats = data.categorias_datos || data.categorias || [];
+    const catsInicio = data.categorias_inicio || [];
+    const vin = data.valores_inicio || {};
 
     const bioSujetoCabecera = htmlDatosSujetoTramo(suj, t);
     const fechaNac = data.fechaNacimientoSugerida
@@ -144,6 +171,7 @@ function buildFichaDom(data) {
                     <p class="mb-1"><strong>${esc(t.animal_ficha_especie || 'Especie')}</strong> ${esc(data.NombreEspecie || '—')}</p>
                     ${suj.DetalleEspecieAloj ? `<p class="mb-1"><strong>${esc(t.animal_ficha_detalle || '')}</strong> ${esc(suj.DetalleEspecieAloj)}</p>` : ''}
                     ${bioSujetoCabecera}
+                    ${htmlValoresInicio(catsInicio, vin, t)}
                 </div>
                 <div class="col-md-6">
                     <p class="mb-1"><strong>${esc(t.animal_ficha_historia || 'Historia')}</strong> #${esc(String(data.historia))}</p>

@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { Auth } from '../../auth.js?v=20260409';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -20,7 +21,7 @@ function formatDateTime(ds) {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
 }
 
-const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'lista_usuarios', 'notificacion', 'institucional'];
+const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'reserva', 'lista_usuarios', 'notificacion', 'institucional'];
 
 function labelOrigenTipo(ot) {
     const t = window.txt?.comunicacion || {};
@@ -28,6 +29,7 @@ function labelOrigenTipo(ot) {
         manual: t.msg_cat_manual,
         formulario: t.msg_cat_formulario,
         alojamiento: t.msg_cat_alojamiento,
+        reserva: t.msg_cat_reserva,
         lista_usuarios: t.msg_cat_lista_usuarios,
         notificacion: t.msg_cat_notificacion,
         institucional: t.msg_cat_institucional,
@@ -56,6 +58,7 @@ function fillCategoriaNuevo() {
         manual: t.msg_cat_manual,
         formulario: t.msg_cat_formulario,
         alojamiento: t.msg_cat_alojamiento,
+        reserva: t.msg_cat_reserva,
         lista_usuarios: t.msg_cat_lista_usuarios,
         notificacion: t.msg_cat_notificacion,
         institucional: t.msg_cat_institucional
@@ -136,6 +139,11 @@ export async function initMensajes(opts = {}) {
     let nuevoMensajeEnviando = false;
     let replyEnviando = false;
     let deleteHiloEnviando = false;
+
+    /** Usuario del que se listan formularios/alojamientos al responder (el otro participante del hilo). */
+    let replySobreUsuarioId = 0;
+    let nuevoRefTimer = null;
+    let replyRefTimer = null;
 
     function setDeleteHiloButtonLoading(on) {
         const btn = document.getElementById('btn-hilo-delete');
@@ -421,6 +429,135 @@ export async function initMensajes(opts = {}) {
         });
     }
 
+    function getNuevoSobreUsuarioId() {
+        const v = String(document.getElementById('nuevo-dest')?.value || '').trim();
+        if (!v || v.startsWith('inst-')) return 0;
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function clearNuevoRefUi() {
+        const bus = document.getElementById('nuevo-ref-buscar');
+        if (bus) bus.value = '';
+        const sel = document.getElementById('nuevo-ref-select');
+        if (sel) {
+            sel.innerHTML = `<option value="">${escapeHtml(t.msg_anexo_sin || '')}</option>`;
+        }
+    }
+
+    function renderRefSelectOptions(sel, items) {
+        if (!sel) return;
+        const none = t.msg_anexo_sin || '';
+        const parts = [`<option value="">${escapeHtml(none)}</option>`];
+        for (const it of items || []) {
+            const id = parseInt(it.id, 10);
+            if (!id) continue;
+            const et = String(it.etiqueta || '').trim() || `#${id}`;
+            const sub = String(it.sub || '').trim();
+            const line = sub ? `${et} — ${sub}` : et;
+            parts.push(`<option value="${id}" data-etiqueta="${escapeHtml(et)}">${escapeHtml(line)}</option>`);
+        }
+        sel.innerHTML = parts.join('');
+    }
+
+    function scheduleNuevoRefLoad() {
+        if (nuevoRefTimer) clearTimeout(nuevoRefTimer);
+        nuevoRefTimer = setTimeout(() => {
+            nuevoRefTimer = null;
+            loadNuevoRefOpciones();
+        }, 300);
+    }
+
+    function scheduleReplyRefLoad() {
+        if (replyRefTimer) clearTimeout(replyRefTimer);
+        replyRefTimer = setTimeout(() => {
+            replyRefTimer = null;
+            loadReplyRefOpciones();
+        }, 300);
+    }
+
+    async function loadNuevoRefOpciones() {
+        const cat = String(document.getElementById('nuevo-categoria')?.value || '').trim();
+        const sel = document.getElementById('nuevo-ref-select');
+        const sobre = getNuevoSobreUsuarioId();
+        if (!sel || !['formulario', 'alojamiento'].includes(cat)) return;
+        if (sobre <= 0) {
+            renderRefSelectOptions(sel, []);
+            return;
+        }
+        const q = String(document.getElementById('nuevo-ref-buscar')?.value || '').trim();
+        try {
+            const res = await API.request(
+                `/comunicacion/mensajes/anexos-contexto?usuarioId=${sobre}&tipo=${encodeURIComponent(cat)}&q=${encodeURIComponent(q)}`,
+                'GET'
+            );
+            const items = res?.status === 'success' && Array.isArray(res.data?.items) ? res.data.items : [];
+            renderRefSelectOptions(sel, items);
+        } catch (e) {
+            console.error(e);
+            renderRefSelectOptions(sel, []);
+        }
+    }
+
+    async function loadReplyRefOpciones() {
+        const tipo = String(document.getElementById('reply-ref-tipo')?.value || '').trim();
+        const sel = document.getElementById('reply-ref-select');
+        if (!sel || !['formulario', 'alojamiento'].includes(tipo) || replySobreUsuarioId <= 0) {
+            if (sel) renderRefSelectOptions(sel, []);
+            return;
+        }
+        const q = String(document.getElementById('reply-ref-buscar')?.value || '').trim();
+        try {
+            const res = await API.request(
+                `/comunicacion/mensajes/anexos-contexto?usuarioId=${replySobreUsuarioId}&tipo=${encodeURIComponent(tipo)}&q=${encodeURIComponent(q)}`,
+                'GET'
+            );
+            const items = res?.status === 'success' && Array.isArray(res.data?.items) ? res.data.items : [];
+            renderRefSelectOptions(sel, items);
+        } catch (e) {
+            console.error(e);
+            renderRefSelectOptions(sel, []);
+        }
+    }
+
+    function syncReplyRefUi() {
+        const tipo = String(document.getElementById('reply-ref-tipo')?.value || '').trim();
+        const buscar = document.getElementById('reply-ref-buscar');
+        const sel = document.getElementById('reply-ref-select');
+        const en = (tipo === 'formulario' || tipo === 'alojamiento') && replySobreUsuarioId > 0;
+        if (buscar) {
+            buscar.disabled = !en;
+            buscar.placeholder = t.msg_anexo_buscar_ph || '';
+        }
+        if (sel) {
+            if (!en) {
+                sel.classList.add('d-none');
+                renderRefSelectOptions(sel, []);
+            } else {
+                sel.classList.remove('d-none');
+                scheduleReplyRefLoad();
+            }
+        }
+    }
+
+    async function promptHiloDeepLinkSinAcceso(res) {
+        const code = String(res?.code || '').trim();
+        const isOther = code === 'hilo_sin_acceso';
+        if (typeof Swal === 'undefined') return;
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: isOther ? (t.msg_deep_link_hilo_otro_titulo || '') : (t.msg_deep_link_hilo_no_existe_titulo || ''),
+            html: `<p class="text-start small mb-0">${escapeHtml(isOther ? (t.msg_deep_link_hilo_otro_texto || '') : (t.msg_deep_link_hilo_no_existe_texto || res?.message || ''))}</p>`,
+            showCancelButton: true,
+            confirmButtonText: t.msg_deep_link_cerrar_sesion || '',
+            cancelButtonText: t.msg_deep_link_quedarse || '',
+        });
+        if (r.isConfirmed) {
+            const returnUrl = window.location.href;
+            Auth.logout(false, returnUrl);
+        }
+    }
+
     async function openHilo(id, opts = {}) {
         const skipLoadHilos = opts.skipLoadHilos === true;
         currentHiloId = id;
@@ -431,10 +568,18 @@ export async function initMensajes(opts = {}) {
 
         const res = await API.request(`/comunicacion/mensajes/hilo/${id}?markRead=1`, 'GET');
         if (res.status !== 'success' || !res.data) {
+            currentHiloId = null;
+            if (pc) pc.classList.add('d-none');
+            if (ph) ph.classList.remove('d-none');
+            const code = String(res.code || '').trim();
+            if (code === 'hilo_sin_acceso' || code === 'hilo_no_encontrado') {
+                await promptHiloDeepLinkSinAcceso(res);
+                return false;
+            }
             if (typeof Swal !== 'undefined') {
                 Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
             }
-            return;
+            return false;
         }
 
         const hilo = res.data.hilo;
@@ -464,6 +609,18 @@ export async function initMensajes(opts = {}) {
             : (pB && parseInt(pB.IdUsrA || 0, 10) === otherId) ? pB
                 : null;
 
+        let replyCtxUserId = otherId;
+        if (replyCtxUserId <= 0 && mensajes.length > 0) {
+            for (let i = 0; i < mensajes.length; i++) {
+                const rid = parseInt(mensajes[i].IdUsrRemitente || 0, 10);
+                if (rid > 0 && rid !== uid) {
+                    replyCtxUserId = rid;
+                    break;
+                }
+            }
+        }
+        replySobreUsuarioId = replyCtxUserId;
+
         /** Interlocutor para cabecera (prioriza participantes API; si no, primer mensaje). */
         let interlocutor = null;
         if (other && parseInt(String(other.IdUsrA || 0), 10) > 0) {
@@ -484,6 +641,29 @@ export async function initMensajes(opts = {}) {
                     Usuario: String(m0.RemitenteUsuario || '').trim()
                 };
             }
+        }
+
+        if (replySobreUsuarioId <= 0 && interlocutor) {
+            const iid = parseInt(String(interlocutor.IdUsrA || 0), 10);
+            if (iid > 0 && iid !== uid) {
+                replySobreUsuarioId = iid;
+            }
+        }
+
+        const isInstHilo = parseInt(hilo.EsInstitucional || 0, 10) === 1;
+        const replyAnexo = document.getElementById('reply-anexo-wrap');
+        if (replyAnexo) {
+            const rt = document.getElementById('reply-ref-tipo');
+            const rb = document.getElementById('reply-ref-buscar');
+            const rs = document.getElementById('reply-ref-select');
+            if (rt) rt.value = '';
+            if (rb) rb.value = '';
+            if (rs) {
+                rs.classList.add('d-none');
+                renderRefSelectOptions(rs, []);
+            }
+            replyAnexo.classList.toggle('d-none', instMode || isInstHilo || !puedeResponder || replySobreUsuarioId <= 0);
+            syncReplyRefUi();
         }
 
         const otherName = other ? `${(other.NombreA || '').trim()} ${(other.ApellidoA || '').trim()}`.trim() : '';
@@ -571,11 +751,18 @@ export async function initMensajes(opts = {}) {
                     if (idRem > 0) partes.push(`${idShort} ${idRem}`);
                     remitente = partes.length ? partes.join(' · ') : `ID ${idRem || ''}`.trim();
                 }
+                const ctxTipo = String(m.OrigenTipo || '').trim();
+                const ctxEt = String(m.OrigenEtiqueta || '').trim();
+                const showCtx = ctxEt !== '' && (ctxTipo === 'formulario' || ctxTipo === 'alojamiento');
+                const ctxHtml = showCtx
+                    ? `<div class="small mt-1" style="opacity:0.95;"><span class="badge bg-light text-dark">${escapeHtml(labelOrigenTipo(ctxTipo))}</span> <span class="${mine ? 'text-white' : 'text-muted'}">${escapeHtml(ctxEt)}</span></div>`
+                    : '';
                 return `
                     <div class="mb-2 ${align}">
                         <div class="small ${mine ? 'text-primary' : 'text-muted'}">${escapeHtml(remitente)}</div>
                         <div class="d-inline-block px-2 py-1 rounded small ${bubble}" style="max-width:85%;text-align:left;">
                             ${escapeHtml(m.Cuerpo || '')}
+                            ${ctxHtml}
                         </div>
                         <div class="small text-muted">${escapeHtml(formatDateTime(m.FechaEnvio))}</div>
                     </div>`;
@@ -589,6 +776,7 @@ export async function initMensajes(opts = {}) {
         if (window.NotificationManager?.check) {
             window.NotificationManager.check();
         }
+        return true;
     }
 
     async function deleteCurrentHilo() {
@@ -688,13 +876,36 @@ export async function initMensajes(opts = {}) {
         replyEnviando = true;
         setReplyEnviando(true);
         try {
-            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', {
+            const body = {
                 IdMensajeHilo: currentHiloId,
                 Cuerpo: txt
-            });
+            };
+            const rt = String(document.getElementById('reply-ref-tipo')?.value || '').trim();
+            if ((rt === 'formulario' || rt === 'alojamiento') && replySobreUsuarioId > 0) {
+                const oid = parseInt(document.getElementById('reply-ref-select')?.value || '0', 10);
+                if (oid > 0) {
+                    body.OrigenTipo = rt;
+                    body.OrigenId = oid;
+                    const opt = document.getElementById('reply-ref-select')?.selectedOptions?.[0];
+                    const et = (opt?.getAttribute('data-etiqueta') || '').trim();
+                    if (et) body.OrigenEtiqueta = et.slice(0, 500);
+                }
+            }
+
+            const res = await API.request('/comunicacion/mensajes/enviar', 'POST', body);
 
             if (res.status === 'success') {
                 if (el) el.value = '';
+                const rt0 = document.getElementById('reply-ref-tipo');
+                const rb0 = document.getElementById('reply-ref-buscar');
+                const rs0 = document.getElementById('reply-ref-select');
+                if (rt0) rt0.value = '';
+                if (rb0) rb0.value = '';
+                if (rs0) {
+                    rs0.classList.add('d-none');
+                    renderRefSelectOptions(rs0, []);
+                }
+                syncReplyRefUi();
                 avisoCorreoMensajeSiFallo(res);
                 await openHilo(currentHiloId);
             } else if (typeof Swal !== 'undefined') {
@@ -721,6 +932,8 @@ export async function initMensajes(opts = {}) {
 
     document.getElementById('btn-reply')?.addEventListener('click', () => sendReply());
     document.getElementById('btn-hilo-delete')?.addEventListener('click', () => deleteCurrentHilo());
+    document.getElementById('reply-ref-tipo')?.addEventListener('change', () => syncReplyRefUi());
+    document.getElementById('reply-ref-buscar')?.addEventListener('input', () => scheduleReplyRefLoad());
 
     const modalEl = document.getElementById('modal-nuevo');
     let modal = null;
@@ -731,6 +944,55 @@ export async function initMensajes(opts = {}) {
                 e.preventDefault();
             }
         });
+    }
+
+    function syncRefBlockVisibility() {
+        const cat = (document.getElementById('nuevo-categoria')?.value || '').trim();
+        const blk = document.getElementById('msg-nuevo-ref-block');
+        const wFa = document.getElementById('nuevo-ref-formaloja-wrap');
+        const wRv = document.getElementById('nuevo-ref-reserva-wrap');
+        if (!blk) return;
+        const showBlk = ['formulario', 'alojamiento', 'reserva'].includes(cat);
+        blk.classList.toggle('d-none', !showBlk);
+        if (wFa) wFa.classList.toggle('d-none', !['formulario', 'alojamiento'].includes(cat));
+        if (wRv) wRv.classList.toggle('d-none', cat !== 'reserva');
+        const buscar = document.getElementById('nuevo-ref-buscar');
+        const sobre = getNuevoSobreUsuarioId();
+        if (buscar) {
+            buscar.disabled = !['formulario', 'alojamiento'].includes(cat) || sobre <= 0;
+            buscar.placeholder = t.msg_anexo_buscar_ph || '';
+        }
+        if (['formulario', 'alojamiento'].includes(cat)) {
+            scheduleNuevoRefLoad();
+        }
+    }
+
+    document.getElementById('nuevo-categoria')?.addEventListener('change', syncRefBlockVisibility);
+
+    function attachOrigenRefToPayload(payload) {
+        const cat = String(payload.OrigenTipo ?? document.getElementById('nuevo-categoria')?.value ?? '').trim() || 'manual';
+        delete payload.OrigenEtiqueta;
+        delete payload.OrigenId;
+        if (cat === 'formulario' || cat === 'alojamiento') {
+            const sel = document.getElementById('nuevo-ref-select');
+            const oid = parseInt(sel?.value || '0', 10);
+            if (oid > 0) {
+                payload.OrigenId = oid;
+                const opt = sel?.selectedOptions?.[0];
+                const et = (opt?.getAttribute('data-etiqueta') || opt?.textContent || '').trim();
+                if (et) payload.OrigenEtiqueta = et.slice(0, 500);
+            }
+            return payload;
+        }
+        if (cat === 'reserva') {
+            const refEl = document.getElementById('nuevo-origen-id');
+            const raw = refEl ? String(refEl.value || '').trim() : '';
+            const n = parseInt(raw, 10);
+            if (!Number.isNaN(n) && n > 0) {
+                payload.OrigenId = n;
+            }
+        }
+        return payload;
     }
 
     async function fillDestinatarios() {
@@ -769,9 +1031,19 @@ export async function initMensajes(opts = {}) {
             renderDestinatariosSelect(e.target?.value || '');
         }
     });
-    document.getElementById('nuevo-dest')?.addEventListener('change', () => updateDestEmailHint());
+    document.getElementById('nuevo-dest')?.addEventListener('change', () => {
+        updateDestEmailHint();
+        clearNuevoRefUi();
+        syncRefBlockVisibility();
+    });
+    document.getElementById('nuevo-ref-buscar')?.addEventListener('input', () => scheduleNuevoRefLoad());
 
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
+        const refIn = document.getElementById('nuevo-origen-id');
+        if (refIn) refIn.value = '';
+        clearNuevoRefUi();
+        syncRefBlockVisibility();
+
         const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
         const avisoInv = document.getElementById('msg-investigador-aviso');
         if (avisoInv) {
@@ -789,6 +1061,7 @@ export async function initMensajes(opts = {}) {
         if (!instMode) {
             await fillDestinatarios();
             fillCategoriaNuevo();
+            syncRefBlockVisibility();
         } else {
             fillInstTipoSelect();
             await fillDestinatarios();
@@ -806,6 +1079,8 @@ export async function initMensajes(opts = {}) {
                 await fillDestinatarios();
                 if (asPersonal) {
                     fillCategoriaNuevo();
+                    clearNuevoRefUi();
+                    syncRefBlockVisibility();
                     renderDestinatariosSelect('');
                 } else {
                     fillInstTipoSelect();
@@ -874,6 +1149,9 @@ export async function initMensajes(opts = {}) {
                     const c = document.getElementById('nuevo-cuerpo');
                     if (a) a.value = '';
                     if (c) c.value = '';
+                    const riInst = document.getElementById('nuevo-origen-id');
+                    if (riInst) riInst.value = '';
+                    clearNuevoRefUi();
                     await loadHilos();
                     if (hid) await openHilo(hid);
                     if (window.NotificationManager?.check) {
@@ -913,6 +1191,8 @@ export async function initMensajes(opts = {}) {
             }
         }
 
+        attachOrigenRefToPayload(payload);
+
         nuevoMensajeEnviando = true;
         setModalNuevoEnviando(true);
         try {
@@ -925,6 +1205,9 @@ export async function initMensajes(opts = {}) {
                 const c = document.getElementById('nuevo-cuerpo');
                 if (a) a.value = '';
                 if (c) c.value = '';
+                const ri2 = document.getElementById('nuevo-origen-id');
+                if (ri2) ri2.value = '';
+                clearNuevoRefUi();
                 avisoCorreoMensajeSiFallo(res);
                 await loadHilos();
                 if (hid) await openHilo(hid);
@@ -988,9 +1271,10 @@ export async function initMensajes(opts = {}) {
             }
         }
         const cat = document.getElementById('nuevo-categoria');
-        if (cat && ['formulario', 'alojamiento', 'manual'].includes(origen)) {
+        if (cat && ['formulario', 'alojamiento', 'reserva', 'manual'].includes(origen)) {
             cat.value = origen;
         }
+        syncRefBlockVisibility();
         const a = document.getElementById('nuevo-asunto');
         if (a) a.value = asuntoRaw;
         const c = document.getElementById('nuevo-cuerpo');
@@ -1004,7 +1288,8 @@ export async function initMensajes(opts = {}) {
         const sp = new URLSearchParams(window.location.search);
         const hid = parseInt(sp.get('hilo') || '0', 10);
         if (!hid) return;
-        await openHilo(hid);
+        const ok = await openHilo(hid);
+        if (!ok) return;
         const url = new URL(window.location.href);
         url.searchParams.delete('hilo');
         const nq = url.searchParams.toString();

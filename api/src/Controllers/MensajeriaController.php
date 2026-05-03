@@ -35,6 +35,32 @@ class MensajeriaController {
         return $instId;
     }
 
+    public function getAnexosContexto() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $uid = (int) $sesion['userId'];
+            $role = (int) ($sesion['role'] ?? 0);
+            $sobre = (int) ($_GET['usuarioId'] ?? $_GET['usuario'] ?? 0);
+            $tipo = strtolower(trim((string) ($_GET['tipo'] ?? '')));
+            $q = trim((string) ($_GET['q'] ?? ''));
+            if ($sobre <= 0 || !in_array($tipo, ['formulario', 'alojamiento'], true)) {
+                $this->json(['status' => 'error', 'message' => 'Parámetros inválidos.'], 400);
+            }
+            if (!$this->model->usuarioEnInstitucion($instId, $sobre)) {
+                $this->json(['status' => 'error', 'message' => 'Usuario no encontrado en la sede.'], 404);
+            }
+            // Staff: cualquier usuario de la sede. Resto: solo propio listado; investigadores (3) pueden enlazar contexto del destinatario en la misma sede.
+            if (!$this->model->esRolStaffInstitucional($role) && $sobre !== $uid && (int) $role !== 3) {
+                $this->json(['status' => 'error', 'message' => 'No tiene permiso para consultar ese contexto.'], 403);
+            }
+            $items = $this->model->listAnexosContextoParaUsuario($instId, $sobre, $tipo, $q);
+            $this->json(['status' => 'success', 'data' => ['items' => $items]]);
+        } catch (\Exception $e) {
+            $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+        }
+    }
+
     public function getDestinatarios() {
         try {
             $sesion = Auditoria::getDatosSesion();
@@ -54,8 +80,22 @@ class MensajeriaController {
                     'NombreInstitucion' => $this->model->getNombreInstitucion($instId)
                 ];
             } else {
-                // Otros roles pueden enviar a personas de su institución
+                // Otros roles: toda la sede (incl. varios perfiles) + investigadores por si el listado base no los incluye.
                 $local = $this->model->listUsuariosInstitucionParaMensaje($instId, $uid);
+                if ($this->model->esRolStaffInstitucional($role)) {
+                    $inv = $this->model->listInvestigadoresInstitucionParaMensaje($instId, $uid);
+                    $seen = [];
+                    foreach ($local as $row) {
+                        $seen[(int) ($row['IdUsrA'] ?? 0)] = true;
+                    }
+                    foreach ($inv as $row) {
+                        $id = (int) ($row['IdUsrA'] ?? 0);
+                        if ($id > 0 && empty($seen[$id])) {
+                            $local[] = $row;
+                            $seen[$id] = true;
+                        }
+                    }
+                }
             }
 
             // Las de red siempre son instituciones (no personas)
@@ -129,7 +169,20 @@ class MensajeriaController {
             $role = (int) ($sesion['role'] ?? 0);
             $hilo = $this->model->getHiloRow($hiloId, $uid, $instId, $role);
             if (!$hilo) {
-                $this->json(['status' => 'error', 'message' => 'Hilo no encontrado.'], 404);
+                $raw = $this->model->fetchHiloRawById($hiloId);
+                if (!$raw) {
+                    $this->json([
+                        'status' => 'error',
+                        'code' => 'hilo_no_encontrado',
+                        'message' => 'Hilo no encontrado.',
+                    ], 404);
+                }
+
+                $this->json([
+                    'status' => 'error',
+                    'code' => 'hilo_sin_acceso',
+                    'message' => 'No tiene acceso a este hilo. Si el enlace es de otro usuario, cierre sesión e inicie con la cuenta correcta.',
+                ], 403);
             }
             // Datos de participantes para título/meta en UI.
             $hilo['ParticipanteA'] = $this->model->getUsuarioResumen((int)($hilo['IdUsrParticipanteA'] ?? 0), $instId);
@@ -308,7 +361,24 @@ class MensajeriaController {
             $idHilo = isset($input['IdMensajeHilo']) ? (int)$input['IdMensajeHilo'] : 0;
             if ($idHilo > 0) {
                 $cuerpo = (string)($input['Cuerpo'] ?? '');
-                $out = $this->model->responder($instId, $idHilo, $uid, $cuerpo, $role);
+                $otMsg = isset($input['OrigenTipo']) ? trim((string) $input['OrigenTipo']) : '';
+                $oiMsg = isset($input['OrigenId']) ? (int) $input['OrigenId'] : 0;
+                $oeMsg = isset($input['OrigenEtiqueta']) ? trim((string) $input['OrigenEtiqueta']) : '';
+                if ($otMsg === '' || $oiMsg <= 0) {
+                    $otMsg = null;
+                    $oiMsg = null;
+                    $oeMsg = '';
+                }
+                $out = $this->model->responder(
+                    $instId,
+                    $idHilo,
+                    $uid,
+                    $cuerpo,
+                    $role,
+                    $otMsg,
+                    $oiMsg > 0 ? $oiMsg : null,
+                    $oeMsg !== '' ? $oeMsg : null
+                );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 if ($code === 200) {
                     $hRow = $this->model->getHiloRow($idHilo, $uid, $instId, $role);
@@ -320,7 +390,7 @@ class MensajeriaController {
                             $esInstH = (int) ($hRow['EsInstitucional'] ?? 0) === 1;
                             if ($esInstH) {
                                 $idsMail = $this->idsDestinatariosEmailRespuestaInstitucional($hRow, $uid);
-                                $emailInfo = $this->notificarCorreoVariosUsuarios($hiloInst, $idsMail, $uid, $asuntoHilo, $cuerpoT);
+                                $emailInfo = $this->notificarCorreoVariosUsuarios($hiloInst, $idsMail, $uid, $asuntoHilo, $cuerpoT, $idHilo, true);
                                 $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                             } else {
                                 $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
@@ -333,7 +403,9 @@ class MensajeriaController {
                                         $destMsg,
                                         $uid,
                                         $asuntoHilo,
-                                        $cuerpoT
+                                        $cuerpoT,
+                                        $idHilo,
+                                        false
                                     );
                                     $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                                 }
@@ -390,7 +462,9 @@ class MensajeriaController {
                                     $idsMail,
                                     $uid,
                                     $asuntoT,
-                                    $cuerpoT
+                                    $cuerpoT,
+                                    $hid,
+                                    true
                                 );
                                 $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                             }
@@ -444,7 +518,9 @@ class MensajeriaController {
                         $dest,
                         $uid,
                         $asuntoT,
-                        $cuerpoT
+                        $cuerpoT,
+                        (int) ($out['data']['IdMensajeHilo'] ?? 0) ?: null,
+                        false
                     );
                     $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                 }
@@ -464,7 +540,9 @@ class MensajeriaController {
         int $destinatarioId,
         int $remitenteId,
         string $asunto,
-        string $cuerpo
+        string $cuerpo,
+        ?int $hiloId = null,
+        bool $esInstitucional = false
     ): array {
         $asunto = trim(strip_tags($asunto));
         $cuerpo = trim(strip_tags($cuerpo));
@@ -496,6 +574,7 @@ class MensajeriaController {
         }
 
         $instName = $this->model->getNombreInstitucion($instIdContexto);
+        $instSlug = $this->model->getInstitucionSlug($instIdContexto);
         $mail = new MailService();
         $ok = $mail->sendInternalMessageNotification(
             $emailTo,
@@ -504,7 +583,10 @@ class MensajeriaController {
             $cuerpo,
             $instName,
             $nombreRem,
-            $lang
+            $lang,
+            $instSlug,
+            $hiloId,
+            $esInstitucional
         );
 
         return ['ok' => $ok, 'codigo' => $ok ? 'ok' : 'smtp_error'];
@@ -519,7 +601,9 @@ class MensajeriaController {
         array $destinatarioIds,
         int $remitenteId,
         string $asunto,
-        string $cuerpo
+        string $cuerpo,
+        ?int $hiloId = null,
+        bool $esInstitucional = false
     ): array {
         $destinatarioIds = array_values(array_unique(array_filter(array_map('intval', $destinatarioIds), static fn ($v) => $v > 0)));
         if ($destinatarioIds === []) {
@@ -532,7 +616,7 @@ class MensajeriaController {
             if ($did === $remitenteId) {
                 continue;
             }
-            $one = $this->notificarCorreoPorMensajeInterno($instIdContexto, $did, $remitenteId, $asunto, $cuerpo);
+            $one = $this->notificarCorreoPorMensajeInterno($instIdContexto, $did, $remitenteId, $asunto, $cuerpo, $hiloId, $esInstitucional);
             if (($one['codigo'] ?? '') === 'sin_email') {
                 $sinEmail = true;
             }
@@ -552,6 +636,7 @@ class MensajeriaController {
      */
     private function idsDestinatariosEmailNuevoHiloInstitucional(array $h, int $remitenteId): array {
         $inst = (int) ($h['IdInstitucion'] ?? 0);
+        $instStaff = $this->model->idInstitucionNotificacionConsultaAbierta($h);
         $t = strtolower(trim((string) ($h['OrigenTipo'] ?? '')));
         $a = (int) ($h['IdUsrParticipanteA'] ?? 0);
         $bRaw = $h['IdUsrParticipanteB'] ?? null;
@@ -576,12 +661,12 @@ class MensajeriaController {
                 return array_values(array_unique($out));
             }
             if ($this->model->usuarioEsInvestigadorEnInstitucion($inst, $remitenteId)) {
-                $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+                $ids = $this->model->listIdsUsuariosConTiposInstitucion($instStaff, [1, 2, 4, 5, 6]);
 
                 return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
             }
             // Consulta abierta por personal (sin investigador concreto): avisar al resto del personal de la sede del hilo
-            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+            $ids = $this->model->listIdsUsuariosConTiposInstitucion($instStaff, [1, 2, 4, 5, 6]);
 
             return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
         }
@@ -594,6 +679,7 @@ class MensajeriaController {
      */
     private function idsDestinatariosEmailRespuestaInstitucional(array $h, int $remitenteId): array {
         $inst = (int) ($h['IdInstitucion'] ?? 0);
+        $instStaff = $this->model->idInstitucionNotificacionConsultaAbierta($h);
         $t = strtolower(trim((string) ($h['OrigenTipo'] ?? '')));
         $a = (int) ($h['IdUsrParticipanteA'] ?? 0);
         $bRaw = $h['IdUsrParticipanteB'] ?? null;
@@ -617,7 +703,7 @@ class MensajeriaController {
                 return [];
             }
             if ($remitenteId === $a) {
-                $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [1, 2, 4, 5, 6]);
+                $ids = $this->model->listIdsUsuariosConTiposInstitucion($instStaff, [1, 2, 4, 5, 6]);
 
                 return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
             }

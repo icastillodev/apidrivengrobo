@@ -127,6 +127,9 @@ class MailLang {
             'msg_int_from' => 'Remitente:',
             'msg_int_subject_label' => 'Asunto:',
             'msg_int_message_label' => 'Mensaje:',
+            'msg_int_btn' => 'Abrir mensajes en GROBO',
+            'mail_btn_mis_formularios' => 'Ver mis formularios',
+            'mail_btn_mis_protocolos' => 'Ver mis protocolos',
 
             'support_user_reply_subject' => 'Respuesta a su ticket',
             'support_user_reply_title' => 'Respuesta de soporte',
@@ -254,6 +257,9 @@ class MailLang {
             'msg_int_from' => 'From:',
             'msg_int_subject_label' => 'Subject:',
             'msg_int_message_label' => 'Message:',
+            'msg_int_btn' => 'Open messages in GROBO',
+            'mail_btn_mis_formularios' => 'View my forms',
+            'mail_btn_mis_protocolos' => 'View my protocols',
 
             'support_user_reply_subject' => 'Reply to your ticket',
             'support_user_reply_title' => 'Support reply',
@@ -381,6 +387,9 @@ class MailLang {
             'msg_int_from' => 'Remetente:',
             'msg_int_subject_label' => 'Assunto:',
             'msg_int_message_label' => 'Mensagem:',
+            'msg_int_btn' => 'Abrir mensagens no GROBO',
+            'mail_btn_mis_formularios' => 'Ver meus formulários',
+            'mail_btn_mis_protocolos' => 'Ver meus protocolos',
 
             'support_user_reply_subject' => 'Resposta ao seu ticket',
             'support_user_reply_title' => 'Resposta do suporte',

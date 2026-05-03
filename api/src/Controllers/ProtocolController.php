@@ -380,6 +380,7 @@ class ProtocolController {
 
             if (!empty($info['Email'])) {
                 $mailer = new MailService();
+                $slugProt = isset($info['InstName']) ? strtolower(trim((string) $info['InstName'])) : null;
                 $mailer->sendProtocolDecision(
                     $info['Email'],
                     $info['NombreUser'] ?: 'Usuario',
@@ -387,7 +388,7 @@ class ProtocolController {
                     2,
                     $motivo,
                     $info['InstName'] ?: 'Institución',
-                    null,
+                    $slugProt !== '' ? $slugProt : null,
                     $info['lang'] ?? 'es'
                 );
             }

@@ -8,7 +8,11 @@ import {
   isCapacitacionAppPath,
 } from '../utils/capacitacionPaths.js?v=20260409';
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
-import { collectMenuPathsFromIds, expandFacturacionPathsIfAllowed } from '../utils/capacitacionMenuPaths.js?v=20260409';
+import {
+  collectMenuPathsFromIds,
+  expandConfigSubpathsIfAllowed,
+  expandFacturacionPathsIfAllowed,
+} from '../utils/capacitacionMenuPaths.js?v=20260409';
 import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260409';
 
 export const FAB_HIDDEN_KEY = 'gecko_hide_capacitacion_fab';
@@ -238,6 +242,7 @@ export async function initCapacitacionHelpFab() {
   }
   allowed.add('capacitacion/tema/red');
   expandFacturacionPathsIfAllowed(allowed);
+  expandConfigSubpathsIfAllowed(allowed);
   if (!allowed.has(menuPath)) {
     return;
   }

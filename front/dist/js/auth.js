@@ -1,5 +1,6 @@
 import { API } from './api.js?v=20260409';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
+import { getPreservableAppReturnHref } from './utils/loginReturnUrl.js';
 import { setInstModulesSnapshot } from './modulesAccess.js';
 import {
     snapshotGroboPersistentUiPrefs,
@@ -127,16 +128,21 @@ async init() {
             }
 
             this.slug = slugLower;
+
+            this.captureRedirectFromNextQuery();
             
             const storedToken = this.getVal('token');
-            const storedInst = this.getVal('NombreInst');
-            
-            // REDIRECCIÓN SI YA ESTÁ LOGUEADO (Evita que vuelva a ver el login)
-            if (storedToken && storedInst === this.slug) {
+            const storedInstNorm = String(this.getVal('NombreInst') || '').trim().toLowerCase();
+            const slugNorm = String(this.slug || '').trim().toLowerCase();
+
+            // REDIRECCIÓN SI YA ESTÁ LOGUEADO (misma sede; slug e NombreInst pueden diferir en mayúsculas)
+            if (storedToken && storedInstNorm && slugNorm && storedInstNorm === slugNorm) {
                 const role = parseInt(this.getVal('userLevel'));
                 this.autoRedirectIfLogged(role);
-                return; 
+                return;
             }
+
+            this.showLoginFormWhileValidatePending();
 
             const res = await API.request(`/validate-inst/${this.slug}`);
             
@@ -187,6 +193,71 @@ async init() {
             this.showErrorState(); 
         }
     },
+    /**
+     * ?next= o ?redirect= URL absoluta mismo origen → redirectAfterLogin (post-login o ya logueado).
+     */
+    showLoginFormWhileValidatePending() {
+        try {
+            if (this.getVal('token')) return;
+            const form = document.getElementById('login-form');
+            const w = document.getElementById('inst-welcome');
+            const tl = window.txt?.login?.cargando_sede || window.txt?.login?.validando || '…';
+            if (w) {
+                w.classList.remove('hidden');
+                w.textContent = tl;
+            }
+            if (form) {
+                form.classList.remove('hidden');
+                const u = document.getElementById('username');
+                const p = document.getElementById('password');
+                const r = document.getElementById('remember-me');
+                if (u) u.disabled = true;
+                if (p) p.disabled = true;
+                if (r) r.disabled = true;
+                const sb = form.querySelector('button[type="submit"]');
+                if (sb) sb.disabled = true;
+            }
+        } catch (e) {
+            console.warn('showLoginFormWhileValidatePending', e);
+        }
+    },
+
+    clearLoginFormDisabledState() {
+        const form = document.getElementById('login-form');
+        if (!form) return;
+        ['username', 'password', 'remember-me'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = false;
+        });
+        const sb = form.querySelector('button[type="submit"]');
+        if (sb) sb.disabled = false;
+    },
+
+    captureRedirectFromNextQuery() {
+        try {
+            const sp = new URLSearchParams(window.location.search || '');
+            const next = sp.get('next') || sp.get('redirect');
+            if (!next || next.length < 6) return;
+            let u;
+            try {
+                u = new URL(next);
+            } catch {
+                return;
+            }
+            if (u.origin !== window.location.origin) return;
+            const path = u.pathname.toLowerCase();
+            if (path.includes('//') || next.includes('@')) return;
+            localStorage.setItem('redirectAfterLogin', u.href);
+            const clean = new URL(window.location.href);
+            clean.searchParams.delete('next');
+            clean.searchParams.delete('redirect');
+            const q = clean.searchParams.toString();
+            window.history.replaceState({}, '', clean.pathname + (q ? `?${q}` : '') + clean.hash);
+        } catch (e) {
+            console.warn('captureRedirectFromNextQuery', e);
+        }
+    },
+
     updateElements(map) {
         for (const [id, val] of Object.entries(map)) {
             if (id === 'logo-url') {
@@ -349,6 +420,7 @@ async init() {
         const savedLang = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
         const savedLogo = localStorage.getItem('instLogo') || '';
         const uiPrefsSnap = snapshotGroboPersistentUiPrefs();
+        const pendingRedirect = localStorage.getItem('redirectAfterLogin');
 
         localStorage.clear();
         sessionStorage.clear();
@@ -391,6 +463,9 @@ async init() {
 
         localStorage.setItem('lang', savedLang);
         localStorage.setItem('idioma', savedLang);
+        if (pendingRedirect && String(pendingRedirect).length > 5) {
+            localStorage.setItem('redirectAfterLogin', pendingRedirect);
+        }
         try {
             await API.request('/user/config/update', 'POST', { lang: savedLang });
         } catch (e) {
@@ -445,10 +520,11 @@ autoRedirectIfLogged(role) {
         }
     },
     renderLogin() {
+        this.clearLoginFormDisabledState();
         const form = document.getElementById('login-form');
-        if (form) { 
-            form.classList.remove('hidden'); 
-            form.onsubmit = (e) => this.handleLogin(e); 
+        if (form) {
+            form.classList.remove('hidden');
+            form.onsubmit = (e) => this.handleLogin(e);
         }
     },
 
@@ -475,7 +551,7 @@ autoRedirectIfLogged(role) {
             console.warn("Acceso denegado: No hay sesión activa.");
             // Evitar slug vacío para no acabar en raíz; en perfil preferir reenviar a institución conocida
             const slugForRedirect = (skipInstCheck && inst) ? inst : (inst || 'urbe');
-            this.redirectToLogin(slugForRedirect);
+            this.redirectToLogin(slugForRedirect, undefined);
             return false;
         }
 
@@ -501,8 +577,11 @@ autoRedirectIfLogged(role) {
         return true; 
     },
 
-    // Le agregamos un parámetro para forzar ir a la raíz si todo se rompe
-    logout(forceRoot = false) {
+    /**
+     * @param {boolean} forceRoot
+     * @param {string} [returnHrefTrasLogin] URL completa same-origin para ?next= (p. ej. enlace de correo con ?hilo=).
+     */
+    logout(forceRoot = false, returnHrefTrasLogin = undefined) {
         let slug = '';
         if (!forceRoot) {
             slug = this.getVal('NombreInst') || '';
@@ -512,17 +591,27 @@ autoRedirectIfLogged(role) {
             }
             if (!slug || slug === 'null' || slug === 'undefined') slug = 'urbe';
         }
-        
+
+        const nextExplicit = forceRoot ? '' : (
+            typeof returnHrefTrasLogin === 'string' && returnHrefTrasLogin.trim() !== ''
+                ? returnHrefTrasLogin.trim()
+                : getPreservableAppReturnHref()
+        );
+
         const uiPrefsSnap = snapshotGroboPersistentUiPrefs();
         localStorage.clear();
         sessionStorage.clear();
         this.clearAllCookies();
         restoreGroboPersistentUiPrefs(uiPrefsSnap);
 
-        this.redirectToLogin(slug);
+        this.redirectToLogin(slug, forceRoot ? '' : nextExplicit);
     },
 
-redirectToLogin(slug) {
+    /**
+     * @param {string} slug
+     * @param {string} [nextExplicit] URL absoluta mismo origen; cadena vacía = sin ?next=; undefined = usar pantalla actual si aplica.
+     */
+    redirectToLogin(slug, nextExplicit = undefined) {
         const basePath = this.getBasePath();
         const safeSlug = String(slug || '').toLowerCase().trim();
 
@@ -535,7 +624,26 @@ redirectToLogin(slug) {
         // 2. CASO BASURA/NULO: No mandar a la raíz (front) — usar slug por defecto para que no quede en blanco
         const invalidSlugs = ['null', 'undefined', '0', ''];
         const targetSlug = invalidSlugs.includes(safeSlug) ? 'urbe' : safeSlug;
-        window.location.href = `${basePath}${targetSlug}`;
+
+        let cand = '';
+        if (nextExplicit !== undefined) {
+            cand = String(nextExplicit || '').trim();
+        } else {
+            cand = getPreservableAppReturnHref();
+        }
+        let nextQs = '';
+        if (cand.length > 6) {
+            try {
+                const u = new URL(cand);
+                if (u.origin === window.location.origin) {
+                    nextQs = `?next=${encodeURIComponent(cand)}`;
+                }
+            } catch (_) {
+                /* ignore */
+            }
+        }
+
+        window.location.href = `${basePath}${targetSlug}/${nextQs}`;
     },
 
     showErrorState() {

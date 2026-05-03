@@ -94,7 +94,8 @@ class InsumoFormularioController {
                     'items' => $itemsParaCorreo
                 ];
 
-                $mail->sendInsumoExpOrder($info['EmailA'], $nombreCompleto, $info['NombreInst'], $mailData, null, $input['lang'] ?? $info['idioma_preferido'] ?? 'es');
+                $slug = isset($info['NombreInst']) ? strtolower(trim((string) $info['NombreInst'])) : null;
+                $mail->sendInsumoExpOrder($info['EmailA'], $nombreCompleto, $info['NombreInst'], $mailData, $slug, $input['lang'] ?? $info['idioma_preferido'] ?? 'es');
             }
 
             echo json_encode(['status' => 'success', 'id' => $idForm]);

@@ -365,6 +365,7 @@ window.downloadPDF = async (id) => {
                 try {
                     const resTraz = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${tramo.IdAlojamiento}&idEspecie=${espId}&instId=${instId}`);
                     if (resTraz.status === 'success' && resTraz.data && resTraz.data.cajas && resTraz.data.cajas.length > 0) {
+                        const catsPdf = resTraz.data.categorias_datos || resTraz.data.categorias || [];
                         let hasObsInTramo = false;
                         const tramoTit = (t.pdf_tramo_bloque || 'Tramo #{id} (desde: {fecha})')
                             .replace('{id}', String(tramo.IdAlojamiento))
@@ -388,15 +389,15 @@ window.downloadPDF = async (id) => {
                                                 <tr style="background-color: #f9f9f9;">
                                                     <th style="border: 1px solid #ccc; padding: 4px;">${t.pdf_th_fecha || 'Fecha'}</th>`;
                                         
-                                        resTraz.data.categorias.forEach(cat => {
+                                        catsPdf.forEach(cat => {
                                             cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${cat.NombreCatAlojUnidad}</th>`;
                                         });
                                         cajaHtml += `</tr>`;
 
                                         u.observaciones_pivot.forEach(obs => {
                                             cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${new Date(obs.fechaObs).toLocaleDateString()}</td>`;
-                                            resTraz.data.categorias.forEach(cat => {
-                                                const val = obs[`cat_${cat.IdDatosUnidadAloj}`] || '-';
+                                            catsPdf.forEach(cat => {
+                                                const val = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '-';
                                                 cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${val}</td>`;
                                             });
                                             cajaHtml += `</tr>`;

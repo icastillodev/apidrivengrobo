@@ -120,6 +120,7 @@ class AdminSolicitudesModel {
                 Auditoria::log($this->db, 'UPDATE_SOLICITUD', 'solicitudprotocolo', "Decisión: RECHAZADA sobre Solicitud ID: " . $solId);
             }
 
+            $slugInst = strtolower(trim((string) $instName));
             $this->mailer->sendProtocolDecision(
                 $info['Email'], 
                 $info['NombreUser'], 
@@ -127,7 +128,7 @@ class AdminSolicitudesModel {
                 $decision, 
                 $mensaje, 
                 $instName,
-                null,
+                $slugInst !== '' ? $slugInst : null,
                 $info['lang'] ?? 'es'
             );
 

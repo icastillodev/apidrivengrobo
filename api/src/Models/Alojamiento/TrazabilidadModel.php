@@ -4,8 +4,70 @@ use PDO;
 use App\Utils\Auditoria;
 
 class TrazabilidadModel {
+    public const TRAZ_ALCANCE_DATOS = 'datos';
+    public const TRAZ_ALCANCE_INICIO = 'inicio';
+
     private $db;
     public function __construct($db) { $this->db = $db; }
+
+    /**
+     * Categorías de trazabilidad visibles para una especie y tramo de alojamiento (protocolo opcional).
+     * idprotA NULL en fila = aplica a cualquier protocolo; si hay protocolo, también entran las filas específicas de ese idprotA.
+     */
+    public function listCategoriasTrazPorContexto(int $idEspA, ?int $idProtA, string $alcance): array {
+        $alcance = $alcance === self::TRAZ_ALCANCE_INICIO ? self::TRAZ_ALCANCE_INICIO : self::TRAZ_ALCANCE_DATOS;
+        if ($idProtA === null || $idProtA <= 0) {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM categoriadatosunidadalojamiento c
+                 WHERE c.IdEspA = ? AND c.alcance_traz = ? AND c.Habilitado != 2 AND c.idprotA IS NULL
+                 ORDER BY c.IdDatosUnidadAloj ASC'
+            );
+            $stmt->execute([$idEspA, $alcance]);
+        } else {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM categoriadatosunidadalojamiento c
+                 WHERE c.IdEspA = ? AND c.alcance_traz = ? AND c.Habilitado != 2
+                   AND (c.idprotA IS NULL OR c.idprotA = ?)
+                 ORDER BY c.IdDatosUnidadAloj ASC'
+            );
+            $stmt->execute([$idEspA, $alcance, $idProtA]);
+        }
+
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getUnidadTrazContext(int $idEspecieAlojUnidad, int $idInstitucion): ?array {
+        $stmt = $this->db->prepare(
+            'SELECT a.TipoAnimal AS idEspA, a.idprotA, a.IdAlojamiento
+             FROM especie_alojamiento_unidad eu
+             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE eu.IdEspecieAlojUnidad = ? AND a.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$idEspecieAlojUnidad, $idInstitucion]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
+    /** Valores actuales de variables de inicio (una fila por categoría). */
+    public function fetchValoresInicioForUnidad(int $idEspecieAlojUnidad): array {
+        $stmtObs = $this->db->prepare(
+            "SELECT o.IdDatosUnidadAloj, c.NombreCatAlojUnidad,
+                    COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) AS Valor
+             FROM observacion_alojamiento_unidad o
+             INNER JOIN categoriadatosunidadalojamiento c ON o.IdDatosUnidadAloj = c.IdDatosUnidadAloj
+             WHERE o.IdEspecieAlojUnidad = ? AND COALESCE(o.es_inicio_traz, 0) = 1"
+        );
+        $stmtObs->execute([$idEspecieAlojUnidad]);
+        $out = [];
+        foreach ($stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+            $out[(int)$r['IdDatosUnidadAloj']] = $r;
+        }
+
+        return $out;
+    }
 
     /** Sexo en ficha: M macho, H hembra, I indistinto (compatible con texto previo). */
     private function normalizeSexoSujeto(?string $raw): ?string {
@@ -28,6 +90,104 @@ class TrazabilidadModel {
         return substr($s, 0, 24);
     }
 
+    /** Prefijo fijo de caja: letra del tipo de protocolo + "A" + número de caja en el tramo. */
+    private function construirPrefijoCaja(string $letra, int $numeroEnTramo): string {
+        $L = strtoupper(trim($letra));
+        if ($L === '') {
+            $L = 'A';
+        }
+        if (function_exists('mb_substr')) {
+            $L = mb_substr($L, 0, 1, 'UTF-8');
+        } else {
+            $L = substr($L, 0, 1);
+        }
+        if ($L === '') {
+            $L = 'A';
+        }
+
+        return $L . 'A' . $numeroEnTramo;
+    }
+
+    private function primeraLetraIdentificadora(string $nombreTipo): string {
+        $s = trim($nombreTipo);
+        if ($s === '') {
+            return 'A';
+        }
+        if (preg_match('/\p{L}/u', $s, $m)) {
+            return function_exists('mb_strtoupper') ? mb_strtoupper($m[0], 'UTF-8') : strtoupper($m[0]);
+        }
+        if (preg_match('/[0-9]/', $s, $m)) {
+            return $m[0];
+        }
+
+        return 'A';
+    }
+
+    private function letraTipoProtocoloPorIdprot(?int $idprotA, int $idInstitucion): string {
+        if ($idprotA === null || $idprotA <= 0) {
+            return 'A';
+        }
+        $st = $this->db->prepare(
+            'SELECT COALESCE(tp.NombreTipoprotocolo, \'\') AS nt
+             FROM protocoloexpe p
+             LEFT JOIN tipoprotocolo tp ON p.tipoprotocolo = tp.idtipoprotocolo
+             WHERE p.idprotA = ? AND p.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $st->execute([$idprotA, $idInstitucion]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return 'A';
+        }
+        $nt = trim((string)($row['nt'] ?? ''));
+        if ($nt === '') {
+            return 'A';
+        }
+
+        return $this->primeraLetraIdentificadora($nt);
+    }
+
+    /** Parte fija del nombre de caja (antes de la primera " - "), p.ej. IA1 o A1 (histórico). */
+    private function prefijoCajaDesdeNombreCompleto(string $nombreCaja): string {
+        $parts = explode(' - ', $nombreCaja, 2);
+        $p = trim($parts[0] ?? '');
+
+        return $p !== '' ? $p : 'A0';
+    }
+
+    private function normalizarEtiquetaCajaRecibida(string $input, string $prefijoFijo, string $nombreCompletoActual): string {
+        $t = trim($input);
+        if ($t === '') {
+            return 'Sin Etiqueta';
+        }
+        $prefijoConSep = $prefijoFijo . ' - ';
+        if ($t === $nombreCompletoActual) {
+            $parts = explode(' - ', $nombreCompletoActual, 2);
+
+            return isset($parts[1]) ? (trim($parts[1]) !== '' ? trim($parts[1]) : 'Sin Etiqueta') : 'Sin Etiqueta';
+        }
+        if (strpos($t, $prefijoConSep) === 0) {
+            $rest = trim(substr($t, strlen($prefijoConSep)));
+
+            return $rest !== '' ? $rest : 'Sin Etiqueta';
+        }
+
+        return $t;
+    }
+
+    /** @return array{prefijo_fijo:string, etiqueta:string}|null */
+    private function parseNombreSujetoTrazas(?string $nombreCompleto): ?array {
+        $n = (string)$nombreCompleto;
+        if (preg_match('/^(.*) - (S\d+) - (.*)$/su', $n, $m)) {
+            return [
+                'prefijo_fijo' => $m[1] . ' - ' . $m[2] . ' - ',
+                'etiqueta' => $m[3],
+            ];
+        }
+
+        return null;
+    }
+
     /**
      * Observaciones agrupadas por fila (misma lógica que el árbol de trazabilidad).
      */
@@ -37,7 +197,7 @@ class TrazabilidadModel {
                    COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) as Valor
             FROM observacion_alojamiento_unidad o
             INNER JOIN categoriadatosunidadalojamiento c ON o.IdDatosUnidadAloj = c.IdDatosUnidadAloj
-            WHERE o.IdEspecieAlojUnidad = ?
+            WHERE o.IdEspecieAlojUnidad = ? AND COALESCE(o.es_inicio_traz, 0) = 0
             ORDER BY o.fechaObs DESC, o.id_fila_obs DESC
         ");
         $stmtObs->execute([$idEspecieAlojUnidad]);
@@ -61,9 +221,10 @@ class TrazabilidadModel {
         $stmtBase = $this->db->prepare("
             SELECT eu.IdEspecieAlojUnidad, eu.IdUnidadAlojamiento, eu.NombreEspecieAloj, eu.DetalleEspecieAloj,
                    eu.PesoSujetoKg, eu.FechaNacimientoSujeto, eu.SexoSujeto, eu.idcepaA_sujeto, eu.CategoriaRazaSujeto, eu.idsubespA_sujeto,
+                   COALESCE(eu.con_cirugia, 0) AS con_cirugia,
                    c0.CepaNombreA AS CepaNombreSujeto,
                    sp0.SubEspeNombreA AS SubespecieNombreSujeto,
-                   a.IdAlojamiento AS IdAlojamientoTramoActual, a.historia, a.TipoAnimal, a.IdInstitucion,
+                   a.IdAlojamiento AS IdAlojamientoTramoActual, a.historia, a.TipoAnimal, a.idprotA, a.IdInstitucion,
                    esp.EspeNombreA AS NombreEspecie,
                    inst.NombreInst AS NombreInstitucion
             FROM especie_alojamiento_unidad eu
@@ -86,13 +247,16 @@ class TrazabilidadModel {
         $idUnidadAloj = (int)$base['IdUnidadAlojamiento'];
         $idEspA = (int)($base['TipoAnimal'] ?? 0);
 
-        $stmtCat = $this->db->prepare("SELECT * FROM categoriadatosunidadalojamiento WHERE IdEspA = ? ORDER BY IdDatosUnidadAloj ASC");
-        $stmtCat->execute([$idEspA]);
-        $categorias = $stmtCat->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $idProtFicha = isset($base['idprotA']) && $base['idprotA'] !== null && $base['idprotA'] !== ''
+            ? (int)$base['idprotA'] : null;
+        $categoriasDatos = $this->listCategoriasTrazPorContexto($idEspA, $idProtFicha, self::TRAZ_ALCANCE_DATOS);
+        $categoriasInicio = $this->listCategoriasTrazPorContexto($idEspA, $idProtFicha, self::TRAZ_ALCANCE_INICIO);
+        $valoresInicio = $this->fetchValoresInicioForUnidad((int)$base['IdEspecieAlojUnidad']);
 
         $stmtTr = $this->db->prepare("
             SELECT eu.IdEspecieAlojUnidad,
                    eu.PesoSujetoKg, eu.FechaNacimientoSujeto, eu.SexoSujeto, eu.idcepaA_sujeto, eu.CategoriaRazaSujeto, eu.idsubespA_sujeto,
+                   COALESCE(eu.con_cirugia, 0) AS con_cirugia,
                    cj.CepaNombreA AS CepaNombreSujeto,
                    spj.SubEspeNombreA AS SubespecieNombreSujeto,
                    a.IdAlojamiento, a.fechavisado, a.hastafecha, a.observaciones AS aloj_obs,
@@ -148,6 +312,7 @@ class TrazabilidadModel {
                 'idsubespA_sujeto' => $row['idsubespA_sujeto'],
                 'SubespecieNombreSujeto' => $row['SubespecieNombreSujeto'],
                 'CepaNombreSujeto' => $row['CepaNombreSujeto'],
+                'con_cirugia' => (int)$row['con_cirugia'],
                 'observaciones_pivot' => $this->fetchObservacionesPivotForUnidad($idEu),
             ];
         }
@@ -178,6 +343,7 @@ class TrazabilidadModel {
                 'idsubespA_sujeto' => $base['idsubespA_sujeto'],
                 'SubespecieNombreSujeto' => $base['SubespecieNombreSujeto'],
                 'CepaNombreSujeto' => $base['CepaNombreSujeto'],
+                'con_cirugia' => (int)($base['con_cirugia'] ?? 0),
             ],
             'NombreEspecie' => $base['NombreEspecie'],
             'NombreInstitucion' => $base['NombreInstitucion'],
@@ -186,7 +352,10 @@ class TrazabilidadModel {
             'fechaNacimientoSugerida' => $fechaNacSugerida,
             'ultimoTramo' => $ultimo,
             'tramos' => $tramos,
-            'categorias' => $categorias,
+            'categorias' => $categoriasDatos,
+            'categorias_datos' => $categoriasDatos,
+            'categorias_inicio' => $categoriasInicio,
+            'valores_inicio' => $valoresInicio,
         ];
     }
 
@@ -233,6 +402,15 @@ class TrazabilidadModel {
     }
 
     public function getArbolBiologico($idAlojamiento, $idEspecie, $idInstitucion) {
+        $stmtAloj = $this->db->prepare('SELECT TipoAnimal, idprotA FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ? LIMIT 1');
+        $stmtAloj->execute([$idAlojamiento, $idInstitucion]);
+        $alojRow = $stmtAloj->fetch(\PDO::FETCH_ASSOC);
+        if (!$alojRow || (int)($alojRow['TipoAnimal'] ?? 0) !== (int)$idEspecie) {
+            throw new \Exception('Alojamiento no encontrado o la especie no coincide con el tramo.');
+        }
+        $idProtA = isset($alojRow['idprotA']) && $alojRow['idprotA'] !== null && $alojRow['idprotA'] !== ''
+            ? (int)$alojRow['idprotA'] : null;
+
         $stmtCajas = $this->db->prepare("
             SELECT ac.*,
                 uf.Nombre AS nombre_ubicacion_fisica,
@@ -248,11 +426,10 @@ class TrazabilidadModel {
             WHERE ac.IdAlojamiento = ? AND a.IdInstitucion = ?
         ");
         $stmtCajas->execute([$idAlojamiento, $idInstitucion]);
-        $cajas = $stmtCajas->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
+        $cajas = $stmtCajas->fetchAll(\PDO::FETCH_ASSOC) ?: [];
 
-        $stmtCat = $this->db->prepare("SELECT * FROM categoriadatosunidadalojamiento WHERE IdEspA = ?");
-        $stmtCat->execute([$idEspecie]);
-        $categorias = $stmtCat->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
+        $categoriasDatos = $this->listCategoriasTrazPorContexto((int)$idEspecie, $idProtA, self::TRAZ_ALCANCE_DATOS);
+        $categoriasInicio = $this->listCategoriasTrazPorContexto((int)$idEspecie, $idProtA, self::TRAZ_ALCANCE_INICIO);
 
         $stmtTipo = $this->db->prepare("
             SELECT t.NombreTipoAlojamiento, a.CantidadCaja 
@@ -272,14 +449,25 @@ class TrazabilidadModel {
             $caja['unidades'] = $stmtUnidades->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
 
             foreach ($caja['unidades'] as &$unidad) {
-                $unidad['observaciones_pivot'] = $this->fetchObservacionesPivotForUnidad((int)$unidad['IdEspecieAlojUnidad']);
+                $idEu = (int)$unidad['IdEspecieAlojUnidad'];
+                $unidad['observaciones_pivot'] = $this->fetchObservacionesPivotForUnidad($idEu);
+                $unidad['valores_inicio'] = $this->fetchValoresInicioForUnidad($idEu);
             }
         }
-        return ['cajas' => $cajas, 'categorias' => $categorias, 'tipoAlojamiento' => $tipoAlojamiento, 'limiteCajas' => $limiteCajas];
+        return [
+            'cajas' => $cajas,
+            'categorias' => $categoriasDatos,
+            'categorias_datos' => $categoriasDatos,
+            'categorias_inicio' => $categoriasInicio,
+            'tipoAlojamiento' => $tipoAlojamiento,
+            'limiteCajas' => $limiteCajas,
+        ];
     }
 
     public function crearCajaYUnidades($idAlojamiento, $nombreCaja, $cantidadUnidades, $idInstitucion, array $ubicacion = null) {
-        $stmtCheck = $this->db->prepare("SELECT IdAlojamiento, fechavisado, historia FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ?");
+        $stmtCheck = $this->db->prepare(
+            'SELECT IdAlojamiento, fechavisado, historia, idprotA FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ?'
+        );
         $stmtCheck->execute([$idAlojamiento, $idInstitucion]);
         $aloj = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
 
@@ -309,8 +497,11 @@ class TrazabilidadModel {
             $stmtCount = $this->db->prepare("SELECT COUNT(*) FROM alojamiento_caja WHERE IdAlojamiento = ?");
             $stmtCount->execute([$idAlojamiento]);
             $numeroSiguiente = $stmtCount->fetchColumn() + 1;
-            
-            $prefijoCaja = "A" . $numeroSiguiente;
+
+            $idProtA = isset($aloj['idprotA']) && $aloj['idprotA'] !== null && $aloj['idprotA'] !== ''
+                ? (int)$aloj['idprotA'] : null;
+            $letra = $this->letraTipoProtocoloPorIdprot($idProtA, $idInstitucion);
+            $prefijoCaja = $this->construirPrefijoCaja($letra, (int)$numeroSiguiente);
             $nombreFinalCaja = $prefijoCaja . " - " . ($nombreCaja ?: "Sin Etiqueta");
 
             $stmtCaja = $this->db->prepare(
@@ -341,11 +532,45 @@ class TrazabilidadModel {
         } catch (\Exception $e) { $this->db->rollBack(); throw new \Exception("Error BD: " . $e->getMessage()); }
     }
 
-    public function renameSujeto($idUnidad, $nuevoNombre) {
-        $stmt = $this->db->prepare("UPDATE especie_alojamiento_unidad SET NombreEspecieAloj = ? WHERE IdEspecieAlojUnidad = ?");
-        $res = $stmt->execute([$nuevoNombre, $idUnidad]);
+    /**
+     * Solo cambia la etiqueta final; el prefijo "{caja} - S{n} -" no es modificable.
+     *
+     * @param string $nombreOEtiqueta etiqueta libre, o nombre completo (compatibilidad con clientes antiguos)
+     */
+    public function renameSujeto(int $idUnidad, int $idInstitucion, string $nombreOEtiqueta): bool {
+        $stmt = $this->db->prepare(
+            'SELECT eu.NombreEspecieAloj FROM especie_alojamiento_unidad eu
+             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE eu.IdEspecieAlojUnidad = ? AND a.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$idUnidad, $idInstitucion]);
+        $actual = $stmt->fetchColumn();
+        if ($actual === false) {
+            throw new \Exception('Sujeto no encontrado o sin permiso.');
+        }
+        $parsed = $this->parseNombreSujetoTrazas((string)$actual);
+        if ($parsed === null) {
+            throw new \Exception('El nombre del sujeto no tiene el formato de trazabilidad esperado.');
+        }
+        $prefijoFijo = $parsed['prefijo_fijo'];
+        $t = trim($nombreOEtiqueta);
+        if ($t === (string)$actual) {
+            $etiqueta = $parsed['etiqueta'];
+        } elseif (strpos($t, $prefijoFijo) === 0) {
+            $etiqueta = trim(substr($t, strlen($prefijoFijo)));
+            if ($etiqueta === '') {
+                $etiqueta = 'Sujeto';
+            }
+        } else {
+            $etiqueta = $t !== '' ? $t : 'Sujeto';
+        }
+        $nuevo = $prefijoFijo . $etiqueta;
+        $stmtUp = $this->db->prepare('UPDATE especie_alojamiento_unidad SET NombreEspecieAloj = ? WHERE IdEspecieAlojUnidad = ?');
+        $res = $stmtUp->execute([$nuevo, $idUnidad]);
         Auditoria::log($this->db, 'UPDATE', 'especie_alojamiento_unidad', "Renombró sujeto ID: $idUnidad");
-        return $res;
+        return (bool)$res;
     }
 
     /**
@@ -354,7 +579,8 @@ class TrazabilidadModel {
      */
     public function updateSujetoFichaBio(int $idEspecieAlojUnidad, int $idInstitucion, array $payload): bool {
         $stmtCtx = $this->db->prepare("
-            SELECT a.TipoAnimal, a.IdInstitucion, eu.PesoSujetoKg, eu.FechaNacimientoSujeto, eu.SexoSujeto, eu.idcepaA_sujeto, eu.idsubespA_sujeto
+            SELECT a.TipoAnimal, a.IdInstitucion, eu.PesoSujetoKg, eu.FechaNacimientoSujeto, eu.SexoSujeto, eu.idcepaA_sujeto, eu.idsubespA_sujeto,
+                   COALESCE(eu.con_cirugia, 0) AS con_cirugia
             FROM especie_alojamiento_unidad eu
             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
@@ -427,21 +653,72 @@ class TrazabilidadModel {
             }
         }
 
+        $conCir = (int)($cur['con_cirugia'] ?? 0);
+        if (array_key_exists('con_cirugia', $payload)) {
+            $raw = $payload['con_cirugia'];
+            $conCir = ($raw === true || $raw === 1 || $raw === '1' || $raw === 'on' || $raw === 'yes') ? 1 : 0;
+        }
+
         $sql = "UPDATE especie_alojamiento_unidad eu
                 INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
                 INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
-                SET eu.PesoSujetoKg = ?, eu.FechaNacimientoSujeto = ?, eu.SexoSujeto = ?, eu.idcepaA_sujeto = ?, eu.idsubespA_sujeto = ?
+                SET eu.PesoSujetoKg = ?, eu.FechaNacimientoSujeto = ?, eu.SexoSujeto = ?, eu.idcepaA_sujeto = ?, eu.idsubespA_sujeto = ?, eu.con_cirugia = ?
                 WHERE eu.IdEspecieAlojUnidad = ? AND a.IdInstitucion = ?";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$peso, $fechaNac, $sexo, $idCepa, $idSub, $idEspecieAlojUnidad, $idInstitucion]);
+        $stmt->execute([$peso, $fechaNac, $sexo, $idCepa, $idSub, $conCir, $idEspecieAlojUnidad, $idInstitucion]);
         Auditoria::log($this->db, 'UPDATE', 'especie_alojamiento_unidad', "Ficha bio sujeto IdEspecieAlojUnidad: $idEspecieAlojUnidad");
         return true;
     }
 
-    public function renameCaja($id, $nombre) {
-        $res = $this->db->prepare("UPDATE alojamiento_caja SET NombreCaja = ? WHERE IdCajaAlojamiento = ?")->execute([$nombre, $id]);
+    /** Alterna con_cirugia (0/1) para el sujeto en el tramo actual. */
+    public function toggleConCirugia(int $idEspecieAlojUnidad, int $idInstitucion): int {
+        $stmt = $this->db->prepare(
+            'SELECT COALESCE(eu.con_cirugia, 0) FROM especie_alojamiento_unidad eu
+             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE eu.IdEspecieAlojUnidad = ? AND a.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$idEspecieAlojUnidad, $idInstitucion]);
+        $cur = $stmt->fetchColumn();
+        if ($cur === false) {
+            throw new \Exception('Sujeto no encontrado o sin permiso.');
+        }
+        $next = ((int)$cur) ? 0 : 1;
+        $sql = 'UPDATE especie_alojamiento_unidad eu
+                INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+                INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+                SET eu.con_cirugia = ?
+                WHERE eu.IdEspecieAlojUnidad = ? AND a.IdInstitucion = ?';
+        $this->db->prepare($sql)->execute([$next, $idEspecieAlojUnidad, $idInstitucion]);
+        Auditoria::log($this->db, 'UPDATE', 'especie_alojamiento_unidad', "Toggle cirugía IdEspecieAlojUnidad: $idEspecieAlojUnidad -> $next");
+        return $next;
+    }
+
+    /**
+     * Solo cambia la etiqueta tras " - "; el prefijo de caja no es modificable.
+     *
+     * @param string $nombreOEtiqueta etiqueta libre o nombre completo (compatibilidad)
+     */
+    public function renameCaja(int $id, int $idInstitucion, string $nombreOEtiqueta): bool {
+        $stmt = $this->db->prepare(
+            'SELECT ac.NombreCaja FROM alojamiento_caja ac
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE ac.IdCajaAlojamiento = ? AND a.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$id, $idInstitucion]);
+        $actual = $stmt->fetchColumn();
+        if ($actual === false) {
+            throw new \Exception('La caja no existe o no pertenece a su institución.');
+        }
+        $actualStr = (string)$actual;
+        $prefijo = $this->prefijoCajaDesdeNombreCompleto($actualStr);
+        $etiqueta = $this->normalizarEtiquetaCajaRecibida($nombreOEtiqueta, $prefijo, $actualStr);
+        $nuevo = $prefijo . ' - ' . $etiqueta;
+        $res = $this->db->prepare('UPDATE alojamiento_caja SET NombreCaja = ? WHERE IdCajaAlojamiento = ?')->execute([$nuevo, $id]);
         Auditoria::log($this->db, 'UPDATE', 'alojamiento_caja', "Renombró caja ID: $id");
-        return $res;
+        return (bool)$res;
     }
 
     /**
@@ -508,40 +785,166 @@ class TrazabilidadModel {
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
 
-    public function insertarObservaciones($idUnidad, $fechaObs, $valores, $idInstitucion) {
-        $this->db->beginTransaction();
-        try {
-            $stmtMax = $this->db->query("SELECT MAX(id_fila_obs) FROM observacion_alojamiento_unidad");
-            $newFilaId = (int)$stmtMax->fetchColumn() + 1;
-
-            foreach ($valores as $item) {
-                $idCat = $item['IdDatosUnidadAloj'];
-                $valorRaw = $item['valor'];
-
-                $stmt = $this->db->prepare("SELECT TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj = ?");
-                $stmt->execute([$idCat]);
-                $tipo = $stmt->fetchColumn();
-
-                $columna = 'DatoObsText';
-                if ($tipo == 'int') $columna = 'DatoObsInt';
-                if ($tipo == 'date') $columna = 'DatoObsFecha';
-                if ($tipo == 'var') $columna = 'DatoObsVar';
-
-                $sql = "INSERT INTO observacion_alojamiento_unidad (fechaObs, IdEspecieAlojUnidad, IdDatosUnidadAloj, {$columna}, id_fila_obs) 
-                        VALUES (?, ?, ?, ?, ?)";
-                $this->db->prepare($sql)->execute([$fechaObs, $idUnidad, $idCat, $valorRaw, $newFilaId]);
-            }
-            
-            Auditoria::log($this->db, 'INSERT', 'observacion_alojamiento_unidad', "Cargó métricas al sujeto ID: $idUnidad");
-            $this->db->commit();
+    private function valorObservacionClinicaVacio($raw): bool {
+        if ($raw === null) {
             return true;
-        } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
+        }
+        if (is_string($raw)) {
+            return trim($raw) === '';
+        }
+
+        return false;
     }
 
-    public function addSujeto($idCaja, $idAlojamiento, $nombreSujetoInput) {
-        $stmtHist = $this->db->prepare("SELECT historia FROM alojamiento WHERE IdAlojamiento = ?");
-        $stmtHist->execute([$idAlojamiento]);
+    private function columnaValorObservacionPorTipo(?string $tipo): string {
+        $t = strtolower(trim((string)$tipo));
+        if ($t === 'int') {
+            return 'DatoObsInt';
+        }
+        if ($t === 'date') {
+            return 'DatoObsFecha';
+        }
+        if ($t === 'varchar' || $t === 'var') {
+            return 'DatoObsVar';
+        }
+
+        return 'DatoObsText';
+    }
+
+    public function insertarObservaciones($idUnidad, $fechaObs, $valores, $idInstitucion) {
+        $ctx = $this->getUnidadTrazContext((int)$idUnidad, $idInstitucion);
+        if (!$ctx) {
+            throw new \Exception('Sujeto no encontrado o sin permiso.');
+        }
+        $idEsp = (int)$ctx['idEspA'];
+        $idProt = isset($ctx['idprotA']) && $ctx['idprotA'] !== null && $ctx['idprotA'] !== ''
+            ? (int)$ctx['idprotA'] : null;
+        $permitidas = $this->listCategoriasTrazPorContexto($idEsp, $idProt, self::TRAZ_ALCANCE_DATOS);
+        $permitidasIds = [];
+        foreach ($permitidas as $c) {
+            $permitidasIds[(int)$c['IdDatosUnidadAloj']] = true;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $stmtMax = $this->db->query('SELECT MAX(id_fila_obs) FROM observacion_alojamiento_unidad');
+            $newFilaId = (int)$stmtMax->fetchColumn() + 1;
+
+            $insertados = 0;
+            foreach ($valores as $item) {
+                $idCat = (int)($item['IdDatosUnidadAloj'] ?? 0);
+                if ($idCat <= 0) {
+                    continue;
+                }
+                if (empty($permitidasIds[$idCat])) {
+                    throw new \Exception('Variable clínica no permitida para este protocolo y especie.');
+                }
+                $valorRaw = $item['valor'] ?? null;
+                if ($this->valorObservacionClinicaVacio($valorRaw)) {
+                    continue;
+                }
+
+                $stmt = $this->db->prepare('SELECT TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj = ?');
+                $stmt->execute([$idCat]);
+                $tipo = $stmt->fetchColumn();
+                $columna = $this->columnaValorObservacionPorTipo($tipo ? (string)$tipo : null);
+
+                $sql = "INSERT INTO observacion_alojamiento_unidad (fechaObs, IdEspecieAlojUnidad, IdDatosUnidadAloj, {$columna}, id_fila_obs, es_inicio_traz)
+                        VALUES (?, ?, ?, ?, ?, 0)";
+                $this->db->prepare($sql)->execute([$fechaObs, $idUnidad, $idCat, $valorRaw, $newFilaId]);
+                ++$insertados;
+            }
+
+            if ($insertados === 0) {
+                throw new \Exception('Indique al menos un dato clínico para guardar (el resto puede quedar vacío).');
+            }
+
+            Auditoria::log($this->db, 'INSERT', 'observacion_alojamiento_unidad', "Cargó métricas al sujeto ID: $idUnidad");
+            $this->db->commit();
+
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Guarda o actualiza valores de variables de inicio (una fila por categoría y sujeto).
+     *
+     * @param array<int, array{IdDatosUnidadAloj:int|string, valor:mixed}> $valores
+     */
+    public function upsertObservacionesInicio(int $idUnidad, array $valores, int $idInstitucion): bool {
+        $ctx = $this->getUnidadTrazContext($idUnidad, $idInstitucion);
+        if (!$ctx) {
+            throw new \Exception('Sujeto no encontrado o sin permiso.');
+        }
+        $idEsp = (int)$ctx['idEspA'];
+        $idProt = isset($ctx['idprotA']) && $ctx['idprotA'] !== null && $ctx['idprotA'] !== ''
+            ? (int)$ctx['idprotA'] : null;
+        $permitidas = $this->listCategoriasTrazPorContexto($idEsp, $idProt, self::TRAZ_ALCANCE_INICIO);
+        $permitidasIds = [];
+        foreach ($permitidas as $c) {
+            $permitidasIds[(int)$c['IdDatosUnidadAloj']] = true;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $del = $this->db->prepare(
+                'DELETE FROM observacion_alojamiento_unidad WHERE IdEspecieAlojUnidad = ? AND IdDatosUnidadAloj = ? AND COALESCE(es_inicio_traz, 0) = 1'
+            );
+            $stmtTipo = $this->db->prepare('SELECT TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj = ?');
+
+            foreach ($valores as $item) {
+                $idCat = (int)($item['IdDatosUnidadAloj'] ?? 0);
+                if ($idCat <= 0 || empty($permitidasIds[$idCat])) {
+                    continue;
+                }
+                $valorRaw = $item['valor'] ?? null;
+                if ($valorRaw === null || $valorRaw === '') {
+                    continue;
+                }
+
+                $stmtTipo->execute([$idCat]);
+                $tipo = $stmtTipo->fetchColumn();
+                $columna = $this->columnaValorObservacionPorTipo($tipo ? (string)$tipo : null);
+
+                $del->execute([$idUnidad, $idCat]);
+                $fechaIni = date('Y-m-d');
+                $sql = "INSERT INTO observacion_alojamiento_unidad (fechaObs, IdEspecieAlojUnidad, IdDatosUnidadAloj, {$columna}, id_fila_obs, es_inicio_traz)
+                        VALUES (?, ?, ?, ?, NULL, 1)";
+                $this->db->prepare($sql)->execute([$fechaIni, $idUnidad, $idCat, $valorRaw]);
+            }
+
+            Auditoria::log($this->db, 'INSERT', 'observacion_alojamiento_unidad', "Actualizó variables de inicio trazabilidad sujeto ID: $idUnidad");
+            $this->db->commit();
+
+            return true;
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    public function addSujeto(int $idCaja, int $idAlojamiento, string $nombreSujetoInput, int $idInstitucion) {
+        $stmtOk = $this->db->prepare(
+            'SELECT ac.NombreCaja FROM alojamiento_caja ac
+             INNER JOIN alojamiento a ON ac.IdAlojamiento = a.IdAlojamiento
+             WHERE ac.IdCajaAlojamiento = ? AND ac.IdAlojamiento = ? AND a.IdInstitucion = ?
+             LIMIT 1'
+        );
+        $stmtOk->execute([$idCaja, $idAlojamiento, $idInstitucion]);
+        $nombreCajaRow = $stmtOk->fetchColumn();
+        if ($nombreCajaRow === false) {
+            throw new \Exception('La caja no corresponde al alojamiento o no tiene permiso.');
+        }
+
+        $stmtHist = $this->db->prepare('SELECT historia FROM alojamiento WHERE IdAlojamiento = ? AND IdInstitucion = ?');
+        $stmtHist->execute([$idAlojamiento, $idInstitucion]);
         $historia = $stmtHist->fetchColumn();
+        if ($historia === false) {
+            throw new \Exception('Alojamiento no encontrado o sin permiso.');
+        }
 
         $stmtMaxAnimal = $this->db->prepare("
             SELECT MAX(eu.IdUnidadAlojamiento) FROM especie_alojamiento_unidad eu
@@ -551,9 +954,7 @@ class TrazabilidadModel {
         $stmtMaxAnimal->execute([$historia]);
         $ultimoIdAnimal = (int)$stmtMaxAnimal->fetchColumn() + 1;
 
-        $stmtCaja = $this->db->prepare("SELECT NombreCaja FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
-        $stmtCaja->execute([$idCaja]);
-        $prefijoCaja = explode(' - ', $stmtCaja->fetchColumn())[0] ?? 'A0'; 
+        $prefijoCaja = $this->prefijoCajaDesdeNombreCompleto((string)$nombreCajaRow);
 
         $nombreFinal = "{$prefijoCaja} - S{$ultimoIdAnimal} - {$nombreSujetoInput}";
 
@@ -651,8 +1052,8 @@ class TrazabilidadModel {
                             $this->db->prepare(
                                 "INSERT INTO especie_alojamiento_unidad (
                                     IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento,
-                                    PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                                    PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto, con_cirugia
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                             )->execute([
                                 $u['IdUnidadAlojamiento'],
                                 $u['NombreEspecieAloj'],
@@ -664,6 +1065,7 @@ class TrazabilidadModel {
                                 $u['idcepaA_sujeto'] ?? null,
                                 $u['CategoriaRazaSujeto'] ?? null,
                                 $u['idsubespA_sujeto'] ?? null,
+                                isset($u['con_cirugia']) ? (int)$u['con_cirugia'] : 0,
                             ]);
                         }
                     }

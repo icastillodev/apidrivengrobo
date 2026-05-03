@@ -60,6 +60,7 @@ class AlojamientoExportModel {
                 LEFT JOIN aloj_rack r ON ac.IdRack = r.IdRack
                 LEFT JOIN aloj_lugar_rack lr ON ac.IdLugarRack = lr.IdLugarRack
                 WHERE a.IdInstitucion = ? $whereHistoria
+                  AND COALESCE(o.es_inicio_traz, 0) = 0
                 ORDER BY a.historia DESC, ac.NombreCaja ASC, o.fechaObs DESC
             ";
             $stmtTraz = $this->db->prepare($sqlTraz);

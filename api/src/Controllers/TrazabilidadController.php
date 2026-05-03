@@ -115,17 +115,47 @@ class TrazabilidadController {
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
 
-        if (empty($data['IdEspecieAlojUnidad']) || empty($data['valores'])) {
+        if (empty($data['IdEspecieAlojUnidad']) || !isset($data['valores']) || !is_array($data['valores'])) {
             http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => 'Faltan datos de la observación']);
             exit;
         }
 
+        $fechaObs = trim((string)($data['fechaObs'] ?? ''));
+        if ($fechaObs === '') {
+            $fechaObs = date('Y-m-d');
+        }
+
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
-            $this->model->insertarObservaciones($data['IdEspecieAlojUnidad'], $data['fechaObs'], $data['valores'], $sesion['instId']);
+            $this->model->insertarObservaciones($data['IdEspecieAlojUnidad'], $fechaObs, $data['valores'], $sesion['instId']);
             echo json_encode(['status' => 'success', 'message' => 'Observaciones registradas']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function saveInicioTraz() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $idU = (int)($data['IdEspecieAlojUnidad'] ?? 0);
+        $valores = $data['valores'] ?? [];
+        if ($idU <= 0 || !is_array($valores)) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Faltan datos de la ficha de inicio']);
+            exit;
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
+            $this->model->upsertObservacionesInicio($idU, $valores, (int)$sesion['instId']);
+            echo json_encode(['status' => 'success', 'message' => 'Variables de inicio guardadas']);
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -164,7 +194,7 @@ class TrazabilidadController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
-            $this->model->renameSujeto($data['idUnidad'], $data['nombre']);
+            $this->model->renameSujeto((int)$data['idUnidad'], (int)$sesion['instId'], (string)($data['nombre'] ?? ''));
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -199,6 +229,32 @@ class TrazabilidadController {
         exit;
     }
 
+    /** Alterna el marcador con_cirugia del sujeto (trazabilidad). */
+    public function toggleConCirugia() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->tryGuardTrazabilidad($sesion);
+            $id = (int)($data['idEspecieAlojUnidad'] ?? 0);
+            if ($id <= 0) {
+                throw new \InvalidArgumentException('Falta idEspecieAlojUnidad.');
+            }
+            $val = $this->model->toggleConCirugia($id, (int)$sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => ['con_cirugia' => $val]]);
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function renameBox() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -206,7 +262,7 @@ class TrazabilidadController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
-            $this->model->renameCaja($data['idCaja'], $data['nombre']);
+            $this->model->renameCaja((int)$data['idCaja'], (int)$sesion['instId'], (string)($data['nombre'] ?? ''));
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
         exit;
@@ -264,7 +320,7 @@ class TrazabilidadController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
-            $this->model->addSujeto($data['idCaja'], $data['idAlojamiento'], $data['nombreSujeto']);
+            $this->model->addSujeto((int)$data['idCaja'], (int)$data['idAlojamiento'], (string)($data['nombreSujeto'] ?? ''), (int)$sesion['instId']);
             echo json_encode(['status' => 'success']);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
         exit;

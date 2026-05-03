@@ -16,6 +16,27 @@ function __ubEsc(s) {
         .replace(/"/g, '&quot;');
 }
 
+/** Escapa un string para usarlo dentro de comillas simples en atributo onclick. */
+function __ubJsStr(s) {
+    return String(s ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r?\n/g, '\\n');
+}
+
+function __ubParseNombreCaja(full) {
+    const s = String(full ?? '');
+    const idx = s.indexOf(' - ');
+    if (idx === -1) return { prefijo: s, etiqueta: '' };
+    return { prefijo: s.slice(0, idx), etiqueta: s.slice(idx + 3) };
+}
+
+function __ubParseNombreSujeto(full) {
+    const m = String(full ?? '').match(/^(.*) - (S\d+) - (.*)$/s);
+    if (!m) return { prefijoFijo: '', etiqueta: String(full ?? '') };
+    return { prefijoFijo: `${m[1]} - ${m[2]} - `, etiqueta: m[3] };
+}
+
 async function __ubFetchBundle() {
     if (window.__alojUbicBundle) return window.__alojUbicBundle;
     const res = await API.request('/admin/config/alojamiento/ubicacion/bundle');
@@ -336,6 +357,8 @@ async toggleRow(idAlojamiento, idEspecie) {
         const limite = data.limiteCajas || 1;
         const cajasActuales = data.cajas ? data.cajas.length : 0;
         const canAddBox = cajasActuales < limite;
+        const catsDatos = data.categorias_datos || data.categorias || [];
+        const catsInicio = data.categorias_inicio || [];
         
         // MAGIA DE PERMISOS: Verificamos si estamos en modo lectura
         const isReadOnly = this.isReadOnly || false;
@@ -404,7 +427,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
                                 <div class="d-flex align-items-center flex-wrap gap-1">
                                     <span class="fw-bold"><i class="bi bi-box-seam me-1"></i>${caja.NombreCaja}</span>
-                                    ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-link text-white p-0 ms-1" title="${__ubEsc(txt.trace_renombrar || 'Renombrar')}" onclick="window.TrazabilidadUI.renameBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil"></i></button>` : ''}
+                                    ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-link text-white p-0 ms-1" title="${__ubEsc(txt.trace_renombrar || 'Renombrar')}" onclick="window.TrazabilidadUI.renameBox(${caja.IdCajaAlojamiento}, '${__ubJsStr(caja.NombreCaja)}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil"></i></button>` : ''}
                                     <div class="dropdown d-inline-block ms-1">
                                         <button type="button" class="btn btn-sm btn-outline-light py-0 dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="${__ubEsc(txt.animal_ficha_dropdown_caja_title || '')}">
                                             <i class="bi bi-card-heading"></i> ${__ubEsc(txt.animal_ficha_dropdown_caja_toggle || '')}
@@ -423,7 +446,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                                         </ul>
                                     </div>
                                 </div>
-                                ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-danger" onclick="window.TrazabilidadUI.deleteBox(${caja.IdCajaAlojamiento}, '${caja.NombreCaja}', ${caja.unidades ? caja.unidades.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-trash"></i></button>` : ''}
+                                ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-danger" onclick="window.TrazabilidadUI.deleteBox(${caja.IdCajaAlojamiento}, '${__ubJsStr(caja.NombreCaja)}', ${caja.unidades ? caja.unidades.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-trash"></i></button>` : ''}
                             </div>
                             ${headerUbicacion}
                             ${filaUbicacionEditable}
@@ -432,10 +455,11 @@ async toggleRow(idAlojamiento, idEspecie) {
                 
                 if (caja.unidades && caja.unidades.length > 0) {
                     caja.unidades.forEach(unidad => {
+                        const cxOn = Number(unidad.con_cirugia) === 1;
                         html += `
                         <div class="border rounded p-3 mb-2 bg-white shadow-sm">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">
-                                <span class="fw-bold small text-dark"><i class="bi bi-bug-fill text-success"></i> ${unidad.NombreEspecieAloj}</span>
+                                <span class="fw-bold small text-dark"><i class="bi bi-bug-fill text-success"></i> ${unidad.NombreEspecieAloj}${cxOn ? ` <span class="badge bg-warning text-dark ms-1">${__ubEsc(txt.trace_surgery_badge || 'Cirugía')}</span>` : ''}</span>
                                 <div class="d-flex align-items-center flex-wrap gap-1">
                                     <div class="dropdown">
                                         <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="${__ubEsc(txt.animal_ficha_dropdown_toggle_title || txt.animal_ficha_title || '')}">
@@ -455,12 +479,31 @@ async toggleRow(idAlojamiento, idEspecie) {
                                         </ul>
                                     </div>
                                     ${!isReadOnly ? `
+                                    <button type="button" class="btn btn-xs border ${cxOn ? 'btn-warning text-dark' : 'btn-outline-secondary'}" title="${__ubEsc(txt.trace_surgery_btn_title || '')}" onclick="window.TrazabilidadUI.toggleCirugia(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-heart-pulse"></i></button>
                                     <button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_ficha_btn_title || '')}" onclick="window.TrazabilidadUI.editSubjectFicha(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>
-                                    <button class="btn btn-xs btn-light border text-primary" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
-                                    <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${unidad.NombreEspecieAloj}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>` : ''}
+                                    <button class="btn btn-xs btn-light border text-primary" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
+                                    <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>` : ''}
                                 </div>
                             </div>`;
                         
+                        const vin = unidad.valores_inicio || {};
+                        const valIni = (idCat) => {
+                            const o = vin[idCat] || vin[String(idCat)];
+                            return o && o.Valor != null && o.Valor !== '' ? String(o.Valor) : '';
+                        };
+                        if (!isReadOnly && catsInicio.length > 0) {
+                            html += `
+                            <form class="mb-3 pb-2 border-bottom border-secondary border-opacity-25" onsubmit="event.preventDefault(); window.guardarInicioTraz(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie}, this)">
+                                <div class="small fw-bold text-secondary mb-2 text-uppercase" style="font-size:10px">${__ubEsc(txt.trace_inicio_title || '')}</div>
+                                <p class="small text-muted mb-2" style="font-size:10px">${__ubEsc(txt.trace_inicio_hint || '')}</p>
+                                <div class="row g-2 align-items-end">`;
+                            catsInicio.forEach((cat) => {
+                                const inputType = this.mapInputType(cat.TipoDeDato);
+                                const iv = __ubEsc(valIni(cat.IdDatosUnidadAloj));
+                                html += `<div class="col-auto"><label style="font-size: 9px;" class="text-uppercase text-secondary fw-bold">${__ubEsc(cat.NombreCatAlojUnidad)}</label><input type="${inputType}" name="inicio_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" value="${iv}"></div>`;
+                            });
+                            html += `<div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-primary fw-bold shadow-sm">${__ubEsc(txt.trace_inicio_guardar || 'Guardar')}</button></div></div></form>`;
+                        }
                         // Ocultamos el formulario EAV si es solo lectura
                         if (!isReadOnly) {
                             html += `
@@ -468,13 +511,13 @@ async toggleRow(idAlojamiento, idEspecie) {
                                     <div class="row g-2 align-items-end">
                                     <div class="col-auto">
                                         <label style="font-size: 9px;" class="text-uppercase text-primary fw-bold">${txt.trace_fecha || 'Fecha'}</label>
-                                        <input type="date" name="fechaObs" class="form-control form-control-sm border-primary" value="${hoy}" required>
+                                        <input type="date" name="fechaObs" class="form-control form-control-sm border-primary" value="${hoy}" title="${__ubEsc(txt.trace_fecha_hoy_hint || '')}">
                                     </div>`;
                             
-                            if (data.categorias && data.categorias.length > 0) {
-                                data.categorias.forEach(cat => {
+                            if (catsDatos.length > 0) {
+                                catsDatos.forEach(cat => {
                                     const inputType = this.mapInputType(cat.TipoDeDato);
-                                    html += `<div class="col-auto"><label style="font-size: 9px;" class="text-uppercase text-muted fw-bold">${cat.NombreCatAlojUnidad}</label><input type="${inputType}" name="cat_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" required></div>`;
+                                    html += `<div class="col-auto"><label style="font-size: 9px;" class="text-uppercase text-muted fw-bold">${cat.NombreCatAlojUnidad}</label><input type="${inputType}" name="cat_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" placeholder="—"></div>`;
                                 });
                                 html += `<div class="col-auto"><button type="submit" class="btn btn-sm btn-success fw-bold shadow-sm"><i class="bi bi-save"></i></button></div>`;
                             }
@@ -487,10 +530,10 @@ async toggleRow(idAlojamiento, idEspecie) {
                                     <thead class="bg-light text-muted">
                                         <tr>
                                             <th>Fecha</th>
-                                            ${data.categorias ? data.categorias.map(c => `<th>${c.NombreCatAlojUnidad}</th>`).join('') : ''}
+                                            ${catsDatos.length ? catsDatos.map(c => `<th>${c.NombreCatAlojUnidad}</th>`).join('') : ''}
                                         </tr>
                                     </thead>
-                                    <tbody>${this.renderPivotTable(unidad.observaciones_pivot, data.categorias)}</tbody>
+                                    <tbody>${this.renderPivotTable(unidad.observaciones_pivot, catsDatos)}</tbody>
                                 </table>
                             </div>
                         </div>`;
@@ -516,7 +559,11 @@ async toggleRow(idAlojamiento, idEspecie) {
             });
         }
     },
-    mapInputType(t) { const d = {'int':'number','text':'text','date':'date','var':'text'}; return d[t]||'text'; },
+    mapInputType(t) {
+        const u = String(t || '').toLowerCase();
+        const d = { int: 'number', text: 'text', date: 'date', varchar: 'text', var: 'text', decimal: 'text', bool: 'text' };
+        return d[u] || 'text';
+    },
 
     renderPivotTable(obsPivot, categorias) {
         const txt = window.txt?.alojamientos || {};
@@ -583,12 +630,33 @@ async toggleRow(idAlojamiento, idEspecie) {
         }
     },
 
+async toggleCirugia(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
+        const txt = window.txt?.alojamientos || {};
+        const target = document.getElementById('modal-historial') || 'body';
+        showLoader();
+        try {
+            const res = await API.request('/trazabilidad/toggle-con-cirugia', 'POST', { idEspecieAlojUnidad });
+            if (res.status !== 'success') {
+                throw new Error(res.message || txt.trace_error || 'Error');
+            }
+            await this.refreshArbol(idAlojamiento, idEspecie);
+        } catch (e) {
+            console.error(e);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', title: txt.trace_error || 'Error', text: String(e.message || e), target });
+            }
+        } finally {
+            hideLoader();
+        }
+    },
+
 async addSubject(idCaja, idAlojamiento, idEspecie) {
-        const { value: nombre } = await Swal.fire({ 
-            title: 'Nombre del Sujeto', 
-            input: 'text', 
-            target: document.getElementById('modal-historial') || 'body', // <-- ESTO EVITA QUE QUEDE INVISIBLE
-            showCancelButton: true 
+        const txt = window.txt?.alojamientos || {};
+        const { value: nombre } = await Swal.fire({
+            title: txt.trace_nombre_sujeto || 'Nombre del Sujeto',
+            input: 'text',
+            target: document.getElementById('modal-historial') || 'body',
+            showCancelButton: true,
         });
         if (nombre) {
             try {
@@ -599,16 +667,29 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
     },
 
     async renameSubject(idUnidad, nombreActual, idAlojamiento, idEspecie) {
-        // Separar el prefijo "A1 - S1 -" del nombre editable
-        let parts = nombreActual.split(' - ');
-        let prefijo = parts.length >= 3 ? parts.slice(0, 2).join(' - ') + ' - ' : '';
-        let nombreEditable = parts.length >= 3 ? parts.slice(2).join(' - ') : nombreActual;
-
-        const { value: newName } = await Swal.fire({ title: 'Editar Nombre', input: 'text', inputValue: nombreEditable, target: document.getElementById('modal-historial') || 'body', showCancelButton: true });
-        if (newName && newName.trim() !== nombreEditable) {
-            await API.request('/trazabilidad/rename-subject', 'POST', { idUnidad, nombre: prefijo + newName.trim() });
-            await this.refreshArbol(idAlojamiento, idEspecie);
-        }
+        const txt = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        const target = document.getElementById('modal-historial') || 'body';
+        const { prefijoFijo, etiqueta } = __ubParseNombreSujeto(nombreActual);
+        const html = `
+            <p class="small text-muted mb-1 text-start">${__ubEsc(txt.trace_id_fijo_readonly || '')}</p>
+            <div class="form-control form-control-sm mb-2 text-start font-monospace text-break bg-light" style="white-space:pre-wrap">${__ubEsc(prefijoFijo || '—')}</div>
+            <label class="form-label small mb-0 text-start d-block">${__ubEsc(txt.trace_etiqueta || '')}</label>
+            <input id="swal-rename-sub-etq" class="form-control" value="${__ubEsc(etiqueta)}">`;
+        const rSub = await Swal.fire({
+            title: txt.trace_editar_nombre || 'Editar nombre',
+            html,
+            target,
+            showCancelButton: true,
+            confirmButtonText: txt.trace_guardar || 'Guardar',
+            focusConfirm: false,
+            preConfirm: () => document.getElementById('swal-rename-sub-etq')?.value ?? '',
+        });
+        if (!rSub.isConfirmed) return;
+        const newEtq = String(rSub.value ?? '').trim();
+        if (newEtq === etiqueta.trim()) return;
+        await API.request('/trazabilidad/rename-subject', 'POST', { idUnidad, nombre: newEtq });
+        await this.refreshArbol(idAlojamiento, idEspecie);
     },
 
     async editSubjectFicha(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
@@ -647,6 +728,7 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
             const subOpts = [`<option value="">${__ubEsc(txt.trace_subject_subespecie_none || '—')}</option>`].concat(
                 subesps.map((x) => `<option value="${x.idsubespA}"${String(x.idsubespA) === selSub ? ' selected' : ''}>${__ubEsc(x.SubEspeNombreA)}</option>`),
             );
+            const cirugiaChecked = Number(s.con_cirugia) === 1 ? ' checked' : '';
             const pesoVal = s.PesoSujetoKg !== null && s.PesoSujetoKg !== undefined && s.PesoSujetoKg !== '' ? String(s.PesoSujetoKg) : '';
             const fn = s.FechaNacimientoSujeto ? String(s.FechaNacimientoSujeto).slice(0, 10) : '';
             const rawSex = String(s.SexoSujeto || '').toUpperCase().trim();
@@ -670,7 +752,11 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
                   <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_cepa_catalogo || '')}</label>
                   <select id="sf-cepa" class="form-select form-select-sm mb-2">${cepaOpts.join('')}</select>
                   <label class="form-label mb-0">${__ubEsc(txt.animal_ficha_subespecie || '')}</label>
-                  <select id="sf-subesp" class="form-select form-select-sm mb-0">${subOpts.join('')}</select>
+                  <select id="sf-subesp" class="form-select form-select-sm mb-2">${subOpts.join('')}</select>
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="sf-cirugia"${cirugiaChecked}>
+                    <label class="form-check-label" for="sf-cirugia">${__ubEsc(txt.trace_subject_ficha_con_cirugia || '')}</label>
+                  </div>
                 </div>`;
 
             const { value: formValues } = await Swal.fire({
@@ -686,6 +772,7 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
                     SexoSujeto: document.getElementById('sf-sexo').value,
                     idcepaA_sujeto: document.getElementById('sf-cepa').value,
                     idsubespA_sujeto: document.getElementById('sf-subesp').value,
+                    con_cirugia: document.getElementById('sf-cirugia')?.checked ? 1 : 0,
                 }),
             });
             if (!formValues) return;
@@ -696,6 +783,7 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
                 SexoSujeto: formValues.SexoSujeto,
                 idcepaA_sujeto: formValues.idcepaA_sujeto,
                 idsubespA_sujeto: formValues.idsubespA_sujeto,
+                con_cirugia: formValues.con_cirugia,
             };
             const saveRes = await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', body);
             if (saveRes.status !== 'success') {
@@ -710,8 +798,31 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
     },
 
     async renameBox(idCaja, nombre, idAloj, idEspecie) {
-        const { value: val } = await Swal.fire({ title: 'Renombrar', input: 'text', inputValue: nombre, target: document.getElementById('modal-historial') || 'body', showCancelButton: true });
-        if (val) { await API.request('/trazabilidad/rename-box', 'POST', { idCaja, nombre: val }); await this.refreshArbol(idAloj, idEspecie); }
+        const txt = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        const target = document.getElementById('modal-historial') || 'body';
+        const { prefijo, etiqueta } = __ubParseNombreCaja(nombre);
+        const html = `
+            <p class="small text-muted mb-1 text-start">${__ubEsc(txt.trace_id_fijo_readonly || '')}</p>
+            <div class="input-group input-group-sm mb-2">
+              <span class="input-group-text font-monospace">${__ubEsc(prefijo || '—')}</span>
+            </div>
+            <label class="form-label small mb-0 text-start d-block">${__ubEsc(txt.trace_etiqueta || '')}</label>
+            <input id="swal-rename-box-etq" class="form-control" value="${__ubEsc(etiqueta)}">`;
+        const rBox = await Swal.fire({
+            title: txt.trace_renombrar_caja || txt.trace_renombrar || 'Renombrar',
+            html,
+            target,
+            showCancelButton: true,
+            confirmButtonText: txt.trace_guardar || 'Guardar',
+            focusConfirm: false,
+            preConfirm: () => document.getElementById('swal-rename-box-etq')?.value ?? '',
+        });
+        if (!rBox.isConfirmed) return;
+        const newEtq = String(rBox.value ?? '').trim();
+        if (newEtq === etiqueta.trim()) return;
+        await API.request('/trazabilidad/rename-box', 'POST', { idCaja, nombre: newEtq });
+        await this.refreshArbol(idAloj, idEspecie);
     },
 
 async deleteBox(idCaja, nombreCaja, numAnimales, idAloj, idEspecie) {
@@ -820,12 +931,54 @@ const { isConfirmed } = await Swal.fire({
     }
 };
 
+function __obsValorTieneContenido(v) {
+    if (v === null || v === undefined) return false;
+    const s = typeof v === 'string' ? v.trim() : String(v).trim();
+    return s !== '';
+}
+
 window.guardarObservacion = async (idUnidad, idAlojamiento, idEspecie, formEl) => {
+    const txt = window.txt?.alojamientos || {};
     const fd = new FormData(formEl);
-    const p = { IdEspecieAlojUnidad: idUnidad, fechaObs: fd.get('fechaObs'), IdInstitucion: localStorage.getItem('instId')||1, valores: [] };
-    fd.forEach((v, k) => { if (k.startsWith('cat_')) p.valores.push({ IdDatosUnidadAloj: k.replace('cat_', ''), valor: v }); });
+    let fechaObs = fd.get('fechaObs');
+    if (!fechaObs || !String(fechaObs).trim()) {
+        fechaObs = new Date().toISOString().split('T')[0];
+    }
+    const p = { IdEspecieAlojUnidad: idUnidad, fechaObs: String(fechaObs).trim(), IdInstitucion: localStorage.getItem('instId') || 1, valores: [] };
+    fd.forEach((v, k) => {
+        if (k.startsWith('cat_') && __obsValorTieneContenido(v)) {
+            p.valores.push({ IdDatosUnidadAloj: k.replace('cat_', ''), valor: v });
+        }
+    });
+    if (p.valores.length === 0) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'info', title: txt.trace_obs_min_one_title || '', text: txt.trace_obs_min_one || '', target: document.getElementById('modal-historial') || 'body' });
+        }
+        return;
+    }
+    try {
+        const res = await API.request('/trazabilidad/save-observation', 'POST', p);
+        if (res.status !== 'success') {
+            throw new Error(res.message || 'Error');
+        }
+        await TrazabilidadUI.refreshArbol(idAlojamiento, idEspecie);
+    } catch (e) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ icon: 'error', title: txt.trace_error || 'Error', text: String(e.message || e), target: document.getElementById('modal-historial') || 'body' });
+        }
+    }
+};
+
+window.guardarInicioTraz = async (idUnidad, idAlojamiento, idEspecie, formEl) => {
+    const fd = new FormData(formEl);
+    const p = { IdEspecieAlojUnidad: idUnidad, valores: [] };
+    fd.forEach((v, k) => {
+        if (k.startsWith('inicio_')) {
+            p.valores.push({ IdDatosUnidadAloj: k.replace('inicio_', ''), valor: v });
+        }
+    });
     if (p.valores.length > 0) {
-        await API.request('/trazabilidad/save-observation', 'POST', p);
+        await API.request('/trazabilidad/save-inicio-traz', 'POST', p);
         await TrazabilidadUI.refreshArbol(idAlojamiento, idEspecie);
     }
 };

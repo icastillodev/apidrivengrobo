@@ -350,9 +350,10 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
         
         $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
-            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado'];
+            $r['total_item'] = round((float) $r['total_item'], 2);
+            $r['pagado'] = round((float) $r['pagado'], 2);
             $r['is_exento'] = ((int)($r['exento'] ?? 0) === 1);
-            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0.0, round($r['total_item'] - $r['pagado'], 2));
         }
         return $rows;
     }
@@ -374,15 +375,17 @@ public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
                 JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
                 JOIN insumo i ON fi.IdInsumo = i.idInsumo
                 JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
-                WHERE f.estado = 'Entregado' AND tf.categoriaformulario LIKE '%insumo%'";
+                WHERE f.estado = 'Entregado'
+                  AND LOWER(COALESCE(tf.categoriaformulario, '')) LIKE '%insumo%'";
         $params = [$idProt];
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $sql .= " GROUP BY f.idformA";
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
-            $r['total_item'] = (float)$r['total_item']; $r['pagado'] = (float)$r['pagado'];
+            $r['total_item'] = round((float) $r['total_item'], 2);
+            $r['pagado'] = round((float) $r['pagado'], 2);
             $r['is_exento'] = ((int)($r['exento'] ?? 0) === 1);
-            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0.0, round($r['total_item'] - $r['pagado'], 2));
         }
         return $rows;
     }
@@ -696,11 +699,33 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             return;
         }
         $idUsr = $this->idUsuarioCobroFromFactDerivadaRow($ffd);
-        $r['total_item'] = (float)$ffd['monto_total'];
-        $r['pagado'] = (float)$ffd['monto_pagado'];
+        $r['total_item'] = round((float) $ffd['monto_total'], 2);
+        $r['pagado'] = round((float) $ffd['monto_pagado'], 2);
         $r['saldoInv'] = $this->getSaldoByInvestigador($idUsr, $instCobradora);
         $r['es_facturacion_derivada'] = 1;
-        $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
+        $r['id_usr_cobro_billetera'] = $idUsr;
+        $exento = isset($r['is_exento']) && ($r['is_exento'] === true || $r['is_exento'] === 1 || $r['is_exento'] === '1');
+        if (!$exento) {
+            $exento = (int) ($r['exento'] ?? 0) === 1;
+        }
+        $r['debe'] = $exento ? 0.0 : max(0.0, round($r['total_item'] - $r['pagado'], 2));
+    }
+
+    /**
+     * Ajusta totales/pagado/debe de filas de insumos cuando existe facturación derivada (misma sede cobradora).
+     */
+    public function applyFacturacionDerivadaToInsumoRows(array &$rows, int $instCobradora): void {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || $rows === []) {
+            return;
+        }
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            return;
+        }
+        foreach ($rows as &$r) {
+            $this->mergeFacturacionDerivadaIntoInsumoRow($r, $instCobradora);
+        }
+        unset($r);
     }
 
     /**
@@ -1030,10 +1055,11 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     public function getInsumoDetailById($id, $instCobradora = null) {
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, MAX(d.SaldoDinero) as saldoInv, 
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo, 
-                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado 
+                MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(COALESCE(tf.exento, 0)) as exento
                 FROM formularioe f 
                 JOIN personae u ON f.IdUsrA = u.IdUsrA 
                 LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion 
+                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
                 JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
                 JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario 
                 JOIN insumo i ON fi.IdInsumo = i.idInsumo 
@@ -1042,9 +1068,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $stmt->execute([$id]);
         $r = $stmt->fetch(\PDO::FETCH_ASSOC);
         if ($r) {
-            $r['total_item'] = (float)$r['total_item'];
-            $r['pagado'] = (float)$r['pagado'];
-            $r['debe'] = max(0, $r['total_item'] - $r['pagado']);
+            $r['total_item'] = round((float) $r['total_item'], 2);
+            $r['pagado'] = round((float) $r['pagado'], 2);
+            $r['is_exento'] = ((int)($r['exento'] ?? 0) === 1);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0.0, round($r['total_item'] - $r['pagado'], 2));
             if ($instCobradora) {
                 $this->mergeFacturacionDerivadaIntoInsumoRow($r, (int)$instCobradora);
             }
@@ -1079,10 +1106,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $sql .= " GROUP BY f.idformA";
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
-            $r['total_item'] = (float)$r['total_item'];
-            $r['pagado'] = (float)$r['pagado'];
+            $r['total_item'] = round((float) $r['total_item'], 2);
+            $r['pagado'] = round((float) $r['pagado'], 2);
             $r['is_exento'] = ((int)($r['is_exento'] ?? 0) === 1);
-            $r['debe'] = $r['is_exento'] ? 0.0 : max(0, $r['total_item'] - $r['pagado']);
+            $r['debe'] = $r['is_exento'] ? 0.0 : max(0.0, round($r['total_item'] - $r['pagado'], 2));
         }
         return $rows;
     }

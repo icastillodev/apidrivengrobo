@@ -37,6 +37,7 @@ export const TrazabilidadUI = {
 
         let html = `<div class="row g-3">`;
         
+        const cats = data.categorias_datos || data.categorias || [];
         data.cajas.forEach(caja => {
             html += `
             <div class="col-md-12 mb-3">
@@ -56,12 +57,12 @@ export const TrazabilidadUI = {
                     <form onsubmit="event.preventDefault(); window.guardarObservacion(${unidad.IdEspecieAlojUnidad}, this)">
                         <div class="row g-2 align-items-end">`;
                 
-                data.categorias.forEach(cat => {
+                cats.forEach(cat => {
                     const inputType = this.mapInputType(cat.TipoDeDato);
                     html += `
                             <div class="col-auto">
                                 <label style="font-size: 9px;" class="text-uppercase text-muted fw-bold">${cat.NombreCatAlojUnidad}</label>
-                                <input type="${inputType}" name="cat_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" required>
+                                <input type="${inputType}" name="cat_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" placeholder="—">
                             </div>`;
                 });
 
@@ -93,8 +94,9 @@ export const TrazabilidadUI = {
     },
 
     mapInputType(tipoDB) {
-        const types = { 'int': 'number', 'text': 'text', 'date': 'date', 'var': 'text' };
-        return types[tipoDB] || 'text';
+        const u = String(tipoDB || '').toLowerCase();
+        const types = { int: 'number', text: 'text', date: 'date', varchar: 'text', var: 'text', decimal: 'text', bool: 'text' };
+        return types[u] || 'text';
     },
 
     renderHistorialObservaciones(obsArray) {
@@ -106,6 +108,7 @@ export const TrazabilidadUI = {
 };
 
 window.guardarObservacion = async (idUnidad, formElement) => {
+    const t = window.txt?.alojamientos || {};
     const formData = new FormData(formElement);
     const payload = {
         IdEspecieAlojUnidad: idUnidad,
@@ -115,9 +118,17 @@ window.guardarObservacion = async (idUnidad, formElement) => {
 
     formData.forEach((value, key) => {
         if (key.startsWith('cat_')) {
-            payload.valores.push({ IdDatosUnidadAloj: key.replace('cat_', ''), valor: value });
+            const v = value != null ? String(value).trim() : '';
+            if (v !== '') {
+                payload.valores.push({ IdDatosUnidadAloj: key.replace('cat_', ''), valor: value });
+            }
         }
     });
+
+    if (payload.valores.length === 0) {
+        Swal.fire({ icon: 'info', title: t.trace_obs_min_one_title || '', text: t.trace_obs_min_one || '' });
+        return;
+    }
 
     try {
         const res = await API.request('/trazabilidad/save-observation', 'POST', payload);

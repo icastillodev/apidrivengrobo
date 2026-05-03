@@ -32,6 +32,24 @@ class BillingController {
         return (int)($v ?? 0) === 1;
     }
 
+    /**
+     * Lista de insumos en facturación: aplica montos de facturación derivada (si existe) y saldo de billetera del usuario que paga.
+     */
+    private function enrichInsumosFacturacionDerivadaSaldo(array &$rows, array $mapaSaldos, int $instId): void {
+        $this->model->applyFacturacionDerivadaToInsumoRows($rows, $instId);
+        foreach ($rows as &$ins) {
+            $uid = (int) ($ins['IdUsrA'] ?? 0);
+            if (!empty($ins['es_facturacion_derivada']) && !empty($ins['id_usr_cobro_billetera'])) {
+                $c = (int) $ins['id_usr_cobro_billetera'];
+                if ($c > 0) {
+                    $uid = $c;
+                }
+            }
+            $ins['saldoInv'] = (float) ($mapaSaldos[$uid] ?? 0.0);
+        }
+        unset($ins);
+    }
+
     public function getDeptoReport() {
         if (ob_get_length()) ob_clean();
         $f = json_decode(file_get_contents('php://input'), true);
@@ -46,12 +64,8 @@ class BillingController {
 
             $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
             $insumosGenerales = $this->model->getInsumosGenerales($deptoId, $desde, $hasta);
-            
-            foreach ($insumosGenerales as &$ins) {
-                $uid = $ins['IdUsrA'];
-                $ins['saldoInv'] = (float)($mapaSaldos[$uid] ?? 0);
-            }
-            
+            $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
+
             $deudaInsumos = 0.0;
             $pagadoInsumos = 0.0;
             foreach ($insumosGenerales as $insRow) {
@@ -200,11 +214,21 @@ class BillingController {
                 foreach ($org['departamentos'] as $d) {
                     $deptoId = $d['iddeptoA'];
                     $insumosGenerales = $this->model->getInsumosGenerales($deptoId, $desde, $hasta);
-                    foreach ($insumosGenerales as &$ins) {
-                        $ins['saldoInv'] = (float)($mapaSaldos[$ins['IdUsrA'] ?? 0] ?? 0);
+                    $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
+                    $deudaInsumos = 0.0;
+                    foreach ($insumosGenerales as $insRow) {
+                        if ($this->billingInsumoEsExento($insRow)) {
+                            continue;
+                        }
+                        $deudaInsumos += (float) ($insRow['debe'] ?? 0);
                     }
-                    $deudaInsumos = array_sum(array_column($insumosGenerales, 'debe'));
-                    $pagadoInsumos = array_sum(array_column($insumosGenerales, 'pagado'));
+                    $pagadoInsumos = 0.0;
+                    foreach ($insumosGenerales as $insRow) {
+                        if ($this->billingInsumoEsExento($insRow)) {
+                            continue;
+                        }
+                        $pagadoInsumos += (float) ($insRow['pagado'] ?? 0);
+                    }
 
                     $protocolosRaw = $this->model->getProtocolosByDepto($deptoId);
                     $reporte = [];
@@ -353,12 +377,7 @@ class BillingController {
                 $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
                 $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
-
-                foreach ($insumosProt as &$ins) {
-                    $uid = $ins['IdUsrA'] ?? ($ins['idUsrA'] ?? 0);
-                    $ins['saldoInv'] = (float)($mapaSaldos[$uid] ?? 0);
-                }
-                unset($ins);
+                $this->enrichInsumosFacturacionDerivadaSaldo($insumosProt, $mapaSaldos, (int) $instId);
 
                 $sumDebeInsProt = 0.0;
                 $sumPagadoInsProt = 0.0;
@@ -434,6 +453,7 @@ class BillingController {
             }
 
             $insumosGeneralesDirectos = $this->model->getInsumosByUser($idUsr, $instId, $desde, $hasta);
+            $this->enrichInsumosFacturacionDerivadaSaldo($insumosGeneralesDirectos, $mapaSaldos, (int) $instId);
 
             // Solo pedidos de insumo sin vínculo a protocolo (depto 0 / NULL); los de protocolo van en cada tarjeta.
             $insumosGenerales = array_values($insumosGeneralesDirectos);
@@ -612,11 +632,16 @@ class BillingController {
         if (!$idProt) $this->jsonResponse('error', 'ID de protocolo no proporcionado.');
 
         try {
-            Auditoria::getDatosSesion(); // Seguridad lectura
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int) ($sesion['instId'] ?? 0);
             $info = $this->model->getProtocolHeaderInfo($idProt);
             $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
             $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
             $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
+            if ($instId > 0) {
+                $mapaSaldosProt = $this->model->getSaldosPorInstitucion($instId);
+                $this->enrichInsumosFacturacionDerivadaSaldo($insumos, $mapaSaldosProt, $instId);
+            }
 
             $insumoIdsSet = [];
             foreach ($insumos as $rowIns) {

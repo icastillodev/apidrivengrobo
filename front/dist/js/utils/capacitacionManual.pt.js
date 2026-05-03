@@ -500,6 +500,13 @@ export const CHAPTERS = {
         h: 'Finalizar, reabrir e faturação',
         html: '<p><strong>Finalizar</strong> ou <strong>reabrir</strong> afeta como os consumos entram na <strong>faturação</strong>. Alinhe com a contabilidade antes de desfazer períodos fechados.</p><ul class="mb-0"><li>O histórico pode mostrar mensagens do responsável de alojamento.</li><li><strong>QR</strong> ou fichas podem mostrar dados só de leitura.</li></ul>',
       },
+      {
+        id: 'trazabilidad_fisica',
+        cat: 'row',
+        icon: 'upc-scan',
+        h: 'Rastreabilidade física (caixas e sujeitos)',
+        html: '<p>No detalhe ou modal de rastreabilidade, as <strong>caixas</strong> identificam-se muitas vezes com um prefixo derivado do tipo de protocolo (primeira letra do tipo + <code>A</code> + número). Os <strong>sujeitos</strong> combinam o prefixo da caixa, um correlativo <code>S…</code> e uma <strong>etiqueta</strong> legível.</p><ul class="mb-0"><li><strong>Renomear:</strong> altera só a etiqueta visível; os IDs internos e o QR mantêm-se ligados ao mesmo registo.</li><li><strong>Cirurgia / clínica:</strong> se estiver ativo para a espécie, pode refletir-se na ficha e nos documentos (conforme configuração e campos na base de dados).</li><li><strong>Tramos:</strong> ao atualizar um tramo e desmarcar caixas, o sistema já não ajusta automaticamente a quantidade associada ao QR da caixa para não sobrescrever a <strong>QuantidadeCaixa</strong> que tenha editado.</li></ul><p class="small text-body-secondary mb-0">O modelo exato de variáveis e tipos define-o a sua sede em <strong>Configuração → Alojamentos e clínica</strong> (tipos e variáveis por protocolo).</p>',
+      },
     ],
   },
   admin__estadisticas: {
@@ -575,6 +582,51 @@ export const CHAPTERS = {
         icon: 'journal-text',
         h: 'Boa prática',
         html: '<p>Mantenha registo externo (wiki interna) do significado de cada estado e de quem autorizou mudanças críticas para auditorias.</p>',
+      },
+    ],
+  },
+  admin__configuracion__alojamientos: {
+    overview:
+      'Aqui define, por espécie e por protocolo, os tipos de alojamento admitidos e as variáveis de rastreabilidade (no início da estadia e durante os dados ou visitas). Também pode trazer modelos a partir de outros protocolos da instituição sem copiar um protocolo de origem literal: o sistema usa um pool institucional e deduplica por nome.\n\nEste ecrã alimenta o que o biotério e os investigadores veem em fichas, PDF e QR. Os identificadores físicos de caixas e sujeitos (prefixos, correlativos) explicam-se no manual de Alojamentos (grelha) e na ajuda contextual do modal de rastreabilidade.',
+    summary:
+      'Configuração de tipos de alojamento por espécie e variáveis de rastreabilidade por protocolo; importação a partir do pool institucional.',
+    roles:
+      'Administração da sede com acesso a Configuração → Alojamentos e clínica (ou rota equivalente no menu).',
+    blocks: [
+      {
+        id: 'flujo',
+        cat: 'navigation',
+        icon: 'diagram-3',
+        h: 'Fluxo de trabalho no ecrã',
+        html: '<ol class="mb-0"><li>Escolha uma <strong>espécie</strong> na lista à esquerda.</li><li>Selecione o <strong>protocolo</strong> cujas regras de rastreabilidade quer editar (a lista filtra por espécie).</li><li>Use os separadores <strong>Tipos</strong>, <strong>Rastreabilidade início</strong> e <strong>Rastreabilidade dados</strong>.</li><li>Guarde ou confirme nos modais; as tabelas atualizam após fecho com sucesso.</li></ol>',
+      },
+      {
+        id: 'tipos',
+        cat: 'forms',
+        icon: 'box-seam',
+        h: 'Tipos de alojamento por espécie',
+        html: '<p>Os tipos são <strong>por espécie</strong>: ao mudar de espécie vê outro catálogo. Pode acrescentar tipo, descrição e estado. Isto condiciona as opções ao registar alojamentos ou tramos.</p><p class="mb-0 text-body-secondary small">Se a sua instituição distingue cirurgia ou outros matizes clínicos, pode haver colunas ou flags extra no tipo ou na ficha animal conforme a configuração e patches de base de dados (p.ex. <code>con_cirugia</code> na unidade espécie-alojamento); o administrador de BD dispõe de scripts de referência na documentação técnica do repositório.</p>',
+      },
+      {
+        id: 'traz_inicio_vs_datos',
+        cat: 'detail',
+        icon: 'clipboard2-data',
+        h: 'Rastreabilidade «início» vs «dados»',
+        html: '<ul class="mb-0"><li><strong>Início:</strong> variáveis captadas ou mostradas ao <strong>começar</strong> a estadia (contexto inicial).</li><li><strong>Dados:</strong> variáveis de seguimento em <strong>visitas ou registos posteriores</strong>.</li><li>Ambas as listas admitem dependências entre variáveis e tipos de dado; respeite a ordem lógica exigida pela validação do servidor.</li></ul>',
+      },
+      {
+        id: 'traer_pool',
+        cat: 'toolbar',
+        icon: 'box-arrow-in-down',
+        h: '«Trazer dados de outros protocolos» (pool)',
+        html: '<p>Os botões de importação abrem uma lista <strong>institucional por espécie</strong>: pode incorporar variáveis ou tipos já usados noutros protocolos <strong>sem escolher manualmente um protocolo de origem</strong>. O backend deduplica por nome.</p><p class="mb-0">Use para homogeneizar critérios entre estudos da mesma espécie. Se não vir resultados, ainda não há dados no pool para essa espécie ou o seu utilizador não tem alcance.</p>',
+      },
+      {
+        id: 'vinculo_grilla',
+        cat: 'links',
+        icon: 'link-45deg',
+        h: 'Ligação à grelha de alojamentos e QR',
+        html: '<p>O definido aqui reflete-se ao operar alojamentos em <strong>Administração → Alojamentos</strong>: rastreabilidade física (prefixos de caixa, sujeitos, renomear só a <strong>etiqueta</strong> visível sem quebrar IDs), atualização de tramos e lotes de caixas, PDF, etc.</p><p class="mb-0 small text-body-secondary">Ao <strong>atualizar um tramo</strong> e desmarcar caixas, o sistema deixa de ajustar automaticamente o campo de quantidade por QR de caixa para não sobrescrever a <strong>QuantidadeCaixa</strong> que fixou manualmente.</p>',
       },
     ],
   },

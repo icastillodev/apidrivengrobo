@@ -243,13 +243,29 @@ class MensajeriaModel {
                )) AS NoLeidos,
             COALESCE(h.FechaUltimoMensaje, h.FechaCreacion) AS _sort_ts
         ";
-        // Buzón local (sede actual): comunicados + consultas (las consultas se listan si participa).
+        // Buzón sede actual: comunicados + consultas locales si participa + consultas de otra sede de la red dirigidas a ESTA sede (OrigenId).
         $whereInst = "
-            h.IdInstitucion = :iid AND h.EsInstitucional = 1
-            AND (
-              LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
-              OR h.IdUsrParticipanteA = :uid3
-              OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+            h.EsInstitucional = 1 AND (
+              (
+                h.IdInstitucion = :iid AND (
+                  LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
+                  OR h.IdUsrParticipanteA = :uid3
+                  OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+                )
+              )
+              OR (
+                LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) = '{$ct}'
+                AND h.OrigenId = :iid
+                AND h.IdInstitucion <> :iid
+                AND EXISTS (
+                  SELECT 1 FROM institucion mi
+                  INNER JOIN institucion hi ON hi.IdInstitucion = h.IdInstitucion
+                  WHERE mi.IdInstitucion = :iid
+                    AND mi.DependenciaInstitucion IS NOT NULL AND TRIM(mi.DependenciaInstitucion) <> ''
+                    AND hi.DependenciaInstitucion IS NOT NULL AND TRIM(hi.DependenciaInstitucion) <> ''
+                    AND hi.DependenciaInstitucion = mi.DependenciaInstitucion
+                )
+              )
             )
         ";
         // En vista institucional, también incluimos los hilos personales propios del usuario (para contestar desde un solo lugar).
@@ -336,9 +352,26 @@ class MensajeriaModel {
                 (
                   h.EsInstitucional = 1
                   AND (
-                    LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
-                    OR h.IdUsrParticipanteA = :uid3
-                    OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+                    (
+                      h.IdInstitucion = :iid AND (
+                        LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) <> '{$ct}'
+                        OR h.IdUsrParticipanteA = :uid3
+                        OR (h.IdUsrParticipanteB IS NOT NULL AND h.IdUsrParticipanteB = :uid4)
+                      )
+                    )
+                    OR (
+                      LOWER(TRIM(COALESCE(h.OrigenTipo, ''))) = '{$ct}'
+                      AND h.OrigenId = :iid
+                      AND h.IdInstitucion <> :iid
+                      AND EXISTS (
+                        SELECT 1 FROM institucion mi
+                        INNER JOIN institucion hi ON hi.IdInstitucion = h.IdInstitucion
+                        WHERE mi.IdInstitucion = :iid
+                          AND mi.DependenciaInstitucion IS NOT NULL AND TRIM(mi.DependenciaInstitucion) <> ''
+                          AND hi.DependenciaInstitucion IS NOT NULL AND TRIM(hi.DependenciaInstitucion) <> ''
+                          AND hi.DependenciaInstitucion = mi.DependenciaInstitucion
+                      )
+                    )
                   )
                 )
                 OR (
@@ -377,12 +410,23 @@ class MensajeriaModel {
             $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
             $bRaw = $row['IdUsrParticipanteB'] ?? null;
             $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
-            if ($hInst !== $instId) {
+            $origenTipo = $this->origenTipoInstitucionalNormalizado($row);
+            $origenIdRaw = $row['OrigenId'] ?? null;
+            $origenId = ($origenIdRaw !== null && $origenIdRaw !== '') ? (int) $origenIdRaw : 0;
+            // Consulta creada en sede A con destino sede B (red): el personal de B debe ver/responder con sesión en B.
+            $esConsultaRedDestino = ($origenTipo === self::ORIGEN_INST_CONSULTA
+                && $origenId > 0
+                && $origenId === $instId
+                && $hInst > 0
+                && $hInst !== $instId
+                && $this->institucionEnMismaRed($instId, $hInst));
+            if (!$esConsultaRedDestino && $hInst !== $instId) {
                 return null;
             }
             if (!$this->esRolStaffInstitucional($role) && !$this->usuarioEnInstitucion($instId, $userId)) {
                 return null;
             }
+
             return $this->puedeVerHiloInstitucional($row, $userId, $role) ? $row : null;
         }
         $a = (int) ($row['IdUsrParticipanteA'] ?? 0);
@@ -556,11 +600,182 @@ class MensajeriaModel {
     }
 
     /**
+     * Listado para UI: formularios o alojamientos vinculados a un usuario (titular / responsable / titular protocolo).
+     *
+     * @return list<array{id:int, etiqueta:string, sub?:string}>
+     */
+    public function listAnexosContextoParaUsuario(
+        int $instId,
+        int $sobreUsuarioId,
+        string $tipo,
+        string $q,
+        int $limit = 40
+    ): array {
+        $sobreUsuarioId = (int) $sobreUsuarioId;
+        if ($instId <= 0 || $sobreUsuarioId <= 0) {
+            return [];
+        }
+        $tipo = strtolower(trim($tipo));
+        $q = trim($q);
+        $limit = max(5, min(60, (int) $limit));
+        $like = '%' . preg_replace('/[%_]/', '', $q) . '%';
+
+        if ($tipo === 'formulario') {
+            $hasEw = $this->hasColumn('formularioe', 'EstadoWorkflow');
+            $ewSel = $hasEw ? 'f.EstadoWorkflow AS EstadoWorkflow' : 'NULL AS EstadoWorkflow';
+            $sql = "
+                SELECT f.idformA AS id,
+                       f.tipoA AS tipoA,
+                       f.estado AS estado,
+                       {$ewSel},
+                       f.fechainicioA AS fechainicioA,
+                       f.fecRetiroA AS fecRetiroA
+                FROM formularioe f
+                WHERE f.IdInstitucion = ? AND f.IdUsrA = ?
+            ";
+            $params = [$instId, $sobreUsuarioId];
+            if ($q !== '') {
+                $sql .= ' AND (
+                    CAST(f.idformA AS CHAR) LIKE ?
+                    OR LOWER(COALESCE(f.tipoA, \'\')) LIKE LOWER(?)
+                    OR LOWER(COALESCE(f.estado, \'\')) LIKE LOWER(?)';
+                $params[] = $like;
+                $params[] = $like;
+                $params[] = $like;
+                if ($hasEw) {
+                    $sql .= '
+                    OR LOWER(COALESCE(f.EstadoWorkflow, \'\')) LIKE LOWER(?)';
+                    $params[] = $like;
+                }
+                $sql .= '
+                )';
+            }
+            $sql .= ' ORDER BY f.idformA DESC LIMIT ' . (int) $limit;
+            $st = $this->db->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            return array_map(static function (array $r): array {
+                $id = (int) ($r['id'] ?? 0);
+                $tipoA = trim((string) ($r['tipoA'] ?? ''));
+                $est = trim((string) ($r['estado'] ?? ''));
+                $ew = trim((string) ($r['EstadoWorkflow'] ?? ''));
+                $fi = trim((string) ($r['fechainicioA'] ?? ''));
+                $ff = trim((string) ($r['fecRetiroA'] ?? ''));
+                $et = '#' . $id . ($tipoA !== '' ? ' · ' . $tipoA : '') . ($est !== '' ? ' · ' . $est : '');
+                $sub = trim($fi . ($ff !== '' ? ' → ' . $ff : '') . ($ew !== '' ? ' · ' . $ew : ''));
+
+                return ['id' => $id, 'etiqueta' => $et, 'sub' => $sub];
+            }, $rows);
+        }
+
+        if ($tipo === 'alojamiento') {
+            $sql = '
+                SELECT DISTINCT a.historia AS id,
+                       a.IdAlojamiento AS IdAlojamiento,
+                       a.IdUsrA AS IdResponsable,
+                       a.idprotA AS idprotA,
+                       p.nprotA AS nprotA,
+                       p.tituloA AS tituloProt,
+                       p.IdUsrA AS IdTitularProt
+                FROM alojamiento a
+                LEFT JOIN protocoloexpe p ON a.idprotA = p.idprotA AND p.IdInstitucion = a.IdInstitucion
+                WHERE a.IdInstitucion = ?
+                  AND (a.IdUsrA = ? OR p.IdUsrA = ?)
+            ';
+            $params = [$instId, $sobreUsuarioId, $sobreUsuarioId];
+            if ($q !== '') {
+                $sql .= ' AND (
+                    CAST(a.historia AS CHAR) LIKE ?
+                    OR CAST(a.idprotA AS CHAR) LIKE ?
+                    OR LOWER(COALESCE(p.nprotA, \'\')) LIKE LOWER(?)
+                    OR LOWER(COALESCE(p.tituloA, \'\')) LIKE LOWER(?)
+                )';
+                $params[] = $like;
+                $params[] = $like;
+                $params[] = $like;
+                $params[] = $like;
+            }
+            $sql .= ' ORDER BY a.historia DESC LIMIT ' . (int) $limit;
+            $st = $this->db->prepare($sql);
+            $st->execute($params);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            return array_map(static function (array $r): array {
+                $hist = (int) ($r['id'] ?? 0);
+                $nprot = trim((string) ($r['nprotA'] ?? ''));
+                $tp = trim((string) ($r['tituloProt'] ?? ''));
+                $idp = (int) ($r['idprotA'] ?? 0);
+                $et = 'Hist. ' . $hist . ($nprot !== '' ? ' · ' . $nprot : ($idp > 0 ? ' · Prot. ' . $idp : ''));
+                $sub = $tp !== '' ? mb_substr($tp, 0, 120) : '';
+
+                return ['id' => $hist, 'etiqueta' => $et, 'sub' => $sub];
+            }, $rows);
+        }
+
+        return [];
+    }
+
+    /**
+     * Contexto opcional en un mensaje de respuesta: solo hilos personales; registro debe vincular a algún participante.
+     *
+     * @param array<string,mixed> $h
+     */
+    public function anexoOpcionalValidoParaHiloPersonal(array $h, int $instId, ?string $origenTipo, ?int $origenId, ?string $origenEtiqueta): bool {
+        if ($this->hiloEsInstitucional($h)) {
+            return ($origenTipo === null || trim((string) $origenTipo) === '')
+                && ($origenId === null || (int) $origenId <= 0);
+        }
+        if ($origenTipo === null || trim((string) $origenTipo) === '' || $origenId === null || (int) $origenId <= 0) {
+            return true;
+        }
+        $tipo = strtolower(trim((string) $origenTipo));
+        if (!in_array($tipo, ['formulario', 'alojamiento'], true)) {
+            return false;
+        }
+        $pa = (int) ($h['IdUsrParticipanteA'] ?? 0);
+        $rawB = $h['IdUsrParticipanteB'] ?? null;
+        $pb = ($rawB !== null && $rawB !== '') ? (int) $rawB : 0;
+        $parts = array_values(array_unique(array_filter([$pa, $pb], static fn ($x) => $x > 0)));
+
+        if ($tipo === 'formulario') {
+            $tit = $this->getTitularFormularioInstitucion((int) $origenId, $instId);
+            if ($tit === null) {
+                return false;
+            }
+
+            return in_array((int) $tit, $parts, true);
+        }
+
+        $st = $this->db->prepare(
+            'SELECT a.IdUsrA AS resp, p.IdUsrA AS titp
+             FROM alojamiento a
+             LEFT JOIN protocoloexpe p ON a.idprotA = p.idprotA AND p.IdInstitucion = a.IdInstitucion
+             WHERE a.IdInstitucion = ? AND a.historia = ?
+             LIMIT 1'
+        );
+        $st->execute([$instId, (int) $origenId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return false;
+        }
+        $resp = (int) ($row['resp'] ?? 0);
+        $titp = (int) ($row['titp'] ?? 0);
+        foreach ([$resp, $titp] as $u) {
+            if ($u > 0 && in_array($u, $parts, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Usuarios de la misma institución (excl. uno), para selector de mensajes.
      */
     public function listUsuariosInstitucionParaMensaje(int $instId, int $excludeUserId): array {
         $stmt = $this->db->prepare("
-            SELECT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA, p.EmailA,
+            SELECT DISTINCT u.IdUsrA, u.UsrA AS Usuario, p.NombreA, p.ApellidoA, p.EmailA,
                    u.IdInstitucion, i.NombreInst AS NombreInstitucion
             FROM usuarioe u
             JOIN personae p ON u.IdUsrA = p.IdUsrA
@@ -683,6 +898,26 @@ class MensajeriaModel {
     }
 
     /**
+     * Sede cuyo personal (roles staff) debe recibir avisos por correo en una consulta institucional «abierta»
+     * (sin IdUsrParticipanteB). Si la consulta es entre sedes de la red, los avisos van a la sede destinataria (OrigenId).
+     */
+    public function idInstitucionNotificacionConsultaAbierta(array $h): int {
+        $hInst = (int) ($h['IdInstitucion'] ?? 0);
+        $t = $this->origenTipoInstitucionalNormalizado($h);
+        $bRaw = $h['IdUsrParticipanteB'] ?? null;
+        $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
+        if ($t !== self::ORIGEN_INST_CONSULTA || $b > 0) {
+            return $hInst;
+        }
+        $oid = isset($h['OrigenId']) ? (int) $h['OrigenId'] : 0;
+        if ($oid > 0 && $oid !== $hInst && $this->institucionEnMismaRed($hInst, $oid)) {
+            return $oid;
+        }
+
+        return $hInst;
+    }
+
+    /**
      * Usuarios de otras sedes con la misma dependencia (red).
      */
     public function listUsuariosRedMismaDependenciaParaMensaje(int $instId, int $excludeUserId): array {
@@ -776,7 +1011,16 @@ class MensajeriaModel {
         }
     }
 
-    public function responder(int $instId, int $hiloId, int $remitenteId, string $cuerpo, int $role = 0): array {
+    public function responder(
+        int $instId,
+        int $hiloId,
+        int $remitenteId,
+        string $cuerpo,
+        int $role = 0,
+        ?string $origenTipoMsg = null,
+        ?int $origenIdMsg = null,
+        ?string $origenEtiquetaMsg = null
+    ): array {
         $h = $this->getHiloAccesible($hiloId, $remitenteId, $instId, $role);
         if (!$h) {
             return ['status' => 'error', 'message' => 'Hilo no encontrado.'];
@@ -792,11 +1036,51 @@ class MensajeriaModel {
             return ['status' => 'error', 'message' => 'El mensaje no puede estar vacío.'];
         }
 
-        $stmt = $this->db->prepare("
-            INSERT INTO mensaje (IdMensajeHilo, IdInstitucion, IdUsrRemitente, Cuerpo, FechaEnvio)
-            VALUES (?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([$hiloId, $instId, $remitenteId, $cuerpo]);
+        $ot = $origenTipoMsg !== null ? strtolower(trim($origenTipoMsg)) : '';
+        $oid = $origenIdMsg !== null ? (int) $origenIdMsg : 0;
+        $oe = $origenEtiquetaMsg !== null ? trim(strip_tags((string) $origenEtiquetaMsg)) : '';
+        if ($oe === '') {
+            $oe = null;
+        }
+        if ($ot === '' || $oid <= 0) {
+            $ot = null;
+            $oid = null;
+            $oe = null;
+        } elseif ($this->hiloEsInstitucional($h)) {
+            return ['status' => 'error', 'message' => 'No se puede anexar contexto en mensajes institucionales.'];
+        } elseif (!$this->anexoOpcionalValidoParaHiloPersonal($h, $instId, $ot, $oid, $oe)) {
+            return ['status' => 'error', 'message' => 'El contexto anexado no corresponde a los participantes del hilo.'];
+        }
+
+        $instMensaje = (int) ($h['IdInstitucion'] ?? 0);
+        if ($instMensaje <= 0) {
+            $instMensaje = $instId;
+        }
+
+        $colsMsg = ['IdMensajeHilo', 'IdInstitucion', 'IdUsrRemitente', 'Cuerpo', 'FechaEnvio'];
+        $vals = [$hiloId, $instMensaje, $remitenteId, $cuerpo];
+        $ph = ['?', '?', '?', '?', 'NOW()'];
+        if ($ot !== null && $oid !== null && $oid > 0
+            && $this->hasColumn('mensaje', 'OrigenTipo')
+            && $this->hasColumn('mensaje', 'OrigenId')) {
+            $colsMsg[] = 'OrigenTipo';
+            $colsMsg[] = 'OrigenId';
+            $ph[] = '?';
+            $ph[] = '?';
+            $vals[] = $ot;
+            $vals[] = $oid;
+            if ($this->hasColumn('mensaje', 'OrigenEtiqueta')) {
+                $colsMsg[] = 'OrigenEtiqueta';
+                $ph[] = '?';
+                $vals[] = $oe;
+            }
+        }
+
+        $stmt = $this->db->prepare('
+            INSERT INTO mensaje (' . implode(', ', $colsMsg) . ')
+            VALUES (' . implode(', ', $ph) . ')
+        ');
+        $stmt->execute($vals);
 
         $this->db->prepare("
             UPDATE mensaje_hilo SET FechaUltimoMensaje = NOW() WHERE IdMensajeHilo = ?
@@ -825,6 +1109,20 @@ class MensajeriaModel {
         $stmt->execute([$instId, $idUsrA]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
+    }
+
+    /**
+     * Slug de URL de la sede (misma columna que usa validate-inst / login).
+     */
+    public function getInstitucionSlug(int $instId): ?string {
+        if ($instId <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT LOWER(TRIM(NombreInst)) AS s FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $stmt->execute([$instId]);
+        $v = $stmt->fetchColumn();
+
+        return $v ? (string) $v : null;
     }
 
     public function getNombreInstitucion(int $instId): string {
@@ -975,6 +1273,20 @@ class MensajeriaModel {
 
             return ['status' => 'error', 'message' => 'No se pudo crear el mensaje.'];
         }
+    }
+
+    /**
+     * Fila cruda del hilo (sin comprobar permisos). Para distinguir 404 vs «existe pero no es suyo».
+     */
+    public function fetchHiloRawById(int $hiloId): ?array {
+        if ($hiloId <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT * FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1');
+        $stmt->execute([$hiloId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
     }
 
     private function hasColumn(string $tableName, string $columnName): bool {

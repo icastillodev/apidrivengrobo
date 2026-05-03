@@ -139,8 +139,8 @@ class AlojamientoModel {
                                 $stmtInsertUnit = $this->db->prepare(
                                     "INSERT INTO especie_alojamiento_unidad (
                                         IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento,
-                                        PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto
-                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                                        PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto, con_cirugia
+                                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                                 );
                                 $stmtInsertUnit->execute([
                                     $oldUnit['IdUnidadAlojamiento'],
@@ -153,6 +153,7 @@ class AlojamientoModel {
                                     $oldUnit['idcepaA_sujeto'] ?? null,
                                     $oldUnit['CategoriaRazaSujeto'] ?? null,
                                     $oldUnit['idsubespA_sujeto'] ?? null,
+                                    isset($oldUnit['con_cirugia']) ? (int)$oldUnit['con_cirugia'] : 0,
                                 ]);
                             }
                         }

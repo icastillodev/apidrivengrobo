@@ -502,6 +502,13 @@ export const CHAPTERS = {
         h: 'Finalizar, reabrir y facturación',
         html: '<p><strong>Finalizar</strong> o <strong>reabrir</strong> afecta cómo se consolidan consumos en <strong>facturación</strong>. Coordine con contabilidad antes de deshacer cierres de período.</p><ul class="mb-0"><li>El historial puede mostrar mensajes del responsable de alojamiento.</li><li><strong>QR</strong> o fichas pueden mostrar datos de solo lectura para visitas.</li></ul>',
       },
+      {
+        id: 'trazabilidad_fisica',
+        cat: 'row',
+        icon: 'upc-scan',
+        h: 'Trazabilidad física (cajas y sujetos)',
+        html: '<p>En el detalle o modal de trazabilidad, las <strong>cajas</strong> suelen identificarse con un prefijo derivado del tipo de protocolo (primera letra del tipo + <code>A</code> + número correlativo). Los <strong>sujetos</strong> combinan prefijo de caja, correlativo <code>S…</code> y una <strong>etiqueta</strong> legible.</p><ul class="mb-0"><li><strong>Renombrar:</strong> solo cambia la etiqueta visible; los IDs internos y QR se mantienen enlazados al mismo registro.</li><li><strong>Cirugía / clínica:</strong> si está habilitado para la especie, puede reflejarse en ficha y documentos (según configuración y campos en base de datos).</li><li><strong>Tramos:</strong> al actualizar un tramo y desmarcar cajas, no se fuerza automáticamente la cantidad asociada al QR de caja para no sobrescribir <strong>CantidadCaja</strong> que haya editado.</li></ul><p class="small text-body-secondary mb-0">La plantilla exacta de variables y tipos la define su sede en <strong>Configuración → Alojamientos & clínica</strong> (tipos y variables por protocolo).</p>',
+      },
     ],
   },
   admin__estadisticas: {
@@ -577,6 +584,51 @@ export const CHAPTERS = {
         icon: 'journal-text',
         h: 'Buena práctica',
         html: '<p>Mantenga un registro externo (wiki interna) de “qué significa cada estado” y “quién autorizó” cambios críticos para auditorías.</p>',
+      },
+    ],
+  },
+  admin__configuracion__alojamientos: {
+    overview:
+      'Aquí define por especie y por protocolo los tipos de alojamiento admitidos y las variables de trazabilidad (al inicio de la estadía y durante los datos o visitas). También puede traer plantillas desde otros protocolos de la institución sin copiar un protocolo origen literal: el sistema usa un pool institucional y deduplica por nombre.\n\nEsta pantalla alimenta lo que verán bioterio e investigadores en fichas, PDF y QR. Los identificadores físicos de cajas y sujetos (prefijos, correlativos) se explican en el manual de Alojamientos (grilla) y en la ayuda contextual del modal de trazabilidad.',
+    summary:
+      'Configuración de tipos de alojamiento por especie y variables de trazabilidad por protocolo; importación desde pool institucional.',
+    roles:
+      'Administración de sede con acceso a Configuración → Alojamientos & clínica (o ruta equivalente en su menú).',
+    blocks: [
+      {
+        id: 'flujo',
+        cat: 'navigation',
+        icon: 'diagram-3',
+        h: 'Flujo de trabajo en la pantalla',
+        html: '<ol class="mb-0"><li>Elija una <strong>especie</strong> en la lista izquierda.</li><li>Seleccione el <strong>protocolo</strong> cuyas reglas de trazabilidad desea editar (el desplegable filtra por especie).</li><li>Use las pestañas <strong>Tipos</strong>, <strong>Trazabilidad inicio</strong> y <strong>Trazabilidad datos</strong>.</li><li>Guarde o confirme según los modales; los listados se refrescan al cerrar con éxito.</li></ol>',
+      },
+      {
+        id: 'tipos',
+        cat: 'forms',
+        icon: 'box-seam',
+        h: 'Tipos de alojamiento por especie',
+        html: '<p>Los tipos son <strong>por especie</strong>: al cambiar de especie ve otro catálogo. Puede añadir tipo, descripción y estado. Esto condiciona qué opciones aparecen al registrar alojamientos o tramos.</p><p class="mb-0 text-body-secondary small">Si su institución distingue cirugía u otros matices clínicos, puede haber columnas o flags adicionales en tipo o en ficha animal según la configuración y parches de base de datos aplicados (p. ej. <code>con_cirugia</code> en alojamiento-especie-unidad); el administrador de BD dispone de scripts de referencia en documentación técnica del repositorio.</p>',
+      },
+      {
+        id: 'traz_inicio_vs_datos',
+        cat: 'detail',
+        icon: 'clipboard2-data',
+        h: 'Trazabilidad inicio frente a «datos»',
+        html: '<ul class="mb-0"><li><strong>Inicio:</strong> variables que se capturan o muestran al <strong>comenzar</strong> la estadía / ingreso (contexto inicial).</li><li><strong>Datos:</strong> variables de seguimiento en <strong>visitas o registros posteriores</strong> (evolución).</li><li>Ambas listas admiten dependencias entre variables y tipos de dato; respete el orden lógico que pida validación del servidor.</li></ul>',
+      },
+      {
+        id: 'traer_pool',
+        cat: 'toolbar',
+        icon: 'box-arrow-in-down',
+        h: '«Traer datos de otros protocolos» (pool)',
+        html: '<p>Los botones de importación abren un listado <strong>institucional por especie</strong>: puede incorporar variables o tipos ya usados en otros protocolos <strong>sin elegir manualmente un protocolo origen</strong>. El backend deduplica por nombre para no duplicar filas.</p><p class="mb-0">Use esta función para homogeneizar criterios entre estudios de la misma especie. Si no ve resultados, no hay aún datos en el pool para esa especie o su usuario no tiene alcance sobre ellos.</p>',
+      },
+      {
+        id: 'vinculo_grilla',
+        cat: 'links',
+        icon: 'link-45deg',
+        h: 'Relación con la grilla de alojamientos y QR',
+        html: '<p>Lo definido aquí se refleja al operar alojamientos en <strong>Administración → Alojamientos</strong>: trazabilidad física (prefijos de caja, sujetos, renombrar solo la <strong>etiqueta</strong> visible sin romper IDs), actualización de tramos y cupos de cajas, PDF, etc.</p><p class="mb-0 small text-body-secondary">Al <strong>actualizar un tramo</strong> y desmarcar cajas, el sistema ya no ajusta automáticamente el campo de cantidad por QR de caja para no pisar valores que usted fijó a mano (<strong>CantidadCaja</strong>).</p>',
       },
     ],
   },

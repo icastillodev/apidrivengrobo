@@ -47,6 +47,12 @@ export function pathnameToMenuPath(pathname) {
     if (sub.includes(seg)) return `admin/facturacion/${seg}`;
     return 'admin/facturacion/index';
   }
+  if (
+    rel === 'admin/configuracion/alojamientos' ||
+    lower.includes('/paginas/admin/configuracion/alojamientos')
+  ) {
+    return 'admin/configuracion/alojamientos';
+  }
   if (rel.startsWith('admin/configuracion/') || lower.includes('/paginas/admin/configuracion/')) {
     return 'admin/configuracion/config';
   }

@@ -105,6 +105,7 @@ export const ExportUI = {
                     const res = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${h.IdAlojamiento}&idEspecie=${first.TipoAnimal || first.idespA}&instId=${instId}`);
                     
                     if (res.status === 'success' && res.data && res.data.cajas && res.data.cajas.length > 0) {
+                        const catsExport = res.data.categorias_datos || res.data.categorias || [];
                         let hasObsInTramo = false;
                         let tramoHtml = `<div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
                             <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">TRAMO #${h.IdAlojamiento} (Desde: ${new Date(h.fechavisado).toLocaleDateString()})</h5>`;
@@ -131,15 +132,15 @@ export const ExportUI = {
                                                 <tr style="background-color: #f9f9f9;">
                                                     <th style="border: 1px solid #ccc; padding: 4px;">Fecha</th>`;
                                         
-                                        res.data.categorias.forEach(cat => {
+                                        catsExport.forEach(cat => {
                                             cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${cat.NombreCatAlojUnidad}</th>`;
                                         });
                                         cajaHtml += `</tr>`;
 
                                         u.observaciones_pivot.forEach(obs => {
                                             cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${new Date(obs.fechaObs).toLocaleDateString()}</td>`;
-                                            res.data.categorias.forEach(cat => {
-                                                const val = obs[`cat_${cat.IdDatosUnidadAloj}`] || '-';
+                                            catsExport.forEach(cat => {
+                                                const val = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '-';
                                                 cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${val}</td>`;
                                             });
                                             cajaHtml += `</tr>`;
@@ -323,7 +324,7 @@ export const ExportUI = {
                     const res = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${r.IdAlojamiento}&idEspecie=${r.TipoAnimal || r.idespA}&instId=${instId}`);
 
                     if (res.status === 'success' && res.data && res.data.cajas) {
-                        const categorias = res.data.categorias || [];
+                        const categorias = res.data.categorias_datos || res.data.categorias || [];
 
                         res.data.cajas.forEach(c => {
                             if (c.unidades) {
@@ -341,7 +342,7 @@ export const ExportUI = {
 
                                             // Agregamos las columnas dinámicas (Ej: Peso, Glucosa, Temp)
                                             categorias.forEach(cat => {
-                                                clinRow[cat.NombreCatAlojUnidad] = obs[`cat_${cat.IdDatosUnidadAloj}`] || '---';
+                                                clinRow[cat.NombreCatAlojUnidad] = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '---';
                                             });
 
                                             allRows.push(clinRow);
