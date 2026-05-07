@@ -629,6 +629,7 @@ window.openProtocolModal = async (p = null) => {
             </div>
     ` : manualAttachmentInputs;
 
+    const cxOnProt = Number(p?.con_cirugia || p?.cirugia || 0) === 1;
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
@@ -643,6 +644,20 @@ window.openProtocolModal = async (p = null) => {
         
         <form id="form-protocolo">
             <input type="hidden" name="IdInstitucion" value="${instId}">
+            <input type="hidden" name="protocolo_cirugia" id="protocolo_cirugia" value="${cxOnProt ? '1' : '0'}">
+
+            <div class="mb-3">
+                <span class="badge bg-warning text-dark" style="font-size:10px;">
+                    <i class="bi bi-heart-pulse me-1"></i>${txtProt.cirugia_badge || (window.txt?.alojamientos?.trace_surgery_badge || 'Cirugía')}
+                </span>
+                <button type="button"
+                        class="btn btn-sm ${cxOnProt ? 'btn-warning text-dark' : 'btn-outline-secondary'} ms-2"
+                        id="btn-toggle-cirugia-prot"
+                        title="${txtProt.cirugia_btn_title || 'Marcar o quitar cirugía en este protocolo'}">
+                    <i class="bi bi-toggle-${cxOnProt ? 'on' : 'off'}"></i>
+                    <span class="ms-1">${txtProt.cirugia_btn_lbl || 'Cirugía'}</span>
+                </button>
+            </div>
             
             ${p ? `
             <div class="row g-2 mb-3 bg-light border rounded p-2">
@@ -809,6 +824,24 @@ window.openProtocolModal = async (p = null) => {
     `;
 
     document.getElementById('form-protocolo').onsubmit = (e) => saveProtocol(e, p?.idprotA);
+
+    const btnCx = document.getElementById('btn-toggle-cirugia-prot');
+    if (btnCx) {
+        btnCx.onclick = () => {
+            const hid = document.getElementById('protocolo_cirugia');
+            const cur = (hid?.value === '1');
+            const next = !cur;
+            if (hid) hid.value = next ? '1' : '0';
+            btnCx.classList.toggle('btn-warning', next);
+            btnCx.classList.toggle('text-dark', next);
+            btnCx.classList.toggle('btn-outline-secondary', !next);
+            const ico = btnCx.querySelector('i.bi');
+            if (ico) {
+                ico.classList.toggle('bi-toggle-on', next);
+                ico.classList.toggle('bi-toggle-off', !next);
+            }
+        };
+    }
     
     // Filtro rápido de usuarios por ID, usuario, nombre o apellido
     const userSearch = document.getElementById('user-search');

@@ -32,6 +32,27 @@ function ensureHtml2pdf() {
     });
 }
 
+function mountDomForPdf(dom) {
+    // Evitar PDFs en blanco: el nodo debe "pintarse" (no opacity:0) y tener un layout estable.
+    // `visibility:hidden` mantiene el render sin mostrarlo.
+    dom.style.position = 'fixed';
+    dom.style.left = '0';
+    dom.style.top = '0';
+    dom.style.visibility = 'hidden';
+    dom.style.pointerEvents = 'none';
+    dom.style.zIndex = '-1';
+    dom.style.background = '#ffffff';
+    dom.style.width = '210mm';
+    dom.style.maxWidth = '210mm';
+    document.body.appendChild(dom);
+    return dom;
+}
+
+async function waitNextFrame() {
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    await new Promise((r) => setTimeout(r, 50));
+}
+
 function sexoSujetoLabel(code, t) {
     const u = String(code ?? '').toUpperCase().trim();
     if (u === 'M') return t.trace_sexo_macho || 'M';
@@ -462,14 +483,19 @@ export const AnimalFichaUI = {
             }
             await ensureHtml2pdf();
             const dom = buildFichaDom(res.data);
-            dom.style.position = 'fixed';
-            dom.style.left = '-9999px';
-            document.body.appendChild(dom);
+            mountDomForPdf(dom);
+            await waitNextFrame();
             const opt = {
                 margin: 10,
                 filename: `ficha-animal-${idEspecieAlojUnidad}.pdf`,
                 image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: dom.scrollWidth || undefined,
+                    windowHeight: dom.scrollHeight || undefined,
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             };
             await window.html2pdf().set(opt).from(dom).save();
@@ -498,14 +524,19 @@ export const AnimalFichaUI = {
             }
             await ensureHtml2pdf();
             const dom = buildFichaDomAggregate(res.data);
-            dom.style.position = 'fixed';
-            dom.style.left = '-9999px';
-            document.body.appendChild(dom);
+            mountDomForPdf(dom);
+            await waitNextFrame();
             const opt = {
                 margin: 10,
                 filename: `ficha-caja-${idCajaAlojamiento}.pdf`,
                 image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: dom.scrollWidth || undefined,
+                    windowHeight: dom.scrollHeight || undefined,
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             };
             await window.html2pdf().set(opt).from(dom).save();
@@ -534,14 +565,19 @@ export const AnimalFichaUI = {
             }
             await ensureHtml2pdf();
             const dom = buildFichaDomAggregate(res.data);
-            dom.style.position = 'fixed';
-            dom.style.left = '-9999px';
-            document.body.appendChild(dom);
+            mountDomForPdf(dom);
+            await waitNextFrame();
             const opt = {
                 margin: 10,
                 filename: `ficha-alojamiento-${idAlojamiento}.pdf`,
                 image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: dom.scrollWidth || undefined,
+                    windowHeight: dom.scrollHeight || undefined,
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
             };
             await window.html2pdf().set(opt).from(dom).save();

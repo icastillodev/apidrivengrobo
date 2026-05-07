@@ -6,6 +6,8 @@ let currentSpeciesName = '';
 let speciesCache = [];
 let currentVarsInicio = [];
 let currentVarsDatos = [];
+/** @type {Array<any>} */
+let protocolosCache = [];
 
 function txtCfg() {
     return window.txt?.config_alojamientos || {};
@@ -32,6 +34,62 @@ function protQuerySuffix() {
     return v ? `&prot=${encodeURIComponent(v)}` : '';
 }
 
+function getProtSelectedId() {
+    const v = getProtSelectValue();
+    const n = parseInt(String(v || ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function ensureProtocolSelectedOrWarn() {
+    const t = txtCfg();
+    if (getProtSelectedId() > 0) {
+        return true;
+    }
+    if (window.Swal) {
+        window.Swal.fire({
+            icon: 'warning',
+            title: t.prot_warn_title || (window.txt?.generales?.atencion || 'Atención'),
+            text: t.prot_warn_body || 'Seleccione un protocolo para configurar Trazabilidad (inicio/datos).',
+        });
+    }
+    return false;
+}
+
+function setTrazTabsEnabled(enabled) {
+    const a = document.getElementById('traz-inicio-tab');
+    const b = document.getElementById('traz-datos-tab');
+    [a, b].forEach((btn) => {
+        if (!btn) return;
+        btn.disabled = !enabled;
+        btn.classList.toggle('disabled', !enabled);
+        btn.setAttribute('aria-disabled', (!enabled).toString());
+        if (!enabled && btn.classList.contains('active')) {
+            document.getElementById('types-tab')?.click?.();
+        }
+    });
+}
+
+function getProtSearchTerm() {
+    const el = document.getElementById('inp-prot-traz-search');
+    return String(el?.value || '').trim().toLowerCase();
+}
+
+function applyProtocolFilter() {
+    fillProtocolSelect(protocolosCache || []);
+}
+
+function wireProtocolSearchInput() {
+    const inp = document.getElementById('inp-prot-traz-search');
+    if (!inp) return;
+    inp.oninput = () => applyProtocolFilter();
+    inp.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+            inp.value = '';
+            applyProtocolFilter();
+        }
+    };
+}
+
 function fillProtocolSelect(protocolos) {
     const sel = document.getElementById('sel-prot-traz');
     if (!sel) {
@@ -41,11 +99,25 @@ function fillProtocolSelect(protocolos) {
     const prev = sel.value;
     const t = txtCfg();
     sel.innerHTML = '';
+
+    const term = getProtSearchTerm();
+    let filtered = (protocolos || []);
+    if (term) {
+        filtered = filtered.filter((p) => {
+            const tit = String(p?.tituloA || '').toLowerCase();
+            const cod = String(p?.nprotA || '').toLowerCase();
+            const id = String(p?.idprotA || '').toLowerCase();
+            return tit.includes(term) || cod.includes(term) || id.includes(term);
+        });
+    }
+
     const opt0 = document.createElement('option');
     opt0.value = '';
-    opt0.textContent = t.prot_global_opt || '— Todas (sin protocolo específico) —';
+    opt0.textContent = t.prot_placeholder || '— Seleccione un protocolo —';
+    opt0.disabled = true;
+    opt0.selected = true;
     sel.appendChild(opt0);
-    (protocolos || []).forEach((p) => {
+    (filtered || []).forEach((p) => {
         const o = document.createElement('option');
         o.value = String(p.idprotA);
         const tit = (p.tituloA || '').trim();
@@ -53,21 +125,30 @@ function fillProtocolSelect(protocolos) {
         o.textContent = cod ? `${cod} — ${tit.slice(0, 80)}` : tit.slice(0, 100) || `ID ${p.idprotA}`;
         sel.appendChild(o);
     });
-    const has = (protocolos || []).length > 0;
     if (prev && [...sel.options].some((o) => o.value === prev)) {
         sel.value = prev;
-    } else if (has) {
-        sel.value = String(protocolos[0].idprotA);
     } else {
         sel.value = '';
     }
+    setTrazTabsEnabled(getProtSelectedId() > 0);
     sel.onchange = () => loadDetails();
 }
 
 export function initConfigAlojamientos() {
     loadSpeciesList();
+    wireProtocolSearchInput();
     document.getElementById('form-type').onsubmit = saveHousingType;
     document.getElementById('form-cat').onsubmit = saveClinicalVar;
+    const tabs = ['traz-inicio-tab', 'traz-datos-tab'];
+    tabs.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('show.bs.tab', (ev) => {
+            if (!ensureProtocolSelectedOrWarn()) {
+                ev.preventDefault();
+            }
+        });
+    });
 }
 
 async function loadSpeciesList() {
@@ -132,12 +213,14 @@ async function loadDetails() {
             `/admin/config/alojamiento/details?esp=${currentSpeciesId}${protQuerySuffix()}&t=${Date.now()}`,
         );
         if (res.status === 'success') {
-            fillProtocolSelect(res.data.protocolos);
+            protocolosCache = res.data.protocolos || [];
+            fillProtocolSelect(protocolosCache);
             renderTypes(res.data.types);
             currentVarsInicio = res.data.categories_inicio || [];
             currentVarsDatos = res.data.categories_datos || res.data.categories || [];
             renderClinicalRows(currentVarsInicio, 'table-traz-inicio', 'inicio');
             renderClinicalRows(currentVarsDatos, 'table-traz-datos', 'datos');
+            setTrazTabsEnabled(getProtSelectedId() > 0);
         }
     } catch (e) {
         console.error(e);
@@ -330,12 +413,18 @@ window.openModalCat = (
 };
 
 window.openModalCatNew = (alcance) => {
+    if ((alcance === 'inicio' || alcance === 'datos') && !ensureProtocolSelectedOrWarn()) {
+        return;
+    }
     window.openModalCat('', '', 'varchar', '', '', 1, alcance, '');
 };
 
 window.openImportCloneTraz = async (alcanceDest) => {
     const t = txtCfg();
     const destProt = getProtSelectValue();
+    if (!ensureProtocolSelectedOrWarn()) {
+        return;
+    }
     if (!currentSpeciesId) {
         return;
     }

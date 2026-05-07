@@ -207,6 +207,21 @@ class ProtocolController {
             $isExterno = isset($data['protocoloexpe']) ? 1 : 0;
             $deptoValue = ($isExterno == 1) ? ($data['departamento_manual'] ?? '') : ($data['departamento'] ?? '');
 
+            // Cirugía (opcional): si existe columna en protocoloexpe.
+            $cirugiaRaw = $data['protocolo_cirugia'] ?? null;
+            $cirugiaVal = ($cirugiaRaw === '1' || $cirugiaRaw === 1 || $cirugiaRaw === true || $cirugiaRaw === 'on') ? 1 : 0;
+            $cirugiaCol = null;
+            try {
+                $cols = $this->db->query("SHOW COLUMNS FROM `protocoloexpe`")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+                foreach ($cols as $c) {
+                    $f = (string)($c['Field'] ?? '');
+                    if (preg_match('/^(con_?cirugia|cirugia)$/i', $f)) {
+                        $cirugiaCol = $f;
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) { $cirugiaCol = null; }
+
             // Normalización y validación de fechas según esquema (DATE NULL) y reglas de negocio
             $rawIni = isset($data['FechaIniProtA']) ? trim($data['FechaIniProtA']) : '';
             $rawFin = isset($data['FechaFinProtA']) ? trim($data['FechaFinProtA']) : '';
@@ -237,28 +252,44 @@ class ProtocolController {
                             departamento = ?, tipoprotocolo = ?, severidad = ?, 
                             IdUsrA = ?, protocoloexpe = ?
                         WHERE idprotA = ?";
+                if ($cirugiaCol) {
+                    $sql = str_replace('protocoloexpe = ?', "protocoloexpe = ?, `{$cirugiaCol}` = ?", $sql);
+                }
                 $stmt = $this->db->prepare($sql);
-                $stmt->execute([
+                $params = [
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
                     $data['CantidadAniA'], $fechaIni, $fechaFin, 
                     $deptoValue, $data['tipoprotocolo'], $data['severidad'], 
-                    $data['IdUsrA'], $isExterno, $id
-                ]);
+                    $data['IdUsrA'], $isExterno
+                ];
+                if ($cirugiaCol) {
+                    $params[] = $cirugiaVal;
+                }
+                $params[] = $id;
+                $stmt->execute($params);
                 $currentId = $id;
                 Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId");
             } else {
                 // INSERT
+                $colsIns = "tituloA, nprotA, InvestigadorACargA, encargaprot, 
+                            CantidadAniA, FechaIniProtA, FechaFinProtA, departamento, 
+                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe" . ($cirugiaCol ? ", `{$cirugiaCol}`" : "");
+                $ph = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($cirugiaCol ? ", ?" : "");
                 $sql = "INSERT INTO protocoloexpe (
                             tituloA, nprotA, InvestigadorACargA, encargaprot, 
                             CantidadAniA, FechaIniProtA, FechaFinProtA, departamento, 
-                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe" . ($cirugiaCol ? ", `{$cirugiaCol}`" : "") . "
+                        ) VALUES (" . $ph . ")";
                 $stmt = $this->db->prepare($sql);
-                $stmt->execute([
+                $params = [
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
                     $data['CantidadAniA'], $fechaIni, $fechaFin, $deptoValue,
                     $data['tipoprotocolo'], $data['severidad'], $data['IdUsrA'], $instId, $isExterno
-                ]);
+                ];
+                if ($cirugiaCol) {
+                    $params[] = $cirugiaVal;
+                }
+                $stmt->execute($params);
                 $currentId = $this->db->lastInsertId();
                 Auditoria::logManual($this->db, $sesion['userId'], 'INSERT', 'protocoloexpe', "Creó protocolo: " . $data['nprotA']);
             }

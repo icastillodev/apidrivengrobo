@@ -135,6 +135,17 @@ async init() {
             const storedInstNorm = String(this.getVal('NombreInst') || '').trim().toLowerCase();
             const slugNorm = String(this.slug || '').trim().toLowerCase();
 
+            // Si ya hay sesión, priorizar redirección directa a ?next= (enlaces de correo),
+            // incluso si la sede actual no coincide (el destino se encargará de validar permisos).
+            if (storedToken) {
+                const redirectUrl = localStorage.getItem('redirectAfterLogin');
+                if (redirectUrl && String(redirectUrl).length > 5 && redirectUrl !== window.location.href) {
+                    localStorage.removeItem('redirectAfterLogin');
+                    window.location.href = redirectUrl;
+                    return;
+                }
+            }
+
             // REDIRECCIÓN SI YA ESTÁ LOGUEADO (misma sede; slug e NombreInst pueden diferir en mayúsculas)
             if (storedToken && storedInstNorm && slugNorm && storedInstNorm === slugNorm) {
                 const role = parseInt(this.getVal('userLevel'));

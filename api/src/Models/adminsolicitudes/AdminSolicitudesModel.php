@@ -11,13 +11,31 @@ use App\Utils\BackblazeB2;
 class AdminSolicitudesModel {
     private $db;
     private $mailer;
+    private $cirugiaCol;
 
     public function __construct($db) {
         $this->db = $db;
         $this->mailer = new MailService();
+        $this->cirugiaCol = $this->detectCirugiaColumn();
+    }
+
+    private function detectCirugiaColumn(): ?string {
+        try {
+            $cols = $this->db->query("SHOW COLUMNS FROM protocoloexpe")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($cols as $c) {
+                $f = (string)($c['Field'] ?? '');
+                if ($f !== '' && preg_match('/^(con_?cirugia|cirugia)$/i', $f)) {
+                    return $f;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Si falla, seguimos sin columna (compatibilidad).
+        }
+        return null;
     }
 
     public function getPendingRequests($instId) {
+        $cirugiaSelect = $this->cirugiaCol ? (", COALESCE(p.`{$this->cirugiaCol}`, 0) AS con_cirugia") : (", 0 AS con_cirugia");
         $fields = "s.idSolicitudProtocolo, s.TipoPedido, 
                    p.idprotA, p.nprotA, p.tituloA, p.InvestigadorACargA, 
                    p.FechaIniProtA, p.FechaFinProtA, p.CantidadAniA,
@@ -29,7 +47,7 @@ class AdminSolicitudesModel {
                     WHERE pe.idprotA = p.idprotA) as Especies,
                    i_orig.NombreInst as Origen,
                    COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), u.UsrA) as Solicitante,
-                   pers.EmailA as Email";
+                   pers.EmailA as Email{$cirugiaSelect}";
 
         $sqlInternal = "SELECT $fields, 'INTERNA' as TipoEtiqueta
                         FROM solicitudprotocolo s
@@ -88,6 +106,17 @@ class AdminSolicitudesModel {
                         WHERE idSolicitudProtocolo = ?";
                 $stmt = $this->db->prepare($sql);
                 $stmt->execute([$decision, $mensaje, $solId]);
+
+                // Si el admin definió cirugía en la solicitud, persistir en el protocolo (si existe la columna).
+                if ($this->cirugiaCol && array_key_exists('protocolo_cirugia', $data)) {
+                    $raw = $data['protocolo_cirugia'];
+                    $val = ($raw === 1 || $raw === '1' || $raw === true || $raw === 'true') ? 1 : 0;
+                    $protId = (int)($meta['idprotA'] ?? 0);
+                    if ($protId > 0) {
+                        $sqlCx = "UPDATE protocoloexpe SET `{$this->cirugiaCol}` = ? WHERE idprotA = ? LIMIT 1";
+                        $this->db->prepare($sqlCx)->execute([$val, $protId]);
+                    }
+                }
 
                 // Al aprobar solicitud de red, crear/asegurar configuración local paralela para esa institución.
                 if ((int)$meta['TipoPedido'] === 2 && !empty($meta['IdInstitucion'])) {

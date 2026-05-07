@@ -41,13 +41,27 @@ class MailService {
      * Base URL del front (para enlaces en correos). Lleva a la institución cuando se pasa $slug.
      */
     private function getBaseUrl($slug = null) {
-        $isLocal = (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false);
-        $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
-        $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
-        if ($isLocal) {
-            $base = $protocol . '://' . $host . '/URBE-API-DRIVEN/front';
+        // Override por entorno (ideal para forzar siempre producción en emails).
+        // Ej: FRONT_PUBLIC_ORIGIN=https://app.groboapp.com
+        //     MAIL_LINKS_FORCE_PROD=1
+        $forceProd = (string) (getenv('MAIL_LINKS_FORCE_PROD') ?: '');
+        $forceProd = trim($forceProd) === '1' || strtolower(trim($forceProd)) === 'true';
+        $originEnv = getenv('FRONT_PUBLIC_ORIGIN');
+        $originEnv = $originEnv !== false ? trim((string) $originEnv) : '';
+        if ($originEnv !== '' && preg_match('#^https?://#i', $originEnv)) {
+            $base = rtrim($originEnv, '/');
         } else {
-            $base = $protocol . '://' . $host;
+            $isLocal = (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false);
+            if ($forceProd) {
+                $isLocal = false;
+            }
+            $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
+            $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
+            if ($isLocal) {
+                $base = $protocol . '://' . $host . '/URBE-API-DRIVEN/front';
+            } else {
+                $base = $protocol . '://' . $host;
+            }
         }
         if ($slug !== null && $slug !== '') {
             return rtrim($base, '/') . '/' . ltrim($slug, '/');
@@ -57,7 +71,17 @@ class MailService {
 
     /** URL base del front (público para uso en controladores). */
     public static function getFrontBaseUrl() {
+        $forceProd = (string) (getenv('MAIL_LINKS_FORCE_PROD') ?: '');
+        $forceProd = trim($forceProd) === '1' || strtolower(trim($forceProd)) === 'true';
+        $originEnv = getenv('FRONT_PUBLIC_ORIGIN');
+        $originEnv = $originEnv !== false ? trim((string) $originEnv) : '';
+        if ($originEnv !== '' && preg_match('#^https?://#i', $originEnv)) {
+            return rtrim($originEnv, '/');
+        }
         $isLocal = (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false);
+        if ($forceProd) {
+            $isLocal = false;
+        }
         $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
         $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';
         if ($isLocal) {
@@ -67,12 +91,22 @@ class MailService {
     }
 
     private function isLocalHostFront(): bool {
+        $forceProd = (string) (getenv('MAIL_LINKS_FORCE_PROD') ?: '');
+        $forceProd = trim($forceProd) === '1' || strtolower(trim($forceProd)) === 'true';
+        if ($forceProd) {
+            return false;
+        }
         $h = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
 
         return strpos($h, 'localhost') !== false || strpos($h, '127.0.0.1') !== false;
     }
 
     private function getFrontOrigin(): string {
+        $originEnv = getenv('FRONT_PUBLIC_ORIGIN');
+        $originEnv = $originEnv !== false ? trim((string) $originEnv) : '';
+        if ($originEnv !== '' && preg_match('#^https?://#i', $originEnv)) {
+            return rtrim($originEnv, '/');
+        }
         $isLocal = $this->isLocalHostFront();
         $protocol = $isLocal ? ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') : 'https';
         $host = $_SERVER['HTTP_HOST'] ?? 'app.groboapp.com';

@@ -5,6 +5,7 @@ export function renderTable(data) {
 
     data.forEach(row => {
         const isInternal = row.TipoEtiqueta === 'INTERNA';
+        const cxOn = Number(row?.con_cirugia || row?.cirugia || 0) === 1;
         const badgeClass = isInternal ? 'badge-type-internal' : 'badge-type-network';
         const badgeLabel = isInternal ? (txt.tipo_interna || 'INTERNA') : (txt.tipo_red || 'RED');
         const icon = !isInternal ? '<i class="bi bi-globe me-1"></i>' : '';
@@ -26,6 +27,7 @@ export function renderTable(data) {
                 <div class="small text-primary font-monospace mt-1 fw-bold">
                     <i class="bi bi-hash"></i> ${row.nprotA}
                 </div>
+                ${cxOn ? `<div class="mt-1"><span class="badge bg-warning text-dark" style="font-size:10px;"><i class="bi bi-heart-pulse me-1"></i>${(window.txt?.admin_protocolos?.cirugia_badge || 'Cirugía')}</span></div>` : ''}
             </td>
             
             <td class="px-3">

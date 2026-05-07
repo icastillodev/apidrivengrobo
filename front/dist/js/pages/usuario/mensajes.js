@@ -1140,10 +1140,23 @@ export async function initMensajes(opts = {}) {
             nuevoMensajeEnviando = true;
             setModalNuevoEnviando(true);
             try {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: t.msg_enviando || 'Enviando…',
+                        text: t.msg_enviando_correo || 'Enviando correo…',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        didOpen: () => Swal.showLoading(),
+                    });
+                }
                 const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payloadInst);
                 if (res.status === 'success') {
                     avisoCorreoMensajeSiFallo(res);
                     const hid = res.data?.IdMensajeHilo;
+                    // IMPORTANTE: el modal bloquea hide mientras nuevoMensajeEnviando=true.
+                    // Bajamos flags antes de cerrar para que el usuario vea el mensaje enviado.
+                    nuevoMensajeEnviando = false;
+                    setModalNuevoEnviando(false);
                     modal?.hide();
                     const a = document.getElementById('nuevo-asunto');
                     const c = document.getElementById('nuevo-cuerpo');
@@ -1157,12 +1170,15 @@ export async function initMensajes(opts = {}) {
                     if (window.NotificationManager?.check) {
                         window.NotificationManager.check();
                     }
+                    if (typeof Swal !== 'undefined') Swal.close();
                 } else if (typeof Swal !== 'undefined') {
+                    Swal.close();
                     Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
                 }
             } finally {
                 nuevoMensajeEnviando = false;
                 setModalNuevoEnviando(false);
+                if (typeof Swal !== 'undefined') Swal.close();
             }
             return;
         }
@@ -1196,10 +1212,22 @@ export async function initMensajes(opts = {}) {
         nuevoMensajeEnviando = true;
         setModalNuevoEnviando(true);
         try {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: t.msg_enviando || 'Enviando…',
+                    text: t.msg_enviando_correo || 'Enviando correo…',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpen: () => Swal.showLoading(),
+                });
+            }
             const res = await API.request('/comunicacion/mensajes/enviar', 'POST', payload);
 
             if (res.status === 'success') {
                 const hid = res.data?.IdMensajeHilo;
+                // IMPORTANTE: el modal bloquea hide mientras nuevoMensajeEnviando=true.
+                nuevoMensajeEnviando = false;
+                setModalNuevoEnviando(false);
                 modal?.hide();
                 const a = document.getElementById('nuevo-asunto');
                 const c = document.getElementById('nuevo-cuerpo');
@@ -1211,12 +1239,15 @@ export async function initMensajes(opts = {}) {
                 avisoCorreoMensajeSiFallo(res);
                 await loadHilos();
                 if (hid) await openHilo(hid);
+                if (typeof Swal !== 'undefined') Swal.close();
             } else if (typeof Swal !== 'undefined') {
+                Swal.close();
                 Swal.fire({ icon: 'error', text: res.message || t.err_generico || '' });
             }
         } finally {
             nuevoMensajeEnviando = false;
             setModalNuevoEnviando(false);
+            if (typeof Swal !== 'undefined') Swal.close();
         }
     });
 

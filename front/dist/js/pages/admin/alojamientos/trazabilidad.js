@@ -359,6 +359,11 @@ async toggleRow(idAlojamiento, idEspecie) {
         const canAddBox = cajasActuales < limite;
         const catsDatos = data.categorias_datos || data.categorias || [];
         const catsInicio = data.categorias_inicio || [];
+        const faltaCfgProt = Number(data.faltante_config_traz_protocolo || 0) === 1;
+        const faltaCfgInicioProt = Number(data.faltante_config_traz_protocolo_inicio || 0) === 1;
+        const faltaCfgDatosProt = Number(data.faltante_config_traz_protocolo_datos || 0) === 1;
+        const idProt = Number(data.idprotA || 0);
+        const allowTraz = !faltaCfgProt;
         
         // MAGIA DE PERMISOS: Verificamos si estamos en modo lectura
         const isReadOnly = this.isReadOnly || false;
@@ -478,20 +483,32 @@ async toggleRow(idAlojamiento, idEspecie) {
                                             </li>
                                         </ul>
                                     </div>
-                                    ${!isReadOnly ? `
+                                    ${!isReadOnly && allowTraz ? `
                                     <button type="button" class="btn btn-xs border ${cxOn ? 'btn-warning text-dark' : 'btn-outline-secondary'}" title="${__ubEsc(txt.trace_surgery_btn_title || '')}" onclick="window.TrazabilidadUI.toggleCirugia(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-heart-pulse"></i></button>
-                                    <button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_ficha_btn_title || '')}" onclick="window.TrazabilidadUI.editSubjectFicha(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>
+                                    ${!faltaCfgInicioProt ? `<button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_ficha_btn_title || '')}" onclick="window.TrazabilidadUI.editSubjectFicha(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>` : ''}
                                     <button class="btn btn-xs btn-light border text-primary" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
                                     <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>` : ''}
                                 </div>
                             </div>`;
                         
+                        if (!isReadOnly && faltaCfgProt) {
+                            const missingBits = []
+                            if (faltaCfgInicioProt) missingBits.push(__ubEsc(txt.trace_falta_cfg_missing_inicio || 'Inicio (ficha del animal)'));
+                            if (faltaCfgDatosProt) missingBits.push(__ubEsc(txt.trace_falta_cfg_missing_datos || 'Datos'));
+                            const missingTxt = missingBits.length ? ('<br><span class="text-muted">' + __ubEsc(txt.trace_falta_cfg_missing_prefix || 'Falta:') + ' ' + missingBits.join(', ') + '</span>') : '';
+                            html += `
+                            <div class="alert alert-warning small py-2 mb-3">
+                                <div class="fw-bold">${__ubEsc(txt.trace_falta_cfg_title || 'Falta configuración de trazabilidad')}</div>
+                                <div>${__ubEsc((txt.trace_falta_cfg_body || 'Este protocolo no tiene trazabilidad configurada para esta especie. Debe configurarla para poder registrar Inicio/Datos.').replace('{idprotA}', String(idProt || '')))}${missingTxt}</div>
+                            </div>`;
+                        }
+
                         const vin = unidad.valores_inicio || {};
                         const valIni = (idCat) => {
                             const o = vin[idCat] || vin[String(idCat)];
                             return o && o.Valor != null && o.Valor !== '' ? String(o.Valor) : '';
                         };
-                        if (!isReadOnly && catsInicio.length > 0) {
+                        if (!isReadOnly && allowTraz && catsInicio.length > 0) {
                             html += `
                             <form class="mb-3 pb-2 border-bottom border-secondary border-opacity-25" onsubmit="event.preventDefault(); window.guardarInicioTraz(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie}, this)">
                                 <div class="small fw-bold text-secondary mb-2 text-uppercase" style="font-size:10px">${__ubEsc(txt.trace_inicio_title || '')}</div>
@@ -505,7 +522,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                             html += `<div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-primary fw-bold shadow-sm">${__ubEsc(txt.trace_inicio_guardar || 'Guardar')}</button></div></div></form>`;
                         }
                         // Ocultamos el formulario EAV si es solo lectura
-                        if (!isReadOnly) {
+                        if (!isReadOnly && allowTraz) {
                             html += `
                             <form onsubmit="event.preventDefault(); window.guardarObservacion(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie}, this)">
                                     <div class="row g-2 align-items-end">
@@ -540,7 +557,8 @@ async toggleRow(idAlojamiento, idEspecie) {
                     });
                 }
                 
-                if (!isReadOnly) {
+                // Para crear sujetos se requiere configuración completa del protocolo (inicio + datos).
+                if (!isReadOnly && allowTraz && catsInicio.length > 0 && catsDatos.length > 0) {
                     html += `
                         <div class="text-center mt-2">
                             <button class="btn btn-sm btn-outline-success fw-bold shadow-sm" onclick="window.TrazabilidadUI.addSubject(${caja.IdCajaAlojamiento}, ${idAlojamiento}, ${idEspecie})">

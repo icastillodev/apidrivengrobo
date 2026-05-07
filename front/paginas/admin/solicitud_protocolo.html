@@ -201,6 +201,12 @@
                     <form id="form-decision">
                         <input type="hidden" name="idSolicitud" id="decision-id">
                         <input type="hidden" name="decision" id="decision-val">
+                        <input type="hidden" name="protocolo_cirugia" id="decision-protocolo-cirugia" value="0">
+
+                        <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="small fw-bold text-muted text-uppercase" data-i18n="solicitudprotocolo.modal.label_cirugia"></div>
+                            <div id="decision-cirugia-ui"></div>
+                        </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold text-secondary small text-uppercase" data-i18n="solicitudprotocolo.modal.label_mensaje"></label>

@@ -184,6 +184,40 @@ export async function openRequestDetails(row) {
     const btns = document.querySelectorAll('#form-decision button');
     btns.forEach(b => b.disabled = false);
 
+    // 6.1 Cirugía (flag de protocolo) — editable por admin al aprobar
+    try {
+        const protTxt = window.txt?.admin_protocolos || {};
+        const on = Number(row?.con_cirugia || row?.cirugia || 0) === 1;
+        const hid = document.getElementById('decision-protocolo-cirugia');
+        if (hid) hid.value = on ? '1' : '0';
+        const wrap = document.getElementById('decision-cirugia-ui');
+        if (wrap) {
+            const cls = on ? 'btn-warning text-dark' : 'btn-outline-secondary';
+            const icon = on ? 'on' : 'off';
+            wrap.innerHTML = `
+                <button type="button"
+                        class="btn btn-sm ${cls}"
+                        id="btn-toggle-cirugia-sol"
+                        title="${protTxt.cirugia_btn_title || 'Marcar o quitar cirugía en este protocolo'}">
+                    <i class="bi bi-toggle-${icon}"></i>
+                    <span class="ms-1">${protTxt.cirugia_btn_lbl || 'Cirugía'}</span>
+                </button>
+            `;
+            const btn = document.getElementById('btn-toggle-cirugia-sol');
+            if (btn) {
+                btn.onclick = () => {
+                    const cur = (hid && String(hid.value) === '1');
+                    const next = !cur;
+                    if (hid) hid.value = next ? '1' : '0';
+                    btn.className = `btn btn-sm ${next ? 'btn-warning text-dark' : 'btn-outline-secondary'}`;
+                    btn.innerHTML = `<i class="bi bi-toggle-${next ? 'on' : 'off'}"></i><span class="ms-1">${protTxt.cirugia_btn_lbl || 'Cirugía'}</span>`;
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('cirugia toggle solicitud', e);
+    }
+
     // 7. Mostrar Modal
     new bootstrap.Modal(document.getElementById('modal-details')).show();
 }

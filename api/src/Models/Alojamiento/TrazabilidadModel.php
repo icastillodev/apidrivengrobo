@@ -36,6 +36,20 @@ class TrazabilidadModel {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
+    private function hasCategoriasConfigForProtocolo(int $idEspA, int $idProtA, string $alcance): bool {
+        $alcance = $alcance === self::TRAZ_ALCANCE_INICIO ? self::TRAZ_ALCANCE_INICIO : self::TRAZ_ALCANCE_DATOS;
+        if ($idProtA <= 0) {
+            return false;
+        }
+        $st = $this->db->prepare(
+            'SELECT 1 FROM categoriadatosunidadalojamiento c
+             WHERE c.IdEspA = ? AND c.alcance_traz = ? AND c.Habilitado != 2 AND c.idprotA = ?
+             LIMIT 1'
+        );
+        $st->execute([$idEspA, $alcance, $idProtA]);
+        return (bool) $st->fetchColumn();
+    }
+
     public function getUnidadTrazContext(int $idEspecieAlojUnidad, int $idInstitucion): ?array {
         $stmt = $this->db->prepare(
             'SELECT a.TipoAnimal AS idEspA, a.idprotA, a.IdAlojamiento
@@ -90,7 +104,7 @@ class TrazabilidadModel {
         return substr($s, 0, 24);
     }
 
-    /** Prefijo fijo de caja: letra del tipo de protocolo + "A" + número de caja en el tramo. */
+    /** Prefijo fijo de caja: "A" + letra del tipo de protocolo + número de caja en el tramo. */
     private function construirPrefijoCaja(string $letra, int $numeroEnTramo): string {
         $L = strtoupper(trim($letra));
         if ($L === '') {
@@ -105,7 +119,7 @@ class TrazabilidadModel {
             $L = 'A';
         }
 
-        return $L . 'A' . $numeroEnTramo;
+        return 'A' . $L . $numeroEnTramo;
     }
 
     private function primeraLetraIdentificadora(string $nombreTipo): string {
@@ -431,6 +445,19 @@ class TrazabilidadModel {
         $categoriasDatos = $this->listCategoriasTrazPorContexto((int)$idEspecie, $idProtA, self::TRAZ_ALCANCE_DATOS);
         $categoriasInicio = $this->listCategoriasTrazPorContexto((int)$idEspecie, $idProtA, self::TRAZ_ALCANCE_INICIO);
 
+        $protIdInt = $idProtA !== null ? (int) $idProtA : 0;
+        $tieneInicioProt = $protIdInt > 0
+            ? $this->hasCategoriasConfigForProtocolo((int)$idEspecie, $protIdInt, self::TRAZ_ALCANCE_INICIO)
+            : false;
+        $tieneDatosProt = $protIdInt > 0
+            ? $this->hasCategoriasConfigForProtocolo((int)$idEspecie, $protIdInt, self::TRAZ_ALCANCE_DATOS)
+            : false;
+        // Regla estricta: para poder operar trazabilidad en alojamientos, el protocolo debe tener
+        // configuradas categorías específicas (idprotA=protocolo) en ambos alcances.
+        $faltaCfgInicio = ($protIdInt > 0 && !$tieneInicioProt);
+        $faltaCfgDatos = ($protIdInt > 0 && !$tieneDatosProt);
+        $tieneConfigProtocolo = ($protIdInt > 0 && !$faltaCfgInicio && !$faltaCfgDatos);
+
         $stmtTipo = $this->db->prepare("
             SELECT t.NombreTipoAlojamiento, a.CantidadCaja 
             FROM alojamiento a 
@@ -461,6 +488,10 @@ class TrazabilidadModel {
             'categorias_inicio' => $categoriasInicio,
             'tipoAlojamiento' => $tipoAlojamiento,
             'limiteCajas' => $limiteCajas,
+            'idprotA' => $protIdInt,
+            'faltante_config_traz_protocolo' => ($protIdInt > 0 && !$tieneConfigProtocolo) ? 1 : 0,
+            'faltante_config_traz_protocolo_inicio' => $faltaCfgInicio ? 1 : 0,
+            'faltante_config_traz_protocolo_datos' => $faltaCfgDatos ? 1 : 0,
         ];
     }
 
