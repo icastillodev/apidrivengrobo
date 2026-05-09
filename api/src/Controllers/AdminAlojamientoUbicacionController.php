@@ -96,4 +96,25 @@ class AdminAlojamientoUbicacionController {
         }
         exit;
     }
+
+    public function deleteCatalog() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int)$sesion['instId'];
+            $input = json_decode(file_get_contents('php://input'), true) ?? [];
+            $tipo = $input['tipo'] ?? '';
+            $id = (int)($input['id'] ?? 0);
+            if ($id <= 0) {
+                throw new \InvalidArgumentException('ID faltante.');
+            }
+            $this->model->deleteCatalog($tipo, $id, $instId);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

@@ -43,8 +43,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de flujos de protocolos
-                    initConfigProtocolos();
+                    // Inicialización de la lógica de flujos de protocolos (await: datos antes de hideLoader)
+                    await initConfigProtocolos();
                     translatePage();
                     
                     console.log("✅ Configuración de Protocolos inicializada correctamente.");

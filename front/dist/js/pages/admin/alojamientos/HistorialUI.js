@@ -460,7 +460,10 @@ renderTable() {
 
     async loadCfgEspecies(idProt) {
         const container = document.getElementById('cfg-list-especies');
-        container.innerHTML = '<div class="spinner-border spinner-border-sm text-warning"></div> Cargando...';
+        const txtA = window.txt?.alojamientos || {};
+        const gen = window.txt?.generales || {};
+        const loadMsg = escListText(txtA.cfg_cargando || gen.msg_cargando || '…');
+        container.innerHTML = `<div class="text-center small text-muted py-2"><div class="spinner-border spinner-border-sm text-warning mb-2" role="status"></div><div>${loadMsg}</div></div>`;
         
         document.getElementById('cfg-list-tipos').innerHTML = '<span class="small text-muted fst-italic">Seleccione una especie primero.</span>';
 

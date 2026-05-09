@@ -379,7 +379,8 @@ export async function initMensajes(opts = {}) {
         if (!list) return;
 
         if (!silent) {
-            list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.msg_cargando || '')}</div>`;
+            const loadingMsg = escapeHtml(t.msg_cargando || window.txt?.generales?.msg_cargando || '…');
+            list.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadingMsg}</div></div>`;
         }
 
         const q = encodeURIComponent(alcance);

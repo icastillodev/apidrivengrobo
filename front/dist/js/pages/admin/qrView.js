@@ -1,5 +1,12 @@
 import { API } from '../../api.js';
 
+function qrViewEsc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;');
+}
+
 let isAdmin = false;
 let currentHistoryData = [];
 
@@ -99,6 +106,16 @@ window.cerrarSesionQR = () => {
  * Carga de datos y renderizado de tabla (Limpia, sin repetir tipo de caja)
  */
 async function cargarDatosQR(historiaId) {
+    const tbodyPre = document.getElementById('tbody-historial');
+    const qrContentEl = document.getElementById('qr-content');
+    const inlineRefetch = !!(tbodyPre && qrContentEl && !qrContentEl.classList.contains('d-none'));
+    if (inlineRefetch) {
+        const ta0 = window.txt?.alojamientos || {};
+        const gen0 = window.txt?.generales || {};
+        const colspan0 = isAdmin ? 9 : 8;
+        const loadMsg0 = qrViewEsc(ta0.trace_loading || gen0.msg_cargando || '…');
+        tbodyPre.innerHTML = `<tr><td colspan="${colspan0}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsg0}</div></td></tr>`;
+    }
     try {
         const res = await API.request(`/alojamiento/history?historia=${historiaId}`);
         if (res.status === 'success' && res.data.length > 0) {
@@ -172,8 +189,29 @@ async function cargarDatosQR(historiaId) {
 
             document.getElementById('qr-loader').classList.add('d-none');
             document.getElementById('qr-content').classList.remove('d-none');
+        } else {
+            const ta = window.txt?.alojamientos || {};
+            const loader = document.getElementById('qr-loader');
+            const title = window.txt?.generales?.error || 'Error';
+            const msg = qrViewEsc((res && res.message && String(res.message).trim()) || ta.qr_error_no_data || '');
+            if (loader) {
+                loader.innerHTML = `<i class="bi bi-exclamation-octagon text-danger" style="font-size: 3rem;"></i><h5 class="mt-3 fw-bold text-danger">${qrViewEsc(title)}</h5><p class="text-muted">${msg}</p>`;
+                loader.classList.remove('d-none');
+            }
+            document.getElementById('qr-content')?.classList.add('d-none');
         }
-    } catch (e) { console.error("Error cargando QR:", e); }
+    } catch (e) {
+        console.error('Error cargando QR:', e);
+        const ta = window.txt?.alojamientos || {};
+        const loader = document.getElementById('qr-loader');
+        const title = window.txt?.generales?.error || 'Error';
+        const msg = qrViewEsc(ta.qr_error_denied || '');
+        if (loader) {
+            loader.innerHTML = `<i class="bi bi-exclamation-octagon text-danger" style="font-size: 3rem;"></i><h5 class="mt-3 fw-bold text-danger">${qrViewEsc(title)}</h5><p class="text-muted">${msg}</p>`;
+            loader.classList.remove('d-none');
+        }
+        document.getElementById('qr-content')?.classList.add('d-none');
+    }
 }
 
 function renderFooterQR(historiaId, isFinalizado) {

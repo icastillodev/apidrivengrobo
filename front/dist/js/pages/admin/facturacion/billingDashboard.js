@@ -1,5 +1,14 @@
 import { formatBillingMoney, billingTipoExento } from './billingLocale.js';
 
+function escBillingDash(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 /**
  * Orquestador del Dashboard
  */
@@ -24,14 +33,18 @@ function renderStatsCards(data) {
     const container = document.getElementById('stats-container');
     const t = data.totales || {};
     const f = window.txt?.facturacion || {};
+    const gd = parseFloat(t.globalDeuda) || 0;
+    const tp = parseFloat(t.totalPagado) || 0;
+    const totalAgregado = gd + tp;
 
     const configs = [
-        { key: 'deuda', always: true, label: f.deuda_total || 'DEUDA TOTAL', val: t.globalDeuda, col: '#dc3545' },
-        { key: 'pagado', always: false, label: f.total_pagado_lbl || 'TOTAL PAGADO', val: t.totalPagado || 0, col: '#198754' },
-        { key: 'anim', always: false, label: f.debe_animales || 'DEBE ANIMALES', val: t.deudaAnimales || 0, col: '#ffc107' },
-        { key: 'react', always: false, label: f.debe_reactivos || 'DEBE REACTIVOS', val: t.deudaReactivos || 0, col: '#0dcaf0' },
-        { key: 'aloj', always: false, label: f.debe_alojamiento || 'DEBE ALOJAMIENTO', val: t.deudaAlojamiento || 0, col: '#6610f2' },
-        { key: 'ins', always: false, label: f.debe_insumos || 'DEBE INSUMOS', val: t.deudaInsumos || 0, col: '#0d6efd' }
+        { key: 'deuda', always: true, label: f.deuda_total || 'DEUDA TOTAL', val: gd, col: '#dc3545' },
+        { key: 'totalAgg', always: true, label: f.dashboard_total_agregado || 'TOTAL AGREGADO', val: totalAgregado, col: '#343a40' },
+        { key: 'pagado', always: false, label: f.total_pagado_lbl || 'TOTAL PAGADO', val: tp, col: '#198754' },
+        { key: 'anim', always: false, label: f.debe_animales || 'DEBE ANIMALES', val: parseFloat(t.deudaAnimales) || 0, col: '#ffc107' },
+        { key: 'react', always: false, label: f.debe_reactivos || 'DEBE REACTIVOS', val: parseFloat(t.deudaReactivos) || 0, col: '#0dcaf0' },
+        { key: 'aloj', always: false, label: f.debe_alojamiento || 'DEBE ALOJAMIENTO', val: parseFloat(t.deudaAlojamiento) || 0, col: '#6610f2' },
+        { key: 'ins', always: false, label: f.debe_insumos || 'DEBE INSUMOS', val: parseFloat(t.deudaInsumos) || 0, col: '#0d6efd' }
     ];
 
     container.innerHTML = configs
@@ -101,7 +114,17 @@ export function renderInvestigadoresTable(data) {
         invMap[uid].pagado += pagadoProt;
     });
 
-    tbody.innerHTML = Object.keys(invMap).map(uid => {
+    const invKeys = Object.keys(invMap);
+    if (invKeys.length === 0) {
+        const colspan = isDeptoSaldoHistorial ? 6 : 5;
+        const emptyMsg = escBillingDash(
+            tf.dashboard_sin_investigadores || tf.inst_sin_investigadores || ''
+        );
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-4 text-muted small">${emptyMsg || '—'}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = invKeys.map(uid => {
         const i = invMap[uid];
         const histCell = isDeptoSaldoHistorial
             ? `<td class="text-center">
@@ -114,7 +137,7 @@ export function renderInvestigadoresTable(data) {
         return `
             <tr class="text-center align-middle">
                 <td class="text-start ps-4">
-                    <div class="fw-bold">${i.nombre} <span class="text-muted small">(ID: ${uid})</span></div>
+                    <div class="fw-bold">${escBillingDash(i.nombre)} <span class="text-muted small">(ID: ${escBillingDash(uid)})</span></div>
                 </td>
                 <td class="text-danger fw-bold">$ ${formatBillingMoney(i.deuda)}</td>
                 <td class="text-success fw-bold">$ ${formatBillingMoney(i.pagado)}</td>

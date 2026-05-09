@@ -11,7 +11,8 @@ console.log('[usuarios.js] módulo cargado (parse OK)');
 
 /** Filas de la página actual (servidor). */
 let pageUsers = [];
-let pageUsersFull = null; // Guardará todos los datos en memoria
+/** Solo si caben todos los usuarios en una página de tabla (≤ rowsPerPage): evita refetch al paginar. */
+let pageUsersFull = null;
 /** Total de usuarios que cumplen filtros (servidor). */
 let totalUsuariosList = 0;
 let currentPage = 1;
@@ -63,7 +64,10 @@ async function fetchUsuariosList(opts = {}) {
     }
 
     if (loading === 'inline' && tbody) {
-        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
+        const msg =
+            window.txt?.admin_usuarios?.cargando_lista ||
+            window.txt?.generales?.msg_cargando ||
+            '…';
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
     }
     const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
@@ -90,9 +94,7 @@ async function fetchUsuariosList(opts = {}) {
             window._allUsersForRouter = pageUsers;
             renderTable(pageUsers);
 
-            if (!opts.skipFullLoad && totalUsuariosList > rowsPerPage) {
-                triggerFullLoad();
-            } else if (totalUsuariosList <= rowsPerPage) {
+            if (totalUsuariosList <= rowsPerPage) {
                 pageUsersFull = pageUsers;
             }
         }
@@ -102,16 +104,6 @@ async function fetchUsuariosList(opts = {}) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
         }
     }
-}
-
-function triggerFullLoad() {
-    const q = buildUsersListQuery({ fullLoad: true });
-    API.request(`/users/institution?${q.toString()}`).then(res => {
-        if (res?.status === 'success') {
-            pageUsersFull = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-            totalUsuariosList = pageUsersFull.length;
-        }
-    }).catch(e => console.error("Error bg load usuarios:", e));
 }
 
 function getFormPageByCategoria(categoria = '') {
@@ -469,9 +461,14 @@ function buildModalHtml(opts) {
     return html;
 }
 
-window.openUserModal = async (u) => {
-    console.log('[usuarios] openUserModal inicio', u && u.IdUsrA);
+window.openUserModal = async (initial) => {
     const instId = localStorage.getItem('instId');
+    if (!initial || initial.IdUsrA == null || !instId) {
+        console.warn('[usuarios] openUserModal: falta usuario o institución');
+        return;
+    }
+    const uid = encodeURIComponent(initial.IdUsrA);
+    console.log('[usuarios] openUserModal inicio', initial.IdUsrA);
     const instName = localStorage.getItem('NombreInst') || 'URBE - Gestión';
     const modalElement = document.getElementById('modal-user');
     const content = document.getElementById('modal-content');
@@ -481,15 +478,20 @@ window.openUserModal = async (u) => {
     const myModal = bootstrap.Modal.getOrCreateInstance(modalElement);
     myModal.show();
     console.log('[usuarios] peticiones API...');
-    const [resProt, resForms, resDeptos, resAloj, resProtocolsUsed, resInsumosPedidos, resInsumosExpPedidos] = await Promise.all([
-        API.request('/users/protocols?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
-        API.request('/users/forms?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
+    const [resOne, resProt, resForms, resDeptos, resAloj, resProtocolsUsed, resInsumosPedidos, resInsumosExpPedidos] = await Promise.all([
+        API.request('/users/one?id=' + uid),
+        API.request('/users/protocols?id=' + uid + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/forms?id=' + uid + '&inst=' + encodeURIComponent(instId)),
         API.request('/deptos/list?inst=' + encodeURIComponent(instId)),
-        API.request('/users/alojamientos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
-        API.request('/users/protocols-used-in-forms?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
-        API.request('/users/insumos-pedidos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId)),
-        API.request('/users/insumos-exp-pedidos?id=' + encodeURIComponent(u.IdUsrA) + '&inst=' + encodeURIComponent(instId))
+        API.request('/users/alojamientos?id=' + uid + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/protocols-used-in-forms?id=' + uid + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/insumos-pedidos?id=' + uid + '&inst=' + encodeURIComponent(instId)),
+        API.request('/users/insumos-exp-pedidos?id=' + uid + '&inst=' + encodeURIComponent(instId))
     ]);
+    let u = initial;
+    if (resOne && resOne.status === 'success' && resOne.data) {
+        u = resOne.data;
+    }
     console.log('[usuarios] API respondida');
     const protocolos = resProt.status === 'success' ? resProt.data : [];
     const formularios = resForms.status === 'success' ? resForms.data : [];
@@ -536,6 +538,7 @@ window.openUserModal = async (u) => {
 
 window.saveUserData = async (id) => {
     const form = document.getElementById('form-usuario-detalle');
+    if (!form) return;
     const formData = new FormData(form);
 
     // Enviamos: 1. Endpoint, 2. Método, 3. Datos
@@ -543,12 +546,17 @@ window.saveUserData = async (id) => {
     
     if (res.status === 'success') {
         alert(window.txt?.admin_usuarios?.saved_ok || "¡Datos actualizados con éxito!");
-        await fetchUsuariosList();
-        
-        // Cerramos el modal usando Bootstrap
-        const modalEl = document.getElementById('modal-user');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
+        const prev = window._lastUserFichaData?.u || {};
+        const uMerged = Object.assign({}, prev, {
+            ApellidoA: String(formData.get('ApellidoA') ?? ''),
+            NombreA: String(formData.get('NombreA') ?? ''),
+            Correo: String(formData.get('EmailA') ?? ''),
+            CelularA: String(formData.get('CelularA') ?? ''),
+            iddeptoA: formData.get('iddeptoA'),
+        });
+        pageUsersFull = null;
+        await fetchUsuariosList({ forceServer: true });
+        await openUserModal(uMerged);
     } else {
         alert((window.txt?.admin_usuarios?.error_msg || "Hubo un error:") + " " + res.message);
     }

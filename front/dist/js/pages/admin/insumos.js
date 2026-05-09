@@ -1219,7 +1219,7 @@ window.downloadInsumoPDF = async (id) => {
     });
 
     const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; line-height: 1.4;">
+        <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; line-height: 1.4; background: #ffffff;">
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                 <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
                 <h4 style="margin: 5px 0; text-transform: uppercase;">Ficha de Pedido: Insumos Experimentales</h4>
@@ -1268,7 +1268,7 @@ window.downloadInsumoPDF = async (id) => {
         margin: [18, 18, 18, 18], 
         filename: `Pedido_Insumos_${id}_${new Date().getTime()}.pdf`, 
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true },
+        html2canvas: { scale: 3, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 

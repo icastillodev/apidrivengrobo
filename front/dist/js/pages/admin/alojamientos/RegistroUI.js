@@ -172,7 +172,9 @@ export const RegistroUI = {
     async loadEspecies() {
         const container = document.getElementById('reg-list-especies');
         const txt = window.txt?.alojamientos || {};
-        container.innerHTML = `<div class="spinner-border spinner-border-sm text-warning"></div> ${txt.cfg_cargando || 'Cargando...'}`;
+        const gen = window.txt?.generales || {};
+        const loadMsg = String(txt.cfg_cargando || gen.msg_cargando || '…').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        container.innerHTML = `<div class="text-center small text-muted py-2"><div class="spinner-border spinner-border-sm text-warning mb-2" role="status"></div><div>${loadMsg}</div></div>`;
         
         document.getElementById('reg-list-tipos').innerHTML = '';
         document.getElementById('step-4-final').classList.add('d-none');

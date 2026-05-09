@@ -452,6 +452,11 @@ window.openAnimalModal = async (a) => {
     if (typeof translatePage === 'function') translatePage();
     if (btnPdfFoot) btnPdfFoot.disabled = false;
 
+    const selAn = document.getElementById('modal-anestesicos-select');
+    if (selAn && !selAn.disabled) {
+        selAn.addEventListener('change', () => window.saveAnestesicosAnimalAdmin());
+    }
+
     // Actualizar org/ámbito al cambiar departamento
     const selDepto = document.getElementById('modal-depto-animal');
     if (selDepto) selDepto.onchange = function() { window.updateDeptoOrgAmbito(this, 'modal-org-animal', 'modal-ambito-animal'); };
@@ -617,6 +622,54 @@ function renderResearcherContact(a) {
     </div>`;
 }
 
+function renderAnestesicosAdminBlock(a) {
+    if (!Object.prototype.hasOwnProperty.call(a, 'TieneAnestesicos')) return '';
+    const t = window.txt?.admin_animales?.modal || {};
+    const permite = Number(a.PermiteAnestesicos || 0) === 1;
+    const tiene = Number(a.TieneAnestesicos || 0) === 1;
+    const optNo = t.anestesicos_opcion_no || 'No';
+    const optSi = t.anestesicos_opcion_si || 'Sí';
+    const opts = [
+        `<option value="0" ${!tiene ? 'selected' : ''}>${optNo}</option>`,
+        `<option value="1" ${tiene ? 'selected' : ''}>${optSi}</option>`
+    ].join('');
+    const disabled = permite ? '' : ' disabled';
+    const hint = permite
+        ? `<small class="text-muted d-block mt-1">${t.anestesicos_help || ''}</small>`
+        : `<div class="alert alert-warning py-1 px-2 small mb-0 mt-1">${t.anestesicos_sin_permiso_protocolo || ''}</div>`;
+    return `
+            <div class="col-12">
+                <label class="form-label small fw-bold text-muted uppercase">${t.anestesicos_label || 'Anestésicos (pedido)'}</label>
+                <select id="modal-anestesicos-select" class="form-select form-select-sm"${disabled} data-idform="${a.idformA}">
+                    ${opts}
+                </select>
+                ${hint}
+            </div>`;
+}
+
+window.saveAnestesicosAnimalAdmin = async function () {
+    const sel = document.getElementById('modal-anestesicos-select');
+    const id = sel?.getAttribute('data-idform') || document.getElementById('current-idformA')?.value;
+    if (!sel || !id) return;
+    try {
+        const res = await API.request('/animals/update-anestesicos', 'POST', {
+            idformA: parseInt(id, 10),
+            tieneAnestesicos: parseInt(sel.value, 10) ? 1 : 0
+        });
+        if (res.status !== 'success') {
+            if (window.Swal) await Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
+            return;
+        }
+        const ok = window.txt?.admin_animales?.modal?.anestesicos_guardado_ok || 'Actualizado';
+        if (window.Swal) {
+            Swal.fire({ icon: 'success', title: ok, toast: true, position: 'top-end', timer: 1500, showConfirmButton: false });
+        }
+    } catch (e) {
+        console.error(e);
+        if (window.Swal) await Swal.fire(window.txt?.generales?.error || 'Error', String(e?.message || e), 'error');
+    }
+};
+
 // --- CORRECCIÓN VISUALIZACIÓN "REVISADO POR" ---
 function renderAdminSection(a, identity, disableEstado = false) {
     // Mostrar nombre + ID como en Reactivos; si no hay visor → "Falta revisar"
@@ -650,6 +703,7 @@ function renderAdminSection(a, identity, disableEstado = false) {
                 <label class="form-label small fw-bold text-muted uppercase">Aclaración Admin (Auto-guardado)</label>
                 <textarea id="modal-aclaracionadm" class="form-control form-control-sm" rows="2" onblur="window.updateAnimalStatusQuick()">${a.AclaracionAdm || ''}</textarea>
             </div>
+            ${renderAnestesicosAdminBlock(a)}
         </div>
     </div>`;
 }
@@ -1620,7 +1674,7 @@ window.downloadAnimalPDF = async (id) => {
 
     // HTML del Template para PDF
     const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 10px;">
+        <div style="font-family: Arial, sans-serif; color: #333; padding: 10px; background: #ffffff;">
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                 <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
                 <h4 style="margin: 5px 0; color: #444;">FICHA DE PEDIDO: ANIMAL</h4>
@@ -1693,7 +1747,7 @@ window.downloadAnimalPDF = async (id) => {
     const opt = {
         margin: [18, 18, 18, 18],
         filename: `GROBO_${inst}_Pedido_${id}.pdf`,
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 

@@ -1,0 +1,16 @@
+---
+description: >-
+  Cualquier cambio en base de datos debe quedar documentado en docs/migrations/
+  como archivo SQL nuevo y ejecutable.
+alwaysApply: true
+---
+
+# Migraciones BD → archivo SQL de referencia
+
+Si **añades o modificas** tablas, columnas, índices, datos semilla u otro SQL que deba aplicarse en el servidor:
+
+1. Crear **un archivo nuevo** en `docs/migrations/` con nombre `YYYY-MM-DD-descripcion-corta.sql`.
+2. Incluir **todo el SQL** de ese cambio (comentarios al inicio explicando contexto y orden si aplica).
+3. No sustituir migraciones ya aplicadas en producción: si hay que corregir, nuevo archivo o sección comentada con la fecha.
+
+Ver convención detallada en `docs/migrations/README.md`.

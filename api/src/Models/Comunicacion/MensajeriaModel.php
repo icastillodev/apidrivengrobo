@@ -584,6 +584,41 @@ class MensajeriaModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Para correos de respuesta: el mensaje publicado justo antes del último (el último es el recién insertado).
+     *
+     * @return array{cuerpo: string, autor: string}|null
+     */
+    public function getPenultimoMensajeEnHilo(int $hiloId): ?array {
+        if ($hiloId <= 0) {
+            return null;
+        }
+        $stmt = $this->db->prepare('
+            SELECT m.Cuerpo, m.IdUsrRemitente,
+                   TRIM(CONCAT(COALESCE(p.NombreA, \'\'), \' \', COALESCE(p.ApellidoA, \'\'))) AS RemitenteNombreCompleto
+            FROM mensaje m
+            LEFT JOIN personae p ON p.IdUsrA = m.IdUsrRemitente
+            WHERE m.IdMensajeHilo = ?
+            ORDER BY m.IdMensaje DESC
+            LIMIT 1 OFFSET 1
+        ');
+        $stmt->execute([$hiloId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $cuerpo = trim(strip_tags((string) ($row['Cuerpo'] ?? '')));
+        if ($cuerpo === '') {
+            return null;
+        }
+        $autor = trim((string) ($row['RemitenteNombreCompleto'] ?? ''));
+        if ($autor === '') {
+            $autor = 'ID ' . (int) ($row['IdUsrRemitente'] ?? 0);
+        }
+
+        return ['cuerpo' => $cuerpo, 'autor' => $autor];
+    }
+
     public function markHiloLeido(int $hiloId, int $userId): void {
         $mensajes = $this->getMensajesHilo($hiloId);
         $ins = $this->db->prepare('

@@ -72,11 +72,14 @@ export async function initAdminNoticias() {
         const estado = editEstado?.value;
         const wrapFc = document.getElementById('wrap-fecha-compartir');
         const wrapProgramada = document.getElementById('wrap-fecha-programada');
-        
+        const wrapOrden = document.getElementById('wrap-orden-fijo');
+
         if (estado === 'borrador') {
             wrapFc?.classList.add('d-none');
+            wrapOrden?.classList.add('d-none');
         } else {
             wrapFc?.classList.remove('d-none');
+            wrapOrden?.classList.remove('d-none');
             if (estado === 'programada') {
                 wrapProgramada?.classList.remove('d-none');
             } else {
@@ -91,13 +94,14 @@ export async function initAdminNoticias() {
         const silent = options.silent === true;
         if (!tbody) return;
         if (!silent) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-muted p-3">${escapeHtml(t.msg_cargando || '')}</td></tr>`;
+            const loadingMsg = escapeHtml(t.msg_cargando || window.txt?.generales?.msg_cargando || '…');
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadingMsg}</div></td></tr>`;
         }
 
         const res = await API.request(`/admin/comunicacion/noticias?page=${page}&pageSize=${pageSize}`, 'GET');
 
         if (res.status !== 'success') {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-danger p-3">${escapeHtml(res.message || t.err_forbidden || t.err_generico || '')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-danger p-3">${escapeHtml(res.message || t.err_forbidden || t.err_generico || '')}</td></tr>`;
             return;
         }
 
@@ -105,16 +109,22 @@ export async function initAdminNoticias() {
         total = parseInt(res.total, 10) || 0;
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-muted p-3">${escapeHtml(t.dash_sin_noticias || '')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-muted p-3">${escapeHtml(t.dash_sin_noticias || '')}</td></tr>`;
         } else {
             tbody.innerHTML = rows.map((r) => {
                 const id = parseInt(r.IdNoticia, 10);
                 const fp = r.FechaPublicacion || r.FechaCreacion || '';
                 const est = estadoLabel(r);
+                const pin = parseInt(r.OrdenFijo, 10);
+                const pinHtml =
+                    pin >= 1 && pin <= 3
+                        ? `<span class="badge bg-success">${escapeHtml(String(pin))}</span>`
+                        : `<span class="text-muted">—</span>`;
                 return `
                     <tr>
                         <td class="text-muted text-nowrap">${escapeHtml(String(fp).substring(0, 16))}${noticiaCategoriaBadgeHtml(r)}</td>
                         <td class="fw-semibold">${escapeHtml(r.Titulo || '—')}</td>
+                        <td class="text-center">${pinHtml}</td>
                         <td class="text-center">${enRedBadge(r)}</td>
                         <td class="text-center"><span class="badge bg-light text-dark border">${escapeHtml(est)}</span></td>
                         <td class="text-end text-nowrap">
@@ -182,6 +192,12 @@ export async function initAdminNoticias() {
         const cb = document.getElementById('edit-compartir-red');
         if (cb) cb.checked = compartir;
 
+        const selOrden = document.getElementById('edit-orden-fijo');
+        if (selOrden) {
+            const o = parseInt(row.OrdenFijo, 10);
+            selOrden.value = o >= 1 && o <= 3 ? String(o) : '';
+        }
+
         const fechaIn = document.getElementById('edit-fecha-pub');
         if (fechaIn) {
             fechaIn.value = (pub && isProgramada) ? toDatetimeLocal(refPub) : '';
@@ -202,6 +218,8 @@ export async function initAdminNoticias() {
         document.getElementById('edit-legacy-red-hint')?.classList.add('d-none');
         if (editEstado) editEstado.value = 'borrador';
         document.getElementById('edit-fecha-pub').value = '';
+        const selOrden = document.getElementById('edit-orden-fijo');
+        if (selOrden) selOrden.value = '';
         const cb = document.getElementById('edit-compartir-red');
         if (cb) cb.checked = true;
         syncEstadoUI();
@@ -228,7 +246,7 @@ export async function initAdminNoticias() {
             Categoria: categoria,
             CategoriaBadge: categoria ? categoriaBadge : ''
         };
-        
+
         if (publicado) {
             if (estado === 'programada' && fechaVal) {
                 base.FechaPublicacion = fechaVal;
@@ -236,6 +254,8 @@ export async function initAdminNoticias() {
                 base.FechaPublicacion = null;
             }
             base.CompartirEnRed = compartir;
+            const ov = document.getElementById('edit-orden-fijo')?.value ?? '';
+            base.OrdenFijo = ov === '' ? '' : parseInt(ov, 10);
         }
 
         let res;

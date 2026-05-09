@@ -509,6 +509,20 @@ export const CHAPTERS = {
         h: 'Trazabilidad física (cajas y sujetos)',
         html: '<p>En el detalle o modal de trazabilidad, las <strong>cajas</strong> suelen identificarse con un prefijo derivado del tipo de protocolo (primera letra del tipo + <code>A</code> + número correlativo). Los <strong>sujetos</strong> combinan prefijo de caja, correlativo <code>S…</code> y una <strong>etiqueta</strong> legible.</p><ul class="mb-0"><li><strong>Renombrar:</strong> solo cambia la etiqueta visible; los IDs internos y QR se mantienen enlazados al mismo registro.</li><li><strong>Cirugía / clínica:</strong> si está habilitado para la especie, puede reflejarse en ficha y documentos (según configuración y campos en base de datos).</li><li><strong>Tramos:</strong> al actualizar un tramo y desmarcar cajas, no se fuerza automáticamente la cantidad asociada al QR de caja para no sobrescribir <strong>CantidadCaja</strong> que haya editado.</li></ul><p class="small text-body-secondary mb-0">La plantilla exacta de variables y tipos la define su sede en <strong>Configuración → Alojamientos & clínica</strong> (tipos y variables por protocolo).</p>',
       },
+      {
+        id: 'alta_sujeto_resaltado',
+        cat: 'forms',
+        icon: 'plus-circle',
+        h: 'Alta de sujeto y ficha biológica',
+        html: '<p>Con la trazabilidad física desplegada y el protocolo configurado (<strong>inicio</strong> y <strong>datos</strong>), puede <strong>añadir sujetos</strong> dentro de una caja. Tras confirmar el nombre, el árbol se actualiza y el aviso de éxito puede ofrecer abrir los <strong>datos biológicos</strong> (peso, sexo, cepa, subespecie, etc.).</p><p class="mb-0 small text-body-secondary">Al cerrar ese aviso, la tarjeta del sujeto recién creado suele <strong>desplazarse a la vista</strong> y mostrar un <strong>borde verde breve</strong> para localizarla entre varias filas.</p>',
+      },
+      {
+        id: 'fichita_tras_alta',
+        cat: 'forms',
+        icon: 'clipboard-check',
+        h: 'Completar la ficha tras crear el sujeto',
+        html: '<p>El alta solo registra el sujeto en la caja; la <strong>ficha útil para auditoría y exportaciones</strong> combina <strong>datos biológicos</strong> (peso, sexo, cepa, etc.) y las <strong>variables de inicio</strong> que la sede definió por especie/protocolo en <strong>Configuración → Trazabilidad — inicio</strong>.</p><p class="mb-0">Abra la ficha desde el aviso de éxito o desde el sujeto en el árbol. Las mediciones posteriores van en <strong>Trazabilidad — datos</strong>. Un recorrido guiado más estricto puede definirse más adelante en producto; hoy el bioterio completa estos bloques según su protocolo interno.</p>',
+      },
     ],
   },
   admin__estadisticas: {
@@ -889,6 +903,13 @@ export const CHAPTERS = {
         h: 'PDF, Excel y ayuda en pantalla',
         html: '<p>En cada subvista suelen existir botones de <strong>PDF</strong> y/o <strong>Excel</strong> y un botón de <strong>Ayuda</strong> que abre un modal propio de esa pantalla. El detalle de <strong>ventanas emergentes</strong> de cobro (animal, reactivo, insumo, alojamiento) está en el tema <strong>Ventanas emergentes (modales)</strong> del manual.</p>',
       },
+      {
+        id: 'historial_saldo',
+        cat: 'toolbar',
+        icon: 'clock-history',
+        h: 'Historial de saldo del titular',
+        html: '<p>En <strong>departamento</strong>, <strong>protocolo</strong> e <strong>investigador</strong> puede abrir el historial de saldo desde los paneles de cobro. Por defecto el modal <strong>no copia automáticamente</strong> las fechas del informe principal, para no excluir movimientos recientes por un filtro demasiado estrecho.</p><p class="mb-0">Según la vista, bajo las tablas aparece un texto guía sobre el alcance del listado. Si ambas tablas quedan vacías y usted esperaba movimientos, revise registros en base de datos o consulte con soporte antes de reportar un fallo de interfaz.</p>',
+      },
     ],
   },
   admin__facturacion__depto: {
@@ -986,6 +1007,13 @@ export const CHAPTERS = {
         html: '<p>Si no ve la opción en el hub, su institución no tiene configurada derivación a otras sedes: no es un fallo de permisos sueltos.</p>',
       },
       {
+        id: 'derivados_contabilidad',
+        cat: 'toolbar',
+        icon: 'diagram-3',
+        h: 'Derivados y departamento de cobro',
+        html: '<p>Las líneas con cobro <strong>derivado</strong> muestran la etiqueta correspondiente frente a las de cobro <strong>común</strong>. En la celda de departamento puede aparecer el área de origen y una segunda línea con el <strong>departamento donde se cobra el pedido</strong> (destino de la derivación), útil para conciliar entre sedes.</p><p class="mb-0">Las exportaciones en <strong>PDF</strong> y <strong>Excel</strong> incluyen ese dato en columna dedicada cuando aplica.</p>',
+      },
+      {
         id: 'pago',
         cat: 'modals',
         icon: 'cash-coin',
@@ -1032,6 +1060,13 @@ export const CHAPTERS = {
         icon: 'journal-text',
         h: 'Qué es el historial contable',
         html: '<p>Documenta <strong>movimientos y ajustes</strong> vinculados a la facturación del bioterio dentro de GROBO: útil para auditoría y para entender correcciones en el tiempo. El detalle visible depende del <strong>rol</strong>.</p>',
+      },
+      {
+        id: 'vs_historial_saldo_facturacion',
+        cat: 'navigation',
+        icon: 'question-circle',
+        h: 'No confundir con el historial de saldo en facturación',
+        html: '<p>Esta pantalla es el <strong>historial contable</strong> del bioterio (movimientos y ajustes para auditoría). Es distinta del <strong>historial de saldo del titular</strong> que se abre dentro de las vistas de <strong>facturación</strong> (departamento, protocolo o investigador): ese cuadro lista cargos y pagos del saldo según el alcance elegido.</p><p class="mb-0">Si busca movimientos de cobro del investigador y no aparecen aquí, use facturación y el botón de historial de saldo. Si esa tabla sale vacía pese a pagos recientes, revise alcance, filtros de fecha o datos en base; en el manual del <strong>Centro de facturación</strong> hay un apartado dedicado al historial de saldo.</p>',
       },
       {
         id: 'auditoria',
@@ -1135,6 +1170,78 @@ export const CHAPTERS = {
         icon: 'funnel',
         h: 'Cómo usarlo',
         html: '<dl class="manual-glossary mb-0"><dt><i class="bi bi-search text-success" aria-hidden="true"></i> Buscar</dt><dd>Filtra por texto cuando exista el campo.</dd><dt><i class="bi bi-geo-alt text-success" aria-hidden="true"></i> Alcance</dt><dd>Algunas sedes permiten ver solo local o también red.</dd><dt><i class="bi bi-cursor text-success" aria-hidden="true"></i> Abrir noticia</dt><dd>Muestra el cuerpo completo y adjuntos si los hay.</dd></dl><p class="small text-muted mt-2 mb-0">Consulte periódicamente; algunas convocatorias solo se anuncian aquí. Puede convivir con correo sin duplicación automática.</p>',
+      },
+    ],
+  },
+  panel__poe: {
+    overview:
+      'Los protocolos operativos estandarizados (POE) son documentos de trabajo y referencia que su institución publica para consulta rápida: procedimientos, normas internas o enlaces útiles.\n\nSe listan como tarjetas; al abrir uno verá el texto completo y hasta dos enlaces externos si la sede los cargó. Complementa al portal de noticias; no sustituye a la mensajería ni a los avisos largos.',
+    summary:
+      'Consulta de POE publicados por la institución.',
+    roles:
+      'Usuarios con acceso al portal de noticias (misma área de comunicación).',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'journal-richtext',
+        h: 'Qué es POE en el panel',
+        html: '<p>Listado de <strong>documentos operativos</strong> que administración mantiene visibles. Suele alcanzarse desde <strong>Noticias</strong> o desde el tablero.</p>',
+      },
+      {
+        id: 'detalle',
+        cat: 'content',
+        icon: 'card-heading',
+        h: 'Abrir un documento',
+        html: '<p>Pulse una tarjeta para ver el detalle en ventana emergente: texto, enlaces y accesos por URL si existen. Puede generarse un <strong>código QR</strong> para compartir el enlace del ítem cuando proceda.</p>',
+      },
+    ],
+  },
+  admin__comunicacion__poe: {
+    overview:
+      'Administración de POE permite crear, ordenar y activar o desactivar los documentos que los usuarios ven en el portal.\n\nCada registro tiene título, cuerpo, orden de aparición, visibilidad y hasta dos URLs de adjunto (entrada manual hasta que exista almacenamiento en nube). Permisos alineados con noticias y portada.',
+    summary:
+      'Alta, edición y listado de POE institucionales.',
+    roles:
+      'Perfiles con administración de comunicación / noticias.',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'journal-richtext',
+        h: 'Listado administrativo',
+        html: '<p>Tabla con título, orden, estado y acciones. Use <strong>Nuevo</strong> para crear otro POE o edite una fila existente.</p>',
+      },
+      {
+        id: 'form',
+        cat: 'forms',
+        icon: 'ui-checks-grid',
+        h: 'Contenido y enlaces',
+        html: '<p>Revise el texto visible en el portal y las <strong>URLs https</strong> de soporte si aplica. Guarde y compruebe el orden; use la paginación en listas largas.</p>',
+      },
+    ],
+  },
+  'admin__comunicacion__portada-popup': {
+    overview:
+      'Portada y popup configuran dos piezas del portal de noticias: el texto de bienvenida en la pantalla principal y un aviso emergente opcional (interruptor, texto y vínculo opcional a una noticia publicada).\n\nTodo se guarda con un solo botón. Las URLs de adjuntos siguen siendo manuales hasta la fase de almacenamiento en nube.',
+    summary:
+      'Texto de portada del portal y popup para usuarios.',
+    roles:
+      'Administración de comunicación / noticias.',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'columns-gap',
+        h: 'Dos bloques en pantalla',
+        html: '<p>A un lado, <strong>portada</strong> (título y cuerpo del tablero). Al otro, <strong>popup</strong> opcional con su interruptor de activación.</p>',
+      },
+      {
+        id: 'guardar',
+        cat: 'forms',
+        icon: 'save',
+        h: 'Guardar y validar',
+        html: '<p>Use <strong>Guardar</strong> para persistir ambos bloques. Revise en el portal con un usuario sin privilegios que el texto y el popup se comporten como espera.</p>',
       },
     ],
   },
@@ -1450,6 +1557,12 @@ export const CHAPTERS = {
         cat: 'modals',
         h: 'Modal alojamiento',
         html: '<p>Muestra <strong>titular (paga)</strong> frente a <strong>responsable de la estadía</strong>, tipo de alojamiento, tramos y días calculados. La parte financiera resume <strong>costo histórico</strong> y <strong>total pagado</strong> con campos para aplicar pagos o quitas según la implementación de la vista. <strong>PDF</strong> y <strong>CERRAR</strong> en el pie.</p>',
+      },
+      {
+        id: 'pago_feedback',
+        cat: 'modals',
+        h: 'Si el pago falla o no actualiza el saldo',
+        html: '<p>Al confirmar <strong>PAGAR</strong> o <strong>QUITAR</strong>, la interfaz muestra un indicador de carga y, al terminar, un mensaje de éxito o el texto que devuelve el servidor ante error (saldo insuficiente, pedido bloqueado, validaciones de exención o derivación, etc.).</p><p class="mb-0">Si el aviso indica éxito pero los importes no reflejan el cambio, recargue el informe o vuelva a abrir la fila: puede haber edición concurrente o datos desfasados en base de datos. Si el problema se repite, anote hora, número de pedido y usuario y escale a soporte con el mensaje mostrado.</p>',
       },
       {
         id: 'sweetalert',

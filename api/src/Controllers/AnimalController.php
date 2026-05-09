@@ -187,6 +187,32 @@ class AnimalController {
         exit;
     }
 
+    /** POST JSON: idformA, tieneAnestesicos (0|1). Requiere protocolo.PermiteAnestesicos. */
+    public function updateAnestesicos() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->enforceModuloSesionOrExit($sesion, 'animales');
+            $raw = json_decode((string) file_get_contents('php://input'), true);
+            if (!is_array($raw)) {
+                $raw = $_POST;
+            }
+            $idformA = isset($raw['idformA']) ? (int) $raw['idformA'] : 0;
+            $tiene = isset($raw['tieneAnestesicos']) ? (int) $raw['tieneAnestesicos'] : 0;
+            $instId = (int) ($sesion['instId'] ?? 0);
+            if ($idformA <= 0 || $instId <= 0) {
+                throw new \InvalidArgumentException('Datos inválidos.');
+            }
+            $this->model->updateTieneAnestesicosAdmin($idformA, $tiene, $instId);
+            echo json_encode(['status' => 'success']);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function getSpeciesByProtocol() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

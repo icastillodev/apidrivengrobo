@@ -50,8 +50,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de gestión de departamentos
-                    initConfigDeptos();
+                    // Inicialización de la lógica de gestión de departamentos (await: deptos/orgs antes de hideLoader)
+                    await initConfigDeptos();
                     translatePage();
                     
                     console.log("✅ Configuración de Departamentos inicializada correctamente.");

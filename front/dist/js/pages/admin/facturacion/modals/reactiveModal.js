@@ -4,7 +4,7 @@
  */
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
-import { formatBillingMoney } from '../billingLocale.js';
+import { formatBillingMoney, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga } from '../billingLocale.js';
 
 export const openReactiveModal = async (idformA) => {
     try {
@@ -22,6 +22,8 @@ export const openReactiveModal = async (idformA) => {
         const d = res.data;
         hideLoader();
 
+        const tituloIdRea = billingPdfFormularioIdDisplay({ ...d, id: d.idformA ?? idformA }, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() });
+
         // Saldo / totales: el API ya fusiona facturación derivada (misma institución) en totalpago, total_calculado y saldoInv.
         const total = parseFloat(d.total_calculado || 0);
         const pagado = parseFloat(d.totalpago || 0);
@@ -34,6 +36,25 @@ export const openReactiveModal = async (idformA) => {
                           (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${t.badge_pago_parcial || 'PAGO PARCIAL'}</span>` :
                           `<span class="badge bg-danger shadow-sm">${t.badge_sin_pagar || 'SIN PAGAR'}</span>`));
 
+        const pcRaw = d.protocolo_con_cirugia;
+        const pc = (pcRaw === null || pcRaw === undefined || pcRaw === '') ? null : Number(pcRaw);
+        let anestBadge = '';
+        if (pc === null || Number.isNaN(pc)) {
+            anestBadge = `<span class="badge bg-secondary">${t.rea_proceso_anest_nd || 'Sin dato'}</span>`;
+        } else if (pc === 1) {
+            anestBadge = `<span class="badge bg-success">${t.rea_proceso_anest_si || 'Sí'}</span>`;
+        } else {
+            anestBadge = `<span class="badge bg-light text-muted border">${t.rea_proceso_anest_no || 'No'}</span>`;
+        }
+        const anestBlock = `
+                                    <div class="col-12 mt-1">
+                                        <label class="small fw-bold text-muted uppercase">${t.lbl_proceso_anestesico || 'Proceso anestésico (protocolo)'}</label>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            ${anestBadge}
+                                        </div>
+                                        <p class="small text-muted mb-0 mt-1">${t.rea_proceso_anest_help || ''}</p>
+                                    </div>`;
+
         const html = `
         <div class="modal fade" id="modalReactivo" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -41,7 +62,7 @@ export const openReactiveModal = async (idformA) => {
                     
                     <div class="modal-header bg-dark text-white py-3">
                         <div class="d-flex align-items-center w-100 justify-content-between pe-4">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-vial me-2 text-info"></i>${(t.titulo_reactivo_tpl || 'REACTIVO {id}').replace(/\{id\}/g, idformA)}</h5>
+                            <h5 class="modal-title fw-bold"><i class="bi bi-vial me-2 text-info"></i>${(t.titulo_reactivo_tpl || 'REACTIVO {id}').replace(/\{id\}/g, tituloIdRea)}</h5>
                             <div class="text-end">
                                 <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">${t.lbl_saldo_disp_titular || 'Saldo Disponible Titular:'}</small>
                                 <span class="badge bg-success fs-5" id="mdl-rea-saldo-txt">$ ${formatBillingMoney(saldo)}</span>
@@ -66,6 +87,7 @@ export const openReactiveModal = async (idformA) => {
                                         <label class="small fw-bold text-muted uppercase">${t.lbl_protocolo_aprobado || 'Protocolo Aprobado'}</label>
                                         <div class="form-control-plaintext border-bottom small">${d.protocolo_info || t.na || 'N/A'}</div>
                                     </div>
+                                    ${anestBlock}
                                 </div>
 
                                 <h6 class="text-success fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">${t.sec_det_bio || 'Detalles del Insumo Biológico'}</h6>

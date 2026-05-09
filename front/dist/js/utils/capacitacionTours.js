@@ -561,6 +561,70 @@ const TOUR_STEPS_ADMIN_COMUNICACION_NOTICIAS = [
   },
 ];
 
+const TOUR_STEPS_PANEL_POE = [
+  {
+    selector: '.container.my-4 .border-bottom.pb-2',
+    titleKey: 'tour_poe_portal_s1_title',
+    bodyKey: 'tour_poe_portal_s1_body',
+  },
+  {
+    selector: '#poe-grid',
+    titleKey: 'tour_poe_portal_s2_title',
+    bodyKey: 'tour_poe_portal_s2_body',
+  },
+  {
+    selector: 'a.btn-outline-secondary[href*="noticias"]',
+    titleKey: 'tour_poe_portal_s3_title',
+    bodyKey: 'tour_poe_portal_s3_body',
+  },
+];
+
+const TOUR_STEPS_ADMIN_POE = [
+  {
+    selector: '.container-fluid.my-4 .border-bottom.pb-2',
+    titleKey: 'tour_poe_admin_s1_title',
+    bodyKey: 'tour_poe_admin_s1_body',
+  },
+  {
+    selector: '#btn-poe-nuevo',
+    titleKey: 'tour_poe_admin_s2_title',
+    bodyKey: 'tour_poe_admin_s2_body',
+  },
+  {
+    selector: '#admin-poe-tbody',
+    titleKey: 'tour_poe_admin_s3_title',
+    bodyKey: 'tour_poe_admin_s3_body',
+  },
+  {
+    selector: '#admin-poe-prev',
+    titleKey: 'tour_poe_admin_s4_title',
+    bodyKey: 'tour_poe_admin_s4_body',
+  },
+];
+
+const TOUR_STEPS_ADMIN_PORTADA_POPUP = [
+  {
+    selector: '.container-fluid.my-4 .border-bottom.pb-2',
+    titleKey: 'tour_pp_admin_s1_title',
+    bodyKey: 'tour_pp_admin_s1_body',
+  },
+  {
+    selector: '#btn-pp-guardar',
+    titleKey: 'tour_pp_admin_s2_title',
+    bodyKey: 'tour_pp_admin_s2_body',
+  },
+  {
+    selector: '#pp-portada-titulo',
+    titleKey: 'tour_pp_admin_s3_title',
+    bodyKey: 'tour_pp_admin_s3_body',
+  },
+  {
+    selector: '#pp-popup-activo',
+    titleKey: 'tour_pp_admin_s4_title',
+    bodyKey: 'tour_pp_admin_s4_body',
+  },
+];
+
 const TOUR_STEPS_CAPACITACION_RED = [
   {
     selector: 'h1.h3, h1',
@@ -744,6 +808,8 @@ export const CAPACITACION_TOUR_STEPS = {
   'admin/facturacion/index': TOUR_STEPS_ADMIN_FACTURACION_INDEX,
   'admin/historialcontable': TOUR_STEPS_ADMIN_HISTORIAL_CONTABLE,
   'admin/comunicacion/noticias': TOUR_STEPS_ADMIN_COMUNICACION_NOTICIAS,
+  'admin/comunicacion/poe': TOUR_STEPS_ADMIN_POE,
+  'admin/comunicacion/portada-popup': TOUR_STEPS_ADMIN_PORTADA_POPUP,
   'admin/precios': TOUR_STEPS_ADMIN_PRECIOS,
   'admin/solicitud_protocolo': TOUR_STEPS_ADMIN_SOLICITUD_PROTOCOLO,
   'panel/misformularios': TOUR_STEPS_MISFORMULARIOS,
@@ -756,6 +822,7 @@ export const CAPACITACION_TOUR_STEPS = {
   'panel/mensajes': TOUR_STEPS_MENSAJES,
   'panel/mensajes_institucion': TOUR_STEPS_MENSAJES_INST,
   'panel/noticias': TOUR_STEPS_NOTICIAS_PORTAL,
+  'panel/poe': TOUR_STEPS_PANEL_POE,
   'panel/soporte': TOUR_STEPS_SOPORTE,
   'panel/perfil': TOUR_STEPS_PERFIL,
   'panel/ventas': TOUR_STEPS_VENTAS,

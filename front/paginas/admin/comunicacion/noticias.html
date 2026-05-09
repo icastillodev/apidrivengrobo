@@ -51,6 +51,12 @@
                 >
                     <i class="bi bi-question-circle me-1"></i><span data-i18n="comunicacion.admin_btn_ayuda">Ayuda</span>
                 </button>
+                <a href="./portada-popup.html" class="btn btn-outline-primary btn-sm fw-bold shadow-sm">
+                    <i class="bi bi-easel me-1"></i><span data-i18n="comunicacion.pp_btn_ir_portada"></span>
+                </a>
+                <a href="./poe.html" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
+                    <i class="bi bi-journal-text me-1"></i><span data-i18n="comunicacion.poe_admin_link"></span>
+                </a>
                 <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-nueva-noticia">
                     <i class="bi bi-plus-lg me-1"></i><span data-i18n="comunicacion.admin_nueva"></span>
                 </button>
@@ -64,6 +70,7 @@
                         <tr>
                             <th data-i18n="comunicacion.col_fecha"></th>
                             <th data-i18n="comunicacion.admin_titulo_campo"></th>
+                            <th class="text-center" data-i18n="comunicacion.admin_col_pin"></th>
                             <th class="text-center" data-i18n="comunicacion.admin_col_en_red"></th>
                             <th class="text-center" data-i18n="comunicacion.admin_col_estado"></th>
                             <th class="text-end" data-i18n="comunicacion.admin_col_acciones"></th>
@@ -153,6 +160,16 @@
                             <label class="form-check-label" for="edit-compartir-red" data-i18n="comunicacion.admin_compartir_red"></label>
                         </div>
                         <p class="small text-muted mb-3" data-i18n="comunicacion.admin_compartir_red_help"></p>
+                    </div>
+                    <div id="wrap-orden-fijo" class="d-none">
+                        <label class="form-label small fw-bold" data-i18n="comunicacion.admin_orden_fijo_label"></label>
+                        <select class="form-select mb-1" id="edit-orden-fijo">
+                            <option value="" data-i18n="comunicacion.admin_orden_fijo_none"></option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                        </select>
+                        <p class="small text-muted mb-3" data-i18n="comunicacion.admin_orden_fijo_help"></p>
                     </div>
                     <label class="form-label small fw-bold" data-i18n="comunicacion.admin_cuerpo"></label>
                     <textarea class="form-control" id="edit-cuerpo" rows="8"></textarea>

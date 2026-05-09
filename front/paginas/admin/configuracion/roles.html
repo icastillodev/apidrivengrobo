@@ -48,8 +48,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de gestión de roles
-                    initConfigRoles();
+                    // Inicialización de la lógica de gestión de roles (await: roles + tabla noticias antes de hideLoader)
+                    await initConfigRoles();
                     translatePage();
                     
                     console.log("✅ Configuración de Roles inicializada correctamente.");

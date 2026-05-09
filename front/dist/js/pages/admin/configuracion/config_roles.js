@@ -71,13 +71,20 @@ async function loadNoticiasRolesPublicar() {
         return;
     }
 
+    const cr0 = window.txt?.config_roles || {};
+    const gen0 = window.txt?.generales || {};
+    const loadMsgNr = esc(cr0.tabla_cargando || gen0.msg_cargando || '…');
+    tbody.innerHTML = `<tr><td colspan="2" class="text-center py-3 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsgNr}</div></td></tr>`;
+
     const res = await API.request('/admin/comunicacion/noticias/roles-publicar', 'GET');
+    const cr = window.txt?.config_roles || {};
     if (res.status !== 'success' || !Array.isArray(res.data)) {
+        tbody.innerHTML = `<tr><td colspan="2" class="text-center text-danger small py-3">${esc(cr.swal_error_generico || '')}</td></tr>`;
+        bloque.classList.remove('d-none');
         return;
     }
 
     bloque.classList.remove('d-none');
-    const cr = window.txt?.config_roles || {};
     tbody.innerHTML = res.data
         .filter((r) => {
             const idt = parseInt(r.IdTipousrA, 10);
@@ -141,6 +148,13 @@ export async function initConfigRoles() {
 
 async function loadData() {
     const instId = localStorage.getItem('instId');
+    const tbodyInit = document.getElementById('table-users');
+    const crLd = window.txt?.config_roles || {};
+    const genLd = window.txt?.generales || {};
+    const loadMsgUsers = esc(crLd.tabla_cargando || genLd.msg_cargando || '…');
+    if (tbodyInit) {
+        tbodyInit.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsgUsers}</div></td></tr>`;
+    }
     try {
         const res = await API.request(`/admin/config/roles/init?inst=${instId}`);
         if (res.status === 'success') {
@@ -148,9 +162,14 @@ async function loadData() {
             menuConfig = res.data.menuConfig || [];
             renderUsers();
             renderMenuPermissions();
+        } else if (tbodyInit) {
+            tbodyInit.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${esc(crLd.swal_error_generico || genLd.error_carga || '')}</td></tr>`;
         }
-    } catch (e) { 
-        console.error("Error al cargar roles:", e); 
+    } catch (e) {
+        console.error("Error al cargar roles:", e);
+        if (tbodyInit) {
+            tbodyInit.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${esc(crLd.swal_error_generico || genLd.error_carga || '')}</td></tr>`;
+        }
     }
 }
 

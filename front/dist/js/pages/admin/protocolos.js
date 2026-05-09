@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 
 let allProtocols = [];
 let currentPage = 1;
@@ -7,6 +8,8 @@ let sortConfig = { key: 'idprotA', direction: 'desc' };
 let formDataCache = null; // Cache para configuración y listas (Usuarios, Deptos, etc.)
 let openedFromUrl = false;
 const PRIVILEGED_ROLES = new Set([1, 2, 4]);
+/** Evita duplicar `addEventListener` si `initProtocolosPage` se llama tras guardar/borrar. */
+let protocolosEventsBound = false;
 
 function isRedProtocol(p) {
     return String(p?.TipoAprobacion || '').toUpperCase() === 'RED';
@@ -54,19 +57,18 @@ function isPrivilegedAdmin() {
     return PRIVILEGED_ROLES.has(role);
 }
 
-export async function initProtocolosPage() {
+async function loadProtocolosPageData(opts = {}) {
+    const inline = opts.inline === true;
     const instId = localStorage.getItem('instId');
-    const instName = localStorage.getItem('NombreInst') || 'Institución';
-    const bread = document.getElementById('institucionbread');
-    if(bread) bread.innerText = instName;
-    console.group('[PROTO-DEBUG] initProtocolosPage');
-    console.log('instId:', instId, 'instName:', instName);
+    const tbody = document.getElementById('table-body-protocols');
 
-    // Actualizar badge de solicitudes pendientes
-    updateRequestsBadge();
+    if (inline && tbody) {
+        const txt = window.txt?.admin_protocolos || {};
+        const msg = escapeHtml(txt.cargando_lista || window.txt?.generales?.msg_cargando || '…');
+        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+    }
 
     try {
-        // 1. Cargar Configuración Inicial (incluye has_network, usuarios, deptos, etc.)
         const conf = await API.request(`/protocols/form-data?inst=${instId}`);
         console.log('[PROTO-DEBUG] /protocols/form-data raw:', conf);
         formDataCache = conf.data;
@@ -76,8 +78,7 @@ export async function initProtocolosPage() {
             depts: Array.isArray(formDataCache?.depts) ? formDataCache.depts.length : 'null',
             types: Array.isArray(formDataCache?.types) ? formDataCache.types.length : 'null'
         });
-        
-        // 2. Configurar visibilidad de filtros prioritarios (Origen / Ámbito)
+
         const filterOrigin = document.getElementById('filter-origin');
         const labelOrigin = document.getElementById('label-origin');
         const filterScope = document.getElementById('filter-scope');
@@ -88,7 +89,6 @@ export async function initProtocolosPage() {
             filterScope.classList.remove('d-none');
             labelScope.classList.remove('d-none');
 
-            // Opción "RED" visible solo si la institución trabaja en red
             const optRedOrigin = filterOrigin.querySelector('option[value="red"]');
             if (optRedOrigin) {
                 if (formDataCache.has_network) {
@@ -110,7 +110,6 @@ export async function initProtocolosPage() {
             }
         }
 
-        // 3. Cargar Protocolos
         const res = await API.request(`/protocols/institution?inst=${instId}`);
         console.log('[PROTO-DEBUG] /protocols/institution raw:', res);
         if (res && res.status === 'success') {
@@ -128,35 +127,67 @@ export async function initProtocolosPage() {
             console.error('[PROTO-DEBUG] /protocols/institution status != success:', res);
         }
     } catch (error) {
-        console.error("[PROTO-DEBUG] EXCEPTION initProtocolosPage:", error);
+        console.error('[PROTO-DEBUG] EXCEPTION loadProtocolosPageData:', error);
         try {
             console.error('[PROTO-DEBUG] error.message:', error?.message);
             console.error('[PROTO-DEBUG] error.stack:', error?.stack);
         } catch (_) {}
+        if (inline && tbody) {
+            const err = escapeHtml(window.txt?.generales?.error_carga || 'Error');
+            tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger py-4">${err}</td></tr>`;
+        }
+    }
+}
+
+/**
+ * @param {{ inline?: boolean }} [opts] — Tras mutaciones usar `{ inline: true }` (spinner en tabla, sin overlay global).
+ */
+export async function initProtocolosPage(opts = {}) {
+    const inline = opts.inline === true;
+    const instId = localStorage.getItem('instId');
+    const instName = localStorage.getItem('NombreInst') || 'Institución';
+    const bread = document.getElementById('institucionbread');
+    if (bread) bread.innerText = instName;
+    console.group('[PROTO-DEBUG] initProtocolosPage');
+    console.log('instId:', instId, 'instName:', instName, 'inline:', inline);
+
+    updateRequestsBadge();
+
+    try {
+        if (!inline) {
+            showLoader({ upgradeOnly: true, staticPhrase: '' });
+            await loadProtocolosPageData({ inline: false });
+            await new Promise((resolve) => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            });
+        } else {
+            await loadProtocolosPageData({ inline: true });
+        }
+    } catch (error) {
+        console.error('[PROTO-DEBUG] EXCEPTION initProtocolosPage:', error);
     } finally {
+        if (!inline) hideLoader();
         console.groupEnd();
     }
 
-    // --- EVENTOS ---
-    // Inicializar tipo de búsqueda dinámico (y enganchar auto-filtro)
-    updateSearchInputType();
-    
-    // Botón Buscar
-    document.getElementById('btn-search-prot').onclick = () => { currentPage = 1; renderTable(); };
-    
-    // Cambio en el tipo de filtro (Para cambiar Input por Select)
-    document.getElementById('filter-type-prot').addEventListener('change', updateSearchInputType);
-    document.getElementById('filter-origin')?.addEventListener('change', () => {
-        currentPage = 1;
-        renderTable();
-    });
-    document.getElementById('filter-scope')?.addEventListener('change', () => {
-        currentPage = 1;
-        renderTable();
-    });
+    if (!protocolosEventsBound) {
+        protocolosEventsBound = true;
+        updateSearchInputType();
 
-    // Exportar Excel
-    document.getElementById('btn-excel-prot').onclick = exportToExcel;
+        document.getElementById('btn-search-prot').onclick = () => { currentPage = 1; renderTable(); };
+
+        document.getElementById('filter-type-prot').addEventListener('change', updateSearchInputType);
+        document.getElementById('filter-origin')?.addEventListener('change', () => {
+            currentPage = 1;
+            renderTable();
+        });
+        document.getElementById('filter-scope')?.addEventListener('change', () => {
+            currentPage = 1;
+            renderTable();
+        });
+
+        document.getElementById('btn-excel-prot').onclick = exportToExcel;
+    }
 }
 
 function openProtocolFromUrlIfNeeded() {
@@ -630,6 +661,7 @@ window.openProtocolModal = async (p = null) => {
     ` : manualAttachmentInputs;
 
     const cxOnProt = Number(p?.con_cirugia || p?.cirugia || 0) === 1;
+    const paOnProt = Number(p?.PermiteAnestesicos ?? p?.permite_anestesicos ?? 0) === 1;
     container.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
@@ -645,6 +677,7 @@ window.openProtocolModal = async (p = null) => {
         <form id="form-protocolo">
             <input type="hidden" name="IdInstitucion" value="${instId}">
             <input type="hidden" name="protocolo_cirugia" id="protocolo_cirugia" value="${cxOnProt ? '1' : '0'}">
+            <input type="hidden" name="protocolo_permite_anestesicos" id="protocolo_permite_anestesicos" value="${paOnProt ? '1' : '0'}">
 
             <div class="mb-3">
                 <span class="badge bg-warning text-dark" style="font-size:10px;">
@@ -653,9 +686,21 @@ window.openProtocolModal = async (p = null) => {
                 <button type="button"
                         class="btn btn-sm ${cxOnProt ? 'btn-warning text-dark' : 'btn-outline-secondary'} ms-2"
                         id="btn-toggle-cirugia-prot"
-                        title="${txtProt.cirugia_btn_title || 'Marcar o quitar cirugía en este protocolo'}">
+                        title="${txtProt.cirugia_btn_title || 'Activar o desactivar cirugía en este protocolo'}">
                     <i class="bi bi-toggle-${cxOnProt ? 'on' : 'off'}"></i>
-                    <span class="ms-1">${txtProt.cirugia_btn_lbl || 'Cirugía'}</span>
+                    <span class="ms-1">${txtProt.cirugia_btn_lbl || 'Activar / desactivar'}</span>
+                </button>
+            </div>
+            <div class="mb-3">
+                <span class="badge bg-info text-dark" style="font-size:10px;">
+                    <i class="bi bi-droplet-half me-1"></i>${txtProt.perm_anest_badge || 'Anestésicos en pedidos'}
+                </span>
+                <button type="button"
+                        class="btn btn-sm ${paOnProt ? 'btn-info text-dark' : 'btn-outline-secondary'} ms-2"
+                        id="btn-toggle-perm-anest-prot"
+                        title="${txtProt.perm_anest_btn_title || ''}">
+                    <i class="bi bi-toggle-${paOnProt ? 'on' : 'off'}"></i>
+                    <span class="ms-1">${txtProt.perm_anest_btn_lbl || 'Activar / desactivar'}</span>
                 </button>
             </div>
             
@@ -842,6 +887,24 @@ window.openProtocolModal = async (p = null) => {
             }
         };
     }
+
+    const btnPa = document.getElementById('btn-toggle-perm-anest-prot');
+    if (btnPa) {
+        btnPa.onclick = () => {
+            const hid = document.getElementById('protocolo_permite_anestesicos');
+            const cur = (hid?.value === '1');
+            const next = !cur;
+            if (hid) hid.value = next ? '1' : '0';
+            btnPa.classList.toggle('btn-info', next);
+            btnPa.classList.toggle('text-dark', next);
+            btnPa.classList.toggle('btn-outline-secondary', !next);
+            const ico = btnPa.querySelector('i.bi');
+            if (ico) {
+                ico.classList.toggle('bi-toggle-on', next);
+                ico.classList.toggle('bi-toggle-off', !next);
+            }
+        };
+    }
     
     // Filtro rápido de usuarios por ID, usuario, nombre o apellido
     const userSearch = document.getElementById('user-search');
@@ -927,7 +990,7 @@ async function saveProtocol(e, id) {
         const res = await API.request(`/protocols/save?id=${id||''}&inst=${instId}`, 'POST', fd);
         if(res.status==='success') { 
             bootstrap.Modal.getInstance(document.getElementById('modal-protocol')).hide(); 
-            initProtocolosPage(); // Recargar tabla y stats
+            await initProtocolosPage({ inline: true });
         } else { 
             alert(res.message); 
             btn.innerHTML = 'GUARDAR';
@@ -1007,7 +1070,7 @@ window.downloadProtocolPDF = async (id) => {
     const h = cloned.querySelector('.d-none.d-print-block');
     if(h) h.classList.remove('d-none');
 
-    const opt = { margin: [18, 18, 18, 18], filename: `Protocolo_${id}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+    const opt = { margin: [18, 18, 18, 18], filename: `Protocolo_${id}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
     await html2pdf().set(opt).from(cloned).save();
 };
 
@@ -1064,7 +1127,7 @@ window.deleteManualProtocolAttachment = async (attId) => {
         window.Swal.fire('OK', txtProt.adjunto_borrado_ok || 'Adjunto eliminado correctamente.', 'success');
         const modal = bootstrap.Modal.getInstance(document.getElementById('modal-protocol'));
         if (modal) modal.hide();
-        await initProtocolosPage();
+        await initProtocolosPage({ inline: true });
     } else {
         window.Swal.fire('Error', res?.message || (txtProt.error_accion || 'No se pudo completar la accion.'), 'error');
     }
@@ -1099,7 +1162,7 @@ window.deleteManualProtocol = async (idprot) => {
         window.Swal.fire('OK', txt.borrado_ok || 'Protocolo borrado correctamente.', 'success');
         const modal = bootstrap.Modal.getInstance(document.getElementById('modal-protocol'));
         if (modal) modal.hide();
-        await initProtocolosPage();
+        await initProtocolosPage({ inline: true });
     } else {
         window.Swal.fire('Error', res?.message || (txt.error_accion || 'No se pudo completar la accion.'), 'error');
     }
@@ -1163,7 +1226,7 @@ window.openTransmitModal = async (idprotA) => {
                     fireSwal('OK', txt.transmitir_ok || '', 'success');
                     modalTransmit.hide();
                     bootstrap.Modal.getInstance(document.getElementById('modal-protocol'))?.hide();
-                    await initProtocolosPage();
+                    await initProtocolosPage({ inline: true });
                 } else {
                     fireSwal('Error', r?.message || (txt.transmitir_error || ''), 'error');
                 }
@@ -1198,7 +1261,7 @@ window.rejectProtocolRequest = async (idprot) => {
         window.Swal.fire('OK', txt.rechazar_ok || 'Solicitud rechazada y notificada.', 'success');
         const modal = bootstrap.Modal.getInstance(document.getElementById('modal-protocol'));
         if (modal) modal.hide();
-        await initProtocolosPage();
+        await initProtocolosPage({ inline: true });
     } else {
         window.Swal.fire('Error', res?.message || (txt.error_accion || 'No se pudo completar la accion.'), 'error');
     }

@@ -1,6 +1,4 @@
 import { API } from '../../../api.js';
-// AÑADE ESTA LÍNEA PARA SOLUCIONAR EL ERROR DEL LOADER
-import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AnimalFichaUI } from './animalFicha.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
 
@@ -339,7 +337,8 @@ async toggleRow(idAlojamiento, idEspecie) {
     async refreshArbol(idAlojamiento, idEspecie) {
         const contentDiv = document.getElementById(`trazabilidad-content-${idAlojamiento}`);
         if (!contentDiv) return;
-        contentDiv.innerHTML = `<div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${(window.txt?.alojamientos?.trace_loading || 'Cargando...')}</div>`;
+        const loadTrace = __ubEsc(window.txt?.alojamientos?.trace_loading || window.txt?.generales?.msg_cargando || '…');
+        contentDiv.innerHTML = `<div class="text-center text-muted small py-2"><div class="spinner-border spinner-border-sm mb-2" role="status"></div><div>${loadTrace}</div></div>`;
         
         try {
             const instId = localStorage.getItem('instId_temp_qr') || localStorage.getItem('instId') || 1;
@@ -347,6 +346,23 @@ async toggleRow(idAlojamiento, idEspecie) {
             if (res.status === 'success') await this.renderArbol(contentDiv, res.data, idAlojamiento, idEspecie);
             else throw new Error(res.message);
         } catch (error) { contentDiv.innerHTML = `<div class="alert alert-danger small">Error: ${error.message}</div>`; }
+    },
+
+    /** Tras crear un sujeto: desplazar la vista dentro del panel y remarcar brevemente la tarjeta. */
+    highlightUnidadCard(idAlojamiento, idEspecieAlojUnidad) {
+        const id = parseInt(String(idEspecieAlojUnidad || ''), 10);
+        if (!id || !idAlojamiento) return;
+        const contentDiv = document.getElementById(`trazabilidad-content-${idAlojamiento}`);
+        if (!contentDiv) return;
+        requestAnimationFrame(() => {
+            const el = contentDiv.querySelector(`[data-traz-unidad-id="${id}"]`);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            el.classList.add('border-success', 'border-2');
+            window.setTimeout(() => {
+                el.classList.remove('border-success', 'border-2');
+            }, 2600);
+        });
     },
 
     async renderArbol(container, data, idAlojamiento, idEspecie) {
@@ -462,7 +478,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                     caja.unidades.forEach(unidad => {
                         const cxOn = Number(unidad.con_cirugia) === 1;
                         html += `
-                        <div class="border rounded p-3 mb-2 bg-white shadow-sm">
+                        <div class="border rounded p-3 mb-2 bg-white shadow-sm" data-traz-unidad-id="${unidad.IdEspecieAlojUnidad}">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 flex-wrap gap-2">
                                 <span class="fw-bold small text-dark"><i class="bi bi-bug-fill text-success"></i> ${unidad.NombreEspecieAloj}${cxOn ? ` <span class="badge bg-warning text-dark ms-1">${__ubEsc(txt.trace_surgery_badge || 'Cirugía')}</span>` : ''}</span>
                                 <div class="d-flex align-items-center flex-wrap gap-1">
@@ -635,7 +651,6 @@ async toggleRow(idAlojamiento, idEspecie) {
     async guardarUbicacionInline(idCaja, idAlojamiento, idEspecie) {
         const ubicacion = __ubReadUbicacionInlineFull(idCaja);
         const txt = window.txt?.alojamientos || {};
-        showLoader();
         try {
             const res = await API.request('/trazabilidad/update-caja-ubicacion', 'POST', { idCaja, ubicacion });
             if (res.status !== 'success') throw new Error(res.message || 'Error');
@@ -643,15 +658,12 @@ async toggleRow(idAlojamiento, idEspecie) {
         } catch (e) {
             console.error(e);
             Swal.fire({ icon: 'error', title: txt.trace_error || 'Error', text: String(e.message || e), target: document.getElementById('modal-historial') || 'body' });
-        } finally {
-            hideLoader();
         }
     },
 
 async toggleCirugia(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
         const txt = window.txt?.alojamientos || {};
         const target = document.getElementById('modal-historial') || 'body';
-        showLoader();
         try {
             const res = await API.request('/trazabilidad/toggle-con-cirugia', 'POST', { idEspecieAlojUnidad });
             if (res.status !== 'success') {
@@ -663,24 +675,67 @@ async toggleCirugia(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
             if (typeof Swal !== 'undefined') {
                 Swal.fire({ icon: 'error', title: txt.trace_error || 'Error', text: String(e.message || e), target });
             }
-        } finally {
-            hideLoader();
         }
     },
 
 async addSubject(idCaja, idAlojamiento, idEspecie) {
         const txt = window.txt?.alojamientos || {};
+        const tCom = window.txt?.comunicacion || {};
+        const Swal = window.Swal;
+        const target = document.getElementById('modal-historial') || 'body';
         const { value: nombre } = await Swal.fire({
             title: txt.trace_nombre_sujeto || 'Nombre del Sujeto',
             input: 'text',
-            target: document.getElementById('modal-historial') || 'body',
+            inputPlaceholder: txt.trace_nombre_placeholder || '',
+            target,
             showCancelButton: true,
         });
-        if (nombre) {
-            try {
-                await API.request('/trazabilidad/add-subject', 'POST', { idCaja, idAlojamiento, nombreSujeto: nombre });
-                await this.refreshArbol(idAlojamiento, idEspecie);
-            } catch (e) { console.error(e); }
+        const nombreTrim = nombre != null ? String(nombre).trim() : '';
+        if (!nombreTrim) return;
+        try {
+            const res = await API.request('/trazabilidad/add-subject', 'POST', {
+                idCaja,
+                idAlojamiento,
+                nombreSujeto: nombreTrim,
+            });
+            if (res.status !== 'success') {
+                throw new Error(res.message || txt.trace_error || 'Error');
+            }
+            await this.refreshArbol(idAlojamiento, idEspecie);
+            const idEu = parseInt(res.data?.IdEspecieAlojUnidad, 10) || 0;
+            if (idEu > 0) {
+                const follow = await Swal.fire({
+                    icon: 'success',
+                    title: txt.trace_subject_added_ok || '',
+                    html: `<p class="text-start small mb-0">${__ubEsc(txt.trace_subject_added_hint || '')}</p>`,
+                    target,
+                    showCancelButton: true,
+                    confirmButtonText: txt.trace_subject_open_ficha_btn || '',
+                    cancelButtonText: tCom.modal_cerrar || '',
+                });
+                this.highlightUnidadCard(idAlojamiento, idEu);
+                if (follow.isConfirmed) {
+                    await this.editSubjectFicha(idEu, idAlojamiento, idEspecie);
+                }
+            } else if (Swal) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: txt.trace_subject_added_ok || '',
+                    timer: 1400,
+                    showConfirmButton: false,
+                    target,
+                });
+            }
+        } catch (e) {
+            console.error(e);
+            if (Swal) {
+                Swal.fire({
+                    icon: 'error',
+                    title: txt.trace_error || 'Error',
+                    text: String(e.message || e),
+                    target,
+                });
+            }
         }
     },
 
@@ -939,11 +994,12 @@ const { isConfirmed } = await Swal.fire({
             const unidades = Array.from(document.querySelectorAll('.check-unidad-imp:checked:not(:disabled)')).map(x => x.value);
             
             if (cajas.length > 0) {
-                showLoader();
                 try {
                     await API.request('/trazabilidad/clone-past-boxes', 'POST', { idAlojamientoActual, cajas, unidades });
                     await this.refreshArbol(idAlojamientoActual, idEspecie);
-                } catch (e) { console.error(e); } finally { hideLoader(); }
+                } catch (e) {
+                    console.error(e);
+                }
             }
         }
     }

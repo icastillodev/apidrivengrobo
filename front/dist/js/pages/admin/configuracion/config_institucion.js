@@ -1,32 +1,59 @@
 import { API } from '../../../api.js';
 
+function tf() {
+    return window.txt?.config_institucion || {};
+}
+
+function escCfg(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/'/g, '&#39;');
+}
+
+function servicesLoadingRow() {
+    const t = tf();
+    const msg = escCfg(t.tabla_servicios_cargando || window.txt?.generales?.msg_cargando || '…');
+    return `<tr><td colspan="4" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+}
+
+function renderServicesLoadError() {
+    const tbody = document.getElementById('table-services-body');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-3 text-danger small">${escCfg(tf().tabla_error_servicios)}</td></tr>`;
+}
+
 export async function initConfigInstitution(instId) {
-    if(!instId) {
-        console.error("Falta instId para cargar la configuración");
+    if (!instId) {
+        console.error('Falta instId para cargar la configuración');
         return;
     }
 
-    // RUTA BASE PARA VISUALIZAR LOGOS (Desde la ubicación del HTML)
     const LOGO_BASE_PATH = '../../../dist/multimedia/imagenes/logos/';
 
-    // ============================================================
-    // 1. LOGICA DE DRAG & DROP DEL LOGO
-    // ============================================================
     const dropArea = document.getElementById('drop-area');
     const inputLogo = document.getElementById('in-logo');
     const previewImg = document.getElementById('img-preview');
     const previewCont = document.getElementById('preview-container');
     const uploadMsg = document.getElementById('upload-msg');
 
-    // Al hacer click en el área, abrir selector de archivos
     dropArea.addEventListener('click', () => inputLogo.click());
 
-    // Al seleccionar archivo manual
-    inputLogo.addEventListener('change', function() {
+    inputLogo.addEventListener('change', function () {
         handleFiles(this.files);
     });
 
-    // Eventos de arrastre
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropArea.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
     });
@@ -42,137 +69,132 @@ export async function initConfigInstitution(instId) {
     dropArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
 
     function handleFiles(files) {
+        const t = tf();
         if (files.length > 0) {
             const file = files[0];
-            // Validaciones
-            if (file.type !== 'image/png') return Swal.fire('Error', 'Solo se permiten archivos PNG', 'error');
-            if (file.size > 3 * 1024 * 1024) return Swal.fire('Error', 'El archivo supera los 3MB', 'error');
+            if (file.type !== 'image/png') {
+                Swal.fire(t.swal_error_titulo || 'Error', t.swal_png_solo || '', 'error');
+                return;
+            }
+            if (file.size > 3 * 1024 * 1024) {
+                Swal.fire(t.swal_error_titulo || 'Error', t.swal_logo_max_mb || '', 'error');
+                return;
+            }
 
-            // Previsualización
             const reader = new FileReader();
             reader.onload = (e) => {
                 previewImg.src = e.target.result;
                 previewCont.classList.remove('d-none');
-                uploadMsg.classList.add('d-none'); // Ocultar texto de ayuda
-                
-                // Asignar al input si vino por drop (necesario para el FormData)
-                if(inputLogo.files.length === 0){
+                uploadMsg.classList.add('d-none');
+
+                if (inputLogo.files.length === 0) {
                     const dT = new DataTransfer();
                     dT.items.add(file);
                     inputLogo.files = dT.files;
                 }
-            }
+            };
             reader.readAsDataURL(file);
         }
     }
 
-    // ============================================================
-    // 2. CARGA INICIAL DE DATOS
-    // ============================================================
-    await loadData();
+    await loadData({ instId, boot: true });
 
-    // ============================================================
-    // 3. GUARDAR FORMULARIO PRINCIPAL (Institución + Logo)
-    // ============================================================
     document.getElementById('form-institution').onsubmit = async (e) => {
         e.preventDefault();
-        
+
         const fd = new FormData(e.target);
         fd.append('instId', instId);
-        
-        // Checkboxes: HTML no los envía si no están marcados, los forzamos
+
         fd.append('otrosceuas', 0);
         fd.append('LogoEnPdf', document.getElementById('check-logopdf').checked ? 1 : 0);
 
-        Swal.fire({ title: 'Guardando...', didOpen: () => Swal.showLoading() });
+        const t = tf();
+        Swal.fire({ title: t.swal_guardando || '…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
         try {
             const res = await API.request('/admin/config/institution/update', 'POST', fd);
             if (res.status === 'success') {
                 Swal.fire({
-                    title: '¡Actualizado!',
-                    text: 'La información se guardó correctamente.',
+                    title: t.swal_actualizado_titulo || '',
+                    text: t.swal_actualizado_texto || '',
                     icon: 'success',
                     timer: 1500,
                     showConfirmButton: false
                 });
-                
-                // Recargar datos para ver el nuevo logo si cambió
-                loadData(); 
-                
-                // Resetear área de subida
+
+                await loadData({ instId, boot: false });
+
                 previewCont.classList.add('d-none');
                 uploadMsg.classList.remove('d-none');
-                inputLogo.value = ''; // Limpiar input file
+                inputLogo.value = '';
             } else {
-                Swal.fire('Error', res.message, 'error');
+                Swal.fire(t.swal_error_titulo || 'Error', res.message || '', 'error');
             }
         } catch (err) {
             console.error(err);
-            Swal.fire('Error', 'Error de conexión con el servidor', 'error');
+            Swal.fire(tf().swal_error_titulo || 'Error', tf().swal_error_conexion || '', 'error');
         }
     };
 
-    // ============================================================
-    // 4. GESTIÓN DE SERVICIOS (Agregar)
-    // ============================================================
     document.getElementById('btn-add-service').onclick = async () => {
+        const t = tf();
         const nombre = document.getElementById('srv-nombre').value;
         const medida = document.getElementById('srv-medida').value;
         const cant = document.getElementById('srv-cant').value;
 
-        if(!nombre.trim()) return Swal.fire('Atención', 'El nombre del servicio es obligatorio', 'warning');
+        if (!nombre.trim()) {
+            Swal.fire(t.swal_atencion || '', t.swal_servicio_nombre_obligatorio || '', 'warning');
+            return;
+        }
 
-        // Botón loading state
         const btn = document.getElementById('btn-add-service');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        const spin = document.createElement('span');
+        spin.className = 'spinner-border spinner-border-sm me-1';
+        spin.setAttribute('role', 'status');
         btn.disabled = true;
+        btn.insertBefore(spin, btn.firstChild);
 
         try {
-            const res = await API.request('/admin/config/institution/service/add', 'POST', { 
-                instId, 
-                nombre, 
-                medida, 
-                cant 
+            const res = await API.request('/admin/config/institution/service/add', 'POST', {
+                instId,
+                nombre,
+                medida,
+                cant
             });
 
-            if(res.status === 'success') {
-                // Limpiar inputs
+            if (res.status === 'success') {
                 document.getElementById('srv-nombre').value = '';
                 document.getElementById('srv-medida').value = '';
                 document.getElementById('srv-cant').value = '1';
-                
-                // Recargar lista
-                loadServices();
+
+                await loadServices(instId);
             } else {
-                Swal.fire('Error', res.message, 'error');
+                Swal.fire(t.swal_error_titulo || 'Error', res.message || '', 'error');
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e);
-            Swal.fire('Error', 'No se pudo agregar el servicio', 'error');
+            Swal.fire(t.swal_error_titulo || 'Error', t.swal_no_agregar_servicio || '', 'error');
         } finally {
-            btn.innerHTML = originalText;
+            btn.querySelector('.spinner-border')?.remove();
             btn.disabled = false;
         }
     };
 
-    // ============================================================
-    // 5. MODAL DE EDICIÓN DE SERVICIO
-    // ============================================================
     const editServiceModalEl = document.getElementById('modal-edit-service');
     const editServiceModal = editServiceModalEl ? bootstrap.Modal.getOrCreateInstance(editServiceModalEl) : null;
     const formEditService = document.getElementById('form-edit-service');
     if (formEditService) {
         formEditService.onsubmit = async (e) => {
             e.preventDefault();
+            const t = tf();
             const id = document.getElementById('edit-srv-id').value;
             const nombre = document.getElementById('edit-srv-nombre').value.trim();
             const medida = document.getElementById('edit-srv-medida').value.trim();
             const cant = document.getElementById('edit-srv-cant').value;
 
             if (!id || !nombre) {
-                return Swal.fire('Atención', 'Faltan datos para modificar el servicio.', 'warning');
+                Swal.fire(t.swal_atencion || '', t.swal_editar_faltan_datos || '', 'warning');
+                return;
             }
 
             try {
@@ -186,36 +208,32 @@ export async function initConfigInstitution(instId) {
                 if (res.status === 'success') {
                     editServiceModal?.hide();
                     Swal.fire({
-                        title: 'Servicio actualizado',
+                        title: t.swal_servicio_actualizado || '',
                         icon: 'success',
                         timer: 1000,
                         showConfirmButton: false
                     });
-                    loadServices();
+                    await loadServices(instId);
                 } else {
-                    Swal.fire('Error', res.message || 'No se pudo actualizar el servicio.', 'error');
+                    Swal.fire(t.swal_error_titulo || 'Error', res.message || t.swal_no_actualizar_servicio || '', 'error');
                 }
             } catch (error) {
                 console.error(error);
-                Swal.fire('Error', 'Error de conexión', 'error');
+                Swal.fire(tf().swal_error_titulo || 'Error', tf().swal_error_conexion || '', 'error');
             }
         };
     }
 
-    // ============================================================
-    // FUNCIONES AUXILIARES
-    // ============================================================
+    async function loadData({ instId: id, boot = false }) {
+        const tbody = document.getElementById('table-services-body');
+        if (!boot && tbody) tbody.innerHTML = servicesLoadingRow();
 
-    // Carga todos los datos de la institución
-    async function loadData() {
         try {
-            // Usamos timestamp para evitar caché agresivo del navegador en imágenes o datos
-            const res = await API.request(`/admin/config/institution?inst=${instId}&t=${Date.now()}`);
-            
+            const res = await API.request(`/admin/config/institution?inst=${id}&t=${Date.now()}`);
+
             if (res.status === 'success') {
                 const d = res.data;
-                
-                // Inputs de Texto
+
                 document.getElementById('in-nombre').value = d.NombreCompletoInst || '';
                 document.getElementById('in-web').value = d.Web || '';
                 document.getElementById('in-correo').value = d.InstCorreo || '';
@@ -223,84 +241,96 @@ export async function initConfigInstitution(instId) {
                 document.getElementById('in-contacto').value = d.InstContacto || '';
                 document.getElementById('in-localidad').value = d.Localidad || '';
                 document.getElementById('in-pais').value = d.Pais || '';
-                
-                // Selects
+
                 document.getElementById('sel-moneda').value = d.Moneda || 'UYU';
-                document.getElementById('sel-idioma').value = d.idioma || 'es'; // Importante: campo 'idioma'
-                
-                // Checkboxes
+                document.getElementById('sel-idioma').value = d.idioma || 'es';
+
                 document.getElementById('check-logopdf').checked = (d.LogoEnPdf == 1);
-                // Para que otros PDFs (fichas, estadísticas) puedan mostrar logo sin volver a pedir la config
                 localStorage.setItem('instLogoEnPdf', d.LogoEnPdf == 1 ? '1' : '0');
 
-                // VISOR DE LOGO ACTUAL
                 const currentLogoBox = document.getElementById('current-logo-container');
                 const imgCurrent = document.getElementById('img-current');
-                
-                if(d.Logo && d.Logo.trim() !== "") {
-                    // Agregamos timestamp para forzar recarga de la imagen si cambió pero tiene mismo nombre
-                    imgCurrent.src = `${LOGO_BASE_PATH}${d.Logo}?t=${Date.now()}`; 
+
+                if (d.Logo && d.Logo.trim() !== '') {
+                    imgCurrent.src = `${LOGO_BASE_PATH}${d.Logo}?t=${Date.now()}`;
                     currentLogoBox.classList.remove('d-none');
                 } else {
                     currentLogoBox.classList.add('d-none');
                 }
 
-                // Renderizar tabla de servicios
-                renderServices(d.servicios);
+                renderServices(Array.isArray(d.servicios) ? d.servicios : []);
             } else {
-                Swal.fire('Error', 'No se pudieron cargar los datos de la institución', 'error');
+                Swal.fire(tf().swal_error_titulo || 'Error', tf().error_carga_institucion || '', 'error');
+                renderServicesLoadError();
             }
         } catch (e) {
-            console.error("Error loading data:", e);
+            console.error('Error loading data:', e);
+            renderServicesLoadError();
+            Swal.fire(tf().swal_error_titulo || 'Error', tf().error_carga_institucion || '', 'error');
         }
     }
 
-    // Carga solo la lista de servicios (para refrescar tras agregar/borrar)
-    async function loadServices() {
-        // Timestamp crítico aquí para asegurar que trae la lista POST-Borrado
-        const res = await API.request(`/admin/config/institution?inst=${instId}&t=${Date.now()}`);
-        if(res.status === 'success') renderServices(res.data.servicios);
+    async function loadServices(id) {
+        const tbody = document.getElementById('table-services-body');
+        if (tbody) tbody.innerHTML = servicesLoadingRow();
+
+        try {
+            const res = await API.request(`/admin/config/institution?inst=${id}&t=${Date.now()}`);
+            if (res.status === 'success') {
+                renderServices(Array.isArray(res.data.servicios) ? res.data.servicios : []);
+            } else {
+                renderServicesLoadError();
+            }
+        } catch (e) {
+            console.error(e);
+            renderServicesLoadError();
+        }
     }
 
-    // Renderiza la tabla HTML
     function renderServices(list) {
         const tbody = document.getElementById('table-services-body');
         tbody.innerHTML = '';
 
-        if(!list || list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted small py-3">No hay servicios registrados en el catálogo.</td></tr>';
+        const t = tf();
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted small py-3">${escCfg(t.tabla_sin_servicios)}</td></tr>`;
             return;
         }
 
         list.forEach(s => {
             const isChecked = (s.Habilitado == 1) ? 'checked' : '';
             const tr = document.createElement('tr');
-            
-            // Asignamos ID a la fila para poder borrarla visualmente rápido
+
             tr.id = `row-service-${s.IdServicioInst}`;
 
+            const medidaLbl = (s.MedidaServicioInst || '').trim() || (t.medida_unidad_defecto || '');
+            const cantStr = String(s.CantidadPorMedidaInst ?? 1);
+            const refCell = `${escCfg(cantStr)} ${escCfg(medidaLbl)}`.trim();
+
             tr.innerHTML = `
-                <td class="fw-bold text-dark">${s.NombreServicioInst}</td>
-                <td class="small text-muted">${s.CantidadPorMedidaInst || 1} ${s.MedidaServicioInst || 'unid.'}</td>
-                
+                <td class="fw-bold text-dark">${escCfg(s.NombreServicioInst)}</td>
+                <td class="small text-muted">${refCell}</td>
+
                 <td class="text-center align-middle">
                     <div class="form-check form-switch d-flex justify-content-center">
-                        <input class="form-check-input srv-toggle" type="checkbox" role="switch" 
-                            data-id="${s.IdServicioInst}" ${isChecked} style="cursor: pointer;">
+                        <input class="form-check-input srv-toggle" type="checkbox" role="switch"
+                            data-id="${escAttr(String(s.IdServicioInst))}" ${isChecked} style="cursor: pointer;">
                     </div>
                 </td>
 
                 <td class="text-end align-middle">
-                    <button class="btn btn-sm btn-link text-primary p-0 border-0 me-2 btn-edit-srv" 
-                        data-id="${s.IdServicioInst}" 
-                        data-nombre="${(s.NombreServicioInst || '').replace(/"/g, '&quot;')}"
-                        data-medida="${(s.MedidaServicioInst || '').replace(/"/g, '&quot;')}"
-                        data-cant="${s.CantidadPorMedidaInst || 1}"
-                        title="Modificar servicio">
+                    <button type="button" class="btn btn-sm btn-link text-primary p-0 border-0 me-2 btn-edit-srv"
+                        data-id="${escAttr(String(s.IdServicioInst))}"
+                        data-nombre="${escAttr(s.NombreServicioInst || '')}"
+                        data-medida="${escAttr(s.MedidaServicioInst || '')}"
+                        data-cant="${escAttr(String(s.CantidadPorMedidaInst ?? 1))}"
+                        title="${escAttr(t.title_editar_servicio)}">
                         <i class="bi bi-pencil-square"></i>
                     </button>
-                    <button class="btn btn-sm btn-link text-danger p-0 border-0 btn-del-srv" 
-                        data-id="${s.IdServicioInst}" title="Eliminar permanentemente">
+                    <button type="button" class="btn btn-sm btn-link text-danger p-0 border-0 btn-del-srv"
+                        data-id="${escAttr(String(s.IdServicioInst))}"
+                        title="${escAttr(t.title_eliminar_servicio)}">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -308,70 +338,61 @@ export async function initConfigInstitution(instId) {
             tbody.appendChild(tr);
         });
 
-        // --- ASIGNAR EVENTOS ---
-
-        // 1. Toggle Switch
         tbody.querySelectorAll('.srv-toggle').forEach(el => {
-            el.onchange = async function() {
+            el.onchange = async function () {
                 try {
-                    // Llamada silenciosa (sin loader) para fluidez
                     await API.request('/admin/config/institution/service/toggle', 'POST', { id: this.dataset.id });
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
-                    // Si falla, revertir el switch visualmente
                     this.checked = !this.checked;
-                    Swal.fire('Error', 'No se pudo cambiar el estado', 'error');
+                    Swal.fire(tf().swal_error_titulo || 'Error', tf().swal_toggle_error || '', 'error');
                 }
             };
         });
 
-        // 2. Botón Eliminar
         tbody.querySelectorAll('.btn-del-srv').forEach(el => {
-            el.onclick = async function() {
+            el.onclick = async function () {
                 const idService = this.dataset.id;
-                
+                const tt = tf();
+
                 const result = await Swal.fire({
-                    title: '¿Estás seguro?',
-                    text: "El servicio se eliminará del catálogo permanentemente.",
+                    title: tt.swal_borrar_titulo || '',
+                    text: tt.swal_borrar_texto || '',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
                     cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'Sí, eliminar',
-                    cancelButtonText: 'Cancelar'
+                    confirmButtonText: tt.swal_borrar_confirm || '',
+                    cancelButtonText: tt.swal_borrar_cancel || ''
                 });
 
                 if (result.isConfirmed) {
                     try {
                         const res = await API.request('/admin/config/institution/service/delete', 'POST', { id: idService });
-                        
-                        if (res.status === 'success') {
-                            // 1. Eliminación visual inmediata (UX rápida)
-                            const row = document.getElementById(`row-service-${idService}`);
-                            if(row) row.remove();
 
-                            // 2. Feedback discreto
+                        if (res.status === 'success') {
+                            const row = document.getElementById(`row-service-${idService}`);
+                            if (row) row.remove();
+
                             const Toast = Swal.mixin({
                                 toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, timerProgressBar: true
                             });
-                            Toast.fire({ icon: 'success', title: 'Servicio eliminado' });
+                            Toast.fire({ icon: 'success', title: tt.swal_toast_servicio_eliminado || '' });
 
-                            // 3. Recarga de seguridad (por si quedó vacía la tabla poner el mensaje de "No hay servicios")
-                            loadServices(); 
+                            await loadServices(instId);
                         } else {
-                            Swal.fire('Error', res.message || 'Error al eliminar', 'error');
+                            Swal.fire(tt.swal_error_titulo || 'Error', res.message || tt.swal_error_eliminar || '', 'error');
                         }
                     } catch (e) {
                         console.error(e);
-                        Swal.fire('Error', 'Error de conexión', 'error');
+                        Swal.fire(tt.swal_error_titulo || 'Error', tt.swal_error_conexion || '', 'error');
                     }
                 }
             };
         });
 
-        // 3. Botón Editar
         tbody.querySelectorAll('.btn-edit-srv').forEach(el => {
-            el.onclick = function() {
+            el.onclick = function () {
                 document.getElementById('edit-srv-id').value = this.dataset.id || '';
                 document.getElementById('edit-srv-nombre').value = this.dataset.nombre || '';
                 document.getElementById('edit-srv-medida').value = this.dataset.medida || '';

@@ -1,6 +1,11 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { formatBillingMoney } from './billingLocale.js';
+import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
+
+let orgBillingReportLoadedOk = false;
+/** @type {{ organizaciones: unknown[], opts: { desde: string, hasta: string, chkAni: boolean, chkAlo: boolean, chkIns: boolean } } | null} */
+let orgLastSnapshot = null;
 
 export async function initBillingOrg() {
     const hoy = new Date();
@@ -22,23 +27,48 @@ async function cargarFacturacionOrg() {
     const chkIns = document.getElementById('chk-insumos-org').checked;
 
     if (!chkAni && !chkAlo && !chkIns) {
-        if (window.Swal) window.Swal.fire(window.txt?.facturacion?.filtro_al_menos || 'Atención', window.txt?.facturacion?.aviso_filtro || 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
+        if (window.Swal) window.Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_filtro || 'Debe tener al menos un filtro activo (Animales, Alojamiento o Insumos).', 'warning');
         return;
     }
 
+    const opts = { desde, hasta, chkAni, chkAlo, chkIns };
+    const resultsEl = document.getElementById('billing-results-org');
+    const prevSnap = orgLastSnapshot;
+    const useGlobalLoader = !orgBillingReportLoadedOk;
+
     try {
-        showLoader();
+        if (useGlobalLoader) {
+            showLoader();
+        } else if (resultsEl) {
+            setBillingResultsLoadingInline('billing-results-org');
+        }
         const res = await API.request('/billing/org-report', 'POST', { desde, hasta, chkAni, chkAlo, chkIns });
         if (res.status === 'success' && res.data && res.data.organizaciones) {
-            renderResultadosOrg(res.data.organizaciones, { desde, hasta, chkAni, chkAlo, chkIns });
+            orgLastSnapshot = { organizaciones: res.data.organizaciones, opts };
+            renderResultadosOrg(res.data.organizaciones, opts);
+            orgBillingReportLoadedOk = true;
         } else {
-        if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', (res && res.message) || window.txt?.facturacion?.no_se_obtuvieron_datos || 'No se obtuvieron datos.', 'error');
+            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', (res && res.message) || window.txt?.facturacion?.no_se_obtuvieron_datos || 'No se obtuvieron datos.', 'error');
+            if (!useGlobalLoader && prevSnap) {
+                renderResultadosOrg(prevSnap.organizaciones, prevSnap.opts);
+            } else if (!useGlobalLoader && resultsEl) {
+                resultsEl.replaceChildren();
+            }
         }
     } catch (e) {
         console.error(e);
         if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al cargar el reporte.', 'error');
+        if (!useGlobalLoader && prevSnap) {
+            renderResultadosOrg(prevSnap.organizaciones, prevSnap.opts);
+        } else if (!useGlobalLoader && resultsEl) {
+            resultsEl.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'alert alert-danger m-3';
+            err.textContent = window.txt?.generales?.error_carga || 'Error al cargar datos.';
+            resultsEl.appendChild(err);
+        }
     } finally {
-        hideLoader();
+        if (useGlobalLoader) hideLoader();
     }
 }
 
@@ -69,7 +99,7 @@ function renderResultadosOrg(organizaciones, opts) {
                         <table class="table table-hover table-sm mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">${t.generales?.departamento || 'Departamento'}</th>
+                                    <th class="ps-3">${t.facturacion?.org_col_departamento || 'Departamento'}</th>
                                     <th class="text-end">${t.facturacion?.deuda_total || 'Deuda'}</th>
                                     <th class="text-end">${t.facturacion?.total_pagado || 'Pagado'}</th>
                                     <th class="text-center" style="width: 120px;"></th>

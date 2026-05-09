@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 
 export const BitacoraState = {
     dataFull: [],
@@ -8,25 +9,63 @@ export const BitacoraState = {
     maxVisiblePages: 6
 };
 
+function txBit() {
+    return window.txt?.superadmin_bitacora || {};
+}
+
+function escBit(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 export async function initBitacora() {
     setupListeners();
-    await loadData();
+    showLoader();
+    try {
+        await loadData();
+    } finally {
+        hideLoader();
+    }
 }
 
 async function loadData() {
     try {
         const res = await API.request('/superadmin/bitacora/list');
         if (res.status === 'success') {
-            BitacoraState.dataFull = res.data || [];
+            BitacoraState.dataFull = Array.isArray(res.data) ? res.data : [];
             BitacoraState.dataFiltered = [...BitacoraState.dataFull];
             BitacoraState.currentPage = 1;
-            
-            poblarFiltroInstituciones(); // Llenamos el dropdown
+
+            poblarFiltroInstituciones();
             renderTable();
+        } else {
+            BitacoraState.dataFull = [];
+            BitacoraState.dataFiltered = [];
+            poblarFiltroInstituciones();
+            renderBitacoraErrorRow();
         }
     } catch (e) {
-        console.error("Error cargando bitácora:", e);
+        console.error('Error cargando bitácora:', e);
+        BitacoraState.dataFull = [];
+        BitacoraState.dataFiltered = [];
+        poblarFiltroInstituciones();
+        renderBitacoraErrorRow();
     }
+}
+
+function renderBitacoraErrorRow() {
+    const tbody = document.getElementById('table-body');
+    const info = document.getElementById('table-info');
+    const msg = escBit(txBit().error_cargar || window.txt?.generales?.error || 'Error');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger small">${msg}</td></tr>`;
+    }
+    if (info) info.innerText = txBit().info_cero || '0';
+    renderPagination(0);
 }
 
 // Extrae las instituciones únicas y las inyecta en el <select>
@@ -63,7 +102,7 @@ function filterData() {
 
     BitacoraState.dataFiltered = BitacoraState.dataFull.filter(row => {
         // 1. Filtro Select Acción
-        if (action !== 'all' && !row.accion.includes(action)) return false;
+        if (action !== 'all' && !String(row.accion || '').includes(action)) return false;
 
         // 2. Filtro Select Institución
         if (instFiltro !== 'all' && row.Institucion !== instFiltro) return false;
@@ -83,6 +122,7 @@ function filterData() {
 function renderTable() {
     const tbody = document.getElementById('table-body');
     const info = document.getElementById('table-info');
+    const t = txBit();
     tbody.innerHTML = '';
 
     const start = (BitacoraState.currentPage - 1) * BitacoraState.itemsPerPage;
@@ -90,39 +130,49 @@ function renderTable() {
     const paginatedItems = BitacoraState.dataFiltered.slice(start, end);
 
     if (paginatedItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No se encontraron movimientos.</td></tr>`;
-        info.innerText = "0 registros";
+        const emptyMsg = escBit(
+            BitacoraState.dataFull.length === 0
+                ? t.tabla_sin_filas || ''
+                : t.sin_resultados_filtro || t.tabla_sin_filas || ''
+        );
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">${emptyMsg || '—'}</td></tr>`;
+        info.innerText = t.info_cero || '0';
         renderPagination(0);
         return;
     }
 
     paginatedItems.forEach(row => {
         let badgeColor = 'bg-secondary';
-        let act = row.accion.toUpperCase();
+        let act = String(row.accion || '').toUpperCase();
         if (act.includes('INSERT')) badgeColor = 'bg-success';
         if (act.includes('UPDATE')) badgeColor = 'bg-primary';
         if (act.includes('DELETE')) badgeColor = 'bg-danger';
         if (act.includes('LOGIN')) badgeColor = 'bg-info text-dark';
 
         // Destacamos SISTEMA GLOBAL
-        const instLabel = row.Institucion === 'SISTEMA GLOBAL' 
-            ? `<span class="badge bg-dark">SISTEMA GLOBAL</span>` 
-            : `<span class="fw-bold text-success">${row.Institucion}</span>`;
+        const instLabel =
+            row.Institucion === 'SISTEMA GLOBAL'
+                ? `<span class="badge bg-dark">SISTEMA GLOBAL</span>`
+                : `<span class="fw-bold text-success">${escBit(row.Institucion)}</span>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="fw-bold text-muted">#${row.id_bitacora}</td>
-            <td style="font-size:11px;">${row.fecha_hora}</td>
-            <td class="fw-bold text-primary">${row.UsuarioName || 'SISTEMA'}</td>
+            <td style="font-size:11px;">${escBit(row.fecha_hora)}</td>
+            <td class="fw-bold text-primary">${escBit(row.UsuarioName || 'SISTEMA')}</td>
             <td>${instLabel}</td>
-            <td class="text-center"><span class="badge ${badgeColor}">${row.accion}</span></td>
-            <td><code class="text-secondary">${row.tabla_afectada}</code></td>
-            <td class="text-muted">${row.detalle}</td>
+            <td class="text-center"><span class="badge ${badgeColor}">${escBit(row.accion)}</span></td>
+            <td><code class="text-secondary">${escBit(row.tabla_afectada)}</code></td>
+            <td class="text-muted">${escBit(row.detalle)}</td>
         `;
         tbody.appendChild(tr);
     });
 
-    info.innerText = `Mostrando ${start + 1} a ${Math.min(end, BitacoraState.dataFiltered.length)} de ${BitacoraState.dataFiltered.length} movimientos`;
+    const tpl = t.table_info || 'Showing {a} to {b} of {total}';
+    info.innerText = tpl
+        .replace('{a}', String(start + 1))
+        .replace('{b}', String(Math.min(end, BitacoraState.dataFiltered.length)))
+        .replace('{total}', String(BitacoraState.dataFiltered.length));
     renderPagination(BitacoraState.dataFiltered.length);
 }
 
@@ -181,7 +231,16 @@ function createPageItem(text, targetPage, disabled = false, active = false) {
 }
 
 function exportToExcel() {
-    if(BitacoraState.dataFiltered.length === 0) return alert("No hay datos para exportar.");
+    const t = txBit();
+    if (BitacoraState.dataFiltered.length === 0) {
+        const msg = t.excel_empty || '';
+        if (typeof Swal !== 'undefined') {
+            Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', msg || '—', 'info');
+        } else {
+            alert(msg || '—');
+        }
+        return;
+    }
     const ws = XLSX.utils.json_to_sheet(BitacoraState.dataFiltered);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Bitacora");

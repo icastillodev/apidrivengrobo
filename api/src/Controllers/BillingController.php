@@ -50,6 +50,11 @@ class BillingController {
         unset($ins);
     }
 
+    /** Listados animal/reactivo en facturación por depto/protocolo/investigador: montos según facturacion_formulario_derivado. */
+    private function enrichPedidosFacturacionDerivada(array &$forms, int $instId): void {
+        $this->model->applyFacturacionDerivadaToPedidoFacturacionRows($forms, $instId);
+    }
+
     public function getDeptoReport() {
         if (ob_get_length()) ob_clean();
         $f = json_decode(file_get_contents('php://input'), true);
@@ -83,6 +88,7 @@ class BillingController {
 
             // Formato viejo: pedidos del departamento sin vincular a ningún protocolo
             $pedidosSinProt = $this->model->getPedidosDeptoSinProtocolo($deptoId, $desde, $hasta);
+            $this->enrichPedidosFacturacionDerivada($pedidosSinProt, (int) $instId);
             if (!empty($pedidosSinProt)) {
                 $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
                 foreach ($pedidosSinProt as $form) {
@@ -132,6 +138,7 @@ class BillingController {
                     $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
                     $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 }
+                $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
 
                 if (!empty($formularios) || !empty($alojamientos)) {
                     $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
@@ -237,6 +244,7 @@ class BillingController {
                     foreach ($protocolosRaw as $p) {
                         $idProt = $p['idprotA'];
                         $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                        $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
                         $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
 
                         if (!empty($formularios) || !empty($alojamientos)) {
@@ -375,6 +383,7 @@ class BillingController {
             foreach ($protocolosRaw as $p) {
                 $idProt = $p['idprotA'];
                 $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
                 $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
                 $this->enrichInsumosFacturacionDerivadaSaldo($insumosProt, $mapaSaldos, (int) $instId);
@@ -636,6 +645,9 @@ class BillingController {
             $instId = (int) ($sesion['instId'] ?? 0);
             $info = $this->model->getProtocolHeaderInfo($idProt);
             $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+            if ($instId > 0) {
+                $this->enrichPedidosFacturacionDerivada($formularios, $instId);
+            }
             $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
             $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
             if ($instId > 0) {
@@ -726,6 +738,29 @@ class BillingController {
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error en el servidor: ' . $e->getMessage()); }
     }
 
+    public function updateInsumoLinePrecio() {
+        $input = $this->getRequestData();
+        if (!isset($input['idForminsumo'], $input['precio_unitario'])) {
+            return $this->jsonResponse('error', 'Datos incompletos (idForminsumo, precio_unitario).');
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->updateInsumoLinePrecioMomento(
+                (int)$input['idForminsumo'],
+                (float)$input['precio_unitario'],
+                (int)$sesion['instId'],
+                (int)$sesion['userId']
+            );
+            return $this->jsonResponse('success', ['ok' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        }
+    }
+
     public function getAlojamientoDetail($id) {
         try {
             $sesion = Auditoria::getDatosSesion();
@@ -807,8 +842,15 @@ class BillingController {
             }
             $from = !empty($_GET['from']) ? (string) $_GET['from'] : null;
             $to = !empty($_GET['to']) ? (string) $_GET['to'] : null;
-            $scope = !empty($_GET['scope']) ? (string) $_GET['scope'] : 'investigador';
+            $scope = !empty($_GET['scope']) ? strtolower(trim((string) $_GET['scope'])) : 'investigador';
             $refId = isset($_GET['refId']) && $_GET['refId'] !== '' ? (int) $_GET['refId'] : null;
+
+            if ($scope === 'depto' && ($refId === null || $refId <= 0)) {
+                $this->jsonResponse('error', 'Se requiere un departamento válido (refId) para el historial por área.');
+            }
+            if ($scope === 'protocolo' && ($refId === null || $refId <= 0)) {
+                $this->jsonResponse('error', 'Se requiere un protocolo válido (refId) para el historial por protocolo.');
+            }
 
             $split = $this->model->getSaldoHistorialSplit($instId, $idUsr, $from, $to, $scope, $refId);
             $saldo = $this->model->getSaldoByInvestigador($idUsr, $instId);

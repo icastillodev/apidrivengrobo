@@ -82,6 +82,69 @@ class NoticiaModel {
     }
 
     /**
+     * Listado local: primero noticias con OrdenFijo 1..3 (fila destacada), luego el resto.
+     * Requiere columna noticia.OrdenFijo (ver docs/migrations).
+     */
+    private function sqlOrderPublicListLocalWithPin(string $sort): string {
+        $pin = '(OrdenFijo IS NULL) ASC, OrdenFijo ASC, ';
+        switch (strtolower(trim($sort))) {
+            case 'fecha_asc':
+                return "ORDER BY {$pin}FechaPublicacion ASC, IdNoticia ASC";
+            case 'titulo_asc':
+                return "ORDER BY {$pin}Titulo ASC, IdNoticia ASC";
+            case 'titulo_desc':
+                return "ORDER BY {$pin}Titulo DESC, IdNoticia DESC";
+            case 'fecha_desc':
+            default:
+                return "ORDER BY {$pin}FechaPublicacion DESC, IdNoticia DESC";
+        }
+    }
+
+    /**
+     * Resuelve OrdenFijo al guardar: borrador => siempre NULL; publicado => payload o valor previo.
+     * @return array{ok:true, orden:?int}|array{ok:false, message:string}
+     */
+    private function resolveOrdenFijoForSave(array $payload, ?array $existingRow, int $publicado): array {
+        if ($publicado !== 1) {
+            return ['ok' => true, 'orden' => null];
+        }
+        if (array_key_exists('OrdenFijo', $payload)) {
+            $raw = $payload['OrdenFijo'];
+            if ($raw === null || $raw === '') {
+                return ['ok' => true, 'orden' => null];
+            }
+            if (is_string($raw) && trim($raw) === '') {
+                return ['ok' => true, 'orden' => null];
+            }
+            $v = (int)$raw;
+            if ($v < 1 || $v > 3) {
+                return ['ok' => false, 'message' => 'La posición fija debe ser 1, 2 o 3 (o ninguna).'];
+            }
+            return ['ok' => true, 'orden' => $v];
+        }
+        if ($existingRow === null) {
+            return ['ok' => true, 'orden' => null];
+        }
+        $ex = $existingRow['OrdenFijo'] ?? null;
+        if ($ex === null || $ex === '') {
+            return ['ok' => true, 'orden' => null];
+        }
+        $v = (int)$ex;
+        if ($v < 1 || $v > 3) {
+            return ['ok' => true, 'orden' => null];
+        }
+        return ['ok' => true, 'orden' => $v];
+    }
+
+    /** Libera el cupo (1..3) para otra noticia de la misma institución. */
+    private function clearOrdenFijoSlot(int $instId, int $slot, int $excludeIdNoticia): void {
+        $stmt = $this->db->prepare(
+            'UPDATE noticia SET OrdenFijo = NULL WHERE IdInstitucion = ? AND OrdenFijo = ? AND IdNoticia <> ?'
+        );
+        $stmt->execute([$instId, $slot, $excludeIdNoticia]);
+    }
+
+    /**
      * Fecha/hora de publicación al guardar: borrador => null; publicar => payload, existente o ahora.
      * Si el payload trae fecha, esa es la que debe guardarse, no sobreescribir con 'now()'.
      * @param string|null $fromPayload Valor enviado por el cliente (ISO o vacío).
@@ -137,7 +200,7 @@ class NoticiaModel {
     public function listPublic(int $instId, string $alcance, int $page, int $pageSize, bool $fullCuerpoLocal = false, string $sort = 'fecha_desc', string $search = ''): array {
         $alcance = strtolower($alcance) === 'red' ? 'red' : 'local';
         $offset = max(0, ($page - 1) * $pageSize);
-        $orderLocal = $this->sqlOrderPublicList($sort, '');
+        $orderLocal = $this->sqlOrderPublicListLocalWithPin($sort);
         $orderRed = $this->sqlOrderPublicList($sort, 'n');
 
         $searchFilterLocal = "";
@@ -165,7 +228,7 @@ class NoticiaModel {
                 : 'LEFT(Cuerpo, 400) AS CuerpoResumen';
             $sql = "
                 SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge, {$cuerpoSel},
-                       FechaPublicacion, FechaCreacion
+                       FechaPublicacion, FechaCreacion, OrdenFijo
                 FROM noticia
                 WHERE IdInstitucion = ? AND Alcance = 'local' AND " . $this->sqlVisiblePublicas() . "
                 {$searchFilterLocal}
@@ -271,10 +334,11 @@ class NoticiaModel {
         $sql = "
             SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge,
                    LEFT(Cuerpo, 200) AS CuerpoPreview,
-                   Publicado, CompartirEnRed, FechaPublicacion, FechaCreacion, FechaActualizacion, IdUsrAutor, DependenciaRed
+                   Publicado, CompartirEnRed, FechaPublicacion, FechaCreacion, FechaActualizacion, IdUsrAutor, DependenciaRed,
+                   OrdenFijo
             FROM noticia
             WHERE IdInstitucion = ?
-            ORDER BY FechaCreacion DESC, IdNoticia DESC
+            ORDER BY (OrdenFijo IS NULL) ASC, OrdenFijo ASC, FechaCreacion DESC, IdNoticia DESC
             LIMIT " . (int)$pageSize . " OFFSET " . (int)$offset;
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
@@ -311,10 +375,16 @@ class NoticiaModel {
 
         [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, null);
 
+        $ordenResolved = $this->resolveOrdenFijoForSave($payload, null, $publicado);
+        if (!$ordenResolved['ok']) {
+            return ['status' => 'error', 'message' => $ordenResolved['message']];
+        }
+        $ordenFijo = $ordenResolved['orden'];
+
         $stmt = $this->db->prepare("
             INSERT INTO noticia
-            (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion, OrdenFijo)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NULL)
         ");
         $stmt->execute([
             $instId,
@@ -328,7 +398,24 @@ class NoticiaModel {
             $fechaPub,
             $idAutor,
         ]);
-        return ['status' => 'success', 'data' => ['IdNoticia' => (int)$this->db->lastInsertId()]];
+        $newId = (int)$this->db->lastInsertId();
+
+        if ($ordenFijo !== null) {
+            $this->db->beginTransaction();
+            try {
+                $this->clearOrdenFijoSlot($instId, $ordenFijo, $newId);
+                $u = $this->db->prepare(
+                    'UPDATE noticia SET OrdenFijo = ? WHERE IdNoticia = ? AND IdInstitucion = ?'
+                );
+                $u->execute([$ordenFijo, $newId, $instId]);
+                $this->db->commit();
+            } catch (\Throwable $e) {
+                $this->db->rollBack();
+                throw $e;
+            }
+        }
+
+        return ['status' => 'success', 'data' => ['IdNoticia' => $newId]];
     }
 
     public function update(int $instId, int $idNoticia, array $payload): array {
@@ -369,25 +456,42 @@ class NoticiaModel {
 
         [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, $row);
 
-        $stmt = $this->db->prepare("
-            UPDATE noticia SET
-            Alcance = ?, DependenciaRed = ?, Titulo = ?, Categoria = ?, CategoriaBadge = ?, Cuerpo = ?,
-            Publicado = ?, CompartirEnRed = ?, FechaPublicacion = ?
-            WHERE IdNoticia = ? AND IdInstitucion = ?
-        ");
-        $stmt->execute([
-            $alcance,
-            $depRed,
-            $titulo,
-            $categoria,
-            $categoriaBadge,
-            $cuerpo,
-            $publicado,
-            $compartirEnRed,
-            $fechaPub,
-            $idNoticia,
-            $instId,
-        ]);
+        $ordenResolved = $this->resolveOrdenFijoForSave($payload, $row, $publicado);
+        if (!$ordenResolved['ok']) {
+            return ['status' => 'error', 'message' => $ordenResolved['message']];
+        }
+        $ordenFijo = $ordenResolved['orden'];
+
+        $this->db->beginTransaction();
+        try {
+            if ($ordenFijo !== null) {
+                $this->clearOrdenFijoSlot($instId, $ordenFijo, $idNoticia);
+            }
+            $stmt = $this->db->prepare("
+                UPDATE noticia SET
+                Alcance = ?, DependenciaRed = ?, Titulo = ?, Categoria = ?, CategoriaBadge = ?, Cuerpo = ?,
+                Publicado = ?, CompartirEnRed = ?, FechaPublicacion = ?, OrdenFijo = ?
+                WHERE IdNoticia = ? AND IdInstitucion = ?
+            ");
+            $stmt->execute([
+                $alcance,
+                $depRed,
+                $titulo,
+                $categoria,
+                $categoriaBadge,
+                $cuerpo,
+                $publicado,
+                $compartirEnRed,
+                $fechaPub,
+                $ordenFijo,
+                $idNoticia,
+                $instId,
+            ]);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
         return ['status' => 'success'];
     }
 

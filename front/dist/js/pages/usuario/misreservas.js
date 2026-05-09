@@ -107,7 +107,9 @@ async function refreshBundle() {
 async function loadMisReservas() {
   const tbody = document.getElementById('table-mis-reservas');
   if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">${window.txt?.misreservas?.cargando || 'Cargando...'}</td></tr>`;
+  const mr = window.txt?.misreservas || {};
+  const loadMsg = escapeHtml(mr.cargando || window.txt?.generales?.msg_cargando || '…');
+  tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsg}</div></td></tr>`;
 
   const from = `${state.year}-${String(state.month).padStart(2,'0')}-01`;
   const to = endOfMonth(state.year, state.month);

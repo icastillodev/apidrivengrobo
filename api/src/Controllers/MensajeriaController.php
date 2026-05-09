@@ -386,11 +386,12 @@ class MensajeriaController {
                         $asuntoHilo = trim((string) ($hRow['Asunto'] ?? ''));
                         $hiloInst = (int) ($hRow['IdInstitucion'] ?? $instId);
                         $cuerpoT = trim(strip_tags($cuerpo));
+                        $ctxAnterior = $this->model->getPenultimoMensajeEnHilo($idHilo);
                         if ($asuntoHilo !== '' && $cuerpoT !== '') {
                             $esInstH = (int) ($hRow['EsInstitucional'] ?? 0) === 1;
                             if ($esInstH) {
                                 $idsMail = $this->idsDestinatariosEmailRespuestaInstitucional($hRow, $uid);
-                                $emailInfo = $this->notificarCorreoVariosUsuarios($hiloInst, $idsMail, $uid, $asuntoHilo, $cuerpoT, $idHilo, true);
+                                $emailInfo = $this->notificarCorreoVariosUsuarios($hiloInst, $idsMail, $uid, $asuntoHilo, $cuerpoT, $idHilo, true, $ctxAnterior);
                                 $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                             } else {
                                 $pa = (int) ($hRow['IdUsrParticipanteA'] ?? 0);
@@ -405,7 +406,8 @@ class MensajeriaController {
                                         $asuntoHilo,
                                         $cuerpoT,
                                         $idHilo,
-                                        false
+                                        false,
+                                        $ctxAnterior
                                     );
                                     $out['data'] = array_merge($out['data'] ?? [], ['emailNotificacion' => $emailInfo]);
                                 }
@@ -542,7 +544,8 @@ class MensajeriaController {
         string $asunto,
         string $cuerpo,
         ?int $hiloId = null,
-        bool $esInstitucional = false
+        bool $esInstitucional = false,
+        ?array $mensajeAnterior = null
     ): array {
         $asunto = trim(strip_tags($asunto));
         $cuerpo = trim(strip_tags($cuerpo));
@@ -586,7 +589,8 @@ class MensajeriaController {
             $lang,
             $instSlug,
             $hiloId,
-            $esInstitucional
+            $esInstitucional,
+            $mensajeAnterior
         );
 
         return ['ok' => $ok, 'codigo' => $ok ? 'ok' : 'smtp_error'];
@@ -603,7 +607,8 @@ class MensajeriaController {
         string $asunto,
         string $cuerpo,
         ?int $hiloId = null,
-        bool $esInstitucional = false
+        bool $esInstitucional = false,
+        ?array $mensajeAnterior = null
     ): array {
         $destinatarioIds = array_values(array_unique(array_filter(array_map('intval', $destinatarioIds), static fn ($v) => $v > 0)));
         if ($destinatarioIds === []) {
@@ -616,7 +621,7 @@ class MensajeriaController {
             if ($did === $remitenteId) {
                 continue;
             }
-            $one = $this->notificarCorreoPorMensajeInterno($instIdContexto, $did, $remitenteId, $asunto, $cuerpo, $hiloId, $esInstitucional);
+            $one = $this->notificarCorreoPorMensajeInterno($instIdContexto, $did, $remitenteId, $asunto, $cuerpo, $hiloId, $esInstitucional, $mensajeAnterior);
             if (($one['codigo'] ?? '') === 'sin_email') {
                 $sinEmail = true;
             }

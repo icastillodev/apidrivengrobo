@@ -157,6 +157,11 @@ class AnimalModel {
         }
         $orderBySql = $this->resolveAnimalListOrderBy($opts['filters'] ?? []);
 
+        $anestFormSel = $this->hasColumn('formularioe', 'TieneAnestesicos')
+            ? ', COALESCE(f.TieneAnestesicos, 0) AS TieneAnestesicos' : '';
+        $anestProtSel = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos')
+            ? ', COALESCE(px.PermiteAnestesicos, 0) AS PermiteAnestesicos' : '';
+
         $sql = "SELECT 
                     f.idformA, f.fechainicioA as Inicio, f.fecRetiroA as Retiro, 
                     f.aclaraA as Aclaracion, f.estado, f.quienvisto as QuienVio, 
@@ -189,6 +194,8 @@ class AnimalModel {
                         WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2
                         ELSE 1
                     END) as DeptoExternoFlag
+                    {$anestFormSel}
+                    {$anestProtSel}
                     {$legacyDerivSelect}
                     {$derivEstadoSelect}
                 FROM formularioe f
@@ -1515,5 +1522,41 @@ $sql = "SELECT p.EmailA, p.NombreA, i.NombreInst, COALESCE(NULLIF(TRIM(p.idioma_
             'nprot' => $nprot,
             'titulo' => $titulo
         ];
+    }
+
+    /**
+     * Admin animales: marca si el pedido prevé anestésicos. Solo si el protocolo tiene PermiteAnestesicos.
+     */
+    public function updateTieneAnestesicosAdmin(int $idformA, int $valor, int $instId): void {
+        if (!$this->hasColumn('formularioe', 'TieneAnestesicos') || !$this->hasColumn('protocoloexpe', 'PermiteAnestesicos')) {
+            throw new \RuntimeException('Función no disponible: ejecute la migración de anestésicos en la base de datos.');
+        }
+        $idformA = (int) $idformA;
+        $valor = $valor ? 1 : 0;
+        $instId = (int) $instId;
+        if ($idformA <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('Datos inválidos.');
+        }
+        FormDerivacionModel::assertInstitutionCanMutate($this->db, $idformA, $instId);
+
+        $stmt = $this->db->prepare(
+            'SELECT COALESCE(px.PermiteAnestesicos, 0) AS p
+             FROM formularioe f
+             LEFT JOIN protformr pf ON f.idformA = pf.idformA
+             LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
+             WHERE f.idformA = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$idformA]);
+        $permite = (int) ($stmt->fetchColumn() ?: 0);
+        if ($permite !== 1) {
+            throw new \RuntimeException('Este protocolo no permite gestionar anestésicos en este pedido.');
+        }
+
+        $up = $this->db->prepare('UPDATE formularioe SET TieneAnestesicos = ? WHERE idformA = ?');
+        $up->execute([$valor, $idformA]);
+        if ($up->rowCount() === 0) {
+            throw new \RuntimeException('No se pudo actualizar el formulario.');
+        }
     }
 }

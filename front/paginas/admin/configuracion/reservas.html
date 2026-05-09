@@ -58,8 +58,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de gestión de reservas
-                    initConfigReservas();
+                    // Inicialización de la lógica de gestión de reservas (await: datos tablas antes de hideLoader global)
+                    await initConfigReservas();
                     translatePage();
                     
                     console.log("✅ Configuración de Reservas inicializada correctamente.");

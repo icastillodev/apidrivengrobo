@@ -4,10 +4,47 @@ import { getPdfLogoHeaderHtml } from '../../utils/pdfLogoHeader.js';
 
 let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {} };
 
-export async function initPreciosPage() {
+const PRECIOS_TBODY_IDS = ['tbody-precios-animales', 'tbody-insumos-exp', 'tbody-insumos-comunes', 'tbody-servicios'];
+
+function __preciosEscapeHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/** Spinner solo en las tablas (evita loader de página completa en recargas). */
+function setPreciosTbodiesLoading(active) {
+    const msg = __preciosEscapeHtml(window.txt?.generales?.msg_cargando || '…');
+    const row = `<tr><td colspan="3" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+    PRECIOS_TBODY_IDS.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el && active) el.innerHTML = row;
+    });
+}
+
+function setPreciosTbodiesError() {
+    const err = __preciosEscapeHtml(window.txt?.generales?.error_carga || 'Error');
+    const row = `<tr><td colspan="3" class="text-center py-4 text-danger">${err}</td></tr>`;
+    PRECIOS_TBODY_IDS.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = row;
+    });
+}
+
+/**
+ * @param {{ inline?: boolean }} [opts] — `inline: true`: sin overlay global; feedback en `<tbody>` (p. ej. tras guardar).
+ */
+export async function initPreciosPage(opts = {}) {
+    const inlineReload = opts.inline === true;
     const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
     try {
-        showLoader();
+        if (inlineReload) {
+            setPreciosTbodiesLoading(true);
+        } else {
+            showLoader();
+        }
         
         // Carga de traducciones en el DOM si no usan data-i18n directo
         if(window.txt && window.txt.precios) {
@@ -32,10 +69,11 @@ export async function initPreciosPage() {
             if (inputTitulo) inputTitulo.value = dataFull.institucion.tituloprecios || '';
             window.renderAllPriceTables();
         }
-    } catch (e) { 
-        console.error("Error cargando precios:", e); 
+    } catch (e) {
+        console.error('Error cargando precios:', e);
+        if (inlineReload) setPreciosTbodiesError();
     } finally {
-        hideLoader();
+        if (!inlineReload) hideLoader();
     }
 }
 
@@ -126,14 +164,17 @@ window.saveAllPrices = async () => {
             tituloprecios: document.getElementById('titulo-precios').value,
             data: items
         });
-        
+        hideLoader();
         window.Swal.fire(
-            window.txt?.precios?.alert_saved || 'Guardado', 
-            window.txt?.precios?.alert_success || 'Tarifas actualizadas correctamente.', 
+            window.txt?.precios?.alert_saved || 'Guardado',
+            window.txt?.precios?.alert_success || 'Tarifas actualizadas correctamente.',
             'success'
-        ).then(() => { initPreciosPage(); });
-            
-    } catch (e) { hideLoader(); }
+        ).then(() => {
+            initPreciosPage({ inline: true });
+        });
+    } catch (e) {
+        hideLoader();
+    }
 };
 
 window.exportPreciosPDF = () => {
@@ -237,7 +278,8 @@ window.exportPreciosPDF = () => {
         html2canvas: {
             scale: 2,
             backgroundColor: '#ffffff',
-            useCORS: true
+            useCORS: true,
+            logging: false
         }
     }).from(template).save();
 };

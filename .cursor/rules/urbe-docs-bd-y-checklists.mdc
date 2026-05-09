@@ -1,0 +1,29 @@
+---
+description: Convención de docs — BACKLOG-BASE-DATOS.md, migraciones SQL y ciclo de vida de checklists (URBE/GROBO)
+alwaysApply: true
+---
+
+# Documentación BD y checklists (URBE)
+
+## Cambios de base de datos
+
+- **Página canónica para humanos y agentes:** `docs/BACKLOG-BASE-DATOS.md`. Ahí va el **SQL copiable** (bloques para phpMyAdmin), **anclas** internas, **tabla de inventario** y **enlaces** a los `.sql` del repo.
+- **Archivos ejecutables:** cada tema → un fichero en `docs/migrations/` con nombre `YYYY-MM-DD-descripcion-kebab.sql` (convención en `docs/migrations/README.md`). Mantener **misma semántica** que el bloque pegado en `BACKLOG-BASE-DATOS.md`.
+- **Al agregar o alterar esquema:** actualizar **en el mismo PR/cambio** (1) `BACKLOG-BASE-DATOS.md`, (2) el `.sql` en `docs/migrations/`, (3) si aplica, `docs/database.sql`. No dejar solo el inventario en Markdown sin SQL ejecutable.
+
+## Checklists — cómo se trabajan
+
+- **Backlog de producto maestro:** `docs/CHECKLIST-BACKLOG-PRODUCTO-GROBO.md` (lista viva con `[ ]` / `[x]`).
+- **Otros checklists temáticos activos:** `docs/CHECKLIST-*.md` en la raíz de `docs/` (nombre explícito del alcance).
+- **Mientras está abierto:** marcar ítems al cerrarlos en código/staging; enlazar cambios de BD a `BACKLOG-BASE-DATOS.md` cuando el ítem toque tablas.
+
+## Checklists terminados (archivo)
+
+- Cuando un checklist **deja de ser backlog activo** (alcance cerrado o sustituido por otro doc): **archivar** en `docs/checklist-finalizados/` con nombre estable, p. ej. `CHECKLIST-<TEMA>-<AAAA-MM>.md` o el nombre histórico que ya use el repo.
+- En el archivo archivado: breve **bloque de cierre** (fecha, qué quedó cubierto, enlaces a código o checklist nuevo).
+- El checklist que quedaba en `docs/` puede **convertirse en puntero** (“cerrado — ver `checklist-finalizados/...`”) o **eliminarse** solo si la historia queda íntegra en finalizados (no perder trazabilidad).
+
+## Referencias cruzadas
+
+- Reglas i18n UI: `docs/checklist-finalizados/CHECKLIST-I18N-REGLA.md` (si existe en el clone).
+- Inventario backlog ↔ BD ya enlazado desde `CHECKLIST-BACKLOG-PRODUCTO-GROBO.md` hacia `BACKLOG-BASE-DATOS.md`.

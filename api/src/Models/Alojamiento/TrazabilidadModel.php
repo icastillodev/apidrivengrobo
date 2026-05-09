@@ -989,11 +989,20 @@ class TrazabilidadModel {
 
         $nombreFinal = "{$prefijoCaja} - S{$ultimoIdAnimal} - {$nombreSujetoInput}";
 
-        $res = $this->db->prepare("INSERT INTO especie_alojamiento_unidad (IdUnidadAlojamiento, NombreEspecieAloj, IdCajaAlojamiento) VALUES (?, ?, ?)")
-                        ->execute([$ultimoIdAnimal, $nombreFinal, $idCaja]);
-        
+        $stmtIns = $this->db->prepare('INSERT INTO especie_alojamiento_unidad (IdUnidadAlojamiento, NombreEspecieAloj, IdCajaAlojamiento) VALUES (?, ?, ?)');
+        $stmtIns->execute([$ultimoIdAnimal, $nombreFinal, $idCaja]);
+
+        $idEu = (int)$this->db->lastInsertId();
+        if ($idEu <= 0) {
+            $stmtEu = $this->db->prepare(
+                'SELECT IdEspecieAlojUnidad FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ? AND IdUnidadAlojamiento = ? ORDER BY IdEspecieAlojUnidad DESC LIMIT 1'
+            );
+            $stmtEu->execute([$idCaja, $ultimoIdAnimal]);
+            $idEu = (int)$stmtEu->fetchColumn();
+        }
+
         Auditoria::log($this->db, 'INSERT', 'especie_alojamiento_unidad', "Agregó Sujeto $nombreFinal a la caja ID: $idCaja");
-        return $res;
+        return $idEu;
     }
 
     public function getCajasTramoAnterior($idAlojamientoActual) {

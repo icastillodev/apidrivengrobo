@@ -58,6 +58,32 @@ class UserController {
         exit;
     }
 
+    /** GET id — resumen de un usuario de la sede (sesión); para modal / router sin cargar todo el listado. */
+    public function getOne() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int) ($sesion['instId'] ?? 0);
+            $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($instId <= 0 || $id <= 0) {
+                echo json_encode(['status' => 'error', 'message' => 'bad_request']);
+                exit;
+            }
+            $row = $this->model->getUserSummaryForInstitution($instId, $id);
+            if (!$row) {
+                echo json_encode(['status' => 'error', 'message' => 'not_found']);
+                exit;
+            }
+            echo json_encode(['status' => 'success', 'data' => $row]);
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     public function getProtocols() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');

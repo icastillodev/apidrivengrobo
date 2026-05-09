@@ -43,8 +43,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de gestión de tipos de formularios
-                    initConfigFormTypes();
+                    // Inicialización de la lógica de gestión de tipos de formularios (await: datos antes de hideLoader)
+                    await initConfigFormTypes();
                     translatePage();
                     
                     console.log("✅ Configuración de Tipos de Formulario inicializada.");

@@ -1,6 +1,13 @@
 import { API, buildQrAlojamientoPublicPageAbsoluteUrl, getGroboFrontBasePath } from '../../api.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
-import { AnimalFichaUI } from './alojamientos/animalFicha.js'; 
+import { AnimalFichaUI } from './alojamientos/animalFicha.js';
+
+function qrEsc(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/"/g, '&quot;');
+}
 
 const QR_STAFF_ROLES = new Set([1, 2, 4, 5, 6]);
 let qrStaff = false;
@@ -411,6 +418,16 @@ function memorizarQrInstitutionSlugParaLogin(firstRow) {
 }
 
 async function cargarDatosQR(hParam, tParam) {
+    const tbodyPre = document.getElementById('tbody-historial');
+    const qrContentEl = document.getElementById('qr-content');
+    const inlineRefetch = !!(tbodyPre && qrContentEl && !qrContentEl.classList.contains('d-none'));
+    if (inlineRefetch) {
+        const ta0 = window.txt?.alojamientos || {};
+        const gen0 = window.txt?.generales || {};
+        const colspan0 = qrStaff ? 7 : 6;
+        const loadMsg0 = qrEsc(ta0.trace_loading || gen0.msg_cargando || '…');
+        tbodyPre.innerHTML = `<tr><td colspan="${colspan0}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsg0}</div></td></tr>`;
+    }
     try {
         let res;
         
@@ -557,7 +574,7 @@ function renderFooterQR(isFinalizado) {
 
 function mostrarErrorCritico(mensaje) {
     const t = window.txt?.alojamientos || {};
-    const msg = mensaje || t.qr_error_init || 'Error';
-    const title = window.txt?.generales?.error || 'Error';
+    const msg = qrEsc(mensaje || t.qr_error_init || 'Error');
+    const title = qrEsc(window.txt?.generales?.error || 'Error');
     document.getElementById('qr-loader').innerHTML = `<i class="bi bi-exclamation-octagon text-danger" style="font-size: 3rem;"></i><h5 class="mt-3 fw-bold text-danger">${title}</h5><p class="text-muted">${msg}</p>`;
 }

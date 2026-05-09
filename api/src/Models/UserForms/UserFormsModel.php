@@ -153,7 +153,10 @@ class UserFormsModel {
         $idInstOrigen = $hasWorkflow ? "COALESCE(f.IdInstitucionOrigen, f.IdInstitucion)" : "f.IdInstitucion";
         $instOrigenJoin = "LEFT JOIN institucion iorig ON iorig.IdInstitucion = ({$idInstOrigen})";
         $tipoOrigenJoin = "LEFT JOIN tipoformularios tf_orig ON tf_orig.IdTipoFormulario = f.tipoA AND tf_orig.IdInstitucion = ({$idInstOrigen})";
-        $sqlHead = "SELECT f.*,
+        $permiteAnestSelect = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos')
+            ? ', COALESCE(px.PermiteAnestesicos, 0) AS protocolo_permite_anestesicos'
+            : '';
+        $sqlHead = "SELECT f.*{$permiteAnestSelect},
                     COALESCE(tf_orig.nombreTipo, tf.nombreTipo, '—') as nombreTipo,
                     COALESCE(tf_orig.categoriaformulario, tf.categoriaformulario, (SELECT categoriaformulario FROM tipoformularios WHERE IdTipoFormulario = f.tipoA LIMIT 1)) as categoriaformulario,
                     COALESCE(tf_orig.categoriaformulario, tf.categoriaformulario, (SELECT categoriaformulario FROM tipoformularios WHERE IdTipoFormulario = f.tipoA LIMIT 1)) as Categoria,

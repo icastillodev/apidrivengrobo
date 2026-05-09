@@ -1,6 +1,7 @@
 import { API } from '../../../api.js';
 import { hideLoader, showLoader } from '../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../components/MenuComponent.js';
+import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
 import { renderDashboard } from './billingDashboard.js';
 import {
     formatBillingMoney,
@@ -14,7 +15,15 @@ import {
     billingSumAlojamientos,
     billingSumInsumosCobrable,
     billingDerivacionPlainText,
-    billingAlojPeriodoParaInforme
+    billingDerivadaLiquidacionBadge,
+    billingPdfFormularioIdDisplay,
+    billingPdfMarcaExentoCorta,
+    billingPdfMarcaExentoLarga,
+    billingAlojPeriodoParaInforme,
+    billingPedidoSinMontoNoExento,
+    billingHtmlRowInsumoPedidoFacturacion,
+    billingHtmlInsumoProtSectionHeader,
+    billingPartitionInsumosPedidoReactivoOtros
 } from './billingLocale.js';
 import './billingPayments.js';
 
@@ -40,6 +49,8 @@ function txBE() {
 let currentReportData = null;
 /** Lista completa de departamentos (para filtrar por ámbito sin nueva petición) */
 let deptosRaw = [];
+/** Tras el primer informe por departamento exitoso, las recargas muestran spinner en el área de resultados. */
+let deptoBillingReportLoadedOk = false;
 
 /** Tarjetas de protocolo por página (menos DOM cuando hay muchos protocolos). */
 const DEPT_BILLING_PROTOCOLS_PER_PAGE = 8;
@@ -152,6 +163,10 @@ export async function initBillingDepto() {
         await cargarListaDeptos();
         const filterAmbito = document.getElementById('filter-ambito-depto');
         if (filterAmbito) filterAmbito.addEventListener('change', () => renderDeptoOptions(filterAmbito.value));
+        const selDeptoInit = document.getElementById('sel-depto');
+        if (selDeptoInit && typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function') {
+            selDeptoInit.addEventListener('change', () => window.invalidateDeptoSaldoHistorialPanelsCache());
+        }
         aplicarParamsUrlDepto();
     } catch (error) { console.error("Error en init:", error); } finally { hideLoader(); }
 }
@@ -211,6 +226,9 @@ function renderDeptoOptions(ambito) {
     if (currentVal && list.some(d => String(d.iddeptoA) === String(currentVal))) {
         select.value = currentVal;
     }
+    if (typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function') {
+        window.invalidateDeptoSaldoHistorialPanelsCache();
+    }
 }
 
 window.cargarFacturacionDepto = async () => {
@@ -229,14 +247,42 @@ window.cargarFacturacionDepto = async () => {
 
     if (!deptoId) { Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_depto || 'Seleccione un departamento.', 'warning'); return; }
 
+    const resultsEl = document.getElementById('billing-results');
+    const prevReport = window.currentReportData;
+    const useGlobalLoader = !deptoBillingReportLoadedOk;
     try {
-        showLoader();
+        if (useGlobalLoader) {
+            showLoader();
+        } else if (resultsEl) {
+            setBillingResultsLoadingInline('billing-results');
+        }
         const res = await API.request('/billing/depto-report', 'POST', { depto: deptoId, desde, hasta, chkAni, chkAlo, chkIns });
         if (res.status === 'success') {
-            window.currentReportData = res.data; 
+            window.currentReportData = res.data;
             renderizarResultados(window.currentReportData);
-        } else { Swal.fire(window.txt?.generales?.error || 'Error', res.message, 'error'); }
-    } catch (error) { console.error(error); } finally { hideLoader(); }
+            deptoBillingReportLoadedOk = true;
+        } else {
+            Swal.fire(window.txt?.generales?.error || 'Error', res.message, 'error');
+            if (!useGlobalLoader && prevReport) {
+                renderizarResultados(prevReport);
+            } else if (!useGlobalLoader && resultsEl) {
+                resultsEl.replaceChildren();
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        if (!useGlobalLoader && prevReport) {
+            renderizarResultados(prevReport);
+        } else if (!useGlobalLoader && resultsEl) {
+            resultsEl.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'alert alert-danger m-3';
+            err.textContent = window.txt?.generales?.error_carga || 'Error al cargar datos.';
+            resultsEl.appendChild(err);
+        }
+    } finally {
+        if (useGlobalLoader) hideLoader();
+    }
 };
 
 function renderizarResultados(data) {
@@ -298,7 +344,7 @@ function getHeaderHTML(prot) {
     const isSinProtocolo = (prot.idProt === 0);
     const protocoloLabel = isSinProtocolo ? (tf.depto_sin_protocolo || prot.nprotA) : prot.nprotA;
     const tituloDisplay = isSinProtocolo ? '' : (prot.tituloA || '');
-    const investigadorDisplay = isSinProtocolo ? '—' : `${prot.investigador} (ID: ${prot.idUsr})`;
+    const investigadorDisplay = isSinProtocolo ? (tf.saldo_hist_placeholder_empty || '—') : `${prot.investigador} (ID: ${prot.idUsr})`;
     const lblProt = `${tf.label_protocolo || 'Protocolo'}:`;
     const lblInv = `${window.txt?.generales?.investigador || 'Investigador'}:`;
     const bloqueSaldo = isSinProtocolo ? '' : `
@@ -339,6 +385,7 @@ function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
     const bd = txBD();
     const bi = txBI();
+    const tf = txF();
     const exL = bi.pdf_monto_exento || 'Exento';
     return `
         <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;">${bd.sec_pedidos_formularios || 'Pedidos (Formularios)'}</h6>
@@ -365,6 +412,8 @@ function getFormsTableHTML(formularios, idProt) {
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
+                        const sinMontoNoEx = billingPedidoSinMontoNoExento(isExento, total, pagado);
+                        const lblSinTot = tf.pedido_sin_total_cobrable || 'Sin total';
 
                         const isRea = f.categoria?.toLowerCase().includes('reactivo');
                         const tipoModal = isRea ? 'REACTIVO' : 'ANIMAL';
@@ -386,18 +435,19 @@ function getFormsTableHTML(formularios, idProt) {
                         const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `<br><small class="text-muted">${f.nombre_subespecie}</small>` : '');
                         const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
                         
-                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` : 
+                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
+                            sinMontoNoEx ? `<span class="badge bg-secondary shadow-sm">${lblSinTot}</span>` :
                                          (debe <= 0 ? `<span class="badge bg-success shadow-sm">${bd.badge_pago_completo || 'PAGO COMPLETO'}</span>` : 
                                          (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${bd.badge_pago_parcial || 'PAGO PARCIAL'}</span>` : 
                                          `<span class="badge bg-danger shadow-sm">${bd.badge_sin_pagar || 'SIN PAGAR'}</span>`));
 
-                        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+                        const rowStyle = (isExento || (debe <= 0 && !sinMontoNoEx)) ? 'background-color: #f8fff9 !important;' : '';
 
                         return `
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
                                 <td>${estadoBadge}</td>
                                 <td class="small fw-bold">${f.solicitante}</td>
                                 <td class="small text-start text-muted">${billingDerivacionPlainText(f) || '—'}</td>
@@ -416,6 +466,8 @@ function getAlojTableHTML(alojamientos, idProt) {
     if (!alojamientos || alojamientos.length === 0) return '';
     const bd = txBD();
     const tf = txF();
+    const bp = txBP();
+    const thDep = bp.th_aloj_departamento || txBI().col_departamento || 'DEPTO';
 
     const filas = alojamientos.map(a => {
         const total = parseFloat(a.total || 0);
@@ -427,8 +479,9 @@ function getAlojTableHTML(alojamientos, idProt) {
                          `<span class="badge bg-danger">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`);
 
         const isDone = (debe <= 0);
-        const investigador = a.TitularProtocolo || window.currentReportData.protocolos.find(p => p.idProt == idProt)?.investigador || 'N/A';
-        const tipoAloj = a.caja || 'Alojamiento Estándar';
+        const investigador = a.TitularProtocolo || window.currentReportData.protocolos.find(p => p.idProt == idProt)?.investigador
+            || window.txt?.facturacion?.billing_modal?.na || 'N/A';
+        const tipoAloj = a.caja || bd.aloj_caja_default || 'Alojamiento estándar';
 
     return `
         <tr onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('ALOJ', ${a.historia})" class="pointer text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
@@ -436,10 +489,10 @@ function getAlojTableHTML(alojamientos, idProt) {
                 <input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${debe}" ${isDone ? 'disabled' : ''}>
             </td>
             <td>#${a.historia}</td>
-            <td>${estadoHTML}</td> 
+            <td>${estadoHTML}</td>
+            <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
             <td class="text-start ps-3 small fw-bold">${investigador}</td>
             <td>${a.especie} <br><span class="badge bg-light text-primary border mt-1">${tipoAloj}</span></td>
-            <td class="small">${a.periodo}</td>
             <td class="fw-bold">${a.dias}</td>
             <td class="text-end">$ ${formatBillingMoney(total)}</td>
             <td class="text-end text-success">$ ${formatBillingMoney(pagado)}</td>
@@ -456,9 +509,9 @@ function getAlojTableHTML(alojamientos, idProt) {
                         <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
                         <th style="width:7%">${bd.th_hist || 'Hist.'}</th>
                         <th style="width:8%">${window.txt?.generales?.estado || 'Estado'}</th>
+                        <th style="width:10%" class="small">${thDep}</th>
                         <th>${tf.titular_paga || 'Titular (Responsable Financiero)'}</th>
                         <th style="width:15%">${tf.esp_tipo_aloj || 'Especie / Tipo Aloj.'}</th>
-                        <th style="width:12%">${tf.periodo || 'Periodo'}</th>
                         <th style="width:5%">${tf.dias || 'Días'}</th>
                         <th style="width:8%">${tf.total || 'Total'}</th>
                         <th style="width:8%">${tf.pago || 'Pago'}</th>
@@ -572,38 +625,30 @@ function getInsumosGeneralesTableHTML(insumos) {
     const tf = txF();
     const bi = txBI();
     const exL = bi.pdf_monto_exento || 'Exento';
+    const packs = { bd, tf, bi, exL };
     let sumTotal = 0, sumPagado = 0, sumDebe = 0;
-
-    const filas = insumos.map(i => {
+    for (const i of insumos) {
         const total = parseFloat(i.total_item || 0);
         const pagado = parseFloat(i.pagado || 0);
         const isExento = billingTipoExento(i);
         const debe = isExento ? 0 : Math.max(0, total - pagado);
-        
         if (!isExento) {
             sumTotal += total; sumPagado += pagado; sumDebe += debe;
         }
-        
-        let badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
-            ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
-                    (pagado > 0 ? `<span class="badge bg-warning text-dark">${tf.estado_cobro_parcial || 'PARCIAL'}</span>` : 
-                    `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`));
-
-        const detalleHTML = i.detalle_completo.split(' | ').map(item => `• ${item}`).join('<br>');
-        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f0fff4 !important;' : '';
-
-        return `
-            <tr class="text-center align-middle pointer" style="${rowStyle}" 
-                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                <td class="small text-muted">${i.id}</td>
-                <td>${badge}</td>
-                <td>${i.solicitante}</td>
-                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
-                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
-                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
-            </tr>`;
-    }).join('');
+    }
+    const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
+    const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
+    const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
+    const colspan = 9;
+    let filas = '';
+    if (reactivos.length > 0) {
+        filas += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
+        filas += reactivos.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'general')).join('');
+    }
+    if (otros.length > 0) {
+        filas += billingHtmlInsumoProtSectionHeader(colspan, lblDem);
+        filas += otros.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'general')).join('');
+    }
 
     return `
         <div class="card shadow-sm border-0 mb-5 card-insumos-generales" style="border-left: 5px solid #0d6efd !important;">
@@ -677,10 +722,11 @@ function actualizarSumaInsumos() {
 }
 
 window.exportExcelDeptoGlobal = () => {
-    if (!window.currentReportData) return Swal.fire(window.txt?.recuperar?.swal_aviso || 'Aviso', txF().sin_datos_cargados || 'No hay datos cargados.', 'info');
+    if (!window.currentReportData) return Swal.fire(window.txt?.generales?.swal_aviso || window.txt?.recuperar?.swal_aviso || 'Aviso', txF().sin_datos_cargados || 'No hay datos cargados.', 'info');
     
     const inst = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
     const be = txBE();
+    const marcaExExcel = billingPdfMarcaExentoLarga();
     const C = {
         dp: be.excel_depto_prot || 'Departamento / Protocolo',
         iu: be.excel_id_usuario || 'ID Usuario',
@@ -693,7 +739,7 @@ window.exportExcelDeptoGlobal = () => {
         mp: be.excel_monto_pagado || 'Monto Pagado',
         da: be.excel_deuda_actual || 'Deuda Actual'
     };
-    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
+    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || txBD().depto_nombre_sin_sel || 'GENERAL';
     const dataMatrix = [];
     const row = (vals) => {
         const o = {};
@@ -702,16 +748,22 @@ window.exportExcelDeptoGlobal = () => {
         return o;
     };
     const tplAloj = (esp, caja) => (be.excel_aloj_concepto_tpl || 'Alojamiento {esp} ({caja})').replace(/\{esp\}/g, esp).replace(/\{caja\}/g, caja);
+    const lblDer = window.txt?.facturacion?.billing_institucion?.origen_badge_derivado ?? 'Derivado';
 
     if (window.currentReportData.insumosGenerales) {
         window.currentReportData.insumosGenerales.forEach(i => {
+            const tiIns = be.excel_tipo_insumo || 'INSUMO';
+            const tiInsMark =
+                i.es_facturacion_derivada === 1 || i.es_facturacion_derivada === true
+                    ? `${tiIns} — ${lblDer}`
+                    : tiIns;
             dataMatrix.push(row({
                 dp: be.excel_ins_generales || 'INSUMOS GENERALES',
                 iu: i.IdUsrA,
                 sol: i.solicitante,
                 qd: billingDerivacionPlainText(i),
-                ti: be.excel_tipo_insumo || 'INSUMO',
-                ids: i.id,
+                ti: tiInsMark,
+                ids: billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExExcel }),
                 cd: (i.detalle_completo || "").replace(/\|/g, " - "),
                 ct: parseFloat(i.total_item || 0),
                 mp: parseFloat(i.pagado || 0),
@@ -722,13 +774,20 @@ window.exportExcelDeptoGlobal = () => {
 
     window.currentReportData.protocolos.forEach(prot => {
         (prot.formularios || []).forEach(f => {
+            const tiBase = f.categoria?.toLowerCase().includes('reactivo')
+                ? (be.excel_tipo_reactivo || 'REACTIVO')
+                : (be.excel_tipo_animal || 'ANIMAL');
+            const tiForm =
+                f.es_facturacion_derivada === 1 || f.es_facturacion_derivada === true
+                    ? `${tiBase} — ${lblDer}`
+                    : tiBase;
             dataMatrix.push(row({
                 dp: `PROT: ${prot.nprotA}`,
                 iu: prot.idUsr,
                 sol: f.solicitante || prot.investigador,
                 qd: billingDerivacionPlainText(f),
-                ti: f.categoria?.toLowerCase().includes('reactivo') ? (be.excel_tipo_reactivo || 'REACTIVO') : (be.excel_tipo_animal || 'ANIMAL'),
-                ids: f.id,
+                ti: tiForm,
+                ids: billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: marcaExExcel }),
                 cd: (f.detalle_display || "").replace(/<[^>]*>/g,''),
                 ct: parseFloat(f.total || 0),
                 mp: parseFloat(f.pagado || 0),
@@ -832,7 +891,7 @@ function getSelectedDateRangeLabel() {
 window.downloadProtocoloPDF = async (idProt) => {
     const tf = txF();
     if (!window.currentReportData || !window.currentReportData.protocolos || window.currentReportData.protocolos.length === 0) {
-        return Swal.fire(window.txt?.recuperar?.swal_aviso || 'Aviso', txBD().aviso_pdf_sin_consulta || 'Primero debe realizar una consulta para exportar los datos.', 'info');
+        return Swal.fire(window.txt?.generales?.swal_aviso || window.txt?.recuperar?.swal_aviso || 'Aviso', txBD().aviso_pdf_sin_consulta || 'Primero debe realizar una consulta para exportar los datos.', 'info');
     }
 
     const prot = window.currentReportData.protocolos.find(p => p.idProt == idProt);
@@ -856,7 +915,7 @@ window.downloadProtocoloPDF = async (idProt) => {
         const inst = (getBillingNombreInstitucion() || biCab.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
         const verdeGecko = [25, 135, 84];
         const rangoFechas = getSelectedDateRangeLabel();
-        const marcaEx = be.pdf_marca_ex || '(EX)';
+        const marcaEx = billingPdfMarcaExentoCorta();
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(verdeGecko[0], verdeGecko[1], verdeGecko[2]);
         doc.text(inst, 105, M, { align: "center" });
@@ -887,7 +946,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
-                    isEx ? `#${f.id} ${marcaEx}` : `#${f.id}`,
+                    billingPdfFormularioIdDisplay(f, { marcaExento: marcaEx }),
                     f.nombre_especie || '---',
                     (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
                     c[0], c[1], c[2]
@@ -973,7 +1032,7 @@ window.downloadInsumosPDF = async () => {
     const bi = txBI();
     const bp = txBP();
     const be = txBE();
-    const av = window.txt?.recuperar?.swal_aviso || 'Aviso';
+    const av = window.txt?.generales?.swal_aviso || window.txt?.recuperar?.swal_aviso || 'Aviso';
     if (!window.currentReportData || !window.currentReportData.insumosGenerales) {
         return Swal.fire(av, be.swal_sin_insumos_cargados || 'No hay datos de insumos cargados.', 'info');
     }
@@ -988,7 +1047,7 @@ window.downloadInsumosPDF = async () => {
     const pageW = doc.internal.pageSize.getWidth();
     const right = pageW - M;
     const inst = (getBillingNombreInstitucion() || bi.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
-    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
+    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || txBD().depto_nombre_sin_sel || 'GENERAL';
     const azulInsumos = [13, 110, 253];
     const rangoFechas = getSelectedDateRangeLabel();
 
@@ -1003,10 +1062,12 @@ window.downloadInsumosPDF = async () => {
     const lblPagPdf = bi.pdf_col_pagado || bi.pdf_col_pago_total || 'Pagado';
     const lblDebPdf = bi.pdf_col_debe || 'Debe';
     const exL = bi.pdf_monto_exento || 'Exento';
+    const marcaExPdfIns = billingPdfMarcaExentoLarga();
     const body = insumos.map(i => {
         const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), i.total_item || 0, i.pagado || 0, exL);
         const c = pdfColsPdfOrdenTotalPagadoDebe(m);
-        return [i.id, i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), c[0], c[1], c[2]];
+        const idPdf = billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExPdfIns });
+        return [String(idPdf).substring(0, 26), i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), c[0], c[1], c[2]];
     });
 
     doc.autoTable({
@@ -1039,7 +1100,7 @@ window.downloadGlobalPDF = async () => {
     const bp = txBP();
     const be = txBE();
     if (!window.currentReportData) {
-        return Swal.fire(window.txt?.recuperar?.swal_aviso || 'Aviso', tf.sin_datos_cargados || 'No hay datos cargados.', 'info');
+        return Swal.fire(window.txt?.generales?.swal_aviso || window.txt?.recuperar?.swal_aviso || 'Aviso', tf.sin_datos_cargados || 'No hay datos cargados.', 'info');
     }
     
     showLoader();
@@ -1049,11 +1110,11 @@ window.downloadGlobalPDF = async () => {
     const pageW = doc.internal.pageSize.getWidth();
     const right = pageW - M;
     const instNombre = (getBillingNombreInstitucion() || bi.pdf_inst_generica || 'INSTITUCIÓN').toUpperCase();
-    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || 'GENERAL';
+    const deptoNombre = document.getElementById('sel-depto')?.selectedOptions[0]?.text || txBD().depto_nombre_sin_sel || 'GENERAL';
     const verdeGrobo = [26, 93, 59];
     const rangoFechas = getSelectedDateRangeLabel();
     const unAb = bd.un_abbr || 'un.';
-    const marcaExFull = be.pdf_marca_exento || '(EXENTO)';
+    const marcaExFull = billingPdfMarcaExentoLarga();
     const cajaDef = be.pdf_caja_def || 'Caja';
     const enCurso = be.pdf_en_curso || 'EN CURSO';
     const lblTotPdf = bi.pdf_col_total || bi.pdf_col_precio || 'Total';
@@ -1103,7 +1164,7 @@ window.downloadGlobalPDF = async () => {
                 const esp = f.nombre_especie || '---';
                 const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
                 const cant = isRea ? `${f.NombreInsumo} (${f.TipoInsumo}) ${f.CantidadInsumo} - ${f.cant_organo} ${unAb}` : `${f.cant_animal} ${unAb}`;
-                const idDisplay = isExento ? `${f.id} ${marcaExFull}` : f.id;
+                const idPlain = billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: marcaExFull });
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
                 const exL = bi.pdf_monto_exento || 'Exento';
@@ -1111,7 +1172,7 @@ window.downloadGlobalPDF = async () => {
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
 
                 return [
-                    { content: idDisplay, styles: { fontStyle: isExento ? 'bold' : 'normal', textColor: isExento ? [0, 150, 200] : [0, 0, 0] } },
+                    { content: idPlain, styles: { fontStyle: isExento ? 'bold' : 'normal', textColor: isExento ? [0, 150, 200] : [0, 0, 0] } },
                     f.solicitante, esp + sub, f.detalle_display.replace(/<[^>]*>/g, ""), cant,
                     c[0], c[1], c[2]
                 ];

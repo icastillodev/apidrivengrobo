@@ -197,7 +197,7 @@ export async function downloadProtocolPDF(id) {
             margin: 8,
             filename: `ficha-protocolo-${safeNprot}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+            html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         }).from(wrapper).save();
 

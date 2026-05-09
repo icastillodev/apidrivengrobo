@@ -56,6 +56,25 @@ export function expandConfigSubpathsIfAllowed(allowedSet) {
   }
 }
 
+/** Pantallas enlazadas desde noticias / comunicación (no siempre tienen ítem propio en el menú lateral). */
+export const COMUNICACION_PANEL_SUB_PATHS = ['panel/poe'];
+
+export const COMUNICACION_ADMIN_SUB_PATHS = [
+  'admin/comunicacion/poe',
+  'admin/comunicacion/portada-popup',
+];
+
+/** Habilita manual/tour en subpantallas de comunicación según el hub que el rol tenga en menú. */
+export function expandComunicacionSubpathsIfAllowed(allowedSet) {
+  if (!allowedSet || typeof allowedSet.has !== 'function') return;
+  if (allowedSet.has('panel/noticias')) {
+    COMUNICACION_PANEL_SUB_PATHS.forEach((p) => allowedSet.add(p));
+  }
+  if (allowedSet.has('admin/comunicacion/noticias')) {
+    COMUNICACION_ADMIN_SUB_PATHS.forEach((p) => allowedSet.add(p));
+  }
+}
+
 /** Orden sugerido de secciones en la biblioteca (filtrado por lo que el rol tiene). */
 export const CAPACITACION_PATH_ORDER = [
   'admin/dashboard',
@@ -91,7 +110,10 @@ export const CAPACITACION_PATH_ORDER = [
   'panel/mensajes',
   'panel/mensajes_institucion',
   'admin/comunicacion/noticias',
+  'admin/comunicacion/portada-popup',
+  'admin/comunicacion/poe',
   'panel/noticias',
+  'panel/poe',
   'panel/perfil',
   'panel/soporte',
   'panel/ventas',

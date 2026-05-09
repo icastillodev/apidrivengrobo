@@ -35,10 +35,10 @@ window.abrirEdicionIndividual = async (tipo, id) => {
             const badge = document.getElementById('badge-edit-status');
             if (d.debe > 0) {
                 header.className = 'modal-header bg-danger text-white py-2';
-                badge.innerHTML = `<span class="badge bg-danger">${itemModalTpl(im.badge_deuda_tpl || 'DEUDA: $ {m}', { m: formatBillingMoney(d.debe) })}</span>`;
+                badge.innerHTML = `<span class="badge bg-danger">${itemModalTpl(im.badge_deuda_tpl || window.txt?.facturacion?.billing_item_modal?.badge_deuda_tpl || 'DEBT: $ {m}', { m: formatBillingMoney(d.debe) })}</span>`;
             } else {
                 header.className = 'modal-header bg-success text-white py-2';
-                badge.innerHTML = `<span class="badge bg-success">${im.badge_liquidado || 'LIQUIDADO'}</span>`;
+                badge.innerHTML = `<span class="badge bg-success">${im.badge_liquidado || window.txt?.facturacion?.billing_item_modal?.badge_liquidado || 'PAID OFF'}</span>`;
             }
 
             setupCalculadora();
@@ -86,7 +86,7 @@ window.guardarCambiosItem = async () => {
         const res = await API.request('/billing/update-item', 'POST', data);
         if (res.status === 'success') {
             editModalInstance.hide();
-            Swal.fire({ title: txI().guardado_ok || 'Actualizado', icon: 'success', timer: 1000, showConfirmButton: false });
+            Swal.fire({ title: txI().guardado_ok || window.txt?.facturacion?.billing_item_modal?.guardado_ok || 'Updated', icon: 'success', timer: 1000, showConfirmButton: false });
 
             if (window.cargarFacturacionDepto) window.cargarFacturacionDepto();
             if (window.cargarFacturacionPersona) window.cargarFacturacionPersona();

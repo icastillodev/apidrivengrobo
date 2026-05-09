@@ -43,8 +43,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de catálogo de insumos
-                    initConfigInsumosExp();
+                    // Inicialización de la lógica de catálogo de insumos experimentales (await: datos antes de hideLoader)
+                    await initConfigInsumosExp();
                     translatePage();
                     
                     console.log("✅ Configuración de Insumos Exp inicializada correctamente.");

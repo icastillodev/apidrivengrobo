@@ -4,7 +4,7 @@
  */
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
-import { formatBillingMoney } from '../billingLocale.js';
+import { formatBillingMoney, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga } from '../billingLocale.js';
 
 export const openAnimalModal = async (idformA) => {
     try {
@@ -19,6 +19,7 @@ export const openAnimalModal = async (idformA) => {
         }
 
         const d = res.data;
+        const tituloIdAni = billingPdfFormularioIdDisplay({ ...d, id: d.idformA ?? idformA }, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() });
         const total = parseFloat(d.total_calculado || 0);
         const pagado = parseFloat(d.totalpago || 0);
         const saldo = parseFloat(d.saldoInv || 0);
@@ -49,7 +50,7 @@ export const openAnimalModal = async (idformA) => {
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                     <div class="modal-header bg-dark text-white py-3">
                         <div class="d-flex align-items-center w-100 justify-content-between pe-4">
-                            <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-medical me-2 text-success"></i>${(t.titulo_pedido_tpl || 'PEDIDO {id}').replace(/\{id\}/g, idformA)}</h5>
+                            <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-medical me-2 text-success"></i>${(t.titulo_pedido_tpl || 'PEDIDO {id}').replace(/\{id\}/g, tituloIdAni)}</h5>
                             <div class="text-end">
                                 <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">${t.lbl_saldo_titular_protocolo || 'Saldo del Titular del Protocolo:'}</small>
                                 <span class="badge bg-success fs-5" id="mdl-ani-saldo-txt">$ ${formatBillingMoney(saldo)}</span>
@@ -164,6 +165,7 @@ export const openAnimalModal = async (idformA) => {
                                         <span class="fs-3 fw-bold text-success" id="mdl-ani-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
                                         <input type="hidden" id="mdl-ani-pagado-val" value="${pagado}">
                                         <input type="hidden" id="mdl-ani-exento" value="${(d.is_exento === true || d.is_exento == 1) ? '1' : '0'}">
+                                        <input type="hidden" id="mdl-ani-derivada" value="${(d.es_facturacion_derivada === true || d.es_facturacion_derivada == 1 || d.es_facturacion_derivada === '1') ? '1' : '0'}">
                                     </div>
 
                                     <div class="input-group">

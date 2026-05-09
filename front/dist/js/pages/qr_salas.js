@@ -152,7 +152,11 @@ async function generarEtiquetaPDF() {
 async function loadBundle() {
   const box = document.getElementById('salas-list');
   const t = window.txt?.qr_salas || {};
-  if (box) box.innerHTML = `<div class="text-muted small py-3">${t.cargando || '...'}</div>`;
+  const gen = window.txt?.generales || {};
+  const loadMsg = escapeHtml(t.cargando || gen.msg_cargando || '…');
+  if (box) {
+    box.innerHTML = `<div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsg}</div></div>`;
+  }
 
   const from = state.dateStr;
   const to = state.dateStr;

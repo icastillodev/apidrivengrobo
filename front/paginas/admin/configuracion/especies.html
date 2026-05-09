@@ -42,8 +42,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de gestión de especies (Maestro biológico)
-                    initConfigEspecies();
+                    // Inicialización de la lógica de gestión de especies (await: primera carga antes de hideLoader)
+                    await initConfigEspecies();
                     translatePage();
                     const tituloPagina = window.txt?.config_especies?.pagina_titulo;
                     if (tituloPagina) document.title = tituloPagina;

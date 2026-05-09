@@ -10,6 +10,15 @@ function tf() {
     return window.txt?.superadmin_formulario || {};
 }
 
+function escForm(v) {
+    if (v === null || v === undefined) return '';
+    return String(v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 export async function initFormAdmin() {
     try {
         const res = await API.request('/superadmin/modulos/catalogo');
@@ -19,31 +28,44 @@ export async function initFormAdmin() {
     } catch (e) {
         console.error('Catálogo módulos onboarding:', e);
     }
-    renderTable();
+    await renderTable();
 }
 
 async function renderTable() {
-    const res = await API.request('/superadmin/form-registros/all');
     const tbody = document.getElementById('table-body-forms');
     const t = tf();
+    if (!tbody) return;
 
-    if (!res || res.status !== 'success' || !res.data) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger font-bold py-4">${t.error_carga_tabla || 'No se pudieron cargar los formularios o no hay registros.'}</td></tr>`;
-        return;
-    }
+    const loadMsg = escForm(t.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><div class="small">${loadMsg}</div></td></tr>`;
 
-    tbody.innerHTML = '';
+    try {
+        const res = await API.request('/superadmin/form-registros/all');
 
-    res.data.forEach(row => {
+        if (!res || res.status !== 'success') {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger font-bold py-4">${escForm(t.error_carga_tabla || '')}</td></tr>`;
+            return;
+        }
+
+        const rows = Array.isArray(res.data) ? res.data : [];
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">${escForm(t.tabla_sin_filas || '')}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+
+        rows.forEach(row => {
         const isActivo = parseInt(row.activo) === 1;
 
         const rowClass = isActivo ? 'hover:bg-slate-50 transition-colors cursor-pointer' : 'bg-red-50 text-muted opacity-75 cursor-pointer';
+        const slugEnc = encodeURIComponent(String(row.slug_url || ''));
         const slugDisplay = isActivo ? `
-        <a href="${window.location.origin}${window.location.pathname.includes('URBE-API-DRIVEN') ? '/URBE-API-DRIVEN/front' : ''}/formulario/${row.slug_url}" 
+        <a href="${window.location.origin}${window.location.pathname.includes('URBE-API-DRIVEN') ? '/URBE-API-DRIVEN/front' : ''}/formulario/${slugEnc}"
        target="_blank" 
        class="btn btn-sm btn-outline-primary fw-bold px-2 py-1 shadow-sm"
-       title="Abrir formulario público">
-        <i class="bi bi-box-arrow-up-right me-1"></i> /formulario/${row.slug_url}
+       title="${escForm(t.abrir_formulario_publico || 'Abrir formulario público')}">
+        <i class="bi bi-box-arrow-up-right me-1"></i> /formulario/${escForm(row.slug_url)}
     </a>` : `<span class="text-danger small fw-bold">${t.link_deshabilitado || 'DESHABILITADO'}</span>`;
 
         const tr = document.createElement('tr');
@@ -56,16 +78,16 @@ async function renderTable() {
         const toggleAction = isActivo ? 0 : 1;
 
         tr.innerHTML = `
-            <td class="font-bold text-center">${row.id_form_config}</td>
-            <td class="font-bold ${isActivo ? 'text-slate-700' : ''}">${row.nombre_inst_previa}</td>
-            <td>${row.encargado_nombre}</td>
+            <td class="font-bold text-center">${escForm(row.id_form_config)}</td>
+            <td class="font-bold ${isActivo ? 'text-slate-700' : ''}">${escForm(row.nombre_inst_previa)}</td>
+            <td>${escForm(row.encargado_nombre)}</td>
             <td>${slugDisplay}</td>
             <td class="text-center">
                 <span class="badge ${row.campos_completados > 0 ? 'bg-success' : 'bg-secondary'} px-2 py-1">
                     ${row.campos_completados} ${t.badge_datos || 'datos cargados'}
                 </span>
             </td>
-            <td style="font-size: 11px;">${row.creado_el}</td>
+            <td style="font-size: 11px;">${escForm(row.creado_el)}</td>
             <td class="text-center">
                 <button class="btn ${toggleBtnClass} btn-sm border-0 me-1" 
                         onclick="event.stopPropagation(); window.toggleLinkStatus(${row.id_form_config}, ${toggleAction})">
@@ -77,8 +99,12 @@ async function renderTable() {
                 </button>
             </td>
         `;
-        tbody.appendChild(tr);
-    });
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger font-bold py-4">${escForm(t.error_carga_tabla || '')}</td></tr>`;
+    }
 }
 
 window.toggleLinkStatus = async (id, newStatus) => {
@@ -100,7 +126,7 @@ window.toggleLinkStatus = async (id, newStatus) => {
 
         if (res && res.status === 'success') {
             Swal.fire(t.actualizado || 'Actualizado', t.estado_cambiado || 'El estado del enlace ha cambiado.', 'success');
-            renderTable();
+            await renderTable();
         } else {
             Swal.fire('Error', res?.message || 'Error al actualizar.', 'error');
         }
@@ -125,7 +151,7 @@ window.deleteLink = async (id) => {
 
         if (res && res.status === 'success') {
             Swal.fire(t.eliminado || 'Eliminado', t.borrado_ok || 'Registro borrado.', 'success');
-            renderTable();
+            await renderTable();
         } else {
             Swal.fire('Error', res?.message || 'Error al eliminar.', 'error');
         }

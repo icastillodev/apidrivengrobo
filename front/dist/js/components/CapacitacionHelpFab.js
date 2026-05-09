@@ -10,6 +10,7 @@ import {
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
 import {
   collectMenuPathsFromIds,
+  expandComunicacionSubpathsIfAllowed,
   expandConfigSubpathsIfAllowed,
   expandFacturacionPathsIfAllowed,
 } from '../utils/capacitacionMenuPaths.js?v=20260409';
@@ -243,6 +244,7 @@ export async function initCapacitacionHelpFab() {
   allowed.add('capacitacion/tema/red');
   expandFacturacionPathsIfAllowed(allowed);
   expandConfigSubpathsIfAllowed(allowed);
+  expandComunicacionSubpathsIfAllowed(allowed);
   if (!allowed.has(menuPath)) {
     return;
   }

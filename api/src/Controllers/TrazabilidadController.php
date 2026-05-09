@@ -320,8 +320,8 @@ class TrazabilidadController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
-            $this->model->addSujeto((int)$data['idCaja'], (int)$data['idAlojamiento'], (string)($data['nombreSujeto'] ?? ''), (int)$sesion['instId']);
-            echo json_encode(['status' => 'success']);
+            $idEu = $this->model->addSujeto((int)$data['idCaja'], (int)$data['idAlojamiento'], (string)($data['nombreSujeto'] ?? ''), (int)$sesion['instId']);
+            echo json_encode(['status' => 'success', 'data' => ['IdEspecieAlojUnidad' => $idEu]]);
         } catch (\Exception $e) { echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); }
         exit;
     }

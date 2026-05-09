@@ -15,11 +15,51 @@ function sessionInstId() {
     return (localStorage.getItem('instId') || sessionStorage.getItem('instId') || '').trim();
 }
 
+function escapePdfHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function valoresInicioOrdered(valoresInicioObj, categoriasInicio) {
+    const rows = Object.values(valoresInicioObj || {});
+    if (!rows.length) return [];
+    const idOrder = (categoriasInicio || []).map((c) => Number(c.IdDatosUnidadAloj));
+    const orderMap = new Map(idOrder.map((id, i) => [id, i]));
+    return rows.sort((a, b) => {
+        const ia = orderMap.has(Number(a.IdDatosUnidadAloj)) ? orderMap.get(Number(a.IdDatosUnidadAloj)) : 9999;
+        const ib = orderMap.has(Number(b.IdDatosUnidadAloj)) ? orderMap.get(Number(b.IdDatosUnidadAloj)) : 9999;
+        if (ia !== ib) return ia - ib;
+        return String(a.NombreCatAlojUnidad || '').localeCompare(String(b.NombreCatAlojUnidad || ''), undefined, { sensitivity: 'base' });
+    });
+}
+
+function escapeMaHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 export async function initMisAlojamientos() {
     const userId = localStorage.getItem('userId');
     const instId = sessionInstId();
 
     document.getElementById('btn-export-excel').onclick = openExcelModal;
+
+    const tbodyBoot = document.getElementById('table-body');
+    const maBoot = window.txt?.misalojamientos || {};
+    const bootMsg = escapeMaHtml(maBoot.cargando || window.txt?.generales?.msg_cargando || '…');
+    if (tbodyBoot) {
+        tbodyBoot.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${bootMsg}</div></td></tr>`;
+    }
+    const ctrBoot = document.getElementById('dynamic-counter');
+    if (ctrBoot) ctrBoot.innerText = bootMsg;
 
     // ENGANCHE GLOBAL PARA LA TRAZABILIDAD (A prueba de fallos)
     window.toggleTrazabilidadReadOnly = async (idAlojamiento, idEspecie) => {
@@ -39,11 +79,24 @@ export async function initMisAlojamientos() {
     try {
         const res = await API.request(`/user/my-housings?user=${userId}&inst=${instId}`);
         if (res.status === 'success') {
-            allHousings = res.data.list;
+            allHousings = Array.isArray(res.data?.list) ? res.data.list : [];
             setupInstitutionFilter();
             renderTable();
+        } else {
+            allHousings = [];
+            const errMsg = escapeMaHtml(maBoot.error_cargar_lista || window.txt?.generales?.error || 'Error');
+            const tb = document.getElementById('table-body');
+            if (tb) tb.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger small">${errMsg}</td></tr>`;
+            updateCounter([]);
         }
-    } catch (e) { console.error("Error:", e); }
+    } catch (e) {
+        console.error('Error:', e);
+        allHousings = [];
+        const errMsg = escapeMaHtml(maBoot.error_cargar_lista || window.txt?.generales?.error || 'Error');
+        const tb = document.getElementById('table-body');
+        if (tb) tb.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger small">${errMsg}</td></tr>`;
+        updateCounter([]);
+    }
 
     document.getElementById('search-input').addEventListener('keyup', () => { currentPage = 1; renderTable(); });
     document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; renderTable(); });
@@ -58,7 +111,8 @@ window.openDetailModal = async (id) => {
     const body = document.getElementById('modal-visor-body');
     const actions = document.getElementById('modal-actions');
     
-    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">${window.txt?.misalojamientos?.buscando_historia || 'Buscando historia...'}</p></div>`;
+    const modalLoad = escapeMaHtml(ma.buscando_historia || window.txt?.generales?.msg_cargando || '…');
+    body.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="text-muted small mt-2">${modalLoad}</p></div>`;
     modal.show();
 
     try {
@@ -205,6 +259,18 @@ function renderTable() {
 
     const start = (currentPage - 1) * rowsPerPage;
     const pageData = filtered.slice(start, start + rowsPerPage);
+
+    if (pageData.length === 0) {
+        const ma = window.txt?.misalojamientos || {};
+        const msg =
+            allHousings.length === 0
+                ? ma.lista_vacia || ''
+                : ma.sin_resultados_filtro || '';
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted small">${escapeMaHtml(msg || '—')}</td></tr>`;
+        renderPagination(filtered.length);
+        updateCounter(filtered);
+        return;
+    }
 
     pageData.forEach(h => {
         const tr = document.createElement('tr');
@@ -366,51 +432,83 @@ window.downloadPDF = async (id) => {
                     const resTraz = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${tramo.IdAlojamiento}&idEspecie=${espId}&instId=${instId}`);
                     if (resTraz.status === 'success' && resTraz.data && resTraz.data.cajas && resTraz.data.cajas.length > 0) {
                         const catsPdf = resTraz.data.categorias_datos || resTraz.data.categorias || [];
-                        let hasObsInTramo = false;
+                        const catsInicio = resTraz.data.categorias_inicio || [];
+                        let hasTrazContentInTramo = false;
                         const tramoTit = (t.pdf_tramo_bloque || 'Tramo #{id} (desde: {fecha})')
                             .replace('{id}', String(tramo.IdAlojamiento))
                             .replace('{fecha}', new Date(tramo.fechavisado).toLocaleDateString());
                         let tramoHtml = `<div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">${tramoTit}</h5>`;
-                        
-                        resTraz.data.cajas.forEach(caja => {
+                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">${escapePdfHtml(tramoTit)}</h5>`;
+
+                        resTraz.data.cajas.forEach((caja) => {
                             let cajaHtml = `<div style="margin-left: 5px; margin-bottom: 10px;">
-                                <strong style="font-size: 10px; color: #444; background: #e9ecef; padding: 2px 5px; border-radius: 3px;">📦 ${caja.NombreCaja}</strong>`;
-                            
-                            let hasObsInCaja = false;
+                                <strong style="font-size: 10px; color: #444; background: #e9ecef; padding: 2px 5px; border-radius: 3px;">📦 ${escapePdfHtml(caja.NombreCaja)}</strong>`;
+
+                            let hasContentInCaja = false;
                             if (caja.unidades && caja.unidades.length > 0) {
-                                caja.unidades.forEach(u => {
-                                    if (u.observaciones_pivot && u.observaciones_pivot.length > 0) {
-                                        hasObsInTramo = true;
-                                        hasObsInCaja = true;
-                                            cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
-                                            <span style="font-size: 10px; color: #198754; font-weight: bold;">🐾 ${u.NombreEspecieAloj}</span>
+                                caja.unidades.forEach((u) => {
+                                    const rowsInicio = valoresInicioOrdered(u.valores_inicio, catsInicio);
+                                    const hasInicio = rowsInicio.length > 0;
+                                    const hasPivot = u.observaciones_pivot && u.observaciones_pivot.length > 0;
+                                    if (!hasInicio && !hasPivot) return;
+
+                                    hasTrazContentInTramo = true;
+                                    hasContentInCaja = true;
+
+                                    const thFecha = t.pdf_th_fecha || 'Fecha';
+                                    const thCampo = t.pdf_th_variable || 'Variable';
+                                    const thValor = t.pdf_th_valor || 'Valor';
+                                    const lblInicio = t.pdf_traz_ficha_inicio || 'Ficha inicial';
+                                    const lblMediciones = t.pdf_traz_mediciones || 'Mediciones clínicas';
+
+                                    cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
+                                            <span style="font-size: 10px; color: #198754; font-weight: bold;">🐾 ${escapePdfHtml(u.NombreEspecieAloj)}</span>`;
+
+                                    if (hasInicio) {
+                                        cajaHtml += `<div style="font-size: 9px; font-weight: bold; color: #495057; margin-top: 6px;">${escapePdfHtml(lblInicio)}</div>
+                                            <table style="width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 9px;">
+                                                <tr style="background-color: #f9f9f9;">
+                                                    <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">${escapePdfHtml(thCampo)}</th>
+                                                    <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">${escapePdfHtml(thValor)}</th>
+                                                </tr>`;
+                                        rowsInicio.forEach((row) => {
+                                            cajaHtml += `<tr>
+                                                <td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(row.NombreCatAlojUnidad)}</td>
+                                                <td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(row.Valor)}</td>
+                                            </tr>`;
+                                        });
+                                        cajaHtml += `</table>`;
+                                    }
+
+                                    if (hasPivot) {
+                                        cajaHtml += `<div style="font-size: 9px; font-weight: bold; color: #495057; margin-top: 8px;">${escapePdfHtml(lblMediciones)}</div>
                                             <table style="width: 100%; border-collapse: collapse; margin-top: 3px; font-size: 9px; text-align: center;">
                                                 <tr style="background-color: #f9f9f9;">
-                                                    <th style="border: 1px solid #ccc; padding: 4px;">${t.pdf_th_fecha || 'Fecha'}</th>`;
-                                        
-                                        catsPdf.forEach(cat => {
-                                            cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${cat.NombreCatAlojUnidad}</th>`;
+                                                    <th style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(thFecha)}</th>`;
+                                        catsPdf.forEach((cat) => {
+                                            cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(cat.NombreCatAlojUnidad)}</th>`;
                                         });
                                         cajaHtml += `</tr>`;
 
-                                        u.observaciones_pivot.forEach(obs => {
-                                            cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${new Date(obs.fechaObs).toLocaleDateString()}</td>`;
-                                            catsPdf.forEach(cat => {
+                                        u.observaciones_pivot.forEach((obs) => {
+                                            cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(new Date(obs.fechaObs).toLocaleDateString())}</td>`;
+                                            catsPdf.forEach((cat) => {
                                                 const val = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '-';
-                                                cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${val}</td>`;
+                                                cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(val)}</td>`;
                                             });
                                             cajaHtml += `</tr>`;
                                         });
-                                        cajaHtml += `</table></div>`;
+                                        cajaHtml += `</table>`;
                                     }
+
+                                    cajaHtml += `</div>`;
                                 });
                             }
                             cajaHtml += `</div>`;
-                            if(hasObsInCaja) tramoHtml += cajaHtml;
+                            if (hasContentInCaja) tramoHtml += cajaHtml;
                         });
                         tramoHtml += `</div>`;
-                        if (hasObsInTramo) trazabilidadHtml += tramoHtml;
+                        if (hasTrazContentInTramo) trazabilidadHtml += tramoHtml;
                     }
                 } catch(err) { console.warn("Sin clínica en tramo:", tramo.IdAlojamiento); }
             }
@@ -432,7 +530,7 @@ window.downloadPDF = async (id) => {
         const piePdf = (t.pdf_generado_por || 'Generado por GROBO el {fecha}').replace('{fecha}', new Date().toLocaleString());
         const subFicha = (t.pdf_ficha_subtitulo || 'Ficha de alojamiento — Historia #{id}').replace('{id}', String(h.IdHistoria));
         const template = `
-            <div style="font-family:Arial;padding:20px;color:#333;font-size:12px;">
+            <div style="font-family:Arial;padding:20px;color:#333;font-size:12px;background:#ffffff;">
                 <div style="text-align:center;border-bottom:2px solid #1a5d3b;padding-bottom:10px;margin-bottom:15px;">
                     <h2 style="color:#1a5d3b;margin:0;font-size:18px;">${h.Institucion.toUpperCase()}</h2>
                     <h3 style="margin:5px 0;font-size:14px;">${subFicha}</h3>
@@ -454,7 +552,14 @@ window.downloadPDF = async (id) => {
             </div>`;
 
         Swal.close();
-        html2pdf().set({ margin: [18, 18, 18, 18], filename: `Alojamiento_${h.IdHistoria}.pdf`, html2canvas: { scale: 2 } }).from(template).save();
+        html2pdf()
+            .set({
+                margin: [18, 18, 18, 18],
+                filename: `Alojamiento_${h.IdHistoria}.pdf`,
+                html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true },
+            })
+            .from(template)
+            .save();
         
     } catch (e) {
         Swal.fire(

@@ -3,17 +3,80 @@ import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { openAnimalModal } from './modals/animalModal.js';
 import { openReactiveModal } from './modals/reactiveModal.js';
 import { openInsumoModal } from './modals/insumoModal.js';
-import { formatBillingMoney, formatBillingDateTime, pdfColsPrecioDebePagoTotal } from './billingLocale.js';
+import {
+    formatBillingMoney,
+    formatBillingDateTime,
+    pdfColsPrecioDebePagoTotal,
+    billingPdfFormularioIdDisplay,
+    billingDerivadaLiquidacionBadge,
+    billingPdfMarcaExentoCorta,
+    billingPdfMarcaExentoLarga
+} from './billingLocale.js';
 import './billingPayments.js';
 import './modals/manager.js';
+import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
 
 let currentReportDataInst = null;
 /** Solo se pintan N tarjetas por institución a la vez; los saldos se piden solo para esa página. */
 const INST_BILLING_CARDS_PER_PAGE = 5;
 let instBillingCardsPage = 1;
+/** Tras el primer informe institución exitoso, las recargas muestran spinner en el área de resultados. */
+let instBillingMainReportLoadedOk = false;
 
 function tf(key, fb = '') {
     return window.txt?.facturacion?.billing_institucion?.[key] ?? fb;
+}
+
+/** Celda tabla: depto origen + línea de depto cobro (destino) en filas derivadas. */
+function formatDepartamentoInstCell(item) {
+    const base = item.departamentoPedidoOriginal || '-';
+    const dest = String(item.departamentoPedidoDestino || '').trim();
+    const esDeriv = String(item.origenFacturacion || '').toLowerCase() === 'derivado';
+    if (!esDeriv || !dest || dest === '-') {
+        return escapeHtml(base);
+    }
+    const lbl = escapeHtml(tf('lbl_depto_cobro_destino', 'Depto. cobro (destino)'));
+    return `${escapeHtml(base)}<div class="small text-muted">${lbl}: ${escapeHtml(dest)}</div>`;
+}
+
+/** Texto compacto para PDF/Excel (columna origen). */
+function departamentoInstExportLine(item) {
+    const base = item.departamentoPedidoOriginal || '-';
+    const dest = String(item.departamentoPedidoDestino || '').trim();
+    const esDeriv = String(item.origenFacturacion || '').toLowerCase() === 'derivado';
+    if (!esDeriv || !dest || dest === '-') {
+        return base;
+    }
+    const short = tf('excel_depto_destino_short', 'Dest.');
+    return `${base} | ${short} ${dest}`;
+}
+
+/** Fila mínima para `billingPdfFormularioIdDisplay` en export institución (RED). */
+function rowFactInstParaIdDisplay(item) {
+    return {
+        id: item.idformA,
+        es_facturacion_derivada:
+            String(item.origenFacturacion || '').toLowerCase() === 'derivado' ? 1 : 0,
+        is_exento: item.is_exento,
+        exento: item.exento
+    };
+}
+
+/** Liquidación RED en tarjeta institución (origenFacturacion o flag API). */
+function instItemBadgeDerivadaRow(item) {
+    const der =
+        String(item.origenFacturacion || '').toLowerCase() === 'derivado' ||
+        item.es_facturacion_derivada === 1 ||
+        item.es_facturacion_derivada === true;
+    return { es_facturacion_derivada: der ? 1 : 0 };
+}
+
+/** Origen de cobro (común / derivado) según idioma — Excel, PDF, etc. */
+function origenCobroInstitucionLabel(item) {
+    const o = String(item.origenFacturacion || '').toLowerCase();
+    if (o === 'comun') return tf('origen_badge_comun', 'Común');
+    if (o === 'derivado') return tf('origen_badge_derivado', 'Derivado');
+    return String(item.origenFacturacion || '').trim() || '-';
 }
 function tRangoSep() {
     return window.txt?.facturacion?.billing_investigador?.fecha_rango_sep ?? ' a ';
@@ -87,12 +150,19 @@ async function fetchInstitucionReportFullData() {
 }
 
 async function cargarFacturacionInstitucion() {
+    const prevData = window.currentReportDataInst;
+    const useGlobalLoader = !instBillingMainReportLoadedOk;
     try {
-        showLoader();
+        if (useGlobalLoader) {
+            showLoader();
+        } else {
+            setBillingResultsLoadingInline('billing-results-inst');
+        }
         const res = await API.request('/billing/institucion-report', 'POST', buildInstReportBody(1, INST_BILLING_CARDS_PER_PAGE));
         if (res.status === 'success' && res.data) {
             window.currentReportDataInst = res.data;
             await renderResultadosInstitucion(res.data);
+            instBillingMainReportLoadedOk = true;
         } else {
             if (window.Swal) {
                 window.Swal.fire(
@@ -101,12 +171,24 @@ async function cargarFacturacionInstitucion() {
                     'error'
                 );
             }
+            if (!useGlobalLoader && prevData) {
+                await renderResultadosInstitucion(prevData);
+            } else if (!useGlobalLoader) {
+                const c = document.getElementById('billing-results-inst');
+                if (c) c.replaceChildren();
+            }
         }
     } catch (e) {
         console.error(e);
         if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al cargar el reporte.', 'error');
+        if (!useGlobalLoader && prevData) {
+            await renderResultadosInstitucion(prevData);
+        } else if (!useGlobalLoader) {
+            const c = document.getElementById('billing-results-inst');
+            if (c) c.replaceChildren();
+        }
     } finally {
-        hideLoader();
+        if (useGlobalLoader) hideLoader();
     }
 }
 
@@ -255,7 +337,7 @@ function buildOneInstitucionCardHtml(inst, t, fmt) {
                                     <th style="width:10%">${tf('th_depto_pedido_orig', 'Departamento (pedido origen)')}</th>
                                     <th style="width:14%">${tf('th_proto_pedido_orig', 'Protocolo (pedido origen)')}</th>
                                     <th style="width:12%">${tf('th_inv_pedido_orig', 'Investigador (pedido origen)')}</th>
-                                    <th style="width:10%">${t.generales?.especie || 'TIPO'}</th>
+                                    <th style="width:10%">${tf('th_tipo_formulario', 'Tipo')}</th>
                                     <th style="width:14%">${t.facturacion?.col_formulario || 'DETALLE'}</th>
                                     <th style="width:8%">${t.facturacion?.total || 'TOTAL'}</th>
                                     <th style="width:8%">${t.facturacion?.total_pagado || 'PAGADO'}</th>
@@ -345,8 +427,9 @@ window.goInstBillingCardPage = async function goInstBillingCardPage(nextPage) {
         if (nextPage < 1 || nextPage > totalPages) return;
         const container = document.getElementById('billing-results-inst');
         if (!container) return;
+        const prevData = window.currentReportDataInst;
         try {
-            showLoader();
+            setBillingResultsLoadingInline('billing-results-inst');
             const res = await API.request('/billing/institucion-report', 'POST', buildInstReportBody(nextPage, metaPg.perPage || INST_BILLING_CARDS_PER_PAGE));
             if (res.status === 'success' && res.data) {
                 window.currentReportDataInst = res.data;
@@ -355,12 +438,12 @@ window.goInstBillingCardPage = async function goInstBillingCardPage(nextPage) {
                 await paintInstBillingCardsPage(fmt, t, container);
             } else if (window.Swal) {
                 window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || window.txt?.facturacion?.no_se_obtuvieron_datos || 'No se obtuvieron datos.', 'error');
+                if (prevData) await renderResultadosInstitucion(prevData);
             }
         } catch (e) {
             console.error(e);
             if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al cargar el reporte.', 'error');
-        } finally {
-            hideLoader();
+            if (prevData) await renderResultadosInstitucion(prevData);
         }
         try {
             container.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -458,10 +541,10 @@ function renderTipoSectionRows(grouped, fmt, inst, t) {
             rows.push(`
                 <tr class="text-center align-middle pointer" style="${rowStyle}" onclick="if(event.target.tagName!=='INPUT' && event.target.tagName!=='BUTTON' && !event.target.closest('button')) window.openBillingInstModal('${tipoModal}', ${item.idformA})">
                     <td><input type="checkbox" class="check-item-inst" data-inst="${inst.idInstitucionSolicitante}" data-id="${idFact}" data-idusr="${idInv}" data-monto="${debe}" ${chkDisabled}></td>
-                    <td class="small text-muted fw-bold">#${item.idformA}</td>
+                    <td class="small text-muted fw-bold">#${item.idformA}${billingDerivadaLiquidacionBadge(Object.assign({}, item, instItemBadgeDerivadaRow(item)))}</td>
                     <td>${estadoBadge}</td>
                     <td class="small text-start align-top">${origenBadges}</td>
-                    <td class="small text-start align-top">${escapeHtml(item.departamentoPedidoOriginal || '-')}</td>
+                    <td class="small text-start align-top">${formatDepartamentoInstCell(item)}</td>
                     <td class="small text-start align-top">${escapeHtml(item.protocoloPedidoOriginal || '-')}</td>
                     <td class="small text-start align-top">${escapeHtml(item.investigadorPedidoOriginal || '-')}</td>
                     <td class="small text-secondary">${escapeHtml(item.nombreTipo || getTipoSectionLabel(tipoKey, t) || '-')}</td>
@@ -623,13 +706,12 @@ window.procesarPagoInstitucion = async (idInstSol) => {
         showCancelButton: true,
         confirmButtonText: t.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#6f42c1',
-        cancelButtonText: window.txt?.facturacion?.btn_cancelar_swal || gen.cancelar || 'Cancelar'
+        cancelButtonText: window.txt?.facturacion?.btn_cancelar_swal || gen.cerrar || 'Cancelar'
     });
     if (confirm.isConfirmed) {
         try {
             showLoader();
             const res = await API.request('/billing/process-payment-institucion', 'POST', { items });
-            hideLoader();
             if (res.status === 'success') {
                 if (window.Swal) window.Swal.fire(t.pago_procesado || '¡Pago Procesado!', res.message || tf('pago_registrado_ok', 'El pago ha sido registrado.'), 'success');
                 cargarFacturacionInstitucion();
@@ -638,8 +720,9 @@ window.procesarPagoInstitucion = async (idInstSol) => {
             }
         } catch (e) {
             console.error(e);
+            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.payment_error_procesar || window.txt?.facturacion?.error_cargar_reporte || 'Error al procesar el pago.', 'error');
+        } finally {
             hideLoader();
-            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.error_cargar_reporte || 'Error al procesar el pago.', 'error');
         }
     }
 };
@@ -746,19 +829,36 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
         doc.text(subTit, 105, M + 7, { align: 'center' });
         doc.line(M, M + 10, 195, M + 10);
 
+        let yLine = M + 22;
         doc.setFontSize(10); doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_id_formulario', 'ID Formulario:'), M, M + 22);
-        doc.setFont('helvetica', 'normal'); doc.text(`#${item.idformA}`, 50, M + 22);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_institucion', 'Institución:'), M, M + 28);
-        doc.setFont('helvetica', 'normal'); doc.text(inst.institucion || '-', 50, M + 28);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_depto_orig', 'Departamento (pedido):'), M, M + 34);
-        doc.setFont('helvetica', 'normal'); doc.text(String(item.departamentoPedidoOriginal || '-').substring(0, 95), 52, M + 34);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_proto_orig', 'Protocolo (pedido):'), M, M + 40);
-        doc.setFont('helvetica', 'normal'); doc.text(String(item.protocoloPedidoOriginal || '-').substring(0, 95), 52, M + 40);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_inv_orig', 'Investigador (pedido):'), M, M + 46);
-        doc.setFont('helvetica', 'normal'); doc.text(String(item.investigadorPedidoOriginal || '-').substring(0, 95), 52, M + 46);
-        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, M + 52);
-        doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, M + 52);
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_id_formulario', 'ID Formulario:'), M, yLine);
+        doc.setFont('helvetica', 'normal');
+        const idFichaPdf = billingPdfFormularioIdDisplay(rowFactInstParaIdDisplay(item), {
+            style: 'hash',
+            marcaExento: billingPdfMarcaExentoCorta()
+        });
+        doc.text(String(idFichaPdf).substring(0, 96), 50, yLine, { maxWidth: 145 });
+        yLine += 6;
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_institucion', 'Institución:'), M, yLine);
+        doc.setFont('helvetica', 'normal'); doc.text(inst.institucion || '-', 50, yLine);
+        yLine += 6;
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_depto_orig', 'Departamento (pedido):'), M, yLine);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.departamentoPedidoOriginal || '-').substring(0, 95), 52, yLine);
+        const destPdf = String(item.departamentoPedidoDestino || '').trim();
+        if (String(item.origenFacturacion || '').toLowerCase() === 'derivado' && destPdf && destPdf !== '-') {
+            yLine += 6;
+            doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_depto_destino', 'Depto. cobro (destino):'), M, yLine);
+            doc.setFont('helvetica', 'normal'); doc.text(destPdf.substring(0, 95), 52, yLine);
+        }
+        yLine += 6;
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_proto_orig', 'Protocolo (pedido):'), M, yLine);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.protocoloPedidoOriginal || '-').substring(0, 95), 52, yLine);
+        yLine += 6;
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_inv_orig', 'Investigador (pedido):'), M, yLine);
+        doc.setFont('helvetica', 'normal'); doc.text(String(item.investigadorPedidoOriginal || '-').substring(0, 95), 52, yLine);
+        yLine += 6;
+        doc.setFont('helvetica', 'bold'); doc.text(tf('pdf_lbl_tipo', 'Tipo:'), M, yLine);
+        doc.setFont('helvetica', 'normal'); doc.text(item.nombreTipo || item.categoria || '-', 50, yLine);
         const tp = tInvPdf();
         const tm = window.txt?.facturacion?.billing_modal || {};
         const exL = tp.pdf_monto_exento || 'Exento';
@@ -769,10 +869,11 @@ window.downloadInstFilaPDF = async (idformA, idInstSol) => {
             item.montoPagado || 0,
             exL
         );
+        yLine += 8;
         doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
-        doc.text(tm.pdf_control_fin || 'CONTROL FINANCIERO', M, M + 60);
+        doc.text(tm.pdf_control_fin || 'CONTROL FINANCIERO', M, yLine);
         doc.autoTable({
-            startY: M + 62,
+            startY: yLine + 2,
             margin: { left: M, right: M },
             head: [[
                 tp.pdf_col_precio || 'Precio',
@@ -835,13 +936,16 @@ window.downloadInstItemPDF = async (idInstSol) => {
 
         const body = (inst.items || []).map(i => {
             const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
-            const oLbl = String(i.origenFacturacion || '') === 'comun' ? 'C' : 'D';
+            const idPdf = billingPdfFormularioIdDisplay(rowFactInstParaIdDisplay(i), {
+                style: 'hash',
+                marcaExento: billingPdfMarcaExentoCorta()
+            });
             return [
-                `#${i.idformA}`,
-                String(i.departamentoPedidoOriginal || '-').substring(0, 32),
+                String(idPdf).substring(0, 22),
+                String(departamentoInstExportLine(i)).substring(0, 40),
                 String(i.protocoloPedidoOriginal || '-').substring(0, 36),
                 String(i.investigadorPedidoOriginal || '-').substring(0, 28),
-                oLbl,
+                String(origenCobroInstitucionLabel(i)).substring(0, 14),
                 (i.nombreTipo || i.categoria || '-').substring(0, 28),
                 m[0], m[1], m[2]
             ];
@@ -857,7 +961,7 @@ window.downloadInstItemPDF = async (idInstSol) => {
                 1: { cellWidth: 24 },
                 2: { cellWidth: 28 },
                 3: { cellWidth: 24 },
-                4: { cellWidth: 10 },
+                4: { cellWidth: 18 },
                 5: { cellWidth: 22 },
                 6: { halign: 'right' },
                 7: { halign: 'right' },
@@ -956,13 +1060,16 @@ window.downloadInstGlobalPDF = async () => {
 
             const body = (inst.items || []).map(i => {
                 const m = pdfColsPrecioDebePagoTotal(false, i.montoTotal || 0, i.montoPagado || 0, exL);
-                const oLbl = String(i.origenFacturacion || '') === 'comun' ? 'C' : 'D';
+                const idPdf = billingPdfFormularioIdDisplay(rowFactInstParaIdDisplay(i), {
+                    style: 'hash',
+                    marcaExento: billingPdfMarcaExentoCorta()
+                });
                 return [
-                    `#${i.idformA}`,
-                    String(i.departamentoPedidoOriginal || '-').substring(0, 28),
+                    String(idPdf).substring(0, 22),
+                    String(departamentoInstExportLine(i)).substring(0, 36),
                     String(i.protocoloPedidoOriginal || '-').substring(0, 32),
                     String(i.investigadorPedidoOriginal || '-').substring(0, 26),
-                    oLbl,
+                    String(origenCobroInstitucionLabel(i)).substring(0, 14),
                     (i.nombreTipo || i.categoria || '-').substring(0, 24),
                     m[0], m[1], m[2]
                 ];
@@ -1051,6 +1158,7 @@ window.exportExcelInstGlobal = async () => {
     const kInst = tf('excel_inst', 'Institución');
     const kId = tf('excel_id_form', 'ID Formulario');
     const kDep = tf('th_depto_pedido_orig', 'Departamento (pedido origen)');
+    const kDepDest = tf('excel_depto_destino', 'Depto. cobro (destino)');
     const kProt = tf('th_proto_pedido_orig', 'Protocolo (pedido origen)');
     const kInv = tf('th_inv_pedido_orig', 'Investigador (pedido origen)');
     const kOrigen = tf('th_origen_fact', 'Origen cobro');
@@ -1065,11 +1173,17 @@ window.exportExcelInstGlobal = async () => {
         (inst.items || []).forEach(item => {
             dataMatrix.push({
                 [kInst]: inst.institucion || '-',
-                [kId]: item.idformA,
+                [kId]: billingPdfFormularioIdDisplay(rowFactInstParaIdDisplay(item), {
+                    style: 'plain',
+                    marcaExento: billingPdfMarcaExentoLarga()
+                }),
                 [kDep]: item.departamentoPedidoOriginal || '-',
+                [kDepDest]: String(item.origenFacturacion || '').toLowerCase() === 'derivado'
+                    ? (String(item.departamentoPedidoDestino || '').trim() || '-')
+                    : '-',
                 [kProt]: item.protocoloPedidoOriginal || '-',
                 [kInv]: item.investigadorPedidoOriginal || '-',
-                [kOrigen]: String(item.origenFacturacion || '') === 'comun' ? 'Común' : 'Derivado',
+                [kOrigen]: origenCobroInstitucionLabel(item),
                 [kTipo]: item.nombreTipo || item.categoria || '-',
                 [kCat]: item.categoria || '-',
                 [kTot]: parseFloat(item.montoTotal || 0),

@@ -36,6 +36,7 @@ const EXPECTED_MENU_PATHS = [
   'panel/mensajes',
   'panel/mensajes_institucion',
   'panel/noticias',
+  'panel/poe',
   'panel/perfil',
   'panel/soporte',
   'panel/ventas',
@@ -43,6 +44,8 @@ const EXPECTED_MENU_PATHS = [
   'admin/facturacion/index',
   'admin/historialcontable',
   'admin/comunicacion/noticias',
+  'admin/comunicacion/poe',
+  'admin/comunicacion/portada-popup',
   'capacitacion/tema/red',
 ];
 

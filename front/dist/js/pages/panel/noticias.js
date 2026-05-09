@@ -196,7 +196,8 @@ export async function initPortalNoticias() {
         const silent = options.silent === true;
         if (!grid) return;
         if (!silent) {
-            grid.innerHTML = `<div class="col-12 text-muted small py-5 text-center">${escapeHtml(t.msg_cargando || '')}</div>`;
+            const loadingMsg = escapeHtml(t.msg_cargando || window.txt?.generales?.msg_cargando || '…');
+            grid.innerHTML = `<div class="col-12 text-center py-5 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadingMsg}</div></div>`;
         }
 
         const q = new URLSearchParams({

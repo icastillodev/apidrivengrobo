@@ -198,9 +198,9 @@ export async function openRequestDetails(row) {
                 <button type="button"
                         class="btn btn-sm ${cls}"
                         id="btn-toggle-cirugia-sol"
-                        title="${protTxt.cirugia_btn_title || 'Marcar o quitar cirugía en este protocolo'}">
+                        title="${protTxt.cirugia_btn_title || 'Activar o desactivar cirugía en este protocolo'}">
                     <i class="bi bi-toggle-${icon}"></i>
-                    <span class="ms-1">${protTxt.cirugia_btn_lbl || 'Cirugía'}</span>
+                    <span class="ms-1">${protTxt.cirugia_btn_lbl || 'Activar / desactivar'}</span>
                 </button>
             `;
             const btn = document.getElementById('btn-toggle-cirugia-sol');
@@ -210,7 +210,7 @@ export async function openRequestDetails(row) {
                     const next = !cur;
                     if (hid) hid.value = next ? '1' : '0';
                     btn.className = `btn btn-sm ${next ? 'btn-warning text-dark' : 'btn-outline-secondary'}`;
-                    btn.innerHTML = `<i class="bi bi-toggle-${next ? 'on' : 'off'}"></i><span class="ms-1">${protTxt.cirugia_btn_lbl || 'Cirugía'}</span>`;
+                    btn.innerHTML = `<i class="bi bi-toggle-${next ? 'on' : 'off'}"></i><span class="ms-1">${protTxt.cirugia_btn_lbl || 'Activar / desactivar'}</span>`;
                 };
             }
         }

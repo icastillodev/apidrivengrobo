@@ -4,8 +4,9 @@
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
+import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingAlojPeriodoParaInforme } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 
@@ -19,9 +20,15 @@ function txBD() {
 function txBI() {
     return txF().billing_investigador || {};
 }
+function txBP() {
+    return txF().billing_protocolo || {};
+}
 
 window.currentReportData = null;
 window.investigadoresCache = [];
+
+/** Informe principal ya cargado al menos una vez con éxito (recargas = spinner inline). */
+let invBillingReportLoadedOk = false;
 
 export async function initBillingInvestigador() {
     try {
@@ -121,14 +128,42 @@ window.cargarFacturacionInvestigador = async () => {
 
     if (!idUsr) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_investigador || 'Seleccione un investigador de la lista.', 'warning');
 
+    const resultsEl = document.getElementById('billing-results');
+    const prevReport = window.currentReportData;
+    const useGlobalLoader = !invBillingReportLoadedOk;
     try {
-        showLoader();
+        if (useGlobalLoader) {
+            showLoader();
+        } else if (resultsEl) {
+            setBillingResultsLoadingInline('billing-results');
+        }
         const res = await API.request('/billing/investigador-report', 'POST', { idUsr, desde, hasta, chkAni, chkIns });
         if (res.status === 'success') {
-            window.currentReportData = res.data; 
+            window.currentReportData = res.data;
             renderizarResultados(res.data);
-        } else { Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error'); }
-    } catch (error) { console.error("Error en búsqueda:", error); } finally { hideLoader(); }
+            invBillingReportLoadedOk = true;
+        } else {
+            Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
+            if (!useGlobalLoader && prevReport) {
+                renderizarResultados(prevReport);
+            } else if (!useGlobalLoader && resultsEl) {
+                resultsEl.replaceChildren();
+            }
+        }
+    } catch (error) {
+        console.error('Error en búsqueda:', error);
+        if (!useGlobalLoader && prevReport) {
+            renderizarResultados(prevReport);
+        } else if (!useGlobalLoader && resultsEl) {
+            resultsEl.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'alert alert-danger m-3';
+            err.textContent = window.txt?.generales?.error_carga || 'Error al cargar datos.';
+            resultsEl.appendChild(err);
+        }
+    } finally {
+        if (useGlobalLoader) hideLoader();
+    }
 };
 
 function renderizarResultados(data) {
@@ -217,6 +252,7 @@ function renderizarResultados(data) {
 function getFormsTableHTML(formularios, idProt) {
     const bd = txBD();
     const bi = txBI();
+    const tf = txF();
     const safeForms = formularios || [];
 
     if (safeForms.length === 0) return `<p class="text-center my-4 text-muted small">${bi.sin_pedidos_protocolo || 'No hay pedidos vinculados a este protocolo.'}</p>`;
@@ -247,6 +283,8 @@ function getFormsTableHTML(formularios, idProt) {
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
+                        const sinMontoNoEx = billingPedidoSinMontoNoExento(isExento, total, pagado);
+                        const lblSinTot = tf.pedido_sin_total_cobrable || 'Sin total';
 
                         const isRea = f.categoria?.toLowerCase().includes('reactivo');
                         const tipoModal = isRea ? 'REACTIVO' : 'ANIMAL';
@@ -270,18 +308,19 @@ function getFormsTableHTML(formularios, idProt) {
                         const fechasDisplay = `<div class="small"><b>${fi}</b> ${f.fecha || '-'}</div><div class="small text-danger"><b>${fo}</b> ${f.fecRetiroA || '-'}</div>`;
                         const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
                         
-                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` : 
-                                         (debe <= 0 ? `<span class="badge bg-success shadow-sm">${bd.badge_pago_completo || 'PAGO COMPLETO'}</span>` : 
-                                         (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${bd.badge_pago_parcial || 'PAGO PARCIAL'}</span>` : 
+                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
+                            sinMontoNoEx ? `<span class="badge bg-secondary shadow-sm">${lblSinTot}</span>` :
+                                         (debe <= 0 ? `<span class="badge bg-success shadow-sm">${bd.badge_pago_completo || 'PAGO COMPLETO'}</span>` :
+                                         (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${bd.badge_pago_parcial || 'PAGO PARCIAL'}</span>` :
                                          `<span class="badge bg-danger shadow-sm">${bd.badge_sin_pagar || 'SIN PAGAR'}</span>`));
 
-                        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+                        const rowStyle = (isExento || (debe <= 0 && !sinMontoNoEx)) ? 'background-color: #f8fff9 !important;' : '';
 
                         return `
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
                                 <td>${estadoBadge}</td>
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
@@ -299,9 +338,11 @@ function getFormsTableHTML(formularios, idProt) {
 function getAlojTableHTML(alojamientos, idProt) {
     const bd = txBD();
     const bi = txBI();
+    const bp = txBP();
     const tf = txF();
     const secA = bi.sec_alojamientos || 'Alojamientos';
     const lblAloj = bi.lbl_aloj_def || 'Alojamiento';
+    const thDep = bp.th_aloj_departamento || bi.col_departamento || 'DEPTO';
     return `
         <div class="mt-2 border-top pt-3">
             <h6 class="fw-bold text-muted mb-2 small uppercase">${secA}</h6>
@@ -309,7 +350,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                 <thead class="table-dark text-center">
                     <tr>
                         <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                        <th>${bi.th_historia || 'HISTORIA'}</th><th>${bd.th_especie_cepa || 'ESPECIE / TIPO'}</th><th>${tf.periodo || 'PERIODO'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
+                        <th>${bi.th_historia || 'HISTORIA'}</th><th class="small">${thDep}</th><th>${bd.th_especie_cepa || 'ESPECIE / TIPO'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -317,8 +358,8 @@ function getAlojTableHTML(alojamientos, idProt) {
                         <tr onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})" class="text-center align-middle pointer">
                             <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
                             <td>#${a.historia}</td>
+                            <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
                             <td>${a.especie} <br><small class="text-muted">${a.caja || lblAloj}</small></td>
-                            <td class="small">${a.periodo}</td>
                             <td class="fw-bold">${a.dias}</td>
                             <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                             <td class="text-end text-success fw-bold">$ ${formatBillingMoney(a.pagado || 0)}</td>
@@ -337,29 +378,20 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
     const bi = txBI();
     const exL = bi.pdf_monto_exento || 'Exento';
     const titulo = tf.insumos_protocolo ?? 'Insumos del protocolo';
-    const filas = insumos.map(i => {
-        const total = parseFloat(i.total_item || 0);
-        const pagado = parseFloat(i.pagado || 0);
-        const isExento = billingTipoExento(i);
-        const debe = isExento ? 0 : Math.max(0, total - pagado);
-        const badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
-            ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
-            (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${tf.estado_cobro_parcial || 'PARCIAL'}</span>` :
-                `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`));
-        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
-        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f0fff4 !important;' : '';
-        return `
-            <tr class="text-center align-middle pointer" style="${rowStyle}"
-                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo-prot" data-prot="${idProt}" data-id="${i.id}" data-monto="${debe}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                <td class="small text-muted">#${i.id}</td>
-                <td>${badge}</td>
-                <td class="small">${i.solicitante || '-'}</td>
-                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
-                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
-                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
-            </tr>`;
-    }).join('');
+    const packs = { bd, tf, bi, exL };
+    const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
+    const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
+    const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
+    const colspan = 9;
+    let tbody = '';
+    if (reactivos.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
+        tbody += reactivos.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
+    if (otros.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblDem);
+        tbody += otros.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
 
     return `
         <div class="mt-4 border-top pt-3">
@@ -379,7 +411,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:10%">${tf.falta || 'Debe'}</th>
                         </tr>
                     </thead>
-                    <tbody>${filas}</tbody>
+                    <tbody>${tbody}</tbody>
                 </table>
             </div>
         </div>`;
@@ -392,38 +424,30 @@ function getInsumosGeneralesTableHTML(insumos) {
     const tf = txF();
     const bi = txBI();
     const exL = bi.pdf_monto_exento || 'Exento';
+    const packs = { bd, tf, bi, exL };
     let sumTotal = 0, sumPagado = 0, sumDebe = 0;
-
-    const filas = insumos.map(i => {
+    for (const i of insumos) {
         const total = parseFloat(i.total_item || 0);
         const pagado = parseFloat(i.pagado || 0);
         const isExento = billingTipoExento(i);
         const debe = isExento ? 0 : Math.max(0, total - pagado);
-
         if (!isExento) {
             sumTotal += total; sumPagado += pagado; sumDebe += debe;
         }
-
-        let badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
-            ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
-            (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${tf.estado_cobro_parcial || 'PARCIAL'}</span>` :
-                `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`));
-
-        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
-        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f0fff4 !important;' : '';
-
-        return `
-            <tr class="text-center align-middle pointer" style="${rowStyle}"
-                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo-global" data-id="${i.id}" data-monto="${debe}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                <td class="small text-muted">${i.id}</td>
-                <td>${badge}</td>
-                <td>${i.solicitante || '-'}</td>
-                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
-                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
-                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
-            </tr>`;
-    }).join('');
+    }
+    const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
+    const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
+    const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
+    const colspan = 9;
+    let filas = '';
+    if (reactivos.length > 0) {
+        filas += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
+        filas += reactivos.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'general')).join('');
+    }
+    if (otros.length > 0) {
+        filas += billingHtmlInsumoProtSectionHeader(colspan, lblDem);
+        filas += otros.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'general')).join('');
+    }
 
     const tituloSinProt = tf.insumos_sin_protocolo ?? 'Insumos sin protocolo (pedidos directos)';
 
@@ -484,16 +508,23 @@ function getFooterHTML(prot) {
     const bi = txBI();
     const tf = txF();
     const mn = window.txt?.menu || {};
-    const totAni = (prot.formularios || []).filter(f => !f.categoria?.toLowerCase().includes('reactivo') && !billingTipoExento(f)).reduce((s, f) => s + parseFloat(f.total || 0), 0);
-    const totRea = (prot.formularios || []).filter(f => f.categoria?.toLowerCase().includes('reactivo') && !billingTipoExento(f)).reduce((s, f) => s + parseFloat(f.total || 0), 0);
-    const totAlo = (prot.alojamientos || []).reduce((s, a) => s + parseFloat(a.total || 0), 0);
-    const totIns = (prot.insumos || []).filter(i => !billingTipoExento(i)).reduce((s, i) => s + parseFloat(i.total_item || 0), 0);
-    
-    const numTotal = totAni + totRea + totAlo + totIns;
-    const numDebe = parseFloat(prot.deudaAnimales || 0) + parseFloat(prot.deudaReactivos || 0) + parseFloat(prot.deudaAlojamiento || 0) + parseFloat(prot.deudaInsumos || 0);
     const sForm = billingSumFormulariosCobrable(prot.formularios);
     const sAloj = billingSumAlojamientos(prot.alojamientos);
     const sIns = billingSumInsumosCobrable(prot.insumos);
+    let totAni = 0;
+    let totRea = 0;
+    for (const f of prot.formularios || []) {
+        if (billingTipoExento(f)) continue;
+        const t = Number(f.total || 0);
+        if (!Number.isFinite(t)) continue;
+        const cat = String(f.categoria || '').toLowerCase();
+        if (cat.includes('reactivo')) totRea += t;
+        else totAni += t;
+    }
+    const totAlo = sAloj.total;
+    const totIns = sIns.total;
+    const numTotal = sForm.total + sAloj.total + sIns.total;
+    const numDebe = sForm.debe + sAloj.debe + sIns.debe;
     const numPago = sForm.pagado + sAloj.pagado + sIns.pagado;
     const lblTot = tf.total || 'Total';
     const lblAloj = mn.accommodations || 'Alojamiento';
@@ -622,7 +653,7 @@ window.abrirAyudaBilling = () => { new bootstrap.Modal(document.getElementById('
 // EXPORTADOR DE PDF GLOBAL
 // =====================================
 window.downloadGlobalPDF = async () => {
-    if (!window.currentReportData) return Swal.fire(window.txt?.generales?.swal_atencion || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
+    if (!window.currentReportData) return Swal.fire(window.txt?.generales?.swal_aviso || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
     
     showLoader();
     const bi = txBI();
@@ -709,7 +740,7 @@ window.downloadGlobalPDF = async () => {
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
 
                 return [
-                    isEx ? `${f.id} (EX)` : f.id,
+                    billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
                     f.fecha,
                     f.nombre_especie,
                     f.detalle_display.replace(/<[^>]*>/g, ""),
@@ -734,7 +765,8 @@ window.downloadGlobalPDF = async () => {
                 const pagado = parseFloat(i.pagado || 0);
                 const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
-                return [`I-${i.id}`, '-', `${pIns}: ${det}`, m[0], m[2], m[1]];
+                const idInsPdf = `I-${billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() })}`;
+                return [String(idInsPdf).substring(0, 28), '-', `${pIns}: ${det}`, m[0], m[2], m[1]];
             })
         ];
 
@@ -828,7 +860,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             const pagadoReal = parseFloat(f.pagado || 0);
             const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
             return [
-                isEx ? `${f.id} (EX)` : f.id,
+                billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
                 f.nombre_especie,
                 f.detalle_display.replace(/<[^>]*>/g, ""),
                 m[0], m[2], m[1]
@@ -848,7 +880,8 @@ window.downloadProtocoloPDF = async (idProt) => {
             const pagado = parseFloat(i.pagado || 0);
             const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
             const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
-            return [`I-${i.id}`, (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[2], m[1]];
+            const idInsPdf = `I-${billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() })}`;
+            return [String(idInsPdf).substring(0, 28), (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[2], m[1]];
         }),
     ];
 

@@ -16,10 +16,61 @@ let deptColorsRed = {};
 /** @type {'sede'|'red'} */
 let currentStatsScope = 'sede';
 let redDataLoaded = false;
+/** Vista red por institución: '' = toda la red (nombre igual a `institucion` en API). */
+let redInstitutionFilter = '';
 
 /** Alineado con StatisticsController::STATS_MAX_RANGE_DAYS (evita peticiones que suelen provocar 504). */
 const STATS_MAX_RANGE_DAYS = 400;
 const STATS_API_TIMEOUT_MS = 120000;
+
+/** Colores fijos por métrica (alineados con filtros / tarjetas). */
+const STATS_METRIC_COLORS = {
+    animales: '#198754',
+    reactivos: '#ffc107',
+    insumos: '#6c757d',
+    protocolos: '#0d6efd',
+    alojamientos: '#0dcaf0'
+};
+
+function ensureGroboStatsPlugins() {
+    const ChartLib = typeof window !== 'undefined' ? window.Chart : null;
+    if (!ChartLib || ChartLib.__groboStatsBarPluginReg) return;
+    ChartLib.__groboStatsBarPluginReg = true;
+    ChartLib.register({
+        id: 'groboStatsBarValues',
+        afterDatasetsDraw(chart) {
+            const en = chart.options.plugins?.groboStatsBarValues?.enabled;
+            if (!en || chart.config.type !== 'bar') return;
+            const ctx = chart.ctx;
+            const indexAxis = chart.options.indexAxis;
+            chart.data.datasets.forEach((dataset, di) => {
+                const meta = chart.getDatasetMeta(di);
+                if (meta.hidden) return;
+                meta.data.forEach((element, i) => {
+                    const raw = dataset.data[i];
+                    const num = typeof raw === 'number' ? raw : parseFloat(raw);
+                    if (!Number.isFinite(num) || num === 0) return;
+                    const { x, y, base } = element.getProps(['x', 'y', 'base'], true);
+                    ctx.save();
+                    ctx.font = '600 11px system-ui,-apple-system,"Segoe UI",sans-serif';
+                    ctx.fillStyle = chart.options.plugins?.groboStatsBarValues?.color || '#212529';
+                    if (indexAxis === 'y') {
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        const tx = Math.min(x + 6, chart.chartArea.right - 2);
+                        ctx.fillText(String(Math.round(num)), tx, y);
+                    } else {
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        const ty = Math.min(y, base) - 4;
+                        ctx.fillText(String(Math.round(num)), x, ty);
+                    }
+                    ctx.restore();
+                });
+            });
+        }
+    });
+}
 
 function txStats() {
     return window.txt?.admin_estadisticas || {};
@@ -54,9 +105,172 @@ function validateStatsDatesForRequest(from, to) {
     return { ok: true };
 }
 
+function extractRedInstitutionNames(raw) {
+    const rows = raw?.por_departamento || [];
+    const set = new Set();
+    rows.forEach((r) => {
+        const n = String(r.institucion || '').trim();
+        if (n) set.add(n);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+function buildRankingEspeciesFromDetalle(detalle) {
+    const m = new Map();
+    (detalle || []).forEach((e) => {
+        const sub = e.subespecie != null && String(e.subespecie).trim() !== '' ? e.subespecie : 'Gral';
+        const label = `${e.especie || ''} (${sub})`.trim();
+        m.set(label, (m.get(label) || 0) + (Number(e.cantidad_animales) || 0));
+    });
+    return [...m.entries()]
+        .map(([etiqueta_especie, cantidad]) => ({ etiqueta_especie, cantidad }))
+        .sort((a, b) => b.cantidad - a.cantidad);
+}
+
+function buildRankingCepasFromDetalle(detalle) {
+    const m = new Map();
+    (detalle || []).forEach((c) => {
+        const k = String(c.cepa ?? '').trim() || '—';
+        m.set(k, (m.get(k) || 0) + (Number(c.cantidad_animales) || 0));
+    });
+    return [...m.entries()]
+        .map(([cepa, cantidad_animales]) => ({ cepa, cantidad_animales }))
+        .sort((a, b) => b.cantidad_animales - a.cantidad_animales);
+}
+
+function buildFilteredRedView(raw, instFilter) {
+    const prefix = `${instFilter} --> `;
+    const porDepartamento = (raw.por_departamento || []).filter((d) => String(d.institucion || '').trim() === instFilter);
+    const deptKeys = new Set(porDepartamento.map((d) => d.departamento));
+    const alojamientos_activos = (raw.alojamientos_activos || []).filter((a) => deptKeys.has(a.departamento));
+    const porOrganizacion = (raw.por_organizacion || []).filter((o) => String(o.organizacion || '').startsWith(prefix));
+    const detalle_especies = (raw.detalle_especies || []).filter((e) => String(e.departamento || '').startsWith(prefix));
+    const detalle_protocolos = (raw.detalle_protocolos || []).filter((p) => String(p.departamento || '').startsWith(prefix));
+    const detalle_cepas = (raw.detalle_cepas || []).filter((c) => String(c.departamento || '').startsWith(prefix));
+
+    let sumAnim = 0;
+    let sumRea = 0;
+    let sumIns = 0;
+    let sumProt = 0;
+    let sumAloj = 0;
+    porDepartamento.forEach((d) => {
+        sumAnim += Number(d.total_animales) || 0;
+        sumRea += Number(d.total_reactivos) || 0;
+        sumIns += Number(d.total_insumos) || 0;
+        sumProt += Number(d.protocolos_aprobados) || 0;
+        const al = alojamientos_activos.find((a) => a.departamento === d.departamento);
+        sumAloj += al ? Number(al.cantidad) || 0 : 0;
+    });
+
+    const globales = {
+        total_animales: sumAnim,
+        total_reactivos: sumRea,
+        total_insumos: sumIns,
+        total_protocolos: sumProt,
+        total_alojamientos: sumAloj
+    };
+
+    return {
+        ...raw,
+        globales,
+        por_departamento: porDepartamento,
+        por_organizacion: porOrganizacion,
+        alojamientos_activos,
+        detalle_especies,
+        detalle_protocolos,
+        detalle_cepas,
+        ranking_especies: buildRankingEspeciesFromDetalle(detalle_especies),
+        ranking_cepas: buildRankingCepasFromDetalle(detalle_cepas),
+        categorias_formularios: [],
+        derivacion_pedidos: { activo: false },
+        alojamiento_trazabilidad: null
+    };
+}
+
+function getRedStatsPayload() {
+    if (!redRawData) return null;
+    if (!redInstitutionFilter) return redRawData;
+    return buildFilteredRedView(redRawData, redInstitutionFilter);
+}
+
+function statsDataForScope(scope) {
+    return scope === 'red' ? getRedStatsPayload() : rawData;
+}
+
+function formatRedDeptLabel(departamento) {
+    if (!redInstitutionFilter || !departamento) return departamento;
+    const p = `${redInstitutionFilter} --> `;
+    const s = String(departamento);
+    return s.startsWith(p) ? s.slice(p.length) : s;
+}
+
+function refreshRedFilteredViews() {
+    if (!redRawData) return;
+    generateDeptColors(statsDataForScope('red').por_departamento || [], 'red');
+    renderGlobalCards('red');
+    renderDerivacionPedidosSection('red');
+    renderAlojamientoTrazabilidadSection('red');
+    renderSpeciesCounters('red');
+    renderStrainCounters('red');
+    renderCategoriasSection('red');
+    renderTable('red');
+    renderTableOrganizacion('red');
+    renderMainChart('red');
+    renderSpeciesChart('red');
+    renderDetailsSection('red');
+}
+
+function renderRedInstitutionTabs() {
+    const wrap = document.getElementById('red-institution-tabs-wrap');
+    if (!wrap || !redRawData) return;
+    const names = extractRedInstitutionNames(redRawData);
+    const t = txStats();
+    const hint = document.getElementById('red-inst-filter-hint');
+    if (names.length <= 1) {
+        wrap.classList.add('d-none');
+        wrap.innerHTML = '';
+        if (hint) {
+            hint.classList.add('d-none');
+            hint.textContent = '';
+        }
+        return;
+    }
+    wrap.classList.remove('d-none');
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const allLbl = t.red_tab_all || 'Toda la red';
+    const secLbl = t.red_tabs_inst_label || 'Institución';
+    let html = `<div class="small fw-bold text-muted mb-2"><i class="bi bi-building"></i> ${esc(secLbl)}</div><div class="btn-group btn-group-sm flex-wrap gap-1" role="group">`;
+    html += `<button type="button" class="btn btn-sm ${!redInstitutionFilter ? 'btn-success' : 'btn-outline-success'} fw-bold" data-red-all="1">${esc(allLbl)}</button>`;
+    names.forEach((name) => {
+        const active = redInstitutionFilter === name;
+        html += `<button type="button" class="btn btn-sm ${active ? 'btn-success' : 'btn-outline-secondary'} fw-bold" data-red-inst="${encodeURIComponent(name)}">${esc(name)}</button>`;
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+    wrap.onclick = (e) => {
+        const btn = e.target.closest('button[data-red-all], button[data-red-inst]');
+        if (!btn || !wrap.contains(btn)) return;
+        if (btn.hasAttribute('data-red-all')) redInstitutionFilter = '';
+        else redInstitutionFilter = decodeURIComponent(btn.getAttribute('data-red-inst') || '');
+        renderRedInstitutionTabs();
+        refreshRedFilteredViews();
+    };
+    if (hint) {
+        if (redInstitutionFilter) {
+            hint.classList.remove('d-none');
+            const tpl = t.red_filter_hint || '';
+            hint.textContent = tpl.replace(/\{inst\}/g, redInstitutionFilter);
+        } else {
+            hint.classList.add('d-none');
+            hint.textContent = '';
+        }
+    }
+}
+
 export async function initStatsPage() {
     console.log("GeckoStats: Inicializando...");
-    
+    ensureGroboStatsPlugins();
+
     // 1. Configurar Fechas por defecto (Mes actual)
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -160,7 +374,7 @@ async function loadStats() {
     const t = txStats();
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || 'CARGANDO...'}`;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || window.txt?.generales?.msg_cargando || '…'}`;
     }
 
     const vr = validateStatsDatesForRequest(from, to);
@@ -195,6 +409,7 @@ async function loadStats() {
             generateDeptColors(rawData.por_departamento, 'sede');
 
             renderGlobalCards('sede');
+            renderDerivacionPedidosSection('sede');
             renderAlojamientoTrazabilidadSection('sede');
             renderSpeciesCounters('sede');
             renderStrainCounters('sede');
@@ -246,7 +461,7 @@ async function loadStatsRedFull() {
     const t = txStats();
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || 'CARGANDO...'}`;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${t?.cargando || window.txt?.generales?.msg_cargando || '…'}`;
     }
 
     const vr = validateStatsDatesForRequest(from, to);
@@ -275,11 +490,13 @@ async function loadStatsRedFull() {
         }
         if (res.status === 'success') {
             redRawData = res.data;
+            redInstitutionFilter = '';
             redDataLoaded = true;
             const pane = document.getElementById('stats-content-red');
             if (pane) pane.style.display = 'block';
             generateDeptColors(redRawData.por_departamento || [], 'red');
             renderGlobalCards('red');
+            renderDerivacionPedidosSection('red');
             renderAlojamientoTrazabilidadSection('red');
             renderSpeciesCounters('red');
             renderStrainCounters('red');
@@ -289,6 +506,7 @@ async function loadStatsRedFull() {
             renderMainChart('red');
             renderSpeciesChart('red');
             renderDetailsSection('red');
+            renderRedInstitutionTabs();
         } else {
             alert(res.message || t?.red_sin_permiso || 'Error al cargar estadísticas de la red.');
         }
@@ -309,8 +527,9 @@ function exportToExcelRed() {
         alert(window.txt?.admin_estadisticas?.red_sin_datos || 'Cargue primero las estadísticas de la red (pestaña Red).');
         return;
     }
+    const rv = getRedStatsPayload();
     const wb = XLSX.utils.book_new();
-    const g = redRawData.globales;
+    const g = rv.globales;
     const globalData = [
         ['METRICA', 'TOTAL RED'],
         ['Animales', g.total_animales],
@@ -319,12 +538,12 @@ function exportToExcelRed() {
         ['Protocolos', g.total_protocolos],
         ['Alojamientos', g.total_alojamientos]
     ];
-    if (redRawData.alojamiento_trazabilidad) {
-        const at = redRawData.alojamiento_trazabilidad;
+    if (rv.alojamiento_trazabilidad) {
+        const at = rv.alojamiento_trazabilidad;
         globalData.push(['Historias (aloj.)', at.total_historias], ['Cajas físicas', at.total_cajas], ['Obs. trazabilidad', at.total_observaciones_trazabilidad]);
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(globalData), 'Resumen_Red');
-    const deptData = (redRawData.por_departamento || []).map(d => ({
+    const deptData = (rv.por_departamento || []).map(d => ({
         Departamento: d.departamento,
         Animales: d.total_animales,
         Reactivos: d.total_reactivos,
@@ -332,14 +551,14 @@ function exportToExcelRed() {
         Protocolos: d.protocolos_aprobados
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(deptData), 'Departamentos_Red');
-    const espData = (redRawData.detalle_especies || []).map(e => ({
+    const espData = (rv.detalle_especies || []).map(e => ({
         Departamento: e.departamento,
         Especie: e.especie,
         Subespecie: e.subespecie,
         Cantidad: e.cantidad_animales
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(espData), 'Detalle_Especies_Red');
-    const protData = (redRawData.detalle_protocolos || []).map(p => ({
+    const protData = (rv.detalle_protocolos || []).map(p => ({
         Departamento: p.departamento,
         Protocolo: p.nprotA,
         Titulo: p.tituloA,
@@ -347,7 +566,7 @@ function exportToExcelRed() {
         Estado: new Date(p.FechaFinProtA) < new Date() ? 'VENCIDO' : 'VIGENTE'
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(protData), 'Protocolos_Red');
-    const orgData = (redRawData.por_organizacion || []).map(o => ({
+    const orgData = (rv.por_organizacion || []).map(o => ({
         Organización: o.organizacion || '',
         Animales: o.total_animales,
         Reactivos: o.total_reactivos,
@@ -355,8 +574,8 @@ function exportToExcelRed() {
         'Prot. Aprob': o.protocolos_aprobados
     }));
     if (orgData.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(orgData), 'Organizacion_Red');
-    if (redRawData.alojamiento_trazabilidad?.por_especie?.length) {
-        const atEsp = redRawData.alojamiento_trazabilidad.por_especie.map(e => ({
+    if (rv.alojamiento_trazabilidad?.por_especie?.length) {
+        const atEsp = rv.alojamiento_trazabilidad.por_especie.map(e => ({
             Especie: e.especie,
             Historias: e.historias,
             Tramos: e.tramos
@@ -364,30 +583,33 @@ function exportToExcelRed() {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(atEsp), 'Aloj_por_especie_Red');
     }
 
-    if (Array.isArray(redRawData.categorias_formularios) && redRawData.categorias_formularios.length) {
-        const cat = redRawData.categorias_formularios.map(c => ({
+    if (Array.isArray(rv.categorias_formularios) && rv.categorias_formularios.length) {
+        const cat = rv.categorias_formularios.map(c => ({
             Categoria: c.categoria,
             Cantidad: c.cantidad
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cat), 'Categorias_Red');
     }
-    if (Array.isArray(redRawData.ranking_cepas) && redRawData.ranking_cepas.length) {
-        const cep = redRawData.ranking_cepas.map(c => ({
+    if (Array.isArray(rv.ranking_cepas) && rv.ranking_cepas.length) {
+        const cep = rv.ranking_cepas.map(c => ({
             Cepa: c.cepa,
             Cantidad: c.cantidad_animales
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cep), 'Top_Cepas_Red');
     }
-    if (Array.isArray(redRawData.detalle_cepas) && redRawData.detalle_cepas.length) {
-        const det = redRawData.detalle_cepas.map(c => ({
+    if (Array.isArray(rv.detalle_cepas) && rv.detalle_cepas.length) {
+        const det = rv.detalle_cepas.map(c => ({
             Departamento: c.departamento,
             Cepa: c.cepa,
             Cantidad: c.cantidad_animales
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), 'Detalle_Cepas_Red');
     }
-    const rank = (redRawData.ranking_especies || []).map(r => ({ Especie: r.etiqueta_especie, Cantidad: r.cantidad }));
+    const rank = (rv.ranking_especies || []).map(r => ({ Especie: r.etiqueta_especie, Cantidad: r.cantidad }));
     if (rank.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rank), 'Ranking_especies_Red');
+
+    statsAppendDerivacionPedidosSheet(wb, rv, 'Deriv_pedidos_Red');
+
     XLSX.writeFile(wb, `Reporte_Red_GROBO_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
@@ -409,6 +631,7 @@ async function exportFastPDFRed(includeCharts) {
         alert(window.txt?.admin_estadisticas?.red_sin_datos || 'Cargue primero las estadísticas de la red (pestaña Red).');
         return;
     }
+    const rv = getRedStatsPayload();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     const M = 18;
@@ -430,27 +653,30 @@ async function exportFastPDFRed(includeCharts) {
             console.warn('Logo no cargado para PDF red:', e);
         }
     }
-    const tTit = window.txt?.admin_estadisticas?.red_pdf_doc_title || 'REPORTE RED — GROBO';
+    const te = txStats();
+    const tTit = te.red_pdf_doc_title || 'REPORTE RED — GROBO';
     doc.setFontSize(16);
     doc.text(tTit, M, titleY);
     doc.setFontSize(10);
-    doc.text(`${window.txt?.admin_estadisticas?.red_pdf_fecha || 'Fecha'}: ${new Date().toLocaleDateString()}`, M, titleY + 7);
-    const g = redRawData.globales;
-    const t = window.txt?.generales;
-    const lblTotal = t?.total ?? 'Total';
+    const metaRed = buildStatsPdfPeriodMeta();
+    let yMetaR = titleY + 7;
+    metaRed.lines.forEach((line) => {
+        doc.text(line, M, yMetaR);
+        yMetaR += 7;
+    });
+    const tableStartRed = yMetaR + 6;
+    const gen = window.txt?.generales || {};
+    const lblTotal = gen.total ?? 'Total';
     doc.autoTable({
-        startY: titleY + 13,
+        startY: tableStartRed,
         margin: { left: M, right: M },
-        head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
-        body: [
-            ['Animales', g.total_animales, 'Reactivos', g.total_reactivos],
-            ['Insumos', g.total_insumos, 'Protocolos', g.total_protocolos],
-            ['Alojamientos', g.total_alojamientos, '', '']
-        ],
+        head: [[te.pdf_col_metrica || 'Métrica', lblTotal, te.pdf_col_metrica || 'Métrica', lblTotal]],
+        body: buildStatsPdfSummaryBody(rv),
         theme: 'grid',
         headStyles: { fillColor: [26, 93, 59] }
     });
     let currentY = doc.lastAutoTable.finalY + 10;
+
     if (includeCharts) {
         const canvas = document.getElementById('red-chart-canvas');
         if (canvas) {
@@ -458,11 +684,13 @@ async function exportFastPDFRed(includeCharts) {
                 const imgData = canvas.toDataURL('image/jpeg', 0.8);
                 const props = doc.getImageProperties(imgData);
                 const h = (props.height * 180) / props.width;
-                if (currentY + h > 280) { doc.addPage(); currentY = 15; }
-                doc.text(window.txt?.admin_estadisticas?.red_pdf_graf_depto || 'Gráfico por departamento (red)', 14, currentY);
+                currentY = pdfEnsureSpace(doc, currentY, h + 20);
+                doc.text(te.red_pdf_graf_depto || 'Gráfico por departamento (red)', M, currentY);
                 doc.addImage(imgData, 'JPEG', 15, currentY + 5, 180, h);
                 currentY += h + 15;
-            } catch (e) { console.warn(e); }
+            } catch (e) {
+                console.warn(e);
+            }
         }
         const canvasSp = document.getElementById('red-chart-species');
         if (canvasSp) {
@@ -470,34 +698,18 @@ async function exportFastPDFRed(includeCharts) {
                 const imgData = canvasSp.toDataURL('image/jpeg', 0.75);
                 const props = doc.getImageProperties(imgData);
                 const h = Math.min(100, (props.height * 170) / props.width);
-                if (currentY + h > 280) { doc.addPage(); currentY = 15; }
-                doc.text(window.txt?.admin_estadisticas?.red_pdf_graf_esp || 'Gráfico especies (red)', 14, currentY);
+                currentY = pdfEnsureSpace(doc, currentY, h + 18);
+                doc.text(te.red_pdf_graf_esp || 'Gráfico especies (red)', M, currentY);
                 doc.addImage(imgData, 'JPEG', 15, currentY + 5, 170, h);
                 currentY += h + 12;
-            } catch (e) { console.warn(e); }
+            } catch (e) {
+                console.warn(e);
+            }
         }
     }
-    if (currentY + 30 > 280) { doc.addPage(); currentY = M; }
-    doc.text(window.txt?.admin_estadisticas?.red_pdf_tab_depto || 'Desglose por departamento (red)', M, currentY);
-    const rowsDept = (redRawData.por_departamento || []).map(d => [d.departamento, d.total_animales, d.total_reactivos, d.total_insumos, d.protocolos_aprobados]);
-    doc.autoTable({
-        startY: currentY + 5,
-        margin: { left: M, right: M },
-        head: [['Departamento', 'Anim.', 'Reac.', 'Ins.', 'Prot.']],
-        body: rowsDept,
-        theme: 'striped'
-    });
-    doc.addPage();
-    doc.text(window.txt?.admin_estadisticas?.red_pdf_tab_esp || 'Detalle especies (red)', M, M);
-    const rowsEsp = (redRawData.detalle_especies || []).map(e => [e.departamento, e.especie, e.subespecie || '-', e.cantidad_animales]);
-    doc.autoTable({
-        startY: M + 5,
-        margin: { left: M, right: M },
-        head: [['Depto', 'Especie', 'Subespecie', 'Cant.']],
-        body: rowsEsp,
-        theme: 'plain',
-        columnStyles: { 0: { fontStyle: 'bold' } }
-    });
+
+    currentY = pdfEnsureSpace(doc, currentY, 35);
+    statsPdfAppendExtendedTables(doc, rv, M, currentY);
     doc.save(`Reporte_Red_GROBO_${Date.now()}.pdf`);
 }
 
@@ -533,7 +745,7 @@ function metricChecked(scope, id) {
 // ==========================================
 
 function renderGlobalCards(scope) {
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!data || !data.globales) return;
     const p = scope === 'red' ? 'red-' : '';
     const g = data.globales;
@@ -544,10 +756,87 @@ function renderGlobalCards(scope) {
     setSafeText(`${p}box-alojamientos`, g.total_alojamientos);
 }
 
+function renderDerivacionPedidosSection(scope) {
+    const containerId = scope === 'red' ? 'red-stats-derivacion-pedidos' : 'stats-derivacion-pedidos';
+    const container = document.getElementById(containerId);
+    const data = statsDataForScope(scope);
+    const t = txStats();
+    if (!container || !data) return;
+    const dp = data.derivacion_pedidos;
+    if (!dp || !dp.activo) {
+        container.innerHTML = '';
+        return;
+    }
+    const prop = dp.propios || {};
+    const recibidos = Array.isArray(dp.recibidos_por_origen) ? dp.recibidos_por_origen : [];
+    const fmtInt = (v) => Math.round(Number(v) || 0).toLocaleString('es-UY');
+    const fmtDec = (v) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return '0';
+        return (Math.abs(n - Math.round(n)) < 1e-6 ? Math.round(n) : n).toLocaleString('es-UY', { maximumFractionDigits: 2 });
+    };
+    const rows = recibidos.length
+        ? recibidos.map((r) => {
+            const nombre = (r.institucion_origen || '').trim() || String(r.id_institucion_origen ?? '');
+            return `<tr><td class="fw-bold">${nombre}</td><td class="text-center">${fmtDec(r.total_animales)}</td><td class="text-center">${fmtInt(r.total_reactivos)}</td><td class="text-center">${fmtInt(r.total_insumos)}</td></tr>`;
+        }).join('')
+        : `<tr><td colspan="4" class="text-muted small text-center py-3">${t.deriv_sin_recibidos || '—'}</td></tr>`;
+
+    container.innerHTML = `
+        <h6 class="fw-bold mb-3 text-secondary border-bottom pb-2">
+            <i class="bi bi-arrow-left-right"></i> ${t.seccion_deriv_pedidos || 'Pedidos: propios y derivados'}
+        </h6>
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <div class="card border-0 shadow-sm h-100 border-start border-3 border-success">
+                    <div class="card-header bg-white fw-bold small">${t.deriv_propios_title || 'Pedidos propios'}</div>
+                    <div class="card-body py-3">
+                        <p class="small text-muted mb-3">${t.deriv_propios_desc || ''}</p>
+                        <div class="row g-2 text-center">
+                            <div class="col-4">
+                                <div class="small text-muted fw-bold">${t.th_animales || 'Animales'}</div>
+                                <div class="fs-5 fw-bold text-success">${fmtDec(prop.total_animales)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted fw-bold">${t.th_reactivos || 'Reactivos'}</div>
+                                <div class="fs-5 fw-bold text-warning">${fmtInt(prop.total_reactivos)}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="small text-muted fw-bold">${t.th_insumos || 'Insumos'}</div>
+                                <div class="fs-5 fw-bold text-secondary">${fmtInt(prop.total_insumos)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card border-0 shadow-sm h-100 border-start border-3 border-primary">
+                    <div class="card-header bg-white fw-bold small">${t.deriv_recibidos_title || 'Recibidos por origen'}</div>
+                    <div class="card-body p-0">
+                        <p class="small text-muted px-3 pt-3 mb-0">${t.deriv_recibidos_desc || ''}</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0" style="font-size: 12px;">
+                                <thead class="table-light text-uppercase">
+                                    <tr>
+                                        <th>${t.deriv_th_inst_origen || 'Origen'}</th>
+                                        <th class="text-center">${t.th_animales || ''}</th>
+                                        <th class="text-center">${t.th_reactivos || ''}</th>
+                                        <th class="text-center">${t.th_insumos || ''}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
+
 function renderAlojamientoTrazabilidadSection(scope) {
     const containerId = scope === 'red' ? 'red-alojamiento-trazabilidad-section' : 'alojamiento-trazabilidad-section';
     const container = document.getElementById(containerId);
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!container || !data || !data.alojamiento_trazabilidad) return;
     const at = data.alojamiento_trazabilidad;
 
@@ -603,7 +892,7 @@ function renderAlojamientoTrazabilidadSection(scope) {
 function renderSpeciesCounters(scope) {
     const containerId = scope === 'red' ? 'red-species-counters-container' : 'species-counters-container';
     const container = document.getElementById(containerId);
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!container || !data?.ranking_especies) return;
     container.innerHTML = '';
 
@@ -644,7 +933,7 @@ function renderSpeciesCounters(scope) {
 function renderTable(scope) {
     const tbodyId = scope === 'red' ? 'red-table-body-stats' : 'table-body-stats';
     const tbody = document.getElementById(tbodyId);
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!tbody || !data?.por_departamento) return;
 
     const colCls = scope === 'red' ? 'red-col-val' : 'col-val';
@@ -655,7 +944,7 @@ function renderTable(scope) {
 
         return `
             <tr>
-                <td class="fw-bold text-success small py-3 text-uppercase">${d.departamento}</td>
+                <td class="fw-bold text-success small py-3 text-uppercase">${scope === 'red' ? formatRedDeptLabel(d.departamento) : d.departamento}</td>
                 <td class="text-center ${colCls}-1 fw-bold">${d.total_animales}</td>
                 <td class="text-center ${colCls}-2 text-muted">${d.total_reactivos}</td>
                 <td class="text-center ${colCls}-3 text-muted">${d.total_insumos}</td>
@@ -673,7 +962,7 @@ function renderTable(scope) {
 function renderTableOrganizacion(scope) {
     const tbodyId = scope === 'red' ? 'red-table-body-org' : 'table-body-org';
     const tbody = document.getElementById(tbodyId);
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!tbody || !data || !data.por_organizacion) {
         if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">–</td></tr>';
         return;
@@ -709,22 +998,29 @@ function toggleTableColumn(colNum, isVisible, scope = 'sede') {
 // GRÁFICOS (CHART.JS)
 // ==========================================
 
+function sumMetricArr(arr) {
+    return arr.reduce((a, b) => a + (Number(b) || 0), 0);
+}
+
 function renderMainChart(scope = 'sede') {
+    ensureGroboStatsPlugins();
     const isRed = scope === 'red';
     const canvasId = isRed ? 'red-chart-canvas' : 'chart-canvas';
     const chartKey = isRed ? 'mainRed' : 'main';
     const typeEl = document.getElementById(isRed ? 'red-chart-type' : 'chart-type');
     const canvas = document.getElementById(canvasId);
-    const data = isRed ? redRawData : rawData;
+    const data = statsDataForScope(isRed ? 'red' : 'sede');
     if (!canvas || !data?.por_departamento) return;
 
     const ctx = canvas.getContext('2d');
     const type = typeEl?.value || 'bar';
     const ChartLib = window.Chart;
+    const te = txStats();
+    const MC = STATS_METRIC_COLORS;
 
     if (charts[chartKey]) charts[chartKey].destroy();
 
-    const labels = data.por_departamento.map(d => d.departamento);
+    const labels = data.por_departamento.map((d) => (isRed ? formatRedDeptLabel(d.departamento) : d.departamento));
     const datasets = [];
     const deptColorMap = isRed ? deptColorsRed : deptColorsSede;
 
@@ -733,79 +1029,195 @@ function renderMainChart(scope = 'sede') {
     const useDeptColors = activeMetricsCount === 1 && metricChecked(scope, 'chk-ani');
 
     if (metricChecked(scope, 'chk-ani')) {
+        const vals = data.por_departamento.map(d => d.total_animales);
+        const bg = useDeptColors ? labels.map(l => deptColorMap[l]) : MC.animales;
         datasets.push({
-            label: 'Animales',
-            data: data.por_departamento.map(d => d.total_animales),
-            backgroundColor: useDeptColors ? labels.map(l => deptColorMap[l]) : '#198754'
+            label: `${te.label_animales || 'Animales'} · Σ ${sumMetricArr(vals)}`,
+            data: vals,
+            backgroundColor: bg,
+            borderRadius: 4,
+            borderSkipped: false
         });
     }
     if (metricChecked(scope, 'chk-rea')) {
-        datasets.push({ label: 'Reactivos', data: data.por_departamento.map(d => d.total_reactivos), backgroundColor: '#ffc107' });
+        const vals = data.por_departamento.map(d => d.total_reactivos);
+        datasets.push({
+            label: `${te.label_reactivos || 'Reactivos'} · Σ ${sumMetricArr(vals)}`,
+            data: vals,
+            backgroundColor: MC.reactivos,
+            borderRadius: 4,
+            borderSkipped: false
+        });
     }
     if (metricChecked(scope, 'chk-ins')) {
-        datasets.push({ label: 'Insumos', data: data.por_departamento.map(d => d.total_insumos), backgroundColor: '#6c757d' });
+        const vals = data.por_departamento.map(d => d.total_insumos);
+        datasets.push({
+            label: `${te.label_insumos || 'Insumos'} · Σ ${sumMetricArr(vals)}`,
+            data: vals,
+            backgroundColor: MC.insumos,
+            borderRadius: 4,
+            borderSkipped: false
+        });
     }
     if (metricChecked(scope, 'chk-pro')) {
-        datasets.push({ label: 'Protocolos', data: data.por_departamento.map(d => d.protocolos_aprobados), backgroundColor: '#0d6efd', hidden: true });
+        const vals = data.por_departamento.map(d => d.protocolos_aprobados);
+        datasets.push({
+            label: `${te.label_prot_aprob || 'Prot.'} · Σ ${sumMetricArr(vals)}`,
+            data: vals,
+            backgroundColor: MC.protocolos,
+            borderRadius: 4,
+            borderSkipped: false
+        });
     }
     if (metricChecked(scope, 'chk-alo')) {
-        const dataAloj = data.por_departamento.map(d => (data.alojamientos_activos || []).find(a => a.departamento === d.departamento)?.cantidad || 0);
-        datasets.push({ label: 'Alojamientos', data: dataAloj, backgroundColor: '#0dcaf0' });
+        const vals = data.por_departamento.map(d => (data.alojamientos_activos || []).find(a => a.departamento === d.departamento)?.cantidad || 0);
+        datasets.push({
+            label: `${te.label_aloj_activos || 'Aloj.'} · Σ ${sumMetricArr(vals)}`,
+            data: vals,
+            backgroundColor: MC.alojamientos,
+            borderRadius: 4,
+            borderSkipped: false
+        });
+    }
+
+    const parentEl = canvas.parentElement;
+    const isHorizBar = type === 'bar';
+    if (parentEl) {
+        if (isHorizBar) {
+            parentEl.style.minHeight = `${Math.max(260, labels.length * (18 + activeMetricsCount * 5))}px`;
+        } else {
+            parentEl.style.minHeight = '';
+        }
     }
 
     charts[chartKey] = new ChartLib(ctx, {
         type,
         data: { labels, datasets },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        options: {
+            indexAxis: isHorizBar ? 'y' : undefined,
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: isHorizBar ? { right: 36, left: 4 } : {}
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        boxWidth: 12,
+                        usePointStyle: true,
+                        padding: 10
+                    }
+                },
+                groboStatsBarValues: { enabled: isHorizBar }
+            },
+            scales: isHorizBar
+                ? {
+                      x: { beginAtZero: true, stacked: false, ticks: { precision: 0 } },
+                      y: { stacked: false, grid: { display: false } }
+                  }
+                : {}
+        }
     });
 }
 
 function renderSpeciesChart(scope = 'sede') {
+    ensureGroboStatsPlugins();
     const isRed = scope === 'red';
     const canvasId = isRed ? 'red-chart-species' : 'chart-species';
     const typeElId = isRed ? 'red-species-chart-type' : 'species-chart-type';
     const containerId = isRed ? 'red-species-chart-container' : 'species-chart-container';
     const chartKey = isRed ? 'speciesRed' : 'species';
     const canvas = document.getElementById(canvasId);
-    const src = isRed ? redRawData : rawData;
-    if (!canvas || !src?.ranking_especies) return;
+    const src = statsDataForScope(isRed ? 'red' : 'sede');
+    if (!canvas || !src) return;
+    const rankList = Array.isArray(src.ranking_especies) ? src.ranking_especies : [];
+    if (!rankList.length) {
+        if (charts[chartKey]) charts[chartKey].destroy();
+        return;
+    }
 
     const ctx = canvas.getContext('2d');
     const type = document.getElementById(typeElId)?.value || 'bar';
     const ChartLib = window.Chart;
+    const te = txStats();
 
     if (charts[chartKey]) charts[chartKey].destroy();
 
-    const rank = src.ranking_especies;
+    const rank = rankList;
     const labels = rank.map(e => e.etiqueta_especie);
     const values = rank.map(e => e.cantidad);
 
     const container = document.getElementById(containerId);
     if (container) {
         if (type === 'bar') {
-            container.style.height = `${Math.max(400, labels.length * 25)}px`;
+            container.style.height = `${Math.max(400, labels.length * 26)}px`;
         } else {
             container.style.height = '400px';
         }
     }
 
-    const pieColors = labels.map((_, i) => `hsl(${(i * 45) % 360}, 65%, 45%)`);
+    const pieColors = labels.map((_, i) => `hsl(${(i * 41 + 18) % 360}, 62%, 44%)`);
+    const barColors = labels.map((_, i) => `hsl(${(i * 41 + 18) % 360}, 58%, 40%)`);
+    const isHorizBar = type === 'bar';
 
     charts[chartKey] = new ChartLib(ctx, {
         type,
         data: {
             labels,
             datasets: [{
-                label: 'Cantidad',
+                label: te.pdf_th_cantidad || 'Cantidad',
                 data: values,
-                backgroundColor: type === 'pie' ? pieColors : '#1a5d3b',
-                borderRadius: 4
+                backgroundColor: type === 'pie' ? pieColors : barColors,
+                borderRadius: 4,
+                borderSkipped: false
             }]
         },
         options: {
-            indexAxis: type === 'bar' ? 'y' : 'x',
+            indexAxis: isHorizBar ? 'y' : 'x',
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            layout: {
+                padding: isHorizBar ? { right: 36 } : {}
+            },
+            plugins: {
+                legend: {
+                    display: type === 'pie',
+                    position: 'right',
+                    labels: {
+                        generateLabels(chart) {
+                            const d = chart.data;
+                            const ds = d.datasets[0];
+                            if (!d.labels?.length || !ds) return [];
+                            return d.labels.map((lbl, i) => ({
+                                text: `${lbl}: ${ds.data[i]}`,
+                                fillStyle: Array.isArray(ds.backgroundColor) ? ds.backgroundColor[i] : ds.backgroundColor,
+                                strokeStyle: '#fff',
+                                lineWidth: 1,
+                                hidden: false,
+                                index: i,
+                                datasetIndex: 0
+                            }));
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label(ctx) {
+                            const v = ctx.raw;
+                            const base = ctx.dataset.label || '';
+                            return `${base ? `${base}: ` : ''}${v}`;
+                        }
+                    }
+                },
+                groboStatsBarValues: { enabled: isHorizBar }
+            },
+            scales: isHorizBar
+                ? {
+                      x: { beginAtZero: true, ticks: { precision: 0 } },
+                      y: { grid: { display: false } }
+                  }
+                : {}
         }
     });
 }
@@ -817,7 +1229,7 @@ function renderSpeciesChart(scope = 'sede') {
 function renderDetailsSection(scope = 'sede') {
     const containerId = scope === 'red' ? 'red-details-container' : 'details-container';
     const container = document.getElementById(containerId);
-    const data = scope === 'red' ? redRawData : rawData;
+    const data = statsDataForScope(scope);
     if (!container || !data?.por_departamento) return;
     const t = window.txt?.admin_estadisticas || {};
     const gen = window.txt?.generales || {};
@@ -893,7 +1305,7 @@ function renderStrainCounters(scope = 'sede') {
     const isRed = scope === 'red';
     const containerId = isRed ? 'red-strain-counters-container' : 'strain-counters-container';
     const container = document.getElementById(containerId);
-    const src = isRed ? redRawData : rawData;
+    const src = statsDataForScope(isRed ? 'red' : 'sede');
     if (!container || !src) return;
 
     const list = Array.isArray(src.ranking_cepas) ? src.ranking_cepas : [];
@@ -921,7 +1333,7 @@ function renderCategoriasSection(scope = 'sede') {
     const listId = isRed ? 'red-categories-list' : 'categories-list';
     const topEl = document.getElementById(topId);
     const listEl = document.getElementById(listId);
-    const src = isRed ? redRawData : rawData;
+    const src = statsDataForScope(isRed ? 'red' : 'sede');
     if (!src) return;
 
     const cats = Array.isArray(src.categorias_formularios) ? src.categorias_formularios : [];
@@ -990,6 +1402,43 @@ function openChartModal(chartKey) {
 // ==========================================
 // EXPORTACIÓN EXCEL AVANZADA (MULTI-HOJA)
 // ==========================================
+
+/**
+ * Hoja opcional: pedidos propios vs recibidos por derivación (misma semántica que la vista).
+ * @param {object} wb libro XLSX
+ * @param {object} data payload stats (sede o red)
+ * @param {string} sheetName máx. 31 caracteres (Excel)
+ */
+function statsAppendDerivacionPedidosSheet(wb, data, sheetName) {
+    const dp = data?.derivacion_pedidos;
+    if (!dp?.activo || !wb || !sheetName) return;
+    const t = window.txt?.admin_estadisticas || {};
+    const p = dp.propios || {};
+    const rows = [];
+    rows.push([t.seccion_deriv_pedidos || 'Pedidos: propios y derivados']);
+    rows.push([]);
+    rows.push([t.deriv_propios_title || 'Propios']);
+    rows.push([t.th_animales || 'Animales', t.th_reactivos || 'Reactivos', t.th_insumos || 'Insumos']);
+    rows.push([p.total_animales ?? 0, p.total_reactivos ?? 0, p.total_insumos ?? 0]);
+    rows.push([]);
+    rows.push([t.deriv_recibidos_title || 'Recibidos por origen']);
+    rows.push([
+        t.deriv_th_inst_origen || 'Institución origen',
+        t.th_animales || 'Animales',
+        t.th_reactivos || 'Reactivos',
+        t.th_insumos || 'Insumos'
+    ]);
+    const rec = Array.isArray(dp.recibidos_por_origen) ? dp.recibidos_por_origen : [];
+    if (rec.length) {
+        rec.forEach((r) => {
+            const nombre = String(r.institucion_origen || '').trim() || String(r.id_institucion_origen ?? '');
+            rows.push([nombre, r.total_animales ?? 0, r.total_reactivos ?? 0, r.total_insumos ?? 0]);
+        });
+    } else {
+        rows.push([t.deriv_sin_recibidos || '—', '', '', '']);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheetName.slice(0, 31));
+}
 
 function exportToExcel() {
     if (!rawData) return;
@@ -1071,6 +1520,8 @@ function exportToExcel() {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), "Detalle Cepas");
     }
 
+    statsAppendDerivacionPedidosSheet(wb, rawData, 'Deriv_pedidos');
+
     XLSX.writeFile(wb, `Reporte_GROBO_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
@@ -1078,15 +1529,342 @@ function exportToExcel() {
 // EXPORTACIÓN PDF RÁPIDO (AUTO-TABLE)
 // ==========================================
 
+/** Metadatos de periodo para encabezado PDF (inputs #stats-from / #stats-to). */
+function buildStatsPdfPeriodMeta() {
+    const t = txStats();
+    const lines = [];
+    const fromIn = document.getElementById('stats-from')?.value?.trim() || '';
+    const toIn = document.getElementById('stats-to')?.value?.trim() || '';
+    const re = /^\d{4}-\d{2}-\d{2}$/;
+    const fmt = (isoYmd) => {
+        const d = new Date(`${isoYmd}T12:00:00`);
+        return Number.isNaN(d.getTime()) ? isoYmd : d.toLocaleDateString();
+    };
+    if (fromIn && toIn && re.test(fromIn) && re.test(toIn)) {
+        let d0 = new Date(`${fromIn}T12:00:00`);
+        let d1 = new Date(`${toIn}T12:00:00`);
+        if (!Number.isNaN(d0.getTime()) && !Number.isNaN(d1.getTime())) {
+            if (d0 > d1) {
+                const tmp = d0;
+                d0 = d1;
+                d1 = tmp;
+            }
+            const iso0 = d0.toISOString().slice(0, 10);
+            const iso1 = d1.toISOString().slice(0, 10);
+            const pLine = (t.pdf_periodo_line_tpl || 'Periodo consultado: {from} — {to}')
+                .replace(/\{from\}/g, fmt(iso0))
+                .replace(/\{to\}/g, fmt(iso1));
+            lines.push(pLine);
+            const dias = Math.floor((d1 - d0) / 86400000) + 1;
+            lines.push((t.pdf_total_dias_tpl || 'Total de días (inclusive): {n}').replace(/\{n\}/g, String(dias)));
+        }
+    }
+    lines.push((t.pdf_emitido_tpl || 'Generado: {fecha}').replace(/\{fecha\}/g, new Date().toLocaleString()));
+    return { lines };
+}
+
+function pdfEnsureSpace(doc, y, reserveMm = 45, marginTop = 18, bottomLimit = 275) {
+    if (y + reserveMm > bottomLimit) {
+        doc.addPage();
+        return marginTop;
+    }
+    return y;
+}
+
+function buildStatsPdfSummaryBody(data) {
+    const te = txStats();
+    const g = data.globales;
+    const rows = [
+        [te.label_animales, g.total_animales, te.label_reactivos, g.total_reactivos],
+        [te.label_insumos, g.total_insumos, te.th_prot_aprob, g.total_protocolos],
+        [te.box_alojamientos, g.total_alojamientos, '', '']
+    ];
+    const at = data.alojamiento_trazabilidad;
+    if (at) {
+        rows.push(
+            [te.pdf_metric_hist_aloj, at.total_historias ?? 0, te.pdf_metric_cajas, at.total_cajas ?? 0],
+            [te.pdf_metric_obs_traz, at.total_observaciones_trazabilidad ?? 0, te.pdf_metric_aloj_tramos, at.alojamientos_activos ?? 0]
+        );
+    }
+    return rows;
+}
+
+function buildStatsPdfDeptRows(data) {
+    return (data.por_departamento || []).map((d) => {
+        const alojObj = (data.alojamientos_activos || []).find((a) => a.departamento === d.departamento);
+        const cantAloj = alojObj ? alojObj.cantidad : 0;
+        return [d.departamento, d.total_animales, d.total_reactivos, d.total_insumos, d.protocolos_aprobados, cantAloj];
+    });
+}
+
+function statsPdfProtocolEstadoRow(p, te) {
+    const vencimiento = new Date(p.FechaFinProtA);
+    if (Number.isNaN(vencimiento.getTime())) return '—';
+    return vencimiento < new Date() ? (te.det_prot_vencido || 'Vencido') : (te.det_prot_vigente || 'Vigente');
+}
+
+function statsPdfRenderCharts(doc, includeCharts, canvasIds, M, startY) {
+    let currentY = startY;
+    const te = txStats();
+    if (!includeCharts) return currentY;
+    const canvas = document.getElementById(canvasIds.main);
+    if (canvas) {
+        try {
+            const imgData = canvas.toDataURL('image/jpeg', 0.8);
+            const props = doc.getImageProperties(imgData);
+            const h = (props.height * 180) / props.width;
+            currentY = pdfEnsureSpace(doc, currentY, h + 20);
+            doc.text(te.pdf_grafico_depto, M, currentY);
+            doc.addImage(imgData, 'JPEG', 15, currentY + 5, 180, h);
+            currentY += h + 15;
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+    const canvasSp = document.getElementById(canvasIds.species);
+    if (canvasSp) {
+        try {
+            const imgData = canvasSp.toDataURL('image/jpeg', 0.75);
+            const props = doc.getImageProperties(imgData);
+            const h = Math.min(100, (props.height * 170) / props.width);
+            currentY = pdfEnsureSpace(doc, currentY, h + 18);
+            doc.text(te.pdf_graf_uso_especies, M, currentY);
+            doc.addImage(imgData, 'JPEG', 15, currentY + 5, 170, h);
+            currentY += h + 12;
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+    return currentY;
+}
+
+function statsPdfAppendExtendedTables(doc, data, M, startY) {
+    const te = txStats();
+    const gen = window.txt?.generales || {};
+    let currentY = startY;
+
+    currentY = pdfEnsureSpace(doc, currentY, 40);
+    doc.text(te.desglose_depto, M, currentY);
+    doc.autoTable({
+        startY: currentY + 5,
+        margin: { left: M, right: M },
+        head: [[
+            te.th_departamento,
+            te.pdf_abbr_anim,
+            te.pdf_abbr_reac,
+            te.pdf_abbr_ins,
+            te.pdf_abbr_prot,
+            te.pdf_abbr_aloj
+        ]],
+        body: buildStatsPdfDeptRows(data),
+        theme: 'striped'
+    });
+    currentY = doc.lastAutoTable.finalY + 10;
+
+    const dpPdf = data.derivacion_pedidos;
+    if (dpPdf && dpPdf.activo) {
+        currentY = pdfEnsureSpace(doc, currentY, 55);
+        doc.setFontSize(11);
+        doc.text(te.seccion_deriv_pedidos, M, currentY);
+        doc.setFontSize(10);
+        const yProp = currentY + 7;
+        doc.text(te.deriv_propios_title, M, yProp);
+        const pr = dpPdf.propios || {};
+        doc.autoTable({
+            startY: yProp + 4,
+            margin: { left: M, right: M },
+            head: [[te.th_animales, te.th_reactivos, te.th_insumos]],
+            body: [[
+                pr.total_animales ?? 0,
+                pr.total_reactivos ?? 0,
+                pr.total_insumos ?? 0
+            ]],
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 8;
+        doc.text(te.deriv_recibidos_title, M, currentY);
+        const recPdf = Array.isArray(dpPdf.recibidos_por_origen) ? dpPdf.recibidos_por_origen : [];
+        const bodyDeriv = recPdf.length
+            ? recPdf.map((r) => [
+                String(r.institucion_origen || '').trim() || String(r.id_institucion_origen ?? ''),
+                r.total_animales ?? 0,
+                r.total_reactivos ?? 0,
+                r.total_insumos ?? 0
+            ])
+            : [[te.deriv_sin_recibidos, '', '', '']];
+        doc.autoTable({
+            startY: currentY + 4,
+            margin: { left: M, right: M },
+            head: [[te.deriv_th_inst_origen, te.th_animales, te.th_reactivos, te.th_insumos]],
+            body: bodyDeriv,
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const orgRows = data.por_organizacion || [];
+    if (orgRows.length) {
+        const labelSinOrg = gen.sin_organizacion || '(Sin organización)';
+        currentY = pdfEnsureSpace(doc, currentY, 50);
+        doc.text(te.desglose_org, M, currentY);
+        const bodyOrg = orgRows.map((o) => {
+            const orgLabel = o.organizacion === '(Sin organización)' ? labelSinOrg : (o.organizacion || '–');
+            return [
+                orgLabel,
+                parseInt(o.total_animales, 10) || 0,
+                parseInt(o.total_reactivos, 10) || 0,
+                parseInt(o.total_insumos, 10) || 0,
+                parseInt(o.protocolos_aprobados, 10) || 0
+            ];
+        });
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[
+                te.th_organizacion,
+                te.th_animales,
+                te.th_reactivos,
+                te.th_insumos,
+                te.th_prot_aprob
+            ]],
+            body: bodyOrg,
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const atEsp = data.alojamiento_trazabilidad?.por_especie;
+    if (Array.isArray(atEsp) && atEsp.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.pdf_seccion_aloj_por_especie, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[te.pdf_th_especie, te.pdf_th_hist_aloj, te.pdf_th_tramos_aloj]],
+            body: atEsp.map((e) => [e.especie, e.historias, e.tramos]),
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const rankEsp = data.ranking_especies || [];
+    if (rankEsp.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.pdf_seccion_ranking_especies, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[te.pdf_th_especie, te.pdf_th_cantidad]],
+            body: rankEsp.map((r) => [r.etiqueta_especie, r.cantidad]),
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const rankCep = data.ranking_cepas || [];
+    if (Array.isArray(rankCep) && rankCep.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.top_cepas, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[te.pdf_th_cepa, te.pdf_th_cantidad]],
+            body: rankCep.map((c) => [String(c.cepa ?? '').trim() || '—', c.cantidad_animales ?? 0]),
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const detCep = data.detalle_cepas || [];
+    if (Array.isArray(detCep) && detCep.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.pdf_seccion_detalle_cepas, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[te.th_departamento, te.pdf_th_cepa, te.pdf_th_cantidad]],
+            body: detCep.map((c) => [c.departamento, c.cepa, c.cantidad_animales]),
+            theme: 'plain',
+            columnStyles: { 0: { fontStyle: 'bold' } }
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const cats = data.categorias_formularios || [];
+    if (Array.isArray(cats) && cats.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.categorias, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[te.pdf_th_categoria, te.pdf_th_cantidad]],
+            body: cats.map((c) => [String(c.categoria ?? '').trim() || '—', c.cantidad ?? 0]),
+            theme: 'striped'
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const detEsp = data.detalle_especies || [];
+    if (detEsp.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.pdf_seccion_detalle_especies, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[
+                te.pdf_th_depto_corta,
+                te.pdf_th_especie,
+                te.pdf_th_subespecie,
+                te.pdf_th_cantidad
+            ]],
+            body: detEsp.map((e) => [
+                e.departamento,
+                e.especie,
+                e.subespecie || '-',
+                e.cantidad_animales
+            ]),
+            theme: 'plain',
+            columnStyles: { 0: { fontStyle: 'bold' } }
+        });
+        currentY = doc.lastAutoTable.finalY + 10;
+    }
+
+    const detProt = data.detalle_protocolos || [];
+    if (detProt.length) {
+        currentY = pdfEnsureSpace(doc, currentY, 45);
+        doc.text(te.pdf_seccion_detalle_protocolos, M, currentY);
+        doc.autoTable({
+            startY: currentY + 5,
+            margin: { left: M, right: M },
+            head: [[
+                te.pdf_th_depto_corta,
+                te.pdf_th_cod_protocolo,
+                te.pdf_th_titulo_prot,
+                te.pdf_th_vence,
+                te.pdf_th_estado_prot
+            ]],
+            body: detProt.map((p) => [
+                p.departamento,
+                p.nprotA,
+                String(p.tituloA || '').slice(0, 100),
+                p.FechaFinProtA || '—',
+                statsPdfProtocolEstadoRow(p, te)
+            ]),
+            theme: 'striped'
+        });
+    }
+}
+
 function askExportPDFOptions() {
+    const t = txStats();
     if (!window.Swal) { exportFastPDF(true); return; }
     Swal.fire({
-        title: 'Exportar PDF',
-        text: '¿Desea incluir los gráficos? (Esto puede tardar un poco más)',
+        title: t.pdf_sede_export_title || 'Exportar PDF',
+        text: t.pdf_sede_export_text || '¿Desea incluir los gráficos? (Esto puede tardar un poco más)',
         icon: 'question',
         showDenyButton: true,
-        confirmButtonText: 'Sí, con Gráficos',
-        denyButtonText: 'No, solo Tablas (Rápido)',
+        confirmButtonText: t.pdf_sede_con_graficos || 'Sí, con Gráficos',
+        denyButtonText: t.pdf_sede_solo_tablas || 'No, solo Tablas (Rápido)',
         confirmButtonColor: '#1a5d3b'
     }).then((r) => exportFastPDF(r.isConfirmed));
 }
@@ -1115,72 +1893,33 @@ async function exportFastPDF(includeCharts) {
         }
     }
 
-    // Título
+    const te = txStats();
     doc.setFontSize(16);
-    doc.text("REPORTE ESTADÍSTICO - GROBO", M, titleY);
+    doc.text(te.pdf_doc_title_sede || 'REPORTE ESTADÍSTICO - GROBO', M, titleY);
     doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, M, titleY + 7);
+    const metaSede = buildStatsPdfPeriodMeta();
+    let yMeta = titleY + 7;
+    metaSede.lines.forEach((line) => {
+        doc.text(line, M, yMeta);
+        yMeta += 7;
+    });
+    const tableStartSede = yMeta + 6;
 
-    // Tabla Resumen
-    const g = rawData.globales;
-    const t = window.txt?.generales;
-    const lblTotal = t?.total ?? 'Total';
+    const gen = window.txt?.generales || {};
+    const lblTotal = gen.total ?? 'Total';
     doc.autoTable({
-        startY: titleY + 13,
+        startY: tableStartSede,
         margin: { left: M, right: M },
-        head: [['Métrica', lblTotal, 'Métrica', lblTotal]],
-        body: [
-            ['Animales', g.total_animales, 'Reactivos', g.total_reactivos],
-            ['Insumos', g.total_insumos, 'Protocolos', g.total_protocolos],
-            ['Alojamientos', g.total_alojamientos, '', '']
-        ],
+        head: [[te.pdf_col_metrica || 'Métrica', lblTotal, te.pdf_col_metrica || 'Métrica', lblTotal]],
+        body: buildStatsPdfSummaryBody(rawData),
         theme: 'grid',
         headStyles: { fillColor: [26, 93, 59] }
     });
 
     let currentY = doc.lastAutoTable.finalY + 10;
-
-    // Inyectar Gráfico (Solo si se pidió)
-    if (includeCharts) {
-        const canvas = document.getElementById('chart-canvas');
-        if (canvas) {
-            try {
-                const imgData = canvas.toDataURL('image/jpeg', 0.8);
-                const props = doc.getImageProperties(imgData);
-                const h = (props.height * 180) / props.width;
-                if (currentY + h > 280) { doc.addPage(); currentY = 15; }
-                doc.text("Gráfico General", 14, currentY);
-                doc.addImage(imgData, 'JPEG', 15, currentY + 5, 180, h);
-                currentY += h + 15;
-            } catch(e) { console.warn("Error chart img"); }
-        }
-    }
-
-    // Tabla Departamentos
-    if (currentY + 30 > 280) { doc.addPage(); currentY = M; }
-    doc.text("Desglose por Departamento", M, currentY);
-
-    const rowsDept = rawData.por_departamento.map(d => [d.departamento, d.total_animales, d.total_reactivos, d.total_insumos, d.protocolos_aprobados]);
-    doc.autoTable({
-        startY: currentY + 5,
-        margin: { left: M, right: M },
-        head: [['Departamento', 'Anim.', 'Reac.', 'Ins.', 'Prot.']],
-        body: rowsDept,
-        theme: 'striped'
-    });
-
-    // Tabla Especies
-    doc.addPage();
-    doc.text("Detalle de Especies Utilizadas", M, M);
-    const rowsEsp = rawData.detalle_especies.map(e => [e.departamento, e.especie, e.subespecie||'-', e.cantidad_animales]);
-    doc.autoTable({
-        startY: M + 5,
-        margin: { left: M, right: M },
-        head: [['Depto', 'Especie', 'Subespecie', 'Cant.']],
-        body: rowsEsp,
-        theme: 'plain',
-        columnStyles: { 0: { fontStyle: 'bold' } }
-    });
+    currentY = statsPdfRenderCharts(doc, includeCharts, { main: 'chart-canvas', species: 'chart-species' }, M, currentY);
+    currentY = pdfEnsureSpace(doc, currentY, 35);
+    statsPdfAppendExtendedTables(doc, rawData, M, currentY);
 
     doc.save(`Reporte_GROBO_${Date.now()}.pdf`);
 }

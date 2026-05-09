@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import {
     isInvestigatorRole,
@@ -10,6 +11,14 @@ let currentPage = 1;
 let protocolsUsedCache = [];
 const rowsPerPage = 12;
 let derivationTargets = [];
+
+function escapeMisFormsHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 function formatMoneyMisForm(value) {
     const v = Number(value);
@@ -70,29 +79,42 @@ export async function initMisFormularios() {
     const userId = localStorage.getItem('userId');
     const instId = localStorage.getItem('instId');
 
-    document.getElementById('btn-export-excel').onclick = openExcelModal;
+    if (!misFormulariosEventsBound) {
+        misFormulariosEventsBound = true;
+        document.getElementById('btn-export-excel').onclick = openExcelModal;
 
-    const btnProtocolsUsed = document.getElementById('btn-protocols-used');
-    if (btnProtocolsUsed) btnProtocolsUsed.onclick = openProtocolsUsedModal;
-    const btnInsumosPedidos = document.getElementById('btn-insumos-pedidos');
-    if (btnInsumosPedidos) btnInsumosPedidos.onclick = openInsumosPedidosModal;
-    const btnInsumosExpPedidos = document.getElementById('btn-insumos-exp-pedidos');
-    if (btnInsumosExpPedidos) btnInsumosExpPedidos.onclick = openInsumosExpPedidosModal;
-    const btnPaymentsHistory = document.getElementById('btn-payments-history');
-    if (btnPaymentsHistory) btnPaymentsHistory.onclick = openMyPaymentsHistoryModal;
-    const btnConfirmDerive = document.getElementById('btn-confirm-derive');
-    if (btnConfirmDerive) btnConfirmDerive.onclick = confirmDeriveForm;
+        const btnProtocolsUsed = document.getElementById('btn-protocols-used');
+        if (btnProtocolsUsed) btnProtocolsUsed.onclick = openProtocolsUsedModal;
+        const btnInsumosPedidos = document.getElementById('btn-insumos-pedidos');
+        if (btnInsumosPedidos) btnInsumosPedidos.onclick = openInsumosPedidosModal;
+        const btnInsumosExpPedidos = document.getElementById('btn-insumos-exp-pedidos');
+        if (btnInsumosExpPedidos) btnInsumosExpPedidos.onclick = openInsumosExpPedidosModal;
+        const btnPaymentsHistory = document.getElementById('btn-payments-history');
+        if (btnPaymentsHistory) btnPaymentsHistory.onclick = openMyPaymentsHistoryModal;
+        const btnConfirmDerive = document.getElementById('btn-confirm-derive');
+        if (btnConfirmDerive) btnConfirmDerive.onclick = confirmDeriveForm;
+
+        document.getElementById('search-input').addEventListener('keyup', () => { currentPage = 1; renderTable(); });
+        document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; renderTable(); });
+        document.getElementById('filter-inst').addEventListener('change', () => { currentPage = 1; renderTable(); });
+        document.getElementById('filter-derivation')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
+        document.getElementById('filter-origin-inst')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
+    }
 
     try {
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
         const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
         if (res.status === 'success') {
             allForms = res.data.list;
-            // Ya no configuramos contacto global aquí
             setupInstitutionFilter();
             setupOriginInstitutionFilter();
             renderTable();
         }
-    } catch (e) { console.error("Error:", e); }
+    } catch (e) {
+        console.error('Error:', e);
+    } finally {
+        hideLoader();
+    }
 
     try {
         const instActiva = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
@@ -100,13 +122,9 @@ export async function initMisFormularios() {
         if (resTargets.status === 'success' && Array.isArray(resTargets.data)) {
             derivationTargets = resTargets.data;
         }
-    } catch (e) { console.error('Error cargando instituciones destino de derivación', e); }
-
-    document.getElementById('search-input').addEventListener('keyup', () => { currentPage = 1; renderTable(); });
-    document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; renderTable(); });
-    document.getElementById('filter-inst').addEventListener('change', () => { currentPage = 1; renderTable(); });
-    document.getElementById('filter-derivation')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
-    document.getElementById('filter-origin-inst')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
+    } catch (e) {
+        console.error('Error cargando instituciones destino de derivación', e);
+    }
 }
 
 /* --- RENDERIZADO DE TABLA --- */
@@ -308,6 +326,17 @@ window.openDetailModal = async (id) => {
                      <div class="col-md-6"><strong class="text-muted">${window.txt?.misformularios?.label_organizacion || 'Organización'}:</strong> ${h.NombreOrganismoSimple || '—'}</div>
                      <div class="col-12"><strong class="text-muted">${window.txt?.misformularios?.label_instituciones || 'Instituciones'}:</strong> ${Array.isArray(h.institucionesParticipantes) && h.institucionesParticipantes.length ? h.institucionesParticipantes.map(inst => inst.NombreInst).join(' → ') : (h.NombreInstitucion || '—')}</div>
                      <div class="col-12"><strong class="text-muted">${window.txt?.misformularios?.label_aclaracion || 'Aclaración'}:</strong> <span class="fst-italic">${h.aclaraA || 'Ninguna'}</span></div>
+                     ${(() => {
+                         const cat = (h.Categoria || h.categoriaformulario || '').toString();
+                         const isAnimal = cat === 'Animal' || cat === 'Animal vivo';
+                         const tmf = window.txt?.misformularios || {};
+                         if (!isAnimal || !Object.prototype.hasOwnProperty.call(h, 'TieneAnestesicos')) return '';
+                         const tiene = Number(h.TieneAnestesicos ?? 0) === 1;
+                         if (tiene) {
+                             return `<div class="col-12 mt-1"><span class="badge bg-info text-dark">${tmf.anestesicos_badge_si || ''}</span></div>`;
+                         }
+                         return `<div class="col-12 mt-2 alert alert-secondary py-2 small mb-0">${tmf.anestesicos_sin_aprobacion || ''}</div>`;
+                     })()}
                 </div>
                 <hr>
                 <h6 class="fw-bold text-success text-uppercase mb-3">Detalle Técnico</h6>
@@ -585,7 +614,7 @@ window.downloadPDF = async (id) => {
 
             // PLANTILLA GENERAL
             const template = `
-                <div style="font-family: Arial, sans-serif; padding: 30px; color: #333;">
+                <div style="font-family: Arial, sans-serif; padding: 30px; color: #333; background: #ffffff;">
                     <div style="text-align: center; border-bottom: 3px solid #1a5d3b; padding-bottom: 15px; margin-bottom: 25px;">
                         <h2 style="color: #1a5d3b; margin: 0; font-size: 24px; text-transform: uppercase;">${instName}</h2>
                         <h4 style="margin: 8px 0; font-weight: bold; color: #555;">FICHA DE PEDIDO #${h.idformA}</h4>
@@ -636,7 +665,7 @@ window.downloadPDF = async (id) => {
                 margin: [18, 18, 18, 18], 
                 filename: `Pedido_${h.idformA}_${instName}.pdf`, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                html2canvas: { scale: 2, useCORS: true } 
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false }
             };
             html2pdf().set(opt).from(template).save();
         }
@@ -887,12 +916,31 @@ function estadoText(v) {
 async function reloadMyForms() {
     const userId = localStorage.getItem('userId');
     const instId = localStorage.getItem('instId');
-    const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
-    if (res.status === 'success') {
-        allForms = res.data.list || [];
-        setupInstitutionFilter();
-        setupOriginInstitutionFilter();
-        renderTable();
+    const tbody = document.getElementById('table-body');
+    const tmf = window.txt?.misformularios || {};
+    const msg = escapeMisFormsHtml(
+        tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…'
+    );
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+    }
+    try {
+        const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
+        if (res.status === 'success') {
+            allForms = res.data.list || [];
+            setupInstitutionFilter();
+            setupOriginInstitutionFilter();
+            renderTable();
+        } else if (tbody) {
+            const err = escapeMisFormsHtml(window.txt?.generales?.error_carga || 'Error');
+            tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${err}</td></tr>`;
+        }
+    } catch (e) {
+        console.error(e);
+        if (tbody) {
+            const err = escapeMisFormsHtml(window.txt?.generales?.error_carga || 'Error');
+            tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${err}</td></tr>`;
+        }
     }
 }
 
@@ -902,7 +950,9 @@ function openExcelModal() { new bootstrap.Modal(document.getElementById('modal-e
 window.openProtocolsUsedModal = async () => {
     const listEl = document.getElementById('protocols-used-list');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const tmf = window.txt?.misformularios || {};
+    const loadLbl = escapeMisFormsHtml(tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…');
+    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted small">${loadLbl}</p></div>`;
     const modal = new bootstrap.Modal(document.getElementById('modal-protocols-used'));
     modal.show();
 
@@ -999,7 +1049,9 @@ window.showProtocolDetail = async (idprotA) => {
 window.openInsumosPedidosModal = async () => {
     const listEl = document.getElementById('insumos-pedidos-list');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const tmf = window.txt?.misformularios || {};
+    const loadLbl = escapeMisFormsHtml(tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…');
+    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-success"></div><p class="mt-2 text-muted small">${loadLbl}</p></div>`;
     const modal = new bootstrap.Modal(document.getElementById('modal-insumos-pedidos'));
     modal.show();
     try {
@@ -1038,7 +1090,9 @@ window.openInsumosPedidosModal = async () => {
 window.openInsumosExpPedidosModal = async () => {
     const listEl = document.getElementById('insumos-exp-pedidos-list');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-info"></div><p class="mt-2 text-muted small">Cargando...</p></div>';
+    const tmf = window.txt?.misformularios || {};
+    const loadLbl = escapeMisFormsHtml(tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…');
+    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-info"></div><p class="mt-2 text-muted small">${loadLbl}</p></div>`;
     const modal = new bootstrap.Modal(document.getElementById('modal-insumos-exp-pedidos'));
     modal.show();
     try {
@@ -1077,7 +1131,8 @@ window.openMyPaymentsHistoryModal = async () => {
     if (!listEl) return;
     const tmf = window.txt?.misformularios || {};
     const errMsg = tmf.historial_pagos_error || 'Error';
-    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-dark"></div><p class="mt-2 text-muted small">${tmf.cargando || '…'}</p></div>`;
+    const loadPay = escapeMisFormsHtml(tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…');
+    listEl.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-dark"></div><p class="mt-2 text-muted small">${loadPay}</p></div>`;
     const modal = new bootstrap.Modal(document.getElementById('modal-payments-history'));
     modal.show();
     try {

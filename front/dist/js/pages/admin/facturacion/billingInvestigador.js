@@ -1,5 +1,7 @@
 import { API } from '../../../api.js';
-import { formatBillingMoney } from './billingLocale.js';
+import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
+import { formatBillingMoney, billingDerivadaLiquidacionBadge, billingTipoExento } from './billingLocale.js';
+import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
 
 const txF = () => window.txt?.facturacion || {};
 const txL = () => window.txt?.facturacion?.billing_legacy || {};
@@ -8,6 +10,68 @@ const g = () => window.txt?.generales || {};
 
 let currentData = null;
 let currentInvestigadorId = null;
+/** Vista legacy persona: informe ya cargado al menos una vez con éxito. */
+let personaLegacyReportLoadedOk = false;
+
+/**
+ * Filas planas para la tabla legacy (modal de pago por saldo).
+ * @param {Record<string, unknown>} p tarjeta protocolo o bloque sintético de insumos sin protocolo
+ */
+function flattenProtocolItemsForPersona(p) {
+    const items = [];
+    for (const f of p.formularios || []) {
+        const isExento = billingTipoExento(f);
+        const total = parseFloat(f.total || 0);
+        const pagado = parseFloat(f.pagado || 0);
+        const debe = isExento ? 0 : Math.max(0, total - pagado);
+        const cat = String(f.categoria || '').toLowerCase();
+        const tipo = cat.includes('reactivo') ? 'REACTIVO' : 'ANIMAL';
+        const concepto = String(f.detalle_display || '').replace(/<[^>]*>/g, '').trim().slice(0, 140) || (`#${f.id}`);
+        items.push({ ...f, id: f.id, tipo, debe, fecha: f.fecha || '—', concepto });
+    }
+    for (const a of p.alojamientos || []) {
+        const debe = parseFloat(a.debe ?? Math.max(0, parseFloat(a.total || 0) - parseFloat(a.pagado || 0)));
+        const concepto = [a.especie, a.caja].filter(Boolean).join(' — ') || (`#${a.historia}`);
+        items.push({ ...a, id: a.historia, tipo: 'ALOJ', debe, fecha: a.fecha_in || a.fecha || '—', concepto });
+    }
+    for (const i of p.insumos || []) {
+        const isExento = billingTipoExento(i);
+        const total = parseFloat(i.total_item || 0);
+        const pagado = parseFloat(i.pagado || 0);
+        const debe = isExento ? 0 : Math.max(0, total - pagado);
+        const concepto = String(i.detalle_completo || '').split(' | ')[0]?.trim().slice(0, 140) || (`#${i.id}`);
+        items.push({ ...i, id: i.id, tipo: 'INSUMO', debe, fecha: i.fecha_pedido || i.fecha || '—', concepto });
+    }
+    return items;
+}
+
+function normalizeInvestigadorReportForPersona(data) {
+    const perfil = data.perfil || {};
+    const baseProt = Array.isArray(data.protocolos) ? data.protocolos : [];
+    const insGen = data.insumosGenerales || [];
+    const tf = txF();
+    const tituloInsSin = tf.insumos_sin_protocolo || 'Insumos sin protocolo';
+    const protocolos = baseProt.map(p => ({
+        ...p,
+        items: flattenProtocolItemsForPersona(p)
+    }));
+    if (insGen.length > 0) {
+        protocolos.push({
+            idProt: 0,
+            nprotA: '—',
+            tituloA: tituloInsSin,
+            formularios: [],
+            alojamientos: [],
+            insumos: insGen,
+            items: flattenProtocolItemsForPersona({ formularios: [], alojamientos: [], insumos: insGen })
+        });
+    }
+    return {
+        ...data,
+        saldo: perfil.SaldoDinero ?? 0,
+        protocolos
+    };
+}
 
 export async function initBillingPersona() {
     await cargarListaInvestigadores();
@@ -31,13 +95,58 @@ window.cargarFacturacionPersona = async () => {
         return Swal.fire(g().error || 'Error', tf.aviso_investigador || 'Seleccione un investigador de la lista.', 'error');
     }
 
+    const resultsEl = document.getElementById('investigador-results');
+    const prevData = currentData;
+    const useGlobalLoader = !personaLegacyReportLoadedOk;
+
     try {
-        const res = await API.request(`/billing/investigador-report?id=${currentInvestigadorId}`);
-        if (res.status === 'success') {
-            currentData = res.data;
-            renderizarFicha();
+        if (useGlobalLoader) {
+            showLoader();
+        } else if (resultsEl) {
+            setBillingResultsLoadingInline('investigador-results');
         }
-    } catch (e) { console.error(e); }
+        const res = await API.request('/billing/investigador-report', 'POST', {
+            idUsr: parseInt(String(currentInvestigadorId), 10),
+            desde: null,
+            hasta: null,
+            chkAni: true,
+            chkIns: true
+        });
+        if (res.status === 'success') {
+            currentData = normalizeInvestigadorReportForPersona(res.data || {});
+            renderizarFicha();
+            personaLegacyReportLoadedOk = true;
+        } else if (res.message) {
+            Swal.fire(g().error || 'Error', res.message, 'error');
+            if (!useGlobalLoader && prevData) {
+                currentData = prevData;
+                renderizarFicha();
+            } else if (!useGlobalLoader && resultsEl) {
+                resultsEl.replaceChildren();
+            }
+        }
+    } catch (e) {
+        console.error(e);
+        if (!useGlobalLoader && prevData) {
+            currentData = prevData;
+            renderizarFicha();
+        } else if (!useGlobalLoader && resultsEl) {
+            resultsEl.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'alert alert-danger m-3';
+            err.textContent = g().error_carga || 'Error al cargar datos.';
+            resultsEl.appendChild(err);
+        }
+    } finally {
+        if (useGlobalLoader) hideLoader();
+    }
+};
+
+window.toggleProtPersona = (idProt, checked) => {
+    document.querySelectorAll(`.check-p-${idProt}`).forEach(c => {
+        if (!c.disabled) c.checked = checked;
+    });
+    window.recalcularSeleccionPersona();
 };
 
 function renderizarFicha() {
@@ -51,7 +160,7 @@ function renderizarFicha() {
     document.getElementById('txt-saldo-actual').innerText = `$ ${formatBillingMoney(d.saldo)}`;
     document.getElementById('lbl-total-sel').innerText = `$ ${formatBillingMoney(0)}`;
 
-    if (d.protocolos.length === 0) {
+    if (!d.protocolos || d.protocolos.length === 0) {
         container.innerHTML = `<div class="alert alert-success text-center fw-bold">${leg.sin_deudas || 'EL INVESTIGADOR NO TIENE DEUDAS PENDIENTES.'}</div>`;
         return;
     }
@@ -67,7 +176,7 @@ function renderizarFicha() {
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
                 <span class="small fw-bold uppercase">${protLbl} ${p.nprotA}</span>
-                <span class="small opacity-75">${p.tituloA.substring(0, 60)}...</span>
+                <span class="small opacity-75">${String(p.tituloA || '').substring(0, 60)}${String(p.tituloA || '').length > 60 ? '…' : ''}</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0" style="font-size: 11px;">
@@ -78,11 +187,11 @@ function renderizarFicha() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${p.items.map(i => `
+                        ${(p.items || []).map(i => `
                             <tr class="text-center">
                                 <td><input type="checkbox" class="form-check-input check-p-${p.idProt} check-persona-global"
-                                           data-monto="${i.debe}" data-id="${i.id}" data-tipo="${i.tipo}" onchange="window.recalcularSeleccionPersona()"></td>
-                                <td>#${i.id}</td>
+                                           data-monto="${i.debe}" data-id="${i.id}" data-tipo="${i.tipo}" ${(parseFloat(i.debe) <= 0 || billingTipoExento(i)) ? 'disabled' : ''} onchange="window.recalcularSeleccionPersona()"></td>
+                                <td class="small text-muted fw-bold">#${i.id}${billingDerivadaLiquidacionBadge(i)}</td>
                                 <td>${i.fecha}</td>
                                 <td class="text-start fw-bold">${i.concepto}</td>
                                 <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(i.debe)}</td>
@@ -100,7 +209,7 @@ window.ajustarSaldoPersona = async (accion) => {
     const tf = txF();
     const montoAbs = parseFloat(document.getElementById('input-ajuste-monto').value);
     if (!montoAbs || montoAbs <= 0) {
-        return Swal.fire(g().swal_atencion || 'Atención', tf.monto_invalido || 'Ingrese un monto válido.', 'warning');
+        return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', tf.monto_invalido || 'Ingrese un monto válido.', 'warning');
     }
     const monto = accion === 'add' ? montoAbs : -montoAbs;
 
@@ -119,8 +228,8 @@ window.ajustarSaldoPersona = async (accion) => {
             </div>`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: tf.saldo_ajuste_confirm || 'Confirmar',
-        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar',
+        confirmButtonText: tf.saldo_ajuste_confirm || window.txt?.generales?.confirmar || 'Confirmar',
+        cancelButtonText: tf.btn_cancelar_swal || g().cerrar || 'Cancelar',
         confirmButtonColor: '#1a5d3b',
         preConfirm: () => {
             const c = Swal.getHtmlContainer();
@@ -169,17 +278,35 @@ window.pagarSeleccionadosPersona = async () => {
         showCancelButton: true,
         confirmButtonColor: '#198754',
         confirmButtonText: tf.confirmar_pago_btn || 'Sí, pagar ahora',
-        cancelButtonText: tf.btn_cancelar_swal || g().btn_cancelar_swal || 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || g().cerrar || 'Cancelar'
     });
 
     if (isConfirmed) {
-        const res = await API.request('/billing/pagar-items-saldo', 'POST', {
-            idUsr: currentInvestigadorId,
-            items: items
-        });
-        if (res.status === 'success') {
-            Swal.fire(tf.procesado_titulo || 'Procesado', tf.items_liquidados || 'Los ítems han sido liquidados', 'success');
-            window.cargarFacturacionPersona();
+        showLoader();
+        try {
+            const res = await API.request('/billing/pagar-items-saldo', 'POST', {
+                idUsr: currentInvestigadorId,
+                items: items
+            });
+            if (res.status === 'success') {
+                Swal.fire(tf.procesado_titulo || 'Procesado', tf.items_liquidados || 'Los ítems han sido liquidados', 'success');
+                window.cargarFacturacionPersona();
+            } else {
+                Swal.fire(
+                    g().error || 'Error',
+                    res.message || tf.payment_error_procesar || window.txt?.facturacion?.payment_error_procesar || 'No se pudo procesar el pago.',
+                    'error'
+                );
+            }
+        } catch (e) {
+            console.error(e);
+            Swal.fire(
+                g().error || 'Error',
+                tf.payment_error_procesar || window.txt?.facturacion?.payment_error_procesar || 'No se pudo procesar el pago.',
+                'error'
+            );
+        } finally {
+            hideLoader();
         }
     }
 };

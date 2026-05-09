@@ -58,6 +58,7 @@ $router->post('/ia/procesar', 'AiController@processCommand');
 // SECCIÓN: Gestión de Usuarios (Admin Sede)
 // ============================================================
 $router->get('/users/institution', 'UserController@index'); 
+$router->get('/users/one', 'UserController@getOne');
 $router->get('/users/protocols', 'UserController@getProtocols'); 
 $router->get('/users/forms', 'UserController@getForms');       
 $router->get('/users/alojamientos', 'UserController@getAlojamientos');
@@ -143,6 +144,18 @@ $router->post('/sales/inquiry', 'SalesContactController@sendInquiry');
 
 $router->get('/comunicacion/noticias', 'ComunicacionNoticiaController@getList');
 $router->get('/comunicacion/noticias/:id', 'ComunicacionNoticiaController@getOne');
+$router->get('/comunicacion/portada-popup', 'PortadaPopupController@getConfig');
+$router->get('/comunicacion/poe', 'ComunicacionPoeController@listItems');
+$router->get('/comunicacion/poe/:id', 'ComunicacionPoeController@getOne');
+
+$router->get('/admin/comunicacion/portada-popup', 'AdminPortadaPopupController@getConfig');
+$router->post('/admin/comunicacion/portada-popup', 'AdminPortadaPopupController@save');
+
+$router->get('/admin/comunicacion/poe', 'AdminInstitucionPoeController@listItems');
+$router->get('/admin/comunicacion/poe/detail', 'AdminInstitucionPoeController@getOne');
+$router->post('/admin/comunicacion/poe', 'AdminInstitucionPoeController@create');
+$router->post('/admin/comunicacion/poe/update', 'AdminInstitucionPoeController@update');
+$router->post('/admin/comunicacion/poe/delete', 'AdminInstitucionPoeController@deleteItem');
 
 $router->get('/admin/comunicacion/noticias', 'AdminNoticiaController@list');
 $router->get('/admin/comunicacion/noticias/detail', 'AdminNoticiaController@getOne');
@@ -196,6 +209,7 @@ $router->get('/animals/filtros-meta', 'AnimalController@getFiltrosMeta');
 $router->get('/animals/form-data', 'AnimalController@getFormData'); 
 $router->get('/animals/last-notification', 'AnimalController@getLastNotification'); 
 $router->post('/animals/update-status', 'AnimalController@updateStatus'); 
+$router->post('/animals/update-anestesicos', 'AnimalController@updateAnestesicos');
 $router->post('/animals/save-notification', 'AnimalController@saveNotification');
 $router->post('/animals/update-full', 'AnimalController@updateFull'); 
 $router->get('/animals/protocol-species', 'AnimalController@getSpeciesByProtocol'); 
@@ -306,7 +320,6 @@ $router->post('/trazabilidad/update-caja-ubicacion', 'TrazabilidadController@upd
 $router->post('/trazabilidad/delete-box', 'TrazabilidadController@deleteBox');
 $router->post('/trazabilidad/delete-subject', 'TrazabilidadController@deleteSubject');
 
-$router->post('/trazabilidad/add-subject', 'TrazabilidadController@addSubject');
 $router->get('/trazabilidad/get-past-boxes', 'TrazabilidadController@getPastBoxes');
 $router->post('/trazabilidad/clone-past-boxes', 'TrazabilidadController@clonePastBoxes');
 $router->post('/alojamiento/update-price', 'AlojamientoController@updatePrice');
@@ -356,6 +369,7 @@ $router->post('/billing/update-alojamiento', 'BillingController@updateAlojamient
 $router->post('/billing/ajustar-pago-individual', 'BillingController@ajustarPagoIndividual');
 $router->post('/billing/ajustar-pago-aloj', 'BillingController@ajustarPagoAloj');
 $router->post('/billing/ajustar-pago-insumo', 'BillingController@ajustarPagoInsumo');
+$router->post('/billing/update-insumo-line-precio', 'BillingController@updateInsumoLinePrecio');
 
 // Generación de PDF
 $router->get('/billing/generate-pdf-ficha', 'BillingController@generatePdfFicha');
@@ -525,6 +539,7 @@ $router->get('/admin/config/alojamiento/ubicacion/bundle', 'AdminAlojamientoUbic
 $router->post('/admin/config/alojamiento/ubicacion/labels', 'AdminAlojamientoUbicacionController@saveLabels');
 $router->post('/admin/config/alojamiento/ubicacion/catalog/save', 'AdminAlojamientoUbicacionController@saveCatalog');
 $router->post('/admin/config/alojamiento/ubicacion/catalog/toggle', 'AdminAlojamientoUbicacionController@toggleCatalog');
+$router->post('/admin/config/alojamiento/ubicacion/catalog/delete', 'AdminAlojamientoUbicacionController@deleteCatalog');
 
 
 // ADMIN: RESERVAS Y ESPACIOS

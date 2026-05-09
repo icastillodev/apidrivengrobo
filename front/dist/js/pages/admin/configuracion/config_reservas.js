@@ -1,19 +1,74 @@
 import { API } from '../../../api.js';
 
-const DAYS = [
-    { id: 1, name: 'Lunes' }, { id: 2, name: 'Martes' }, { id: 3, name: 'Miércoles' },
-    { id: 4, name: 'Jueves' }, { id: 5, name: 'Viernes' }, { id: 6, name: 'Sábado' }, { id: 7, name: 'Domingo' }
-];
-
 let CACHED_SALAS = [];
 
-export function initConfigReservas() {
-    loadModoAprobacion();
-    loadSalas();
-    loadInstrumentos();
+function escCfg(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/'/g, '&#39;');
+}
+
+function tablaLoadingRow(colspan, fallbackMsg) {
+    const tf = window.txt?.config_reservas || {};
+    const msg = escCfg(fallbackMsg || tf.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
+    return `<tr><td colspan="${colspan}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+}
+
+function tablaMsgRow(colspan, text, variant = 'muted') {
+    const cls = variant === 'danger' ? 'text-danger small' : 'text-muted';
+    return `<tr><td colspan="${colspan}" class="text-center py-4 ${cls}">${escCfg(text || '—')}</td></tr>`;
+}
+
+function getScheduleDays() {
+    const tf = window.txt?.config_reservas || {};
+    return [
+        { id: 1, name: tf.dia_semana_1 || '—' },
+        { id: 2, name: tf.dia_semana_2 || '—' },
+        { id: 3, name: tf.dia_semana_3 || '—' },
+        { id: 4, name: tf.dia_semana_4 || '—' },
+        { id: 5, name: tf.dia_semana_5 || '—' },
+        { id: 6, name: tf.dia_semana_6 || '—' },
+        { id: 7, name: tf.dia_semana_7 || '—' }
+    ];
+}
+
+function bindInstTableDelegation() {
+    const tbody = document.getElementById('table-inst');
+    if (!tbody || tbody.dataset.delegBound === '1') return;
+    tbody.dataset.delegBound = '1';
+    tbody.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-edit-inst');
+        if (!btn) return;
+        window.openModalInst(
+            parseInt(btn.dataset.instId, 10),
+            btn.dataset.instNombre || '',
+            parseInt(btn.dataset.instCant || '1', 10),
+            btn.dataset.instDetalle || '',
+            parseInt(btn.dataset.instHab || '1', 10)
+        );
+    });
+}
+
+export async function initConfigReservas() {
+    await loadModoAprobacion();
+    await Promise.all([loadSalas({ boot: true }), loadInstrumentos({ boot: true })]);
 
     document.getElementById('form-sala').onsubmit = saveSala;
     document.getElementById('form-inst').onsubmit = saveInst;
+
+    bindInstTableDelegation();
 
     const btnSaveAprob = document.getElementById('btn-save-aprob');
     if (btnSaveAprob) btnSaveAprob.onclick = () => saveModoAprobacion();
@@ -61,36 +116,58 @@ async function saveModoAprobacion() {
 // SECCIÓN SALAS
 // ==========================================
 
-async function loadSalas() {
+async function loadSalas({ boot = false } = {}) {
+    const tf = window.txt?.config_reservas || {};
+    const colspan = 5;
     const instId = localStorage.getItem('instId');
-    const res = await API.request(`/admin/config/reservas/sala/all?inst=${instId}&t=${Date.now()}`);
     const tbody = document.getElementById('table-salas');
-    tbody.innerHTML = '';
+    if (!tbody) return;
 
-    if (res.status === 'success' && res.data.length > 0) {
-        CACHED_SALAS = Array.isArray(res.data) ? res.data : [];
-        res.data.forEach(s => {
+    if (!boot) tbody.innerHTML = tablaLoadingRow(colspan, tf.tabla_cargando_salas);
+
+    try {
+        const res = await API.request(`/admin/config/reservas/sala/all?inst=${instId}&t=${Date.now()}`);
+        tbody.innerHTML = '';
+
+        const ok = res?.status === 'success';
+        const rows = ok && Array.isArray(res.data) ? res.data : null;
+
+        if (!ok || rows === null) {
+            CACHED_SALAS = [];
+            tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_error_salas, 'danger');
+            return;
+        }
+
+        if (rows.length === 0) {
+            CACHED_SALAS = [];
+            tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_sin_salas);
+            return;
+        }
+
+        CACHED_SALAS = rows;
+        rows.forEach(s => {
             const isOff = (s.habilitado == 0);
-            let tipoTxt = 'Personalizado';
-            if(s.tipohorasalas == 1) tipoTxt = 'Bloque 1 Hora';
-            if(s.tipohorasalas == 2) tipoTxt = 'Bloque 30 Min';
+            let tipoTxt = tf.tipo_bloque_custom || 'Custom';
+            if (s.tipohorasalas == 1) tipoTxt = tf.tipo_bloque_1h || tipoTxt;
+            if (s.tipohorasalas == 2) tipoTxt = tf.tipo_bloque_30m || tipoTxt;
+            const estadoTxt = isOff ? (tf.estado_off || 'OFF') : (tf.estado_on || 'ON');
 
             tbody.innerHTML += `
                 <tr class="${isOff ? 'text-muted bg-light' : ''}">
-                    <td class="fw-bold text-dark">${s.Nombre}</td>
-                    <td class="small">${s.Lugar || '-'}</td>
-                    <td class="text-center small"><span class="badge bg-light text-dark border">${tipoTxt}</span></td>
+                    <td class="fw-bold text-dark">${escCfg(s.Nombre)}</td>
+                    <td class="small">${escCfg(s.Lugar || '-')}</td>
+                    <td class="text-center small"><span class="badge bg-light text-dark border">${escCfg(tipoTxt)}</span></td>
                     <td class="text-center">
                         <span class="badge ${isOff ? 'bg-secondary' : 'bg-success'} rounded-pill" style="width: 80px;">
-                            ${isOff ? 'OFF' : 'ON'}
+                            ${escCfg(estadoTxt)}
                         </span>
                     </td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-light border ms-1" 
+                        <button type="button" class="btn btn-sm btn-light border ms-1"
                             onclick="window.loadSalaDetail(${s.IdSalaReserva})">
                             <i class="bi bi-pencil-fill text-primary"></i>
                         </button>
-                        <button class="btn btn-sm btn-link text-danger border-0" 
+                        <button type="button" class="btn btn-sm btn-link text-danger border-0"
                             onclick="window.toggleSala(${s.IdSalaReserva}, ${s.habilitado})">
                             <i class="bi ${isOff ? 'bi-toggle-off' : 'bi-toggle-on'} fs-5"></i>
                         </button>
@@ -98,9 +175,10 @@ async function loadSalas() {
                 </tr>
             `;
         });
-    } else {
+    } catch (e) {
+        console.error(e);
         CACHED_SALAS = [];
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No hay salas configuradas.</td></tr>';
+        tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_error_salas, 'danger');
     }
 }
 
@@ -142,7 +220,7 @@ function renderScheduleInputs(existingHours = []) {
     const tbody = document.getElementById('schedule-body');
     tbody.innerHTML = '';
 
-    DAYS.forEach(day => {
+    getScheduleDays().forEach(day => {
         // Buscar si existe horario para este día
         const h = existingHours.find(x => x.IdDiaSala == day.id);
         const isActive = !!h;
@@ -151,7 +229,7 @@ function renderScheduleInputs(existingHours = []) {
 
         tbody.innerHTML += `
             <tr>
-                <td class="align-middle fw-bold small text-muted">${day.name}</td>
+                <td class="align-middle fw-bold small text-muted">${escCfg(day.name)}</td>
                 <td><input type="time" class="form-control form-control-sm inp-ini" data-day="${day.id}" value="${ini}" ${!isActive ? 'disabled' : ''}></td>
                 <td><input type="time" class="form-control form-control-sm inp-fin" data-day="${day.id}" value="${fin}" ${!isActive ? 'disabled' : ''}></td>
                 <td class="text-center align-middle">
@@ -190,29 +268,35 @@ async function saveSala(e) {
     });
     fd.append('horarios', JSON.stringify(schedule));
 
+    const tf = window.txt?.config_reservas || {};
     try {
         const res = await API.request('/admin/config/reservas/sala/save', 'POST', fd);
         if(res.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('modal-sala')).hide();
             loadSalas();
-            Swal.fire('Guardado', 'Sala y horarios actualizados', 'success');
+            Swal.fire(tf.swal_ok || 'OK', tf.msg_sala_saved || '', 'success');
+            return;
         }
-    } catch(err) { Swal.fire('Error', 'No se pudo guardar', 'error'); }
+        Swal.fire(tf.swal_error || 'Error', res?.message || tf.msg_no_guardar || '', 'error');
+    } catch(err) {
+        Swal.fire(tf.swal_error || 'Error', tf.msg_no_guardar || '', 'error');
+    }
 }
 
 // CAMBIO MASIVO DE TIPO DE HORA
 window.updateGlobalTimeType = async (type) => {
+    const tf = window.txt?.config_reservas || {};
     const instId = localStorage.getItem('instId');
-    const text = type == 1 ? '1 Hora' : '30 Minutos';
-    
+    const bodyText = type == 1 ? (tf.swal_masiva_body_1h || '') : (tf.swal_masiva_body_30m || '');
+
     if((await Swal.fire({
-        title: '¿Configuración Masiva?', 
-        text: `Se cambiarán TODAS las salas a bloques de ${text}.`, 
+        title: tf.swal_masiva_title || '',
+        text: bodyText,
         icon: 'warning', showCancelButton:true
     })).isConfirmed) {
         await API.request('/admin/config/reservas/sala/global-type', 'POST', { instId, type });
         loadSalas();
-        Swal.fire('Procesado', 'Configuración aplicada.', 'success');
+        Swal.fire(tf.swal_procesado_ok || '', tf.swal_procesado_body || '', 'success');
     }
 };
 
@@ -225,38 +309,69 @@ window.toggleSala = async (id, status) => {
 // SECCIÓN INSTRUMENTOS
 // ==========================================
 
-async function loadInstrumentos() {
+async function loadInstrumentos({ boot = false } = {}) {
+    const tf = window.txt?.config_reservas || {};
+    const colspan = 5;
     const instId = localStorage.getItem('instId');
-    const res = await API.request(`/admin/config/reservas/inst/all?inst=${instId}&t=${Date.now()}`);
     const tbody = document.getElementById('table-inst');
-    tbody.innerHTML = '';
+    if (!tbody) return;
 
-    if (res.status === 'success' && res.data.length > 0) {
-        res.data.forEach(i => {
+    if (!boot) tbody.innerHTML = tablaLoadingRow(colspan, tf.tabla_cargando_instrumentos);
+
+    try {
+        const res = await API.request(`/admin/config/reservas/inst/all?inst=${instId}&t=${Date.now()}`);
+        tbody.innerHTML = '';
+
+        const ok = res?.status === 'success';
+        const rows = ok && Array.isArray(res.data) ? res.data : null;
+
+        if (!ok || rows === null) {
+            tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_error_instrumentos, 'danger');
+            return;
+        }
+
+        if (rows.length === 0) {
+            tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_sin_instrumentos);
+            return;
+        }
+
+        rows.forEach(i => {
             const isOff = (i.habilitado == 0);
+            const estadoTxt = isOff ? (tf.estado_off || 'OFF') : (tf.estado_on || 'ON');
+            const idInst = parseInt(i.IdReservaInstrumento, 10);
+            const nomEsc = escAttr(i.NombreInstrumento || '');
+            const detEsc = escAttr(i.detalleInstrumento || '');
+
             tbody.innerHTML += `
                 <tr class="${isOff ? 'text-muted bg-light' : ''}">
-                    <td class="fw-bold">${i.NombreInstrumento}</td>
-                    <td class="fw-bold">${i.cantidad}</td>
-                    <td class="small text-muted">${i.detalleInstrumento || '-'}</td>
+                    <td class="fw-bold">${escCfg(i.NombreInstrumento)}</td>
+                    <td class="fw-bold">${escCfg(String(i.cantidad ?? ''))}</td>
+                    <td class="small text-muted">${escCfg(i.detalleInstrumento || '-')}</td>
                     <td class="text-center">
                         <span class="badge ${isOff ? 'bg-secondary' : 'bg-primary'} rounded-pill">
-                            ${isOff ? 'OFF' : 'ON'}
+                            ${escCfg(estadoTxt)}
                         </span>
                     </td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-light border ms-1" onclick="window.openModalInst(${i.IdReservaInstrumento}, '${i.NombreInstrumento}', ${i.cantidad}, '${i.detalleInstrumento || ''}', ${i.habilitado})">
+                        <button type="button" class="btn btn-sm btn-light border ms-1 btn-edit-inst"
+                            data-inst-id="${idInst}"
+                            data-inst-nombre="${nomEsc}"
+                            data-inst-cant="${escAttr(String(i.cantidad ?? 1))}"
+                            data-inst-detalle="${detEsc}"
+                            data-inst-hab="${escAttr(String(i.habilitado ?? 1))}">
                             <i class="bi bi-pencil-fill text-secondary"></i>
                         </button>
-                        <button class="btn btn-sm btn-link text-danger border-0" onclick="window.toggleInst(${i.IdReservaInstrumento}, ${i.habilitado})">
+                        <button type="button" class="btn btn-sm btn-link text-danger border-0"
+                            onclick="window.toggleInst(${i.IdReservaInstrumento}, ${i.habilitado})">
                             <i class="bi ${isOff ? 'bi-toggle-off' : 'bi-toggle-on'} fs-5"></i>
                         </button>
                     </td>
                 </tr>
             `;
         });
-    } else {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No hay instrumentos registrados.</td></tr>';
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = tablaMsgRow(colspan, tf.tabla_error_instrumentos, 'danger');
     }
 }
 
@@ -359,11 +474,11 @@ function renderInstSalasPermitidasUI(selectedSalaIds = []) {
             const id = parseInt(s.IdSalaReserva, 10);
             if (!Number.isFinite(id)) return;
             const checked = selectedSalaIds.includes(id);
-            const label = `${s.Nombre}${s.Lugar ? ` (${s.Lugar})` : ''}`;
+            const labelRaw = `${s.Nombre}${s.Lugar ? ` (${s.Lugar})` : ''}`;
             cont.insertAdjacentHTML('beforeend', `
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" data-sala-id="${id}" id="inst-sala-${id}" ${checked ? 'checked' : ''}>
-                    <label class="form-check-label" for="inst-sala-${id}">${label}</label>
+                    <label class="form-check-label" for="inst-sala-${id}">${escCfg(labelRaw)}</label>
                 </div>
             `);
         });

@@ -2,9 +2,16 @@
  * Configuración: ubicación física de cajas (catálogos por institución + etiquetas UI).
  */
 import { API } from '../../../api.js';
-import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 
 let state = { bundle: null };
+
+/** Filas de carga/error alineadas con `<thead>` de cada tabla en `alojamientos-ubicacion.html`. */
+const UBIC_TBODY_META = [
+    { id: 'tbody-uf', colspan: 3 },
+    { id: 'tbody-salon', colspan: 4 },
+    { id: 'tbody-rack', colspan: 4 },
+    { id: 'tbody-lugar', colspan: 4 }
+];
 
 function t(k, fb) {
     const o = window.txt?.config_aloj_ubicacion || {};
@@ -13,26 +20,95 @@ function t(k, fb) {
 
 export async function initConfigAlojamientoUbicacion() {
     document.getElementById('btn-save-labels')?.addEventListener('click', saveLabels);
-    document.getElementById('btn-reload')?.addEventListener('click', () => loadAll(true));
-    await loadAll(true);
+    document.getElementById('btn-reload')?.addEventListener('click', () => loadAll('inline'));
+    const finp = document.getElementById('inp-filter-ubic');
+    if (finp) {
+        finp.placeholder = t('filter_catalog_ph', finp.placeholder || '');
+        finp.addEventListener('input', () => renderTables());
+    }
+    // La página (`alojamientos-ubicacion.html`) ya muestra el loader global; `boot` no llama showLoader aquí.
+    await loadAll('boot');
 }
 
-async function loadAll(showLoading) {
-    if (showLoading) showLoader();
+async function fetchUbicBundleAndApply() {
+    const res = await API.request('/admin/config/alojamiento/ubicacion/bundle');
+    if (res.status !== 'success' || !res.data) {
+        throw new Error(res.message || 'Error al cargar');
+    }
+    state.bundle = res.data;
+    renderLabels(res.data.labels || {});
+    renderTables();
+}
+
+/**
+ * Spinners en tablas + deshabilita recarga/guardar etiquetas; ejecuta `work()` y luego refresca el bundle.
+ * Errores: restaura filas desde `state.bundle` si existe; el llamador puede mostrar Swal.
+ */
+async function withUbicTablesInlineBusy(work) {
+    const btnReload = document.getElementById('btn-reload');
+    const btnSave = document.getElementById('btn-save-labels');
+    setUbicTablesLoadingRows();
+    if (btnReload) btnReload.disabled = true;
+    if (btnSave) btnSave.disabled = true;
     try {
-        const res = await API.request('/admin/config/alojamiento/ubicacion/bundle');
-        if (res.status !== 'success' || !res.data) {
-            throw new Error(res.message || 'Error al cargar');
-        }
-        state.bundle = res.data;
-        renderLabels(res.data.labels || {});
-        renderTables();
+        await work();
+        await fetchUbicBundleAndApply();
+    } catch (e) {
+        console.error(e);
+        if (state.bundle) renderTables();
+        else setUbicTablesErrorRows(t('error_recarga_catalogo', 'No se pudo cargar el catálogo.'));
+        throw e;
+    } finally {
+        if (btnReload) btnReload.disabled = false;
+        if (btnSave) btnSave.disabled = false;
+    }
+}
+
+/**
+ * @param {'boot'|'inline'|'none'} loadingMode
+ * - `boot`: primera carga; el HTML ya muestra loader global (no overlay aquí).
+ * - `inline`: recarga manual → spinners en los cuatro `<tbody>` (sin overlay de página).
+ * - `none`: solo refresca bundle (uso interno legado; preferir `withUbicTablesInlineBusy`).
+ */
+async function loadAll(loadingMode = 'none') {
+    const inline = loadingMode === 'inline';
+    const btnReload = document.getElementById('btn-reload');
+    if (inline) {
+        setUbicTablesLoadingRows();
+        if (btnReload) btnReload.disabled = true;
+    }
+    try {
+        await fetchUbicBundleAndApply();
     } catch (e) {
         console.error(e);
         Swal.fire(t('swal_error', 'Error'), String(e.message || e), 'error');
+        if (inline) {
+            if (state.bundle) renderTables();
+            else setUbicTablesErrorRows(t('error_recarga_catalogo', 'No se pudo cargar el catálogo.'));
+        }
     } finally {
-        if (showLoading) hideLoader();
+        if (inline && btnReload) btnReload.disabled = false;
     }
+}
+
+function setUbicTablesLoadingRows() {
+    const msg = escapeHtml(t('tabla_cargando', window.txt?.generales?.msg_cargando || '…'));
+    const rowHtml = (colspan) =>
+        `<tr><td colspan="${colspan}" class="text-center py-4">` +
+        `<div class="spinner-border spinner-border-sm text-primary" role="status"></div>` +
+        `<div class="small text-muted mt-2">${msg}</div></td></tr>`;
+    UBIC_TBODY_META.forEach(({ id, colspan }) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = rowHtml(colspan);
+    });
+}
+
+function setUbicTablesErrorRows(text) {
+    const cell = escapeHtml(text);
+    UBIC_TBODY_META.forEach(({ id, colspan }) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-danger small py-3">${cell}</td></tr>`;
+    });
 }
 
 function renderLabels(lbl) {
@@ -52,44 +128,117 @@ async function saveLabels() {
         LabelLugarRack: document.getElementById('inp-lbl-lugar')?.value || '',
         LabelComentarioUbicacion: document.getElementById('inp-lbl-com')?.value || ''
     };
-    showLoader();
     try {
-        const res = await API.request('/admin/config/alojamiento/ubicacion/labels', 'POST', payload);
-        if (res.status !== 'success') throw new Error(res.message || 'Error');
-        Swal.fire(t('swal_ok', 'Listo'), t('msg_labels_saved', 'Etiquetas guardadas.'), 'success');
-        await loadAll(false);
+        await withUbicTablesInlineBusy(async () => {
+            const res = await API.request('/admin/config/alojamiento/ubicacion/labels', 'POST', payload);
+            if (res.status !== 'success') throw new Error(res.message || 'Error');
+            Swal.fire(t('swal_ok', 'Listo'), t('msg_labels_saved', 'Etiquetas guardadas.'), 'success');
+        });
     } catch (e) {
         Swal.fire(t('swal_error', 'Error'), String(e.message || e), 'error');
-    } finally {
-        hideLoader();
     }
+}
+
+function catalogFilterQuery() {
+    return (document.getElementById('inp-filter-ubic')?.value || '').trim().toLowerCase();
+}
+
+function rowMatchesFilter(tipo, row) {
+    const q = catalogFilterQuery();
+    if (!q) return true;
+    const hay = (s) => String(s ?? '').toLowerCase().includes(q);
+    if (tipo === 'uf') return hay(row.Nombre);
+    if (tipo === 'salon') {
+        return hay(row.Nombre) || hay(nombreUfPlain(row.IdUbicacionFisica));
+    }
+    if (tipo === 'rack') {
+        return hay(row.Nombre) || hay(nombreSalonPlain(row.IdSalon));
+    }
+    if (tipo === 'lugar') {
+        const rack = (state.bundle?.racks || []).find(x => String(x.IdRack) === String(row.IdRack));
+        return hay(row.Nombre) || hay(row.NombreRack) || hay(nombreSalonPlain(rack?.IdSalon));
+    }
+    return true;
+}
+
+function nombreUfPlain(id) {
+    if (!id) return '';
+    const r = (state.bundle?.ubicacionesFisicas || []).find(x => String(x.IdUbicacionFisica) === String(id));
+    return r ? String(r.Nombre) : '';
+}
+
+function nombreSalonPlain(id) {
+    if (!id) return '';
+    const r = (state.bundle?.salones || []).find(x => String(x.IdSalon) === String(id));
+    return r ? String(r.Nombre) : '';
+}
+
+function sortedRacks(rows) {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+        const sa = nombreSalonPlain(a.IdSalon).toLowerCase();
+        const sb = nombreSalonPlain(b.IdSalon).toLowerCase();
+        if (sa !== sb) return sa.localeCompare(sb);
+        const oa = Number(a.Orden) || 0;
+        const ob = Number(b.Orden) || 0;
+        if (oa !== ob) return oa - ob;
+        return String(a.Nombre || '').localeCompare(String(b.Nombre || ''), undefined, { sensitivity: 'base' });
+    });
+    return copy;
+}
+
+function sortedLugares(rows) {
+    const racks = state.bundle?.racks || [];
+    const salonOfRack = (idRack) => {
+        const rack = racks.find(x => String(x.IdRack) === String(idRack));
+        return nombreSalonPlain(rack?.IdSalon).toLowerCase();
+    };
+    const copy = [...rows];
+    copy.sort((a, b) => {
+        const sa = salonOfRack(a.IdRack);
+        const sb = salonOfRack(b.IdRack);
+        if (sa !== sb) return sa.localeCompare(sb);
+        const ra = String(a.NombreRack || '').toLowerCase();
+        const rb = String(b.NombreRack || '').toLowerCase();
+        if (ra !== rb) return ra.localeCompare(rb);
+        const oa = Number(a.Orden) || 0;
+        const ob = Number(b.Orden) || 0;
+        if (oa !== ob) return oa - ob;
+        return String(a.Nombre || '').localeCompare(String(b.Nombre || ''), undefined, { sensitivity: 'base' });
+    });
+    return copy;
 }
 
 function renderTables() {
     const b = state.bundle;
     if (!b) return;
 
-    renderTableBody('tbody-uf', b.ubicacionesFisicas || [], 'uf', [
+    const ufs = (b.ubicacionesFisicas || []).filter(r => rowMatchesFilter('uf', r));
+    const salones = (b.salones || []).filter(r => rowMatchesFilter('salon', r));
+    const racks = sortedRacks(b.racks || []).filter(r => rowMatchesFilter('rack', r));
+    const lugares = sortedLugares(b.lugaresRack || []).filter(r => rowMatchesFilter('lugar', r));
+
+    renderTableBody('tbody-uf', ufs, 'uf', [
         r => escapeHtml(r.Nombre),
         r => badgeActivo(r.Activo),
         r => accionesRow('uf', r)
     ]);
 
-    renderTableBody('tbody-salon', b.salones || [], 'salon', [
+    renderTableBody('tbody-salon', salones, 'salon', [
         r => escapeHtml(r.Nombre),
         r => nombreUf(r.IdUbicacionFisica),
         r => badgeActivo(r.Activo),
         r => accionesRow('salon', r)
     ]);
 
-    renderTableBody('tbody-rack', b.racks || [], 'rack', [
+    renderTableBody('tbody-rack', racks, 'rack', [
         r => escapeHtml(r.Nombre),
         r => nombreSalon(r.IdSalon),
         r => badgeActivo(r.Activo),
         r => accionesRow('rack', r)
     ]);
 
-    renderTableBody('tbody-lugar', b.lugaresRack || [], 'lugar', [
+    renderTableBody('tbody-lugar', lugares, 'lugar', [
         r => escapeHtml(r.Nombre),
         r => escapeHtml(r.NombreRack || '-'),
         r => badgeActivo(r.Activo),
@@ -99,13 +248,13 @@ function renderTables() {
 
 function nombreUf(id) {
     if (!id) return '—';
-    const r = (state.bundle.ubicacionesFisicas || []).find(x => String(x.IdUbicacionFisica) === String(id));
+    const r = (state.bundle?.ubicacionesFisicas || []).find(x => String(x.IdUbicacionFisica) === String(id));
     return r ? escapeHtml(r.Nombre) : `#${id}`;
 }
 
 function nombreSalon(id) {
     if (!id) return '—';
-    const r = (state.bundle.salones || []).find(x => String(x.IdSalon) === String(id));
+    const r = (state.bundle?.salones || []).find(x => String(x.IdSalon) === String(id));
     return r ? escapeHtml(r.Nombre) : `#${id}`;
 }
 
@@ -121,9 +270,13 @@ function accionesRow(tipo, row) {
         : tipo === 'salon' ? row.IdSalon
         : tipo === 'rack' ? row.IdRack
         : row.IdLugarRack;
+    const idNum = Number(id);
+    const delBtn = idNum > 0
+        ? `<button type="button" class="btn btn-sm btn-outline-danger ms-1" onclick="window._deleteUbicCat('${tipo}',${idNum})">${escapeHtml(t('btn_delete', 'Eliminar'))}</button>`
+        : '';
     return `
         <button type="button" class="btn btn-sm btn-outline-primary me-1">${t('btn_edit', 'Editar')}</button>
-        <button type="button" class="btn btn-sm btn-outline-warning" onclick="window._toggleUbicCat('${tipo}',${id},${Number(row.Activo) === 1 ? 0 : 1})">${Number(row.Activo) === 1 ? t('btn_deactivate', 'Desactivar') : t('btn_activate', 'Activar')}</button>`;
+        <button type="button" class="btn btn-sm btn-outline-warning" onclick="window._toggleUbicCat('${tipo}',${idNum},${Number(row.Activo) === 1 ? 0 : 1})">${Number(row.Activo) === 1 ? t('btn_deactivate', 'Desactivar') : t('btn_activate', 'Activar')}</button>${delBtn}`;
 }
 
 function renderTableBody(tbodyId, rows, tipo, colFns) {
@@ -152,15 +305,48 @@ function escapeHtml(s) {
 }
 
 window._toggleUbicCat = async function (tipo, id, activo) {
-    showLoader();
     try {
-        const res = await API.request('/admin/config/alojamiento/ubicacion/catalog/toggle', 'POST', { tipo, id, activo });
-        if (res.status !== 'success') throw new Error(res.message || 'Error');
-        await loadAll(false);
+        await withUbicTablesInlineBusy(async () => {
+            const res = await API.request('/admin/config/alojamiento/ubicacion/catalog/toggle', 'POST', { tipo, id, activo });
+            if (res.status !== 'success') throw new Error(res.message || 'Error');
+        });
     } catch (e) {
         Swal.fire(t('swal_error', 'Error'), String(e.message || e), 'error');
-    } finally {
-        hideLoader();
+    }
+};
+
+function rowNombreForDelete(tipo, id) {
+    const b = state.bundle;
+    if (!b) return '';
+    if (tipo === 'uf') return (b.ubicacionesFisicas || []).find(r => Number(r.IdUbicacionFisica) === id)?.Nombre || '';
+    if (tipo === 'salon') return (b.salones || []).find(r => Number(r.IdSalon) === id)?.Nombre || '';
+    if (tipo === 'rack') return (b.racks || []).find(r => Number(r.IdRack) === id)?.Nombre || '';
+    return (b.lugaresRack || []).find(r => Number(r.IdLugarRack) === id)?.Nombre || '';
+}
+
+window._deleteUbicCat = async function (tipo, id) {
+    const idNum = Number(id);
+    if (!idNum || idNum <= 0) return;
+    const nom = rowNombreForDelete(tipo, idNum);
+    const extra = tipo === 'rack' ? `<p class="small text-muted mb-0">${escapeHtml(t('delete_warn_rack', ''))}</p>` : '';
+    const r = await Swal.fire({
+        icon: 'warning',
+        title: t('delete_confirm_title', '¿Eliminar?'),
+        html: `<p>${escapeHtml(t('delete_confirm_text', 'Se eliminará del catálogo.'))}</p><p class="fw-bold">${escapeHtml(nom || `#${idNum}`)}</p>${extra}`,
+        showCancelButton: true,
+        confirmButtonText: t('delete_confirm_btn', 'Eliminar'),
+        cancelButtonText: t('delete_cancel_btn', 'Cancelar'),
+        confirmButtonColor: '#dc3545'
+    });
+    if (!r.isConfirmed) return;
+    try {
+        await withUbicTablesInlineBusy(async () => {
+            const res = await API.request('/admin/config/alojamiento/ubicacion/catalog/delete', 'POST', { tipo, id: idNum });
+            if (res.status !== 'success') throw new Error(res.message || 'Error');
+            Swal.fire(t('swal_ok', 'Listo'), t('msg_cat_deleted', 'Eliminado.'), 'success');
+        });
+    } catch (e) {
+        Swal.fire(t('swal_error', 'Error'), String(e.message || e), 'error');
     }
 };
 
@@ -271,16 +457,14 @@ function buildFieldsNombreActivo(nombre, activo) {
 }
 
 async function saveCatalog(payload) {
-    showLoader();
     try {
-        const res = await API.request('/admin/config/alojamiento/ubicacion/catalog/save', 'POST', payload);
-        if (res.status !== 'success') throw new Error(res.message || 'Error');
-        Swal.fire(t('swal_ok', 'Listo'), t('msg_cat_saved', 'Guardado.'), 'success');
-        await loadAll(false);
+        await withUbicTablesInlineBusy(async () => {
+            const res = await API.request('/admin/config/alojamiento/ubicacion/catalog/save', 'POST', payload);
+            if (res.status !== 'success') throw new Error(res.message || 'Error');
+            Swal.fire(t('swal_ok', 'Listo'), t('msg_cat_saved', 'Guardado.'), 'success');
+        });
     } catch (e) {
         Swal.fire(t('swal_error', 'Error'), String(e.message || e), 'error');
-    } finally {
-        hideLoader();
     }
 }
 

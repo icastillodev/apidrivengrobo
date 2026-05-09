@@ -207,20 +207,28 @@ class ProtocolController {
             $isExterno = isset($data['protocoloexpe']) ? 1 : 0;
             $deptoValue = ($isExterno == 1) ? ($data['departamento_manual'] ?? '') : ($data['departamento'] ?? '');
 
-            // Cirugía (opcional): si existe columna en protocoloexpe.
+            // Cirugía / Permite anestésicos (opcional): columnas en protocoloexpe si existen.
             $cirugiaRaw = $data['protocolo_cirugia'] ?? null;
             $cirugiaVal = ($cirugiaRaw === '1' || $cirugiaRaw === 1 || $cirugiaRaw === true || $cirugiaRaw === 'on') ? 1 : 0;
+            $permiteAnestRaw = $data['protocolo_permite_anestesicos'] ?? null;
+            $permiteAnestVal = ($permiteAnestRaw === '1' || $permiteAnestRaw === 1 || $permiteAnestRaw === true || $permiteAnestRaw === 'on') ? 1 : 0;
             $cirugiaCol = null;
+            $permiteAnestCol = null;
             try {
                 $cols = $this->db->query("SHOW COLUMNS FROM `protocoloexpe`")->fetchAll(\PDO::FETCH_ASSOC) ?: [];
                 foreach ($cols as $c) {
                     $f = (string)($c['Field'] ?? '');
-                    if (preg_match('/^(con_?cirugia|cirugia)$/i', $f)) {
+                    if ($cirugiaCol === null && preg_match('/^(con_?cirugia|cirugia)$/i', $f)) {
                         $cirugiaCol = $f;
-                        break;
+                    }
+                    if ($permiteAnestCol === null && preg_match('/^permite_?anestesicos$/i', $f)) {
+                        $permiteAnestCol = $f;
                     }
                 }
-            } catch (\Throwable $e) { $cirugiaCol = null; }
+            } catch (\Throwable $e) {
+                $cirugiaCol = null;
+                $permiteAnestCol = null;
+            }
 
             // Normalización y validación de fechas según esquema (DATE NULL) y reglas de negocio
             $rawIni = isset($data['FechaIniProtA']) ? trim($data['FechaIniProtA']) : '';
@@ -246,24 +254,31 @@ class ProtocolController {
 
             if ($id) {
                 // UPDATE
+                $endSet = 'protocoloexpe = ?';
+                if ($cirugiaCol) {
+                    $endSet .= ", `{$cirugiaCol}` = ?";
+                }
+                if ($permiteAnestCol) {
+                    $endSet .= ", `{$permiteAnestCol}` = ?";
+                }
                 $sql = "UPDATE protocoloexpe SET 
                             tituloA = ?, nprotA = ?, InvestigadorACargA = ?, encargaprot = ?, 
                             CantidadAniA = ?, FechaIniProtA = ?, FechaFinProtA = ?, 
                             departamento = ?, tipoprotocolo = ?, severidad = ?, 
-                            IdUsrA = ?, protocoloexpe = ?
+                            IdUsrA = ?, {$endSet}
                         WHERE idprotA = ?";
-                if ($cirugiaCol) {
-                    $sql = str_replace('protocoloexpe = ?', "protocoloexpe = ?, `{$cirugiaCol}` = ?", $sql);
-                }
                 $stmt = $this->db->prepare($sql);
                 $params = [
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
-                    $data['CantidadAniA'], $fechaIni, $fechaFin, 
-                    $deptoValue, $data['tipoprotocolo'], $data['severidad'], 
+                    $data['CantidadAniA'], $fechaIni, $fechaFin,
+                    $deptoValue, $data['tipoprotocolo'], $data['severidad'],
                     $data['IdUsrA'], $isExterno
                 ];
                 if ($cirugiaCol) {
                     $params[] = $cirugiaVal;
+                }
+                if ($permiteAnestCol) {
+                    $params[] = $permiteAnestVal;
                 }
                 $params[] = $id;
                 $stmt->execute($params);
@@ -271,15 +286,13 @@ class ProtocolController {
                 Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId");
             } else {
                 // INSERT
-                $colsIns = "tituloA, nprotA, InvestigadorACargA, encargaprot, 
-                            CantidadAniA, FechaIniProtA, FechaFinProtA, departamento, 
-                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe" . ($cirugiaCol ? ", `{$cirugiaCol}`" : "");
-                $ph = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($cirugiaCol ? ", ?" : "");
+                $extraCols = ($cirugiaCol ? ", `{$cirugiaCol}`" : '') . ($permiteAnestCol ? ", `{$permiteAnestCol}`" : '');
+                $extraPh = ($cirugiaCol ? ', ?' : '') . ($permiteAnestCol ? ', ?' : '');
                 $sql = "INSERT INTO protocoloexpe (
                             tituloA, nprotA, InvestigadorACargA, encargaprot, 
                             CantidadAniA, FechaIniProtA, FechaFinProtA, departamento, 
-                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe" . ($cirugiaCol ? ", `{$cirugiaCol}`" : "") . "
-                        ) VALUES (" . $ph . ")";
+                            tipoprotocolo, severidad, IdUsrA, IdInstitucion, protocoloexpe{$extraCols}
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?{$extraPh})";
                 $stmt = $this->db->prepare($sql);
                 $params = [
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
@@ -288,6 +301,9 @@ class ProtocolController {
                 ];
                 if ($cirugiaCol) {
                     $params[] = $cirugiaVal;
+                }
+                if ($permiteAnestCol) {
+                    $params[] = $permiteAnestVal;
                 }
                 $stmt->execute($params);
                 $currentId = $this->db->lastInsertId();

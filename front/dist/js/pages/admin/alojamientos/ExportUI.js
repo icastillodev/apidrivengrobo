@@ -15,6 +15,69 @@ function formatCajaUbicacionTxt(caja) {
     return parts.filter(Boolean).join(' · ');
 }
 
+function escapePdfHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/** Ordena filas de valores_inicio según categorias_inicio (IdDatosUnidadAloj), resto alfabético. */
+function valoresInicioOrdered(valoresInicioObj, categoriasInicio) {
+    const rows = Object.values(valoresInicioObj || {});
+    if (!rows.length) return [];
+    const idOrder = (categoriasInicio || []).map((c) => Number(c.IdDatosUnidadAloj));
+    const orderMap = new Map(idOrder.map((id, i) => [id, i]));
+    return rows.sort((a, b) => {
+        const ia = orderMap.has(Number(a.IdDatosUnidadAloj)) ? orderMap.get(Number(a.IdDatosUnidadAloj)) : 9999;
+        const ib = orderMap.has(Number(b.IdDatosUnidadAloj)) ? orderMap.get(Number(b.IdDatosUnidadAloj)) : 9999;
+        if (ia !== ib) return ia - ib;
+        return String(a.NombreCatAlojUnidad || '').localeCompare(String(b.NombreCatAlojUnidad || ''), undefined, { sensitivity: 'base' });
+    });
+}
+
+function pickValorInicio(valoresInicioObj, idDatos) {
+    if (!valoresInicioObj || idDatos === undefined || idDatos === null || Number.isNaN(Number(idDatos))) {
+        return null;
+    }
+    const id = Number(idDatos);
+    return valoresInicioObj[id] ?? valoresInicioObj[String(id)] ?? null;
+}
+
+function formatInicioCellVal(vi) {
+    if (!vi) return '---';
+    const v = vi.Valor;
+    if (v === null || v === undefined || String(v).trim() === '') return '---';
+    return v;
+}
+
+/** Columnas planas para Excel: prefijo i18n + nombre de categoría (coherente con orden de configuración). */
+function excelInicioColumnsForUnidad(u, categoriasInicio, t) {
+    const prefix = t.export_excel_inicio_prefix || 'Inicio';
+    const cells = {};
+    const seenIds = new Set();
+    (categoriasInicio || []).forEach((cat) => {
+        const id = Number(cat.IdDatosUnidadAloj);
+        if (Number.isNaN(id)) return;
+        seenIds.add(id);
+        const vi = pickValorInicio(u.valores_inicio, id);
+        cells[`${prefix}: ${cat.NombreCatAlojUnidad}`] = formatInicioCellVal(vi);
+    });
+    valoresInicioOrdered(u.valores_inicio, []).forEach((r) => {
+        const id = Number(r.IdDatosUnidadAloj);
+        if (seenIds.has(id)) return;
+        seenIds.add(id);
+        cells[`${prefix}: ${r.NombreCatAlojUnidad}`] = formatInicioCellVal(r);
+    });
+    return cells;
+}
+
+function unidadTieneValoresInicio(u) {
+    return Object.keys(u.valores_inicio || {}).length > 0;
+}
+
 export const ExportUI = {
     init() {
         window.exportarFichaPDF = this.downloadAlojamientoPDF.bind(this);
@@ -106,55 +169,91 @@ export const ExportUI = {
                     
                     if (res.status === 'success' && res.data && res.data.cajas && res.data.cajas.length > 0) {
                         const catsExport = res.data.categorias_datos || res.data.categorias || [];
-                        let hasObsInTramo = false;
+                        const catsInicio = res.data.categorias_inicio || [];
+                        let hasTrazContentInTramo = false;
+                        const fechIniTramo = new Date(h.fechavisado).toLocaleDateString();
+                        const tramoTitulo = (t.export_pdf_tramo_header || 'TRAMO #{id} ({desde}: {fecha})')
+                            .replace('{id}', String(h.IdAlojamiento))
+                            .replace('{desde}', t.export_tramo_desde || 'Desde')
+                            .replace('{fecha}', fechIniTramo);
                         let tramoHtml = `<div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee;">
-                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">TRAMO #${h.IdAlojamiento} (Desde: ${new Date(h.fechavisado).toLocaleDateString()})</h5>`;
+                            <h5 style="font-size: 11px; background-color: #f0f8ff; padding: 5px; color: #0d6efd; margin-bottom: 8px;">${escapePdfHtml(tramoTitulo)}</h5>`;
                         
                         res.data.cajas.forEach(caja => {
                             const ubiTxt = formatCajaUbicacionTxt(caja);
                             let cajaHtml = `<div style="margin-left: 5px; margin-bottom: 10px;">
-                                <strong style="font-size: 10px; color: #444; background: #e9ecef; padding: 2px 5px; border-radius: 3px;">📦 ${caja.NombreCaja}</strong>`;
+                                <strong style="font-size: 10px; color: #444; background: #e9ecef; padding: 2px 5px; border-radius: 3px;">📦 ${escapePdfHtml(caja.NombreCaja)}</strong>`;
                             if (ubiTxt) {
-                                cajaHtml += `<div style="font-size: 9px; color: #555; margin-top: 3px;">📍 ${ubiTxt.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+                                cajaHtml += `<div style="font-size: 9px; color: #555; margin-top: 3px;">📍 ${escapePdfHtml(ubiTxt)}</div>`;
                             }
                             
-                            let hasObsInCaja = false;
+                            let hasContentInCaja = false;
 
                             if (caja.unidades && caja.unidades.length > 0) {
                                 caja.unidades.forEach(u => {
-                                    if (u.observaciones_pivot && u.observaciones_pivot.length > 0) {
-                                        hasObsInTramo = true;
-                                        hasObsInCaja = true;
-                                        
-                                        cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
-                                            <span style="font-size: 10px; color: #198754; font-weight: bold;">🐾 ${u.NombreEspecieAloj}</span>
+                                    const rowsInicio = valoresInicioOrdered(u.valores_inicio, catsInicio);
+                                    const hasInicio = rowsInicio.length > 0;
+                                    const hasPivot = u.observaciones_pivot && u.observaciones_pivot.length > 0;
+                                    if (!hasInicio && !hasPivot) return;
+
+                                    hasTrazContentInTramo = true;
+                                    hasContentInCaja = true;
+
+                                    const thFecha = t.export_pdf_th_fecha || 'Fecha';
+                                    const thCampo = t.export_pdf_th_variable || 'Campo';
+                                    const thValor = t.export_pdf_th_valor || 'Valor';
+                                    const lblInicio = t.export_traz_ficha_inicio || 'Ficha inicial';
+                                    const lblMediciones = t.export_traz_mediciones || 'Mediciones clínicas';
+
+                                    cajaHtml += `<div style="margin-left: 15px; margin-top: 8px;">
+                                            <span style="font-size: 10px; color: #198754; font-weight: bold;">🐾 ${escapePdfHtml(u.NombreEspecieAloj)}</span>`;
+
+                                    if (hasInicio) {
+                                        cajaHtml += `<div style="font-size: 9px; font-weight: bold; color: #495057; margin-top: 6px;">${escapePdfHtml(lblInicio)}</div>
+                                            <table style="width: 100%; border-collapse: collapse; margin-top: 2px; font-size: 9px;">
+                                                <tr style="background-color: #f9f9f9;">
+                                                    <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">${escapePdfHtml(thCampo)}</th>
+                                                    <th style="border: 1px solid #ccc; padding: 4px; text-align: left;">${escapePdfHtml(thValor)}</th>
+                                                </tr>`;
+                                        rowsInicio.forEach((row) => {
+                                            cajaHtml += `<tr>
+                                                <td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(row.NombreCatAlojUnidad)}</td>
+                                                <td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(row.Valor)}</td>
+                                            </tr>`;
+                                        });
+                                        cajaHtml += `</table>`;
+                                    }
+
+                                    if (hasPivot) {
+                                        cajaHtml += `<div style="font-size: 9px; font-weight: bold; color: #495057; margin-top: 8px;">${escapePdfHtml(lblMediciones)}</div>
                                             <table style="width: 100%; border-collapse: collapse; margin-top: 3px; font-size: 9px; text-align: center;">
                                                 <tr style="background-color: #f9f9f9;">
-                                                    <th style="border: 1px solid #ccc; padding: 4px;">Fecha</th>`;
-                                        
+                                                    <th style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(thFecha)}</th>`;
                                         catsExport.forEach(cat => {
-                                            cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${cat.NombreCatAlojUnidad}</th>`;
+                                            cajaHtml += `<th style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(cat.NombreCatAlojUnidad)}</th>`;
                                         });
                                         cajaHtml += `</tr>`;
 
                                         u.observaciones_pivot.forEach(obs => {
-                                            cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${new Date(obs.fechaObs).toLocaleDateString()}</td>`;
+                                            cajaHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(new Date(obs.fechaObs).toLocaleDateString())}</td>`;
                                             catsExport.forEach(cat => {
                                                 const val = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '-';
-                                                cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${val}</td>`;
+                                                cajaHtml += `<td style="border: 1px solid #ccc; padding: 4px;">${escapePdfHtml(val)}</td>`;
                                             });
                                             cajaHtml += `</tr>`;
                                         });
-                                        cajaHtml += `</table></div>`;
+                                        cajaHtml += `</table>`;
                                     }
+
+                                    cajaHtml += `</div>`;
                                 });
                             }
                             cajaHtml += `</div>`;
-                            if(hasObsInCaja) tramoHtml += cajaHtml;
+                            if (hasContentInCaja) tramoHtml += cajaHtml;
                         });
                         
                         tramoHtml += `</div>`;
-                        if (hasObsInTramo) trazabilidadHtml += tramoHtml;
+                        if (hasTrazContentInTramo) trazabilidadHtml += tramoHtml;
                     }
                 } catch (e) { console.error("Error", e); }
             }
@@ -166,7 +265,7 @@ export const ExportUI = {
         }
 
         const pdfTemplate = `
-            <div style="font-family: Arial, sans-serif; color: #333; padding: 15px;">
+            <div style="font-family: Arial, sans-serif; color: #333; padding: 15px; background: #ffffff;">
                 <div style="text-align: center; border-bottom: 2px solid #0d6efd; padding-bottom: 10px; margin-bottom: 20px;">
                     <h2 style="margin: 0; color: #0d6efd;">GROBO - ${instName}</h2>
                     <h4 style="margin: 5px 0;">${t.export_ficha_tecnica || 'FICHA TÉCNICA: ALOJAMIENTO ANIMAL'}</h4>
@@ -207,9 +306,9 @@ export const ExportUI = {
                 ` : ''}
 
                 ${options.traz ? `
-                <div style="border-top: 2px solid #eee; padding-top: 15px; background: #fff; padding: 10px;">
+                <div style="border-top: 2px solid #eee; padding-top: 15px; background: #ffffff; padding: 10px;">
                     <p style="font-size: 13px; font-weight: bold; color: #0d6efd; border-bottom: 1px solid #0d6efd; padding-bottom: 5px; margin-bottom: 15px;">
-                        TRAZABILIDAD Y CONSTANTES CLÍNICAS:
+                        ${escapePdfHtml(t.export_traz_section_title || 'TRAZABILIDAD Y CONSTANTES CLÍNICAS')}
                     </p>
                     ${trazabilidadHtml}
                 </div>
@@ -221,7 +320,7 @@ export const ExportUI = {
             margin: [18, 18, 18, 18], 
             filename: `Alojamiento_H${historiaId}.pdf`, 
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            html2canvas: { scale: 2 } 
+            html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }
         };
         
         window.html2pdf().set(opt).from(pdfTemplate).save();
@@ -318,35 +417,50 @@ export const ExportUI = {
 
             if (options.traz) {
                 baseRow["Nota Administrativa"] = r.observaciones || '---';
-                let hasClinicalData = false;
+                let hasTrazRows = false;
+                const sinRegTxt = t.export_excel_sin_registro_clinico || 'Sin registro clínico';
+                const soloInicioTxt = t.export_excel_solo_inicio || '(Solo ficha inicial)';
 
                 try {
                     const res = await API.request(`/trazabilidad/get-arbol?idAlojamiento=${r.IdAlojamiento}&idEspecie=${r.TipoAnimal || r.idespA}&instId=${instId}`);
 
                     if (res.status === 'success' && res.data && res.data.cajas) {
                         const categorias = res.data.categorias_datos || res.data.categorias || [];
+                        const categoriasInicio = res.data.categorias_inicio || [];
 
                         res.data.cajas.forEach(c => {
                             if (c.unidades) {
                                 c.unidades.forEach(u => {
-                                    if (u.observaciones_pivot && u.observaciones_pivot.length > 0) {
-                                        hasClinicalData = true;
+                                    const inicioCols = excelInicioColumnsForUnidad(u, categoriasInicio, t);
+                                    const hasPivot = u.observaciones_pivot && u.observaciones_pivot.length > 0;
+                                    const hasInicio = unidadTieneValoresInicio(u);
 
-                                        // Por cada medición clínica de este animal, creamos una fila en Excel
+                                    if (hasPivot) {
+                                        hasTrazRows = true;
                                         u.observaciones_pivot.forEach(obs => {
-                                            let clinRow = { ...baseRow }; // Copiamos los datos del alojamiento
+                                            let clinRow = { ...baseRow, ...inicioCols };
                                             clinRow["Caja Física"] = c.NombreCaja;
                                             clinRow[colUbic] = formatCajaUbicacionTxt(c) || '---';
                                             clinRow["Sujeto / Animal"] = u.NombreEspecieAloj;
                                             clinRow["Fecha de Medición"] = new Date(obs.fechaObs).toLocaleDateString();
 
-                                            // Agregamos las columnas dinámicas (Ej: Peso, Glucosa, Temp)
                                             categorias.forEach(cat => {
                                                 clinRow[cat.NombreCatAlojUnidad] = (obs.valores && obs.valores[cat.NombreCatAlojUnidad]) || '---';
                                             });
 
                                             allRows.push(clinRow);
                                         });
+                                    } else if (hasInicio) {
+                                        hasTrazRows = true;
+                                        let clinRow = { ...baseRow, ...inicioCols };
+                                        clinRow["Caja Física"] = c.NombreCaja;
+                                        clinRow[colUbic] = formatCajaUbicacionTxt(c) || '---';
+                                        clinRow["Sujeto / Animal"] = u.NombreEspecieAloj;
+                                        clinRow["Fecha de Medición"] = soloInicioTxt;
+                                        categorias.forEach(cat => {
+                                            clinRow[cat.NombreCatAlojUnidad] = '---';
+                                        });
+                                        allRows.push(clinRow);
                                     }
                                 });
                             }
@@ -354,10 +468,9 @@ export const ExportUI = {
                     }
                 } catch(e) { console.error("Fallo al traer trazabilidad", e); }
 
-                // Si el usuario pidió trazabilidad pero el tramo no tiene animales/observaciones
-                if (!hasClinicalData) {
+                if (!hasTrazRows) {
                     let emptyRow = { ...baseRow };
-                    emptyRow["Caja Física"] = "Sin registro clínico";
+                    emptyRow["Caja Física"] = sinRegTxt;
                     emptyRow[colUbic] = '---';
                     emptyRow["Sujeto / Animal"] = "---";
                     emptyRow["Fecha de Medición"] = "---";

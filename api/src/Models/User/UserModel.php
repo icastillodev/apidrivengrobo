@@ -139,7 +139,50 @@ class UserModel {
         $stCount->execute($paramsCount);
         $total = (int) ($stCount->fetchColumn() ?: 0);
 
+        // Listado: sin subconsultas correlacionadas por fila (coste O(n)); fechas y conteos completos en GET /users/one.
         $selectSql = "SELECT 
+                    u.IdUsrA,
+                    u.UsrA as Usuario,
+                    p.NombreA,
+                    p.ApellidoA,
+                    p.CelularA,
+                    p.EmailA as Correo,
+                    p.LabA as iddeptoA,
+                    COALESCE(NULLIF(TRIM(d.NombreDeptoA), ''), NULLIF(TRIM(p.LabA), ''), '') AS Laboratorio,
+                    0 AS OtrosCeuaCount,
+                    0 AS ProtocolCount,
+                    COALESCE(a.ActivoA, 1) as ActivoA,
+                    t.IdTipousrA,
+                    NULL AS FechaCreacion
+                $fromSql
+                ORDER BY $orderExpr $sortDir, u.IdUsrA DESC";
+        
+        if ((int)$limit > 0) {
+            $selectSql .= " LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
+        }
+
+        $stData = $this->db->prepare($selectSql);
+        $stData->execute($paramsData);
+        $rows = $stData->fetchAll(PDO::FETCH_ASSOC);
+
+        return ['rows' => $rows, 'total' => $total];
+    }
+
+    /**
+     * Una fila de usuario para la institución (modal / URL ?id= sin tener la lista completa en memoria).
+     */
+    public function getUserSummaryForInstitution(int $instId, int $userId): ?array {
+        if ($instId <= 0 || $userId <= 0) {
+            return null;
+        }
+        $fromSql = "FROM usuarioe u
+                JOIN personae p ON u.IdUsrA = p.IdUsrA
+                LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
+                LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
+                LEFT JOIN departamentoe d ON d.IdInstitucion = u.IdInstitucion
+                    AND d.iddeptoA = CAST(NULLIF(NULLIF(TRIM(p.LabA), ''), 'null') AS UNSIGNED)
+                WHERE u.IdInstitucion = ? AND u.IdUsrA = ?";
+        $sql = "SELECT 
                     u.IdUsrA,
                     u.UsrA as Usuario,
                     p.NombreA,
@@ -158,17 +201,12 @@ class UserModel {
                     t.IdTipousrA,
                     (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
                 $fromSql
-                ORDER BY $orderExpr $sortDir, u.IdUsrA DESC";
-        
-        if ((int)$limit > 0) {
-            $selectSql .= " LIMIT " . (int) $limit . " OFFSET " . (int) $offset;
-        }
+                LIMIT 1";
+        $st = $this->db->prepare($sql);
+        $st->execute([$instId, $userId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
 
-        $stData = $this->db->prepare($selectSql);
-        $stData->execute($paramsData);
-        $rows = $stData->fetchAll(PDO::FETCH_ASSOC);
-
-        return ['rows' => $rows, 'total' => $total];
+        return $row ?: null;
     }
 
     /**

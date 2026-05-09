@@ -75,7 +75,7 @@
                     
                     // 5. INICIALIZACIÓN DE LÓGICA DE PÁGINA
                     if (instId) {
-                        initConfigInstitution(instId);
+                        await initConfigInstitution(instId);
                         translatePage();
                         console.log(`✅ Configuración para Institución ID: ${instId} inicializada.`);
                     } else {

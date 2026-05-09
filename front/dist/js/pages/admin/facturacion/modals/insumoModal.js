@@ -3,7 +3,7 @@
  */
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
-import { formatBillingMoney } from '../billingLocale.js';
+import { formatBillingMoney, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga } from '../billingLocale.js';
 
 export const openInsumoModal = async (idformA) => {
     try {
@@ -18,22 +18,81 @@ export const openInsumoModal = async (idformA) => {
         }
 
         const d = res.data;
+        const tituloIdIns = billingPdfFormularioIdDisplay(d, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() });
         const total = parseFloat(d.total_item || 0);
         const pagado = parseFloat(d.pagado || 0);
         const saldo = parseFloat(d.saldoInv || 0);
         const debe = Math.max(0, total - pagado);
 
-        // Convertimos el separador "|" en una lista visual limpia
-        const listaHtml = d.detalle_completo.split('|').map(item => 
-            `<div class="border-bottom py-1 small"><i class="bi bi-check2 text-warning me-2"></i>${item.trim()}</div>`
-        ).join('');
+        const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        const lineas = Array.isArray(d.lineas) ? d.lineas : [];
+        const puedeLineas = d.puede_editar_precios_linea === true || d.puede_editar_precios_linea === 1;
+        const thIns = t.ins_th_insumo || 'Insumo';
+        const thCant = t.ins_th_cant || 'Cant.';
+        const thPu = t.ins_th_precio_unit || 'P. unit.';
+        const thSub = t.ins_th_subtotal || 'Subtotal';
+
+        let detalleBloque;
+        if (lineas.length > 0) {
+            const hint = puedeLineas && t.ins_hint_precio_linea
+                ? `<p class="small text-muted mb-2">${esc(t.ins_hint_precio_linea)}</p>`
+                : '';
+            const theadExtra = puedeLineas ? `<th class="text-center" style="width:52px"></th>` : '';
+            const filas = lineas.map((ln) => {
+                const pid = Number(ln.id_forminsumo);
+                const nom = esc(ln.nombre_insumo);
+                const um = esc(ln.unidad_medida || '');
+                const cant = esc(String(ln.cantidad));
+                const sub = formatBillingMoney(ln.subtotal_linea);
+                const pNum = Number(ln.precio_unitario || 0);
+                const pVal = pNum.toFixed(2);
+                if (puedeLineas) {
+                    return `<tr>
+                        <td class="text-start small">${nom}${um ? `<br><span class="text-muted">${um}</span>` : ''}</td>
+                        <td class="text-end small">${cant}</td>
+                        <td class="text-end" style="min-width:108px">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="mdl-ins-line-precio-${pid}" value="${pVal}">
+                            </div>
+                        </td>
+                        <td class="text-end small fw-bold">$ ${sub}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-success" onclick="window.guardarPrecioLineaInsumo(${pid}, ${idformA})" title="${esc(t.ins_btn_aplicar_precio || 'Aplicar')}">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+                }
+                return `<tr>
+                    <td class="text-start small">${nom}${um ? `<br><span class="text-muted">${um}</span>` : ''}</td>
+                    <td class="text-end small">${cant}</td>
+                    <td class="text-end small">$ ${formatBillingMoney(ln.precio_unitario)}</td>
+                    <td class="text-end small fw-bold">$ ${sub}</td>
+                </tr>`;
+            }).join('');
+            detalleBloque = `${hint}<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0 bg-white">
+                <thead class="table-light"><tr>
+                    <th>${thIns}</th>
+                    <th class="text-end">${thCant}</th>
+                    <th class="text-end">${thPu}</th>
+                    <th class="text-end">${thSub}</th>
+                    ${theadExtra}
+                </tr></thead>
+                <tbody>${filas}</tbody>
+            </table></div>`;
+        } else {
+            detalleBloque = (String(d.detalle_completo || '').split('|').map((item) =>
+                `<div class="border-bottom py-1 small"><i class="bi bi-check2 text-warning me-2"></i>${esc(item.trim())}</div>`
+            ).join(''));
+        }
 
         const html = `
         <div class="modal fade" id="modalInsumo" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg">
                     <div class="modal-header bg-dark text-white py-2">
-                        <h5 class="modal-title small fw-bold">${(t.titulo_insumos_tpl || 'INSUMOS {id}').replace(/\{id\}/g, idformA)}</h5>
+                        <h5 class="modal-title small fw-bold">${(t.titulo_insumos_tpl || 'INSUMOS {id}').replace(/\{id\}/g, tituloIdIns)}</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="${g.aria_cerrar_dialogo || 'Close'}"></button>
                     </div>
                     <div class="modal-body p-4 bg-light">
@@ -44,7 +103,7 @@ export const openInsumoModal = async (idformA) => {
                                 
                                 <label class="small fw-bold text-muted uppercase">${t.lbl_detalle_pedido || 'Detalle del Pedido'}</label>
                                 <div class="bg-white border rounded p-3 shadow-sm mb-3">
-                                    ${listaHtml}
+                                    ${detalleBloque}
                                 </div>
                             </div>
 

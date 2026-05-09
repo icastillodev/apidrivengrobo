@@ -43,8 +43,8 @@
                     await initMenu();
                     NotificationManager.init();
                     
-                    // Inicialización de la lógica de catálogo de insumos generales
-                    initConfigInsumos();
+                    // Inicialización de la lógica de catálogo de insumos generales (await: datos antes de hideLoader)
+                    await initConfigInsumos();
                     translatePage();
                     
                     console.log("✅ Configuración de Insumos inicializada correctamente.");

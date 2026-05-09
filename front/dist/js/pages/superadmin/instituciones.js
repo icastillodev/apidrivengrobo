@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 
 let modalInst;
 let listaSedes = [];
@@ -15,8 +16,13 @@ export async function initSuperInstituciones() {
 
     setupGrupoClearButton();
     setupDependenciaEnRedSync();
-    await cargarCatalogoModulos();
-    await cargarInstituciones();
+    showLoader();
+    try {
+        await cargarCatalogoModulos();
+        await cargarInstituciones({ mode: 'initial' });
+    } finally {
+        hideLoader();
+    }
     setupBusqueda();
 }
 
@@ -37,20 +43,35 @@ function escHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-async function cargarInstituciones() {
+async function cargarInstituciones({ mode = 'initial' } = {}) {
+    const tbody = document.getElementById('tabla-sedes');
+    const t = window.txt?.superadmin_instituciones || {};
+    if (mode === 'inline' && tbody) {
+        const msg = escHtml(t.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+    }
     try {
         const res = await API.request('/superadmin/instituciones');
         if (res.status === 'success') {
-            listaSedes = res.data;
+            listaSedes = Array.isArray(res.data) ? res.data : [];
             renderizarTabla(listaSedes);
+        } else if (tbody) {
+            listaSedes = [];
+            renderizarTabla([]);
         }
-    } catch (err) { console.error("Error al recuperar sedes:", err); }
+    } catch (err) {
+        console.error('Error al recuperar sedes:', err);
+        listaSedes = [];
+        renderizarTabla([]);
+    }
 }
 
 function renderizarTabla(data) {
     const tbody = document.getElementById('tabla-sedes');
+    if (!tbody) return;
+    const tEmpty = window.txt?.superadmin_instituciones?.tabla_sin_filas || '';
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">No se encontraron instituciones</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">${escHtml(tEmpty || '—')}</td></tr>`;
         return;
     }
 
@@ -276,7 +297,7 @@ async function guardarCambios() {
         
         if (res.status === 'success') {
             modalInst.hide();
-            await cargarInstituciones();
+            await cargarInstituciones({ mode: 'inline' });
             mostrarNotificacion(id ? "Datos actualizados correctamente" : "Institución creada con éxito");
         } else {
             alert("Error del servidor: " + res.message);

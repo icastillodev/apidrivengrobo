@@ -6,13 +6,30 @@ function txF() {
     return window.txt?.facturacion || {};
 }
 
+/** Paneles de historial bajo cada protocolo (facturación por depto): invalidar caché si cambia el departamento. */
+window.invalidateDeptoSaldoHistorialPanelsCache = () => {
+    document.querySelectorAll('[id^="saldo-hist-inner-"]').forEach((el) => {
+        el.dataset.histLoaded = '0';
+        delete el.dataset.histRefDepto;
+    });
+};
+
 async function fetchSaldoHistorialData(opts) {
     const idUsr = parseInt(opts?.idUsr, 10) || 0;
-    if (!idUsr) throw new Error('Usuario inválido.');
+    if (!idUsr) throw new Error(txF().saldo_hist_err_id_usuario || 'Usuario inválido.');
     const scope = (opts?.scope || 'investigador').toString();
     const refId = opts?.refId != null ? parseInt(opts.refId, 10) : null;
-    const from = opts?.from ?? document.getElementById('f-desde')?.value ?? null;
-    const to = opts?.to ?? document.getElementById('f-hasta')?.value ?? null;
+    let from = null;
+    let to = null;
+    if (opts && typeof opts === 'object') {
+        if ('from' in opts) from = opts.from;
+        else from = document.getElementById('f-desde')?.value ?? null;
+        if ('to' in opts) to = opts.to;
+        else to = document.getElementById('f-hasta')?.value ?? null;
+    } else {
+        from = document.getElementById('f-desde')?.value ?? null;
+        to = document.getElementById('f-hasta')?.value ?? null;
+    }
     const qs = new URLSearchParams();
     qs.set('idUsr', String(idUsr));
     if (from) qs.set('from', String(from));
@@ -21,17 +38,64 @@ async function fetchSaldoHistorialData(opts) {
     if (refId && refId > 0) qs.set('refId', String(refId));
     const res = await API.request(`/billing/saldo-historial?${qs.toString()}`, 'GET');
     if (res.status !== 'success') {
-        throw new Error(res.message || 'Error');
+        throw new Error(res.message || window.txt?.generales?.error || 'Error');
     }
     return res.data || {};
 }
 
-function buildSaldoHistorialInnerHtml(data) {
+function escapeHtmlBillingTxt(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/** Etiqueta legible para códigos `TipoHistorial` de `historialpago` (i18n `saldo_hist_tipo_*`). */
+function saldoHistorialTipoDisplay(raw) {
+    const code = String(raw ?? '').trim();
+    if (!code) return '—';
     const tf = txF();
-    const gen = window.txt?.generales || {};
+    const v = tf[`saldo_hist_tipo_${code}`];
+    return (typeof v === 'string' && v.trim()) ? v.trim() : code;
+}
+
+function buildSaldoHistorialInnerHtml(data, histOpts = {}) {
+    const tf = txF();
+    const scopeHist = String(histOpts?.scope || 'investigador').toLowerCase();
+    const hintParts = [];
+    if (scopeHist === 'depto') {
+        const h = (tf.saldo_hist_hint_filtrado_depto || '').trim();
+        if (h) hintParts.push(h);
+    } else if (scopeHist === 'protocolo') {
+        const h = (tf.saldo_hist_hint_filtrado_proto || '').trim();
+        if (h) hintParts.push(h);
+    } else if (scopeHist === 'investigador') {
+        const h = (tf.saldo_hist_hint_investigador || '').trim();
+        if (h) hintParts.push(h);
+    }
+
     const saldo = parseFloat(data.saldo || 0);
     const mov = Array.isArray(data.movimientos_saldo) ? data.movimientos_saldo : [];
     const pagos = Array.isArray(data.pagos) ? data.pagos : [];
+
+    if (mov.length === 0 && pagos.length === 0) {
+        const hEmpty = (tf.saldo_hist_hint_sin_movimientos || '').trim();
+        if (hEmpty) hintParts.push(hEmpty);
+    }
+
+    const hintHtml = hintParts.length
+        ? `<div class="small text-muted mt-3 mb-0 border-top pt-2">${hintParts
+              .map((t) => `<p class="mb-2">${escapeHtmlBillingTxt(t)}</p>`)
+              .join('')}</div>`
+        : '';
+
+    const dash = tf.saldo_hist_placeholder_empty || '—';
+
+    const cellHistorialApiText = (val) => {
+        if (val == null || String(val).trim() === '') return dash;
+        return escapeHtmlBillingTxt(String(val));
+    };
 
     const fmtMonto = (m) => {
         const v = parseFloat(m || 0);
@@ -39,30 +103,38 @@ function buildSaldoHistorialInnerHtml(data) {
         const sign = v < 0 ? '−' : '+';
         return `<span class="fw-bold ${cls}">${sign} $ ${formatBillingMoney(Math.abs(v))}</span>`;
     };
-    const fmtFecha = (f) => (f ? String(f) : '—');
+    const fmtFecha = (f) => (f ? escapeHtmlBillingTxt(String(f)) : dash);
     const empty = (tf.saldo_hist_empty || 'Sin movimientos.');
 
     const htmlMov = mov.length ? mov.map((r) => `
             <tr>
-                <td class="text-muted small">#${r.IdHistoPago}</td>
+                <td class="text-muted small">#${parseInt(String(r.IdHistoPago ?? ''), 10) || 0}</td>
                 <td class="small">${fmtFecha(r.fecha)}</td>
                 <td>${fmtMonto(r.Monto)}</td>
-                <td class="small text-muted">${(r.IdentificadorTransferencia || '—')}</td>
-                <td class="small">${(r.Comentario || '—')}</td>
+                <td class="small text-muted">${cellHistorialApiText(r.IdentificadorTransferencia)}</td>
+                <td class="small">${cellHistorialApiText(r.Comentario)}</td>
             </tr>
         `).join('') : `<tr><td colspan="5" class="text-center text-muted small py-3">${empty}</td></tr>`;
 
-    const htmlPagos = pagos.length ? pagos.map((r) => `
+    const htmlPagos = pagos.length ? pagos.map((r) => {
+        const tipoCode = String(r.TipoHistorial ?? '').trim();
+        const tipoLbl = saldoHistorialTipoDisplay(tipoCode);
+        const tipoTitle = tipoCode ? escapeHtmlBillingTxt(tipoCode) : '';
+        const tipoHtml = `<span class="badge bg-secondary"${tipoTitle ? ` title="${tipoTitle}"` : ''}>${escapeHtmlBillingTxt(tipoLbl)}</span>`;
+        const idFormNum = parseInt(String(r.IdFormA ?? ''), 10);
+        const refForm = Number.isFinite(idFormNum) && idFormNum > 0 ? `#${idFormNum}` : dash;
+        return `
             <tr>
-                <td class="text-muted small">#${r.IdHistoPago}</td>
+                <td class="text-muted small">#${parseInt(String(r.IdHistoPago ?? ''), 10) || 0}</td>
                 <td class="small">${fmtFecha(r.fecha)}</td>
-                <td class="small"><span class="badge bg-secondary">${r.TipoHistorial}</span></td>
-                <td class="small text-muted">${(r.IdFormA && String(r.IdFormA) !== '0') ? '#' + r.IdFormA : '—'}</td>
-                <td class="small text-muted">${(r.IdentificadorTransferencia || '—')}</td>
-                <td class="small">${(r.Comentario || '—')}</td>
+                <td class="small">${tipoHtml}</td>
+                <td class="small text-muted">${refForm === dash ? dash : escapeHtmlBillingTxt(refForm)}</td>
+                <td class="small text-muted">${cellHistorialApiText(r.IdentificadorTransferencia)}</td>
+                <td class="small">${cellHistorialApiText(r.Comentario)}</td>
                 <td>${fmtMonto(0 - Math.abs(parseFloat(r.Monto || 0)))}</td>
             </tr>
-        `).join('') : `<tr><td colspan="7" class="text-center text-muted small py-3">${empty}</td></tr>`;
+        `;
+    }).join('') : `<tr><td colspan="7" class="text-center text-muted small py-3">${empty}</td></tr>`;
 
     return `
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -76,8 +148,8 @@ function buildSaldoHistorialInnerHtml(data) {
                                 <table class="table table-sm mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th>
-                                            <th>${gen.fecha || 'Fecha'}</th>
+                                            <th>${tf.saldo_hist_col_id || 'ID'}</th>
+                                            <th>${tf.saldo_hist_col_fecha || 'Fecha'}</th>
                                             <th>${tf.total || 'Total'}</th>
                                             <th>${tf.saldo_transfer_id_label || 'Transferencia'}</th>
                                             <th>${tf.saldo_comentario_label || 'Comentario'}</th>
@@ -93,8 +165,8 @@ function buildSaldoHistorialInnerHtml(data) {
                                 <table class="table table-sm mb-0 align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th>
-                                            <th>${gen.fecha || 'Fecha'}</th>
+                                            <th>${tf.saldo_hist_col_id || 'ID'}</th>
+                                            <th>${tf.saldo_hist_col_fecha || 'Fecha'}</th>
                                             <th>${tf.hist_tipo || 'Tipo'}</th>
                                             <th>${tf.hist_ref || 'Ref.'}</th>
                                             <th>${tf.saldo_transfer_id_label || 'Transferencia'}</th>
@@ -106,7 +178,7 @@ function buildSaldoHistorialInnerHtml(data) {
                                 </table>
                             </div>
                         </div>
-                    </div>`;
+                    </div>${hintHtml}`;
 }
 
 /**
@@ -145,8 +217,8 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                 `,
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: tf.saldo_ajuste_confirm || 'Confirmar',
-                cancelButtonText: tf.btn_cancelar_swal || 'Cancelar',
+                confirmButtonText: tf.saldo_ajuste_confirm || window.txt?.generales?.confirmar || 'Confirmar',
+                cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar',
                 confirmButtonColor: '#1a5d3b',
                 preConfirm: () => {
                     const c = Swal.getHtmlContainer();
@@ -207,28 +279,60 @@ window.openSaldoHistorialPopup = async (opts) => {
     const idUsr = parseInt(opts?.idUsr, 10) || 0;
     if (!idUsr) return;
 
-    const scope = (opts?.scope || 'investigador').toString();
+    const scope = (opts?.scope || 'investigador').toString().toLowerCase();
     const refId = opts?.refId != null ? parseInt(opts.refId, 10) : null;
-    const from = opts?.from ?? document.getElementById('f-desde')?.value ?? null;
-    const to = opts?.to ?? document.getElementById('f-hasta')?.value ?? null;
+
+    if (scope === 'depto' && (!refId || refId <= 0)) {
+        await Swal.fire(
+            gen.swal_atencion || gen.error || 'Atención',
+            tf.saldo_hist_err_depto_ref || 'Seleccione un departamento para ver el historial filtrado por área.',
+            'warning'
+        );
+        return;
+    }
+    if (scope === 'protocolo' && (!refId || refId <= 0)) {
+        await Swal.fire(
+            gen.swal_atencion || gen.error || 'Atención',
+            tf.saldo_hist_err_proto_ref || 'Protocolo no válido para el historial.',
+            'warning'
+        );
+        return;
+    }
+
+    const histTitle = tf.saldo_hist_title || 'Historial de saldo';
+    const loadingMsg =
+        tf.billing_loading_inline ||
+        gen.msg_cargando ||
+        '…';
+    const loadingHtml = `<div class="d-flex flex-column align-items-center justify-content-center py-4 text-muted" role="status" aria-live="polite"><div class="spinner-border text-secondary mb-2"></div><span class="small">${escapeHtmlBillingTxt(loadingMsg)}</span></div>`;
 
     try {
-        showLoader();
-        const data = await fetchSaldoHistorialData({ idUsr, scope, refId, from, to });
-        hideLoader();
-        await Swal.fire({
-            title: tf.saldo_hist_title || 'Historial de saldo',
+        Swal.fire({
+            title: histTitle,
+            html: loadingHtml,
             width: 980,
-            html: `<div class="text-start">${buildSaldoHistorialInnerHtml(data)}</div>`,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+        });
+        const data = await fetchSaldoHistorialData({
+            idUsr,
+            scope,
+            refId,
+            from: opts?.from !== undefined ? opts.from : null,
+            to: opts?.to !== undefined ? opts.to : null,
+        });
+        Swal.close();
+        await Swal.fire({
+            title: histTitle,
+            width: 980,
+            html: `<div class="text-start">${buildSaldoHistorialInnerHtml(data, { scope })}</div>`,
             showConfirmButton: true,
             confirmButtonText: gen.cerrar || 'Cerrar',
         });
     } catch (e) {
         console.error(e);
-        hideLoader();
+        Swal.close();
         await Swal.fire(gen.error || 'Error', String(e?.message || e), 'error');
-    } finally {
-        hideLoader();
     }
 };
 
@@ -247,14 +351,27 @@ window.toggleDeptoSaldoHistorialPanel = async (idProt, idUsr) => {
         return;
     }
     const refId = parseInt(document.getElementById('sel-depto')?.value || '0', 10) || 0;
-    if (inner.dataset.histLoaded !== '1') {
+    if (!refId) {
+        const tf = txF();
+        inner.innerHTML = `<div class="alert alert-warning small mb-0">${tf.saldo_hist_err_depto_ref || 'Seleccione un departamento.'}</div>`;
+        inner.dataset.histLoaded = '0';
+        const instWarn = bootstrap.Collapse.getInstance(collapseEl) || bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+        instWarn.show();
+        return;
+    }
+    const refKey = String(refId);
+    const cacheOk = inner.dataset.histLoaded === '1' && inner.dataset.histRefDepto === refKey;
+    if (!cacheOk) {
         inner.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm text-secondary"></span></div>`;
         try {
             const data = await fetchSaldoHistorialData({ idUsr, scope: 'depto', refId, from: null, to: null });
-            inner.innerHTML = buildSaldoHistorialInnerHtml(data);
+            inner.innerHTML = buildSaldoHistorialInnerHtml(data, { scope: 'depto' });
             inner.dataset.histLoaded = '1';
+            inner.dataset.histRefDepto = refKey;
         } catch (e) {
             console.error(e);
+            inner.dataset.histLoaded = '0';
+            delete inner.dataset.histRefDepto;
             inner.innerHTML = `<div class="alert alert-danger small mb-0">${gen.error || 'Error'}: ${String(e?.message || e)}</div>`;
             return;
         }
@@ -335,7 +452,7 @@ window.procesarPagoProtocolo = async (idProt) => {
         showCancelButton: true,
         confirmButtonText: tf.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#1a5d3b',
-        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar'
     });
 
     if (confirm.isConfirmed) {
@@ -391,6 +508,8 @@ window.ejecutarPagoAPI = async (idUsr, monto, items) => {
             const tf = txF();
             await Swal.fire(tf.payment_exitoso_titulo || 'Pago exitoso', tf.payment_exitoso_msg || 'Los ítems han sido liquidados y el saldo actualizado.', 'success');
             await window.cargarFacturacionDepto(); // Refresca tablas y dashboard
+        } else {
+            await Swal.fire(window.txt?.generales?.error || 'Error', res.message || txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
         }
     } catch (e) { 
         console.error(e); 
@@ -471,7 +590,7 @@ window.procesarPagoInsumosGenerales = async () => {
         showCancelButton: true,
         confirmButtonText: tf.payment_insumos_confirm_btn || 'Sí, liquidar insumos',
         confirmButtonColor: '#0d6efd',
-        cancelButtonText: tf.btn_cancelar_swal || 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar'
     });
 
     if (confirm.isConfirmed) {

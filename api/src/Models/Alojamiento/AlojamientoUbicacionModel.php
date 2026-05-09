@@ -231,6 +231,48 @@ class AlojamientoUbicacionModel {
         Auditoria::log($this->db, 'UPDATE', 'aloj_ubicacion_cat', "toggle tipo=$tipo id=$id activo=$activo");
     }
 
+    /**
+     * Elimina un ítem del catálogo (institución acotada). Respeta FKs del esquema estándar:
+     * al borrar rack se eliminan posiciones en cascada; referencias en alojamiento_caja pasan a NULL.
+     */
+    public function deleteCatalog(string $tipo, int $id, int $instId): void {
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('ID inválido.');
+        }
+        $this->db->beginTransaction();
+        try {
+            switch ($tipo) {
+                case 'lugar':
+                    $this->assertLugarRackInst($id, $instId);
+                    $st = $this->db->prepare('DELETE FROM aloj_lugar_rack WHERE IdLugarRack = ?');
+                    $st->execute([$id]);
+                    break;
+                case 'rack':
+                    $this->assertRackInst($id, $instId);
+                    $st = $this->db->prepare('DELETE FROM aloj_rack WHERE IdRack = ?');
+                    $st->execute([$id]);
+                    break;
+                case 'salon':
+                    $this->assertSalonInst($id, $instId);
+                    $st = $this->db->prepare('DELETE FROM aloj_salon WHERE IdSalon = ?');
+                    $st->execute([$id]);
+                    break;
+                case 'uf':
+                    $this->assertUbicacionFisicaInst($id, $instId);
+                    $st = $this->db->prepare('DELETE FROM aloj_ubicacion_fisica WHERE IdUbicacionFisica = ?');
+                    $st->execute([$id]);
+                    break;
+                default:
+                    throw new \InvalidArgumentException('tipo inválido');
+            }
+            Auditoria::log($this->db, 'DELETE', 'aloj_ubicacion_cat', "tipo=$tipo id=$id inst=$instId");
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     private function assertUbicacionFisicaInst(int $id, int $instId): void {
         $stmt = $this->db->prepare('SELECT 1 FROM aloj_ubicacion_fisica WHERE IdUbicacionFisica = ? AND IdInstitucion = ?');
         $stmt->execute([$id, $instId]);

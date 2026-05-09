@@ -262,7 +262,9 @@ async function loadAgenda() {
   const tbody = document.getElementById('table-agenda');
   const colspan = 6;
 
-  tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center text-muted py-4">${window.txt?.admin_reservas?.cargando || 'Cargando...'}</td></tr>`;
+  const arLoad = window.txt?.admin_reservas || {};
+  const loadMsgAgenda = escapeHtml(arLoad.cargando || window.txt?.generales?.msg_cargando || '…');
+  tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsgAgenda}</div></td></tr>`;
 
   let rows = [];
   let salaSingle = null;
@@ -364,7 +366,9 @@ async function loadPendientes() {
   const tbody = document.getElementById('table-pendientes');
   if (!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${window.txt?.admin_reservas?.cargando || 'Cargando...'}</td></tr>`;
+  const arPend = window.txt?.admin_reservas || {};
+  const loadMsgPend = escapeHtml(arPend.cargando || window.txt?.generales?.msg_cargando || '…');
+  tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsgPend}</div></td></tr>`;
   const qsSala = salaId ? `&IdSalaReserva=${salaId}` : '';
   const res = await API.request(`/admin/reservas/pending/list?from=${from}&to=${to}${qsSala}`, 'GET');
   const rows = (res?.status === 'success' && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
@@ -719,7 +723,9 @@ async function refreshInstrumentosDisponibles() {
   const end = document.getElementById('res-hora-fin').value;
   const cont = document.getElementById('inst-admin-list');
 
-  cont.innerHTML = `<div class="small text-muted">${window.txt?.admin_reservas?.cargando || 'Cargando...'}</div>`;
+  const arInst = window.txt?.admin_reservas || {};
+  const loadMsgInst = escapeHtml(arInst.cargando || window.txt?.generales?.msg_cargando || '…');
+  cont.innerHTML = `<div class="text-center py-2 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsgInst}</div></div>`;
 
   if (!salaId || !date || !start || !end || !(start < end)) {
     cont.innerHTML = `<div class="small text-muted">${window.txt?.admin_reservas?.msg_inst_need_slot || 'Seleccione sala/fecha/horario.'}</div>`;

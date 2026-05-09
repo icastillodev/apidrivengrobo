@@ -942,7 +942,7 @@ window.downloadReactivoPDF = async (id) => {
     const nProtocolo = getSelTextByName('idprotA');
 
     const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 15px;">
+        <div style="font-family: Arial, sans-serif; color: #333; padding: 15px; background: #ffffff;">
             <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
                 <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
                 <h4 style="margin: 5px 0;">FICHA DE PEDIDO: REACTIVO BIOLÓGICO</h4>
@@ -996,7 +996,7 @@ window.downloadReactivoPDF = async (id) => {
         margin: [18, 18, 18, 18], 
         filename: `Pedido_Reactivo_${id}.pdf`, 
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        html2canvas: { scale: 2 } 
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }
     };
     html2pdf().set(opt).from(pdfTemplate).save();
 };

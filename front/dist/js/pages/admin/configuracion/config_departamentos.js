@@ -1,27 +1,70 @@
 import { API } from '../../../api.js';
+import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 
 let deptosList = [];
 let orgsList = [];
 
+function escCfg(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function tablaLoadingRow(colspan) {
+    const t = window.txt?.config_departamentos || {};
+    const msg = escCfg(t.lista_cargando || window.txt?.generales?.msg_cargando || '…');
+    return `<tr><td colspan="${colspan}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+}
+
+function renderDeptOrgsLoadError() {
+    const t = window.txt?.config_departamentos || {};
+    const msg = escCfg(t.error_cargar_listas || window.txt?.generales?.error || 'Error');
+    const td = document.getElementById('table-deptos');
+    const to = document.getElementById('table-orgs');
+    if (td) td.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger small">${msg}</td></tr>`;
+    if (to) to.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger small">${msg}</td></tr>`;
+}
+
 export async function initConfigDeptos() {
     const instId = localStorage.getItem('instId');
-    loadData(instId);
+    await loadData(instId, { boot: true });
 
     // Eventos de Formularios
     document.getElementById('form-depto').onsubmit = (e) => saveDepto(e, instId);
     document.getElementById('form-org').onsubmit = (e) => saveOrg(e, instId);
 }
 
-async function loadData(instId) {
+async function loadData(instId, { boot = false } = {}) {
+    const tbDepto = document.getElementById('table-deptos');
+    const tbOrg = document.getElementById('table-orgs');
+    if (boot) showLoader();
+    else {
+        if (tbDepto) tbDepto.innerHTML = tablaLoadingRow(5);
+        if (tbOrg) tbOrg.innerHTML = tablaLoadingRow(6);
+    }
     try {
         const res = await API.request(`/admin/config/deptos-init?inst=${instId}`);
         if (res.status === 'success') {
-            deptosList = res.data.deptos;
-            orgsList = res.data.orgs;
+            deptosList = Array.isArray(res.data?.deptos) ? res.data.deptos : [];
+            orgsList = Array.isArray(res.data?.orgs) ? res.data.orgs : [];
             renderDeptos();
             renderOrgs();
+        } else {
+            deptosList = [];
+            orgsList = [];
+            renderDeptOrgsLoadError();
         }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        deptosList = [];
+        orgsList = [];
+        renderDeptOrgsLoadError();
+    } finally {
+        if (boot) hideLoader();
+    }
 }
 
 /* --- DEPARTAMENTOS --- */
@@ -29,8 +72,9 @@ function renderDeptos() {
     const tbody = document.getElementById('table-deptos');
     tbody.innerHTML = '';
     
-    if(deptosList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No hay departamentos registrados</td></tr>`;
+    const tEmpty = window.txt?.config_departamentos?.tabla_sin_deptos || '';
+    if (deptosList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">${escCfg(tEmpty || '—')}</td></tr>`;
         return;
     }
 
@@ -130,7 +174,7 @@ async function saveDepto(e, instId) {
         const res = await API.request('/admin/config/depto/save', 'POST', fd);
         if (res.status === 'success') {
             await Swal.fire('Éxito', 'Departamento guardado.', 'success');
-            loadData(instId);
+            loadData(instId, { boot: false });
         } else {
             Swal.fire('Error', res.message, 'error');
         }
@@ -148,7 +192,7 @@ window.deleteDepto = async (id) => {
         const res = await API.request('/admin/config/depto/delete', 'POST', fd);
         if (res.status === 'success') {
             Swal.fire('Eliminado', '', 'success');
-            loadData(localStorage.getItem('instId'));
+            loadData(localStorage.getItem('instId'), { boot: false });
         } else {
             Swal.fire('Error', res.message, 'error');
         }
@@ -160,6 +204,12 @@ window.deleteDepto = async (id) => {
 function renderOrgs() {
     const tbody = document.getElementById('table-orgs');
     tbody.innerHTML = '';
+
+    const tEmpty = window.txt?.config_departamentos?.tabla_sin_orgs || '';
+    if (orgsList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">${escCfg(tEmpty || '—')}</td></tr>`;
+        return;
+    }
 
     orgsList.forEach(o => {
         const esExterno = Number(o.externoorganismo) === 2;
@@ -234,7 +284,7 @@ async function saveOrg(e, instId) {
         const res = await API.request('/admin/config/org/save', 'POST', fd);
         if (res.status === 'success') {
             await Swal.fire('Éxito', 'Organismo guardado.', 'success');
-            loadData(instId);
+            loadData(instId, { boot: false });
         } else {
             Swal.fire('Error', res.message, 'error');
         }
@@ -250,7 +300,7 @@ window.deleteOrg = async (id) => {
         const res = await API.request('/admin/config/org/delete', 'POST', fd);
         if (res.status === 'success') {
             Swal.fire('Eliminado', '', 'success');
-            loadData(localStorage.getItem('instId'));
+            loadData(localStorage.getItem('instId'), { boot: false });
         } else {
             Swal.fire('Error', res.message, 'error');
         }

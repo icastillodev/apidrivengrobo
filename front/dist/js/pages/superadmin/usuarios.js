@@ -1,6 +1,9 @@
 import { API } from '../../api.js';
+import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 
 let allUsers = [];
+/** True si la última petición `/superadmin/usuarios` falló (mostrar fila error). */
+let usuariosLoadError = false;
 let currentPage = 1;
 const rowsPerPage = 15;
 let modalUser;
@@ -9,6 +12,15 @@ let deletePreviewUserId = null;
 let deletePreviewData = null;
 /** UsrA al abrir el modal en edición (cuentas legadas con espacios). */
 let modalOriginalUsrA = '';
+
+function escHtmlUsr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 function getRolesMap() {
     const t = window.txt?.superadmin_usuarios_global;
@@ -19,8 +31,13 @@ function getRolesMap() {
 export async function initSuperUsuarios() {
     modalUser = new bootstrap.Modal(document.getElementById('modal-user'));
     modalDeleteFull = new bootstrap.Modal(document.getElementById('modal-delete-full'));
-    await cargarSedes();
-    await cargarUsuarios();
+    showLoader();
+    try {
+        await cargarSedes();
+        await cargarUsuarios({ inline: false });
+    } finally {
+        hideLoader();
+    }
     poblarSelectRoles();
 
     document.getElementById('btn-search').onclick = () => {
@@ -43,10 +60,29 @@ async function cargarSedes() {
     }
 }
 
-async function cargarUsuarios() {
-    const res = await API.request('/superadmin/usuarios');
-    if (res.status === 'success') {
-        allUsers = res.data;
+async function cargarUsuarios({ inline = false } = {}) {
+    const tbody = document.getElementById('table-body');
+    const t = window.txt?.superadmin_usuarios_global || {};
+    if (inline && tbody) {
+        usuariosLoadError = false;
+        const msg = escHtmlUsr(t.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+    }
+    try {
+        const res = await API.request('/superadmin/usuarios');
+        usuariosLoadError = false;
+        if (res.status === 'success') {
+            allUsers = Array.isArray(res.data) ? res.data : [];
+            renderTable();
+        } else {
+            usuariosLoadError = true;
+            allUsers = [];
+            renderTable();
+        }
+    } catch (e) {
+        console.error(e);
+        usuariosLoadError = true;
+        allUsers = [];
         renderTable();
     }
 }
@@ -61,9 +97,19 @@ function poblarSelectRoles() {
 // --- RENDERIZADO Y BÚSQUEDA ---
 
 function renderTable() {
+    const tbody = document.getElementById('table-body');
+    const t = window.txt?.superadmin_usuarios_global || {};
+    if (!tbody) return;
+
+    if (usuariosLoadError) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger small">${escHtmlUsr(t.error_cargar_lista || window.txt?.generales?.error || 'Error')}</td></tr>`;
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+
     const rolesMap = getRolesMap();
     const term = document.getElementById('search-input').value.toLowerCase().trim();
-    
+
     const filtered = allUsers.filter(u => {
         const id = String(u.IdUsrA || "");
         const sede = (u.NombreInst || "").toLowerCase();
@@ -76,9 +122,16 @@ function renderTable() {
                nombre.includes(term) || apellido.includes(term) || email.includes(term);
     });
 
-    const tbody = document.getElementById('table-body');
     const start = (currentPage - 1) * rowsPerPage;
     const pageData = filtered.slice(start, start + rowsPerPage);
+
+    if (pageData.length === 0) {
+        const msg =
+            allUsers.length === 0 ? t.tabla_sin_filas || '' : t.sin_resultados_filtro || '';
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted small">${escHtmlUsr(msg || '—')}</td></tr>`;
+        renderPagination(filtered.length);
+        return;
+    }
 
     tbody.innerHTML = pageData.map(u => `
         <tr onclick="abrirModalEditar(${u.IdUsrA})" class="cursor-pointer border-b hover:bg-gray-50">
@@ -216,7 +269,7 @@ window.guardarUsuario = async () => {
     const res = await API.request(endpoint, 'POST', data);
     if (res.status === 'success') {
         modalUser.hide();
-        cargarUsuarios();
+        await cargarUsuarios({ inline: true });
         (window.mostrarNotificacion || alert)(id ? "Datos actualizados" : "Usuario creado (Clave: 12345678)");
     } else {
         let msg = res.message || 'Error';
@@ -358,7 +411,7 @@ async function confirmarEliminacionTotal() {
             modalDeleteFull.hide();
             deletePreviewUserId = null;
             deletePreviewData = null;
-            await cargarUsuarios();
+            await cargarUsuarios({ inline: true });
             (window.mostrarNotificacion || alert)(t?.delete_success ?? res.message);
         } else {
             (window.mostrarNotificacion || alert)(res.message || (t?.delete_error ?? 'Error'));

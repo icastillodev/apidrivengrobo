@@ -23,9 +23,137 @@ function portalHref() {
     return getCorrectPath('panel/noticias');
 }
 
+function poePortalHref() {
+    return getCorrectPath('panel/poe');
+}
+
+function renderPoeDashboardBlock(poeRows, t) {
+    if (!poeRows || !poeRows.length) return '';
+    const max = 5;
+    const slice = poeRows.slice(0, max);
+    const tit = escapeHtml(t.dash_poe_label || '');
+    const ver = escapeHtml(t.dash_poe_ver_todos || '');
+    const lines = slice
+        .map((r) => {
+            const id = parseInt(r.IdPoe, 10) || 0;
+            if (!id) return '';
+            const title = escapeHtml(r.Titulo || '—');
+            const href = `${poePortalHref()}?id=${encodeURIComponent(String(id))}`;
+            return `<li class="list-group-item py-2"><a href="${href}" class="fw-semibold text-success text-decoration-none">${title}</a></li>`;
+        })
+        .join('');
+    return `
+        <div class="col-12 mb-3">
+            <div class="border rounded-3 overflow-hidden bg-white shadow-sm">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-bottom bg-light">
+                    <div class="fw-black text-uppercase small text-muted mb-0">${tit}</div>
+                    <a href="${poePortalHref()}" class="btn btn-sm btn-outline-success fw-bold">${ver}</a>
+                </div>
+                <ul class="list-group list-group-flush">${lines}</ul>
+            </div>
+        </div>`;
+}
+
+function renderPortadaDashboardBlock(pp, t) {
+    if (!pp) return '';
+    const tit = (pp.PortadaTitulo || '').trim();
+    const cue = (pp.PortadaCuerpo || '').trim();
+    const adj = pp.portada_adjuntos || [];
+    if (!tit && !cue && adj.length === 0) return '';
+    const adjHtml = adj.length
+        ? `<div class="d-flex flex-wrap gap-2 mt-2">${adj
+              .map(
+                  (a) =>
+                      `<a href="${escapeHtml(a.url)}" class="btn btn-sm btn-outline-success fw-bold" target="_blank" rel="noopener noreferrer">${escapeHtml(
+                          a.nombre || a.url
+                      )}</a>`
+              )
+              .join('')}</div>`
+        : '';
+    return `
+        <div class="col-12 mb-3">
+            <div class="card border-0 shadow-sm border-start border-success border-4 overflow-hidden">
+                <div class="card-body">
+                    <div class="fw-black text-uppercase small text-muted mb-2">${escapeHtml(t.dash_portada_label || '')}</div>
+                    ${tit ? `<h5 class="fw-bold mb-2">${escapeHtml(tit)}</h5>` : ''}
+                    ${cue ? `<div class="small text-dark" style="white-space: pre-wrap;">${escapeHtml(cue)}</div>` : ''}
+                    ${adjHtml}
+                </div>
+            </div>
+        </div>`;
+}
+
+function maybeShowPortadaPopup(pp, t) {
+    if (!pp || parseInt(pp.PopupActivo, 10) !== 1) return;
+    const tit = (pp.PopupTitulo || '').trim();
+    const cue = (pp.PopupCuerpo || '').trim();
+    const adj = pp.popup_adjuntos || [];
+    const news = pp.PopupNoticia;
+    if (!tit && !cue && adj.length === 0 && !news) return;
+    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+    const fu = pp.FechaActualizacion ? String(pp.FechaActualizacion) : '0';
+    const key = `grobo_portada_popup_${instId}_${fu}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+
+    const modalId = 'grobo-modal-portada-popup';
+    document.getElementById(modalId)?.remove();
+
+    const titleModal = tit || (t.pp_popup_fallback_title || '');
+    const newsHtml =
+        news && news.IdNoticia
+            ? `<div class="mt-3 pt-2 border-top">
+            <a href="${portalHref()}?id=${encodeURIComponent(String(news.IdNoticia))}" class="btn btn-success btn-sm fw-bold">${escapeHtml(
+                  t.pp_popup_ver_noticia || t.dash_abrir_noticia || ''
+              )}</a>
+            <div class="small text-muted mt-2 text-break">${escapeHtml(news.Titulo || '')}</div>
+        </div>`
+            : '';
+    const adjHtml = adj.length
+        ? `<div class="d-flex flex-wrap gap-2 mt-3">${adj
+              .map(
+                  (a) =>
+                      `<a href="${escapeHtml(a.url)}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">${escapeHtml(
+                          a.nombre || a.url
+                      )}</a>`
+              )
+              .join('')}</div>`
+        : '';
+
+    document.body.insertAdjacentHTML(
+        'beforeend',
+        `<div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold">${escapeHtml(titleModal)}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body pt-2">
+                        ${cue ? `<div class="small text-dark" style="white-space:pre-wrap">${escapeHtml(cue)}</div>` : ''}
+                        ${adjHtml}
+                        ${newsHtml}
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-success fw-bold px-4" data-bs-dismiss="modal">${escapeHtml(t.modal_cerrar || '')}</button>
+                    </div>
+                </div>
+            </div>
+        </div>`
+    );
+
+    const el = document.getElementById(modalId);
+    if (el && window.bootstrap?.Modal) {
+        const m = new window.bootstrap.Modal(el);
+        el.addEventListener('hidden.bs.modal', () => el.remove(), { once: true });
+        m.show();
+    }
+}
+
 const refreshBound = new Set();
 
-const DASH_NOTICIAS_PAGE_SIZE = 3;
+/** Listado API: suficientes ítems para hasta 3 destacadas + recientes debajo. */
+const DASH_NOTICIAS_PAGE_SIZE = 12;
 const DASH_MENSAJES_UNREAD_MAX = 5;
 
 function mensajesPanelHref(alcance, hiloId) {
@@ -83,13 +211,18 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         mount.innerHTML = `<div class="text-center text-muted py-3 small">${escapeHtml(t.msg_cargando || '')}</div>`;
     }
 
-    const [loc, unreadHilos] = await Promise.all([
+    const [loc, unreadHilos, ppRes, poeRes] = await Promise.all([
         API.request(
             `/comunicacion/noticias?alcance=local&page=1&pageSize=${DASH_NOTICIAS_PAGE_SIZE}&fullCuerpo=1`,
             'GET'
         ),
         fetchUnreadHilosDashboard(),
+        API.request('/comunicacion/portada-popup', 'GET'),
+        API.request('/comunicacion/poe', 'GET'),
     ]);
+
+    const ppConfig = ppRes?.status === 'success' && ppRes.data ? ppRes.data : null;
+    const poeRows = poeRes?.status === 'success' && poeRes.data?.rows ? poeRes.data.rows : [];
 
     if (loc?.status !== 'success') {
         if (silent && hadInjected) return;
@@ -99,24 +232,70 @@ export async function injectDashboardNoticias(mountId, options = {}) {
 
     const rowsLoc = (loc?.data?.rows) ? loc.data.rows : [];
 
-    const bloqueLocal = rowsLoc.length
-        ? rowsLoc.map((row) => {
-            const titulo = escapeHtml(row.Titulo || '—');
-            const fp = row.FechaPublicacion || row.FechaCreacion || '';
-            const cuerpoRaw = row.Cuerpo || row.CuerpoResumen || '';
-            const cuerpoHtml = escapeHtml(cuerpoRaw);
-            const idNoticia = parseInt(row.IdNoticia, 10) || 0;
-            return `
+    function noticiaCardInner(row) {
+        const titulo = escapeHtml(row.Titulo || '—');
+        const fp = row.FechaPublicacion || row.FechaCreacion || '';
+        const cuerpoRaw = row.Cuerpo || row.CuerpoResumen || '';
+        const cuerpoHtml = escapeHtml(cuerpoRaw);
+        const idNoticia = parseInt(row.IdNoticia, 10) || 0;
+        return `
+            <div class="d-flex flex-wrap align-items-center gap-2 small text-muted text-uppercase mb-1" style="font-size:10px;">
+                <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(row)}
+            </div>
+            <h6 class="fw-bold mb-2">${titulo}</h6>
+            <div class="small text-dark dash-noticia-cuerpo" style="white-space: pre-wrap; max-height: 140px; overflow-y: auto;">${cuerpoHtml}</div>
+            ${idNoticia ? `<a href="${portalHref()}?id=${encodeURIComponent(String(idNoticia))}" class="d-inline-block mt-2 small text-success fw-semibold">${escapeHtml(t.dash_abrir_noticia || t.ver_mas || '')}</a>` : ''}`;
+    }
+
+    const pinned = [];
+    const rest = [];
+    for (const row of rowsLoc) {
+        const o = row.OrdenFijo != null && row.OrdenFijo !== '' ? parseInt(row.OrdenFijo, 10) : NaN;
+        if (o >= 1 && o <= 3) {
+            pinned.push(row);
+        } else {
+            rest.push(row);
+        }
+    }
+    pinned.sort((a, b) => parseInt(a.OrdenFijo, 10) - parseInt(b.OrdenFijo, 10));
+    const pinnedShow = pinned.slice(0, 3);
+
+    const bloquePinned =
+        pinnedShow.length > 0
+            ? `
+        <div class="mb-3">
+            <div class="fw-black text-uppercase small text-muted mb-2">${escapeHtml(t.dash_noticias_destacadas || '')}</div>
+            <div class="row g-2">
+                ${pinnedShow
+                    .map(
+                        (row) => `
+                <div class="col-12 col-md-4">
+                    <div class="border rounded-3 p-3 bg-white shadow-sm h-100 pointer transition-hover" style="cursor:pointer" role="link" tabindex="0"
+                         data-dash-noticia-id="${parseInt(row.IdNoticia, 10) || 0}">
+                        ${noticiaCardInner(row)}
+                    </div>
+                </div>`
+                    )
+                    .join('')}
+            </div>
+        </div>`
+            : '';
+
+    const bloqueLocal =
+        rest.length > 0
+            ? rest
+                  .map((row) => {
+                      const idNoticia = parseInt(row.IdNoticia, 10) || 0;
+                      const inner = noticiaCardInner(row);
+                      return `
             <div class="border rounded-3 p-3 bg-white shadow-sm mb-3">
-                <div class="d-flex flex-wrap align-items-center gap-2 small text-muted text-uppercase mb-1" style="font-size:10px;">
-                    <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(row)}
-                </div>
-                <h6 class="fw-bold mb-2">${titulo}</h6>
-                <div class="small text-dark dash-noticia-cuerpo" style="white-space: pre-wrap; max-height: 140px; overflow-y: auto;">${cuerpoHtml}</div>
-                ${idNoticia ? `<a href="${portalHref()}?id=${encodeURIComponent(String(idNoticia))}" class="d-inline-block mt-2 small text-success fw-semibold">${escapeHtml(t.dash_abrir_noticia || t.ver_mas || '')}</a>` : ''}
+                ${inner}
             </div>`;
-        }).join('')
-        : `<div class="border rounded-3 p-3 bg-white shadow-sm"><p class="text-muted small mb-0">${escapeHtml(t.dash_sin_noticias || '')}</p></div>`;
+                  })
+                  .join('')
+            : pinnedShow.length === 0
+              ? `<div class="border rounded-3 p-3 bg-white shadow-sm"><p class="text-muted small mb-0">${escapeHtml(t.dash_sin_noticias || '')}</p></div>`
+              : '';
 
     const bloqueMensajes = (() => {
         const tit = escapeHtml(t.dash_mensajes_titulo || '');
@@ -161,16 +340,43 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         </div>`;
     })();
 
+    const showListaTitulo = rest.length > 0 || rowsLoc.length === 0;
+    const bloqueTituloYLista = showListaTitulo
+        ? `<div class="fw-black text-uppercase small text-muted mb-2">${escapeHtml(t.dash_noticias_locales || '')}</div>${bloqueLocal}`
+        : '';
+
+    const bloquePortada = renderPortadaDashboardBlock(ppConfig, t);
+    const bloquePoe = renderPoeDashboardBlock(poeRows, t);
+
     mount.innerHTML = `
+        ${bloquePortada}
+        ${bloquePoe}
         ${bloqueMensajes}
         <div class="col-12">
-            <div class="fw-black text-uppercase small text-muted mb-2">${escapeHtml(t.dash_noticias_locales || '')}</div>
-            ${bloqueLocal}
+            ${bloquePinned}
+            ${bloqueTituloYLista}
             <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 mt-3">
                 <a href="${portalHref()}" class="btn btn-sm btn-outline-success fw-bold">${escapeHtml(t.dash_ver_todas || '')}</a>
                 <a href="${portalHref()}?alcance=red" class="btn btn-sm btn-outline-secondary fw-bold">${escapeHtml(t.dash_ver_noticias_red || '')}</a>
             </div>
         </div>`;
+
+    maybeShowPortadaPopup(ppConfig, t);
+
+    mount.querySelectorAll('[data-dash-noticia-id]').forEach((el) => {
+        const id = el.getAttribute('data-dash-noticia-id');
+        if (!id || id === '0') return;
+        const go = () => {
+            window.location.href = `${portalHref()}?id=${encodeURIComponent(id)}`;
+        };
+        el.addEventListener('click', go);
+        el.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                go();
+            }
+        });
+    });
 
     mount.dataset.newsDashboardInjected = '1';
 

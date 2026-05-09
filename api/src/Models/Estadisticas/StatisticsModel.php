@@ -167,7 +167,7 @@ class StatisticsModel {
              AND (NOT EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA) OR EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA AND sp.Aprobado = 1))
             ) as total_protocolos,
 
-            (SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion = ? AND a.finalizado = 0) as total_alojamientos";
+            (SELECT COUNT(DISTINCT a.historia) FROM alojamiento a WHERE a.IdInstitucion = ? AND a.finalizado = 0 AND a.historia IS NOT NULL) as total_alojamientos";
         
         $stmtG = $this->db->prepare($sqlG);
         $paramsG = array_merge(
@@ -233,8 +233,14 @@ class StatisticsModel {
         $stmtE->execute(array_merge($pInstF, [$from, $to]));
         $res['ranking_especies'] = $stmtE->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 4. ALOJAMIENTOS ACTIVOS (Sin cambios)
-        $sqlA = "SELECT d.NombreDeptoA as departamento, COUNT(a.IdAlojamiento) as cantidad FROM departamentoe d LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ? WHERE d.IdInstitucion = ? GROUP BY d.NombreDeptoA";
+        // 4. ALOJAMIENTOS ACTIVOS por depto: historias distintas (no tramos) con al menos un tramo vigente, protocolo asociado al depto vía protdeptor
+        $sqlA = "SELECT d.NombreDeptoA as departamento,
+                        COUNT(DISTINCT CASE WHEN a.historia IS NOT NULL THEN a.historia END) as cantidad
+                 FROM departamentoe d
+                 LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA
+                 LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ?
+                 WHERE d.IdInstitucion = ?
+                 GROUP BY d.iddeptoA, d.NombreDeptoA";
         $stmtA = $this->db->prepare($sqlA);
         $stmtA->execute([$instId, $instId]);
         $res['alojamientos_activos'] = $stmtA->fetchAll(\PDO::FETCH_ASSOC);
@@ -287,7 +293,138 @@ class StatisticsModel {
         $res['ranking_cepas'] = $this->getRankingCepas((int)$instId, (string)$from, (string)$to);
         $res['detalle_cepas'] = $this->getDetalleCepas((int)$instId, (string)$from, (string)$to);
 
+        $res['derivacion_pedidos'] = $this->getDerivacionVsPropios((int) $instId, (string) $from, (string) $to);
+
         return $res;
+    }
+
+    /**
+     * Pedidos entregados propios de la sede vs recibidos por derivación activa, desglosados por institución de origen.
+     *
+     * @return array{activo: bool, propios?: array<string, float|int>, recibidos_por_origen?: array<int, array<string, mixed>>}
+     */
+    private function getDerivacionVsPropios(int $instId, string $from, string $to): array {
+        if (!$this->hasFormularioDerivacionTable()) {
+            return ['activo' => false];
+        }
+        $i = (int) $instId;
+        if ($i <= 0) {
+            return ['activo' => false];
+        }
+        $notRecibidoComoDestino = 'NOT EXISTS (SELECT 1 FROM formulario_derivacion fd_nr WHERE fd_nr.idformA = f.idformA AND fd_nr.Activo = 1 AND fd_nr.IdInstitucionDestino = f.IdInstitucion)';
+        $sqlP = "SELECT
+            (SELECT IFNULL(SUM(s.totalA), 0) FROM formularioe f INNER JOIN sexoe s ON f.idformA = s.idformA
+                WHERE f.estado = 'Entregado' AND f.IdInstitucion = ? AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_animales,
+            (SELECT COUNT(*) FROM formularioe f WHERE f.estado = 'Entregado' AND f.reactivo IS NOT NULL AND f.IdInstitucion = ? AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_reactivos,
+            (SELECT COUNT(*) FROM formularioe f INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                WHERE f.estado = 'Entregado' AND t.categoriaformulario = 'Insumos' AND f.IdInstitucion = ? AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_insumos";
+        $stmtP = $this->db->prepare($sqlP);
+        $stmtP->execute([$i, $from, $to, $i, $from, $to, $i, $from, $to]);
+        $propios = $stmtP->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $propiosOut = [
+            'total_animales' => (float) ($propios['total_animales'] ?? 0),
+            'total_reactivos' => (int) ($propios['total_reactivos'] ?? 0),
+            'total_insumos' => (int) ($propios['total_insumos'] ?? 0),
+        ];
+
+        $sqlR = "SELECT fd.IdInstitucionOrigen AS id_institucion_origen,
+                TRIM(COALESCE(io.NombreInst, '')) AS institucion_origen,
+                IFNULL(SUM(se.totalA), 0) AS total_animales,
+                SUM(CASE WHEN f.reactivo IS NOT NULL THEN 1 ELSE 0 END) AS total_reactivos,
+                SUM(CASE WHEN tf.categoriaformulario = 'Insumos' THEN 1 ELSE 0 END) AS total_insumos
+            FROM formulario_derivacion fd
+            LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
+            LEFT JOIN sexoe se ON f.idformA = se.idformA
+            LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY fd.IdInstitucionOrigen, io.NombreInst
+            ORDER BY institucion_origen ASC";
+        $stmtR = $this->db->prepare($sqlR);
+        $stmtR->execute([$i, $from, $to]);
+        $rows = $stmtR->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $recibidos = [];
+        foreach ($rows as $row) {
+            $recibidos[] = [
+                'id_institucion_origen' => (int) ($row['id_institucion_origen'] ?? 0),
+                'institucion_origen' => (string) ($row['institucion_origen'] ?? ''),
+                'total_animales' => (float) ($row['total_animales'] ?? 0),
+                'total_reactivos' => (int) ($row['total_reactivos'] ?? 0),
+                'total_insumos' => (int) ($row['total_insumos'] ?? 0),
+            ];
+        }
+
+        return [
+            'activo' => true,
+            'propios' => $propiosOut,
+            'recibidos_por_origen' => $recibidos,
+        ];
+    }
+
+    /**
+     * Igual que {@see getDerivacionVsPropios} pero para todas las sedes de la red (destinos en red).
+     *
+     * @param int[] $ids
+     * @return array{activo: bool, propios?: array<string, float|int>, recibidos_por_origen?: array<int, array<string, mixed>>}
+     */
+    private function getDerivacionVsPropiosRed(array $ids, string $from, string $to): array {
+        $ids = array_values(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0));
+        if (!$this->hasFormularioDerivacionTable() || $ids === []) {
+            return ['activo' => false];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $notRecibidoComoDestino = 'NOT EXISTS (SELECT 1 FROM formulario_derivacion fd_nr WHERE fd_nr.idformA = f.idformA AND fd_nr.Activo = 1 AND fd_nr.IdInstitucionDestino = f.IdInstitucion)';
+        $sqlP = "SELECT
+            (SELECT IFNULL(SUM(s.totalA), 0) FROM formularioe f INNER JOIN sexoe s ON f.idformA = s.idformA
+                WHERE f.estado = 'Entregado' AND f.IdInstitucion IN ($ph) AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_animales,
+            (SELECT COUNT(*) FROM formularioe f WHERE f.estado = 'Entregado' AND f.reactivo IS NOT NULL AND f.IdInstitucion IN ($ph) AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_reactivos,
+            (SELECT COUNT(*) FROM formularioe f INNER JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario
+                WHERE f.estado = 'Entregado' AND t.categoriaformulario = 'Insumos' AND f.IdInstitucion IN ($ph) AND f.fechainicioA BETWEEN ? AND ? AND {$notRecibidoComoDestino}) AS total_insumos";
+        $stmtP = $this->db->prepare($sqlP);
+        $stmtP->execute(array_merge($ids, [$from, $to], $ids, [$from, $to], $ids, [$from, $to]));
+        $propios = $stmtP->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $propiosOut = [
+            'total_animales' => (float) ($propios['total_animales'] ?? 0),
+            'total_reactivos' => (int) ($propios['total_reactivos'] ?? 0),
+            'total_insumos' => (int) ($propios['total_insumos'] ?? 0),
+        ];
+
+        $sqlR = "SELECT fd.IdInstitucionOrigen AS id_institucion_origen,
+                TRIM(COALESCE(io.NombreInst, '')) AS institucion_origen,
+                IFNULL(SUM(se.totalA), 0) AS total_animales,
+                SUM(CASE WHEN f.reactivo IS NOT NULL THEN 1 ELSE 0 END) AS total_reactivos,
+                SUM(CASE WHEN tf.categoriaformulario = 'Insumos' THEN 1 ELSE 0 END) AS total_insumos
+            FROM formulario_derivacion fd
+            LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
+            LEFT JOIN sexoe se ON f.idformA = se.idformA
+            LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino IN ($ph)
+              AND f.estado = 'Entregado'
+              AND f.fechainicioA BETWEEN ? AND ?
+            GROUP BY fd.IdInstitucionOrigen, io.NombreInst
+            ORDER BY institucion_origen ASC";
+        $stmtR = $this->db->prepare($sqlR);
+        $stmtR->execute(array_merge($ids, [$from, $to]));
+        $rows = $stmtR->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $recibidos = [];
+        foreach ($rows as $row) {
+            $recibidos[] = [
+                'id_institucion_origen' => (int) ($row['id_institucion_origen'] ?? 0),
+                'institucion_origen' => (string) ($row['institucion_origen'] ?? ''),
+                'total_animales' => (float) ($row['total_animales'] ?? 0),
+                'total_reactivos' => (int) ($row['total_reactivos'] ?? 0),
+                'total_insumos' => (int) ($row['total_insumos'] ?? 0),
+            ];
+        }
+
+        return [
+            'activo' => true,
+            'propios' => $propiosOut,
+            'recibidos_por_origen' => $recibidos,
+        ];
     }
 
     /**
@@ -658,7 +795,7 @@ class StatisticsModel {
             (SELECT COUNT(*) FROM formularioe f WHERE $wfRed AND f.estado = 'Entregado' AND f.reactivo IS NOT NULL AND f.fechainicioA BETWEEN ? AND ?) as total_reactivos,
             (SELECT COUNT(*) FROM formularioe f JOIN tipoformularios t ON f.tipoA = t.IdTipoFormulario WHERE $wfRed AND f.estado = 'Entregado' AND t.categoriaformulario = 'Insumos' AND f.fechainicioA BETWEEN ? AND ?) as total_insumos,
             (SELECT COUNT(*) FROM protocoloexpe pe WHERE pe.IdInstitucion IN ($placeholders) AND pe.FechaFinProtA >= CURDATE() AND (NOT EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA) OR EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA AND sp.Aprobado = 1))) as total_protocolos,
-            (SELECT COUNT(*) FROM alojamiento a WHERE a.IdInstitucion IN ($placeholders) AND a.finalizado = 0) as total_alojamientos";
+            (SELECT COUNT(DISTINCT a.historia) FROM alojamiento a WHERE a.IdInstitucion IN ($placeholders) AND a.finalizado = 0 AND a.historia IS NOT NULL) as total_alojamientos";
         $dblIds = $this->paramsIdsFormularioInstitucionesRed($ids);
         $paramsG = array_merge(
             $dblIds, [$from, $to],
@@ -731,7 +868,15 @@ class StatisticsModel {
         // 4. ALOJAMIENTOS ACTIVOS por inst (agregado)
         $res['alojamientos_activos'] = [];
         foreach ($ids as $id) {
-            $stmtA = $this->db->prepare("SELECT d.NombreDeptoA as departamento, COUNT(a.IdAlojamiento) as cantidad FROM departamentoe d LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ? WHERE d.IdInstitucion = ? GROUP BY d.NombreDeptoA");
+            $stmtA = $this->db->prepare(
+                "SELECT d.NombreDeptoA as departamento,
+                        COUNT(DISTINCT CASE WHEN a.historia IS NOT NULL THEN a.historia END) as cantidad
+                 FROM departamentoe d
+                 LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA
+                 LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ?
+                 WHERE d.IdInstitucion = ?
+                 GROUP BY d.iddeptoA, d.NombreDeptoA"
+            );
             $stmtA->execute([$id, $id]);
             $instName = $institutionNames[(int) $id] ?? (string) $id;
             foreach ($stmtA->fetchAll(\PDO::FETCH_ASSOC) as $r) {
@@ -781,6 +926,8 @@ class StatisticsModel {
         // 9. CEPAS (red)
         $res['ranking_cepas'] = $this->getRankingCepasRed($ids, (string)$from, (string)$to);
         $res['detalle_cepas'] = $this->getDetalleCepasRed($ids, (string)$from, (string)$to);
+
+        $res['derivacion_pedidos'] = $this->getDerivacionVsPropiosRed($ids, (string) $from, (string) $to);
 
         return $res;
     }

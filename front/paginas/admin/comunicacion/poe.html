@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POE (admin) - GROBO</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../../../dist/style/css/tailwind.css?v=20260409">
+    <script type="module">
+        import { showLoader, hideLoader } from '../../../dist/js/components/LoaderComponent.js?v=20260420';
+        import { Auth } from '../../../dist/js/auth.js?v=20260409';
+        import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260409';
+        import { NotificationManager } from '../../../dist/js/NotificationManager.js?v=20260409';
+        import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260409';
+        import { initAdminPoe } from '../../../dist/js/pages/admin/comunicacion_poe.js?v=20260509';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            showLoader();
+            try {
+                await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+                if (window.txt) translatePage();
+                Auth.checkAccess([2, 3, 4, 5, 6]);
+                if (window.txt) {
+                    await initMenu();
+                    NotificationManager.init();
+                    await initAdminPoe();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                hideLoader();
+            }
+        });
+    </script>
+</head>
+<body class="bg-light" style="font-family: Lato, sans-serif;" data-page-title-key="poe_admin">
+    <div class="container-fluid my-4 px-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2">
+            <div>
+                <h4 class="fw-black m-0" data-i18n="comunicacion.poe_admin_titulo"></h4>
+                <p class="text-muted small mb-0 mt-1" data-i18n="comunicacion.poe_admin_sub"></p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="./noticias.html" class="btn btn-outline-secondary btn-sm fw-bold">
+                    <i class="bi bi-newspaper me-1"></i><span data-i18n="comunicacion.pp_btn_volver_noticias"></span>
+                </a>
+                <button type="button" class="btn btn-success btn-sm fw-bold" id="btn-poe-nuevo">
+                    <i class="bi bi-plus-lg me-1"></i><span data-i18n="comunicacion.poe_btn_nuevo"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-i18n="comunicacion.poe_col_titulo"></th>
+                            <th class="text-center" data-i18n="comunicacion.poe_col_orden"></th>
+                            <th class="text-center" data-i18n="comunicacion.poe_col_estado"></th>
+                            <th class="text-end pe-3" data-i18n="comunicacion.poe_col_acciones"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-poe-tbody"></tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2 bg-white border-0">
+                <span class="text-muted small" id="admin-poe-pag-info"></span>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" id="admin-poe-prev" data-i18n="comunicacion.portal_pag_prev"></button>
+                    <button type="button" class="btn btn-outline-secondary" id="admin-poe-next" data-i18n="comunicacion.portal_pag_next"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-poe-admin" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="modal-poe-admin-title" data-i18n="comunicacion.poe_modal_nuevo"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="poe-id">
+                    <label class="form-label small fw-bold" data-i18n="comunicacion.pp_lbl_titulo"></label>
+                    <input type="text" class="form-control mb-2" id="poe-titulo" maxlength="255">
+                    <label class="form-label small fw-bold" data-i18n="comunicacion.poe_lbl_resena"></label>
+                    <textarea class="form-control mb-2" id="poe-resena" rows="3"></textarea>
+                    <label class="form-label small fw-bold" data-i18n="comunicacion.pp_lbl_cuerpo"></label>
+                    <textarea class="form-control mb-3" id="poe-cuerpo" rows="8"></textarea>
+                    <hr class="text-muted opacity-25" />
+                    <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.pp_adjuntos_title"></p>
+                    <label class="form-label small" data-i18n="comunicacion.pp_lbl_url1"></label>
+                    <input type="url" class="form-control mb-1" id="poe-url1" maxlength="768" placeholder="https://">
+                    <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre1"></label>
+                    <input type="text" class="form-control mb-3" id="poe-nombre1" maxlength="255">
+                    <label class="form-label small" data-i18n="comunicacion.pp_lbl_url2"></label>
+                    <input type="url" class="form-control mb-1" id="poe-url2" maxlength="768" placeholder="https://">
+                    <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre2"></label>
+                    <input type="text" class="form-control mb-3" id="poe-nombre2" maxlength="255">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold" data-i18n="comunicacion.poe_lbl_orden"></label>
+                            <input type="number" class="form-control" id="poe-orden" value="0" step="1">
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="poe-activo" checked>
+                                <label class="form-check-label small fw-bold" for="poe-activo" data-i18n="comunicacion.poe_lbl_activo"></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-2 border-top">
+                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="btn-poe-admin-qr" disabled>
+                            <i class="bi bi-qr-code me-1"></i><span data-i18n="comunicacion.poe_btn_qr"></span>
+                        </button>
+                        <span class="small text-muted ms-2" data-i18n="comunicacion.poe_admin_qr_hint"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="comunicacion.admin_cancelar"></button>
+                    <button type="button" class="btn btn-success fw-bold" id="btn-poe-guardar" data-i18n="comunicacion.poe_btn_guardar"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

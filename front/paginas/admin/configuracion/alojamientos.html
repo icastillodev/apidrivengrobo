@@ -59,7 +59,7 @@
                     NotificationManager.init();
                     
                     // Inicialización de la lógica de configuración (Salas, Racks, Cajas)
-                    initConfigAlojamientos();
+                    await initConfigAlojamientos();
                     translatePage();
                     
                     console.log("✅ Configuración de Alojamientos inicializada correctamente.");
@@ -178,7 +178,7 @@
 
                             <div class="tab-pane fade" id="traz-inicio-pane">
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                    <p class="text-muted small mb-0" data-i18n="config_alojamientos.desc_traz_inicio"></p>
+                                    <p class="text-muted small mb-0 flex-grow-1 me-md-2" style="min-width: min(100%, 260px);" data-i18n="config_alojamientos.desc_traz_inicio"></p>
                                     <div class="d-flex flex-wrap gap-2">
                                         <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm" onclick="window.openImportCloneTraz('inicio')">
                                             <i class="bi bi-box-arrow-in-down"></i> <span data-i18n="config_alojamientos.btn_copiar_desde"></span>

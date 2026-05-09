@@ -507,6 +507,20 @@ export const CHAPTERS = {
         h: 'Physical traceability (cages and subjects)',
         html: '<p>In the housing detail or traceability modal, <strong>cages</strong> are often identified with a prefix derived from the protocol type (first letter of the type + <code>A</code> + serial). <strong>Subjects</strong> combine the cage prefix, a <code>S…</code> serial, and a readable <strong>label</strong>.</p><ul class="mb-0"><li><strong>Rename:</strong> only changes the visible label; internal IDs and QR stay tied to the same record.</li><li><strong>Surgery / clinical:</strong> when enabled for the species, it may appear on the animal card and documents (per configuration and database fields).</li><li><strong>Segments (tramos):</strong> when you update a segment and unselect cages, the system no longer auto-adjusts the quantity tied to the cage QR so it does not overwrite a manually edited <strong>Cage quantity</strong>.</li></ul><p class="small text-body-secondary mb-0">The exact variable template is defined under <strong>Settings → Housing & clinic</strong> (types and per-protocol variables).</p>',
       },
+      {
+        id: 'alta_sujeto_resaltado',
+        cat: 'forms',
+        icon: 'plus-circle',
+        h: 'Adding a subject and biological data',
+        html: '<p>With physical traceability expanded and the protocol configured for both <strong>start</strong> and <strong>data</strong> categories, you can <strong>add subjects</strong> inside a cage. After you confirm the name, the tree refreshes and the success dialog may offer to open <strong>biological data</strong> (weight, sex, strain, subspecies, etc.).</p><p class="mb-0 small text-body-secondary">When you close that dialog, the new subject card usually <strong>scrolls into view</strong> and shows a <strong>short green border</strong> so you can spot it among several rows.</p>',
+      },
+      {
+        id: 'fichita_tras_alta',
+        cat: 'forms',
+        icon: 'clipboard-check',
+        h: 'Completing the record after creating a subject',
+        html: '<p>Creation only registers the subject on the cage card; an <strong>audit-ready record</strong> combines <strong>biological data</strong> (weight, sex, strain, etc.) and the <strong>start variables</strong> your site defined per species/protocol under <strong>Configuration → Traceability — start</strong>.</p><p class="mb-0">Open the record from the success dialog or from the subject in the tree. Later measurements belong under <strong>Traceability — data</strong>. A stricter guided wizard may be added later; today staff complete these sections per your facility’s internal procedure.</p>',
+      },
     ],
   },
   admin__estadisticas: {
@@ -887,6 +901,13 @@ export const CHAPTERS = {
         h: 'PDF, Excel, and on-screen help',
         html: '<p>Subpages usually offer <strong>PDF</strong> and/or <strong>Excel</strong> and a local <strong>Help</strong> button opening a modal for that screen. Field-level detail for billing line modals (animal, reagent, supply, housing) is in the <strong>Pop-up windows (modals)</strong> topic.</p>',
       },
+      {
+        id: 'historial_saldo',
+        cat: 'toolbar',
+        icon: 'clock-history',
+        h: 'Holder balance history',
+        html: '<p>In <strong>department</strong>, <strong>protocol</strong>, and <strong>investigator</strong> views you can open balance history from the billing panels. By default the modal <strong>does not automatically reuse</strong> the main report date filters, so recent movements are not dropped by an overly narrow range.</p><p class="mb-0">Depending on the view, helper text under the tables explains the scope shown. If both tables are empty but you expected movements, verify database records or contact support before assuming a UI defect.</p>',
+      },
     ],
   },
   admin__facturacion__depto: {
@@ -984,6 +1005,13 @@ export const CHAPTERS = {
         html: '<p>If the option is missing from the hub, your site has no configured routing to other sites—not necessarily a permission bug.</p>',
       },
       {
+        id: 'derivados_contabilidad',
+        cat: 'toolbar',
+        icon: 'diagram-3',
+        h: 'Derived lines and billing department',
+        html: '<p><strong>Derived</strong> billing lines show the matching badge versus <strong>standard</strong> lines. The department cell may show the originating area and a second line with the <strong>department where the order is billed</strong> (routing destination), which helps reconcile charges across sites.</p><p class="mb-0"><strong>PDF</strong> and <strong>Excel</strong> exports include that value in a dedicated column when applicable.</p>',
+      },
+      {
         id: 'pago',
         cat: 'modals',
         icon: 'cash-coin',
@@ -1030,6 +1058,13 @@ export const CHAPTERS = {
         icon: 'journal-text',
         h: 'What accounting history is',
         html: '<p>Records <strong>movements and adjustments</strong> tied to GROBO billing—useful for audits and corrections over time. Visible detail depends on <strong>role</strong>.</p>',
+      },
+      {
+        id: 'vs_historial_saldo_facturacion',
+        cat: 'navigation',
+        icon: 'question-circle',
+        h: 'Not the same as billing balance history',
+        html: '<p>This screen is <strong>accounting history</strong> for the facility (audit-oriented movements and adjustments). It differs from the <strong>holder balance history</strong> opened inside <strong>billing</strong> views (department, protocol, or investigator): that dialog lists charges and payments against balance for the selected scope.</p><p class="mb-0">If you expect investigator payment lines here and do not see them, open billing and use the balance history action. If that table is empty despite recent payments, check scope, date filters, or database data; the <strong>Billing centre</strong> manual topic includes a section on balance history.</p>',
       },
       {
         id: 'auditoria',
@@ -1133,6 +1168,78 @@ export const CHAPTERS = {
         icon: 'funnel',
         h: 'How to use it',
         html: '<dl class="manual-glossary mb-0"><dt><i class="bi bi-search text-success" aria-hidden="true"></i> Search</dt><dd>Filter by text when the field exists.</dd><dt><i class="bi bi-geo-alt text-success" aria-hidden="true"></i> Scope</dt><dd>Some sites allow local-only vs network-wide items.</dd><dt><i class="bi bi-cursor text-success" aria-hidden="true"></i> Open item</dt><dd>Shows full body and attachments if any.</dd></dl><p class="small text-muted mt-2 mb-0">Check regularly; some announcements appear only here. Email may not duplicate automatically.</p>',
+      },
+    ],
+  },
+  panel__poe: {
+    overview:
+      'Standard procedures (POE) are working/reference documents your institution publishes for quick consultation: internal procedures, guidelines, or useful links.\n\nThey appear as cards; opening one shows the full text and up to two external URLs if configured. This complements the news portal; it does not replace messaging or long announcements.',
+    summary:
+      'Reading institution-published POE.',
+    roles:
+      'Users with portal news access (same communications area).',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'journal-richtext',
+        h: 'What POE is in the panel',
+        html: '<p>A list of <strong>operational documents</strong> maintained by administration. Usually reached from <strong>News</strong> or the dashboard.</p>',
+      },
+      {
+        id: 'detalle',
+        cat: 'content',
+        icon: 'card-heading',
+        h: 'Open a document',
+        html: '<p>Click a card for a modal with text, links, and URLs when present. A <strong>QR code</strong> may be generated to share the item link when appropriate.</p>',
+      },
+    ],
+  },
+  admin__comunicacion__poe: {
+    overview:
+      'POE administration lets you create, order, and show or hide documents users see in the portal.\n\nEach record has title, body, sort order, visibility, and up to two attachment URLs (manual entry until cloud storage ships). Permissions align with news and landing settings.',
+    summary:
+      'Create, edit, and list institutional POE.',
+    roles:
+      'Profiles with communications / news administration.',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'journal-richtext',
+        h: 'Admin table',
+        html: '<p>Table with title, order, status, and row actions. Use <strong>New</strong> to add a POE or edit an existing row.</p>',
+      },
+      {
+        id: 'form',
+        cat: 'forms',
+        icon: 'ui-checks-grid',
+        h: 'Content and links',
+        html: '<p>Check portal-visible text and any supporting <strong>https URLs</strong>. Save and verify order; use pagination for long lists.</p>',
+      },
+    ],
+  },
+  'admin__comunicacion__portada-popup': {
+    overview:
+      'Welcome & popup configures two pieces of the news portal: landing copy on the main screen and an optional popup (toggle, copy, and optional link to a published news item).\n\nBoth save with one button. Attachment URLs remain manual until the cloud-storage phase.',
+    summary:
+      'Portal landing text and user popup.',
+    roles:
+      'Communications / news administration.',
+    blocks: [
+      {
+        id: 'intro',
+        cat: 'navigation',
+        icon: 'columns-gap',
+        h: 'Two blocks on screen',
+        html: '<p>One side is <strong>landing</strong> (title and body on the board). The other is optional <strong>popup</strong> with its activation switch.</p>',
+      },
+      {
+        id: 'guardar',
+        cat: 'forms',
+        icon: 'save',
+        h: 'Save and verify',
+        html: '<p>Use <strong>Save</strong> to persist both sections. Check on the portal with a non-admin user that wording and popup behaviour match expectations.</p>',
       },
     ],
   },
@@ -1448,6 +1555,12 @@ export const CHAPTERS = {
         cat: 'modals',
         h: 'Housing modal',
         html: '<p>Shows <strong>holder (pays)</strong> vs <strong>stay responsible</strong>, housing type, segments and computed days. The financial section summarizes <strong>historic cost</strong> and <strong>total paid</strong> with fields to apply payments or reversals per implementation. <strong>PDF</strong> and <strong>CLOSE</strong> in the footer.</p>',
+      },
+      {
+        id: 'pago_feedback',
+        cat: 'modals',
+        h: 'When payment fails or balances look wrong',
+        html: '<p>After confirming <strong>PAY</strong> or <strong>REMOVE</strong>, the UI shows a loading indicator and then either a success message or server text on failure (insufficient balance, blocked order, exemption/routing checks, etc.).</p><p class="mb-0">If success is reported but amounts do not update, reload the report or reopen the row—another user may be editing the same order or database values may be stale. If it keeps happening, capture time, order id, user, and the message shown, then escalate to support.</p>',
       },
       {
         id: 'sweetalert',

@@ -4,6 +4,7 @@
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
+import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
 import {
     formatBillingMoney,
@@ -17,13 +18,23 @@ import {
     billingSumAlojamientos,
     billingSumInsumosCobrable,
     billingDerivacionPlainText,
-    billingAlojPeriodoParaInforme
+    billingDerivadaLiquidacionBadge,
+    billingPdfFormularioIdDisplay,
+    billingAlojPeriodoParaInforme,
+    billingPedidoSinMontoNoExento,
+    billingHtmlRowInsumoPedidoFacturacion,
+    billingHtmlInsumoProtSectionHeader,
+    billingPartitionInsumosPedidoReactivoOtros
 } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';  
 
 window.currentReportData = null;
 window.protocolosCache = [];
+
+let protBillingReportLoadedOk = false;
+/** Último payload renderizado con éxito (restaurar si falla una recarga inline). */
+let protocoloLastRenderData = null;
 
 function txF() {
     return window.txt?.facturacion || {};
@@ -71,10 +82,14 @@ function renderizarOpciones(lista) {
 
 function vincularFiltro() {
     document.getElementById('busqueda-protocolo').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtrados = window.protocolosCache.filter(p => 
-            p.nprotA.toLowerCase().includes(term) || p.tituloA.toLowerCase().includes(term)
-        );
+        const term = (e.target.value || '').trim().toLowerCase();
+        const filtrados = window.protocolosCache.filter((p) => {
+            if (!term) return true;
+            const dep = String(p.nombreDepartamento ?? p.nombre_departamento ?? '').toLowerCase();
+            const nprot = String(p.nprotA ?? '').toLowerCase();
+            const tit = String(p.tituloA ?? '').toLowerCase();
+            return nprot.includes(term) || tit.includes(term) || (dep && dep.includes(term));
+        });
         renderizarOpciones(filtrados);
     });
 }
@@ -82,20 +97,47 @@ function vincularFiltro() {
 window.cargarFacturacionProtocolo = async () => {
     const idProt = document.getElementById('sel-protocolo').value;
     if (!idProt) return Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', window.txt?.facturacion?.aviso_protocolo || 'Seleccione un protocolo.', 'warning');
+    const resultsEl = document.getElementById('billing-results');
+    const prevRender = protocoloLastRenderData;
+    const useGlobalLoader = !protBillingReportLoadedOk;
     try {
-        showLoader();
+        if (useGlobalLoader) {
+            showLoader();
+        } else if (resultsEl) {
+            setBillingResultsLoadingInline('billing-results');
+        }
         const res = await API.request('/billing/protocol-report', 'POST', {
             idProt,
             desde: document.getElementById('f-desde').value,
             hasta: document.getElementById('f-hasta').value
         });
         if (res.status === 'success') {
-            window.currentReportData = { protocolos: [res.data] }; 
+            window.currentReportData = { protocolos: [res.data] };
+            protocoloLastRenderData = res.data;
             renderizarResultados(res.data);
+            protBillingReportLoadedOk = true;
         } else {
             Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
+            if (!useGlobalLoader && prevRender) {
+                renderizarResultados(prevRender);
+            } else if (!useGlobalLoader && resultsEl) {
+                resultsEl.replaceChildren();
+            }
         }
-    } catch (e) { console.error(e); } finally { hideLoader(); }
+    } catch (e) {
+        console.error(e);
+        if (!useGlobalLoader && prevRender) {
+            renderizarResultados(prevRender);
+        } else if (!useGlobalLoader && resultsEl) {
+            resultsEl.replaceChildren();
+            const err = document.createElement('div');
+            err.className = 'alert alert-danger m-3';
+            err.textContent = window.txt?.generales?.error_carga || 'Error al cargar datos.';
+            resultsEl.appendChild(err);
+        }
+    } finally {
+        if (useGlobalLoader) hideLoader();
+    }
 };
 
 function renderizarResultados(data) {
@@ -155,6 +197,7 @@ function renderizarResultados(data) {
 function getFormsTableHTML(formularios, idProt) {
     const bd = txBD();
     const bi = txBI();
+    const tf = txF();
     const safeForms = formularios || [];
 
     if (!safeForms || safeForms.length === 0) return `<p class="text-center my-4 text-muted small">${bi.sin_pedidos_protocolo || 'No hay pedidos vinculados a este protocolo.'}</p>`;
@@ -185,6 +228,8 @@ function getFormsTableHTML(formularios, idProt) {
                         const total = parseFloat(f.total || 0);
                         const pagado = parseFloat(f.pagado || 0);
                         const debe = isExento ? 0 : Math.max(0, total - pagado);
+                        const sinMontoNoEx = billingPedidoSinMontoNoExento(isExento, total, pagado);
+                        const lblSinTot = tf.pedido_sin_total_cobrable || 'Sin total';
 
                         const isRea = f.categoria?.toLowerCase().includes('reactivo');
                         const tipoModal = isRea ? 'REACTIVO' : 'ANIMAL';
@@ -208,18 +253,19 @@ function getFormsTableHTML(formularios, idProt) {
                         const fechasDisplay = `<div class="small"><b>${fi}</b> ${f.fecha || '-'}</div><div class="small text-danger"><b>${fo}</b> ${f.fecRetiroA || '-'}</div>`;
                         const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
                         
-                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` : 
+                        let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
+                            sinMontoNoEx ? `<span class="badge bg-secondary shadow-sm">${lblSinTot}</span>` :
                                          (debe <= 0 ? `<span class="badge bg-success shadow-sm">${bd.badge_pago_completo || 'PAGO COMPLETO'}</span>` : 
                                          (pagado > 0 ? `<span class="badge bg-warning text-dark shadow-sm">${bd.badge_pago_parcial || 'PAGO PARCIAL'}</span>` : 
                                          `<span class="badge bg-danger shadow-sm">${bd.badge_sin_pagar || 'SIN PAGAR'}</span>`));
 
-                        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f8fff9 !important;' : '';
+                        const rowStyle = (isExento || (debe <= 0 && !sinMontoNoEx)) ? 'background-color: #f8fff9 !important;' : '';
 
                         return `
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
                                 <td>${estadoBadge}</td>
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
@@ -239,20 +285,23 @@ function getAlojTableHTML(alojamientos, idProt) {
     const bp = txBP();
     const tf = txF();
     const secA = bi.sec_alojamientos || 'Alojamientos';
+    const thDep = bp.th_aloj_departamento || bi.col_departamento || 'DEPTO';
     return `
         <h6 class="fw-bold text-muted mb-2 small uppercase">${secA}</h6>
         <table class="table table-bordered table-billing mb-0">
             <thead class="table-dark text-center">
                 <tr>
                     <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                    <th>${bi.th_historia || 'HISTORIA'}</th><th>${bp.th_especie || 'ESPECIE'}</th><th>${tf.periodo || 'PERIODO'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
+                    <th>${bi.th_historia || 'HISTORIA'}</th><th class="small">${thDep}</th><th>${bp.th_especie || 'ESPECIE'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
                 </tr>
             </thead>
             <tbody>
                 ${alojamientos.map(a => `
                     <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})">
                         <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
-                        <td>#${a.historia}</td><td>${a.especie}</td><td class="small">${a.periodo}</td><td class="fw-bold">${a.dias ?? ''}</td>
+                        <td>#${a.historia}</td>
+                        <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
+                        <td>${a.especie}</td><td class="fw-bold">${a.dias ?? ''}</td>
                         <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                         <td class="text-end text-success">$ ${formatBillingMoney(a.pagado)}</td>
                         <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}</td>
@@ -268,28 +317,20 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
     const bi = txBI();
     const titulo = tf.insumos_protocolo ?? 'Insumos del protocolo';
     const exL = bi.pdf_monto_exento || 'Exento';
-    const filas = insumos.map(i => {
-        const total = parseFloat(i.total_item || 0);
-        const pagado = parseFloat(i.pagado || 0);
-        const isExento = billingTipoExento(i);
-        const debe = isExento ? 0 : Math.max(0, total - pagado);
-        const badge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
-            ((debe <= 0) ? `<span class="badge bg-success shadow-sm">${bd.aloj_estado_pago || 'PAGO'}</span>` :
-            (pagado > 0 ? `<span class="badge bg-warning text-dark">${tf.estado_cobro_parcial || 'PARCIAL'}</span>` : `<span class="badge bg-danger shadow-sm">${tf.estado_cobro_pendiente || 'PENDIENTE'}</span>`));
-        const detalleHTML = (i.detalle_completo || '').split(' | ').map(item => `• ${item}`).join('<br>');
-        const rowStyle = (debe <= 0 || isExento) ? 'background-color: #f0fff4 !important;' : '';
-        return `
-            <tr class="text-center align-middle pointer" style="${rowStyle}"
-                onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
-                <td><input type="checkbox" class="check-item-insumo-prot" data-prot="${idProt}" data-id="${i.id}" data-monto="${debe}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                <td class="small text-muted">#${i.id}</td>
-                <td>${badge}</td>
-                <td class="small">${i.solicitante}</td>
-                <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
-                <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>
-                ${billingTdTotalPagadoDebe(isExento, total, pagado, exL)}
-            </tr>`;
-    }).join('');
+    const packs = { bd, tf, bi, exL };
+    const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
+    const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
+    const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
+    const colspan = 9;
+    let tbody = '';
+    if (reactivos.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
+        tbody += reactivos.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
+    if (otros.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblDem);
+        tbody += otros.map(i => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
 
     return `
         <div class="mt-4">
@@ -309,7 +350,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:10%">${tf.falta || 'Debe'}</th>
                         </tr>
                     </thead>
-                    <tbody>${filas}</tbody>
+                    <tbody>${tbody}</tbody>
                 </table>
             </div>
         </div>`;
@@ -387,6 +428,10 @@ function renderDashboardProtocolo(totales) {
     };
 
     const f = (n) => `$ ${formatBillingMoney(parseFloat(n || 0))}`;
+    const deuda = parseFloat(totales.deudaTotal) || 0;
+    const pagado = parseFloat(totales.totalPagado) || 0;
+    const elAgg = document.getElementById('total-agregado-protocolo');
+    if (elAgg) elAgg.innerText = f(deuda + pagado);
 
     if (document.getElementById(ids.global)) document.getElementById(ids.global).innerText = f(totales.deudaTotal);
     if (document.getElementById(ids.animales)) document.getElementById(ids.animales).innerText = f(totales.deudaAnimales);
@@ -410,7 +455,7 @@ function getSelectedDateRangeLabelProt() {
 // =====================================
 window.downloadProtocoloPDF = async (idProt) => {
     if (!window.currentReportData || !window.currentReportData.protocolos || window.currentReportData.protocolos.length === 0) {
-        return Swal.fire(window.txt?.generales?.swal_atencion || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
+        return Swal.fire(window.txt?.generales?.swal_aviso || 'Aviso', window.txt?.facturacion?.sin_datos_cargados || 'No hay datos cargados.', 'info');
     }
 
     const data = window.currentReportData.protocolos[0];
@@ -466,7 +511,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
-                    isEx ? `#${f.id} (EX)` : `#${f.id}`,
+                    billingPdfFormularioIdDisplay(f),
                     f.nombre_especie,
                     (f.detalle_display || '').replace(/<[^>]*>/g, ""),
                     c[0], c[1], c[2]
@@ -529,7 +574,8 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const detalle = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 60);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL2);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
-                return [`#${i.id}`, (i.solicitante || '').substring(0, 25), detalle, c[0], c[1], c[2]];
+                const idInsPdf = billingPdfFormularioIdDisplay(i, { style: 'hash' });
+                return [String(idInsPdf).substring(0, 22), (i.solicitante || '').substring(0, 25), detalle, c[0], c[1], c[2]];
             });
             doc.autoTable({
                 startY: currentY,

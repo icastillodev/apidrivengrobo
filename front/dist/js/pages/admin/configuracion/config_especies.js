@@ -1,11 +1,19 @@
 import { API } from '../../../api.js';
 
+function escCfgEsp(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 let fullData = [];
 let cepasCache = {};
 let cepasInlineOpen = {};
 
 export async function initConfigEspecies() {
-    loadData();
+    await loadData();
     document.getElementById('form-especie').onsubmit = saveEspecie;
     document.getElementById('form-subespecie').onsubmit = saveSubespecie;
     const formCepa = document.getElementById('form-cepa');
@@ -16,15 +24,27 @@ export async function initConfigEspecies() {
 
 async function loadData() {
     const instId = localStorage.getItem('instId');
+    const container = document.getElementById('especies-container');
+    const te = window.txt?.config_especies || {};
+    const gen = window.txt?.generales || {};
+    const loadMain = escCfgEsp(te.cargando || gen.msg_cargando || '…');
+    if (container) {
+        container.innerHTML = `<div class="text-center py-5 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMain}</div></div>`;
+    }
     try {
         // Timestamp para evitar caché
         const res = await API.request(`/admin/config/especies/all?inst=${instId}&t=${Date.now()}`);
         if (res.status === 'success') {
             fullData = res.data;
             renderTree();
+        } else if (container) {
+            container.innerHTML = `<div class="alert alert-danger m-3">${escCfgEsp(te.error || gen.error || '')}</div>`;
         }
-    } catch (e) { 
-        console.error("Error al cargar especies:", e); 
+    } catch (e) {
+        console.error("Error al cargar especies:", e);
+        if (container) {
+            container.innerHTML = `<div class="alert alert-danger m-3">${escCfgEsp(te.error_conexion || gen.error || '')}</div>`;
+        }
     }
 }
 
@@ -251,9 +271,11 @@ window.deleteCepaConfirm = async (idcepaA, idespA) => {
 
 async function loadCepas(idespA) {
     const listEl = document.getElementById('cepas-list');
-    const t = window.txt?.config_especies;
+    const t = window.txt?.config_especies || {};
+    const gen = window.txt?.generales || {};
     if (!listEl) return;
-    listEl.innerHTML = `<div class="text-center text-muted small py-3">${t?.cargando || 'Cargando...'}</div>`;
+    const msg = escCfgEsp(t.cargando || gen.msg_cargando || '…');
+    listEl.innerHTML = `<div class="text-center text-muted small py-3"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div>${msg}</div></div>`;
     try {
         const res = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
         if (res.status === 'success') {
@@ -315,9 +337,11 @@ window.toggleCepasInline = async (idespA) => {
 
 async function loadCepasInline(idespA) {
     const box = document.getElementById(`cepas-inline-esp-${idespA}`);
-    const t = window.txt?.config_especies;
+    const t = window.txt?.config_especies || {};
+    const gen = window.txt?.generales || {};
     if (!box) return;
-    box.innerHTML = `<div class="text-center text-muted small py-2">${t?.cargando || 'Cargando...'}</div>`;
+    const msg = escCfgEsp(t.cargando || gen.msg_cargando || '…');
+    box.innerHTML = `<div class="text-center text-muted small py-2"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div>${msg}</div></div>`;
     try {
         const res = await API.request(`/admin/config/cepas/all?idespA=${idespA}&t=${Date.now()}`);
         if (res.status === 'success') {

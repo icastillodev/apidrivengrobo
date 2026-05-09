@@ -134,8 +134,8 @@ function fillProtocolSelect(protocolos) {
     sel.onchange = () => loadDetails();
 }
 
-export function initConfigAlojamientos() {
-    loadSpeciesList();
+export async function initConfigAlojamientos() {
+    await loadSpeciesList();
     wireProtocolSearchInput();
     document.getElementById('form-type').onsubmit = saveHousingType;
     document.getElementById('form-cat').onsubmit = saveClinicalVar;
@@ -154,7 +154,10 @@ export function initConfigAlojamientos() {
 async function loadSpeciesList() {
     const instId = localStorage.getItem('instId');
     const container = document.getElementById('list-species');
-    container.innerHTML = '<div class="text-center p-3"><span class="spinner-border spinner-border-sm"></span></div>';
+    const t = txtCfg();
+    const gen = window.txt?.generales || {};
+    const loadMsg = escAttr(t.cargando || gen.msg_cargando || '…');
+    container.innerHTML = `<div class="text-center p-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadMsg}</div></div>`;
 
     try {
         const res = await API.request(`/admin/config/especies/all?inst=${instId}`);
@@ -171,11 +174,11 @@ async function loadSpeciesList() {
             });
         } else {
             speciesCache = [];
-            container.innerHTML = '<div class="p-3 text-muted small text-center">No hay especies activas.</div>';
+            container.innerHTML = `<div class="p-3 text-muted small text-center">${escAttr(t.sin_especies_activas || '')}</div>`;
         }
     } catch (e) {
         console.error(e);
-        container.innerHTML = '<div class="text-danger p-3 small">Error al cargar especies.</div>';
+        container.innerHTML = `<div class="text-danger p-3 small">${escAttr(t.error_cargar_especies || gen.error || '')}</div>`;
     }
 }
 
@@ -198,13 +201,16 @@ async function loadDetails() {
         return;
     }
 
+    const tLd = txtCfg();
+    const genLd = window.txt?.generales || {};
+    const rowMsg = escAttr(tLd.cargando || genLd.msg_cargando || '…');
     document.getElementById('table-types').innerHTML =
-        '<tr><td colspan="4" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></td></tr>';
+        `<tr><td colspan="4" class="text-center py-3 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${rowMsg}</div></td></tr>`;
     ['table-traz-inicio', 'table-traz-datos'].forEach((tid) => {
         const el = document.getElementById(tid);
         if (el) {
             el.innerHTML =
-                '<tr><td colspan="5" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></td></tr>';
+                `<tr><td colspan="5" class="text-center py-3 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${rowMsg}</div></td></tr>`;
         }
     });
 

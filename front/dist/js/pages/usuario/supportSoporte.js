@@ -46,7 +46,7 @@ function estadoInfo(estado) {
   return { cls: 'bg-light text-dark', label: e };
 }
 
-export function initSupportSoporte() {
+export async function initSupportSoporte() {
   state.role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
 
   const ta = document.getElementById('reply-text');
@@ -64,13 +64,16 @@ export function initSupportSoporte() {
     if (id) selectTicket(id);
   });
 
-  loadList();
+  await loadList();
 }
 
 async function loadList() {
   const box = document.getElementById('lista-tickets');
   if (!box) return;
-  box.innerHTML = `<div class="p-3 small text-muted">${escapeHtml(t('soporte.cargando', 'Cargando…'))}</div>`;
+  const loadTxt = escapeHtml(
+    (window.txt?.soporte?.cargando || window.txt?.generales?.msg_cargando || '').trim() || '…'
+  );
+  box.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadTxt}</div></div>`;
 
   const res = await API.request('/support/tickets?page=1&limit=50', 'GET');
   if (res?.status !== 'success' || !res.data) {
