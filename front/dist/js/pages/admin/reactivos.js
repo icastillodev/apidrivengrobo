@@ -10,6 +10,7 @@ import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
 let allReactivos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -113,18 +114,23 @@ async function fetchReactivosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (reactivosListBootLocked) loading = 'none';
 
-    reactivosPageCacheApi.syncFiltersKey();
+    const prefetchGen = reactivosPageCacheApi.syncFiltersKey();
 
     if (reactivosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allReactivos = reactivosPageCacheApi.pageCache.get(currentPage);
         renderTableBody(allReactivos);
+        reactivosPageCacheApi.schedulePrefetchAround(totalReactivosList, currentPage, prefetchGen);
         return;
     }
 
     const tbody = document.getElementById('table-body-reactivos');
     if (loading === 'inline' && tbody) {
-        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+        setTbodyLoadingSpinner(tbody, {
+            colspan: 13,
+            layout: 'inventory',
+            spinnerTone: 'success',
+            message: window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…',
+        });
     }
     try {
         const res = await reactivosPageCacheApi.fetchPage(currentPage);
@@ -138,10 +144,18 @@ async function fetchReactivosList(opts = {}) {
             }
             reactivosPageCacheApi.pageCache.set(currentPage, [...allReactivos]);
             renderTableBody(allReactivos);
+            reactivosPageCacheApi.schedulePrefetchAround(totalReactivosList, currentPage, prefetchGen);
         }
     } catch (e) {
         console.error('❌ Error cargando reactivos:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        if (tbody) {
+            setTbodyMessageRow(tbody, {
+                colspan: 13,
+                variant: 'danger',
+                layout: 'inventory',
+                message: window.txt?.generales?.error_carga || 'Error al cargar datos.',
+            });
+        }
     }
 }
 
@@ -1040,7 +1054,13 @@ function renderTableBody(pageDataOverride = null) {
 
     tbody.innerHTML = '';
     if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        setTbodyMessageRow(tbody, {
+            colspan: 13,
+            variant: 'mutedEmpty',
+            message:
+                window.txt?.admin_animales?.sin_resultados ||
+                'No hay registros para los filtros seleccionados.',
+        });
         updateHeaderIcons();
         renderPagination(totalReactivosList, 'pagination-reactivo', () => fetchReactivosList());
         hideLoader();

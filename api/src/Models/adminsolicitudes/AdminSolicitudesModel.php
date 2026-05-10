@@ -130,7 +130,7 @@ class AdminSolicitudesModel {
                 // Solo se limpian adjuntos (B2 + BD) y se marca la solicitud como rechazada.
                 $attachments = $this->getAttachmentsBySolicitud($solId);
                 if (!empty($attachments)) {
-                    $b2 = new BackblazeB2();
+                    $b2 = new BackblazeB2('PROTOCOLOS');
                     foreach ($attachments as $att) {
                         $fileKey = trim((string)($att['file_key'] ?? ''));
                         if ($fileKey !== '') {

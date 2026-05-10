@@ -29,7 +29,7 @@
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260409';
         
         // Importamos el módulo específico de esta página
-        import { initHistorialContable } from '../../dist/js/pages/admin/historialcontable.js?v=20260430';
+        import { initHistorialContable } from '../../dist/js/pages/admin/historialcontable.js?v=20260511';
 
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
@@ -49,7 +49,7 @@
 
                     await initMenu();
                     NotificationManager.init();
-                    initHistorialContable(); // Inicializa lógica de la grilla
+                    await initHistorialContable();
                     
                     const instEl = document.getElementById('institucionbread');
                     if (instEl) instEl.innerText = Auth.getVal('NombreInst') || 'Institución';

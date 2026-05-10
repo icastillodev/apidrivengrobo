@@ -20,8 +20,12 @@ class GlobalSearchController {
         try {
             $sesion = Auditoria::getDatosSesion(); // Extracción Segura
             
-            $query  = isset($_GET['q']) ? trim($_GET['q']) : '';
-            $scope  = isset($_GET['scope']) ? trim($_GET['scope']) : 'global';
+            $query  = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+            $scope  = isset($_GET['scope']) ? trim((string) $_GET['scope']) : 'global';
+
+            if (strlen($query) > 120) {
+                $query = substr($query, 0, 120);
+            }
 
             if (strlen($query) < 1) { 
                 echo json_encode(['status' => 'success', 'data' => []]);

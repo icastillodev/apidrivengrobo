@@ -8,7 +8,56 @@ class TrazabilidadModel {
     public const TRAZ_ALCANCE_INICIO = 'inicio';
 
     private $db;
+
+    /** @var bool|null cache por request: columna opcional `con_cirugia` en `especie_alojamiento_unidad` */
+    private $euHasConCirugiaCol = null;
+
     public function __construct($db) { $this->db = $db; }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+
+            return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /** Columnas `categoriadatosunidadalojamiento` — `docs/database.sql`. */
+    private function sqlSelectCategoriaDatosUnidadAlojamientoColumns(string $alias = 'c'): string {
+        $p = $alias . '.';
+
+        return $p . 'IdDatosUnidadAloj, ' . $p . 'NombreCatAlojUnidad, ' . $p . 'DetalleCatAloj, ' . $p . 'IdEspA, '
+            . $p . 'idprotA, ' . $p . 'alcance_traz, ' . $p . 'TipoDeDato, ' . $p . 'dependencia_id, ' . $p . 'Habilitado';
+    }
+
+    /** Columnas `especie_alojamiento_unidad`; `con_cirugia` si existe en BD (parche). */
+    private function sqlSelectEspecieAlojamientoUnidadAllColumns(): string {
+        $base = 'IdEspecieAlojUnidad, NombreEspecieAloj, DetalleEspecieAloj, IdUnidadAlojamiento, IdCajaAlojamiento, '
+            . 'PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto';
+        if ($this->euHasConCirugiaCol === null) {
+            $this->euHasConCirugiaCol = $this->hasColumn('especie_alojamiento_unidad', 'con_cirugia');
+        }
+        if ($this->euHasConCirugiaCol) {
+            return $base . ', con_cirugia';
+        }
+
+        return $base;
+    }
+
+    /** Columnas `alojamiento_caja` — `docs/database.sql`. */
+    private function sqlSelectAlojamientoCajaAllColumns(): string {
+        return 'IdCajaAlojamiento, FechaInicio, Detalle, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion, '
+            . 'NombreCaja, IdAlojamiento, ubicacion';
+    }
+
+    /** Igual que sqlSelectAlojamientoCajaAllColumns con prefijo de alias (p. ej. getArbolBiologico). */
+    private function sqlSelectAlojamientoCajaColumnsAlias(string $alias = 'ac'): string {
+        return "{$alias}.IdCajaAlojamiento, {$alias}.FechaInicio, {$alias}.Detalle, {$alias}.IdUbicacionFisica, {$alias}.IdSalon, "
+            . "{$alias}.IdRack, {$alias}.IdLugarRack, {$alias}.ComentarioUbicacion, {$alias}.NombreCaja, {$alias}.IdAlojamiento, {$alias}.ubicacion";
+    }
 
     /**
      * Categorías de trazabilidad visibles para una especie y tramo de alojamiento (protocolo opcional).
@@ -16,19 +65,20 @@ class TrazabilidadModel {
      */
     public function listCategoriasTrazPorContexto(int $idEspA, ?int $idProtA, string $alcance): array {
         $alcance = $alcance === self::TRAZ_ALCANCE_INICIO ? self::TRAZ_ALCANCE_INICIO : self::TRAZ_ALCANCE_DATOS;
+        $catCols = $this->sqlSelectCategoriaDatosUnidadAlojamientoColumns('c');
         if ($idProtA === null || $idProtA <= 0) {
             $stmt = $this->db->prepare(
-                'SELECT * FROM categoriadatosunidadalojamiento c
+                "SELECT {$catCols} FROM categoriadatosunidadalojamiento c
                  WHERE c.IdEspA = ? AND c.alcance_traz = ? AND c.Habilitado != 2 AND c.idprotA IS NULL
-                 ORDER BY c.IdDatosUnidadAloj ASC'
+                 ORDER BY c.IdDatosUnidadAloj ASC"
             );
             $stmt->execute([$idEspA, $alcance]);
         } else {
             $stmt = $this->db->prepare(
-                'SELECT * FROM categoriadatosunidadalojamiento c
+                "SELECT {$catCols} FROM categoriadatosunidadalojamiento c
                  WHERE c.IdEspA = ? AND c.alcance_traz = ? AND c.Habilitado != 2
                    AND (c.idprotA IS NULL OR c.idprotA = ?)
-                 ORDER BY c.IdDatosUnidadAloj ASC'
+                 ORDER BY c.IdDatosUnidadAloj ASC"
             );
             $stmt->execute([$idEspA, $alcance, $idProtA]);
         }
@@ -65,22 +115,58 @@ class TrazabilidadModel {
         return $row ?: null;
     }
 
-    /** Valores actuales de variables de inicio (una fila por categoría). */
-    public function fetchValoresInicioForUnidad(int $idEspecieAlojUnidad): array {
+    /**
+     * Agrupa filas planas de observaciones (no inicio) en el mismo formato que el árbol de trazabilidad.
+     *
+     * @param array<int, array<string, mixed>> $obsFlat
+     */
+    private function groupObsFlatIntoPivot(array $obsFlat): array {
+        $obsGrouped = [];
+        $idx = 0;
+        foreach ($obsFlat as $o) {
+            $key = $o['id_fila_obs'] ?: $o['fechaObs'] . '_' . ($idx++);
+            if (!isset($obsGrouped[$key])) {
+                $obsGrouped[$key] = ['fechaObs' => $o['fechaObs'], 'valores' => []];
+            }
+            $obsGrouped[$key]['valores'][$o['CategoriaNombre']] = $o['Valor'];
+        }
+
+        return array_values($obsGrouped);
+    }
+
+    /**
+     * @param int[] $idsEu
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    private function fetchValoresInicioForUnidadesBatch(array $idsEu): array {
+        $idsEu = array_values(array_unique(array_filter(array_map('intval', $idsEu))));
+        if ($idsEu === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($idsEu), '?'));
         $stmtObs = $this->db->prepare(
-            "SELECT o.IdDatosUnidadAloj, c.NombreCatAlojUnidad,
+            "SELECT o.IdEspecieAlojUnidad, o.IdDatosUnidadAloj, c.NombreCatAlojUnidad,
                     COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) AS Valor
              FROM observacion_alojamiento_unidad o
              INNER JOIN categoriadatosunidadalojamiento c ON o.IdDatosUnidadAloj = c.IdDatosUnidadAloj
-             WHERE o.IdEspecieAlojUnidad = ? AND COALESCE(o.es_inicio_traz, 0) = 1"
+             WHERE o.IdEspecieAlojUnidad IN ($ph) AND COALESCE(o.es_inicio_traz, 0) = 1"
         );
-        $stmtObs->execute([$idEspecieAlojUnidad]);
-        $out = [];
+        $stmtObs->execute($idsEu);
+        $out = array_fill_keys($idsEu, []);
         foreach ($stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
-            $out[(int)$r['IdDatosUnidadAloj']] = $r;
+            $idEu = (int)$r['IdEspecieAlojUnidad'];
+            unset($r['IdEspecieAlojUnidad']);
+            $out[$idEu][(int)$r['IdDatosUnidadAloj']] = $r;
         }
 
         return $out;
+    }
+
+    /** Valores actuales de variables de inicio (una fila por categoría). */
+    public function fetchValoresInicioForUnidad(int $idEspecieAlojUnidad): array {
+        $map = $this->fetchValoresInicioForUnidadesBatch([$idEspecieAlojUnidad]);
+
+        return $map[$idEspecieAlojUnidad] ?? [];
     }
 
     /** Sexo en ficha: M macho, H hembra, I indistinto (compatible con texto previo). */
@@ -202,30 +288,37 @@ class TrazabilidadModel {
         return null;
     }
 
-    /**
-     * Observaciones agrupadas por fila (misma lógica que el árbol de trazabilidad).
-     */
-    private function fetchObservacionesPivotForUnidad(int $idEspecieAlojUnidad): array {
+    /** @param int[] $idsEu */
+    private function fetchObservacionesPivotForUnidadesBatch(array $idsEu): array {
+        $idsEu = array_values(array_unique(array_filter(array_map('intval', $idsEu))));
+        if ($idsEu === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($idsEu), '?'));
         $stmtObs = $this->db->prepare("
-            SELECT o.fechaObs, o.id_fila_obs, c.NombreCatAlojUnidad as CategoriaNombre,
+            SELECT o.IdEspecieAlojUnidad, o.fechaObs, o.id_fila_obs, c.NombreCatAlojUnidad as CategoriaNombre,
                    COALESCE(o.DatoObsVar, o.DatoObsText, CAST(o.DatoObsInt AS CHAR), CAST(o.DatoObsFecha AS CHAR)) as Valor
             FROM observacion_alojamiento_unidad o
             INNER JOIN categoriadatosunidadalojamiento c ON o.IdDatosUnidadAloj = c.IdDatosUnidadAloj
-            WHERE o.IdEspecieAlojUnidad = ? AND COALESCE(o.es_inicio_traz, 0) = 0
-            ORDER BY o.fechaObs DESC, o.id_fila_obs DESC
+            WHERE o.IdEspecieAlojUnidad IN ($ph) AND COALESCE(o.es_inicio_traz, 0) = 0
+            ORDER BY o.IdEspecieAlojUnidad ASC, o.fechaObs DESC, o.id_fila_obs DESC
         ");
-        $stmtObs->execute([$idEspecieAlojUnidad]);
-        $obsFlat = $stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-
-        $obsGrouped = [];
-        foreach ($obsFlat as $o) {
-            $key = $o['id_fila_obs'] ?: $o['fechaObs'] . '_' . uniqid('', true);
-            if (!isset($obsGrouped[$key])) {
-                $obsGrouped[$key] = ['fechaObs' => $o['fechaObs'], 'valores' => []];
-            }
-            $obsGrouped[$key]['valores'][$o['CategoriaNombre']] = $o['Valor'];
+        $stmtObs->execute($idsEu);
+        $byEu = [];
+        foreach ($idsEu as $id) {
+            $byEu[$id] = [];
         }
-        return array_values($obsGrouped);
+        foreach ($stmtObs->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $row) {
+            $idEu = (int)$row['IdEspecieAlojUnidad'];
+            unset($row['IdEspecieAlojUnidad']);
+            $byEu[$idEu][] = $row;
+        }
+        $out = [];
+        foreach ($idsEu as $idEu) {
+            $out[$idEu] = $this->groupObsFlatIntoPivot($byEu[$idEu]);
+        }
+
+        return $out;
     }
 
     /**
@@ -299,6 +392,14 @@ class TrazabilidadModel {
         ");
         $stmtTr->execute([$idInstitucion, $historia, $idUnidadAloj]);
         $rows = $stmtTr->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $idsEuTramos = [];
+        foreach ($rows as $row) {
+            $idsEuTramos[] = (int)$row['IdEspecieAlojUnidad'];
+        }
+        $idsEuTramos = array_values(array_unique(array_filter($idsEuTramos, static fn ($v) => $v > 0)));
+        $obsPivotPorEuTramo = $idsEuTramos !== []
+            ? $this->fetchObservacionesPivotForUnidadesBatch($idsEuTramos)
+            : [];
 
         $tramos = [];
         foreach ($rows as $row) {
@@ -327,7 +428,7 @@ class TrazabilidadModel {
                 'SubespecieNombreSujeto' => $row['SubespecieNombreSujeto'],
                 'CepaNombreSujeto' => $row['CepaNombreSujeto'],
                 'con_cirugia' => (int)$row['con_cirugia'],
-                'observaciones_pivot' => $this->fetchObservacionesPivotForUnidad($idEu),
+                'observaciones_pivot' => $obsPivotPorEuTramo[$idEu] ?? [],
             ];
         }
 
@@ -425,8 +526,9 @@ class TrazabilidadModel {
         $idProtA = isset($alojRow['idprotA']) && $alojRow['idprotA'] !== null && $alojRow['idprotA'] !== ''
             ? (int)$alojRow['idprotA'] : null;
 
+        $acCols = $this->sqlSelectAlojamientoCajaColumnsAlias('ac');
         $stmtCajas = $this->db->prepare("
-            SELECT ac.*,
+            SELECT {$acCols},
                 uf.Nombre AS nombre_ubicacion_fisica,
                 s.Nombre AS nombre_salon,
                 r.Nombre AS nombre_rack,
@@ -470,17 +572,46 @@ class TrazabilidadModel {
         $tipoAlojamiento = $infoAloj['NombreTipoAlojamiento'] ?? 'Caja';
         $limiteCajas = (int)($infoAloj['CantidadCaja'] ?? 1);
 
-        foreach ($cajas as &$caja) {
-            $stmtUnidades = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
-            $stmtUnidades->execute([$caja['IdCajaAlojamiento']]);
-            $caja['unidades'] = $stmtUnidades->fetchAll(\PDO::FETCH_ASSOC) ?: []; 
-
-            foreach ($caja['unidades'] as &$unidad) {
-                $idEu = (int)$unidad['IdEspecieAlojUnidad'];
-                $unidad['observaciones_pivot'] = $this->fetchObservacionesPivotForUnidad($idEu);
-                $unidad['valores_inicio'] = $this->fetchValoresInicioForUnidad($idEu);
+        $euCols = $this->sqlSelectEspecieAlojamientoUnidadAllColumns();
+        $unidadesPorCaja = [];
+        foreach ($cajas as $cajaRow) {
+            $unidadesPorCaja[(int)$cajaRow['IdCajaAlojamiento']] = [];
+        }
+        if ($cajas !== []) {
+            $cajaIds = array_map(static function ($c) {
+                return (int)$c['IdCajaAlojamiento'];
+            }, $cajas);
+            $phCajas = implode(',', array_fill(0, count($cajaIds), '?'));
+            $stmtUnidades = $this->db->prepare(
+                "SELECT {$euCols} FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento IN ($phCajas)"
+            );
+            $stmtUnidades->execute($cajaIds);
+            foreach ($stmtUnidades->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $uRow) {
+                $cid = (int)$uRow['IdCajaAlojamiento'];
+                $unidadesPorCaja[$cid][] = $uRow;
             }
         }
+        $idsEuArbol = [];
+        foreach ($unidadesPorCaja as $lista) {
+            foreach ($lista as $uRow) {
+                $idsEuArbol[] = (int)$uRow['IdEspecieAlojUnidad'];
+            }
+        }
+        $pivotPorEu = $this->fetchObservacionesPivotForUnidadesBatch($idsEuArbol);
+        $inicioPorEu = $this->fetchValoresInicioForUnidadesBatch($idsEuArbol);
+
+        foreach ($cajas as &$caja) {
+            $cid = (int)$caja['IdCajaAlojamiento'];
+            $caja['unidades'] = $unidadesPorCaja[$cid] ?? [];
+            foreach ($caja['unidades'] as &$unidad) {
+                $idEu = (int)$unidad['IdEspecieAlojUnidad'];
+                $unidad['observaciones_pivot'] = $pivotPorEu[$idEu] ?? [];
+                $unidad['valores_inicio'] = $inicioPorEu[$idEu] ?? [];
+            }
+            unset($unidad);
+        }
+        unset($caja);
+
         return [
             'cajas' => $cajas,
             'categorias' => $categoriasDatos,
@@ -842,6 +973,30 @@ class TrazabilidadModel {
         return 'DatoObsText';
     }
 
+    /**
+     * @param int[] $idsCat
+     * @return array<int, string|null> IdDatosUnidadAloj => TipoDeDato
+     */
+    private function fetchTiposDatoCategoriaBatch(array $idsCat): array {
+        $idsCat = array_values(array_unique(array_filter(array_map('intval', $idsCat))));
+        if ($idsCat === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($idsCat), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT IdDatosUnidadAloj, TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj IN ($ph)"
+        );
+        $stmt->execute($idsCat);
+        $map = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+            $map[(int)$r['IdDatosUnidadAloj']] = isset($r['TipoDeDato']) && $r['TipoDeDato'] !== null && $r['TipoDeDato'] !== ''
+                ? (string)$r['TipoDeDato']
+                : null;
+        }
+
+        return $map;
+    }
+
     public function insertarObservaciones($idUnidad, $fechaObs, $valores, $idInstitucion) {
         $ctx = $this->getUnidadTrazContext((int)$idUnidad, $idInstitucion);
         if (!$ctx) {
@@ -861,7 +1016,7 @@ class TrazabilidadModel {
             $stmtMax = $this->db->query('SELECT MAX(id_fila_obs) FROM observacion_alojamiento_unidad');
             $newFilaId = (int)$stmtMax->fetchColumn() + 1;
 
-            $insertados = 0;
+            $candidatosInsert = [];
             foreach ($valores as $item) {
                 $idCat = (int)($item['IdDatosUnidadAloj'] ?? 0);
                 if ($idCat <= 0) {
@@ -874,11 +1029,19 @@ class TrazabilidadModel {
                 if ($this->valorObservacionClinicaVacio($valorRaw)) {
                     continue;
                 }
+                $candidatosInsert[] = ['idCat' => $idCat, 'valorRaw' => $valorRaw];
+            }
 
-                $stmt = $this->db->prepare('SELECT TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj = ?');
-                $stmt->execute([$idCat]);
-                $tipo = $stmt->fetchColumn();
-                $columna = $this->columnaValorObservacionPorTipo($tipo ? (string)$tipo : null);
+            $tipoPorCat = $this->fetchTiposDatoCategoriaBatch(
+                array_values(array_unique(array_column($candidatosInsert, 'idCat')))
+            );
+
+            $insertados = 0;
+            foreach ($candidatosInsert as $cand) {
+                $idCat = $cand['idCat'];
+                $valorRaw = $cand['valorRaw'];
+                $tipoCol = $tipoPorCat[$idCat] ?? null;
+                $columna = $this->columnaValorObservacionPorTipo($tipoCol);
 
                 $sql = "INSERT INTO observacion_alojamiento_unidad (fechaObs, IdEspecieAlojUnidad, IdDatosUnidadAloj, {$columna}, id_fila_obs, es_inicio_traz)
                         VALUES (?, ?, ?, ?, ?, 0)";
@@ -924,8 +1087,8 @@ class TrazabilidadModel {
             $del = $this->db->prepare(
                 'DELETE FROM observacion_alojamiento_unidad WHERE IdEspecieAlojUnidad = ? AND IdDatosUnidadAloj = ? AND COALESCE(es_inicio_traz, 0) = 1'
             );
-            $stmtTipo = $this->db->prepare('SELECT TipoDeDato FROM categoriadatosunidadalojamiento WHERE IdDatosUnidadAloj = ?');
 
+            $candidatosInicio = [];
             foreach ($valores as $item) {
                 $idCat = (int)($item['IdDatosUnidadAloj'] ?? 0);
                 if ($idCat <= 0 || empty($permitidasIds[$idCat])) {
@@ -935,10 +1098,18 @@ class TrazabilidadModel {
                 if ($valorRaw === null || $valorRaw === '') {
                     continue;
                 }
+                $candidatosInicio[] = ['idCat' => $idCat, 'valorRaw' => $valorRaw];
+            }
 
-                $stmtTipo->execute([$idCat]);
-                $tipo = $stmtTipo->fetchColumn();
-                $columna = $this->columnaValorObservacionPorTipo($tipo ? (string)$tipo : null);
+            $tipoPorCatIni = $this->fetchTiposDatoCategoriaBatch(
+                array_values(array_unique(array_column($candidatosInicio, 'idCat')))
+            );
+
+            foreach ($candidatosInicio as $cand) {
+                $idCat = $cand['idCat'];
+                $valorRaw = $cand['valorRaw'];
+                $tipoCol = $tipoPorCatIni[$idCat] ?? null;
+                $columna = $this->columnaValorObservacionPorTipo($tipoCol);
 
                 $del->execute([$idUnidad, $idCat]);
                 $fechaIni = date('Y-m-d');
@@ -1024,33 +1195,57 @@ class TrazabilidadModel {
         $stmtCajasAct->execute([$idAlojamientoActual]);
         $cajasActuales = $stmtCajasAct->fetchAll(\PDO::FETCH_COLUMN);
 
-        $cajasUnicas = [];
-        $nombresVistos = [];
+        $stmtIdsEnTramoActual = $this->db->prepare(
+            'SELECT eu.IdUnidadAlojamiento FROM especie_alojamiento_unidad eu
+             INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
+             WHERE ac.IdAlojamiento = ?'
+        );
+        $stmtIdsEnTramoActual->execute([$idAlojamientoActual]);
+        $unidadYaEnTramoActual = [];
+        foreach ($stmtIdsEnTramoActual->fetchAll(\PDO::FETCH_COLUMN) ?: [] as $idUa) {
+            $unidadYaEnTramoActual[(int)$idUa] = true;
+        }
 
-        foreach($allCajas as $caja) {
+        $pasoCajas = [];
+        $nombresVistos = [];
+        foreach ($allCajas as $caja) {
             if (!in_array($caja['NombreCaja'], $nombresVistos)) {
                 $nombresVistos[] = $caja['NombreCaja'];
-                $caja['ya_existe'] = in_array($caja['NombreCaja'], $cajasActuales);
-                
-                $stmtU = $this->db->prepare("SELECT IdEspecieAlojUnidad, IdUnidadAlojamiento, NombreEspecieAloj FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
-                $stmtU->execute([$caja['IdCajaAlojamiento']]);
-                $unidades = $stmtU->fetchAll(\PDO::FETCH_ASSOC);
-
-                $stmtUAct = $this->db->prepare("
-                    SELECT 1 FROM especie_alojamiento_unidad eu 
-                    INNER JOIN alojamiento_caja ac ON eu.IdCajaAlojamiento = ac.IdCajaAlojamiento
-                    WHERE ac.IdAlojamiento = ? AND eu.IdUnidadAlojamiento = ?
-                ");
-                
-                foreach($unidades as &$u) {
-                    $stmtUAct->execute([$idAlojamientoActual, $u['IdUnidadAlojamiento']]);
-                    $u['ya_existe'] = (bool)$stmtUAct->fetchColumn();
-                }
-
-                $caja['unidades'] = $unidades;
-                $cajasUnicas[] = $caja;
+                $pasoCajas[] = $caja;
             }
         }
+
+        $unidadesPorCaja = [];
+        if ($pasoCajas !== []) {
+            $idsCajaHist = array_values(array_unique(array_map(static function ($c) {
+                return (int)$c['IdCajaAlojamiento'];
+            }, $pasoCajas)));
+            foreach ($idsCajaHist as $cid) {
+                $unidadesPorCaja[$cid] = [];
+            }
+            $ph = implode(',', array_fill(0, count($idsCajaHist), '?'));
+            $stmtU = $this->db->prepare(
+                "SELECT IdCajaAlojamiento, IdEspecieAlojUnidad, IdUnidadAlojamiento, NombreEspecieAloj
+                 FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento IN ($ph)
+                 ORDER BY IdCajaAlojamiento ASC, IdEspecieAlojUnidad ASC"
+            );
+            $stmtU->execute($idsCajaHist);
+            foreach ($stmtU->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $uRow) {
+                $cid = (int)$uRow['IdCajaAlojamiento'];
+                $uRow['ya_existe'] = isset($unidadYaEnTramoActual[(int)$uRow['IdUnidadAlojamiento']]);
+                unset($uRow['IdCajaAlojamiento']);
+                $unidadesPorCaja[$cid][] = $uRow;
+            }
+        }
+
+        $cajasUnicas = [];
+        foreach ($pasoCajas as $caja) {
+            $cid = (int)$caja['IdCajaAlojamiento'];
+            $caja['ya_existe'] = in_array($caja['NombreCaja'], $cajasActuales);
+            $caja['unidades'] = $unidadesPorCaja[$cid] ?? [];
+            $cajasUnicas[] = $caja;
+        }
+
         return $cajasUnicas;
     }
 
@@ -1061,16 +1256,26 @@ class TrazabilidadModel {
             $stmtAloj->execute([$idAlojamientoActual]);
             $fecha = $stmtAloj->fetchColumn();
 
+            $acCols = $this->sqlSelectAlojamientoCajaAllColumns();
+            $euColsClone = $this->sqlSelectEspecieAlojamientoUnidadAllColumns();
+            $stmtCaja = $this->db->prepare("SELECT {$acCols} FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
+            $stmtU = $this->db->prepare("SELECT {$euColsClone} FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
+            $stmtInsCaja = $this->db->prepare(
+                "INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmtInsUnit = $this->db->prepare(
+                "INSERT INTO especie_alojamiento_unidad (
+                    IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento,
+                    PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto, con_cirugia
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
             foreach ($cajasIds as $oldIdCaja) {
-                $stmtCaja = $this->db->prepare("SELECT * FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
                 $stmtCaja->execute([$oldIdCaja]);
                 $oldCaja = $stmtCaja->fetch(\PDO::FETCH_ASSOC);
 
                 if ($oldCaja) {
-                    $this->db->prepare(
-                        "INSERT INTO alojamiento_caja (FechaInicio, Detalle, NombreCaja, IdAlojamiento, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    )->execute([
+                    $stmtInsCaja->execute([
                         $fecha,
                         $oldCaja['Detalle'] ?? null,
                         $oldCaja['NombreCaja'],
@@ -1083,18 +1288,12 @@ class TrazabilidadModel {
                     ]);
                     $newIdCaja = $this->db->lastInsertId();
 
-                    $stmtU = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
                     $stmtU->execute([$oldIdCaja]);
                     $unidades = $stmtU->fetchAll(\PDO::FETCH_ASSOC);
 
                     foreach ($unidades as $u) {
                         if (in_array($u['IdEspecieAlojUnidad'], $unidadesIds)) {
-                            $this->db->prepare(
-                                "INSERT INTO especie_alojamiento_unidad (
-                                    IdUnidadAlojamiento, NombreEspecieAloj, DetalleEspecieAloj, IdCajaAlojamiento,
-                                    PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto, con_cirugia
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                            )->execute([
+                            $stmtInsUnit->execute([
                                 $u['IdUnidadAlojamiento'],
                                 $u['NombreEspecieAloj'],
                                 $u['DetalleEspecieAloj'] ?? null,
@@ -1183,15 +1382,32 @@ class TrazabilidadModel {
         $stmtC = $this->db->prepare("SELECT IdCajaAlojamiento, NombreCaja FROM alojamiento_caja WHERE IdAlojamiento = ? ORDER BY IdCajaAlojamiento ASC");
         $stmtC->execute([$idAlojamiento]);
         $cajas = $stmtC->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        $idsEuPorCaja = [];
+        if ($cajas !== []) {
+            $cajaIds = array_map(static function ($c) {
+                return (int)$c['IdCajaAlojamiento'];
+            }, $cajas);
+            foreach ($cajaIds as $cid) {
+                $idsEuPorCaja[$cid] = [];
+            }
+            $ph = implode(',', array_fill(0, count($cajaIds), '?'));
+            $stmtU = $this->db->prepare(
+                "SELECT IdCajaAlojamiento, IdEspecieAlojUnidad FROM especie_alojamiento_unidad
+                 WHERE IdCajaAlojamiento IN ($ph)
+                 ORDER BY IdCajaAlojamiento ASC, IdEspecieAlojUnidad ASC"
+            );
+            $stmtU->execute($cajaIds);
+            foreach ($stmtU->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $ur) {
+                $idsEuPorCaja[(int)$ur['IdCajaAlojamiento']][] = (int)$ur['IdEspecieAlojUnidad'];
+            }
+        }
         $grupos = [];
         foreach ($cajas as $c) {
             $idCaja = (int)$c['IdCajaAlojamiento'];
-            $stmtU = $this->db->prepare("SELECT IdEspecieAlojUnidad FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ? ORDER BY IdEspecieAlojUnidad ASC");
-            $stmtU->execute([$idCaja]);
-            $ids = $stmtU->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $ids = $idsEuPorCaja[$idCaja] ?? [];
             $fichas = [];
             foreach ($ids as $idEu) {
-                $f = $this->getFichaAnimalCompleta((int)$idEu, $idInstitucion);
+                $f = $this->getFichaAnimalCompleta($idEu, $idInstitucion);
                 if ($f) {
                     $fichas[] = $f;
                 }

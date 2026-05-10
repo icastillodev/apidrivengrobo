@@ -25,7 +25,10 @@ class AlojamientoUbicacionModel {
 
     public function getConfigLabels(int $instId): array {
         $this->ensureConfigRow($instId);
-        $stmt = $this->db->prepare('SELECT * FROM aloj_config_ubicacion WHERE IdInstitucion = ? LIMIT 1');
+        $stmt = $this->db->prepare(
+            'SELECT IdInstitucion, LabelLugarFisico, LabelSalon, LabelRack, LabelLugarRack, LabelComentarioUbicacion
+             FROM aloj_config_ubicacion WHERE IdInstitucion = ? LIMIT 1'
+        );
         $stmt->execute([$instId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: [];
@@ -49,7 +52,7 @@ class AlojamientoUbicacionModel {
     }
 
     public function listUbicacionesFisicas(int $instId, bool $soloActivos = false): array {
-        $sql = 'SELECT * FROM aloj_ubicacion_fisica WHERE IdInstitucion = ?';
+        $sql = 'SELECT IdUbicacionFisica, IdInstitucion, Nombre, Orden, Activo FROM aloj_ubicacion_fisica WHERE IdInstitucion = ?';
         if ($soloActivos) {
             $sql .= ' AND Activo = 1';
         }
@@ -60,7 +63,7 @@ class AlojamientoUbicacionModel {
     }
 
     public function listSalones(int $instId, ?int $idUbicacionFisica = null, bool $soloActivos = false): array {
-        $sql = 'SELECT * FROM aloj_salon WHERE IdInstitucion = ?';
+        $sql = 'SELECT IdSalon, IdInstitucion, IdUbicacionFisica, Nombre, Orden, Activo FROM aloj_salon WHERE IdInstitucion = ?';
         $params = [$instId];
         if ($idUbicacionFisica !== null) {
             $sql .= ' AND (IdUbicacionFisica IS NULL OR IdUbicacionFisica = ?)';
@@ -76,7 +79,7 @@ class AlojamientoUbicacionModel {
     }
 
     public function listRacks(int $instId, ?int $idSalon = null, bool $soloActivos = false): array {
-        $sql = 'SELECT * FROM aloj_rack WHERE IdInstitucion = ?';
+        $sql = 'SELECT IdRack, IdInstitucion, IdSalon, Nombre, Orden, Activo FROM aloj_rack WHERE IdInstitucion = ?';
         $params = [$instId];
         if ($idSalon !== null) {
             $sql .= ' AND (IdSalon IS NULL OR IdSalon = ?)';
@@ -92,7 +95,8 @@ class AlojamientoUbicacionModel {
     }
 
     public function listLugaresRackByInstitucion(int $instId, bool $soloActivos = false): array {
-        $sql = 'SELECT lr.*, r.IdInstitucion, r.IdSalon, r.Nombre AS NombreRack
+        $sql = 'SELECT lr.IdLugarRack, lr.IdRack, lr.Nombre, lr.Orden, lr.Activo,
+                       r.IdInstitucion, r.IdSalon, r.Nombre AS NombreRack
                 FROM aloj_lugar_rack lr
                 INNER JOIN aloj_rack r ON lr.IdRack = r.IdRack
                 WHERE r.IdInstitucion = ?';

@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\Comunicacion;
 
+use App\Utils\ComunicacionArchivoValidacion;
 use PDO;
 
 class NoticiaModel {
@@ -98,6 +99,153 @@ class NoticiaModel {
             default:
                 return "ORDER BY {$pin}FechaPublicacion DESC, IdNoticia DESC";
         }
+    }
+
+    /** Todas las columnas de `noticia` (sin wildcard) para detalle admin/público. */
+    private function sqlSelectNoticiaAllColumns(?string $alias = null): string {
+        $p = $alias !== null && $alias !== '' ? $alias . '.' : '';
+        $base = "{$p}IdNoticia, {$p}IdInstitucion, {$p}Alcance, {$p}DependenciaRed, {$p}Titulo, {$p}Categoria, {$p}CategoriaBadge, "
+            . "{$p}Cuerpo, {$p}Publicado, {$p}CompartirEnRed, {$p}FechaPublicacion, {$p}IdUsrAutor, {$p}FechaCreacion, "
+            . "{$p}FechaActualizacion, {$p}OrdenFijo";
+        $extra = [];
+        if ($this->hasColumnNoticia('ImagenPortadaB2Key')) {
+            $extra[] = "{$p}ImagenPortadaB2Key";
+            $extra[] = "{$p}ImagenPortadaNombre";
+        }
+        if ($this->hasColumnNoticia('AdjuntoDoc1B2Key')) {
+            $extra[] = "{$p}AdjuntoDoc1B2Key";
+            $extra[] = "{$p}AdjuntoDoc1Nombre";
+            $extra[] = "{$p}AdjuntoDoc2B2Key";
+            $extra[] = "{$p}AdjuntoDoc2Nombre";
+        }
+        if ($extra !== []) {
+            return $base . ', ' . implode(', ', $extra);
+        }
+
+        return $base;
+    }
+
+    private function hasColumnNoticia(string $column): bool {
+        try {
+            $stmt = $this->db->prepare('SHOW COLUMNS FROM `noticia` LIKE ?');
+            $stmt->execute([$column]);
+
+            return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return array{ok:bool, message?:string, adjuntos?:array<string,mixed>}
+     */
+    private function normalizarAdjuntosNoticiaPayload(int $instId, array $payload, ?array $existingRow): array {
+        if (!$this->hasColumnNoticia('ImagenPortadaB2Key')) {
+            return ['ok' => true, 'adjuntos' => []];
+        }
+
+        $t = static function ($v): ?string {
+            if ($v === null) {
+                return null;
+            }
+            $s = trim((string) $v);
+
+            return $s === '' ? null : $s;
+        };
+
+        if (array_key_exists('ImagenPortadaB2Key', $payload) || array_key_exists('ImagenPortadaNombre', $payload)) {
+            $imgKey = array_key_exists('ImagenPortadaB2Key', $payload) ? $t($payload['ImagenPortadaB2Key']) : null;
+            $imgNom = array_key_exists('ImagenPortadaNombre', $payload)
+                ? trim(strip_tags((string) ($payload['ImagenPortadaNombre'] ?? ''))) : null;
+            $imgNom = $imgNom === '' ? null : $imgNom;
+        } elseif ($existingRow !== null) {
+            $imgKey = isset($existingRow['ImagenPortadaB2Key']) ? $t($existingRow['ImagenPortadaB2Key']) : null;
+            $imgNom = isset($existingRow['ImagenPortadaNombre']) ? trim((string) $existingRow['ImagenPortadaNombre']) : null;
+            $imgNom = $imgNom === '' ? null : $imgNom;
+        } else {
+            $imgKey = null;
+            $imgNom = null;
+        }
+
+        $readDoc = static function (array $p, ?array $ex, string $kKey, string $kNom) use ($t) {
+            if (array_key_exists($kKey, $p) || array_key_exists($kNom, $p)) {
+                return [$t($p[$kKey] ?? null), isset($p[$kNom]) ? trim(strip_tags((string) $p[$kNom])) : null];
+            }
+            if ($ex !== null) {
+                $nk = isset($ex[$kKey]) ? $t($ex[$kKey]) : null;
+                $nn = isset($ex[$kNom]) ? trim((string) $ex[$kNom]) : null;
+                $nn = $nn === '' ? null : $nn;
+
+                return [$nk, $nn];
+            }
+
+            return [null, null];
+        };
+
+        [$d1k, $d1n] = $readDoc($payload, $existingRow, 'AdjuntoDoc1B2Key', 'AdjuntoDoc1Nombre');
+        [$d2k, $d2n] = $readDoc($payload, $existingRow, 'AdjuntoDoc2B2Key', 'AdjuntoDoc2Nombre');
+        $d1n = $d1n === '' ? null : $d1n;
+        $d2n = $d2n === '' ? null : $d2n;
+
+        if ($imgKey !== null || $imgNom !== null) {
+            if ($imgKey === null || $imgNom === null) {
+                return ['ok' => false, 'message' => 'Imagen de portada: indique clave B2 y nombre.'];
+            }
+            if (!ComunicacionArchivoValidacion::clavePerteneceInstitucion($imgKey, 'noticias/imagen', $instId)) {
+                return ['ok' => false, 'message' => 'Imagen de portada: clave B2 no válida para esta sede.'];
+            }
+        }
+
+        if (($d2k !== null || $d2n !== null) && ($d1k === null || $d1n === null)) {
+            return ['ok' => false, 'message' => 'Si adjunta un segundo documento, el primero es obligatorio.'];
+        }
+
+        foreach ([[ $d1k, $d1n ], [ $d2k, $d2n ]] as $pair) {
+            [$kk, $nn] = $pair;
+            if (($kk === null && $nn === null) || ($kk !== null && $nn !== null)) {
+                continue;
+            }
+
+            return ['ok' => false, 'message' => 'Adjuntos de noticia: cada archivo requiere clave B2 y nombre.'];
+        }
+
+        foreach ([['k' => $d1k, 'n' => $d1n], ['k' => $d2k, 'n' => $d2n]] as $slot) {
+            if ($slot['k'] !== null && !ComunicacionArchivoValidacion::clavePerteneceInstitucion((string) $slot['k'], 'noticias/doc', $instId)) {
+                return ['ok' => false, 'message' => 'Documento adjunto: clave B2 no válida para esta sede.'];
+            }
+        }
+
+        return [
+            'ok' => true,
+            'adjuntos' => [
+                'ImagenPortadaB2Key' => $imgKey,
+                'ImagenPortadaNombre' => $imgNom,
+                'AdjuntoDoc1B2Key' => $d1k,
+                'AdjuntoDoc1Nombre' => $d1n,
+                'AdjuntoDoc2B2Key' => $d2k,
+                'AdjuntoDoc2Nombre' => $d2n,
+            ],
+        ];
+    }
+
+    /** @param array<string,mixed> $adj */
+    private function persistAdjuntosNoticia(int $instId, int $idNoticia, array $adj): void {
+        if (!$this->hasColumnNoticia('ImagenPortadaB2Key') || $adj === []) {
+            return;
+        }
+        $stmt = $this->db->prepare(
+            'UPDATE noticia SET ImagenPortadaB2Key = ?, ImagenPortadaNombre = ?, AdjuntoDoc1B2Key = ?, AdjuntoDoc1Nombre = ?, AdjuntoDoc2B2Key = ?, AdjuntoDoc2Nombre = ? WHERE IdNoticia = ? AND IdInstitucion = ?'
+        );
+        $stmt->execute([
+            $adj['ImagenPortadaB2Key'] ?? null,
+            $adj['ImagenPortadaNombre'] ?? null,
+            $adj['AdjuntoDoc1B2Key'] ?? null,
+            $adj['AdjuntoDoc1Nombre'] ?? null,
+            $adj['AdjuntoDoc2B2Key'] ?? null,
+            $adj['AdjuntoDoc2Nombre'] ?? null,
+            $idNoticia,
+            $instId,
+        ]);
     }
 
     /**
@@ -286,8 +434,9 @@ class NoticiaModel {
     }
 
     public function getPublicById(int $instId, int $idNoticia): ?array {
+        $cols = $this->sqlSelectNoticiaAllColumns('n');
         $stmt = $this->db->prepare("
-            SELECT n.*, i.NombreInst AS NombreInstitucion
+            SELECT {$cols}, i.NombreInst AS NombreInstitucion
             FROM noticia n
             INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
             WHERE n.IdNoticia = ? AND n.Publicado = 1
@@ -352,7 +501,8 @@ class NoticiaModel {
     }
 
     public function getByIdAdmin(int $instId, int $idNoticia): ?array {
-        $stmt = $this->db->prepare('SELECT * FROM noticia WHERE IdNoticia = ? AND IdInstitucion = ? LIMIT 1');
+        $cols = $this->sqlSelectNoticiaAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM noticia WHERE IdNoticia = ? AND IdInstitucion = ? LIMIT 1");
         $stmt->execute([$idNoticia, $instId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -381,6 +531,11 @@ class NoticiaModel {
         }
         $ordenFijo = $ordenResolved['orden'];
 
+        $adjResCreate = $this->normalizarAdjuntosNoticiaPayload($instId, $payload, null);
+        if (!$adjResCreate['ok']) {
+            return ['status' => 'error', 'message' => $adjResCreate['message'] ?? 'Adjuntos inválidos.'];
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO noticia
             (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion, OrdenFijo)
@@ -399,6 +554,8 @@ class NoticiaModel {
             $idAutor,
         ]);
         $newId = (int)$this->db->lastInsertId();
+
+        $this->persistAdjuntosNoticia($instId, $newId, $adjResCreate['adjuntos'] ?? []);
 
         if ($ordenFijo !== null) {
             $this->db->beginTransaction();
@@ -462,6 +619,11 @@ class NoticiaModel {
         }
         $ordenFijo = $ordenResolved['orden'];
 
+        $adjResUpd = $this->normalizarAdjuntosNoticiaPayload($instId, $payload, $row);
+        if (!$adjResUpd['ok']) {
+            return ['status' => 'error', 'message' => $adjResUpd['message'] ?? 'Adjuntos inválidos.'];
+        }
+
         $this->db->beginTransaction();
         try {
             if ($ordenFijo !== null) {
@@ -487,6 +649,7 @@ class NoticiaModel {
                 $idNoticia,
                 $instId,
             ]);
+            $this->persistAdjuntosNoticia($instId, $idNoticia, $adjResUpd['adjuntos'] ?? []);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();

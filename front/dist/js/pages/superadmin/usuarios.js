@@ -1,7 +1,12 @@
 import { API } from '../../api.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
+import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
-let allUsers = [];
+/** Filas de la página actual (servidor). */
+let pageUsers = [];
+let totalUsers = 0;
+/** Término enviado al API en la última carga (coincide con el cuadro de búsqueda al pulsar Buscar). */
+let currentSearch = '';
 /** True si la última petición `/superadmin/usuarios` falló (mostrar fila error). */
 let usuariosLoadError = false;
 let currentPage = 1;
@@ -40,10 +45,21 @@ export async function initSuperUsuarios() {
     }
     poblarSelectRoles();
 
-    document.getElementById('btn-search').onclick = () => {
+    const runSearch = async () => {
+        currentSearch = (document.getElementById('search-input')?.value || '').trim();
         currentPage = 1;
-        renderTable();
+        await cargarUsuarios({ inline: true });
     };
+    document.getElementById('btn-search').onclick = () => runSearch();
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runSearch();
+            }
+        });
+    }
     document.getElementById('btn-excel').onclick = exportToExcel;
 
     document.getElementById('btn-eliminacion-total').onclick = abrirModalEliminacionTotal;
@@ -65,24 +81,39 @@ async function cargarUsuarios({ inline = false } = {}) {
     const t = window.txt?.superadmin_usuarios_global || {};
     if (inline && tbody) {
         usuariosLoadError = false;
-        const msg = escHtmlUsr(t.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+        setTbodyLoadingSpinner(tbody, {
+            colspan: 5,
+            spinnerTone: 'primary',
+            message: t.tabla_cargando || window.txt?.generales?.msg_cargando || '…',
+        });
     }
     try {
-        const res = await API.request('/superadmin/usuarios');
+        const limit = rowsPerPage;
+        const offset = (currentPage - 1) * rowsPerPage;
+        const q = encodeURIComponent(currentSearch);
+        const res = await API.request(`/superadmin/usuarios?limit=${limit}&offset=${offset}&q=${q}`);
         usuariosLoadError = false;
         if (res.status === 'success') {
-            allUsers = Array.isArray(res.data) ? res.data : [];
+            pageUsers = Array.isArray(res.data) ? res.data : [];
+            totalUsers = typeof res.total === 'number' ? res.total : pageUsers.length;
+            const totalPages = Math.max(1, Math.ceil(totalUsers / rowsPerPage));
+            if (totalUsers > 0 && currentPage > totalPages) {
+                currentPage = totalPages;
+                await cargarUsuarios({ inline });
+                return;
+            }
             renderTable();
         } else {
             usuariosLoadError = true;
-            allUsers = [];
+            pageUsers = [];
+            totalUsers = 0;
             renderTable();
         }
     } catch (e) {
         console.error(e);
         usuariosLoadError = true;
-        allUsers = [];
+        pageUsers = [];
+        totalUsers = 0;
         renderTable();
     }
 }
@@ -102,34 +133,23 @@ function renderTable() {
     if (!tbody) return;
 
     if (usuariosLoadError) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-danger small">${escHtmlUsr(t.error_cargar_lista || window.txt?.generales?.error || 'Error')}</td></tr>`;
+        setTbodyMessageRow(tbody, {
+            colspan: 5,
+            variant: 'danger',
+            message: t.error_cargar_lista || window.txt?.generales?.error || 'Error',
+        });
         document.getElementById('pagination').innerHTML = '';
         return;
     }
 
     const rolesMap = getRolesMap();
-    const term = document.getElementById('search-input').value.toLowerCase().trim();
-
-    const filtered = allUsers.filter(u => {
-        const id = String(u.IdUsrA || "");
-        const sede = (u.NombreInst || "").toLowerCase();
-        const rol = (rolesMap[u.IdTipoUsrA] || "").toLowerCase();
-        const nombre = (u.NombreA || "").toLowerCase();
-        const apellido = (u.ApellidoA || "").toLowerCase();
-        const email = (u.EmailA || "").toLowerCase();
-
-        return id.includes(term) || sede.includes(term) || rol.includes(term) || 
-               nombre.includes(term) || apellido.includes(term) || email.includes(term);
-    });
-
-    const start = (currentPage - 1) * rowsPerPage;
-    const pageData = filtered.slice(start, start + rowsPerPage);
+    const pageData = pageUsers;
 
     if (pageData.length === 0) {
         const msg =
-            allUsers.length === 0 ? t.tabla_sin_filas || '' : t.sin_resultados_filtro || '';
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted small">${escHtmlUsr(msg || '—')}</td></tr>`;
-        renderPagination(filtered.length);
+            totalUsers === 0 ? t.tabla_sin_filas || '' : t.sin_resultados_filtro || '';
+        setTbodyMessageRow(tbody, { colspan: 5, variant: 'muted', message: msg || '—' });
+        renderPagination(totalUsers);
         return;
     }
 
@@ -150,13 +170,12 @@ function renderTable() {
         </tr>
     `).join('');
 
-    renderPagination(filtered.length);
+    renderPagination(totalUsers);
 }
-
-
 
 function renderPagination(totalRows) {
     const pagination = document.getElementById('pagination');
+    const tPag = window.txt?.superadmin_usuarios_global || {};
     const totalPages = Math.ceil(totalRows / rowsPerPage);
     pagination.innerHTML = '';
     if (totalPages <= 1) return;
@@ -172,7 +191,7 @@ function renderPagination(totalRows) {
             e.preventDefault();
             if (!isDisabled) {
                 currentPage = targetPage;
-                renderTable();
+                cargarUsuarios({ inline: true });
             }
         });
         li.appendChild(a);
@@ -186,7 +205,7 @@ function renderPagination(totalRows) {
         pagination.appendChild(li);
     };
 
-    pagination.appendChild(createBtn('Anterior', currentPage - 1, currentPage === 1));
+    pagination.appendChild(createBtn(tPag.pag_anterior || 'Anterior', currentPage - 1, currentPage === 1));
     pagination.appendChild(createBtn(1, 1, false, currentPage === 1));
 
     let start = Math.max(2, currentPage - 2);
@@ -197,7 +216,7 @@ function renderPagination(totalRows) {
     if (end < totalPages - 1) addEllipsis();
 
     pagination.appendChild(createBtn(totalPages, totalPages, false, currentPage === totalPages));
-    pagination.appendChild(createBtn('Siguiente', currentPage + 1, currentPage === totalPages));
+    pagination.appendChild(createBtn(tPag.pag_siguiente || 'Siguiente', currentPage + 1, currentPage === totalPages));
 }
 
 // --- ACCIONES MODAL ---
@@ -213,7 +232,7 @@ window.abrirModalCrear = () => {
 };
 
 window.abrirModalEditar = (id) => {
-    const u = allUsers.find(user => user.IdUsrA == id);
+    const u = pageUsers.find(user => user.IdUsrA == id);
     if (!u) return;
 
     modalOriginalUsrA = u.UsrA || '';
@@ -291,14 +310,34 @@ window.resetPassword = async () => {
     if (res.status === 'success') alert("Clave restablecida correctamente.");
 };
 
-function exportToExcel() {
+async function exportToExcel() {
+    const t = window.txt?.superadmin_usuarios_global || {};
     const rolesMap = getRolesMap();
-    const ws = XLSX.utils.json_to_sheet(allUsers.map(u => ({
-        "ID": u.IdUsrA, "Institución": u.NombreInst, "Apellido": u.ApellidoA, "Nombre": u.NombreA, "Email": u.EmailA, "Rol": rolesMap[u.IdTipoUsrA]
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Usuarios_Global");
-    XLSX.writeFile(wb, "Reporte_Gecko_Personal.xlsx");
+    showLoader();
+    try {
+        const q = encodeURIComponent(currentSearch);
+        const res = await API.request(`/superadmin/usuarios?limit=0&offset=0&q=${q}`);
+        if (res.status !== 'success' || !Array.isArray(res.data) || res.data.length === 0) {
+            (window.mostrarNotificacion || alert)(t.excel_empty || 'Sin datos.');
+            return;
+        }
+        const ws = XLSX.utils.json_to_sheet(res.data.map(u => ({
+            ID: u.IdUsrA,
+            Institución: u.NombreInst,
+            Apellido: u.ApellidoA,
+            Nombre: u.NombreA,
+            Email: u.EmailA,
+            Rol: rolesMap[u.IdTipoUsrA]
+        })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Usuarios_Global');
+        XLSX.writeFile(wb, 'Reporte_Gecko_Personal.xlsx');
+    } catch (e) {
+        console.error(e);
+        (window.mostrarNotificacion || alert)(t.error_cargar_lista || 'Error');
+    } finally {
+        hideLoader();
+    }
 }
 
 async function abrirModalEliminacionTotal() {

@@ -9,6 +9,7 @@
  */
 
 import { API } from '../api.js';
+import { hideLoader, showLoader } from '../components/LoaderComponent.js';
 
 
 
@@ -217,6 +218,14 @@ export async function openMensajeriaCompose(opts) {
 
             <textarea id="swal-msg-cuerpo" class="form-control" rows="5">${esc(cuerpo0)}</textarea>
 
+            <hr class="text-muted opacity-25 my-2" />
+
+            <label class="form-label small mb-1" for="swal-msg-file">${esc(t.msg_adjunto_label || '')}</label>
+
+            <p class="small text-muted mb-2">${esc(t.msg_adjunto_help || '')}</p>
+
+            <input type="file" id="swal-msg-file" class="form-control form-control-sm mb-0" accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf">
+
         </div>`;
 
 
@@ -260,7 +269,7 @@ export async function openMensajeriaCompose(opts) {
             reactivateBootstrapModalFocusTrapsAfterSwal();
         },
 
-        preConfirm: () => {
+        preConfirm: async () => {
 
             const tipo = lockCategory
 
@@ -280,7 +289,53 @@ export async function openMensajeriaCompose(opts) {
 
             }
 
-            return { tipo, asunto: as, cuerpo: cu };
+            let adjuntoB2Key = null;
+
+            let adjuntoNombreOriginal = null;
+
+            const fileInp = document.getElementById('swal-msg-file');
+
+            const file = fileInp?.files?.[0];
+
+            if (file) {
+
+                showLoader({ upgradeOnly: true, staticPhrase: '' });
+
+                try {
+
+                    const fd = new FormData();
+
+                    fd.append('file', file);
+
+                    const up = await API.request('/comunicacion/b2/upload/mensaje-adjunto', 'POST', fd);
+
+                    if (up.status !== 'success' || !up.data) {
+
+                        Swal.showValidationMessage(up.message || t.pp_b2_err_upload || '');
+
+                        return false;
+
+                    }
+
+                    adjuntoB2Key = up.data.AdjuntoB2Key ?? null;
+
+                    adjuntoNombreOriginal = up.data.AdjuntoNombreOriginal ?? null;
+
+                } catch (e) {
+
+                    Swal.showValidationMessage(e.message || t.err_generico || '');
+
+                    return false;
+
+                } finally {
+
+                    hideLoader();
+
+                }
+
+            }
+
+            return { tipo, asunto: as, cuerpo: cu, adjuntoB2Key, adjuntoNombreOriginal };
 
         }
 
@@ -311,6 +366,14 @@ export async function openMensajeriaCompose(opts) {
         OrigenEtiqueta: origenEtiqueta
 
     };
+
+    if (r.value.adjuntoB2Key && r.value.adjuntoNombreOriginal) {
+
+        payload.AdjuntoB2Key = r.value.adjuntoB2Key;
+
+        payload.AdjuntoNombreOriginal = r.value.adjuntoNombreOriginal;
+
+    }
 
 
 

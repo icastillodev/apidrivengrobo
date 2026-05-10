@@ -13,7 +13,7 @@ const state = {
   selectedInstrumentoIds: new Set()
 };
 
-export function initMisReservas() {
+export async function initMisReservas() {
   const now = new Date();
   state.year = now.getFullYear();
   state.month = now.getMonth() + 1;
@@ -52,8 +52,8 @@ export function initMisReservas() {
     refreshBundle();
   };
 
-  loadSalas();
-  loadMisReservas();
+  await loadSalas();
+  await loadMisReservas();
 }
 
 async function loadSalas() {

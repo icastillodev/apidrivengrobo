@@ -12,12 +12,19 @@ class AdminConfigEspeciesModel {
     }
 
     public function getTree($instId) {
-        $stmt = $this->db->prepare("SELECT * FROM especiee WHERE IdInstitucion = ? ORDER BY EspeNombreA ASC");
+        // Sin `caracteristicasA` (texto largo): la UI de configuración solo usa nombre, flags y subespecies.
+        $stmt = $this->db->prepare(
+            "SELECT idespA, EspeNombreA, IdInstitucion, Habilitado, Panimal, PalojamientoChica, PalojamientoGrande
+             FROM especiee WHERE IdInstitucion = ? ORDER BY EspeNombreA ASC"
+        );
         $stmt->execute([$instId]);
         $especies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($especies as &$esp) {
-            $stmtSub = $this->db->prepare("SELECT * FROM subespecie WHERE idespA = ? ORDER BY SubEspeNombreA ASC");
+            $stmtSub = $this->db->prepare(
+                "SELECT idsubespA, idespA, SubEspeNombreA, SubEspTipo, SubEspCantidad, Existe
+                 FROM subespecie WHERE idespA = ? ORDER BY SubEspeNombreA ASC"
+            );
             $stmtSub->execute([$esp['idespA']]);
             $esp['subespecies'] = $stmtSub->fetchAll(PDO::FETCH_ASSOC);
         }

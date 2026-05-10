@@ -8,25 +8,90 @@ class UsuarioModel {
 
     public function __construct($db) { $this->db = $db; }
 
-public function getAllGlobal() {
-        // Quitamos el filtro "u.IdInstitucion = ?" para que traiga absolutamente a todos
-        // (Excepto a otros SuperAdmins -> IdTipousrA != 1)
-        // Usamos LEFT JOIN en institucion por si algún usuario quedó "huérfano" de sede.
-        $sql = "SELECT u.IdUsrA, u.UsrA, u.IdInstitucion, p.NombreA, p.ApellidoA, p.EmailA, 
-                    COALESCE(i.NombreInst, 'Sin Asignar') as NombreInst, 
-                    t.IdTipousrA AS IdTipoUsrA,
-                    a.ActivoA AS confirmado,
-                    (SELECT fecha_hora FROM bitacora b WHERE b.id_usuario = u.IdUsrA AND b.tabla_afectada = 'usuarioe' AND b.accion = 'INSERT' ORDER BY b.id_bitacora ASC LIMIT 1) as FechaCreacion
+/**
+     * Listado global sin paginación (tope duro; exportaciones masivas deben usar query acotada).
+     */
+    public function getAllGlobal() {
+        return $this->getGlobalUsersPaged(50000, 0, null);
+    }
+
+    /** @param string|null $q LIKE sobre id, login, persona, email, sede, tipo de usuario */
+    private function globalUsersSearchClause(?string $q): array {
+        if ($q === null) {
+            return ['', []];
+        }
+        $t = trim($q);
+        if ($t === '') {
+            return ['', []];
+        }
+        $qq = '%' . addcslashes($t, '%_\\') . '%';
+        $sql = " AND (
+            CAST(u.IdUsrA AS CHAR) LIKE ?
+            OR u.UsrA LIKE ?
+            OR COALESCE(p.NombreA,'') LIKE ?
+            OR COALESCE(p.ApellidoA,'') LIKE ?
+            OR COALESCE(p.EmailA,'') LIKE ?
+            OR COALESCE(i.NombreInst,'') LIKE ?
+            OR COALESCE(tu.NombretipoA,'') LIKE ?
+            OR COALESCE(tu.NombreCompleto,'') LIKE ?
+        )";
+
+        return [$sql, array_fill(0, 8, $qq)];
+    }
+
+    public function countGlobalUsers(?string $q): int {
+        [$searchSql, $searchParams] = $this->globalUsersSearchClause($q);
+        $sql = "SELECT COUNT(DISTINCT u.IdUsrA) AS c
                 FROM usuarioe u
                 LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
+                LEFT JOIN tipousuarioe tu ON t.IdTipousrA = tu.IdTipousrA
                 LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
-                WHERE t.IdTipousrA != 1 
-                ORDER BY i.NombreInst ASC, p.ApellidoA ASC";
-        
+                LEFT JOIN (
+                    SELECT id_usuario, MIN(id_bitacora) AS min_bid
+                    FROM bitacora
+                    WHERE tabla_afectada = 'usuarioe' AND accion = 'INSERT'
+                    GROUP BY id_usuario
+                ) bmin ON bmin.id_usuario = u.IdUsrA
+                LEFT JOIN bitacora bfc ON bfc.id_bitacora = bmin.min_bid
+                WHERE t.IdTipousrA != 1
+                {$searchSql}";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute();
+        $stmt->execute($searchParams);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getGlobalUsersPaged(int $limit, int $offset, ?string $q): array {
+        [$searchSql, $searchParams] = $this->globalUsersSearchClause($q);
+        $limit = max(0, $limit);
+        $offset = max(0, $offset);
+        $sql = "SELECT u.IdUsrA, u.UsrA, u.IdInstitucion, p.NombreA, p.ApellidoA, p.EmailA,
+                    COALESCE(i.NombreInst, 'Sin Asignar') as NombreInst,
+                    t.IdTipousrA AS IdTipoUsrA,
+                    a.ActivoA AS confirmado,
+                    bfc.fecha_hora AS FechaCreacion
+                FROM usuarioe u
+                LEFT JOIN personae p ON u.IdUsrA = p.IdUsrA
+                LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
+                JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
+                LEFT JOIN tipousuarioe tu ON t.IdTipousrA = tu.IdTipousrA
+                LEFT JOIN actividade a ON u.IdUsrA = a.IdUsrA
+                LEFT JOIN (
+                    SELECT id_usuario, MIN(id_bitacora) AS min_bid
+                    FROM bitacora
+                    WHERE tabla_afectada = 'usuarioe' AND accion = 'INSERT'
+                    GROUP BY id_usuario
+                ) bmin ON bmin.id_usuario = u.IdUsrA
+                LEFT JOIN bitacora bfc ON bfc.id_bitacora = bmin.min_bid
+                WHERE t.IdTipousrA != 1
+                {$searchSql}
+                ORDER BY COALESCE(i.NombreInst,'') ASC, COALESCE(p.ApellidoA,'') ASC, u.IdUsrA ASC
+                LIMIT {$limit} OFFSET {$offset}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($searchParams);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     public function updateGlobal($id, $data) {

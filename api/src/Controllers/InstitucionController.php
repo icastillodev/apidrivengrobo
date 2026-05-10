@@ -23,11 +23,62 @@ class InstitucionController {
 
     public function list() {
         try {
-            Auditoria::getDatosSesion(); 
-            $data = $this->model->getAllInstitutions();
-            $this->sendJSON(['status' => 'success', 'data' => $data]);
+            Auditoria::getDatosSesion();
+
+            if (!isset($_GET['limit'])) {
+                $data = $this->model->getAllInstitutions();
+                $this->sendJSON(['status' => 'success', 'data' => $data]);
+
+                return;
+            }
+
+            $limitIn = (int) $_GET['limit'];
+            $offset = isset($_GET['offset']) ? max(0, (int) $_GET['offset']) : 0;
+            $qRaw = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+            if (strlen($qRaw) > 200) {
+                $qRaw = substr($qRaw, 0, 200);
+            }
+            $q = $qRaw !== '' ? $qRaw : null;
+
+            if ($limitIn === 0) {
+                $limit = 50000;
+            } else {
+                $limit = max(1, min(500, $limitIn));
+            }
+
+            $total = $this->model->countInstitutionsFiltered($q);
+            $data = $this->model->getInstitutionsPaged($limit, $offset, $q);
+            $this->sendJSON([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $total,
+                'limit' => $limit,
+                'offset' => $offset,
+            ]);
         } catch (\Exception $e) {
             // AHORA DEVOLVERÁ 500 (Error Interno) EN LUGAR DE 401
+            $this->sendJSON(['status' => 'error', 'message' => 'Error BD: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /** GET `/superadmin/instituciones/:id` — detalle para modal edición (paginación servidor). */
+    public function getOne($id) {
+        try {
+            Auditoria::getDatosSesion();
+            $idInt = is_numeric($id) ? (int) $id : 0;
+            if ($idInt <= 0) {
+                $this->sendJSON(['status' => 'error', 'message' => 'ID inválido'], 400);
+
+                return;
+            }
+            $row = $this->model->getInstitutionByIdForSuperadmin($idInt);
+            if ($row === null) {
+                $this->sendJSON(['status' => 'error', 'message' => 'Institución no encontrada'], 404);
+
+                return;
+            }
+            $this->sendJSON(['status' => 'success', 'data' => $row]);
+        } catch (\Exception $e) {
             $this->sendJSON(['status' => 'error', 'message' => 'Error BD: ' . $e->getMessage()], 500);
         }
     }

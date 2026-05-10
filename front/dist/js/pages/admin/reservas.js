@@ -35,7 +35,7 @@ window.composeMensajeReservaTitular = async (idUsrTitular, idReserva) => {
   });
 };
 
-export function initAdminReservas() {
+export async function initAdminReservas() {
   const today = new Date();
   const from = new Date(today.getFullYear(), today.getMonth(), 1);
   const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -99,7 +99,7 @@ export function initAdminReservas() {
 
   document.getElementById('form-reserva').onsubmit = onSubmit;
 
-  loadInit();
+  await loadInit();
 }
 
 async function loadInit() {

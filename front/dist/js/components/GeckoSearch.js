@@ -2,6 +2,9 @@ import { GeckoVoice } from './GeckoVoice.js';
 import { GeckoSearchEngine } from './GeckoSearchEngine.js';
 import { getPanelOrUsuarioPaginasSegment } from './menujs/MenuConfig.js';
 
+/** Debounce para `/search/global`: evita una petición por tecla (checklist optimización tablas). */
+const OMNI_SEARCH_DEBOUNCE_MS = 350;
+
 export const GeckoSearch = {
     overlay: null,
     box: null,
@@ -11,6 +14,24 @@ export const GeckoSearch = {
     voiceTrainBtn: null,
     aiMessageBox: null,
     selectedIndex: -1, // Índice para navegación por teclado
+    _omniDebounceTimer: null,
+    _omniSearchGeneration: 0,
+
+    _scheduleOmniSearchFromInput(rawTerm) {
+        clearTimeout(this._omniDebounceTimer);
+        this._omniDebounceTimer = null;
+        const term = rawTerm;
+        if (!term || term.length < 1) {
+            this._omniSearchGeneration++;
+            this.renderEmpty();
+            return;
+        }
+        this._omniDebounceTimer = setTimeout(() => {
+            this._omniDebounceTimer = null;
+            const gen = ++this._omniSearchGeneration;
+            this.executeSearch(term, gen);
+        }, OMNI_SEARCH_DEBOUNCE_MS);
+    },
 
     init() {
         this.overlay = document.getElementById('gecko-omni-overlay');
@@ -27,7 +48,7 @@ export const GeckoSearch = {
         if (this.input) {
             // Usamos keydown para interceptar las flechas antes de que muevan el cursor de texto
             this.input.addEventListener('keydown', (e) => this.handleKeyDown(e));
-            this.input.oninput = (e) => this.executeSearch(e.target.value);
+            this.input.oninput = (e) => this._scheduleOmniSearchFromInput(e.target.value);
         }
 
         // Eventos de Voz
@@ -53,6 +74,9 @@ export const GeckoSearch = {
 
     open() {
         if (!this.overlay) this.init();
+        clearTimeout(this._omniDebounceTimer);
+        this._omniDebounceTimer = null;
+        this._omniSearchGeneration++;
         this.triggerEl = document.getElementById('gecko-search-trigger');
 
         // Animación de apertura (Morphing)
@@ -96,7 +120,10 @@ export const GeckoSearch = {
 
     close() {
         if (!this.overlay) return;
-        
+        clearTimeout(this._omniDebounceTimer);
+        this._omniDebounceTimer = null;
+        this._omniSearchGeneration++;
+
         const rect = this.triggerEl.getBoundingClientRect();
         this.box.classList.remove('open'); 
         
@@ -123,7 +150,10 @@ export const GeckoSearch = {
 
     setInput(text) {
         if (this.input) this.input.value = text;
-        this.executeSearch(text);
+        clearTimeout(this._omniDebounceTimer);
+        this._omniDebounceTimer = null;
+        const gen = ++this._omniSearchGeneration;
+        this.executeSearch(text, gen);
     },
 
     setListening(isListening) {
@@ -230,24 +260,25 @@ export const GeckoSearch = {
     },
 
     // --- MÓDULO DE BÚSQUEDA TRADICIONAL ---
-    async executeSearch(term) {
+    async executeSearch(term, gen) {
         if (!term || term.length < 1) {
             this.renderEmpty();
             return;
         }
+        if (gen !== undefined && gen !== this._omniSearchGeneration) return;
         this.renderSpinner();
-        
+
         // Análisis léxico simple para detectar intenciones
         const analysis = GeckoSearchEngine.analyze(term);
 
-            try {
+        try {
             // 🚀 IMPORTACIÓN DINÁMICA HÍBRIDA (Local vs Prod)
-            const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
-                ? '/URBE-API-DRIVEN/front/' 
+            const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? '/URBE-API-DRIVEN/front/'
                 : '/';
-            
+
             const { API } = await import(`${basePath}dist/js/api.js`);
-            
+
             const instId = localStorage.getItem('instId');
             const params = new URLSearchParams({
                 q: analysis.term,
@@ -259,12 +290,15 @@ export const GeckoSearch = {
 
             const res = await API.request(`/search/global?${params.toString()}`);
 
+            if (gen !== undefined && gen !== this._omniSearchGeneration) return;
+
             if (res.status === 'success') {
                 this.renderResults(res.data, term);
             } else {
                 this.renderNoResults(term);
             }
         } catch (e) {
+            if (gen !== undefined && gen !== this._omniSearchGeneration) return;
             this.results.innerHTML = `<div class="p-3 text-center text-danger small">Error de conexión con el motor de búsqueda.</div>`;
         }
     },

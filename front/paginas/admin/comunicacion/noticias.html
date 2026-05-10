@@ -15,7 +15,7 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260409';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js?v=20260409';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260409';
-        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260409';
+        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260509c';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -26,7 +26,7 @@
                 if (window.txt) {
                     await initMenu();
                     NotificationManager.init();
-                    initAdminNoticias();
+                    await initAdminNoticias();
                 }
             } catch (e) {
                 console.error(e);
@@ -171,6 +171,40 @@
                         </select>
                         <p class="small text-muted mb-3" data-i18n="comunicacion.admin_orden_fijo_help"></p>
                     </div>
+                    <hr class="text-muted opacity-25" />
+                    <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.admin_noticia_b2_section"></p>
+                    <p class="small text-muted mb-3" data-i18n="comunicacion.admin_noticia_b2_help"></p>
+                    <div class="border rounded p-3 mb-3 bg-white">
+                        <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.admin_noticia_b2_img_title"></p>
+                        <input type="file" class="form-control form-control-sm mb-2" id="noticia-file-img" accept="image/jpeg,.jpg,.jpeg">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="noticia-btn-upload-img"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                            <span class="small text-muted flex-grow-1" id="noticia-status-img"></span>
+                            <button type="button" class="btn btn-sm btn-link p-0 d-none" id="noticia-btn-prev-img"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="noticia-btn-clear-img"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                        </div>
+                    </div>
+                    <div class="border rounded p-2 mb-3 bg-light bg-opacity-50">
+                        <p class="small fw-semibold mb-2 text-muted"><span data-i18n="comunicacion.admin_noticia_b2_doc1"></span></p>
+                        <input type="file" class="form-control form-control-sm mb-2" id="noticia-file-d1" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="noticia-btn-upload-d1"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                            <span class="small text-muted flex-grow-1" id="noticia-status-d1"></span>
+                            <button type="button" class="btn btn-sm btn-link p-0 d-none" id="noticia-btn-prev-d1"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="noticia-btn-clear-d1"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                        </div>
+                    </div>
+                    <div class="border rounded p-2 mb-3 bg-light bg-opacity-50">
+                        <p class="small fw-semibold mb-2 text-muted"><span data-i18n="comunicacion.admin_noticia_b2_doc2"></span></p>
+                        <input type="file" class="form-control form-control-sm mb-2" id="noticia-file-d2" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="noticia-btn-upload-d2"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                            <span class="small text-muted flex-grow-1" id="noticia-status-d2"></span>
+                            <button type="button" class="btn btn-sm btn-link p-0 d-none" id="noticia-btn-prev-d2"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="noticia-btn-clear-d2"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-3 d-none" id="noticia-b2-preview-hint" data-i18n="comunicacion.admin_noticia_b2_preview_need_save"></p>
                     <label class="form-label small fw-bold" data-i18n="comunicacion.admin_cuerpo"></label>
                     <textarea class="form-control" id="edit-cuerpo" rows="8"></textarea>
                 </div>

@@ -12,10 +12,12 @@ class AdminConfigProtocoloModel {
     }
 
     public function getAllData($instId) {
-        $stmtTypes = $this->db->prepare("SELECT * FROM tipoprotocolo WHERE IdInstitucion = ? ORDER BY NombreTipoprotocolo ASC");
+        $tipoCols = 'idtipoprotocolo, NombreTipoprotocolo, IdInstitucion';
+        $stmtTypes = $this->db->prepare("SELECT {$tipoCols} FROM tipoprotocolo WHERE IdInstitucion = ? ORDER BY NombreTipoprotocolo ASC");
         $stmtTypes->execute([$instId]);
-        
-        $stmtSev = $this->db->prepare("SELECT * FROM tiposeveridad WHERE IdInstitucion = ? ORDER BY NombreSeveridad ASC");
+
+        $sevCols = 'IdSeveridadTipo, NombreSeveridad, detalle, IdInstitucion';
+        $stmtSev = $this->db->prepare("SELECT {$sevCols} FROM tiposeveridad WHERE IdInstitucion = ? ORDER BY NombreSeveridad ASC");
         $stmtSev->execute([$instId]);
 
         return [

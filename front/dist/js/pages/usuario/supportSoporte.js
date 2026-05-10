@@ -1,10 +1,27 @@
 import { API } from '../../api.js';
+import { createAdminListPageCache, offsetLimitToPageLimitQuery } from '../../utils/adminListPageCache.js';
+
+const SUPPORT_TICKETS_PAGE_SIZE = 50;
+
+const buildSupportTicketsQuery = (extra) => offsetLimitToPageLimitQuery(SUPPORT_TICKETS_PAGE_SIZE, extra);
+const supportTicketsPageCacheApi = createAdminListPageCache(
+  SUPPORT_TICKETS_PAGE_SIZE,
+  buildSupportTicketsQuery,
+  '/support/tickets'
+);
+
+let supportTicketsCurrentPage = 1;
+let supportTicketsTotal = 0;
 
 const state = {
   items: [],
   selectedId: null,
   role: 0,
 };
+
+function invalidateSupportTicketsCache() {
+  supportTicketsPageCacheApi.bustPages();
+}
 
 function t(k, fb) {
   const parts = k.split('.');
@@ -46,48 +63,16 @@ function estadoInfo(estado) {
   return { cls: 'bg-light text-dark', label: e };
 }
 
-export async function initSupportSoporte() {
-  state.role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-
-  const ta = document.getElementById('reply-text');
-  if (ta) {
-    ta.placeholder = t('soporte.placeholder_respuesta', 'Escriba su mensaje…');
-  }
-
-  document.getElementById('btn-nuevo-ticket')?.addEventListener('click', () => openNuevoTicket());
-  document.getElementById('btn-reply')?.addEventListener('click', () => sendReply());
-  document.getElementById('btn-cerrar')?.addEventListener('click', () => cerrarSeleccionado());
-  document.getElementById('lista-tickets')?.addEventListener('click', (ev) => {
-    const row = ev.target.closest('[data-ticket-id]');
-    if (!row) return;
-    const id = parseInt(row.getAttribute('data-ticket-id'), 10);
-    if (id) selectTicket(id);
-  });
-
-  await loadList();
+function totalSupportTicketPages() {
+  return Math.max(1, Math.ceil(supportTicketsTotal / SUPPORT_TICKETS_PAGE_SIZE));
 }
 
-async function loadList() {
-  const box = document.getElementById('lista-tickets');
+function paintTicketList(box) {
   if (!box) return;
-  const loadTxt = escapeHtml(
-    (window.txt?.soporte?.cargando || window.txt?.generales?.msg_cargando || '').trim() || '…'
-  );
-  box.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadTxt}</div></div>`;
-
-  const res = await API.request('/support/tickets?page=1&limit=50', 'GET');
-  if (res?.status !== 'success' || !res.data) {
-    box.innerHTML = `<div class="p-3 small text-danger">${escapeHtml(res?.message || t('soporte.error_cargar', 'No se pudo cargar.'))}</div>`;
-    return;
-  }
-
-  state.items = Array.isArray(res.data.items) ? res.data.items : [];
-  if (state.items.length === 0) {
+  if (!state.items.length) {
     box.innerHTML = `<div class="p-3 small text-muted">${escapeHtml(t('soporte.sin_tickets', 'No hay tickets.'))}</div>`;
-    clearPanel();
     return;
   }
-
   const gecko = state.role === 1;
   let html = '';
   for (const row of state.items) {
@@ -107,6 +92,134 @@ async function loadList() {
       </button>`;
   }
   box.innerHTML = html;
+}
+
+function updateSupportPaginationUi() {
+  const wrap = document.getElementById('soporte-pag-wrap');
+  const infoEl = document.getElementById('soporte-pag-info');
+  const btnPrev = document.getElementById('soporte-pag-prev');
+  const btnNext = document.getElementById('soporte-pag-next');
+  const tp = totalSupportTicketPages();
+  if (wrap) {
+    wrap.classList.toggle('d-none', tp <= 1);
+  }
+  if (infoEl) {
+    const tpl = t('soporte.pag_info', '{page} / {totalPages} · {total}');
+    infoEl.textContent = tpl
+      .replace('{page}', String(supportTicketsCurrentPage))
+      .replace('{totalPages}', String(tp))
+      .replace('{total}', String(supportTicketsTotal));
+  }
+  if (btnPrev) btnPrev.disabled = supportTicketsCurrentPage <= 1;
+  if (btnNext) btnNext.disabled = supportTicketsCurrentPage >= tp;
+}
+
+export async function initSupportSoporte() {
+  state.role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+
+  const ta = document.getElementById('reply-text');
+  if (ta) {
+    ta.placeholder = t('soporte.placeholder_respuesta', 'Escriba su mensaje…');
+  }
+
+  document.getElementById('btn-nuevo-ticket')?.addEventListener('click', () => openNuevoTicket());
+  document.getElementById('btn-reply')?.addEventListener('click', () => sendReply());
+  document.getElementById('btn-cerrar')?.addEventListener('click', () => cerrarSeleccionado());
+  document.getElementById('lista-tickets')?.addEventListener('click', (ev) => {
+    const row = ev.target.closest('[data-ticket-id]');
+    if (!row) return;
+    const id = parseInt(row.getAttribute('data-ticket-id'), 10);
+    if (id) selectTicket(id);
+  });
+
+  document.getElementById('soporte-pag-prev')?.addEventListener('click', () => {
+    if (supportTicketsCurrentPage > 1) {
+      supportTicketsCurrentPage -= 1;
+      loadList();
+    }
+  });
+  document.getElementById('soporte-pag-next')?.addEventListener('click', () => {
+    if (supportTicketsCurrentPage < totalSupportTicketPages()) {
+      supportTicketsCurrentPage += 1;
+      loadList();
+    }
+  });
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    await loadList({ silent: true, forceServer: true });
+  });
+
+  await loadList();
+}
+
+async function loadList(options = {}) {
+  const silent = options.silent === true;
+  const forceServer = options.forceServer === true;
+  const box = document.getElementById('lista-tickets');
+  if (!box) return;
+
+  const prefetchGen = supportTicketsPageCacheApi.syncFiltersKey();
+
+  if (!forceServer && supportTicketsPageCacheApi.pageCache.has(supportTicketsCurrentPage)) {
+    state.items = supportTicketsPageCacheApi.pageCache.get(supportTicketsCurrentPage);
+    paintTicketList(box);
+    updateSupportPaginationUi();
+    supportTicketsPageCacheApi.schedulePrefetchAround(
+      supportTicketsTotal,
+      supportTicketsCurrentPage,
+      prefetchGen
+    );
+    if (state.selectedId && !state.items.some((x) => x.IdSupportTicket === state.selectedId)) {
+      state.selectedId = null;
+      clearPanel();
+    } else if (state.selectedId) {
+      await loadDetail(state.selectedId);
+    }
+    return;
+  }
+
+  if (!silent) {
+    const loadTxt = escapeHtml(
+      (window.txt?.soporte?.cargando || window.txt?.generales?.msg_cargando || '').trim() || '…'
+    );
+    box.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadTxt}</div></div>`;
+  }
+
+  const res = await supportTicketsPageCacheApi.fetchPage(supportTicketsCurrentPage);
+  if (res?.status !== 'success' || !res.data) {
+    box.innerHTML = `<div class="p-3 small text-danger">${escapeHtml(res?.message || t('soporte.error_cargar', 'No se pudo cargar.'))}</div>`;
+    return;
+  }
+
+  const bundle = res.data;
+  const rows = Array.isArray(bundle.items) ? bundle.items : [];
+  supportTicketsTotal = parseInt(bundle.total, 10) || 0;
+
+  if (!rows.length && supportTicketsTotal > 0 && supportTicketsCurrentPage > 1) {
+    supportTicketsCurrentPage = 1;
+    invalidateSupportTicketsCache();
+    await loadList(options);
+    return;
+  }
+
+  state.items = rows;
+  supportTicketsPageCacheApi.pageCache.set(supportTicketsCurrentPage, [...rows]);
+  supportTicketsPageCacheApi.schedulePrefetchAround(
+    supportTicketsTotal,
+    supportTicketsCurrentPage,
+    prefetchGen
+  );
+
+  if (!state.items.length) {
+    box.innerHTML = `<div class="p-3 small text-muted">${escapeHtml(t('soporte.sin_tickets', 'No hay tickets.'))}</div>`;
+    clearPanel();
+    updateSupportPaginationUi();
+    return;
+  }
+
+  paintTicketList(box);
+  updateSupportPaginationUi();
 
   if (state.selectedId && !state.items.some((x) => x.IdSupportTicket === state.selectedId)) {
     state.selectedId = null;
@@ -119,10 +232,10 @@ async function loadList() {
 function clearPanel() {
   document.getElementById('panel-ticket-placeholder')?.classList.remove('d-none');
   document.getElementById('panel-ticket-cont')?.classList.add('d-none');
-  document.getElementById('panel-ticket-placeholder').textContent = t(
-    'soporte.seleccione_ticket',
-    'Seleccione un ticket de la lista.'
-  );
+  const ph = document.getElementById('panel-ticket-placeholder');
+  if (ph) {
+    ph.textContent = t('soporte.seleccione_ticket', 'Seleccione un ticket de la lista.');
+  }
 }
 
 async function selectTicket(id) {
@@ -236,6 +349,7 @@ async function sendReply() {
     await Swal.fire({ icon: 'error', text: res?.message || t('soporte.error_enviar', 'No se pudo enviar.') });
     return;
   }
+  invalidateSupportTicketsCache();
   await loadList();
   await loadDetail(id);
 }
@@ -256,6 +370,7 @@ async function cerrarSeleccionado() {
     await Swal.fire({ icon: 'error', text: res?.message || t('soporte.error_cerrar', 'No se pudo cerrar.') });
     return;
   }
+  invalidateSupportTicketsCache();
   await loadList();
   await loadDetail(id);
 }
@@ -298,7 +413,9 @@ async function openNuevoTicket() {
   }
   const newId = res.data.IdSupportTicket;
   state.selectedId = newId;
+  supportTicketsCurrentPage = 1;
   await Swal.fire({ icon: 'success', text: t('soporte.creado_ok', 'Ticket creado.'), timer: 1600, showConfirmButton: false });
+  invalidateSupportTicketsCache();
   await loadList();
   await selectTicket(newId);
 }

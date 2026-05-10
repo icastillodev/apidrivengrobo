@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\AdminConfig;
 
+use App\Models\Reservas\ReservaTableColumns;
 use PDO;
 use App\Utils\Auditoria;
 
@@ -9,17 +10,20 @@ class AdminConfigReservasModel {
     public function __construct($db) { $this->db = $db; }
 
     public function getAllSalas($instId) {
-        $stmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? ORDER BY Nombre ASC");
+        $cols = ReservaTableColumns::reservaSala();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM reserva_sala WHERE IdInstitucion = ? ORDER BY Nombre ASC");
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getSalaDetail($id) {
-        $sala = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdSalaReserva = ?");
+        $colsSala = ReservaTableColumns::reservaSala();
+        $sala = $this->db->prepare("SELECT {$colsSala} FROM reserva_sala WHERE IdSalaReserva = ?");
         $sala->execute([$id]);
         $salaData = $sala->fetch(PDO::FETCH_ASSOC);
 
-        $horarios = $this->db->prepare("SELECT * FROM reserva_horariospordiasala WHERE IdSalaReserva = ?");
+        $colsHor = ReservaTableColumns::reservaHorariosPorDiaSala();
+        $horarios = $this->db->prepare("SELECT {$colsHor} FROM reserva_horariospordiasala WHERE IdSalaReserva = ?");
         $horarios->execute([$id]);
         
         return ['sala' => $salaData, 'horarios' => $horarios->fetchAll(PDO::FETCH_ASSOC)];
@@ -71,7 +75,8 @@ class AdminConfigReservasModel {
     }
 
     public function getAllInst($instId) {
-        $stmt = $this->db->prepare("SELECT * FROM reserva_instrumento WHERE IdInstitucion = ?");
+        $cols = ReservaTableColumns::reservaInstrumento();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM reserva_instrumento WHERE IdInstitucion = ?");
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

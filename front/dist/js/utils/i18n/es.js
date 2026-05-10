@@ -256,7 +256,7 @@ export const es = {
         pp_popup_fallback_title: "Aviso institucional",
         pp_popup_ver_noticia: "Ver noticia enlazada",
         pp_page_title: "Portada del panel y popup",
-        pp_page_sub: "Texto visible en el inicio y un aviso modal opcional. Adjuntos: pegue la URL del archivo (PDF, Word, PowerPoint u otro); más adelante podrá subirse a almacenamiento cloud.",
+        pp_page_sub: "Texto en el inicio y aviso modal opcional. Adjuntos: URL o archivo en la nube (Backblaze) por ranura; tras subir, pulse Guardar.",
         pp_btn_guardar: "Guardar",
         pp_btn_volver_noticias: "Volver a noticias",
         pp_btn_ir_portada: "Portada / popup",
@@ -276,6 +276,23 @@ export const es = {
         pp_lbl_id_noticia: "ID de noticia (opcional)",
         pp_id_noticia_help: "Debe ser una noticia ya publicada y visible para usuarios de esta sede. Deje vacío si no aplica.",
         pp_save_ok: "Guardado",
+        pp_b2_img_title: "Imagen de portada (JPG; opcional)",
+        pp_b2_help_mixed: "Por cada adjunto use una URL pública o un archivo subido; si rellena URL, se descarta el archivo en esa ranura al guardar contexto mixto. Evite duplicar.",
+        pp_b2_doc_slot: "Archivo en la nube (opcional)",
+        pp_b2_btn_upload: "Subir",
+        pp_b2_btn_preview: "Vista previa",
+        pp_b2_btn_clear: "Quitar archivo",
+        pp_b2_status_uploaded: "Subido:",
+        pp_b2_upload_ok: "Subido. Pulse Guardar para aplicar.",
+        pp_b2_err_upload: "No se pudo subir el archivo.",
+        pp_b2_err_no_file: "Seleccione un archivo.",
+        pp_b2_preview_fail: "No se pudo abrir la vista previa.",
+        admin_noticia_b2_section: "Archivos en la nube (opcional)",
+        admin_noticia_b2_help: "Imagen JPG hasta 1 MB; hasta 2 documentos (PDF, Excel, Word) hasta 1 MB cada uno. Tras subir, pulse Guardar en la noticia.",
+        admin_noticia_b2_img_title: "Imagen de portada de la noticia (JPG)",
+        admin_noticia_b2_doc1: "Documento 1",
+        admin_noticia_b2_doc2: "Documento 2",
+        admin_noticia_b2_preview_need_save: "Guarde la noticia al menos una vez para poder previsualizar los archivos subidos desde aquí.",
         dash_poe_label: "Protocolos operativos (POE)",
         dash_poe_ver_todos: "Ver todos",
         poe_link_corto: "POE",
@@ -292,7 +309,7 @@ export const es = {
         poe_meta_actualizado: "Actualizado",
         poe_admin_titulo: "POE — administración",
         poe_admin_sub:
-            "Texto y hasta dos URLs por documento. La subida de archivos con Backblaze quedará en la fase final junto con adjuntos de noticias y mensajería.",
+            "Texto del documento y hasta dos adjuntos por ranura: URL pública (http/https) o archivo en Backblaze. Los instructivos subidos se guardan al pulsar Guardar.",
         poe_btn_nuevo: "Nuevo POE",
         poe_col_titulo: "Título",
         poe_col_orden: "Orden",
@@ -313,6 +330,9 @@ export const es = {
         poe_save_ok: "Guardado",
         poe_admin_vacio: "No hay registros.",
         poe_admin_qr_hint: "Solo si el documento está visible.",
+        poe_b2_help:
+            "Por cada ranura use una URL pública o suba un archivo (PDF u Office según validación del servidor). Si escribe una URL, se descarta el archivo en la nube de esa ranura. Pulse Guardar para aplicar.",
+        poe_b2_preview_need_save: "Guarde el documento primero para poder usar la vista previa del archivo en la nube.",
         msg_categoria: "Categoría del mensaje",
         msg_compose_cuerpo: "Mensaje",
         msg_compose_titulo: "Enviar mensaje interno",
@@ -334,6 +354,11 @@ export const es = {
         msg_anexo_buscar_ph: "Buscar por ID, protocolo o estado…",
         msg_anexo_nuevo_hint: "Lista los formularios o alojamientos del destinatario en esta sede. Opcional: puede enviar sin elegir nada.",
         msg_anexo_reply_hint: "Opcional: enlaza un pedido o alojamiento del otro participante para dejar claro el tema. No aplica en hilos institucionales.",
+        msg_adjunto_label: "Adjunto (opcional)",
+        msg_adjunto_help:
+            "Un archivo JPG o PDF de hasta 50 KB (la API valida tipo y tamaño). Máximo un archivo por mensaje.",
+        msg_adjunto_subido_pref: "Subido:",
+        msg_adjunto_abrir: "Abrir adjunto",
         msg_deep_link_hilo_otro_titulo: "Este mensaje no es de tu cuenta",
         msg_deep_link_hilo_otro_texto: "El enlace corresponde a un hilo al que tu usuario actual no tiene acceso (suele ser de otro usuario). Cierra sesión e inicia con la cuenta que recibió el correo para verlo.",
         msg_deep_link_hilo_no_existe_titulo: "Conversación no disponible",
@@ -370,7 +395,7 @@ export const es = {
         cap_help_s2_text: "Seleccione un ítem para cargar los mensajes a la derecha. Las respuestas quedan agrupadas en el mismo hilo.",
         cap_help_s3_title: "Panel del hilo",
         cap_help_s3_text:
-            "Lea el historial y escriba en el cuadro inferior; pulse «Responder» para enviar (atajo Ctrl+Enter u ⌘+Enter si está habilitado).",
+            "Lea el historial y escriba en el cuadro inferior; pulse «Responder» para enviar (atajo Ctrl+Enter u ⌘+Enter si está habilitado). Opcionalmente puede adjuntar un JPG o PDF de hasta 50 KB (un archivo por mensaje) al responder o al usar «Nuevo mensaje»; en el hilo el adjunto aparece como enlace bajo el texto.",
         cap_help_inst_titulo: "Mensajería institucional: guía rápida",
         cap_help_inst_s1_title: "Canal institucional",
         cap_help_inst_s1_text:
@@ -380,7 +405,7 @@ export const es = {
             "Seleccione un hilo para ver el contenido. Los comunicados pueden ser visibles para toda la sede; las consultas son privadas entre usted y el personal autorizado.",
         cap_help_inst_s3_title: "Lectura y respuesta",
         cap_help_inst_s3_text:
-            "En algunos hilos solo puede leer; si no ve el botón de respuesta, abra una nueva consulta desde «Nuevo mensaje». Elija tipo (comunicado/consulta) según lo que permita su rol.",
+            "En algunos hilos solo puede leer; si no ve el botón de respuesta, abra una nueva consulta desde «Nuevo mensaje». Elija tipo (comunicado/consulta) según lo que permita su rol. Si puede enviar, puede incluir un adjunto opcional (JPG o PDF, hasta 50 KB, uno por mensaje); quedará como enlace en el hilo.",
         cap_help_portal_titulo: "Portal de noticias: guía rápida",
         cap_help_portal_s1_title: "Qué verá aquí",
         cap_help_portal_s1_text:
@@ -4182,6 +4207,12 @@ export const es = {
         th_ceuas: "CEUAS",
         th_estado: "Estado",
         modal_titulo: "Detalles de la Institución",
+        modal_nueva: "Nueva institución",
+        modal_editando: "Editando: {nombre}",
+        error_cargar_sede: "No se pudo cargar la sede. Compruebe el ID o su conexión.",
+        toast_creada: "Institución creada correctamente.",
+        error_servidor_prefix: "Error del servidor: ",
+        error_comunicacion: "Fallo de comunicación con la API. Revise la consola.",
         label_nombre_corto: "Nombre Corto (Sede)",
         ph_nombre_corto: "Ej: URBE",
         label_correo: "Correo Electrónico",
@@ -4233,7 +4264,11 @@ export const es = {
         btn_vaciar_grupo: "Vaciar grupo",
         label_madre_grupo_stats: "Madre del grupo",
         help_madre_grupo: "Solo la sede con este interruptor activo guarda MadreGrupo = 1 y puede usar la pestaña de estadísticas de la red/grupo (misma DependenciaInstitucion).",
-        switch_madre_grupo: "Esta sede es madre del grupo (estadísticas agregadas)"
+        switch_madre_grupo: "Esta sede es madre del grupo (estadísticas agregadas)",
+        sin_resultados_filtro: "Ninguna sede coincide con la búsqueda.",
+        table_info: "Mostrando {a} a {b} de {total} sedes",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Siguiente"
     },
     superadmin_formulario: {
         titulo: "Gestión de Links de Registro",
@@ -4370,7 +4405,8 @@ export const es = {
         sin_resultados_filtro: "No hay movimientos con los filtros actuales.",
         info_cero: "0 registros",
         table_info: "Mostrando {a} a {b} de {total} movimientos",
-        excel_empty: "No hay datos para exportar."
+        excel_empty: "No hay datos para exportar.",
+        tabla_cargando: "Cargando bitácora…"
     },
     superadmin_usuarios_global: {
         bread_gecko: "GECKO DEVS",
@@ -4435,7 +4471,10 @@ export const es = {
         tabla_cargando: "Cargando usuarios…",
         tabla_sin_filas: "No hay usuarios en el directorio global.",
         sin_resultados_filtro: "Ningún usuario coincide con la búsqueda.",
-        error_cargar_lista: "No se pudo cargar el listado de usuarios."
+        error_cargar_lista: "No se pudo cargar el listado de usuarios.",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Siguiente",
+        excel_empty: "No hay datos para exportar con los filtros actuales."
     },
     soporte: {
         page_title: "Soporte Gecko",
@@ -4463,6 +4502,9 @@ export const es = {
         usuario: "Usuario",
         msg_soporte: "Soporte Gecko",
         cargando: "Cargando…",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Siguiente",
+        pag_info: "Página {page} de {totalPages} ({total} tickets)",
         error_cargar: "No se pudo cargar la información.",
         error_enviar: "No se pudo enviar el mensaje.",
         error_cerrar: "No se pudo cerrar el ticket.",

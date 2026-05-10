@@ -30,7 +30,8 @@ class AdminConfigInstitutionModel {
     }
 
     public function getServices($instId) {
-        $sql = "SELECT * FROM serviciosinst WHERE IdInstitucion = ? ORDER BY IdServicioInst DESC";
+        $svcCols = 'IdServicioInst, NombreServicioInst, MedidaServicioInst, CantidadPorMedidaInst, Precio, Habilitado, IdInstitucion';
+        $sql = "SELECT {$svcCols} FROM serviciosinst WHERE IdInstitucion = ? ORDER BY IdServicioInst DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

@@ -32,8 +32,31 @@ public function list() {
                 throw new \Exception("Acceso denegado. Privilegios insuficientes.");
             }
 
-            // Llamamos a la función global sin filtros de sede
-            $this->jsonOut(['status' => 'success', 'data' => $this->model->getAllGlobal()]);
+            $limitIn = isset($_GET['limit']) ? (int) $_GET['limit'] : 15;
+            $offset = isset($_GET['offset']) ? (int) $_GET['offset'] : 0;
+            $offset = max(0, $offset);
+            $qRaw = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+            if (strlen($qRaw) > 200) {
+                $qRaw = substr($qRaw, 0, 200);
+            }
+            $q = $qRaw !== '' ? $qRaw : null;
+
+            if ($limitIn === 0) {
+                $limit = 50000;
+            } else {
+                $limit = max(1, min(500, $limitIn));
+            }
+
+            $total = $this->model->countGlobalUsers($q);
+            $data = $this->model->getGlobalUsersPaged($limit, $offset, $q);
+
+            $this->jsonOut([
+                'status' => 'success',
+                'data' => $data,
+                'total' => $total,
+                'limit' => $limit,
+                'offset' => $offset,
+            ]);
             
         } catch (\Exception $e) {
             $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 401);

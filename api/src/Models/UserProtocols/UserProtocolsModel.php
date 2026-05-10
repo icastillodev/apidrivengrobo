@@ -6,8 +6,41 @@ use PDO;
 class UserProtocolsModel {
     private $db;
 
+    /** @var bool|null */
+    private $protocoloexpeHasPermiteAnestesicos = null;
+
     public function __construct($db) {
         $this->db = $db;
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+
+            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function protocoloexpeHasPermiteAnestesicos(): bool {
+        if ($this->protocoloexpeHasPermiteAnestesicos === null) {
+            $this->protocoloexpeHasPermiteAnestesicos = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos');
+        }
+
+        return $this->protocoloexpeHasPermiteAnestesicos;
+    }
+
+    private function sqlSelectProtocoloexpeBasePrefixed(string $alias = 'p'): string {
+        $base = 'idprotA, tituloA, nprotA, InvestigadorACargA, CantidadAniA, FechaIniProtA, FechaFinProtA, especie, '
+            . 'protocoloexpe, departamento, tipoprotocolo, encargaprot, severidad, IdUsrA, IdInstitucion, variasInst';
+        if ($this->protocoloexpeHasPermiteAnestesicos()) {
+            $base .= ', PermiteAnestesicos';
+        }
+        $parts = array_map('trim', explode(',', $base));
+
+        return $alias . '.' . implode(', ' . $alias . '.', $parts);
     }
 
     public function getAllProtocols($userId, $currentInstId) {
@@ -73,7 +106,8 @@ class UserProtocolsModel {
 
     public function getDetail($id) {
         // Reutilizamos lógica similar pero para un solo ID y con todos los campos
-        $sql = "SELECT p.*, 
+        $pCols = $this->sqlSelectProtocoloexpeBasePrefixed('p');
+        $sql = "SELECT {$pCols}, 
                        i.NombreInst, i.InstCorreo, i.InstContacto,
                        d.NombreDeptoA, 
                        tp.NombreTipoprotocolo, 

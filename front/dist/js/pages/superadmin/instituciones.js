@@ -1,8 +1,15 @@
 import { API } from '../../api.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
+import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
 let modalInst;
-let listaSedes = [];
+/** Filas de la página actual (API paginada). */
+let pageRows = [];
+let totalInst = 0;
+let currentPage = 1;
+const rowsPerPage = 15;
+let currentSearch = '';
+let searchDebounceTimer = null;
 let catalogoModulos = [];
 
 // Exportamos la función principal para que el HTML la llame de forma controlada
@@ -47,31 +54,124 @@ async function cargarInstituciones({ mode = 'initial' } = {}) {
     const tbody = document.getElementById('tabla-sedes');
     const t = window.txt?.superadmin_instituciones || {};
     if (mode === 'inline' && tbody) {
-        const msg = escHtml(t.tabla_cargando || window.txt?.generales?.msg_cargando || '…');
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
+        setTbodyLoadingSpinner(tbody, {
+            colspan: 10,
+            spinnerTone: 'primary',
+            message: t.tabla_cargando || window.txt?.generales?.msg_cargando || '…',
+        });
     }
     try {
-        const res = await API.request('/superadmin/instituciones');
+        const limit = rowsPerPage;
+        const offset = (currentPage - 1) * rowsPerPage;
+        const q = encodeURIComponent(currentSearch);
+        const res = await API.request(`/superadmin/instituciones?limit=${limit}&offset=${offset}&q=${q}`);
         if (res.status === 'success') {
-            listaSedes = Array.isArray(res.data) ? res.data : [];
-            renderizarTabla(listaSedes);
+            pageRows = Array.isArray(res.data) ? res.data : [];
+            totalInst = typeof res.total === 'number' ? res.total : pageRows.length;
+            const totalPages = Math.max(1, Math.ceil(totalInst / rowsPerPage));
+            if (totalInst > 0 && currentPage > totalPages) {
+                currentPage = totalPages;
+                await cargarInstituciones({ mode: 'inline' });
+                return;
+            }
+            renderizarTabla(pageRows);
+            updateInstTableInfo();
+            renderInstPagination();
         } else if (tbody) {
-            listaSedes = [];
+            pageRows = [];
+            totalInst = 0;
             renderizarTabla([]);
+            updateInstTableInfo();
+            renderInstPagination();
         }
     } catch (err) {
         console.error('Error al recuperar sedes:', err);
-        listaSedes = [];
+        pageRows = [];
+        totalInst = 0;
         renderizarTabla([]);
+        updateInstTableInfo();
+        renderInstPagination();
     }
+}
+
+function updateInstTableInfo() {
+    const el = document.getElementById('inst-table-info');
+    const tx = window.txt?.superadmin_instituciones || {};
+    if (!el) return;
+    if (totalInst === 0 || pageRows.length === 0) {
+        el.textContent = '';
+        return;
+    }
+    const start = (currentPage - 1) * rowsPerPage;
+    const tpl = tx.table_info || '';
+    el.textContent = tpl
+        .replace('{a}', String(start + 1))
+        .replace('{b}', String(Math.min(start + pageRows.length, totalInst)))
+        .replace('{total}', String(totalInst));
+}
+
+function renderInstPagination() {
+    const ul = document.getElementById('pagination-inst');
+    if (!ul) return;
+    ul.innerHTML = '';
+    const totalPages = Math.ceil(totalInst / rowsPerPage);
+    if (totalPages <= 1) return;
+
+    const tx = window.txt?.superadmin_instituciones || {};
+    const pagPrev = tx.pag_anterior || 'Anterior';
+    const pagNext = tx.pag_siguiente || 'Siguiente';
+
+    const addBtn = (label, page, disabled, active = false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link shadow-none';
+        a.href = '#';
+        a.textContent = label;
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!disabled) {
+                currentPage = page;
+                cargarInstituciones({ mode: 'inline' });
+            }
+        });
+        li.appendChild(a);
+        ul.appendChild(li);
+    };
+
+    addBtn(pagPrev, currentPage - 1, currentPage === 1);
+    addBtn('1', 1, false, currentPage === 1);
+
+    let start = Math.max(2, currentPage - 2);
+    let end = Math.min(totalPages - 1, currentPage + 2);
+    if (start > 2) {
+        const li = document.createElement('li');
+        li.className = 'page-item disabled';
+        li.innerHTML = '<span class="page-link border-0">…</span>';
+        ul.appendChild(li);
+    }
+    for (let i = start; i <= end; i++) addBtn(String(i), i, false, i === currentPage);
+    if (end < totalPages - 1) {
+        const li = document.createElement('li');
+        li.className = 'page-item disabled';
+        li.innerHTML = '<span class="page-link border-0">…</span>';
+        ul.appendChild(li);
+    }
+
+    if (totalPages > 1) addBtn(String(totalPages), totalPages, false, currentPage === totalPages);
+    addBtn(pagNext, currentPage + 1, currentPage === totalPages);
 }
 
 function renderizarTabla(data) {
     const tbody = document.getElementById('tabla-sedes');
     if (!tbody) return;
-    const tEmpty = window.txt?.superadmin_instituciones?.tabla_sin_filas || '';
+    const tx = window.txt?.superadmin_instituciones || {};
+    const tEmpty = tx.tabla_sin_filas || '';
+    const tFilter = tx.sin_resultados_filtro || tEmpty;
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">${escHtml(tEmpty || '—')}</td></tr>`;
+        const hasSearch = String(currentSearch || '').trim() !== '';
+        const msg = hasSearch ? tFilter : tEmpty;
+        setTbodyMessageRow(tbody, { colspan: 10, variant: 'muted', message: msg || '—' });
         return;
     }
 
@@ -137,15 +237,16 @@ function renderizarTabla(data) {
 }
 
 function setupBusqueda() {
-    document.getElementById('busqueda').oninput = (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtrados = listaSedes.filter(i => 
-            i.IdInstitucion.toString().includes(term) ||
-            i.NombreInst.toLowerCase().includes(term) ||
-            (i.Localidad && i.Localidad.toLowerCase().includes(term))
-        );
-        renderizarTabla(filtrados);
-    };
+    const input = document.getElementById('busqueda');
+    if (!input) return;
+    input.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            currentSearch = (input.value || '').trim();
+            currentPage = 1;
+            cargarInstituciones({ mode: 'inline' });
+        }, 400);
+    });
 }
 
 /** El switch refleja si hay texto de grupo; al escribir/borrar en dependencia se actualiza solo. */
@@ -210,9 +311,11 @@ function dibujarSelectsModulos(valoresPrevios = []) {
 }
 
 function abrirModalCrear() {
+    const tx = window.txt?.superadmin_instituciones || {};
     document.getElementById('form-inst').reset();
     document.getElementById('IdInstitucion').value = "";
-    document.getElementById('modalLabel').innerText = "Nueva Institución";
+    const ml = document.getElementById('modalLabel');
+    if (ml) ml.textContent = tx.modal_nueva || 'Nueva institución';
     
     document.getElementById('Pais').value = 'Uruguay';
     document.getElementById('Moneda').value = 'UYU';
@@ -225,11 +328,30 @@ function abrirModalCrear() {
     modalInst.show();
 }
 
-function abrirModalEditar(id) {
-    const inst = listaSedes.find(i => i.IdInstitucion == id);
-    if (!inst) return;
+async function abrirModalEditar(id) {
+    const tx = window.txt?.superadmin_instituciones || {};
+    let inst = pageRows.find((i) => i.IdInstitucion == id);
+    if (!inst) {
+        showLoader();
+        try {
+            const res = await API.request(`/superadmin/instituciones/${encodeURIComponent(id)}`);
+            if (res.status === 'success' && res.data && typeof res.data === 'object') {
+                inst = res.data;
+            }
+        } catch (e) {
+            console.error('Error al cargar sede:', e);
+        } finally {
+            hideLoader();
+        }
+        if (!inst) {
+            alert(tx.error_cargar_sede || 'No se pudo cargar la sede.');
+            return;
+        }
+    }
 
-    document.getElementById('modalLabel').innerText = `Editando: ${inst.NombreInst}`;
+    const modalTituloTpl = tx.modal_editando || 'Editando: {nombre}';
+    const ml = document.getElementById('modalLabel');
+    if (ml) ml.textContent = modalTituloTpl.replace('{nombre}', String(inst.NombreInst ?? ''));
     document.getElementById('IdInstitucion').value = inst.IdInstitucion;
     
     document.getElementById('NombreInst').value = inst.NombreInst;
@@ -295,16 +417,18 @@ async function guardarCambios() {
     try {
         const res = await API.request(endpoint, 'POST', data);
         
+        const txi = window.txt?.superadmin_instituciones || {};
         if (res.status === 'success') {
             modalInst.hide();
             await cargarInstituciones({ mode: 'inline' });
-            mostrarNotificacion(id ? "Datos actualizados correctamente" : "Institución creada con éxito");
+            mostrarNotificacion(id ? (txi.toast_ok || '') : (txi.toast_creada || ''));
         } else {
-            alert("Error del servidor: " + res.message);
+            alert((txi.error_servidor_prefix || 'Error del servidor: ') + (res.message || ''));
         }
     } catch (err) {
         console.error("Detalle del fallo:", err);
-        alert("Fallo de comunicación con la API. Revise la consola.");
+        const txi = window.txt?.superadmin_instituciones || {};
+        alert(txi.error_comunicacion || 'Fallo de comunicación con la API.');
     }
 }
 

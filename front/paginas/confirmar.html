@@ -17,7 +17,7 @@
                 await loadLanguage(lang);
                 if (window.txt) translatePage();
             } catch (e) { console.warn('i18n:', e); }
-            initConfirmacion();
+            await initConfirmacion();
             var current = localStorage.getItem('lang') || localStorage.getItem('idioma') || 'es';
             document.querySelectorAll('[id^="btn-conf-lang-"]').forEach(function(btn) {
                 var isActive = btn.id === 'btn-conf-lang-' + current;

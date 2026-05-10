@@ -149,7 +149,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
             if (window.txt) translatePage();
-            initQRSalaPage();
+            await initQRSalaPage();
         });
     </script>
 </body>

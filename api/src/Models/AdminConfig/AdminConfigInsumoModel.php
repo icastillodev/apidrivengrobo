@@ -12,7 +12,8 @@ class AdminConfigInsumoModel {
     }
 
     public function getAll($instId) {
-        $sql = "SELECT i.*, t.nombreTipo as NombreCategoria 
+        $insumoCols = 'i.idInsumo, i.NombreInsumo, i.CantidadInsumo, i.TipoInsumo, i.PrecioInsumo, i.OrdenInsumos, i.CategoriaInsumo, i.IdInstitucion, i.Existencia';
+        $sql = "SELECT {$insumoCols}, t.nombreTipo as NombreCategoria 
                 FROM insumo i 
                 LEFT JOIN tipoformularios t ON i.CategoriaInsumo = t.IdTipoFormulario
                 WHERE i.IdInstitucion = ? 

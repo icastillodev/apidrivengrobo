@@ -25,7 +25,8 @@ class AdminConfigRolesModel {
         $stmtUsers->execute([$instId]);
         $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
 
-        $sqlMenus = "SELECT * FROM menudistr WHERE IdInstitucion = ? AND IdTipoUsrA IN (5, 6)";
+        $menuCols = 'IdMenu, IdInstitucion, IdTipoUsrA, NombreMenu, Activo';
+        $sqlMenus = "SELECT {$menuCols} FROM menudistr WHERE IdInstitucion = ? AND IdTipoUsrA IN (5, 6)";
         $stmtMenus = $this->db->prepare($sqlMenus);
         $stmtMenus->execute([$instId]);
         $menus = $stmtMenus->fetchAll(PDO::FETCH_ASSOC);

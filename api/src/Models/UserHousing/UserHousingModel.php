@@ -10,6 +10,19 @@ class UserHousingModel {
         $this->db = $db;
     }
 
+    /** Igual que `AlojamientoModel::sqlSelectAlojamientoAllColumns` con prefijo (sin `a.*`). */
+    private function sqlSelectAlojamientoAllColumnsPrefixed(string $alias = 'a'): string {
+        $cols = [
+            'IdAlojamiento', 'fechavisado', 'totalcajachica', 'totalcajagrande', 'preciocajachica', 'preciocajagrande',
+            'cuentaapagar', 'IdUsrA', 'observaciones', 'TipoAnimal', 'idprotA', 'hastafecha', 'historia', 'totaldiasdefinidos',
+            'totalpago', 'detallepago', 'finalizado', 'coloniapropia', 'IdInstitucion', 'IdTipoAlojamiento', 'CantidadCaja',
+            'PrecioCajaMomento',
+        ];
+        $p = $alias . '.';
+
+        return $p . implode(', ' . $p, $cols);
+    }
+
     public function getAllHousings($userId, $currentInstId) {
         // 1. Info Institución Actual
         $stmtInst = $this->db->prepare("SELECT NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion = ?");
@@ -55,8 +68,9 @@ class UserHousingModel {
 
     public function getDetail($historiaId) {
         // CORRECCIÓN: Join con especiee para el nombre
+        $aCols = $this->sqlSelectAlojamientoAllColumnsPrefixed('a');
         $sql = "SELECT 
-                    a.*,
+                    {$aCols},
                     i.NombreInst, 
                     i.InstCorreo, 
                     i.InstContacto,

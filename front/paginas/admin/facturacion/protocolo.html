@@ -42,7 +42,7 @@
                 if (window.txt) {
                     await initMenu();
                     NotificationManager.init();
-                    initBillingProtocolo();
+                    await initBillingProtocolo();
                 }
 
                 setTimeout(() => { checkUrlParamsAndOpen(); }, 300);

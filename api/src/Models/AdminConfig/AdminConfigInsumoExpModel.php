@@ -12,7 +12,8 @@ class AdminConfigInsumoExpModel {
     }
 
     public function getAll($instId) {
-        $sql = "SELECT i.*, e.EspeNombreA as NombreEspecie
+        $insumoCols = 'i.IdInsumoexp, i.NombreInsumo, i.PrecioInsumo, i.CantidadInsumo, i.TipoInsumo, i.IdespA, i.IdInstitucion, i.habilitado';
+        $sql = "SELECT {$insumoCols}, e.EspeNombreA as NombreEspecie
                 FROM insumoexperimental i
                 LEFT JOIN especiee e ON i.IdespA = e.idespA
                 WHERE i.IdInstitucion = ? 

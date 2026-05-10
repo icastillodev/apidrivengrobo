@@ -9,12 +9,29 @@ class AuthModel {
         $this->db = $db; 
     }
 
+    /** Columnas de `institucion` alineadas a `docs/database.sql` (sin `SELECT *`). */
+    private function sqlSelectInstitucionAllColumns(): string {
+        return 'IdInstitucion, NombreInst, PrecioJornadaTrabajoExp, DependenciaInstitucion, Web, Detalle, InstDir, '
+            . 'InstContacto, InstCorreo, NombreCompletoInst, Logo, TipoApp, Moneda, Pais, Localidad, IdOrganismo, '
+            . 'otrosceuas, FechaDepuracion, Activo, UltimoPago, TipoFacturacion, FechaContrato, tituloprecios, idioma, '
+            . 'MadreGrupo, LogoEnPdf, ReservasRequierenAprobacion, ReservaQrTokenGeneral';
+    }
+
+    /** `usuarioe` — `docs/database.sql` + prefijo para login (sin `u.*`). */
+    private function sqlSelectUsuarioeAllColumnsPrefixed(string $alias = 'u'): string {
+        $cols = 'IdUsrA, UsrA, PassA, password_secure, confirmado, hash_migrated, IdInstitucion, token_confirmacion, two_factor_code, two_factor_expires';
+        $parts = array_map('trim', explode(',', $cols));
+
+        return $alias . '.' . implode(', ' . $alias . '.', $parts);
+    }
+
     public function getInstitucionBySlug($slug) {
         $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
         if ($slug === '') {
             return false;
         }
-        $stmt = $this->db->prepare("SELECT * FROM institucion WHERE LOWER(NombreInst) = LOWER(?) LIMIT 1");
+        $cols = $this->sqlSelectInstitucionAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE LOWER(NombreInst) = LOWER(?) LIMIT 1");
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -26,7 +43,8 @@ class AuthModel {
         if ($id <= 0) {
             return null;
         }
-        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $cols = $this->sqlSelectInstitucionAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE IdInstitucion = ? LIMIT 1");
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -88,7 +106,8 @@ class AuthModel {
         }
 
         $userExpr = $this->sqlLoginUsrCompactExpr('u');
-        $select = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
+        $uCols = $this->sqlSelectUsuarioeAllColumnsPrefixed('u');
+        $select = "SELECT {$uCols}, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
                 FROM usuarioe u
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 LEFT JOIN tienetipor t ON u.IdUsrA = t.IdUsrA
@@ -102,7 +121,8 @@ class AuthModel {
             return $row;
         }
 
-        $sql = "SELECT u.*, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
+        $uCols = $this->sqlSelectUsuarioeAllColumnsPrefixed('u');
+        $sql = "SELECT {$uCols}, i.DependenciaInstitucion, t.IdTipousrA as role, p.EmailA, p.NombreA, p.ApellidoA
                 FROM usuarioe u
                 LEFT JOIN institucion i ON u.IdInstitucion = i.IdInstitucion
                 INNER JOIN tienetipor t ON u.IdUsrA = t.IdUsrA AND t.IdTipousrA = 1

@@ -9,7 +9,7 @@ const state = {
   bundle: null
 };
 
-export function initQRSalasPage() {
+export async function initQRSalasPage() {
   state.token = getTokenFromUrl();
   if (!state.token) {
     Swal.fire('Error', window.txt?.qr_salas?.err_token || '', 'error');
@@ -34,7 +34,7 @@ export function initQRSalasPage() {
   document.getElementById('btn-qr-salas-reload')?.addEventListener('click', () => loadBundle());
 
   renderAuthZone();
-  loadBundle();
+  await loadBundle();
 }
 
 function toYMD(d) {

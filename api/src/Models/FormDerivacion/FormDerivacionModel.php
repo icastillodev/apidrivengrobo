@@ -14,6 +14,26 @@ class FormDerivacionModel
         $this->db = $db;
     }
 
+    /** Columnas completas `formularioe` — `docs/database.sql` (sin `SELECT *`). */
+    private function sqlSelectFormularioeAllColumns(): string {
+        return 'idformA, tipoA, edadA, pesoA, fecRetiroA, aclaraA, fechainicioA, IdUsrA, estado, EstadoWorkflow, '
+            . 'IdInstitucionOrigen, DerivadoActivo, FechaDerivado, raza, reactivo, visto, quienvisto, aclaracionadm, '
+            . 'viruta, alimento, idsubespA, idcepaA, nocuenta, depto, otroinsumo, IdInstitucion';
+    }
+
+    /** Columnas completas `formulario_derivacion` — `docs/database.sql`. */
+    private function sqlSelectFormularioDerivacionAllColumns(): string {
+        return 'IdFormularioDerivacion, idformA, idformAOrigen, IdFormularioDerivacionPadre, IdInstitucionOrigen, '
+            . 'IdInstitucionDestino, IdUsrOrigen, IdUsrDestinoResponsable, estado_derivacion, estado_origen, estado_destino, '
+            . 'tipoA_destino, depto_destino, idsubespA_destino, idcepaA_destino, FechaConfigDestino, IdUsrConfigDestino, '
+            . 'mensaje_origen, mensaje_destino, motivo_rechazo, FechaCreado, FechaRespondido, FechaCerrado, Activo';
+    }
+
+    /** Columnas completas `formulario_owner_actual` — `docs/database.sql`. */
+    private function sqlSelectFormularioOwnerActualAllColumns(): string {
+        return 'idformA, IdInstitucionActual, IdUsrPropietarioActual, IdFormularioDerivacionActiva, EsDerivado, FechaActualizado';
+    }
+
     public static function assertInstitutionCanMutate($db, $idformA, $instId)
     {
         if (!self::tableExists($db, 'formulario_owner_actual')) {
@@ -590,7 +610,8 @@ class FormDerivacionModel
      */
     private function copyFormularioToInstitution($idformAOrigen, $instDestino, $instOrigen, $categoria): int
     {
-        $stmt = $this->db->prepare("SELECT * FROM formularioe WHERE idformA = ? LIMIT 1");
+        $feCols = $this->sqlSelectFormularioeAllColumns();
+        $stmt = $this->db->prepare("SELECT {$feCols} FROM formularioe WHERE idformA = ? LIMIT 1");
         $stmt->execute([$idformAOrigen]);
         $orig = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$orig) {
@@ -641,7 +662,7 @@ class FormDerivacionModel
 
     private function copySexoe($idOrig, $idNew): void
     {
-        $stmt = $this->db->prepare("SELECT * FROM sexoe WHERE idformA = ? LIMIT 1");
+        $stmt = $this->db->prepare('SELECT machoA, hembraA, indistintoA, totalA, organo FROM sexoe WHERE idformA = ? LIMIT 1');
         $stmt->execute([$idOrig]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) return;
@@ -770,11 +791,12 @@ class FormDerivacionModel
 
     private function getActiveDerivation($idformA)
     {
+        $fdCols = $this->sqlSelectFormularioDerivacionAllColumns();
         if ($this->columnExists('formulario_derivacion', 'idformAOrigen')) {
-            $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE (idformA = ? OR idformAOrigen = ?) AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
+            $stmt = $this->db->prepare("SELECT {$fdCols} FROM formulario_derivacion WHERE (idformA = ? OR idformAOrigen = ?) AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
             $stmt->execute([$idformA, $idformA]);
         } else {
-            $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
+            $stmt = $this->db->prepare("SELECT {$fdCols} FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 ORDER BY IdFormularioDerivacion DESC LIMIT 1");
             $stmt->execute([$idformA]);
         }
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -782,14 +804,16 @@ class FormDerivacionModel
 
     private function getDerivationByIdForUpdate($idDeriv)
     {
-        $stmt = $this->db->prepare("SELECT * FROM formulario_derivacion WHERE IdFormularioDerivacion = ? LIMIT 1");
+        $fdCols = $this->sqlSelectFormularioDerivacionAllColumns();
+        $stmt = $this->db->prepare("SELECT {$fdCols} FROM formulario_derivacion WHERE IdFormularioDerivacion = ? LIMIT 1");
         $stmt->execute([$idDeriv]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     private function ensureOwnerRow($idformA, $defaultInst = null, $defaultUsr = null)
     {
-        $stmt = $this->db->prepare("SELECT * FROM formulario_owner_actual WHERE idformA = ? LIMIT 1");
+        $foaCols = $this->sqlSelectFormularioOwnerActualAllColumns();
+        $stmt = $this->db->prepare("SELECT {$foaCols} FROM formulario_owner_actual WHERE idformA = ? LIMIT 1");
         $stmt->execute([$idformA]);
         $owner = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($owner) {

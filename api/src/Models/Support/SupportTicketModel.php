@@ -72,7 +72,10 @@ class SupportTicketModel
 
     public function assertCanAccessTicket(int $ticketId, int $userId, int $role): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM support_ticket WHERE IdSupportTicket = ? LIMIT 1');
+        $stmt = $this->db->prepare(
+            'SELECT IdSupportTicket, IdUsrA, IdInstitucion, asunto, estado, FechaCreacion, FechaActualizacion
+             FROM support_ticket WHERE IdSupportTicket = ? LIMIT 1'
+        );
         $stmt->execute([$ticketId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
@@ -98,14 +101,13 @@ class SupportTicketModel
             $sqlCount = 'SELECT COUNT(*) FROM support_ticket';
             $total = (int) $this->db->query($sqlCount)->fetchColumn();
 
-            $sql = "SELECT t.*,
-                    p.NombreA, p.ApellidoA, u.UsrA,
-                    i.NombreInst
+            // Listado panel Gecko: solo columnas que usa `supportSoporte.js` (detalle vía GET /support/tickets/:id).
+            $sql = "SELECT t.IdSupportTicket, t.asunto, t.estado, t.FechaActualizacion,
+                    u.UsrA, i.NombreInst
                 FROM support_ticket t
                 INNER JOIN usuarioe u ON u.IdUsrA = t.IdUsrA
-                LEFT JOIN personae p ON p.IdUsrA = t.IdUsrA
                 LEFT JOIN institucion i ON i.IdInstitucion = t.IdInstitucion
-                ORDER BY t.FechaActualizacion DESC
+                ORDER BY t.FechaActualizacion DESC, t.IdSupportTicket DESC
                 LIMIT {$limit} OFFSET {$off}";
             $items = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
         } else {
@@ -114,15 +116,10 @@ class SupportTicketModel
             $total = (int) $c->fetchColumn();
 
             $stmt = $this->db->prepare(
-                "SELECT t.*,
-                    p.NombreA, p.ApellidoA, u.UsrA,
-                    i.NombreInst
+                "SELECT t.IdSupportTicket, t.asunto, t.estado, t.FechaActualizacion
                 FROM support_ticket t
-                INNER JOIN usuarioe u ON u.IdUsrA = t.IdUsrA
-                LEFT JOIN personae p ON p.IdUsrA = t.IdUsrA
-                LEFT JOIN institucion i ON i.IdInstitucion = t.IdInstitucion
                 WHERE t.IdUsrA = ?
-                ORDER BY t.FechaActualizacion DESC
+                ORDER BY t.FechaActualizacion DESC, t.IdSupportTicket DESC
                 LIMIT {$limit} OFFSET {$off}"
             );
             $stmt->execute([$userId]);
@@ -140,7 +137,8 @@ class SupportTicketModel
         $ticket = $this->assertCanAccessTicket($ticketId, $userId, $role);
 
         $stmt = $this->db->prepare(
-            'SELECT m.*, u.UsrA, p.NombreA, p.ApellidoA
+            'SELECT m.IdMensaje, m.IdSupportTicket, m.es_soporte, m.IdUsrA, m.cuerpo, m.FechaCreacion,
+                    u.UsrA, p.NombreA, p.ApellidoA
              FROM support_ticket_mensaje m
              INNER JOIN usuarioe u ON u.IdUsrA = m.IdUsrA
              LEFT JOIN personae p ON p.IdUsrA = m.IdUsrA

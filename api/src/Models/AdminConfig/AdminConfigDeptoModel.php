@@ -13,13 +13,15 @@ class AdminConfigDeptoModel {
 
     public function getAllData($instId) {
         // 1. FIX: Ahora filtramos los Organismos estrictamente por IdInstitucion
-        $stmtOrg = $this->db->prepare("SELECT * FROM organismoe WHERE IdInstitucion = ? ORDER BY NombreOrganismoSimple ASC");
+        $orgCols = 'IdOrganismo, NombreOrganismoSimple, ContactoOrgnismo, NombreOrganismoCompleto, CorreoOrganismo, DireccionOrganismo, PaisOrganismo, LogoOrganismo, IdInstitucion, externoorganismo';
+        $stmtOrg = $this->db->prepare("SELECT {$orgCols} FROM organismoe WHERE IdInstitucion = ? ORDER BY NombreOrganismoSimple ASC");
         $stmtOrg->execute([$instId]);
         $orgs = $stmtOrg->fetchAll(PDO::FETCH_ASSOC);
 
         // 2. Departamentos (Ya estaba filtrado, pero es bueno revisar el JOIN)
+        $deptoCols = 'd.iddeptoA, d.NombreDeptoA, d.DetalledeptoA, d.IdInstitucion, d.organismopertenece, d.externodepto';
         $sqlDepto = "SELECT 
-                        d.*, 
+                        {$deptoCols}, 
                         o.NombreOrganismoSimple as NombreOrg
                      FROM departamentoe d
                      LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo 

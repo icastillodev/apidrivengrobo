@@ -6,6 +6,16 @@ class Router {
     private $basePath;
     private $db;
 
+    /** Si es true, captura la salida del controlador y envía Server-Timing (duración ms). Ver CHECKLIST-OPTIMIZACION-TABLAS-CARGAS §5 Fase 1. */
+    private function serverTimingEnabled(): bool {
+        $v = getenv('API_SERVER_TIMING');
+        if ($v === false || $v === '') {
+            return false;
+        }
+        $v = strtolower(trim((string) $v));
+        return in_array($v, ['1', 'true', 'yes', 'on'], true);
+    }
+
     public function __construct($basePath, $db) {
         $this->basePath = $basePath;
         $this->db = $db;
@@ -50,6 +60,18 @@ class Router {
         foreach ($this->routes as $route) {
             if ($route['method'] === $method && preg_match($route['pattern'], $uri, $matches)) {
                 array_shift($matches); // Eliminar el match completo (dejando solo los parámetros capturados)
+                if ($this->serverTimingEnabled()) {
+                    ob_start();
+                    $t0 = microtime(true);
+                    try {
+                        $this->resolve($route['handler'], $matches);
+                    } finally {
+                        $durMs = (microtime(true) - $t0) * 1000.0;
+                        header('Server-Timing: app;dur=' . round($durMs, 2));
+                        echo ob_get_clean();
+                    }
+                    return;
+                }
                 return $this->resolve($route['handler'], $matches);
             }
         }

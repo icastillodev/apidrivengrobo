@@ -36,36 +36,68 @@ class FormRegistroModel {
         if (!is_array($modulos) || $modulos === []) {
             return null;
         }
+        $ids = [];
+        foreach ($modulos as $m) {
+            $id = (int) ($m['IdModulosApp'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+        $idList = array_keys($ids);
+        if ($idList === []) {
+            return null;
+        }
+        $placeholders = implode(',', array_fill(0, count($idList), '?'));
+        $stmt = $this->db->prepare("SELECT IdModulosApp, NombreModulo FROM modulosapp WHERE IdModulosApp IN ({$placeholders})");
+        $stmt->execute($idList);
+        /** @var array<int, string> */
+        $nombreById = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $nombreById[(int) ($row['IdModulosApp'] ?? 0)] = (string) ($row['NombreModulo'] ?? '');
+        }
+
         $plan = [];
-        $stmt = $this->db->prepare('SELECT NombreModulo FROM modulosapp WHERE IdModulosApp = ? LIMIT 1');
         foreach ($modulos as $m) {
             $id = (int) ($m['IdModulosApp'] ?? 0);
             $est = (int) ($m['estado_logico'] ?? 1);
-            if ($id <= 0) {
+            if ($id <= 0 || !isset($nombreById[$id]) || $nombreById[$id] === '') {
                 continue;
             }
-            $stmt->execute([$id]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$row) {
-                continue;
-            }
-            $k = ModulosInstitucion::nombreModuloToKey($row['NombreModulo'] ?? '');
+            $k = ModulosInstitucion::nombreModuloToKey($nombreById[$id]);
             if ($k !== null && $k !== '') {
                 $plan[$k] = $est;
             }
         }
+
         return $plan === [] ? null : json_encode($plan, JSON_UNESCAPED_UNICODE);
     }
 
-// Agrega esta función dentro de FormRegistroModel
+    /** Columnas en docs/database.sql + migración plan_modulos */
+    private function sqlSelectFormRegistroConfigAllColumns(): string
+    {
+        return 'id_form_config, slug_url, nombre_inst_previa, encargado_nombre, activo, creado_el, plan_modulos';
+    }
+
+    private function sqlSelectFormRegistroConfigColumnsCPrefixed(): string
+    {
+        return 'c.id_form_config, c.slug_url, c.nombre_inst_previa, c.encargado_nombre, c.activo, c.creado_el, c.plan_modulos';
+    }
+
+    private function sqlSelectFormRegistroRespuestasAllColumns(): string
+    {
+        return 'id_respuesta, id_form_config, categoria, campo, valor, valor_extra, dependencia_id';
+    }
+
     public function getConfigById($id) {
-        $stmt = $this->db->prepare("SELECT * FROM form_registro_config WHERE id_form_config = ? LIMIT 1");
+        $cols = $this->sqlSelectFormRegistroConfigAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM form_registro_config WHERE id_form_config = ? LIMIT 1");
         $stmt->execute([$id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    
-public function getConfigBySlug($slug) {
-        $stmt = $this->db->prepare("SELECT * FROM form_registro_config WHERE slug_url = ? AND activo = 1 LIMIT 1");
+
+    public function getConfigBySlug($slug) {
+        $cols = $this->sqlSelectFormRegistroConfigAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM form_registro_config WHERE slug_url = ? AND activo = 1 LIMIT 1");
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -101,17 +133,23 @@ public function getConfigBySlug($slug) {
     }
 
     public function getAllConfigs() {
-        $sql = "SELECT c.*, 
-                (SELECT COUNT(*) FROM form_registro_respuestas WHERE id_form_config = c.id_form_config) as campos_completados
-                FROM form_registro_config c 
+        $cCols = $this->sqlSelectFormRegistroConfigColumnsCPrefixed();
+        $sql = "SELECT {$cCols},
+                COALESCE(rc.cnt, 0) AS campos_completados
+                FROM form_registro_config c
+                LEFT JOIN (
+                    SELECT id_form_config, COUNT(*) AS cnt
+                    FROM form_registro_respuestas
+                    GROUP BY id_form_config
+                ) rc ON rc.id_form_config = c.id_form_config
                 ORDER BY c.creado_el DESC";
+
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
-public function getFullResponsesGrouped($idConfig) {
-        // Hacemos un SELECT * puro para asegurarnos de traer todas las columnas
-        // Quitamos el ORDER BY id_respuesta por si tu llave primaria se llama distinto
-        $sql = "SELECT * FROM form_registro_respuestas 
+    public function getFullResponsesGrouped($idConfig) {
+        $cols = $this->sqlSelectFormRegistroRespuestasAllColumns();
+        $sql = "SELECT {$cols} FROM form_registro_respuestas
                 WHERE id_form_config = ?";
                 
         $stmt = $this->db->prepare($sql);

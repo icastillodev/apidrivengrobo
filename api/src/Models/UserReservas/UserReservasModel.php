@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\UserReservas;
 
+use App\Models\Reservas\ReservaTableColumns;
 use PDO;
 
 class UserReservasModel {
@@ -17,7 +18,8 @@ class UserReservasModel {
         $from = $from ?: date('Y-m-01');
         $to = $to ?: date('Y-m-t');
 
-        $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
+        $cols = ReservaTableColumns::reservaSala();
+        $salaStmt = $this->db->prepare("SELECT {$cols} FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
         $salaStmt->execute([$instId, $salaId]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala inválida'];
@@ -154,7 +156,8 @@ class UserReservasModel {
         }
 
         // Validar sala
-        $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
+        $cols = ReservaTableColumns::reservaSala();
+        $salaStmt = $this->db->prepare("SELECT {$cols} FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
         $salaStmt->execute([$instId, $salaId]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala inválida'];

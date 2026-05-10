@@ -48,6 +48,17 @@ class InstitucionModel {
         return null;
     }
 
+    /** Misma lista que `AuthModel::sqlSelectInstitucionAllColumns` con prefijo `i.` */
+    private function sqlSelectInstitucionAllColumnsIPrefixed(): string {
+        $cols = 'IdInstitucion, NombreInst, PrecioJornadaTrabajoExp, DependenciaInstitucion, Web, Detalle, InstDir, '
+            . 'InstContacto, InstCorreo, NombreCompletoInst, Logo, TipoApp, Moneda, Pais, Localidad, IdOrganismo, '
+            . 'otrosceuas, FechaDepuracion, Activo, UltimoPago, TipoFacturacion, FechaContrato, tituloprecios, idioma, '
+            . 'MadreGrupo, LogoEnPdf, ReservasRequierenAprobacion, ReservaQrTokenGeneral';
+        $parts = array_map('trim', explode(',', $cols));
+
+        return 'i.' . implode(', i.', $parts);
+    }
+
     // Trae los módulos existentes en la app
     public function getModulosMaestros() {
         $rows = $this->db->query("SELECT IdModulosApp, NombreModulo FROM modulosapp")->fetchAll(PDO::FETCH_ASSOC);
@@ -59,35 +70,129 @@ class InstitucionModel {
         return $rows;
     }
 
-    public function getAllInstitutions() {
-        $sql = "SELECT i.* FROM institucion i ORDER BY i.IdInstitucion DESC";
-        $instituciones = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    /**
+     * @return array{0: string, 1: array<int, mixed>}
+     */
+    private function institutionSearchWhere(?string $q): array {
+        if ($q === null || trim($q) === '') {
+            return ['', []];
+        }
+        $needle = strtolower(trim($q));
+        $qq = '%' . addcslashes($needle, '%_\\') . '%';
+        $sql = ' AND (
+            LOWER(CAST(i.IdInstitucion AS CHAR)) LIKE ?
+            OR LOWER(COALESCE(i.NombreInst,\'\')) LIKE ?
+            OR LOWER(COALESCE(i.Localidad,\'\')) LIKE ?
+        )';
 
-        // Por cada institución, traemos sus módulos y los comprimimos al "estado lógico" (1, 2, 3)
-        $sqlMod = "SELECT ma.IdModulosApp, app.NombreModulo, ma.Habilitado, ma.ActivoInvestigador 
-                   FROM modulosactivosinst ma 
-                   JOIN modulosapp app ON ma.IdModulosApp = app.IdModulosApp
-                   WHERE ma.IdInstitucion = ?";
-        $stmtMod = $this->db->prepare($sqlMod);
+        return [$sql, [$qq, $qq, $qq]];
+    }
 
-        foreach ($instituciones as &$inst) {
-            $stmtMod->execute([$inst['IdInstitucion']]);
-            $mods = $stmtMod->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Transformamos las dos variables binarias al estado lógico de tu dropdown
-            foreach ($mods as &$m) {
-                if ($m['Habilitado'] == 2) {
-                    $m['estado_logico'] = 1; // Desactivado total
-                } else if ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 2) {
-                    $m['estado_logico'] = 2; // Solo Admin
-                } else if ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 1) {
-                    $m['estado_logico'] = 3; // Full Admin y User
-                }
+    public function countInstitutionsFiltered(?string $q): int {
+        [$w, $params] = $this->institutionSearchWhere($q);
+        $sql = 'SELECT COUNT(*) FROM institucion i WHERE 1=1' . $w;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Asigna `modulos` y `estado_logico` por sede vía una query IN (…).
+     *
+     * @param array<int, array<string,mixed>> $instituciones
+     */
+    private function hydrateInstitucionesModulos(array &$instituciones): void {
+        $ids = [];
+        foreach ($instituciones as $inst) {
+            $id = (int) ($inst['IdInstitucion'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = true;
             }
-            $inst['modulos'] = $mods;
+        }
+        $idList = array_keys($ids);
+
+        /** @var array<int, list<array<string,mixed>>> */
+        $modsByInst = [];
+        if ($idList !== []) {
+            $placeholders = implode(',', array_fill(0, count($idList), '?'));
+            $sqlMod = "SELECT ma.IdInstitucion, ma.IdModulosApp, app.NombreModulo, ma.Habilitado, ma.ActivoInvestigador
+                       FROM modulosactivosinst ma
+                       JOIN modulosapp app ON ma.IdModulosApp = app.IdModulosApp
+                       WHERE ma.IdInstitucion IN ({$placeholders})";
+            $stmtMod = $this->db->prepare($sqlMod);
+            $stmtMod->execute($idList);
+            while ($row = $stmtMod->fetch(PDO::FETCH_ASSOC)) {
+                $iid = (int) ($row['IdInstitucion'] ?? 0);
+                unset($row['IdInstitucion']);
+                if ($iid <= 0) {
+                    continue;
+                }
+                if (!isset($modsByInst[$iid])) {
+                    $modsByInst[$iid] = [];
+                }
+                $modsByInst[$iid][] = $row;
+            }
         }
 
+        foreach ($instituciones as &$inst) {
+            $iid = (int) ($inst['IdInstitucion'] ?? 0);
+            $mods = $modsByInst[$iid] ?? [];
+
+            foreach ($mods as &$m) {
+                if ($m['Habilitado'] == 2) {
+                    $m['estado_logico'] = 1;
+                } elseif ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 2) {
+                    $m['estado_logico'] = 2;
+                } elseif ($m['Habilitado'] == 1 && $m['ActivoInvestigador'] == 1) {
+                    $m['estado_logico'] = 3;
+                }
+            }
+            unset($m);
+            $inst['modulos'] = $mods;
+        }
+        unset($inst);
+    }
+
+    /**
+     * Una sede con la misma forma que filas del listado paginado (incl. `modulos`).
+     */
+    public function getInstitutionByIdForSuperadmin(int $id): ?array {
+        if ($id <= 0) {
+            return null;
+        }
+        $iCols = $this->sqlSelectInstitucionAllColumnsIPrefixed();
+        $sql = "SELECT {$iCols} FROM institucion i WHERE i.IdInstitucion = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $list = [$row];
+        $this->hydrateInstitucionesModulos($list);
+
+        return $list[0];
+    }
+
+    /** Listado paginado + filtros (misma forma que filas del listado paginado). */
+    public function getInstitutionsPaged(int $limit, int $offset, ?string $q): array {
+        $iCols = $this->sqlSelectInstitucionAllColumnsIPrefixed();
+        [$w, $params] = $this->institutionSearchWhere($q);
+        $limit = max(0, $limit);
+        $offset = max(0, $offset);
+        $sql = "SELECT {$iCols} FROM institucion i WHERE 1=1 {$w} ORDER BY i.IdInstitucion DESC LIMIT {$limit} OFFSET {$offset}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $instituciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $this->hydrateInstitucionesModulos($instituciones);
+
         return $instituciones;
+    }
+
+    /** Lista completa (tope 50 000 filas) — selects sin `limit` en API, exports. */
+    public function getAllInstitutions() {
+        return $this->getInstitutionsPaged(50000, 0, null);
     }
 
     public function crearInstitucionCompleta($data) {

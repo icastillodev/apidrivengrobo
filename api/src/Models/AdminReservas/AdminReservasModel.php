@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\AdminReservas;
 
+use App\Models\Reservas\ReservaTableColumns;
 use PDO;
 
 class AdminReservasModel {
@@ -17,7 +18,8 @@ class AdminReservasModel {
         $from = $from ?: date('Y-m-01');
         $to = $to ?: date('Y-m-t');
 
-        $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? LIMIT 1");
+        $cols = ReservaTableColumns::reservaSala();
+        $salaStmt = $this->db->prepare("SELECT {$cols} FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? LIMIT 1");
         $salaStmt->execute([$instId, $salaId]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala inválida'];
@@ -81,7 +83,8 @@ class AdminReservasModel {
         if (!$uStmt->fetchColumn()) return ['status' => 'error', 'message' => 'Titular inválido para esta institución'];
 
         // Validar sala
-        $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
+        $colsSala = ReservaTableColumns::reservaSala();
+        $salaStmt = $this->db->prepare("SELECT {$colsSala} FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
         $salaStmt->execute([$instId, $salaId]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala inválida'];
@@ -158,7 +161,8 @@ class AdminReservasModel {
         if ($idReserva <= 0) return ['status' => 'error', 'message' => 'ID inválido'];
 
         // Traer reserva actual (para validar y para recalcular conflictos sin contarse a sí misma)
-        $cur = $this->db->prepare("SELECT * FROM reserva WHERE idReserva = ? AND IdInstitucion = ? LIMIT 1");
+        $colsR = ReservaTableColumns::reserva();
+        $cur = $this->db->prepare("SELECT {$colsR} FROM reserva WHERE idReserva = ? AND IdInstitucion = ? LIMIT 1");
         $cur->execute([$idReserva, $instId]);
         $current = $cur->fetch(PDO::FETCH_ASSOC);
         if (!$current) return ['status' => 'error', 'message' => 'Reserva no encontrada'];
@@ -182,7 +186,8 @@ class AdminReservasModel {
         if (!$uStmt->fetchColumn()) return ['status' => 'error', 'message' => 'Titular inválido para esta institución'];
 
         // Validar sala
-        $salaStmt = $this->db->prepare("SELECT * FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
+        $colsSala2 = ReservaTableColumns::reservaSala();
+        $salaStmt = $this->db->prepare("SELECT {$colsSala2} FROM reserva_sala WHERE IdInstitucion = ? AND IdSalaReserva = ? AND habilitado = 1");
         $salaStmt->execute([$instId, $salaId]);
         $sala = $salaStmt->fetch(PDO::FETCH_ASSOC);
         if (!$sala) return ['status' => 'error', 'message' => 'Sala inválida'];

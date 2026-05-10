@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
+import { debounce } from '../../utils/debounce.js';
 
 export const HistorialState = {
     dataFull: [],
@@ -12,6 +13,8 @@ export const HistorialState = {
 };
 
 let investigadoresHistorialCache = [];
+
+const debouncedRenderInvestigatorsPanel = debounce(() => renderInvestigatorsPanel(), 280);
 
 function txHist() {
     return window.txt?.admin_historialcontable || {};
@@ -186,9 +189,7 @@ function setupListeners() {
         renderInvestigatorsPanel();
         filterData();
     });
-    document.getElementById('inv-hist-search')?.addEventListener('input', () => {
-        renderInvestigatorsPanel();
-    });
+    document.getElementById('inv-hist-search')?.addEventListener('input', () => debouncedRenderInvestigatorsPanel());
 
     document.getElementById('lista-invest-historial')?.addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-inv-filter');

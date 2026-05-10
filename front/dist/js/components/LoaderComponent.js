@@ -1,6 +1,8 @@
 // front/dist/js/components/LoaderComponent.js
 import '../utils/stripCloudflareInsights.js';
 
+// UX carga: primera visita `showLoader`/`hideLoader` en `finally`; refetches → spinner en tabla (no overlay página). Ver docs/CHECKLIST-OPTIMIZACION-TABLAS-CARGAS.md · filas tbody reutilizables: `utils/tableInlineLoading.js`.
+
 let loaderStartTime = 0;
 let phraseIntervalId = null;
 let progressIntervalId = null;

@@ -10,6 +10,12 @@ class StatisticsModel {
     /** @var array<string, bool> */
     private $columnExistsCache = [];
 
+    /** @var \PDOStatement|null Reutiliza prepare para `aggregateByDeptoList` con deptos sin organismo (SQL idéntico entre sedes). */
+    private $stmtAggregateByDeptoSinOrganismo = null;
+
+    /** @var string|null Cadena SQL asociada a {@see $stmtAggregateByDeptoSinOrganismo}. */
+    private $stmtAggregateByDeptoSinOrganismoSql = null;
+
     public function __construct($db) {
         $this->db = $db;
     }
@@ -32,6 +38,14 @@ class StatisticsModel {
             $this->columnExistsCache[$k] = false;
         }
         return $this->columnExistsCache[$k];
+    }
+
+    /** Columnas `institucion` — `docs/database.sql` (alineado con `AuthModel`). */
+    private function sqlSelectInstitucionAllColumns(): string {
+        return 'IdInstitucion, NombreInst, PrecioJornadaTrabajoExp, DependenciaInstitucion, Web, Detalle, InstDir, '
+            . 'InstContacto, InstCorreo, NombreCompletoInst, Logo, TipoApp, Moneda, Pais, Localidad, IdOrganismo, '
+            . 'otrosceuas, FechaDepuracion, Activo, UltimoPago, TipoFacturacion, FechaContrato, tituloprecios, idioma, '
+            . 'MadreGrupo, LogoEnPdf, ReservasRequierenAprobacion, ReservaQrTokenGeneral';
     }
 
     private function hasDerivacionDeptoDestino(): bool {
@@ -428,14 +442,50 @@ class StatisticsModel {
     }
 
     /**
-     * Estadísticas agrupadas por organización (organismoe). Incluye fila "(Sin organización)" para deptos sin organismo.
+     * Organismos por institución en una consulta (evita N+1 en estadísticas de red).
+     *
+     * @param int[] $ids
+     * @return array<int, array<int, array<string, mixed>>>
      */
-    public function getPorOrganizacion($instId, $from, $to) {
+    private function fetchOrganismosPorInstitucionesBatch(array $ids): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn ($v) => $v > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT IdInstitucion, IdOrganismo, NombreOrganismoSimple FROM organismoe WHERE IdInstitucion IN ($ph) ORDER BY IdInstitucion ASC, NombreOrganismoSimple ASC"
+        );
+        $stmt->execute($ids);
+        $by = [];
+        foreach ($ids as $i) {
+            $by[$i] = [];
+        }
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $r) {
+            $by[(int) $r['IdInstitucion']][] = [
+                'IdOrganismo' => $r['IdOrganismo'],
+                'NombreOrganismoSimple' => $r['NombreOrganismoSimple'],
+            ];
+        }
+
+        return $by;
+    }
+
+    /**
+     * Estadísticas agrupadas por organización (organismoe). Incluye fila "(Sin organización)" para deptos sin organismo.
+     *
+     * @param array<int, array<string, mixed>>|null $orgsPrecargadas Filas como `organismoe` (IdOrganismo, NombreOrganismoSimple); si no es null, no se consulta la BD.
+     */
+    public function getPorOrganizacion($instId, $from, $to, ?array $orgsPrecargadas = null) {
         $out = [];
         // Organizaciones con sus deptos
-        $stmtO = $this->db->prepare("SELECT IdOrganismo, NombreOrganismoSimple FROM organismoe WHERE IdInstitucion = ? ORDER BY NombreOrganismoSimple ASC");
-        $stmtO->execute([$instId]);
-        $orgs = $stmtO->fetchAll(\PDO::FETCH_ASSOC);
+        if ($orgsPrecargadas === null) {
+            $stmtO = $this->db->prepare('SELECT IdOrganismo, NombreOrganismoSimple FROM organismoe WHERE IdInstitucion = ? ORDER BY NombreOrganismoSimple ASC');
+            $stmtO->execute([$instId]);
+            $orgs = $stmtO->fetchAll(\PDO::FETCH_ASSOC);
+        } else {
+            $orgs = $orgsPrecargadas;
+        }
         foreach ($orgs as $o) {
             $row = $this->aggregateByDeptoList($instId, $from, $to, 'd2.organismopertenece = ' . (int)$o['IdOrganismo']);
             $row['organizacion'] = $o['NombreOrganismoSimple'] ?: '';
@@ -464,7 +514,16 @@ class StatisticsModel {
             (SELECT COUNT(*) FROM formularioe fx WHERE fx.estado = 'Entregado' AND fx.reactivo IS NOT NULL AND $wfx AND fx.fechainicioA BETWEEN ? AND ? AND $fdForm) as total_reactivos,
             (SELECT COUNT(*) FROM formularioe fx INNER JOIN tipoformularios tx ON fx.tipoA = tx.IdTipoFormulario WHERE fx.estado = 'Entregado' AND tx.categoriaformulario = 'Insumos' AND $wfx AND fx.fechainicioA BETWEEN ? AND ? AND $fdForm) as total_insumos,
             (SELECT COUNT(DISTINCT pd.idprotA) FROM protdeptor pd JOIN protocoloexpe pe ON pd.idprotA = pe.idprotA JOIN departamentoe d2 ON pd.iddeptoA = d2.iddeptoA AND d2.IdInstitucion = ? WHERE $deptoWhere AND pe.IdInstitucion = ? AND pe.FechaFinProtA >= CURDATE() AND (NOT EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA) OR EXISTS (SELECT 1 FROM solicitudprotocolo sp WHERE sp.idprotA = pe.idprotA AND sp.Aprobado = 1))) as protocolos_aprobados";
-        $stmt = $this->db->prepare($sql);
+        $sinOrganismo = ($deptoWhere === 'd2.organismopertenece IS NULL');
+        if ($sinOrganismo && $this->stmtAggregateByDeptoSinOrganismo !== null && $this->stmtAggregateByDeptoSinOrganismoSql === $sql) {
+            $stmt = $this->stmtAggregateByDeptoSinOrganismo;
+        } else {
+            $stmt = $this->db->prepare($sql);
+            if ($sinOrganismo) {
+                $this->stmtAggregateByDeptoSinOrganismo = $stmt;
+                $this->stmtAggregateByDeptoSinOrganismoSql = $sql;
+            }
+        }
         $i = (int) $instId;
         if ($this->hasDerivacionDeptoDestino()) {
             $blk = array_merge([$i, $i, $i], $pFx, [$from, $to]);
@@ -707,7 +766,8 @@ class StatisticsModel {
      * Devuelve flags para estadísticas de red/grupo: madre_grupo y red/dependencia_grupo siempre en camel/snake esperado por el front.
      */
     public function getInstitutionFlags($instId) {
-        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $cols = $this->sqlSelectInstitucionAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE IdInstitucion = ? LIMIT 1");
         $stmt->execute([(int) $instId]);
         $full = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$full) {
@@ -813,12 +873,10 @@ class StatisticsModel {
         // 2. POR DEPARTAMENTO: una fila por (institución, departamento), con nombre de institución
         $res['por_departamento'] = [];
         $wfxRedLoop = $this->sqlFormularioEnInstitucion('fx');
-        foreach ($ids as $id) {
-            $pfxLoop = $this->paramsInstitucionFormulario((int) $id);
-            $formDeptLoop = $this->sqlFormularioAsignadoADepto('fx', 'd.iddeptoA');
-            $deptoEtqLoop = $this->sqlDeptoEtiquetaConInstitucion('d', '?');
-            $xdLoop = $this->hasDerivacionDeptoDestino() ? [(int) $id] : [];
-            $sqlD = "SELECT {$deptoEtqLoop} AS departamento,
+        $formDeptLoop = $this->sqlFormularioAsignadoADepto('fx', 'd.iddeptoA');
+        $deptoEtqLoop = $this->sqlDeptoEtiquetaConInstitucion('d', '?');
+        $hasDerivDept = $this->hasDerivacionDeptoDestino();
+        $sqlD = "SELECT {$deptoEtqLoop} AS departamento,
                 (SELECT IFNULL(SUM(sx.totalA), 0) FROM formularioe fx INNER JOIN sexoe sx ON fx.idformA = sx.idformA WHERE fx.estado = 'Entregado' AND $wfxRedLoop AND fx.fechainicioA BETWEEN ? AND ? AND {$formDeptLoop}) as total_animales,
                 (SELECT COUNT(*) FROM formularioe fx WHERE fx.estado = 'Entregado' AND fx.reactivo IS NOT NULL AND $wfxRedLoop AND fx.fechainicioA BETWEEN ? AND ? AND {$formDeptLoop}) as total_reactivos,
                 (SELECT COUNT(*) FROM formularioe fx INNER JOIN tipoformularios tx ON fx.tipoA = tx.IdTipoFormulario WHERE fx.estado = 'Entregado' AND tx.categoriaformulario = 'Insumos' AND $wfxRedLoop AND fx.fechainicioA BETWEEN ? AND ? AND {$formDeptLoop}) as total_insumos,
@@ -826,7 +884,10 @@ class StatisticsModel {
                 FROM departamentoe d
                 LEFT JOIN institucion ins_stat ON ins_stat.IdInstitucion = d.IdInstitucion
                 WHERE d.IdInstitucion = ?";
-            $stmtD = $this->db->prepare($sqlD);
+        $stmtD = $this->db->prepare($sqlD);
+        foreach ($ids as $id) {
+            $pfxLoop = $this->paramsInstitucionFormulario((int) $id);
+            $xdLoop = $hasDerivDept ? [(int) $id] : [];
             $stmtD->execute(array_merge(
                 [(int) $id],
                 array_merge($pfxLoop, [$from, $to], $xdLoop),
@@ -846,8 +907,9 @@ class StatisticsModel {
 
         // 2b. POR ORGANIZACIÓN (una fila por inst + org)
         $res['por_organizacion'] = [];
+        $orgsPorInstRed = $this->fetchOrganismosPorInstitucionesBatch($ids);
         foreach ($ids as $id) {
-            $orgRows = $this->getPorOrganizacion($id, $from, $to);
+            $orgRows = $this->getPorOrganizacion($id, $from, $to, $orgsPorInstRed[(int) $id] ?? []);
             $instName = $institutionNames[(int) $id] ?? (string) $id;
             foreach ($orgRows as $r) {
                 $r['institucion'] = $instName;
@@ -865,23 +927,32 @@ class StatisticsModel {
         $stmtE->execute(array_merge($dblIds, [$from, $to]));
         $res['ranking_especies'] = $stmtE->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 4. ALOJAMIENTOS ACTIVOS por inst (agregado)
+        // 4. ALOJAMIENTOS ACTIVOS por inst (agregado) — una consulta para toda la red
         $res['alojamientos_activos'] = [];
-        foreach ($ids as $id) {
-            $stmtA = $this->db->prepare(
-                "SELECT d.NombreDeptoA as departamento,
+        if ($ids !== []) {
+            $phA = implode(',', array_fill(0, count($ids), '?'));
+            $sqlA = "SELECT d.IdInstitucion,
+                        d.NombreDeptoA as departamento,
                         COUNT(DISTINCT CASE WHEN a.historia IS NOT NULL THEN a.historia END) as cantidad
                  FROM departamentoe d
                  LEFT JOIN protdeptor pd ON d.iddeptoA = pd.iddeptoA
-                 LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = ?
-                 WHERE d.IdInstitucion = ?
-                 GROUP BY d.iddeptoA, d.NombreDeptoA"
-            );
-            $stmtA->execute([$id, $id]);
-            $instName = $institutionNames[(int) $id] ?? (string) $id;
-            foreach ($stmtA->fetchAll(\PDO::FETCH_ASSOC) as $r) {
-                $r['departamento'] = $instName . ' --> ' . $r['departamento'];
-                $res['alojamientos_activos'][] = $r;
+                 LEFT JOIN alojamiento a ON pd.idprotA = a.idprotA AND a.finalizado = 0 AND a.IdInstitucion = d.IdInstitucion
+                 WHERE d.IdInstitucion IN ($phA)
+                 GROUP BY d.IdInstitucion, d.iddeptoA, d.NombreDeptoA";
+            $stmtA = $this->db->prepare($sqlA);
+            $stmtA->execute($ids);
+            $rowsByInst = [];
+            foreach ($stmtA->fetchAll(\PDO::FETCH_ASSOC) ?: [] as $arow) {
+                $iid = (int) $arow['IdInstitucion'];
+                unset($arow['IdInstitucion']);
+                $rowsByInst[$iid][] = $arow;
+            }
+            foreach ($ids as $id) {
+                $instName = $institutionNames[(int) $id] ?? (string) $id;
+                foreach ($rowsByInst[(int) $id] ?? [] as $r) {
+                    $r['departamento'] = $instName . ' --> ' . $r['departamento'];
+                    $res['alojamientos_activos'][] = $r;
+                }
             }
         }
 

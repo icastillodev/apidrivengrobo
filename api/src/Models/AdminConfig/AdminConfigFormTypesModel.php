@@ -12,7 +12,8 @@ class AdminConfigFormTypesModel {
     }
 
     public function getAll($instId) {
-        $sql = "SELECT * FROM tipoformularios WHERE IdInstitucion = ? ORDER BY categoriaformulario ASC, nombreTipo ASC";
+        $cols = 'IdTipoFormulario, nombreTipo, exento, descuento, IdInstitucion, categoriaformulario, color';
+        $sql = "SELECT {$cols} FROM tipoformularios WHERE IdInstitucion = ? ORDER BY categoriaformulario ASC, nombreTipo ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

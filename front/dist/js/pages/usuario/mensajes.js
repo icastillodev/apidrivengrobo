@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js?v=20260409';
+import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -19,6 +20,17 @@ function formatDateTime(ds) {
     if (!ds) return '';
     const d = new Date(ds);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+}
+
+async function openMensajeAdjuntoDescarga(idMensaje) {
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const url = `${API.urlBase}/comunicacion/mensajes/adjunto/${idMensaje}`;
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    window.open(objUrl, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
 }
 
 const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'reserva', 'lista_usuarios', 'notificacion', 'institucional'];
@@ -140,10 +152,160 @@ export async function initMensajes(opts = {}) {
     let replyEnviando = false;
     let deleteHiloEnviando = false;
 
+    let replyAdjuntoKey = null;
+    let replyAdjuntoNombre = null;
+    let nuevoAdjuntoKey = null;
+    let nuevoAdjuntoNombre = null;
+
     /** Usuario del que se listan formularios/alojamientos al responder (el otro participante del hilo). */
     let replySobreUsuarioId = 0;
     let nuevoRefTimer = null;
     let replyRefTimer = null;
+
+    function resetReplyAdjuntoUi() {
+        replyAdjuntoKey = null;
+        replyAdjuntoNombre = null;
+        const fi = document.getElementById('reply-adj-file');
+        if (fi) fi.value = '';
+        const st = document.getElementById('reply-adj-status');
+        if (st) st.textContent = '';
+        document.getElementById('reply-adj-btn-clear')?.classList.add('d-none');
+    }
+
+    function renderReplyAdjuntoUi() {
+        const st = document.getElementById('reply-adj-status');
+        const clr = document.getElementById('reply-adj-btn-clear');
+        const pref = (t.msg_adjunto_subido_pref || t.pp_b2_status_uploaded || '').trim();
+        const has = !!(replyAdjuntoKey && replyAdjuntoNombre);
+        if (st) st.textContent = has ? `${pref}${pref ? ' ' : ''}${replyAdjuntoNombre}`.trim() : '';
+        if (clr) clr.classList.toggle('d-none', !has);
+    }
+
+    async function uploadReplyAdjuntoManual() {
+        const fi = document.getElementById('reply-adj-file');
+        const file = fi?.files?.[0];
+        if (!file) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'warning', title: t.pp_b2_err_no_file || '', timer: 2000, showConfirmButton: false });
+            }
+            return;
+        }
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await API.request('/comunicacion/b2/upload/mensaje-adjunto', 'POST', fd);
+            if (res.status !== 'success' || !res.data) throw new Error(res.message || t.pp_b2_err_upload || '');
+            replyAdjuntoKey = res.data.AdjuntoB2Key;
+            replyAdjuntoNombre = res.data.AdjuntoNombreOriginal;
+            renderReplyAdjuntoUi();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'success', title: t.pp_b2_upload_ok || '', timer: 1400, showConfirmButton: false });
+            }
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: e.message || t.err_generico || '' });
+        } finally {
+            hideLoader();
+        }
+    }
+
+    function resetNuevoAdjuntoUi() {
+        nuevoAdjuntoKey = null;
+        nuevoAdjuntoNombre = null;
+        const fi = document.getElementById('nuevo-adj-file');
+        if (fi) fi.value = '';
+        const st = document.getElementById('nuevo-adj-status');
+        if (st) st.textContent = '';
+        document.getElementById('nuevo-adj-btn-clear')?.classList.add('d-none');
+    }
+
+    function renderNuevoAdjuntoUi() {
+        const st = document.getElementById('nuevo-adj-status');
+        const clr = document.getElementById('nuevo-adj-btn-clear');
+        const pref = (t.msg_adjunto_subido_pref || t.pp_b2_status_uploaded || '').trim();
+        const has = !!(nuevoAdjuntoKey && nuevoAdjuntoNombre);
+        if (st) st.textContent = has ? `${pref}${pref ? ' ' : ''}${nuevoAdjuntoNombre}`.trim() : '';
+        if (clr) clr.classList.toggle('d-none', !has);
+    }
+
+    async function uploadNuevoAdjuntoManual() {
+        const fi = document.getElementById('nuevo-adj-file');
+        const file = fi?.files?.[0];
+        if (!file) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'warning', title: t.pp_b2_err_no_file || '', timer: 2000, showConfirmButton: false });
+            }
+            return;
+        }
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await API.request('/comunicacion/b2/upload/mensaje-adjunto', 'POST', fd);
+            if (res.status !== 'success' || !res.data) throw new Error(res.message || t.pp_b2_err_upload || '');
+            nuevoAdjuntoKey = res.data.AdjuntoB2Key;
+            nuevoAdjuntoNombre = res.data.AdjuntoNombreOriginal;
+            renderNuevoAdjuntoUi();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'success', title: t.pp_b2_upload_ok || '', timer: 1400, showConfirmButton: false });
+            }
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: e.message || t.err_generico || '' });
+        } finally {
+            hideLoader();
+        }
+    }
+
+    function nuevoAdjuntoPayload() {
+        if (nuevoAdjuntoKey && nuevoAdjuntoNombre) {
+            return { AdjuntoB2Key: nuevoAdjuntoKey, AdjuntoNombreOriginal: nuevoAdjuntoNombre };
+        }
+        return {};
+    }
+
+    async function ensureNuevoAdjuntoUploaded() {
+        const fi = document.getElementById('nuevo-adj-file');
+        const file = fi?.files?.[0];
+        if (!file || nuevoAdjuntoKey) return true;
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await API.request('/comunicacion/b2/upload/mensaje-adjunto', 'POST', fd);
+            if (res.status !== 'success' || !res.data) throw new Error(res.message || t.pp_b2_err_upload || '');
+            nuevoAdjuntoKey = res.data.AdjuntoB2Key;
+            nuevoAdjuntoNombre = res.data.AdjuntoNombreOriginal;
+            renderNuevoAdjuntoUi();
+            return true;
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: e.message || t.err_generico || '' });
+            return false;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function ensureReplyAdjuntoUploaded() {
+        const fi = document.getElementById('reply-adj-file');
+        const file = fi?.files?.[0];
+        if (!file || replyAdjuntoKey) return true;
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await API.request('/comunicacion/b2/upload/mensaje-adjunto', 'POST', fd);
+            if (res.status !== 'success' || !res.data) throw new Error(res.message || t.pp_b2_err_upload || '');
+            replyAdjuntoKey = res.data.AdjuntoB2Key;
+            replyAdjuntoNombre = res.data.AdjuntoNombreOriginal;
+            renderReplyAdjuntoUi();
+            return true;
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: e.message || t.err_generico || '' });
+            return false;
+        } finally {
+            hideLoader();
+        }
+    }
 
     function setDeleteHiloButtonLoading(on) {
         const btn = document.getElementById('btn-hilo-delete');
@@ -561,7 +723,11 @@ export async function initMensajes(opts = {}) {
 
     async function openHilo(id, opts = {}) {
         const skipLoadHilos = opts.skipLoadHilos === true;
+        const prevHiloId = currentHiloId;
         currentHiloId = id;
+        if (prevHiloId !== id) {
+            resetReplyAdjuntoUi();
+        }
         const ph = document.getElementById('panel-hilo-placeholder');
         const pc = document.getElementById('panel-hilo-cont');
         if (ph) ph.classList.add('d-none');
@@ -587,8 +753,10 @@ export async function initMensajes(opts = {}) {
         const mensajes = res.data.mensajes || [];
         const puedeResponder = res.data?.puedeResponder !== false;
         const replyWrap = document.getElementById('hilo-reply-wrap');
+        const replyAdjWrap = document.getElementById('reply-adjunto-wrap');
         const soloLec = document.getElementById('hilo-solo-lectura');
         if (replyWrap) replyWrap.classList.toggle('d-none', !puedeResponder);
+        if (replyAdjWrap) replyAdjWrap.classList.toggle('d-none', !puedeResponder);
         if (soloLec) soloLec.classList.toggle('d-none', puedeResponder);
 
         const ts = hilo.FechaUltimoMensaje || hilo.FechaCreacion || '';
@@ -758,12 +926,21 @@ export async function initMensajes(opts = {}) {
                 const ctxHtml = showCtx
                     ? `<div class="small mt-1" style="opacity:0.95;"><span class="badge bg-light text-dark">${escapeHtml(labelOrigenTipo(ctxTipo))}</span> <span class="${mine ? 'text-white' : 'text-muted'}">${escapeHtml(ctxEt)}</span></div>`
                     : '';
+                const adjKey = m.AdjuntoB2Key != null && String(m.AdjuntoB2Key).trim() !== '';
+                const mid = parseInt(m.IdMensaje || 0, 10);
+                const adjNombre = String(m.AdjuntoNombreOriginal || '').trim();
+                const adjLbl = adjNombre || (t.msg_adjunto_abrir || '');
+                const linkMine = mine ? 'text-white text-decoration-underline' : 'text-primary text-decoration-underline';
+                const adjHtml = adjKey && mid > 0
+                    ? `<div class="small mt-1"><button type="button" class="btn btn-link p-0 align-baseline msg-adjunto-dl ${linkMine}" data-msg-id="${mid}" title="${escapeHtml(t.msg_adjunto_abrir || '')}" style="font-size:inherit;">${escapeHtml(adjLbl)}</button></div>`
+                    : '';
                 return `
                     <div class="mb-2 ${align}">
                         <div class="small ${mine ? 'text-primary' : 'text-muted'}">${escapeHtml(remitente)}</div>
                         <div class="d-inline-block px-2 py-1 rounded small ${bubble}" style="max-width:85%;text-align:left;">
                             ${escapeHtml(m.Cuerpo || '')}
                             ${ctxHtml}
+                            ${adjHtml}
                         </div>
                         <div class="small text-muted">${escapeHtml(formatDateTime(m.FechaEnvio))}</div>
                     </div>`;
@@ -877,6 +1054,8 @@ export async function initMensajes(opts = {}) {
         replyEnviando = true;
         setReplyEnviando(true);
         try {
+            if (!(await ensureReplyAdjuntoUploaded())) return;
+
             const body = {
                 IdMensajeHilo: currentHiloId,
                 Cuerpo: txt
@@ -892,11 +1071,16 @@ export async function initMensajes(opts = {}) {
                     if (et) body.OrigenEtiqueta = et.slice(0, 500);
                 }
             }
+            if (replyAdjuntoKey && replyAdjuntoNombre) {
+                body.AdjuntoB2Key = replyAdjuntoKey;
+                body.AdjuntoNombreOriginal = replyAdjuntoNombre;
+            }
 
             const res = await API.request('/comunicacion/mensajes/enviar', 'POST', body);
 
             if (res.status === 'success') {
                 if (el) el.value = '';
+                resetReplyAdjuntoUi();
                 const rt0 = document.getElementById('reply-ref-tipo');
                 const rb0 = document.getElementById('reply-ref-buscar');
                 const rs0 = document.getElementById('reply-ref-select');
@@ -932,6 +1116,21 @@ export async function initMensajes(opts = {}) {
     }
 
     document.getElementById('btn-reply')?.addEventListener('click', () => sendReply());
+    document.getElementById('reply-adj-btn-upload')?.addEventListener('click', () => uploadReplyAdjuntoManual());
+    document.getElementById('reply-adj-btn-clear')?.addEventListener('click', () => {
+        resetReplyAdjuntoUi();
+    });
+    document.getElementById('hilo-mensajes')?.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('.msg-adjunto-dl');
+        if (!btn) return;
+        const id = parseInt(btn.getAttribute('data-msg-id') || '0', 10);
+        if (!id) return;
+        try {
+            await openMensajeAdjuntoDescarga(id);
+        } catch (_) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: t.pp_b2_preview_fail || t.err_generico || '' });
+        }
+    });
     document.getElementById('btn-hilo-delete')?.addEventListener('click', () => deleteCurrentHilo());
     document.getElementById('reply-ref-tipo')?.addEventListener('change', () => syncReplyRefUi());
     document.getElementById('reply-ref-buscar')?.addEventListener('input', () => scheduleReplyRefLoad());
@@ -1038,8 +1237,13 @@ export async function initMensajes(opts = {}) {
         syncRefBlockVisibility();
     });
     document.getElementById('nuevo-ref-buscar')?.addEventListener('input', () => scheduleNuevoRefLoad());
+    document.getElementById('nuevo-adj-btn-upload')?.addEventListener('click', () => uploadNuevoAdjuntoManual());
+    document.getElementById('nuevo-adj-btn-clear')?.addEventListener('click', () => {
+        resetNuevoAdjuntoUi();
+    });
 
     document.getElementById('btn-nuevo-msg')?.addEventListener('click', async () => {
+        resetNuevoAdjuntoUi();
         const refIn = document.getElementById('nuevo-origen-id');
         if (refIn) refIn.value = '';
         clearNuevoRefUi();
@@ -1138,6 +1342,9 @@ export async function initMensajes(opts = {}) {
                 };
             }
 
+            if (!(await ensureNuevoAdjuntoUploaded())) return;
+            Object.assign(payloadInst, nuevoAdjuntoPayload());
+
             nuevoMensajeEnviando = true;
             setModalNuevoEnviando(true);
             try {
@@ -1166,6 +1373,7 @@ export async function initMensajes(opts = {}) {
                     const riInst = document.getElementById('nuevo-origen-id');
                     if (riInst) riInst.value = '';
                     clearNuevoRefUi();
+                    resetNuevoAdjuntoUi();
                     await loadHilos();
                     if (hid) await openHilo(hid);
                     if (window.NotificationManager?.check) {
@@ -1210,6 +1418,9 @@ export async function initMensajes(opts = {}) {
 
         attachOrigenRefToPayload(payload);
 
+        if (!(await ensureNuevoAdjuntoUploaded())) return;
+        Object.assign(payload, nuevoAdjuntoPayload());
+
         nuevoMensajeEnviando = true;
         setModalNuevoEnviando(true);
         try {
@@ -1237,6 +1448,7 @@ export async function initMensajes(opts = {}) {
                 const ri2 = document.getElementById('nuevo-origen-id');
                 if (ri2) ri2.value = '';
                 clearNuevoRefUi();
+                resetNuevoAdjuntoUi();
                 avisoCorreoMensajeSiFallo(res);
                 await loadHilos();
                 if (hid) await openHilo(hid);

@@ -6,6 +6,7 @@ import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader } from '../../components/LoaderComponent.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
 
@@ -53,6 +54,13 @@ function buildUsersListQuery(extra = {}) {
     return p;
 }
 
+const usuariosPageCacheApi = createAdminListPageCache(rowsPerPage, buildUsersListQuery, '/users/institution');
+
+function invalidateUsuariosPageCache() {
+    pageUsersFull = null;
+    usuariosPageCacheApi.bustPages();
+}
+
 async function fetchUsuariosList(opts = {}) {
     const tbody = document.getElementById('table-body');
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
@@ -60,6 +68,17 @@ async function fetchUsuariosList(opts = {}) {
 
     if (pageUsersFull && !opts.forceServer) {
         renderTable();
+        return;
+    }
+
+    const prefetchGen = usuariosPageCacheApi.syncFiltersKey();
+
+    if (usuariosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
+        pageUsers = usuariosPageCacheApi.pageCache.get(currentPage);
+        window.allUsers = pageUsers;
+        window._allUsersForRouter = pageUsers;
+        renderTable(pageUsers);
+        usuariosPageCacheApi.schedulePrefetchAround(totalUsuariosList, currentPage, prefetchGen);
         return;
     }
 
@@ -76,7 +95,7 @@ async function fetchUsuariosList(opts = {}) {
         return;
     }
     try {
-        const res = await API.request(`/users/institution?${buildUsersListQuery().toString()}`);
+        const res = await usuariosPageCacheApi.fetchPage(currentPage);
         if (res?.status === 'success') {
             if (typeof res.total === 'number') {
                 pageUsers = Array.isArray(res.data) ? res.data : [];
@@ -90,6 +109,7 @@ async function fetchUsuariosList(opts = {}) {
                 await fetchUsuariosList(opts);
                 return;
             }
+            usuariosPageCacheApi.pageCache.set(currentPage, [...pageUsers]);
             window.allUsers = pageUsers;
             window._allUsersForRouter = pageUsers;
             renderTable(pageUsers);
@@ -97,6 +117,7 @@ async function fetchUsuariosList(opts = {}) {
             if (totalUsuariosList <= rowsPerPage) {
                 pageUsersFull = pageUsers;
             }
+            usuariosPageCacheApi.schedulePrefetchAround(totalUsuariosList, currentPage, prefetchGen);
         }
     } catch (error) {
         console.error('❌ Error cargando usuarios:', error);
@@ -173,7 +194,7 @@ async function _initUsuariosPage() {
     if (btnSearch) {
         btnSearch.onclick = () => {
             currentPage = 1;
-            pageUsersFull = null;
+            invalidateUsuariosPageCache();
             fetchUsuariosList();
         };
     }
@@ -181,7 +202,7 @@ async function _initUsuariosPage() {
         searchInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
                 currentPage = 1;
-                pageUsersFull = null;
+                invalidateUsuariosPageCache();
                 fetchUsuariosList();
             }
         });
@@ -191,7 +212,7 @@ async function _initUsuariosPage() {
     if (filterType) {
         filterType.onchange = () => {
             currentPage = 1;
-            pageUsersFull = null;
+            invalidateUsuariosPageCache();
             fetchUsuariosList();
         };
     }
@@ -256,7 +277,7 @@ function handleSort(key) {
         sortConfig.direction = 'desc';
     }
     currentPage = 1;
-    pageUsersFull = null;
+    invalidateUsuariosPageCache();
     fetchUsuariosList();
 }
 
@@ -554,7 +575,7 @@ window.saveUserData = async (id) => {
             CelularA: String(formData.get('CelularA') ?? ''),
             iddeptoA: formData.get('iddeptoA'),
         });
-        pageUsersFull = null;
+        invalidateUsuariosPageCache();
         await fetchUsuariosList({ forceServer: true });
         await openUserModal(uMerged);
     } else {
@@ -655,6 +676,7 @@ window.deleteUser = async (id) => {
             const res = await API.request('/users/delete', 'POST', { id, password });
             if (res.status === 'success') {
                 alert(res.message || 'Usuario eliminado.');
+                invalidateUsuariosPageCache();
                 await fetchUsuariosList();
             } else alert('Error: ' + (res.message || 'No se pudo eliminar'));
         } catch (e) {
@@ -697,6 +719,7 @@ window.deleteUser = async (id) => {
         const res = await API.request('/users/delete', 'POST', { id, password: formValues });
         if (res.status === 'success') {
             await Swal.fire('Listo', res.message || 'Usuario eliminado correctamente.', 'success');
+            invalidateUsuariosPageCache();
             await fetchUsuariosList();
             return;
         }
@@ -839,6 +862,7 @@ window.confirmarEliminacionTotalAdmin = async function() {
             if (modalDelEl && bootstrap.Modal.getInstance(modalDelEl)) bootstrap.Modal.getInstance(modalDelEl).hide();
             adminDeletePreviewUserId = null;
             adminDeletePreviewData = null;
+            invalidateUsuariosPageCache();
             await fetchUsuariosList();
             (window.mostrarNotificacion || alert)(t.delete_success || res.message);
         } else {

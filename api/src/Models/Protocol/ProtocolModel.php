@@ -9,8 +9,42 @@ use App\Utils\Auditoria;
 class ProtocolModel {
     private $db;
 
+    /** @var bool|null */
+    private $protocoloexpeHasPermiteAnestesicos = null;
+
     public function __construct($db) {
         $this->db = $db;
+    }
+
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+
+            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function protocoloexpeHasPermiteAnestesicos(): bool {
+        if ($this->protocoloexpeHasPermiteAnestesicos === null) {
+            $this->protocoloexpeHasPermiteAnestesicos = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos');
+        }
+
+        return $this->protocoloexpeHasPermiteAnestesicos;
+    }
+
+    /** Columnas base `protocoloexpe` — `docs/database.sql` + `PermiteAnestesicos` opcional (sin `pe.*` / `p.*`). */
+    private function sqlSelectProtocoloexpeBasePrefixed(string $alias = 'pe'): string {
+        $base = 'idprotA, tituloA, nprotA, InvestigadorACargA, CantidadAniA, FechaIniProtA, FechaFinProtA, especie, '
+            . 'protocoloexpe, departamento, tipoprotocolo, encargaprot, severidad, IdUsrA, IdInstitucion, variasInst';
+        if ($this->protocoloexpeHasPermiteAnestesicos()) {
+            $base .= ', PermiteAnestesicos';
+        }
+        $parts = array_map('trim', explode(',', $base));
+
+        return $alias . '.' . implode(', ' . $alias . '.', $parts);
     }
 
     private function hasLocalSolicitudByProtocol($idprotA): bool {
@@ -27,11 +61,9 @@ class ProtocolModel {
     }
 
     public function getByInstitution($instId) {
+        $peCols = $this->sqlSelectProtocoloexpeBasePrefixed('pe');
         $sql = "SELECT DISTINCT
-                    pe.*, 
-                    pe.idprotA, 
-                    pe.nprotA, 
-                    pe.tituloA, 
+                    {$peCols}, 
                     pe.CantidadAniA as SaldoAnimales, 
                     pe.encargaprot as RespProt, 
                     pe.FechaFinProtA as Vencimiento,
@@ -491,7 +523,7 @@ class ProtocolModel {
 
         $fileKey = trim((string)($att['file_key'] ?? ''));
         if ($fileKey !== '') {
-            $b2 = new BackblazeB2();
+            $b2 = new BackblazeB2('PROTOCOLOS');
             $b2->deleteFileByKey($fileKey);
         }
 
@@ -519,7 +551,7 @@ class ProtocolModel {
             throw new Exception('Los adjuntos solo se permiten en protocolos manuales sin solicitud.');
         }
 
-        $b2 = new BackblazeB2();
+        $b2 = new BackblazeB2('PROTOCOLOS');
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         if (!$finfo) {
             throw new Exception('No se pudo validar tipo de archivo.');
@@ -682,8 +714,9 @@ class ProtocolModel {
     public function getProtocolosValidos($instId) {
         // Trae los protocolos de la institución que NO estén rechazados (2) ni pendientes (3) en la tabla solicitud.
         // Si no existen en la tabla solicitud (LEFT JOIN es NULL), significa que fueron manuales y están aprobados.
+        $pCols = $this->sqlSelectProtocoloexpeBasePrefixed('p');
         $sql = "
-            SELECT p.*, 
+            SELECT {$pCols}, 
                    COALESCE(CONCAT(u.NombreA, ' ', u.ApellidoA), p.InvestigadorACargA) as InvestigadorACargA
             FROM protocoloexpe p
             LEFT JOIN personae u ON p.IdUsrA = u.IdUsrA
@@ -743,7 +776,7 @@ class ProtocolModel {
             $stmtFiles->execute([$idprotA]);
             $fileRows = $stmtFiles->fetchAll(PDO::FETCH_ASSOC);
             if (!empty($fileRows)) {
-                $b2 = new BackblazeB2();
+                $b2 = new BackblazeB2('PROTOCOLOS');
                 foreach ($fileRows as $row) {
                     $key = trim((string)($row['file_key'] ?? ''));
                     if ($key !== '') {
@@ -757,7 +790,7 @@ class ProtocolModel {
             $stmtManualFiles->execute([$idprotA]);
             $manualRows = $stmtManualFiles->fetchAll(PDO::FETCH_ASSOC);
             if (!empty($manualRows)) {
-                $b2 = isset($b2) ? $b2 : new BackblazeB2();
+                $b2 = isset($b2) ? $b2 : new BackblazeB2('PROTOCOLOS');
                 foreach ($manualRows as $row) {
                     $key = trim((string)($row['file_key'] ?? ''));
                     if ($key !== '') {
@@ -825,7 +858,7 @@ class ProtocolModel {
         $stmtAtt->execute([(int)$row['idSolicitudProtocolo']]);
         $attachments = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
         if (!empty($attachments)) {
-            $b2 = new BackblazeB2();
+            $b2 = new BackblazeB2('PROTOCOLOS');
             foreach ($attachments as $att) {
                 $key = trim((string)($att['file_key'] ?? ''));
                 if ($key !== '') {

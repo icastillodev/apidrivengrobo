@@ -358,6 +358,11 @@ class MensajeriaController {
                 $input = [];
             }
 
+            $adjKIn = isset($input['AdjuntoB2Key']) ? trim((string) $input['AdjuntoB2Key']) : '';
+            $adjNIn = isset($input['AdjuntoNombreOriginal']) ? trim((string) $input['AdjuntoNombreOriginal']) : '';
+            $adjuntoB2Key = $adjKIn !== '' ? $adjKIn : null;
+            $adjuntoNombre = $adjNIn !== '' ? $adjNIn : null;
+
             $idHilo = isset($input['IdMensajeHilo']) ? (int)$input['IdMensajeHilo'] : 0;
             if ($idHilo > 0) {
                 $cuerpo = (string)($input['Cuerpo'] ?? '');
@@ -377,7 +382,9 @@ class MensajeriaController {
                     $role,
                     $otMsg,
                     $oiMsg > 0 ? $oiMsg : null,
-                    $oeMsg !== '' ? $oeMsg : null
+                    $oeMsg !== '' ? $oeMsg : null,
+                    $adjuntoB2Key,
+                    $adjuntoNombre
                 );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 if ($code === 200) {
@@ -447,7 +454,9 @@ class MensajeriaController {
                     $origenEtiqueta,
                     $role,
                     $instDestinoId > 0 ? $instDestinoId : null,
-                    $idInvDest > 0 ? $idInvDest : null
+                    $idInvDest > 0 ? $idInvDest : null,
+                    $adjuntoB2Key,
+                    $adjuntoNombre
                 );
                 $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
                 if ($code === 200) {
@@ -507,7 +516,9 @@ class MensajeriaController {
                 $cuerpo,
                 $origenTipo,
                 $origenId,
-                $origenEtiqueta
+                $origenEtiqueta,
+                $adjuntoB2Key,
+                $adjuntoNombre
             );
             $code = ($out['status'] ?? '') === 'success' ? 200 : 400;
 

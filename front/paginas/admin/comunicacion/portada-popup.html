@@ -15,7 +15,7 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260409';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js?v=20260409';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260409';
-        import { initAdminPortadaPopup } from '../../../dist/js/pages/admin/comunicacion_portada_popup.js?v=20260509';
+        import { initAdminPortadaPopup } from '../../../dist/js/pages/admin/comunicacion_portada_popup.js?v=20260509b';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -65,16 +65,47 @@
                         <input type="text" class="form-control mb-2" id="pp-portada-titulo" maxlength="255">
                         <label class="form-label small fw-bold" data-i18n="comunicacion.pp_lbl_cuerpo"></label>
                         <textarea class="form-control mb-3" id="pp-portada-cuerpo" rows="6"></textarea>
+                        <div class="border rounded p-3 mb-3 bg-white">
+                            <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.pp_b2_img_title"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="pp-file-portada-img" accept="image/jpeg,.jpg,.jpeg">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="pp-btn-upload-portada-img"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="pp-status-portada-img"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 d-none" id="pp-btn-prev-portada-img" data-preview-path="/comunicacion/portada-popup/archivo/portada_imagen"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="pp-btn-clear-portada-img"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                         <hr class="text-muted opacity-25" />
                         <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.pp_adjuntos_title"></p>
+                        <p class="small text-muted mb-3" data-i18n="comunicacion.pp_b2_help_mixed"></p>
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_url1"></label>
                         <input type="url" class="form-control mb-1" id="pp-portada-url1" maxlength="768" placeholder="https://">
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre1"></label>
-                        <input type="text" class="form-control mb-3" id="pp-portada-nombre1" maxlength="255">
+                        <input type="text" class="form-control mb-2" id="pp-portada-nombre1" maxlength="255">
+                        <div class="border rounded p-2 mb-3 bg-light bg-opacity-50">
+                            <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.pp_b2_doc_slot"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="pp-file-portada-d1" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="pp-btn-upload-portada-d1"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="pp-status-portada-d1"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 d-none" id="pp-btn-prev-portada-d1" data-preview-path="/comunicacion/portada-popup/archivo/portada_doc1"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="pp-btn-clear-portada-d1"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_url2"></label>
                         <input type="url" class="form-control mb-1" id="pp-portada-url2" maxlength="768" placeholder="https://">
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre2"></label>
-                        <input type="text" class="form-control" id="pp-portada-nombre2" maxlength="255">
+                        <input type="text" class="form-control mb-2" id="pp-portada-nombre2" maxlength="255">
+                        <div class="border rounded p-2 mb-0 bg-light bg-opacity-50">
+                            <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.pp_b2_doc_slot"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="pp-file-portada-d2" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="pp-btn-upload-portada-d2"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="pp-status-portada-d2"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 d-none" id="pp-btn-prev-portada-d2" data-preview-path="/comunicacion/portada-popup/archivo/portada_doc2"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="pp-btn-clear-portada-d2"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -98,14 +129,35 @@
                         <p class="small text-muted mb-3" data-i18n="comunicacion.pp_id_noticia_help"></p>
                         <hr class="text-muted opacity-25" />
                         <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.pp_adjuntos_popup_title"></p>
+                        <p class="small text-muted mb-3" data-i18n="comunicacion.pp_b2_help_mixed"></p>
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_url1"></label>
                         <input type="url" class="form-control mb-1" id="pp-popup-url1" maxlength="768" placeholder="https://">
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre1"></label>
-                        <input type="text" class="form-control mb-3" id="pp-popup-nombre1" maxlength="255">
+                        <input type="text" class="form-control mb-2" id="pp-popup-nombre1" maxlength="255">
+                        <div class="border rounded p-2 mb-3 bg-light bg-opacity-50">
+                            <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.pp_b2_doc_slot"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="pp-file-popup-d1" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="pp-btn-upload-popup-d1"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="pp-status-popup-d1"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 d-none" id="pp-btn-prev-popup-d1" data-preview-path="/comunicacion/portada-popup/archivo/popup_doc1"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="pp-btn-clear-popup-d1"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_url2"></label>
                         <input type="url" class="form-control mb-1" id="pp-popup-url2" maxlength="768" placeholder="https://">
                         <label class="form-label small" data-i18n="comunicacion.pp_lbl_nombre2"></label>
-                        <input type="text" class="form-control" id="pp-popup-nombre2" maxlength="255">
+                        <input type="text" class="form-control mb-2" id="pp-popup-nombre2" maxlength="255">
+                        <div class="border rounded p-2 mb-0 bg-light bg-opacity-50">
+                            <p class="small fw-semibold mb-2 text-muted" data-i18n="comunicacion.pp_b2_doc_slot"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="pp-file-popup-d2" accept=".pdf,.doc,.docx,.xls,.xlsx,application/pdf">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="pp-btn-upload-popup-d2"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="pp-status-popup-d2"></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 d-none" id="pp-btn-prev-popup-d2" data-preview-path="/comunicacion/portada-popup/archivo/popup_doc2"><span data-i18n="comunicacion.pp_b2_btn_preview"></span></button>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="pp-btn-clear-popup-d2"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

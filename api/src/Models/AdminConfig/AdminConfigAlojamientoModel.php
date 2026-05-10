@@ -13,8 +13,22 @@ class AdminConfigAlojamientoModel {
         $this->db = $db;
     }
 
+    /** Columnas `tipoalojamiento` — `docs/database.sql`. */
+    private function sqlSelectTipoalojamientoAllColumns(): string {
+        return 'IdTipoAlojamiento, NombreTipoAlojamiento, DetalleTipoAlojamiento, idespA, PrecioXunidad, Habilitado';
+    }
+
+    /** Columnas `categoriadatosunidadalojamiento` — `docs/database.sql` (mismo contrato que `TrazabilidadModel`). */
+    private function sqlSelectCategoriaDatosUnidadAlojamientoColumns(string $alias = 'c'): string {
+        $p = $alias . '.';
+
+        return $p . 'IdDatosUnidadAloj, ' . $p . 'NombreCatAlojUnidad, ' . $p . 'DetalleCatAloj, ' . $p . 'IdEspA, '
+            . $p . 'idprotA, ' . $p . 'alcance_traz, ' . $p . 'TipoDeDato, ' . $p . 'dependencia_id, ' . $p . 'Habilitado';
+    }
+
     public function getTypes($espId) {
-        $stmt = $this->db->prepare("SELECT * FROM tipoalojamiento WHERE idespA = ? ORDER BY NombreTipoAlojamiento ASC");
+        $cols = $this->sqlSelectTipoalojamientoAllColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM tipoalojamiento WHERE idespA = ? ORDER BY NombreTipoAlojamiento ASC");
         $stmt->execute([$espId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -155,7 +169,8 @@ class AdminConfigAlojamientoModel {
         }
         $in = implode(',', array_fill(0, count($ids), '?'));
         $params = array_merge($ids, [$instId]);
-        $sql = "SELECT c.* FROM categoriadatosunidadalojamiento c
+        $catCols = $this->sqlSelectCategoriaDatosUnidadAlojamientoColumns('c');
+        $sql = "SELECT {$catCols} FROM categoriadatosunidadalojamiento c
                 INNER JOIN especiee e ON e.idespA = c.IdEspA
                 WHERE c.IdDatosUnidadAloj IN ($in) AND e.IdInstitucion = ?
                 ORDER BY c.IdDatosUnidadAloj ASC";

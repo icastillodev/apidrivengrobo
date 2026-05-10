@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\Comunicacion;
 
+use App\Utils\ComunicacionArchivoValidacion;
 use PDO;
 
 class MensajeriaModel {
@@ -14,6 +15,67 @@ class MensajeriaModel {
 
     public function __construct(PDO $db) {
         $this->db = $db;
+    }
+
+    /** Columnas de `mensaje_hilo` sin wildcard (`EsInstitucional` solo si existe en BD). */
+    private function sqlSelectMensajeHiloColumns(?string $tableAlias = null): string {
+        $p = ($tableAlias !== null && $tableAlias !== '') ? $tableAlias . '.' : '';
+        $cols = [
+            'IdMensajeHilo', 'IdInstitucion', 'Asunto', 'IdUsrParticipanteA', 'IdUsrParticipanteB',
+            'FechaCreacion', 'FechaUltimoMensaje', 'OrigenTipo', 'OrigenId', 'OrigenEtiqueta',
+        ];
+        if ($this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
+            $cols[] = 'EsInstitucional';
+        }
+        $prefixed = [];
+        foreach ($cols as $c) {
+            $prefixed[] = $p . $c;
+        }
+
+        return implode(', ', $prefixed);
+    }
+
+    /** Columnas de `mensaje` sin wildcard (alineado a `docs/database.sql`). */
+    private function sqlSelectMensajeColumns(?string $tableAlias = null): string {
+        $p = ($tableAlias !== null && $tableAlias !== '') ? $tableAlias . '.' : '';
+        $cols = ['IdMensaje', 'IdMensajeHilo', 'IdInstitucion', 'IdUsrRemitente', 'Cuerpo', 'FechaEnvio'];
+        if ($this->hasColumn('mensaje', 'AdjuntoB2Key')) {
+            $cols[] = 'AdjuntoB2Key';
+        }
+        if ($this->hasColumn('mensaje', 'AdjuntoNombreOriginal')) {
+            $cols[] = 'AdjuntoNombreOriginal';
+        }
+        $prefixed = [];
+        foreach ($cols as $c) {
+            $prefixed[] = $p . $c;
+        }
+
+        return implode(', ', $prefixed);
+    }
+
+    /**
+     * @return array{status:string, message?:string, key?:?string, nombre?:?string}
+     */
+    private function normalizarAdjuntoMensajeOpcional(int $instId, ?string $key, ?string $nombre): array {
+        $key = $key !== null ? trim($key) : '';
+        $nombre = $nombre !== null ? trim(strip_tags($nombre)) : '';
+        if ($key === '' && $nombre === '') {
+            return ['status' => 'ok', 'key' => null, 'nombre' => null];
+        }
+        if ($key === '' || $nombre === '') {
+            return ['status' => 'error', 'message' => 'Adjunto incompleto (clave y nombre requeridos).'];
+        }
+        if (!$this->hasColumn('mensaje', 'AdjuntoB2Key')) {
+            return ['status' => 'error', 'message' => 'Los adjuntos en mensajes no están disponibles (migración pendiente).'];
+        }
+        if (!ComunicacionArchivoValidacion::clavePerteneceInstitucion($key, 'mensajes', $instId)) {
+            return ['status' => 'error', 'message' => 'El adjunto no corresponde a esta sede o no es válido.'];
+        }
+        if (function_exists('mb_strlen') && mb_strlen($nombre, 'UTF-8') > 255) {
+            return ['status' => 'error', 'message' => 'Nombre de archivo demasiado largo.'];
+        }
+
+        return ['status' => 'ok', 'key' => $key, 'nombre' => $nombre];
     }
 
     /**
@@ -184,8 +246,9 @@ class MensajeriaModel {
         $filtroInst = $this->hasColumn('mensaje_hilo', 'EsInstitucional')
             ? ' AND COALESCE(h.EsInstitucional, 0) = 0'
             : '';
+        $hCols = $this->sqlSelectMensajeHiloColumns('h');
         $sql = "
-            SELECT h.*,
+            SELECT {$hCols},
               (SELECT m.Cuerpo FROM mensaje m
                WHERE m.IdMensajeHilo = h.IdMensajeHilo
                ORDER BY m.FechaEnvio DESC LIMIT 1) AS UltimoCuerpoPreview,
@@ -229,8 +292,9 @@ class MensajeriaModel {
         }
         $offset = max(0, ($page - 1) * $limit);
         $ct = self::ORIGEN_INST_CONSULTA;
+        $hCols = $this->sqlSelectMensajeHiloColumns('h');
         $sel = "
-            h.*,
+            {$hCols},
             (SELECT m.Cuerpo FROM mensaje m
              WHERE m.IdMensajeHilo = h.IdMensajeHilo
              ORDER BY m.FechaEnvio DESC LIMIT 1) AS UltimoCuerpoPreview,
@@ -271,8 +335,9 @@ class MensajeriaModel {
         // En vista institucional, también incluimos los hilos personales propios del usuario (para contestar desde un solo lugar).
         $wherePer = "h.IdInstitucion = :iid2 AND COALESCE(h.EsInstitucional, 0) = 0
             AND (h.IdUsrParticipanteA = :uid5 OR h.IdUsrParticipanteB = :uid6)";
+        $uCols = $this->sqlSelectMensajeHiloColumns('u');
         $sql = "
-            SELECT * FROM (
+            SELECT {$uCols}, u.UltimoCuerpoPreview, u.NoLeidos, u._sort_ts FROM (
                 SELECT {$sel} FROM mensaje_hilo h WHERE {$whereInst}
                 UNION ALL
                 SELECT {$sel} FROM mensaje_hilo h WHERE {$wherePer}
@@ -399,7 +464,8 @@ class MensajeriaModel {
      * Acceso a un hilo: personal (A/B) o institucional (según tipo: comunicado sede / consulta privada a staff).
      */
     public function getHiloAccesible(int $hiloId, int $userId, int $instId, int $role = 0): ?array {
-        $stmt = $this->db->prepare('SELECT * FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1');
+        $cols = $this->sqlSelectMensajeHiloColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1");
         $stmt->execute([$hiloId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
@@ -546,11 +612,12 @@ class MensajeriaModel {
 
     public function getHiloRow(int $hiloId, int $userId, int $instId = 0, int $role = 0): ?array {
         if ($instId <= 0) {
-            $stmt = $this->db->prepare('
-                SELECT * FROM mensaje_hilo
+            $cols = $this->sqlSelectMensajeHiloColumns();
+            $stmt = $this->db->prepare("
+                SELECT {$cols} FROM mensaje_hilo
                 WHERE IdMensajeHilo = ? AND (IdUsrParticipanteA = ? OR IdUsrParticipanteB = ?)
                 LIMIT 1
-            ');
+            ");
             $stmt->execute([$hiloId, $userId, $userId]);
 
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -568,9 +635,10 @@ class MensajeriaModel {
     }
 
     public function getMensajesHilo(int $hiloId): array {
+        $mCols = $this->sqlSelectMensajeColumns('m');
         $stmt = $this->db->prepare("
             SELECT
-                m.*,
+                {$mCols},
                 COALESCE(p.NombreA, '') AS RemitenteNombre,
                 COALESCE(p.ApellidoA, '') AS RemitenteApellido,
                 COALESCE(u.UsrA, '') AS RemitenteUsuario
@@ -984,7 +1052,9 @@ class MensajeriaModel {
         string $cuerpo,
         ?string $origenTipo,
         ?int $origenId,
-        ?string $origenEtiqueta
+        ?string $origenEtiqueta,
+        ?string $adjuntoB2Key = null,
+        ?string $adjuntoNombreOriginal = null
     ): array {
         if ($remitenteId === $destinatarioId) {
             return ['status' => 'error', 'message' => 'El destinatario no puede ser el mismo usuario.'];
@@ -1011,6 +1081,11 @@ class MensajeriaModel {
             return ['status' => 'error', 'message' => 'El asunto es demasiado largo.'];
         }
 
+        $adjRes = $this->normalizarAdjuntoMensajeOpcional($instId, $adjuntoB2Key, $adjuntoNombreOriginal);
+        if (($adjRes['status'] ?? '') !== 'ok') {
+            return ['status' => 'error', 'message' => $adjRes['message'] ?? 'Adjunto inválido.'];
+        }
+
         [$pa, $pb] = $this->normalizeParticipantes($remitenteId, $destinatarioId);
 
         $this->db->beginTransaction();
@@ -1032,11 +1107,23 @@ class MensajeriaModel {
             ]);
             $hiloId = (int)$this->db->lastInsertId();
 
-            $stmtM = $this->db->prepare("
-                INSERT INTO mensaje (IdMensajeHilo, IdInstitucion, IdUsrRemitente, Cuerpo, FechaEnvio)
-                VALUES (?, ?, ?, ?, NOW())
-            ");
-            $stmtM->execute([$hiloId, $instId, $remitenteId, $cuerpo]);
+            $colsIns = ['IdMensajeHilo', 'IdInstitucion', 'IdUsrRemitente', 'Cuerpo', 'FechaEnvio'];
+            $phIns = ['?', '?', '?', '?', 'NOW()'];
+            $valsIns = [$hiloId, $instId, $remitenteId, $cuerpo];
+            $ak = $adjRes['key'] ?? null;
+            $an = $adjRes['nombre'] ?? null;
+            if ($ak !== null && $an !== null && $this->hasColumn('mensaje', 'AdjuntoB2Key')) {
+                $colsIns[] = 'AdjuntoB2Key';
+                $colsIns[] = 'AdjuntoNombreOriginal';
+                $phIns[] = '?';
+                $phIns[] = '?';
+                $valsIns[] = $ak;
+                $valsIns[] = $an;
+            }
+            $stmtM = $this->db->prepare(
+                'INSERT INTO mensaje (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $phIns) . ')'
+            );
+            $stmtM->execute($valsIns);
 
             $this->db->commit();
             return ['status' => 'success', 'data' => ['IdMensajeHilo' => $hiloId]];
@@ -1054,7 +1141,9 @@ class MensajeriaModel {
         int $role = 0,
         ?string $origenTipoMsg = null,
         ?int $origenIdMsg = null,
-        ?string $origenEtiquetaMsg = null
+        ?string $origenEtiquetaMsg = null,
+        ?string $adjuntoB2Key = null,
+        ?string $adjuntoNombreOriginal = null
     ): array {
         $h = $this->getHiloAccesible($hiloId, $remitenteId, $instId, $role);
         if (!$h) {
@@ -1069,6 +1158,11 @@ class MensajeriaModel {
         $cuerpo = trim(strip_tags($cuerpo));
         if ($cuerpo === '') {
             return ['status' => 'error', 'message' => 'El mensaje no puede estar vacío.'];
+        }
+
+        $adjRes = $this->normalizarAdjuntoMensajeOpcional($instId, $adjuntoB2Key, $adjuntoNombreOriginal);
+        if (($adjRes['status'] ?? '') !== 'ok') {
+            return ['status' => 'error', 'message' => $adjRes['message'] ?? 'Adjunto inválido.'];
         }
 
         $ot = $origenTipoMsg !== null ? strtolower(trim($origenTipoMsg)) : '';
@@ -1109,6 +1203,16 @@ class MensajeriaModel {
                 $ph[] = '?';
                 $vals[] = $oe;
             }
+        }
+        $adjK = $adjRes['key'] ?? null;
+        $adjN = $adjRes['nombre'] ?? null;
+        if ($adjK !== null && $adjN !== null && $this->hasColumn('mensaje', 'AdjuntoB2Key')) {
+            $colsMsg[] = 'AdjuntoB2Key';
+            $colsMsg[] = 'AdjuntoNombreOriginal';
+            $ph[] = '?';
+            $ph[] = '?';
+            $vals[] = $adjK;
+            $vals[] = $adjN;
         }
 
         $stmt = $this->db->prepare('
@@ -1213,7 +1317,9 @@ class MensajeriaModel {
         ?string $origenEtiqueta,
         int $role = 0,
         ?int $instDestinoId = null,
-        ?int $idInvestigadorDestino = null
+        ?int $idInvestigadorDestino = null,
+        ?string $adjuntoB2Key = null,
+        ?string $adjuntoNombreOriginal = null
     ): array {
         if (!$this->hasColumn('mensaje_hilo', 'EsInstitucional')) {
             return ['status' => 'error', 'message' => 'El buzón institucional no está disponible. Ejecute la migración de base de datos.'];
@@ -1230,6 +1336,11 @@ class MensajeriaModel {
         }
         if (mb_strlen($asunto) > 255) {
             return ['status' => 'error', 'message' => 'El asunto es demasiado largo.'];
+        }
+
+        $adjResInst = $this->normalizarAdjuntoMensajeOpcional($instId, $adjuntoB2Key, $adjuntoNombreOriginal);
+        if (($adjResInst['status'] ?? '') !== 'ok') {
+            return ['status' => 'error', 'message' => $adjResInst['message'] ?? 'Adjunto inválido.'];
         }
 
         $resTipo = $this->resolverTipoCreacionInstitucional($origenTipo, $role);
@@ -1294,11 +1405,23 @@ class MensajeriaModel {
             ]);
             $hiloId = (int) $this->db->lastInsertId();
 
-            $stmtM = $this->db->prepare("
-                INSERT INTO mensaje (IdMensajeHilo, IdInstitucion, IdUsrRemitente, Cuerpo, FechaEnvio)
-                VALUES (?, ?, ?, ?, NOW())
-            ");
-            $stmtM->execute([$hiloId, $instId, $remitenteId, $cuerpo]);
+            $colsIns = ['IdMensajeHilo', 'IdInstitucion', 'IdUsrRemitente', 'Cuerpo', 'FechaEnvio'];
+            $phIns = ['?', '?', '?', '?', 'NOW()'];
+            $valsIns = [$hiloId, $instId, $remitenteId, $cuerpo];
+            $aki = $adjResInst['key'] ?? null;
+            $ani = $adjResInst['nombre'] ?? null;
+            if ($aki !== null && $ani !== null && $this->hasColumn('mensaje', 'AdjuntoB2Key')) {
+                $colsIns[] = 'AdjuntoB2Key';
+                $colsIns[] = 'AdjuntoNombreOriginal';
+                $phIns[] = '?';
+                $phIns[] = '?';
+                $valsIns[] = $aki;
+                $valsIns[] = $ani;
+            }
+            $stmtM = $this->db->prepare(
+                'INSERT INTO mensaje (' . implode(', ', $colsIns) . ') VALUES (' . implode(', ', $phIns) . ')'
+            );
+            $stmtM->execute($valsIns);
 
             $this->db->commit();
 
@@ -1317,7 +1440,8 @@ class MensajeriaModel {
         if ($hiloId <= 0) {
             return null;
         }
-        $stmt = $this->db->prepare('SELECT * FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1');
+        $cols = $this->sqlSelectMensajeHiloColumns();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM mensaje_hilo WHERE IdMensajeHilo = ? LIMIT 1");
         $stmt->execute([$hiloId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 

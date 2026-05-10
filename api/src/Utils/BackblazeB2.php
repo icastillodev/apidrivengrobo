@@ -3,26 +3,43 @@ namespace App\Utils;
 
 use Exception;
 
+/**
+ * Cliente B2 por perfil: variables `B2_*_{PERFIL}` en mayúsculas, ej. `B2_KEY_ID_PROTOCOLOS`.
+ * Perfil por defecto: PROTOCOLOS (adjuntos de protocolos / solicitudes).
+ */
 class BackblazeB2
 {
+    private string $profile;
+
     private string $keyId;
     private string $applicationKey;
     private string $bucketId;
     private string $bucketName;
 
-    private static ?string $authToken = null;
-    private static ?string $apiUrl = null;
-    private static ?string $downloadUrl = null;
+    /** Auth por instancia (cada perfil puede usar Application Key distinta). */
+    private ?string $authToken = null;
+    private ?string $apiUrl = null;
+    private ?string $downloadUrl = null;
 
-    public function __construct()
+    /**
+     * @param string $profile Sufijo de variables en .env: PROTOCOLOS, MENSAJES, NOTICIASPOPUP, POES, etc.
+     */
+    public function __construct(string $profile = 'PROTOCOLOS')
     {
-        $this->keyId          = getenv('B2_KEY_ID') ?: '';
-        $this->applicationKey = getenv('B2_APPLICATION_KEY') ?: '';
-        $this->bucketId       = getenv('B2_BUCKET_ID') ?: '';
-        $this->bucketName     = getenv('B2_BUCKET_NAME') ?: '';
+        $this->profile = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', $profile)) ?: 'PROTOCOLOS';
+
+        $this->keyId = $this->readEnv('B2_KEY_ID');
+        $this->applicationKey = $this->readEnv('B2_APPLICATION_KEY');
+        $this->bucketId = $this->readEnv('B2_BUCKET_ID');
+        $this->bucketName = $this->readEnv('B2_BUCKET_NAME');
 
         if ($this->keyId === '' || $this->applicationKey === '' || $this->bucketId === '' || $this->bucketName === '') {
-            throw new Exception('Backblaze B2 no está configurado correctamente en el .env (faltan B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID o B2_BUCKET_NAME).');
+            throw new Exception(
+                'Backblaze B2 no está configurado para el perfil "' . $this->profile . '". '
+                . 'Definí en .env: B2_KEY_ID_' . $this->profile . ', B2_APPLICATION_KEY_' . $this->profile . ', '
+                . 'B2_BUCKET_ID_' . $this->profile . ', B2_BUCKET_NAME_' . $this->profile
+                . ($this->profile === 'PROTOCOLOS' ? ' (Migración: también valen B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID, B2_BUCKET_NAME sin sufijo).' : '')
+            );
         }
 
         if (!extension_loaded('curl')) {
@@ -30,9 +47,28 @@ class BackblazeB2
         }
     }
 
+    /**
+     * Lee B2_{$base}_{PROFILE}; para PROTOCOLOS admite fallback a variables sin sufijo (migración).
+     */
+    private function readEnv(string $base): string
+    {
+        $v = getenv($base . '_' . $this->profile);
+        if ($v !== false && $v !== '') {
+            return (string) $v;
+        }
+        if ($this->profile === 'PROTOCOLOS') {
+            $legacy = getenv($base);
+            if ($legacy !== false && $legacy !== '') {
+                return (string) $legacy;
+            }
+        }
+
+        return '';
+    }
+
     private function authorize(): void
     {
-        if (self::$authToken && self::$apiUrl && self::$downloadUrl) {
+        if ($this->authToken && $this->apiUrl && $this->downloadUrl) {
             return;
         }
 
@@ -58,11 +94,11 @@ class BackblazeB2
             throw new Exception('Respuesta inválida de Backblaze B2 (authorize): ' . $res);
         }
 
-        self::$authToken   = $data['authorizationToken'] ?? null;
-        self::$apiUrl      = $data['apiUrl'] ?? null;
-        self::$downloadUrl = $data['downloadUrl'] ?? null;
+        $this->authToken   = $data['authorizationToken'] ?? null;
+        $this->apiUrl      = $data['apiUrl'] ?? null;
+        $this->downloadUrl = $data['downloadUrl'] ?? null;
 
-        if (!self::$authToken || !self::$apiUrl || !self::$downloadUrl) {
+        if (!$this->authToken || !$this->apiUrl || !$this->downloadUrl) {
             throw new Exception('Backblaze B2 devolvió datos incompletos al autorizar la cuenta.');
         }
     }
@@ -71,7 +107,7 @@ class BackblazeB2
     {
         $this->authorize();
 
-        $url     = self::$apiUrl . '/b2api/v2/b2_get_upload_url';
+        $url     = $this->apiUrl . '/b2api/v2/b2_get_upload_url';
         $payload = json_encode(['bucketId' => $this->bucketId]);
 
         $ch = curl_init($url);
@@ -79,7 +115,7 @@ class BackblazeB2
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_HTTPHEADER     => [
-                'Authorization: ' . self::$authToken,
+                'Authorization: ' . $this->authToken,
                 'Content-Type: application/json',
             ],
             CURLOPT_POSTFIELDS     => $payload,
@@ -154,33 +190,45 @@ class BackblazeB2
     }
 
     /**
-     * Envía el archivo al navegador leyendo desde B2 (bucket privado).
+     * Adjuntos manuales de protocolos (histórico): fuerza PDF en cabeceras.
      */
     public function streamDownload(string $fileKey, string $downloadName): void
     {
+        $this->streamDownloadAttachment($fileKey, $downloadName, 'application/pdf', false);
+    }
+
+    /**
+     * Descarga genérica (imagen, Office, PDF) desde B2.
+     *
+     * @param bool $inline Si true, Content-Disposition inline (p. ej. imágenes en portada).
+     */
+    public function streamDownloadAttachment(
+        string $fileKey,
+        string $downloadName,
+        string $mime = 'application/octet-stream',
+        bool $inline = false
+    ): void {
         $this->authorize();
 
-        $url = rtrim(self::$downloadUrl, '/') . '/file/' . rawurlencode($this->bucketName) . '/' . str_replace('%2F', '/', rawurlencode($fileKey));
+        $url = rtrim($this->downloadUrl, '/') . '/file/' . rawurlencode($this->bucketName) . '/' . str_replace('%2F', '/', rawurlencode($fileKey));
 
         if (ob_get_length()) {
             ob_clean();
         }
 
         $safe = $this->sanitizeFileName($downloadName);
-        if (!preg_match('/\.pdf$/i', $safe)) {
-            $safe .= '.pdf';
-        }
+        $disp = $inline ? 'inline' : 'attachment';
 
         header('Content-Description: File Transfer');
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . $safe . '"');
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . $disp . '; filename="' . $safe . '"');
         header('Cache-Control: no-cache, must-revalidate');
         header('Pragma: no-cache');
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_HTTPHEADER => [
-                'Authorization: ' . self::$authToken,
+                'Authorization: ' . $this->authToken,
             ],
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_FOLLOWLOCATION => true,
@@ -204,7 +252,7 @@ class BackblazeB2
     {
         $this->authorize();
 
-        $lookupUrl = self::$apiUrl . '/b2api/v2/b2_list_file_names';
+        $lookupUrl = $this->apiUrl . '/b2api/v2/b2_list_file_names';
         $lookupPayload = json_encode([
             'bucketId'      => $this->bucketId,
             'prefix'        => $fileKey,
@@ -216,7 +264,7 @@ class BackblazeB2
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_HTTPHEADER     => [
-                'Authorization: ' . self::$authToken,
+                'Authorization: ' . $this->authToken,
                 'Content-Type: application/json',
             ],
             CURLOPT_POSTFIELDS     => $lookupPayload,
@@ -258,7 +306,7 @@ class BackblazeB2
             return;
         }
 
-        $deleteUrl = self::$apiUrl . '/b2api/v2/b2_delete_file_version';
+        $deleteUrl = $this->apiUrl . '/b2api/v2/b2_delete_file_version';
         $deletePayload = json_encode([
             'fileName' => $fileName,
             'fileId'   => $fileId,
@@ -269,7 +317,7 @@ class BackblazeB2
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_HTTPHEADER     => [
-                'Authorization: ' . self::$authToken,
+                'Authorization: ' . $this->authToken,
                 'Content-Type: application/json',
             ],
             CURLOPT_POSTFIELDS     => $deletePayload,
@@ -300,4 +348,3 @@ class BackblazeB2
         return $name ?: 'file';
     }
 }
-

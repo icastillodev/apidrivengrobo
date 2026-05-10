@@ -89,7 +89,7 @@ class ControllerAdminSolicitudes {
                 exit;
             }
 
-            $b2 = new BackblazeB2();
+            $b2 = new BackblazeB2('PROTOCOLOS');
             $b2->streamDownload($att['file_key'], $att['nombre_original']);
         } catch (\Exception $e) {
             http_response_code(500);

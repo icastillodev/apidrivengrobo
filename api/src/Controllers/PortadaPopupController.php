@@ -33,23 +33,45 @@ class PortadaPopupController {
         return $instId;
     }
 
-    private function adjuntosFromRow(array $row, string $prefixUrl, string $prefixNombre): array {
+    private function apiDownloadBase(): string {
+        return ComunicacionB2Controller::absoluteApiPrefix();
+    }
+
+    /**
+     * Combina adjuntos por URL (legacy) y archivos en B2 (NOTICIASPOPUP).
+     *
+     * @param 'Portada'|'Popup' $bloque
+     */
+    private function adjuntosDocumentosMerge(array $row, string $bloque): array {
         $out = [];
-        $u1 = $row[$prefixUrl . '1'] ?? null;
-        if ($u1 !== null && $u1 !== '') {
-            $n1 = $row[$prefixNombre . '1'] ?? null;
-            $out[] = [
-                'url' => (string)$u1,
-                'nombre' => ($n1 !== null && $n1 !== '') ? (string)$n1 : (string)$u1,
-            ];
-        }
-        $u2 = $row[$prefixUrl . '2'] ?? null;
-        if ($u2 !== null && $u2 !== '') {
-            $n2 = $row[$prefixNombre . '2'] ?? null;
-            $out[] = [
-                'url' => (string)$u2,
-                'nombre' => ($n2 !== null && $n2 !== '') ? (string)$n2 : (string)$u2,
-            ];
+        $prefixUrl = $bloque === 'Portada' ? 'PortadaUrlAdjunto' : 'PopupUrlAdjunto';
+        $prefixNombre = $bloque === 'Portada' ? 'PortadaNombreAdjunto' : 'PopupNombreAdjunto';
+
+        for ($i = 1; $i <= 2; $i++) {
+            $bk = $bloque === 'Portada'
+                ? ($row['PortadaAdjunto' . $i . 'B2Key'] ?? null)
+                : ($row['PopupAdjunto' . $i . 'B2Key'] ?? null);
+            $bn = $bloque === 'Portada'
+                ? ($row['PortadaAdjunto' . $i . 'Nombre'] ?? null)
+                : ($row['PopupAdjunto' . $i . 'Nombre'] ?? null);
+            if ($bk !== null && $bk !== '') {
+                $tipo = ($bloque === 'Portada' ? 'portada_doc' : 'popup_doc') . $i;
+                $out[] = [
+                    'url' => $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/' . $tipo,
+                    'nombre' => ($bn !== null && $bn !== '') ? (string) $bn : 'adjunto',
+                    'origen' => 'b2',
+                ];
+                continue;
+            }
+            $u = $row[$prefixUrl . $i] ?? null;
+            if ($u !== null && $u !== '') {
+                $n = $row[$prefixNombre . $i] ?? null;
+                $out[] = [
+                    'url' => (string) $u,
+                    'nombre' => ($n !== null && $n !== '') ? (string) $n : (string) $u,
+                    'origen' => 'url',
+                ];
+            }
         }
 
         return $out;
@@ -63,6 +85,7 @@ class PortadaPopupController {
             return [
                 'PortadaTitulo' => null,
                 'PortadaCuerpo' => null,
+                'PortadaImagenUrl' => null,
                 'portada_adjuntos' => [],
                 'PopupActivo' => 0,
                 'PopupTitulo' => null,
@@ -86,14 +109,20 @@ class PortadaPopupController {
             }
         }
 
+        $imgUrl = null;
+        if (!empty($row['PortadaImagenB2Key'])) {
+            $imgUrl = $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/portada_imagen';
+        }
+
         return [
             'PortadaTitulo' => $row['PortadaTitulo'] ?? null,
             'PortadaCuerpo' => $row['PortadaCuerpo'] ?? null,
-            'portada_adjuntos' => $this->adjuntosFromRow($row, 'PortadaUrlAdjunto', 'PortadaNombreAdjunto'),
+            'PortadaImagenUrl' => $imgUrl,
+            'portada_adjuntos' => $this->adjuntosDocumentosMerge($row, 'Portada'),
             'PopupActivo' => (int)($row['PopupActivo'] ?? 0),
             'PopupTitulo' => $row['PopupTitulo'] ?? null,
             'PopupCuerpo' => $row['PopupCuerpo'] ?? null,
-            'popup_adjuntos' => $this->adjuntosFromRow($row, 'PopupUrlAdjunto', 'PopupNombreAdjunto'),
+            'popup_adjuntos' => $this->adjuntosDocumentosMerge($row, 'Popup'),
             'PopupNoticia' => $popupNoticia,
             'FechaActualizacion' => $row['FechaActualizacion'] ?? null,
         ];

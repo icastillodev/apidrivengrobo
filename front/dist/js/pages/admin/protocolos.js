@@ -1,5 +1,6 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { debounce } from '../../utils/debounce.js';
 
 let allProtocols = [];
 let currentPage = 1;
@@ -252,18 +253,22 @@ function updateSearchInputType() {
     // Auto-búsqueda según tipo de control
     const inputEl = document.getElementById('search-input-prot');
     if (inputEl) {
-        const triggerSearch = () => {
+        const triggerSearchImmediate = () => {
             currentPage = 1;
             renderTable();
         };
 
         if (inputEl.tagName === 'INPUT') {
-            inputEl.addEventListener('input', triggerSearch);
+            const debouncedSearch = debounce(triggerSearchImmediate, 300);
+            inputEl.addEventListener('input', debouncedSearch);
             inputEl.addEventListener('keyup', (e) => {
-                if (e.key === 'Enter') triggerSearch();
+                if (e.key === 'Enter') {
+                    debouncedSearch.cancel();
+                    triggerSearchImmediate();
+                }
             });
         } else {
-            inputEl.addEventListener('change', triggerSearch);
+            inputEl.addEventListener('change', triggerSearchImmediate);
         }
     }
 }

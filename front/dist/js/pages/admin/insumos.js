@@ -6,6 +6,7 @@ import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifar
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
 let allInsumos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -93,18 +94,23 @@ async function fetchInsumosList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (insumosListBootLocked) loading = 'none';
 
-    insumosPageCacheApi.syncFiltersKey();
+    const prefetchGen = insumosPageCacheApi.syncFiltersKey();
 
     if (insumosPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allInsumos = insumosPageCacheApi.pageCache.get(currentPage);
         renderTableBody(allInsumos);
+        insumosPageCacheApi.schedulePrefetchAround(totalInsumosList, currentPage, prefetchGen);
         return;
     }
 
     const tbody = document.getElementById('table-body-insumos');
     if (loading === 'inline' && tbody) {
-        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+        setTbodyLoadingSpinner(tbody, {
+            colspan: 11,
+            layout: 'inventory',
+            spinnerTone: 'success',
+            message: window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…',
+        });
     }
     try {
         const res = await insumosPageCacheApi.fetchPage(currentPage);
@@ -118,10 +124,18 @@ async function fetchInsumosList(opts = {}) {
             }
             insumosPageCacheApi.pageCache.set(currentPage, [...allInsumos]);
             renderTableBody(allInsumos);
+            insumosPageCacheApi.schedulePrefetchAround(totalInsumosList, currentPage, prefetchGen);
         }
     } catch (e) {
         console.error('Error cargando insumos:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        if (tbody) {
+            setTbodyMessageRow(tbody, {
+                colspan: 11,
+                variant: 'danger',
+                layout: 'inventory',
+                message: window.txt?.generales?.error_carga || 'Error al cargar datos.',
+            });
+        }
     }
 }
 
@@ -262,7 +276,13 @@ function renderTableBody(pageDataOverride = null) {
     tbody.innerHTML = '';
 
     if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        setTbodyMessageRow(tbody, {
+            colspan: 11,
+            variant: 'mutedEmpty',
+            message:
+                window.txt?.admin_animales?.sin_resultados ||
+                'No hay registros para los filtros seleccionados.',
+        });
         updateHeaderIcons();
         renderPagination(totalInsumosList, 'pagination-insumo', () => fetchInsumosList());
         hideLoader();

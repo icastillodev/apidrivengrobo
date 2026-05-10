@@ -11,7 +11,7 @@ const state = {
   selectedSlots: []
 };
 
-export function initQRSalaPage() {
+export async function initQRSalaPage() {
   state.token = getTokenFromUrl();
   if (!state.token) {
     Swal.fire('Error', window.txt?.qr_sala?.err_token || 'Enlace inválido.', 'error');
@@ -31,7 +31,7 @@ export function initQRSalaPage() {
   document.getElementById('btn-reservar').onclick = () => reservar();
 
   renderAuthZone();
-  loadBundle();
+  await loadBundle();
 }
 
 function renderAuthZone() {

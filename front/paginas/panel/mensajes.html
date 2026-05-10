@@ -24,7 +24,7 @@
         import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260409';
         import { NotificationManager } from '../../dist/js/NotificationManager.js?v=20260409';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260409';
-        import { initMensajes } from '../../dist/js/pages/usuario/mensajes.js?v=20260414';
+        import { initMensajes } from '../../dist/js/pages/usuario/mensajes.js?v=20260509f';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -42,7 +42,7 @@
                     const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
                     const isStaff = [1, 2, 4, 5, 6].includes(role);
                     const alcance = (alcanceQ === 'personal' || alcanceQ === 'institucional') ? alcanceQ : (isStaff ? 'institucional' : 'personal');
-                    initMensajes({ alcance });
+                    await initMensajes({ alcance });
                 }
             } catch (e) {
                 console.error(e);
@@ -115,6 +115,16 @@
                             <select id="reply-ref-select" class="form-select form-select-sm mt-1 d-none" size="4" aria-label="context"></select>
                             <small class="text-muted d-block mt-1" style="font-size:11px;" data-i18n="comunicacion.msg_anexo_reply_hint"></small>
                         </div>
+                        <div id="reply-adjunto-wrap" class="mb-2 border rounded p-2 bg-light bg-opacity-50">
+                            <label class="form-label small fw-bold mb-1" data-i18n="comunicacion.msg_adjunto_label"></label>
+                            <p class="small text-muted mb-2" data-i18n="comunicacion.msg_adjunto_help"></p>
+                            <input type="file" class="form-control form-control-sm mb-2" id="reply-adj-file" accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="reply-adj-btn-upload"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                                <span class="small text-muted flex-grow-1" id="reply-adj-status"></span>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="reply-adj-btn-clear"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
+                            </div>
+                        </div>
                         <div id="hilo-reply-wrap" class="d-flex gap-2">
                             <textarea class="form-control form-control-sm" id="reply-text" rows="2"></textarea>
                             <button type="button" class="btn btn-primary btn-sm align-self-end" id="btn-reply" data-i18n="comunicacion.msg_responder"></button>
@@ -186,6 +196,16 @@
                             <label class="form-label small text-muted mb-0" data-i18n="comunicacion.msg_ref_id_label"></label>
                             <input type="number" min="1" class="form-control form-control-sm mb-1" id="nuevo-origen-id" autocomplete="off">
                             <small class="text-muted d-block mb-2" data-i18n="comunicacion.msg_ref_id_hint"></small>
+                        </div>
+                    </div>
+                    <div id="nuevo-adjunto-wrap" class="border rounded p-2 mb-2 bg-light bg-opacity-50">
+                        <label class="form-label small fw-bold mb-1" data-i18n="comunicacion.msg_adjunto_label"></label>
+                        <p class="small text-muted mb-2" data-i18n="comunicacion.msg_adjunto_help"></p>
+                        <input type="file" class="form-control form-control-sm mb-2" id="nuevo-adj-file" accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="nuevo-adj-btn-upload"><span data-i18n="comunicacion.pp_b2_btn_upload"></span></button>
+                            <span class="small text-muted flex-grow-1" id="nuevo-adj-status"></span>
+                            <button type="button" class="btn btn-sm btn-link text-danger p-0 d-none" id="nuevo-adj-btn-clear"><span data-i18n="comunicacion.pp_b2_btn_clear"></span></button>
                         </div>
                     </div>
                     <label class="form-label small fw-bold" data-i18n="comunicacion.admin_cuerpo"></label>

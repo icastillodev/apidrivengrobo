@@ -98,7 +98,7 @@ class AdminInstitucionPoeController {
             if (!is_array($input)) {
                 $input = [];
             }
-            $validated = $this->model->validatePayload($input, true);
+            $validated = $this->model->validatePayload($input, true, $instId);
             if (!$validated['ok']) {
                 $this->json(['status' => 'error', 'message' => $validated['message']], 400);
             }
@@ -127,7 +127,7 @@ class AdminInstitucionPoeController {
             if (!$existing) {
                 $this->json(['status' => 'error', 'message' => 'No encontrado.'], 404);
             }
-            $validated = $this->model->validatePayload($input, false);
+            $validated = $this->model->validatePayload($input, false, $instId, $existing);
             if (!$validated['ok']) {
                 $this->json(['status' => 'error', 'message' => $validated['message']], 400);
             }

@@ -46,7 +46,7 @@
                 if (window.txt) {
                     await initMenu();
                     NotificationManager.init();
-                    initBillingDepto();
+                    await initBillingDepto();
                 }
 
                 setTimeout(() => { checkUrlParamsAndOpen(); }, 300);

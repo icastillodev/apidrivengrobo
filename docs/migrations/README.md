@@ -8,7 +8,9 @@ Los cambios de esquema o datos que no estén ya automatizados en otro sitio se d
 
 Ejemplo: `2026-05-09-facturacion-indice-saldo.sql`
 
-Ejemplos recientes en este repo: `2026-05-09-noticia-orden-fijo.sql` (noticias pin), `2026-05-09-institucion-portada-popup.sql` (portada/popup dashboard por sede), `2026-05-09-institucion-poe.sql` (POE por institución, URLs de adjuntos), `2026-05-09-noticia-adjuntos-storage-plantilla.sql` (solo plantilla hasta Backblaze).
+Ejemplos recientes en este repo: `2026-05-09-noticia-orden-fijo.sql` (noticias pin), `2026-05-09-institucion-portada-popup.sql` (portada/popup dashboard por sede), `2026-05-09-institucion-poe.sql` (POE por institución, URLs de adjuntos), `2026-05-09-comunicacion-b2-adjuntos.sql` (mensajes/noticias/portada popup/POE — columnas clave B2), `2026-05-09-noticia-adjuntos-storage-plantilla.sql` (plantilla de referencia).
+
+**Un solo archivo con todo el pack maestro (orden correcto + índices opcionales al final):** `2026-05-09-feature-pack-backlog-maestro.sql`.
 
 ## Contenido de cada archivo
 

@@ -132,6 +132,18 @@ $router->post('/comunicacion/mensajes/hilo/:id/delete-full', 'MensajeriaControll
 $router->get('/comunicacion/mensajes/anexos-contexto', 'MensajeriaController@getAnexosContexto');
 $router->post('/comunicacion/mensajes/enviar', 'MensajeriaController@enviar');
 
+$router->post('/comunicacion/b2/upload/mensaje-adjunto', 'ComunicacionB2Controller@uploadMensajeAdjunto');
+$router->post('/comunicacion/b2/upload/noticia-imagen-portada', 'ComunicacionB2Controller@uploadNoticiaImagenPortada');
+$router->post('/comunicacion/b2/upload/noticia-documento', 'ComunicacionB2Controller@uploadNoticiaDocumento');
+$router->post('/comunicacion/b2/upload/portada-imagen', 'ComunicacionB2Controller@uploadPortadaImagen');
+$router->post('/comunicacion/b2/upload/portada-documento', 'ComunicacionB2Controller@uploadPortadaDocumento');
+$router->post('/comunicacion/b2/upload/popup-documento', 'ComunicacionB2Controller@uploadPopupDocumento');
+$router->post('/comunicacion/b2/upload/poe-instructivo', 'ComunicacionB2Controller@uploadPoeInstructivo');
+$router->get('/comunicacion/mensajes/adjunto/:id', 'ComunicacionB2Controller@downloadMensajeAdjunto');
+$router->get('/comunicacion/noticias/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivo');
+$router->get('/comunicacion/portada-popup/archivo/:tipo', 'ComunicacionB2Controller@downloadPortadaPopupArchivo');
+$router->get('/comunicacion/poe/:id/adjunto/:slot', 'ComunicacionB2Controller@downloadPoeAdjunto');
+
 // Tickets de soporte Gecko (turnos 1:1, correo a soporte@appgrobo.com)
 $router->get('/support/tickets', 'SupportTicketController@listTickets');
 $router->get('/support/tickets/:id', 'SupportTicketController@getTicket');
@@ -572,6 +584,7 @@ $router->get('/stats/dashboard-red', 'StatisticsController@getStatsRed');
 $router->get('/superadmin/global-stats', 'InstitucionController@getGlobalStats');
 
 // Instituciones
+$router->get('/superadmin/instituciones/:id', 'InstitucionController@getOne');
 $router->get('/superadmin/instituciones', 'InstitucionController@list');
 $router->post('/superadmin/instituciones/create', 'InstitucionController@create');
 $router->post('/superadmin/instituciones/update', 'InstitucionController@update');
@@ -607,6 +620,7 @@ $router->get('/superadmin/form-registros/detail/:id', 'FormRegistroController@ge
 $router->post('/superadmin/form-registros/delete', 'FormRegistroController@deleteConfig');
 
 $router->get('/superadmin/bitacora/list', 'BitacoraController@listAll');
+$router->get('/superadmin/bitacora/instituciones-filtro', 'BitacoraController@institucionesFiltro');
 $router->post('/superadmin/form-registros/submit', 'FormRegistroController@submit');
 // 4. Habilitar o Deshabilitar un link (La que te daba 404)
 $router->post('/superadmin/form-registros/toggle-status', 'FormRegistroController@toggleStatus');

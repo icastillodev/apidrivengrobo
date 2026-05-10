@@ -6,12 +6,68 @@ use App\Utils\Auditoria;
 class AlojamientoModel {
     private $db;
 
+    /** @var bool|null cache por request: columna opcional `con_cirugia` en `especie_alojamiento_unidad` */
+    private $euHasConCirugiaCol = null;
+
     public function __construct($db) { 
         $this->db = $db; 
     }
 
+    private function hasColumn(string $tableName, string $columnName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$tableName}` LIKE ?");
+            $stmt->execute([$columnName]);
+
+            return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /** Columnas `alojamiento` — `docs/database.sql` (`$alias` p. ej. `a.`). */
+    private function sqlSelectAlojamientoAllColumns(?string $alias = null): string {
+        $cols = [
+            'IdAlojamiento', 'fechavisado', 'totalcajachica', 'totalcajagrande', 'preciocajachica', 'preciocajagrande',
+            'cuentaapagar', 'IdUsrA', 'observaciones', 'TipoAnimal', 'idprotA', 'hastafecha', 'historia', 'totaldiasdefinidos',
+            'totalpago', 'detallepago', 'finalizado', 'coloniapropia', 'IdInstitucion', 'IdTipoAlojamiento', 'CantidadCaja',
+            'PrecioCajaMomento',
+        ];
+        if ($alias !== null && $alias !== '') {
+            $p = $alias . '.';
+            $prefixed = [];
+            foreach ($cols as $c) {
+                $prefixed[] = $p . $c;
+            }
+
+            return implode(', ', $prefixed);
+        }
+
+        return implode(', ', $cols);
+    }
+
+    /** Columnas `alojamiento_caja` — `docs/database.sql`. */
+    private function sqlSelectAlojamientoCajaAllColumns(): string {
+        return 'IdCajaAlojamiento, FechaInicio, Detalle, IdUbicacionFisica, IdSalon, IdRack, IdLugarRack, ComentarioUbicacion, '
+            . 'NombreCaja, IdAlojamiento, ubicacion';
+    }
+
+    /** Columnas `especie_alojamiento_unidad`; `con_cirugia` si existe en BD. */
+    private function sqlSelectEspecieAlojamientoUnidadAllColumns(): string {
+        $base = 'IdEspecieAlojUnidad, NombreEspecieAloj, DetalleEspecieAloj, IdUnidadAlojamiento, IdCajaAlojamiento, '
+            . 'PesoSujetoKg, FechaNacimientoSujeto, SexoSujeto, idcepaA_sujeto, CategoriaRazaSujeto, idsubespA_sujeto';
+        if ($this->euHasConCirugiaCol === null) {
+            $this->euHasConCirugiaCol = $this->hasColumn('especie_alojamiento_unidad', 'con_cirugia');
+        }
+        if ($this->euHasConCirugiaCol) {
+            return $base . ', con_cirugia';
+        }
+
+        return $base;
+    }
+
     public function getAllGrouped($instId) {
-        $sql = "SELECT a.*, p.nprotA, p.tituloA, e.EspeNombreA, e.idespA,
+        $aCols = $this->sqlSelectAlojamientoAllColumns('a');
+        $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, e.EspeNombreA, e.idespA,
                        t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), 'Sin Asignar') as Investigador
                 FROM alojamiento a
@@ -32,7 +88,8 @@ class AlojamientoModel {
     }
 
     public function getHistory($historiaId) {
-        $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
+        $aCols = $this->sqlSelectAlojamientoAllColumns('a');
+        $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
                        a.IdUsrA AS IdUsrResponsableAlojamiento,
                        ins_bi.NombreInst as QrNombreInstFolder,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
@@ -107,8 +164,10 @@ class AlojamientoModel {
             if ($isUpdate && isset($data['continuidad']) && !empty($data['continuidad']['cajas'])) {
                 $cajasViejasIds = $data['continuidad']['cajas']; 
                 $unidadesViejasIds = $data['continuidad']['unidades'] ?? []; 
+                $acCols = $this->sqlSelectAlojamientoCajaAllColumns();
+                $euCols = $this->sqlSelectEspecieAlojamientoUnidadAllColumns();
                 foreach ($cajasViejasIds as $oldIdCaja) {
-                    $stmtGetCaja = $this->db->prepare("SELECT * FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
+                    $stmtGetCaja = $this->db->prepare("SELECT {$acCols} FROM alojamiento_caja WHERE IdCajaAlojamiento = ?");
                     $stmtGetCaja->execute([$oldIdCaja]);
                     $oldCaja = $stmtGetCaja->fetch(\PDO::FETCH_ASSOC);
 
@@ -130,7 +189,7 @@ class AlojamientoModel {
                         ]);
                         $newIdCaja = $this->db->lastInsertId();
 
-                        $stmtGetUnits = $this->db->prepare("SELECT * FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
+                        $stmtGetUnits = $this->db->prepare("SELECT {$euCols} FROM especie_alojamiento_unidad WHERE IdCajaAlojamiento = ?");
                         $stmtGetUnits->execute([$oldIdCaja]);
                         $unidadesCaja = $stmtGetUnits->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -178,7 +237,8 @@ class AlojamientoModel {
 
     // CORRECCIÓN CRÍTICA: Se usan las variables MODERNAS (CantidadCaja y PrecioCajaMomento)
     private function closePreviousRecord($historia, $newDate) {
-        $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY IdAlojamiento DESC LIMIT 1";
+        $aCols = $this->sqlSelectAlojamientoAllColumns();
+        $sql = "SELECT {$aCols} FROM alojamiento WHERE historia = ? ORDER BY IdAlojamiento DESC LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$historia]);
         $prev = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -228,7 +288,8 @@ class AlojamientoModel {
 
     // CORRECCIÓN: El recálculo ahora actualiza la 'cuentaapagar' en lugar del 'totalpago' (el cual es para lo que el usuario YA pagó de su bolsillo)
 public function recalculateHistory($historiaId) {
-        $sql = "SELECT * FROM alojamiento WHERE historia = ? ORDER BY fechavisado ASC";
+        $aCols = $this->sqlSelectAlojamientoAllColumns();
+        $sql = "SELECT {$aCols} FROM alojamiento WHERE historia = ? ORDER BY fechavisado ASC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$historiaId]);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -411,7 +472,8 @@ public function generarCodigoQR($historiaId, $idUsuario, $instId) {
         $codigoToken = strtolower(trim((string)$codigoToken));
 
         // Inner join qralojamiento + institución (nombre de carpeta login) + titular protocolo
-        $sql = "SELECT a.*, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
+        $aCols = $this->sqlSelectAlojamientoAllColumns('a');
+        $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        ins_bi.NombreInst as QrNombreInstFolder,
                        COALESCE(CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador

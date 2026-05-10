@@ -32,24 +32,32 @@ class ComunicacionPoeController {
         return $instId;
     }
 
-    /** @return list<array{url:string,nombre:string}> */
+    /** @return list<array{url:string,nombre:string,origen?:string}> */
     private function adjuntosFromRow(array $row): array {
         $out = [];
-        $u1 = $row['UrlAdjunto1'] ?? null;
-        if ($u1 !== null && $u1 !== '') {
-            $n1 = $row['NombreAdjunto1'] ?? null;
-            $out[] = [
-                'url' => (string)$u1,
-                'nombre' => ($n1 !== null && $n1 !== '') ? (string)$n1 : (string)$u1,
-            ];
-        }
-        $u2 = $row['UrlAdjunto2'] ?? null;
-        if ($u2 !== null && $u2 !== '') {
-            $n2 = $row['NombreAdjunto2'] ?? null;
-            $out[] = [
-                'url' => (string)$u2,
-                'nombre' => ($n2 !== null && $n2 !== '') ? (string)$n2 : (string)$u2,
-            ];
+        $base = ComunicacionB2Controller::absoluteApiPrefix();
+        $id = (int)($row['IdPoe'] ?? 0);
+
+        for ($i = 1; $i <= 2; $i++) {
+            $bk = $row['Adjunto' . $i . 'B2Key'] ?? null;
+            if ($bk !== null && $bk !== '') {
+                $n = $row['NombreAdjunto' . $i] ?? null;
+                $out[] = [
+                    'url' => $base . '/comunicacion/poe/' . $id . '/adjunto/' . $i,
+                    'nombre' => ($n !== null && $n !== '') ? (string) $n : 'adjunto',
+                    'origen' => 'b2',
+                ];
+                continue;
+            }
+            $u = $row['UrlAdjunto' . $i] ?? null;
+            if ($u !== null && $u !== '') {
+                $n = $row['NombreAdjunto' . $i] ?? null;
+                $out[] = [
+                    'url' => (string) $u,
+                    'nombre' => ($n !== null && $n !== '') ? (string) $n : (string) $u,
+                    'origen' => 'url',
+                ];
+            }
         }
 
         return $out;

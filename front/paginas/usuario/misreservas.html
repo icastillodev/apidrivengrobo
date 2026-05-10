@@ -24,7 +24,7 @@
                 if (window.txt) {
                     await initMenu();
                     NotificationManager.init();
-                    initMisReservas();
+                    await initMisReservas();
                 } else {
                     throw new Error("El objeto de idioma window.txt no se generó.");
                 }

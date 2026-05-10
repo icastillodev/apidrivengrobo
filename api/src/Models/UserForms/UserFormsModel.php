@@ -111,8 +111,13 @@ class UserFormsModel {
         }
         $originalMap = $this->getOriginalRowDataMap($derivedIds);
 
+        $participantesByForm = $this->getInstitucionesParticipantesBatch(array_map(static function ($row) {
+            return (int)$row['idformA'];
+        }, $list));
+
         foreach ($list as &$row) {
-            $row['institucionesParticipantes'] = $this->getInstitucionesParticipantes((int)$row['idformA']);
+            $fid = (int)$row['idformA'];
+            $row['institucionesParticipantes'] = $participantesByForm[$fid] ?? [];
             $id = (int)$row['idformA'];
             if (isset($originalMap[$id])) {
                 $orig = $originalMap[$id];
@@ -156,7 +161,8 @@ class UserFormsModel {
         $permiteAnestSelect = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos')
             ? ', COALESCE(px.PermiteAnestesicos, 0) AS protocolo_permite_anestesicos'
             : '';
-        $sqlHead = "SELECT f.*{$permiteAnestSelect},
+        $fCols = $this->sqlSelectFormularioeAllColumnsPrefixed('f');
+        $sqlHead = "SELECT {$fCols}{$permiteAnestSelect},
                     COALESCE(tf_orig.nombreTipo, tf.nombreTipo, '—') as nombreTipo,
                     COALESCE(tf_orig.categoriaformulario, tf.categoriaformulario, (SELECT categoriaformulario FROM tipoformularios WHERE IdTipoFormulario = f.tipoA LIMIT 1)) as categoriaformulario,
                     COALESCE(tf_orig.categoriaformulario, tf.categoriaformulario, (SELECT categoriaformulario FROM tipoformularios WHERE IdTipoFormulario = f.tipoA LIMIT 1)) as Categoria,
@@ -472,49 +478,34 @@ class UserFormsModel {
     }
 
     /**
-     * Obtiene todas las instituciones que participan en un formulario (origen + derivaciones).
+     * Orden de aparición de ids de institución según filas de derivación (misma regla que antes).
+     *
+     * @param array<int, array<string, mixed>> $rowsOrdenadas
+     * @return int[]
      */
-    private function getInstitucionesParticipantes($idformA): array {
-        if (!$this->hasTable('formulario_derivacion')) {
-            $stmt = $this->db->prepare("SELECT i.IdInstitucion, i.NombreInst, i.InstCorreo, i.InstContacto FROM formularioe f JOIN institucion i ON f.IdInstitucion = i.IdInstitucion WHERE f.idformA = ?");
-            $stmt->execute([(int)$idformA]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $row ? [[
-                'IdInstitucion' => $row['IdInstitucion'],
-                'NombreInst' => $row['NombreInst'],
-                'InstCorreo' => $row['InstCorreo'] ?? '',
-                'InstContacto' => $row['InstContacto'] ?? '',
-            ]] : [];
-        }
-        $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
-        $whereClause = $hasIdformAOrigen ? "(idformA = ? OR idformAOrigen = ?)" : "idformA = ?";
-        $params = $hasIdformAOrigen ? [(int)$idformA, (int)$idformA] : [(int)$idformA];
-        $stmt = $this->db->prepare("SELECT IdInstitucionOrigen, IdInstitucionDestino FROM formulario_derivacion WHERE {$whereClause} ORDER BY IdFormularioDerivacion ASC");
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    private function participantesInstIdsFromDerivRows(array $rowsOrdenadas): array {
         $ids = [];
-        foreach ($rows as $r) {
-            if (!empty($r['IdInstitucionOrigen']) && !in_array((int)$r['IdInstitucionOrigen'], $ids)) {
+        foreach ($rowsOrdenadas as $r) {
+            if (!empty($r['IdInstitucionOrigen']) && !in_array((int)$r['IdInstitucionOrigen'], $ids, true)) {
                 $ids[] = (int)$r['IdInstitucionOrigen'];
             }
-            if (!empty($r['IdInstitucionDestino']) && !in_array((int)$r['IdInstitucionDestino'], $ids)) {
+            if (!empty($r['IdInstitucionDestino']) && !in_array((int)$r['IdInstitucionDestino'], $ids, true)) {
                 $ids[] = (int)$r['IdInstitucionDestino'];
             }
         }
-        if (empty($ids)) {
-            $stmt = $this->db->prepare("SELECT f.IdInstitucion FROM formularioe f WHERE f.idformA = ?");
-            $stmt->execute([(int)$idformA]);
-            $id = $stmt->fetchColumn();
-            if ($id) $ids = [(int)$id];
-        }
-        if (empty($ids)) return [];
-        $byId = [];
-        foreach ($ids as $idInst) {
-            $st = $this->db->prepare("SELECT IdInstitucion, NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion = ?");
-            $st->execute([$idInst]);
-            $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $ids;
+    }
+
+    /**
+     * @param int[] $orderedInstIds
+     * @param array<int, array<string, mixed>> $instMap IdInstitucion => fila institucion
+     */
+    private function institucionRowsFromOrderedIds(array $orderedInstIds, array $instMap): array {
+        $out = [];
+        foreach ($orderedInstIds as $idInst) {
+            $r = $instMap[$idInst] ?? null;
             if ($r) {
-                $byId[] = [
+                $out[] = [
                     'IdInstitucion' => $r['IdInstitucion'],
                     'NombreInst' => $r['NombreInst'],
                     'InstCorreo' => $r['InstCorreo'] ?? '',
@@ -522,7 +513,140 @@ class UserFormsModel {
                 ];
             }
         }
-        return $byId;
+        return $out;
+    }
+
+    /**
+     * Batch de {@see getInstitucionesParticipantes}: una pasada de derivaciones + una de instituciones.
+     *
+     * @param int[] $idformAs
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    private function getInstitucionesParticipantesBatch(array $idformAs): array {
+        $idformAs = array_values(array_unique(array_filter(array_map('intval', $idformAs))));
+        if ($idformAs === []) {
+            return [];
+        }
+        $idSet = array_fill_keys($idformAs, true);
+        $empty = array_fill_keys($idformAs, []);
+
+        if (!$this->hasTable('formulario_derivacion')) {
+            $ph = implode(',', array_fill(0, count($idformAs), '?'));
+            $sql = "SELECT f.idformA, i.IdInstitucion, i.NombreInst, i.InstCorreo, i.InstContacto
+                    FROM formularioe f
+                    JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+                    WHERE f.idformA IN ($ph)";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($idformAs);
+            $out = $empty;
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $fid = (int)$row['idformA'];
+                $out[$fid] = [[
+                    'IdInstitucion' => $row['IdInstitucion'],
+                    'NombreInst' => $row['NombreInst'],
+                    'InstCorreo' => $row['InstCorreo'] ?? '',
+                    'InstContacto' => $row['InstContacto'] ?? '',
+                ]];
+            }
+            return $out;
+        }
+
+        $hasIdformAOrigen = $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $ph = implode(',', array_fill(0, count($idformAs), '?'));
+        if ($hasIdformAOrigen) {
+            $sql = "SELECT IdFormularioDerivacion, idformA, idformAOrigen, IdInstitucionOrigen, IdInstitucionDestino
+                    FROM formulario_derivacion
+                    WHERE idformA IN ($ph) OR idformAOrigen IN ($ph)";
+            $params = array_merge($idformAs, $idformAs);
+        } else {
+            $sql = "SELECT IdFormularioDerivacion, idformA, IdInstitucionOrigen, IdInstitucionDestino
+                    FROM formulario_derivacion
+                    WHERE idformA IN ($ph)";
+            $params = $idformAs;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $allRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $buckets = [];
+        foreach ($idformAs as $fid) {
+            $buckets[$fid] = [];
+        }
+        foreach ($allRows as $r) {
+            $derivId = (int)$r['IdFormularioDerivacion'];
+            $fa = (int)$r['idformA'];
+            if (isset($idSet[$fa])) {
+                $buckets[$fa][$derivId] = $r;
+            }
+            if ($hasIdformAOrigen) {
+                $fo = isset($r['idformAOrigen']) ? (int)$r['idformAOrigen'] : 0;
+                if ($fo !== 0 && isset($idSet[$fo])) {
+                    $buckets[$fo][$derivId] = $r;
+                }
+            }
+        }
+
+        $pendingInstIds = [];
+        $fallbackFids = [];
+
+        foreach ($idformAs as $fid) {
+            $rowsByDeriv = $buckets[$fid];
+            ksort($rowsByDeriv, SORT_NUMERIC);
+            $orderedRows = array_values($rowsByDeriv);
+            $ids = $this->participantesInstIdsFromDerivRows($orderedRows);
+            if ($ids === []) {
+                $fallbackFids[] = $fid;
+            } else {
+                $pendingInstIds[$fid] = $ids;
+            }
+        }
+
+        if ($fallbackFids !== []) {
+            $phf = implode(',', array_fill(0, count($fallbackFids), '?'));
+            $stFb = $this->db->prepare("SELECT idformA, IdInstitucion FROM formularioe WHERE idformA IN ($phf)");
+            $stFb->execute($fallbackFids);
+            while ($row = $stFb->fetch(PDO::FETCH_ASSOC)) {
+                $fid = (int)$row['idformA'];
+                $idInst = (int)$row['IdInstitucion'];
+                if ($idInst !== 0) {
+                    $pendingInstIds[$fid] = [$idInst];
+                }
+            }
+        }
+
+        $allInstPk = [];
+        foreach ($pendingInstIds as $ids) {
+            foreach ($ids as $iid) {
+                $allInstPk[$iid] = true;
+            }
+        }
+        $instPkList = array_keys($allInstPk);
+        $instMap = [];
+        if ($instPkList !== []) {
+            $phi = implode(',', array_fill(0, count($instPkList), '?'));
+            $stInst = $this->db->prepare(
+                "SELECT IdInstitucion, NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion IN ($phi)"
+            );
+            $stInst->execute($instPkList);
+            while ($row = $stInst->fetch(PDO::FETCH_ASSOC)) {
+                $instMap[(int)$row['IdInstitucion']] = $row;
+            }
+        }
+
+        $out = [];
+        foreach ($idformAs as $fid) {
+            $ordered = $pendingInstIds[$fid] ?? [];
+            $out[$fid] = $this->institucionRowsFromOrderedIds($ordered, $instMap);
+        }
+        return $out;
+    }
+
+    /**
+     * Obtiene todas las instituciones que participan en un formulario (origen + derivaciones).
+     */
+    private function getInstitucionesParticipantes($idformA): array {
+        $map = $this->getInstitucionesParticipantesBatch([(int)$idformA]);
+        return $map[(int)$idformA] ?? [];
     }
 
     /**
@@ -562,17 +686,29 @@ class UserFormsModel {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$userId]);
         $forms = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $out = [];
-        foreach ($forms as $row) {
-            $itemsSql = "SELECT i.NombreInsumo, fi.cantidad,
+        if ($forms === []) {
+            return [];
+        }
+        $formIds = array_map('intval', array_column($forms, 'idformA'));
+        $ph = implode(',', array_fill(0, count($formIds), '?'));
+        $itemsSql = "SELECT pif.idformA, i.NombreInsumo, fi.cantidad,
                          i.CantidadInsumo as PresentacionCant, i.TipoInsumo as PresentacionTipo
                          FROM forminsumo fi
                          JOIN insumo i ON fi.IdInsumo = i.idInsumo
                          JOIN precioinsumosformulario pif ON fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario
-                         WHERE pif.idformA = ?";
-            $stItems = $this->db->prepare($itemsSql);
-            $stItems->execute([$row['idformA']]);
-            $row['items'] = $stItems->fetchAll(PDO::FETCH_ASSOC);
+                         WHERE pif.idformA IN ($ph)";
+        $stItems = $this->db->prepare($itemsSql);
+        $stItems->execute($formIds);
+        $itemsByForm = [];
+        while ($it = $stItems->fetch(PDO::FETCH_ASSOC)) {
+            $fid = (int)$it['idformA'];
+            unset($it['idformA']);
+            $itemsByForm[$fid][] = $it;
+        }
+        $out = [];
+        foreach ($forms as $row) {
+            $fid = (int)$row['idformA'];
+            $row['items'] = $itemsByForm[$fid] ?? [];
             $out[] = $row;
         }
         return $out;
@@ -637,6 +773,19 @@ class UserFormsModel {
             LIMIT 1");
         $stmt->execute($params);
         return (bool)$stmt->fetchColumn();
+    }
+
+    /** Columnas `formularioe` — `docs/database.sql` + `TieneAnestesicos` si existe (sin `f.*`). */
+    private function sqlSelectFormularioeAllColumnsPrefixed(string $alias = 'f'): string {
+        $base = 'idformA, tipoA, edadA, pesoA, fecRetiroA, aclaraA, fechainicioA, IdUsrA, estado, EstadoWorkflow, '
+            . 'IdInstitucionOrigen, DerivadoActivo, FechaDerivado, raza, reactivo, visto, quienvisto, aclaracionadm, '
+            . 'viruta, alimento, idsubespA, idcepaA, nocuenta, depto, otroinsumo, IdInstitucion';
+        if ($this->hasColumn('formularioe', 'TieneAnestesicos')) {
+            $base .= ', TieneAnestesicos';
+        }
+        $parts = array_map('trim', explode(',', str_replace(["\r", "\n"], '', $base)));
+
+        return $alias . '.' . implode(', ' . $alias . '.', $parts);
     }
 
     private function hasTable(string $tableName): bool {

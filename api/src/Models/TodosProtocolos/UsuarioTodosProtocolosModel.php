@@ -257,7 +257,7 @@ class UsuarioTodosProtocolosModel {
             $idSolicitud = (int)$this->db->lastInsertId();
 
             if ($files && is_array($files)) {
-                $b2 = new BackblazeB2();
+                $b2 = new BackblazeB2('PROTOCOLOS');
                 $stmtAdj = $this->db->prepare("INSERT INTO solicitudadjuntosprotocolos (nombre_original,file_key,IdSolicitudProtocolo,tipoadjunto) VALUES (?,?,?,?)");
 
                 for ($i = 1; $i <= 3; $i++) {
@@ -330,7 +330,7 @@ class UsuarioTodosProtocolosModel {
 
             // Procesar adjuntos nuevos (si existen) y asociarlos a la solicitud reenviada.
             if ($idSolicitud > 0 && $files && is_array($files)) {
-                $b2 = new BackblazeB2();
+                $b2 = new BackblazeB2('PROTOCOLOS');
                 $stmtAdj = $this->db->prepare("INSERT INTO solicitudadjuntosprotocolos (nombre_original,file_key,IdSolicitudProtocolo,tipoadjunto) VALUES (?,?,?,?)");
 
                 for ($i = 1; $i <= 3; $i++) {

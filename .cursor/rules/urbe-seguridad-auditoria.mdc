@@ -1,0 +1,31 @@
+---
+description: Seguridad API (JWT, autorización por sede/rol), bitácora obligatoria en mutaciones, SQL/XSS/CORS. Aplicable a URBE/GROBO.
+alwaysApply: true
+---
+
+# Seguridad y auditoría (URBE / GROBO)
+
+Checklist detallado y verificación: **`docs/CHECKLIST-SEGURIDAD-Y-AUDITORIA.md`**.
+
+## API PHP (`api/src/**`)
+
+1. **Sesión:** en rutas privadas, obtener contexto con `Auditoria::getDatosSesion()` y usar `userId`, `instId`, `role` del payload verificado — no sustituir por IDs solo-cliente sin validar.
+2. **Autorización:** toda lectura/escritura multi-institución debe filtrar por `instId` de sesión (salvo superadmin con reglas explícitas documentadas en el controlador).
+3. **SQL:** solo `prepare`/`execute` con parámetros; ORDER BY y columnas dinámicas — lista blanca como en `UserModel`.
+4. **Bitácora:** en **POST/PUT/DELETE** (o equivalentes) que cambien datos sensibles o configuración, registrar al menos una línea:
+   - Con JWT: `Auditoria::log($db, 'INSERT'|'UPDATE'|'DELETE', 'tabla_logica', 'detalle con IDs')`.
+   - Sin JWT aún (login, jobs internos acotados): `Auditoria::logManual($db, $userId, ...)`.
+   - No loguear contraseñas, tokens ni PII innecesaria en `detalle`.
+5. **Errores al cliente:** mensajes genéricos; detalle técnico solo en logs servidor. No exponer rutas internas en prod (ojo respuestas 404 con `debug_*` del `Router`).
+6. **Secretos:** jamás commit de `.env`; si tocás JWT, recordar `JWT_SECRET` obligatorio en despliegue (evitar fallback por defecto en `Auditoria`/`AuthController`).
+7. **Rutas nuevas:** decidir si son públicas o no; si son públicas, documentar por qué no requieren `getDatosSesion`.
+
+## Front (`front/dist/**`)
+
+1. **XSS:** preferir `textContent` / helpers de escape del proyecto; evitar `innerHTML` con datos del API.
+2. **Tokens:** enviar JWT en header `Authorization` como ya hace el cliente; no guardar en URLs compartibles.
+3. **i18n:** mensajes de error hacia el usuario siguen la regla **`i18n-siempre-traducir.mdc`** (es/en/pt); no filtrar texto crudo del servidor si puede contener detalles internos.
+
+## Contradicciones con rendimiento
+
+- Paginación y límites en listados ayudan **seguridad y estabilidad** (abuso, DoS lógico). Alinear con `CHECKLIST-OPTIMIZACION-TABLAS-CARGAS.md` §2.

@@ -256,7 +256,7 @@ export const en = {
         pp_popup_fallback_title: "Institutional notice",
         pp_popup_ver_noticia: "Open linked news",
         pp_page_title: "Dashboard welcome & popup",
-        pp_page_sub: "Text on the home dashboard and an optional modal notice. Attachments: paste the file URL (PDF, Word, PowerPoint, etc.); upload to cloud storage may be added later.",
+        pp_page_sub: "Home dashboard text and an optional modal. Attachments: public URL or cloud file (Backblaze) per slot; after upload, click Save.",
         pp_btn_guardar: "Save",
         pp_btn_volver_noticias: "Back to news",
         pp_btn_ir_portada: "Welcome / popup",
@@ -276,6 +276,23 @@ export const en = {
         pp_lbl_id_noticia: "News ID (optional)",
         pp_id_noticia_help: "Must be a published news item visible to users at your site. Leave empty if not used.",
         pp_save_ok: "Saved",
+        pp_b2_img_title: "Welcome image (JPEG; optional)",
+        pp_b2_help_mixed: "For each attachment use either a public URL or an uploaded file; if you enter a URL, the uploaded file for that slot is cleared when appropriate. Avoid mixing duplicates.",
+        pp_b2_doc_slot: "Cloud file (optional)",
+        pp_b2_btn_upload: "Upload",
+        pp_b2_btn_preview: "Preview",
+        pp_b2_btn_clear: "Remove file",
+        pp_b2_status_uploaded: "Uploaded:",
+        pp_b2_upload_ok: "Uploaded. Click Save to apply.",
+        pp_b2_err_upload: "Could not upload the file.",
+        pp_b2_err_no_file: "Choose a file.",
+        pp_b2_preview_fail: "Could not open preview.",
+        admin_noticia_b2_section: "Cloud files (optional)",
+        admin_noticia_b2_help: "JPEG cover image up to 1 MB; up to 2 documents (PDF, Excel, Word) up to 1 MB each. After upload, click Save on the news item.",
+        admin_noticia_b2_img_title: "News cover image (JPEG)",
+        admin_noticia_b2_doc1: "Document 1",
+        admin_noticia_b2_doc2: "Document 2",
+        admin_noticia_b2_preview_need_save: "Save the news item at least once to preview files uploaded from here.",
         dash_poe_label: "Standard procedures (POE)",
         dash_poe_ver_todos: "View all",
         poe_link_corto: "POE",
@@ -292,7 +309,7 @@ export const en = {
         poe_meta_actualizado: "Updated",
         poe_admin_titulo: "POE — administration",
         poe_admin_sub:
-            "Body text and up to two URLs per document. File uploads via Backblaze will arrive in the final phase along with news and messaging attachments.",
+            "Document body and up to two attachments per slot: public URL (http/https) or a Backblaze upload. Uploaded instructivos are persisted when you click Save.",
         poe_btn_nuevo: "New POE",
         poe_col_titulo: "Title",
         poe_col_orden: "Order",
@@ -313,6 +330,9 @@ export const en = {
         poe_save_ok: "Saved",
         poe_admin_vacio: "No records.",
         poe_admin_qr_hint: "Only when the document is visible.",
+        poe_b2_help:
+            "For each slot use either a public URL or upload a file (PDF or Office per server validation). If you enter a URL, the cloud file for that slot is discarded. Click Save to apply.",
+        poe_b2_preview_need_save: "Save the document first to preview the cloud file.",
         msg_categoria: "Message category",
         msg_compose_cuerpo: "Message",
         msg_compose_titulo: "Send internal message",
@@ -334,6 +354,11 @@ export const en = {
         msg_anexo_buscar_ph: "Search by ID, protocol, or status…",
         msg_anexo_nuevo_hint: "Lists the recipient’s forms or housing stays at this site. You can send without selecting anything.",
         msg_anexo_reply_hint: "Optional: link a request or stay from the other participant to clarify the topic. Not available on institutional threads.",
+        msg_adjunto_label: "Attachment (optional)",
+        msg_adjunto_help:
+            "One JPG or PDF up to 50 KB (the API validates type and size). One file per message maximum.",
+        msg_adjunto_subido_pref: "Uploaded:",
+        msg_adjunto_abrir: "Open attachment",
         msg_deep_link_hilo_otro_titulo: "This message is not for your account",
         msg_deep_link_hilo_otro_texto: "The link points to a thread your current user cannot open (it usually belongs to someone else). Sign out and log in with the account that received the email to view it.",
         msg_deep_link_hilo_no_existe_titulo: "Conversation not available",
@@ -370,7 +395,7 @@ export const en = {
         cap_help_s2_text: "Select an item to load messages on the right. Replies stay grouped in the same thread.",
         cap_help_s3_title: "Thread panel",
         cap_help_s3_text:
-            "Read the history and type in the box below; click “Reply” to send (Ctrl+Enter or ⌘+Enter when enabled).",
+            "Read the history and type in the box below; click “Reply” to send (Ctrl+Enter or ⌘+Enter when enabled). You may attach one optional JPG or PDF up to 50 KB per message when replying or using “New message”; in the thread it shows as a link under the text.",
         cap_help_inst_titulo: "Institutional messaging: quick guide",
         cap_help_inst_s1_title: "Institutional channel",
         cap_help_inst_s1_text:
@@ -380,7 +405,7 @@ export const en = {
             "Pick a thread to read it. Notices may be visible site-wide; queries are private between you and authorized staff.",
         cap_help_inst_s3_title: "Reading and replying",
         cap_help_inst_s3_text:
-            "Some threads are read-only; if you do not see reply, start a new query from “New message”. Choose type (notice/query) as your role allows.",
+            "Some threads are read-only; if you do not see reply, start a new query from “New message”. Choose type (notice/query) as your role allows. When you can send, you may add one optional attachment (JPG or PDF, up to 50 KB, one per message); it appears as a link in the thread.",
         cap_help_portal_titulo: "News portal: quick guide",
         cap_help_portal_s1_title: "What you see here",
         cap_help_portal_s1_text:
@@ -4170,6 +4195,12 @@ alojamientos: {
         th_ceuas: "CEUAS",
         th_estado: "Status",
         modal_titulo: "Institution Details",
+        modal_nueva: "New institution",
+        modal_editando: "Editing: {nombre}",
+        error_cargar_sede: "Could not load the site. Check the ID or your connection.",
+        toast_creada: "Institution created successfully.",
+        error_servidor_prefix: "Server error: ",
+        error_comunicacion: "Could not reach the API. Check the console.",
         label_nombre_corto: "Short Name (Site)",
         ph_nombre_corto: "E.g. URBE",
         label_correo: "Email",
@@ -4221,7 +4252,11 @@ alojamientos: {
         btn_vaciar_grupo: "Clear group",
         label_madre_grupo_stats: "Group parent site",
         help_madre_grupo: "Only the site with this switch on stores MadreGrupo = 1 and can use the network/group statistics tab (same DependenciaInstitucion).",
-        switch_madre_grupo: "This site is the group parent (aggregated statistics)"
+        switch_madre_grupo: "This site is the group parent (aggregated statistics)",
+        sin_resultados_filtro: "No sites match your search.",
+        table_info: "Showing {a} to {b} of {total} sites",
+        pag_anterior: "Previous",
+        pag_siguiente: "Next"
     },
     superadmin_formulario: {
         titulo: "Registration Links Management",
@@ -4358,7 +4393,8 @@ alojamientos: {
         sin_resultados_filtro: "No movements match the current filters.",
         info_cero: "0 records",
         table_info: "Showing {a} to {b} of {total} entries",
-        excel_empty: "No data to export."
+        excel_empty: "No data to export.",
+        tabla_cargando: "Loading audit log…"
     },
     superadmin_usuarios_global: {
         bread_gecko: "GECKO DEVS",
@@ -4423,7 +4459,10 @@ alojamientos: {
         tabla_cargando: "Loading users…",
         tabla_sin_filas: "No users in the global directory.",
         sin_resultados_filtro: "No users match your search.",
-        error_cargar_lista: "Could not load the user list."
+        error_cargar_lista: "Could not load the user list.",
+        pag_anterior: "Previous",
+        pag_siguiente: "Next",
+        excel_empty: "No data to export with the current filters."
     },
     soporte: {
         page_title: "Gecko support",
@@ -4451,6 +4490,9 @@ alojamientos: {
         usuario: "User",
         msg_soporte: "Gecko support",
         cargando: "Loading…",
+        pag_anterior: "Previous",
+        pag_siguiente: "Next",
+        pag_info: "Page {page} of {totalPages} ({total} tickets)",
         error_cargar: "Could not load data.",
         error_enviar: "Could not send the message.",
         error_cerrar: "Could not close the ticket.",

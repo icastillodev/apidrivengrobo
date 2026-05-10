@@ -1,7 +1,45 @@
 import { API } from '../api.js';
 
 /**
- * Caché por número de página + prefetch en idle para bandejas admin (animales, insumos, reactivos).
+ * Adaptador para endpoints que usan `page` + `pageSize` en lugar de `limit` + `offset`.
+ * `createAdminListPageCache` sigue pasando limit/offset en `extra`; aquí se convierten.
+ *
+ * @param {number} rowsPerPage tamaño de página por defecto
+ * @param {Record<string, unknown>} extra p. ej. `{ limit, offset }` o `{ fullLoad: true }`
+ */
+export function offsetLimitToPagePageSizeQuery(rowsPerPage, extra = {}) {
+    const p = new URLSearchParams();
+    if (extra.fullLoad) {
+        return p;
+    }
+    const limit = extra.limit != null ? Number(extra.limit) : rowsPerPage;
+    const offset = extra.offset != null ? Number(extra.offset) : 0;
+    const page = Math.max(1, Math.floor(offset / limit) + 1);
+    p.set('page', String(page));
+    p.set('pageSize', String(limit));
+    return p;
+}
+
+/**
+ * Igual que arriba pero el API espera `limit` (no `pageSize`). Ej.: `GET /support/tickets`.
+ * Aplica techo 50 / suelo 5 alineado con `SupportTicketController`.
+ */
+export function offsetLimitToPageLimitQuery(rowsPerPage, extra = {}) {
+    const p = new URLSearchParams();
+    if (extra.fullLoad) {
+        return p;
+    }
+    const rawLimit = extra.limit != null ? Number(extra.limit) : rowsPerPage;
+    const limit = Math.min(50, Math.max(5, rawLimit));
+    const offset = extra.offset != null ? Number(extra.offset) : 0;
+    const page = Math.max(1, Math.floor(offset / limit) + 1);
+    p.set('page', String(page));
+    p.set('limit', String(limit));
+    return p;
+}
+
+/**
+ * Caché por número de página + prefetch en idle para bandejas admin (animales, insumos, reactivos, usuarios, noticias/POE admin, soporte panel vía `offsetLimitToPagePageSizeQuery` / `offsetLimitToPageLimitQuery`).
  * Evita pedir al API miles de filas de una vez cuando hay cientos de páginas.
  *
  * @param {number} rowsPerPage
@@ -43,8 +81,14 @@ export function createAdminListPageCache(rowsPerPage, buildListQuery, listUrlPat
         try {
             const res = await fetchPage(pageNum);
             if (gen !== listGeneration) return;
+            let rows = null;
             if (res?.status === 'success' && Array.isArray(res.data)) {
-                pageCache.set(pageNum, res.data);
+                rows = res.data;
+            } else if (res?.status === 'success' && res.data && Array.isArray(res.data.items)) {
+                rows = res.data.items;
+            }
+            if (rows) {
+                pageCache.set(pageNum, rows);
             }
         } catch (e) {
             console.warn('[adminListPrefetch]', listUrlPath, 'página', pageNum, e);

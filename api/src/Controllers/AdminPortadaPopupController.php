@@ -93,7 +93,7 @@ class AdminPortadaPopupController {
             if (!is_array($input)) {
                 $input = [];
             }
-            $validated = $this->model->validateAndNormalize($input);
+            $validated = $this->model->validateAndNormalize($input, $instId);
             if (!$validated['ok']) {
                 $this->json(['status' => 'error', 'message' => $validated['message']], 400);
             }

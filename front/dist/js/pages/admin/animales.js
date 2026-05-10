@@ -8,6 +8,7 @@ import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../.
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -88,18 +89,23 @@ async function fetchAnimalesList(opts = {}) {
     let loading = typeof opts === 'object' && opts !== null ? (opts.loading ?? 'inline') : 'inline';
     if (animalesListBootLocked) loading = 'none';
 
-    animalesPageCacheApi.syncFiltersKey();
+    const prefetchGen = animalesPageCacheApi.syncFiltersKey();
 
     if (animalesPageCacheApi.pageCache.has(currentPage) && !opts.forceServer) {
         allAnimals = animalesPageCacheApi.pageCache.get(currentPage);
         renderTableBody(allAnimals);
+        animalesPageCacheApi.schedulePrefetchAround(totalAnimalesList, currentPage, prefetchGen);
         return;
     }
 
     const tbody = document.getElementById('table-body-animals');
     if (loading === 'inline' && tbody) {
-        const msg = window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…';
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
+        setTbodyLoadingSpinner(tbody, {
+            colspan: 13,
+            layout: 'inventory',
+            spinnerTone: 'success',
+            message: window.txt?.admin_animales?.cargando_pagina || 'Cargando esta página…',
+        });
     }
     try {
         const res = await animalesPageCacheApi.fetchPage(currentPage);
@@ -113,10 +119,18 @@ async function fetchAnimalesList(opts = {}) {
             }
             animalesPageCacheApi.pageCache.set(currentPage, [...allAnimals]);
             renderTableBody(allAnimals);
+            animalesPageCacheApi.schedulePrefetchAround(totalAnimalesList, currentPage, prefetchGen);
         }
     } catch (e) {
         console.error('❌ Error cargando animales:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        if (tbody) {
+            setTbodyMessageRow(tbody, {
+                colspan: 13,
+                variant: 'danger',
+                layout: 'inventory',
+                message: window.txt?.generales?.error_carga || 'Error al cargar datos.',
+            });
+        }
     }
 }
 
@@ -333,7 +347,13 @@ function renderTableBody(pageDataOverride = null) {
     }
 
     if (!pageData.length) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-5 text-muted fst-italic">${window.txt?.admin_animales?.sin_resultados || 'No hay registros para los filtros seleccionados.'}</td></tr>`;
+        setTbodyMessageRow(tbody, {
+            colspan: 13,
+            variant: 'mutedEmpty',
+            message:
+                window.txt?.admin_animales?.sin_resultados ||
+                'No hay registros para los filtros seleccionados.',
+        });
         updateHeaderIcons();
         renderPagination(totalAnimalesList, 'pagination-animal', () => fetchAnimalesList());
         return;

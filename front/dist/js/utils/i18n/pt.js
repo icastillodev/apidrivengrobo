@@ -256,7 +256,7 @@ export const pt = {
         pp_popup_fallback_title: "Aviso institucional",
         pp_popup_ver_noticia: "Abrir notícia ligada",
         pp_page_title: "Boas-vindas do painel e popup",
-        pp_page_sub: "Texto no início e um aviso modal opcional. Anexos: cole o URL do ficheiro (PDF, Word, PowerPoint, etc.); envio para armazenamento na nuvem pode vir depois.",
+        pp_page_sub: "Texto inicial e aviso modal opcional. Anexos: URL pública ou ficheiro na nuvem (Backblaze) por ranura; após enviar, clique em Guardar.",
         pp_btn_guardar: "Guardar",
         pp_btn_volver_noticias: "Voltar às notícias",
         pp_btn_ir_portada: "Boas-vindas / popup",
@@ -276,6 +276,23 @@ export const pt = {
         pp_lbl_id_noticia: "ID da notícia (opcional)",
         pp_id_noticia_help: "Tem de ser uma notícia publicada e visível para utilizadores desta sede. Deixe vazio se não aplicar.",
         pp_save_ok: "Guardado",
+        pp_b2_img_title: "Imagem de boas-vindas (JPG; opcional)",
+        pp_b2_help_mixed: "Por cada anexo use um URL público ou um ficheiro enviado; se preencher URL, o ficheiro dessa ranura pode ser limpo. Evite duplicar.",
+        pp_b2_doc_slot: "Ficheiro na nuvem (opcional)",
+        pp_b2_btn_upload: "Enviar",
+        pp_b2_btn_preview: "Pré-visualizar",
+        pp_b2_btn_clear: "Remover ficheiro",
+        pp_b2_status_uploaded: "Enviado:",
+        pp_b2_upload_ok: "Enviado. Clique em Guardar para aplicar.",
+        pp_b2_err_upload: "Não foi possível enviar o ficheiro.",
+        pp_b2_err_no_file: "Selecione um ficheiro.",
+        pp_b2_preview_fail: "Não foi possível abrir a pré-visualização.",
+        admin_noticia_b2_section: "Ficheiros na nuvem (opcional)",
+        admin_noticia_b2_help: "Imagem JPG até 1 MB; até 2 documentos (PDF, Excel, Word) até 1 MB cada. Depois de enviar, clique em Guardar na notícia.",
+        admin_noticia_b2_img_title: "Imagem de capa da notícia (JPG)",
+        admin_noticia_b2_doc1: "Documento 1",
+        admin_noticia_b2_doc2: "Documento 2",
+        admin_noticia_b2_preview_need_save: "Guarde a notícia pelo menos uma vez para poder pré-visualizar os ficheiros enviados aqui.",
         dash_poe_label: "Protocolos operacionais (POE)",
         dash_poe_ver_todos: "Ver todos",
         poe_link_corto: "POE",
@@ -292,7 +309,7 @@ export const pt = {
         poe_meta_actualizado: "Atualizado",
         poe_admin_titulo: "POE — administração",
         poe_admin_sub:
-            "Texto e até dois URLs por documento. O envio de ficheiros com Backblaze ficará para a fase final juntamente com anexos de notícias e mensagens.",
+            "Corpo do documento e até dois anexos por ranura: URL pública (http/https) ou ficheiro no Backblaze. Os instructivos enviados ficam gravados ao clicar em Guardar.",
         poe_btn_nuevo: "Novo POE",
         poe_col_titulo: "Título",
         poe_col_orden: "Ordem",
@@ -313,6 +330,9 @@ export const pt = {
         poe_save_ok: "Guardado",
         poe_admin_vacio: "Sem registos.",
         poe_admin_qr_hint: "Só se o documento estiver visível.",
+        poe_b2_help:
+            "Por ranura use um URL público ou envie um ficheiro (PDF ou Office conforme validação do servidor). Se preencher um URL, o ficheiro na nuvem dessa ranura é descartado. Clique em Guardar para aplicar.",
+        poe_b2_preview_need_save: "Guarde o documento primeiro para poder pré-visualizar o ficheiro na nuvem.",
         msg_categoria: "Categoria da mensagem",
         msg_compose_cuerpo: "Mensagem",
         msg_compose_titulo: "Enviar mensagem interna",
@@ -334,6 +354,11 @@ export const pt = {
         msg_anexo_buscar_ph: "Pesquisar por ID, protocolo ou estado…",
         msg_anexo_nuevo_hint: "Lista os formulários ou alojamentos do destinatário nesta sede. Pode enviar sem escolher nada.",
         msg_anexo_reply_hint: "Opcional: associe um pedido ou alojamento do outro participante para clarificar o assunto. Não disponível em fios institucionais.",
+        msg_adjunto_label: "Anexo (opcional)",
+        msg_adjunto_help:
+            "Um ficheiro JPG ou PDF até 50 KB (a API valida tipo e tamanho). No máximo um ficheiro por mensagem.",
+        msg_adjunto_subido_pref: "Enviado:",
+        msg_adjunto_abrir: "Abrir anexo",
         msg_deep_link_hilo_otro_titulo: "Esta mensagem não é da sua conta",
         msg_deep_link_hilo_otro_texto: "O link corresponde a um fio ao qual o seu utilizador atual não tem acesso (costuma ser de outro utilizador). Termine a sessão e inicie com a conta que recebeu o e-mail para o ver.",
         msg_deep_link_hilo_no_existe_titulo: "Conversa indisponível",
@@ -370,7 +395,7 @@ export const pt = {
         cap_help_s2_text: "Selecione um item para carregar as mensagens à direita. As respostas ficam agrupadas no mesmo fio.",
         cap_help_s3_title: "Painel do fio",
         cap_help_s3_text:
-            "Leia o histórico e escreva na caixa em baixo; prima «Responder» para enviar (Ctrl+Enter ou ⌘+Enter se estiver ativo).",
+            "Leia o histórico e escreva na caixa em baixo; prima «Responder» para enviar (Ctrl+Enter ou ⌘+Enter se estiver ativo). Opcionalmente pode anexar um JPG ou PDF até 50 KB (um ficheiro por mensagem) ao responder ou em «Nova mensagem»; no fio o anexo aparece como ligação por baixo do texto.",
         cap_help_inst_titulo: "Mensagens institucionais: guia rápido",
         cap_help_inst_s1_title: "Canal institucional",
         cap_help_inst_s1_text:
@@ -380,7 +405,7 @@ export const pt = {
             "Escolha um fio para ver o conteúdo. Os comunicados podem ser visíveis para toda a sede; as consultas são privadas entre si e o pessoal autorizado.",
         cap_help_inst_s3_title: "Leitura e resposta",
         cap_help_inst_s3_text:
-            "Em alguns fios só pode ler; se não vir o botão de resposta, abra uma nova consulta em «Nova mensagem». Escolha o tipo (comunicado/consulta) conforme o seu perfil.",
+            "Em alguns fios só pode ler; se não vir o botão de resposta, abra uma nova consulta em «Nova mensagem». Escolha o tipo (comunicado/consulta) conforme o seu perfil. Se puder enviar, pode incluir um anexo opcional (JPG ou PDF, até 50 KB, um por mensagem); ficará como ligação no fio.",
         cap_help_portal_titulo: "Portal de notícias: guia rápido",
         cap_help_portal_s1_title: "O que verá aqui",
         cap_help_portal_s1_text:
@@ -4171,6 +4196,12 @@ alojamientos: {
         th_ceuas: "CEUAS",
         th_estado: "Estado",
         modal_titulo: "Detalhes da Instituição",
+        modal_nueva: "Nova instituição",
+        modal_editando: "A editar: {nombre}",
+        error_cargar_sede: "Não foi possível carregar a sede. Verifique o ID ou a ligação.",
+        toast_creada: "Instituição criada com sucesso.",
+        error_servidor_prefix: "Erro do servidor: ",
+        error_comunicacion: "Falha na comunicação com a API. Veja a consola.",
         label_nombre_corto: "Nome Curto (Sede)",
         ph_nombre_corto: "Ex: URBE",
         label_correo: "E-mail",
@@ -4222,7 +4253,11 @@ alojamientos: {
         btn_vaciar_grupo: "Limpar grupo",
         label_madre_grupo_stats: "Sede mãe do grupo",
         help_madre_grupo: "Só a sede com este interruptor ativo grava MadreGrupo = 1 e pode usar o separador de estatísticas da rede/grupo (mesma DependenciaInstitucion).",
-        switch_madre_grupo: "Esta sede é mãe do grupo (estatísticas agregadas)"
+        switch_madre_grupo: "Esta sede é mãe do grupo (estatísticas agregadas)",
+        sin_resultados_filtro: "Nenhuma sede corresponde à pesquisa.",
+        table_info: "A mostrar {a} a {b} de {total} sedes",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Seguinte"
     },
     superadmin_formulario: {
         titulo: "Gestão de Links de Registro",
@@ -4359,7 +4394,8 @@ alojamientos: {
         sin_resultados_filtro: "Não há movimentos com os filtros atuais.",
         info_cero: "0 registos",
         table_info: "A mostrar {a} a {b} de {total} movimentos",
-        excel_empty: "Não há dados para exportar."
+        excel_empty: "Não há dados para exportar.",
+        tabla_cargando: "A carregar auditoria…"
     },
     superadmin_usuarios_global: {
         bread_gecko: "GECKO DEVS",
@@ -4424,7 +4460,10 @@ alojamientos: {
         tabla_cargando: "A carregar utilizadores…",
         tabla_sin_filas: "Não há utilizadores no diretório global.",
         sin_resultados_filtro: "Nenhum utilizador corresponde à pesquisa.",
-        error_cargar_lista: "Não foi possível carregar a lista de utilizadores."
+        error_cargar_lista: "Não foi possível carregar a lista de utilizadores.",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Seguinte",
+        excel_empty: "Não há dados para exportar com os filtros atuais."
     },
     soporte: {
         page_title: "Suporte Gecko",
@@ -4452,6 +4491,9 @@ alojamientos: {
         usuario: "Usuário",
         msg_soporte: "Suporte Gecko",
         cargando: "Carregando…",
+        pag_anterior: "Anterior",
+        pag_siguiente: "Seguinte",
+        pag_info: "Página {page} de {totalPages} ({total} tickets)",
         error_cargar: "Não foi possível carregar os dados.",
         error_enviar: "Não foi possível enviar a mensagem.",
         error_cerrar: "Não foi possível fechar o ticket.",

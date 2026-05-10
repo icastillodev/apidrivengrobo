@@ -1,6 +1,7 @@
 <?php
 namespace App\Models\Comunicacion;
 
+use App\Utils\ComunicacionArchivoValidacion;
 use PDO;
 
 class InstitucionPoeModel {
@@ -48,9 +49,10 @@ class InstitucionPoeModel {
 
     /**
      * @param array<string,mixed> $payload
+     * @param array<string,mixed>|null $existingRow
      * @return array{ok:bool,data?:array,message?:string}
      */
-    public function validatePayload(array $payload, bool $isCreate): array {
+    public function validatePayload(array $payload, bool $isCreate, int $instId, ?array $existingRow = null): array {
         $titulo = isset($payload['Titulo']) ? trim(strip_tags((string)$payload['Titulo'])) : '';
         if ($isCreate && $titulo === '') {
             return ['ok' => false, 'message' => 'El título es obligatorio.'];
@@ -73,6 +75,26 @@ class InstitucionPoeModel {
         $cuerpo = isset($payload['Cuerpo']) ? trim(strip_tags((string)$payload['Cuerpo'])) : '';
         $cuerpo = $cuerpo === '' ? null : $cuerpo;
 
+        if (array_key_exists('Adjunto1B2Key', $payload)) {
+            $t = trim((string) $payload['Adjunto1B2Key']);
+            $b1 = $t === '' ? null : $t;
+        } elseif (!$isCreate && $existingRow !== null) {
+            $t = isset($existingRow['Adjunto1B2Key']) ? trim((string) $existingRow['Adjunto1B2Key']) : '';
+            $b1 = $t === '' ? null : $t;
+        } else {
+            $b1 = null;
+        }
+
+        if (array_key_exists('Adjunto2B2Key', $payload)) {
+            $t = trim((string) $payload['Adjunto2B2Key']);
+            $b2 = $t === '' ? null : $t;
+        } elseif (!$isCreate && $existingRow !== null) {
+            $t = isset($existingRow['Adjunto2B2Key']) ? trim((string) $existingRow['Adjunto2B2Key']) : '';
+            $b2 = $t === '' ? null : $t;
+        } else {
+            $b2 = null;
+        }
+
         $u1 = $this->normalizeOptionalUrl($payload['UrlAdjunto1'] ?? null);
         if ($u1 === false) {
             return ['ok' => false, 'message' => 'La URL del adjunto 1 no es válida (use http/https, máx. 768 caracteres).'];
@@ -83,8 +105,29 @@ class InstitucionPoeModel {
             return ['ok' => false, 'message' => 'La URL del adjunto 2 no es válida.'];
         }
         $n2 = $this->normalizeNombre(isset($payload['NombreAdjunto2']) ? (string)$payload['NombreAdjunto2'] : null);
-        if ($u2 !== null && $u1 === null) {
-            return ['ok' => false, 'message' => 'Si indica un segundo adjunto, el primero debe tener URL.'];
+
+        if ($b1 !== null) {
+            if ($instId <= 0 || !ComunicacionArchivoValidacion::clavePerteneceInstitucion($b1, 'poe/doc', $instId)) {
+                return ['ok' => false, 'message' => 'Archivo instructivo 1: clave B2 no válida para esta sede.'];
+            }
+            $u1 = null;
+        }
+        if ($b2 !== null) {
+            if ($instId <= 0 || !ComunicacionArchivoValidacion::clavePerteneceInstitucion($b2, 'poe/doc', $instId)) {
+                return ['ok' => false, 'message' => 'Archivo instructivo 2: clave B2 no válida para esta sede.'];
+            }
+            $u2 = null;
+        }
+
+        if (array_key_exists('UrlAdjunto1', $payload) && $u1 !== null && !array_key_exists('Adjunto1B2Key', $payload)) {
+            $b1 = null;
+        }
+        if (array_key_exists('UrlAdjunto2', $payload) && $u2 !== null && !array_key_exists('Adjunto2B2Key', $payload)) {
+            $b2 = null;
+        }
+
+        if (($u2 !== null || $b2 !== null || $n2 !== null) && ($u1 === null && $b1 === null)) {
+            return ['ok' => false, 'message' => 'Si indica un segundo adjunto, el primero debe estar definido (URL o archivo subido).'];
         }
 
         $orden = isset($payload['Orden']) ? (int)$payload['Orden'] : 0;
@@ -98,11 +141,22 @@ class InstitucionPoeModel {
             'NombreAdjunto1' => $n1,
             'UrlAdjunto2' => $u2,
             'NombreAdjunto2' => $n2,
+            'Adjunto1B2Key' => $b1,
+            'Adjunto2B2Key' => $b2,
             'Orden' => $orden,
             'Activo' => $activo,
         ];
 
         return ['ok' => true, 'data' => $data];
+    }
+
+    /** Todas las columnas de `institucion_poe` (sin wildcard). */
+    private function sqlSelectInstitucionPoeAllColumns(?string $alias = null): string {
+        $p = $alias !== null && $alias !== '' ? $alias . '.' : '';
+        return "{$p}IdPoe, {$p}IdInstitucion, {$p}Titulo, {$p}Resena, {$p}Cuerpo, "
+            . "{$p}Adjunto1B2Key, {$p}Adjunto2B2Key, "
+            . "{$p}UrlAdjunto1, {$p}NombreAdjunto1, {$p}UrlAdjunto2, {$p}NombreAdjunto2, "
+            . "{$p}Orden, {$p}Activo, {$p}FechaCreacion, {$p}FechaActualizacion";
     }
 
     /** @return list<array<string,mixed>> */
@@ -119,8 +173,9 @@ class InstitucionPoeModel {
 
     /** @return array<string,mixed>|null */
     public function getPublicById(int $instId, int $id): ?array {
+        $cols = $this->sqlSelectInstitucionPoeAllColumns();
         $stmt = $this->db->prepare(
-            'SELECT * FROM institucion_poe WHERE IdInstitucion = ? AND IdPoe = ? AND Activo = 1 LIMIT 1'
+            "SELECT {$cols} FROM institucion_poe WHERE IdInstitucion = ? AND IdPoe = ? AND Activo = 1 LIMIT 1"
         );
         $stmt->execute([$instId, $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -142,6 +197,7 @@ class InstitucionPoeModel {
         $total = $this->countAdmin($instId);
         $off = max(0, ($page - 1) * $pageSize);
         $sql = 'SELECT IdPoe, Titulo, Resena, Orden, Activo, FechaCreacion, FechaActualizacion,
+                       Adjunto1B2Key, Adjunto2B2Key,
                        UrlAdjunto1, NombreAdjunto1, UrlAdjunto2, NombreAdjunto2
                 FROM institucion_poe
                 WHERE IdInstitucion = ?
@@ -156,8 +212,9 @@ class InstitucionPoeModel {
 
     /** @return array<string,mixed>|null */
     public function getByIdAdmin(int $instId, int $id): ?array {
+        $cols = $this->sqlSelectInstitucionPoeAllColumns();
         $stmt = $this->db->prepare(
-            'SELECT * FROM institucion_poe WHERE IdInstitucion = ? AND IdPoe = ? LIMIT 1'
+            "SELECT {$cols} FROM institucion_poe WHERE IdInstitucion = ? AND IdPoe = ? LIMIT 1"
         );
         $stmt->execute([$instId, $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -169,15 +226,18 @@ class InstitucionPoeModel {
     public function insert(int $instId, array $data): int {
         $sql = 'INSERT INTO institucion_poe (
             IdInstitucion, Titulo, Resena, Cuerpo,
+            Adjunto1B2Key, Adjunto2B2Key,
             UrlAdjunto1, NombreAdjunto1, UrlAdjunto2, NombreAdjunto2,
             Orden, Activo
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             $instId,
             $data['Titulo'],
             $data['Resena'],
             $data['Cuerpo'],
+            $data['Adjunto1B2Key'] ?? null,
+            $data['Adjunto2B2Key'] ?? null,
             $data['UrlAdjunto1'],
             $data['NombreAdjunto1'],
             $data['UrlAdjunto2'],
@@ -193,6 +253,7 @@ class InstitucionPoeModel {
     public function update(int $instId, int $id, array $data): bool {
         $sql = 'UPDATE institucion_poe SET
             Titulo = ?, Resena = ?, Cuerpo = ?,
+            Adjunto1B2Key = ?, Adjunto2B2Key = ?,
             UrlAdjunto1 = ?, NombreAdjunto1 = ?, UrlAdjunto2 = ?, NombreAdjunto2 = ?,
             Orden = ?, Activo = ?
             WHERE IdInstitucion = ? AND IdPoe = ?';
@@ -201,6 +262,8 @@ class InstitucionPoeModel {
             $data['Titulo'],
             $data['Resena'],
             $data['Cuerpo'],
+            $data['Adjunto1B2Key'] ?? null,
+            $data['Adjunto2B2Key'] ?? null,
             $data['UrlAdjunto1'],
             $data['NombreAdjunto1'],
             $data['UrlAdjunto2'],

@@ -60,7 +60,7 @@
 
                     await initMenu();
                     NotificationManager.init();
-                    initPreciosPage();
+                    await initPreciosPage();
                 } else {
                     throw new Error("El objeto de idioma window.txt no se generó.");
                 }
