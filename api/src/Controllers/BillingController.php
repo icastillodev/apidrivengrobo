@@ -973,7 +973,24 @@ class BillingController {
                 return;
             }
             $map = $this->model->getMapDeptoOrigenesDerivacionPendiente($instId);
-            $this->sendSuccess(['map' => $map]);
+            $idUsrDerivados = $this->model->getIdsUsuariosDerivacionPendiente($instId);
+            $idProtDerivados = $this->model->getIdsProtocolosDerivacionPendiente($instId);
+            $deptoIdsDerivados = array_map('intval', array_keys($map));
+            sort($deptoIdsDerivados);
+            $tieneDerivadosPendientes = $map !== [] || $idUsrDerivados !== [] || $idProtDerivados !== [];
+            $deptoIdsLocal = $this->model->getIdsDeptosFacturacionLocalPendienteOEntregada($instId);
+            $idUsrLocal = $this->model->getIdsUsuariosFacturacionLocalPendienteOEntregada($instId);
+            $idProtLocal = $this->model->getIdsProtocolosFacturacionLocalPendienteOEntregada($instId);
+            $this->sendSuccess([
+                'map' => $map,
+                'deptoIdsDerivados' => $deptoIdsDerivados,
+                'idUsrDerivados' => $idUsrDerivados,
+                'idProtDerivados' => $idProtDerivados,
+                'tieneDerivadosPendientes' => $tieneDerivadosPendientes,
+                'deptoIdsLocal' => $deptoIdsLocal,
+                'idUsrLocal' => $idUsrLocal,
+                'idProtLocal' => $idProtLocal,
+            ]);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
         }

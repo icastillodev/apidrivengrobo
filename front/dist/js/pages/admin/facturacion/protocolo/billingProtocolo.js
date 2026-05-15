@@ -28,25 +28,25 @@ import {
     billingPartitionInsumosPedidoReactivoOtros
 } from '../billingLocale.js';
 import '../billingPayments.js'; 
-import '../modals/manager.js';  
+import '../modals/manager.js';
+import {
+    fetchFiltrosAlcanceDerivacion,
+    aplicarVisibilidadColumnaFacturacionDerivacion,
+    getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionProt,
+    getFiltrosAlcanceDerivacionCached,
+} from '../billingDerivacionFiltros.js';
 
 window.currentReportData = null;
 window.protocolosCache = [];
+window.protocolosCacheFull = [];
 
 let protBillingReportLoadedOk = false;
 /** Último payload renderizado con éxito (restaurar si falla una recarga inline). */
 let protocoloLastRenderData = null;
+let filtroProtocoloVinculado = false;
 
 function txF() {
     return window.txt?.facturacion || {};
-}
-function getFacturacionDerivacionSeleccionProt() {
-    const el = document.getElementById('sel-facturacion-derivacion');
-    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
-    if (v === 'derivados' || v === 'institucionales') {
-        return v;
-    }
-    return 'todos';
 }
 function txBD() {
     return txF().billing_depto || {};
@@ -56,6 +56,19 @@ function txBI() {
 }
 function txBP() {
     return txF().billing_protocolo || {};
+}
+
+function listaProtocolosBaseFiltrada() {
+    const full = Array.isArray(window.protocolosCacheFull) ? window.protocolosCacheFull : [];
+    const fa = getFiltrosAlcanceDerivacionCached();
+    const scope = getFacturacionDerivacionSeleccionProt();
+    if (scope === 'derivados' && fa?.idProtDerivados?.size) {
+        return full.filter((p) => fa.idProtDerivados.has(Number(p.idprotA)));
+    }
+    if (scope === 'institucionales' && fa?.idProtLocal?.size) {
+        return full.filter((p) => fa.idProtLocal.has(Number(p.idprotA)));
+    }
+    return full;
 }
 
 export async function initBillingProtocolo() {
@@ -68,7 +81,20 @@ export async function initBillingProtocolo() {
         document.getElementById('f-desde').value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
         document.getElementById('f-hasta').value = hoy.toISOString().split('T')[0];
 
+        await fetchFiltrosAlcanceDerivacion();
+        aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
+
         await cargarListaProtocolos();
+        const selDer = document.getElementById('sel-facturacion-derivacion');
+        if (selDer) {
+            selDer.addEventListener('change', () => {
+                const inp = document.getElementById('busqueda-protocolo');
+                if (inp) {
+                    inp.value = '';
+                }
+                renderizarOpciones(listaProtocolosBaseFiltrada());
+            });
+        }
     } catch (e) { console.error(e); } finally { hideLoader(); }
 }
 
@@ -76,8 +102,9 @@ async function cargarListaProtocolos() {
     const instId = localStorage.getItem('instId') || 1;
     const res = await API.request(`/billing/list-active-protocols?inst=${instId}`);
     if (res.status === 'success') {
+        window.protocolosCacheFull = res.data;
         window.protocolosCache = res.data;
-        renderizarOpciones(res.data);
+        renderizarOpciones(listaProtocolosBaseFiltrada());
         vincularFiltro();
     }
 }
@@ -90,9 +117,13 @@ function renderizarOpciones(lista) {
 }
 
 function vincularFiltro() {
+    if (filtroProtocoloVinculado) {
+        return;
+    }
+    filtroProtocoloVinculado = true;
     document.getElementById('busqueda-protocolo').addEventListener('input', (e) => {
         const term = (e.target.value || '').trim().toLowerCase();
-        const filtrados = window.protocolosCache.filter((p) => {
+        const filtrados = listaProtocolosBaseFiltrada().filter((p) => {
             if (!term) return true;
             const dep = String(p.nombreDepartamento ?? p.nombre_departamento ?? '').toLowerCase();
             const nprot = String(p.nprotA ?? '').toLowerCase();

@@ -29,18 +29,16 @@ import {
 import './billingPayments.js';
 
 import './modals/manager.js' ;
+import {
+    fetchFiltrosAlcanceDerivacion,
+    aplicarVisibilidadColumnaFacturacionDerivacion,
+    getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccion,
+    getFiltrosAlcanceDerivacionCached,
+} from './billingDerivacionFiltros.js';
 
 /** Textos facturación (incl. `billing_depto` — lote i18n ES/EN/PT) */
 function txF() {
     return window.txt?.facturacion || {};
-}
-function getFacturacionDerivacionSeleccion() {
-    const el = document.getElementById('sel-facturacion-derivacion');
-    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
-    if (v === 'derivados' || v === 'institucionales') {
-        return v;
-    }
-    return 'todos';
 }
 function txBD() {
     return txF().billing_depto || {};
@@ -58,8 +56,6 @@ function txBE() {
 let currentReportData = null;
 /** Lista completa de departamentos (para filtrar por ámbito sin nueva petición) */
 let deptosRaw = [];
-/** iddeptoA -> nombres de institución(es) de origen con derivación pendiente (tooltip en selector). */
-let deptosDerivacionOrigenesMap = {};
 /** Tras el primer informe por departamento exitoso, las recargas muestran spinner en el área de resultados. */
 let deptoBillingReportLoadedOk = false;
 
@@ -171,14 +167,24 @@ export async function initBillingDepto() {
             fDesde.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
             fHasta.value = hoy.toISOString().split('T')[0];
         }
+        await fetchFiltrosAlcanceDerivacion();
+        aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
         await cargarListaDeptos();
         const filterAmbito = document.getElementById('filter-ambito-depto');
         if (filterAmbito) filterAmbito.addEventListener('change', () => renderDeptoOptions(filterAmbito.value));
+        const selDer = document.getElementById('sel-facturacion-derivacion');
+        if (selDer) {
+            selDer.addEventListener('change', () => {
+                const amb = document.getElementById('filter-ambito-depto')?.value || 'all';
+                renderDeptoOptions(amb);
+            });
+        }
         const selDeptoInit = document.getElementById('sel-depto');
         if (selDeptoInit && typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function') {
             selDeptoInit.addEventListener('change', () => window.invalidateDeptoSaldoHistorialPanelsCache());
         }
         aplicarParamsUrlDepto();
+        renderDeptoOptions(filterAmbito ? filterAmbito.value : 'all');
     } catch (error) { console.error("Error en init:", error); } finally { hideLoader(); }
 }
 
@@ -205,7 +211,8 @@ function aplicarParamsUrlDepto() {
     const fd = params.get('facturacionDerivacion');
     if (fd) {
         const selFd = document.getElementById('sel-facturacion-derivacion');
-        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd)) {
+        const fa = getFiltrosAlcanceDerivacionCached();
+        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd) && (fd === 'todos' || (fa && fa.tieneDerivadosPendientes))) {
             selFd.value = fd;
         }
     }
@@ -217,26 +224,11 @@ async function cargarListaDeptos() {
         const res = await API.request(`/deptos/list?inst=${instId}`);
         if (res.status === 'success' && res.data) {
             deptosRaw = res.data;
-            await cargarMapaDeptosDerivacionOrigen();
             const filterAmbito = document.getElementById('filter-ambito-depto');
             const ambito = filterAmbito ? filterAmbito.value : 'all';
             renderDeptoOptions(ambito);
         }
     } catch (e) { console.error(e); }
-}
-
-async function cargarMapaDeptosDerivacionOrigen() {
-    try {
-        const res = await API.request('/billing/deptos-derivacion-origenes', 'GET');
-        if (res.status === 'success' && res.data && res.data.map && typeof res.data.map === 'object') {
-            deptosDerivacionOrigenesMap = res.data.map;
-        } else {
-            deptosDerivacionOrigenesMap = {};
-        }
-    } catch (e) {
-        console.warn(e);
-        deptosDerivacionOrigenesMap = {};
-    }
 }
 
 /** Filtra deptos por ámbito (all | interno | externo) y rellena el select. */
@@ -250,6 +242,15 @@ function renderDeptoOptions(ambito) {
     if (ambito === 'interno') list = deptosRaw.filter(d => !isExterno(d));
     if (ambito === 'externo') list = deptosRaw.filter(d => isExterno(d));
 
+    const fa = getFiltrosAlcanceDerivacionCached();
+    const scope = getFacturacionDerivacionSeleccion();
+    if (scope === 'derivados' && fa?.deptoIdsDerivados?.size) {
+        list = list.filter((d) => fa.deptoIdsDerivados.has(Number(d.iddeptoA)));
+    } else if (scope === 'institucionales' && fa?.deptoIdsLocal?.size) {
+        list = list.filter((d) => fa.deptoIdsLocal.has(Number(d.iddeptoA)));
+    }
+
+    const mapOrigenes = fa?.map || {};
     const tf = txF();
     const suffixNote = tf.derivacion_depto_suffix || '';
     const titleTpl = tf.derivacion_depto_title_tpl || '';
@@ -259,7 +260,7 @@ function renderDeptoOptions(ambito) {
             const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
             const base = `${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})`;
             const idNum = d.iddeptoA;
-            const origenes = deptosDerivacionOrigenesMap[idNum] ?? deptosDerivacionOrigenesMap[String(idNum)];
+            const origenes = mapOrigenes[idNum] ?? mapOrigenes[String(idNum)];
             let titleAttr = '';
             let label = base;
             if (origenes) {

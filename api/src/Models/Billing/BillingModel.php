@@ -880,6 +880,225 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
     }
 
     /**
+     * Departamentos con al menos un formulario entregado en la sede sin facturación derivada **pendiente**
+     * (líneas que en liquidación se tratan como locales).
+     *
+     * @return array<int, int>
+     */
+    public function getIdsDeptosFacturacionLocalPendienteOEntregada(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            $sql = "
+                SELECT DISTINCT COALESCE(p.departamento, f.depto) AS iddepto
+                FROM formularioe f
+                LEFT JOIN protformr pr ON pr.idformA = f.idformA
+                LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
+                  AND COALESCE(p.departamento, f.depto) IS NOT NULL AND COALESCE(p.departamento, f.depto) > 0
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion]);
+        } else {
+            $sql = "
+                SELECT DISTINCT COALESCE(p.departamento, f.depto) AS iddepto
+                FROM formularioe f
+                LEFT JOIN protformr pr ON pr.idformA = f.idformA
+                LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
+                  AND COALESCE(p.departamento, f.depto) IS NOT NULL AND COALESCE(p.departamento, f.depto) > 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM facturacion_formulario_derivado x
+                      WHERE x.idformA = f.idformA AND x.IdInstitucionCobradora = ?
+                        AND (x.monto_total - COALESCE(x.monto_pagado, 0)) > 0.005
+                  )
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion, $idInstitucion]);
+        }
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['iddepto'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Investigadores con al menos un formulario entregado en la sede sin derivación **pendiente** (misma regla que deptos).
+     *
+     * @return array<int, int>
+     */
+    public function getIdsUsuariosFacturacionLocalPendienteOEntregada(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            $sql = "
+                SELECT DISTINCT f.IdUsrA AS id
+                FROM formularioe f
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado' AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion]);
+        } else {
+            $sql = "
+                SELECT DISTINCT f.IdUsrA AS id
+                FROM formularioe f
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado' AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM facturacion_formulario_derivado x
+                      WHERE x.idformA = f.idformA AND x.IdInstitucionCobradora = ?
+                        AND (x.monto_total - COALESCE(x.monto_pagado, 0)) > 0.005
+                  )
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion, $idInstitucion]);
+        }
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Protocolos con al menos un formulario entregado vinculado sin derivación **pendiente** en esta sede.
+     *
+     * @return array<int, int>
+     */
+    public function getIdsProtocolosFacturacionLocalPendienteOEntregada(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        if (!$this->tableExists('facturacion_formulario_derivado')) {
+            $sql = "
+                SELECT DISTINCT p.idprotA AS id
+                FROM protocoloexpe p
+                INNER JOIN protformr pr ON p.idprotA = pr.idprotA
+                INNER JOIN formularioe f ON pr.idformA = f.idformA
+                WHERE p.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion]);
+        } else {
+            $sql = "
+                SELECT DISTINCT p.idprotA AS id
+                FROM protocoloexpe p
+                INNER JOIN protformr pr ON p.idprotA = pr.idprotA
+                INNER JOIN formularioe f ON pr.idformA = f.idformA
+                WHERE p.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
+                  AND NOT EXISTS (
+                      SELECT 1 FROM facturacion_formulario_derivado x
+                      WHERE x.idformA = f.idformA AND x.IdInstitucionCobradora = ?
+                        AND (x.monto_total - COALESCE(x.monto_pagado, 0)) > 0.005
+                  )
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$idInstitucion, $idInstitucion]);
+        }
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Investigadores con al menos un formulario en facturación derivada pendiente (misma sede cobradora).
+     *
+     * @return array<int, int> lista de IdUsrA
+     */
+    public function getIdsUsuariosDerivacionPendiente(int $instCobradora): array {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT x.IdUsrA AS id
+            FROM (
+                SELECT p.IdUsrA
+                FROM facturacion_formulario_derivado ffd
+                INNER JOIN formularioe f ON f.idformA = ffd.idformA
+                INNER JOIN protformr pr ON pr.idformA = f.idformA
+                INNER JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+                INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+                WHERE ffd.IdInstitucionCobradora = ?
+                  AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+                  AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
+                UNION
+                SELECT f.IdUsrA
+                FROM facturacion_formulario_derivado ffd
+                INNER JOIN formularioe f ON f.idformA = ffd.idformA
+                LEFT JOIN protformr pr ON pr.idformA = f.idformA
+                INNER JOIN formulario_derivacion fd2 ON fd2.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd2.Activo = 1
+                WHERE ffd.IdInstitucionCobradora = ?
+                  AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+                  AND (pr.idprotA IS NULL OR pr.idprotA = 0)
+                  AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
+            ) x
+            ORDER BY x.IdUsrA ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora, $instCobradora]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Protocolos con al menos un formulario en facturación derivada pendiente (cobro en esta sede).
+     *
+     * @return array<int, int> lista de idprotA
+     */
+    public function getIdsProtocolosDerivacionPendiente(int $instCobradora): array {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT pr.idprotA AS id
+            FROM facturacion_formulario_derivado ffd
+            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            INNER JOIN protformr pr ON pr.idformA = f.idformA
+            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+            WHERE ffd.IdInstitucionCobradora = ?
+              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+              AND pr.idprotA IS NOT NULL AND pr.idprotA > 0
+            ORDER BY pr.idprotA ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return $out;
+    }
+
+    /**
      * Ajusta totales/pagado/debe de filas de insumos cuando existe facturación derivada (misma sede cobradora).
      */
     public function applyFacturacionDerivadaToInsumoRows(array &$rows, int $instCobradora): void {

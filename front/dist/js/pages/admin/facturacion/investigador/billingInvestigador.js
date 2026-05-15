@@ -9,18 +9,16 @@ import { renderDashboard } from '../billingDashboard.js';
 import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
+import {
+    fetchFiltrosAlcanceDerivacion,
+    aplicarVisibilidadColumnaFacturacionDerivacion,
+    getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionInv,
+    getFiltrosAlcanceDerivacionCached,
+} from '../billingDerivacionFiltros.js';
 
 /** Textos facturación (incl. `billing_depto`, `billing_investigador`) */
 function txF() {
     return window.txt?.facturacion || {};
-}
-function getFacturacionDerivacionSeleccionInv() {
-    const el = document.getElementById('sel-facturacion-derivacion');
-    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
-    if (v === 'derivados' || v === 'institucionales') {
-        return v;
-    }
-    return 'todos';
 }
 function txBD() {
     return txF().billing_depto || {};
@@ -34,9 +32,24 @@ function txBP() {
 
 window.currentReportData = null;
 window.investigadoresCache = [];
+window.investigadoresCacheFull = [];
+
+function listaInvestigadoresBaseFiltrada() {
+    const full = Array.isArray(window.investigadoresCacheFull) ? window.investigadoresCacheFull : [];
+    const fa = getFiltrosAlcanceDerivacionCached();
+    const scope = getFacturacionDerivacionSeleccionInv();
+    if (scope === 'derivados' && fa?.idUsrDerivados?.size) {
+        return full.filter((u) => fa.idUsrDerivados.has(Number(u.IdUsrA)));
+    }
+    if (scope === 'institucionales' && fa?.idUsrLocal?.size) {
+        return full.filter((u) => fa.idUsrLocal.has(Number(u.IdUsrA)));
+    }
+    return full;
+}
 
 /** Informe principal ya cargado al menos una vez con éxito (recargas = spinner inline). */
 let invBillingReportLoadedOk = false;
+let filtroInvestigadorVinculado = false;
 
 export async function initBillingInvestigador() {
     try {
@@ -52,7 +65,20 @@ export async function initBillingInvestigador() {
             fHasta.value = hoy.toISOString().split('T')[0];
         }
 
+        await fetchFiltrosAlcanceDerivacion();
+        aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
+
         await cargarListaInvestigadores();
+        const selDer = document.getElementById('sel-facturacion-derivacion');
+        if (selDer) {
+            selDer.addEventListener('change', () => {
+                const inputBusqueda = document.getElementById('busqueda-investigador');
+                if (inputBusqueda) {
+                    inputBusqueda.value = '';
+                }
+                renderizarOpcionesInvestigador(listaInvestigadoresBaseFiltrada());
+            });
+        }
         autoLoadFromUrlParams();
     } catch (error) { 
         console.error("Error en init:", error); 
@@ -89,10 +115,13 @@ function autoLoadFromUrlParams() {
     const fd = params.get('facturacionDerivacion');
     if (fd) {
         const selFd = document.getElementById('sel-facturacion-derivacion');
-        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd)) {
+        const fa = getFiltrosAlcanceDerivacionCached();
+        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd) && (fd === 'todos' || (fa && fa.tieneDerivadosPendientes))) {
             selFd.value = fd;
         }
     }
+
+    renderizarOpcionesInvestigador(listaInvestigadoresBaseFiltrada());
 
     setTimeout(() => {
         window.cargarFacturacionInvestigador();
@@ -104,9 +133,10 @@ async function cargarListaInvestigadores() {
     try {
         const res = await API.request(`/users/list-investigators?inst=${instId}`);
         if (res.status === 'success' && res.data) {
+            window.investigadoresCacheFull = res.data;
             window.investigadoresCache = res.data;
-            renderizarOpcionesInvestigador(res.data);
-            vincularFiltroRealTime(); 
+            renderizarOpcionesInvestigador(listaInvestigadoresBaseFiltrada());
+            vincularFiltroRealTime();
         }
     } catch (e) { console.error("Error cargando investigadores:", e); }
 }
@@ -121,11 +151,15 @@ function renderizarOpcionesInvestigador(lista) {
 }
 
 function vincularFiltroRealTime() {
+    if (filtroInvestigadorVinculado) {
+        return;
+    }
+    filtroInvestigadorVinculado = true;
     const inputBusqueda = document.getElementById('busqueda-investigador');
     if (!inputBusqueda) return;
     inputBusqueda.addEventListener('input', (e) => {
         const termino = e.target.value.toLowerCase();
-        const filtrados = window.investigadoresCache.filter(u => {
+        const filtrados = listaInvestigadoresBaseFiltrada().filter(u => {
             const nombreCompleto = `${u.ApellidoA} ${u.NombreA}`.toLowerCase();
             return nombreCompleto.includes(termino) || u.IdUsrA.toString().includes(termino);
         });

@@ -2,19 +2,16 @@ import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { formatBillingMoney } from './billingLocale.js';
 import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
+import {
+    fetchFiltrosAlcanceDerivacion,
+    aplicarVisibilidadColumnaFacturacionDerivacion,
+    getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionOrg,
+    getFiltrosAlcanceDerivacionCached,
+} from './billingDerivacionFiltros.js';
 
 let orgBillingReportLoadedOk = false;
 /** @type {{ organizaciones: unknown[], opts: { desde: string, hasta: string, chkAni: boolean, chkAlo: boolean, chkIns: boolean, facturacionDerivacion?: string } } | null} */
 let orgLastSnapshot = null;
-
-function getFacturacionDerivacionSeleccionOrg() {
-    const el = document.getElementById('sel-facturacion-derivacion');
-    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
-    if (v === 'derivados' || v === 'institucionales') {
-        return v;
-    }
-    return 'todos';
-}
 
 export async function initBillingOrg() {
     const hoy = new Date();
@@ -24,6 +21,8 @@ export async function initBillingOrg() {
         fDesde.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
         fHasta.value = hoy.toISOString().split('T')[0];
     }
+    await fetchFiltrosAlcanceDerivacion();
+    aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
     const btn = document.getElementById('btn-cargar-org');
     if (btn) btn.addEventListener('click', cargarFacturacionOrg);
 }
