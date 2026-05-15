@@ -710,19 +710,28 @@ window.procesarPagoInstitucion = async (idInstSol) => {
     });
     if (confirm.isConfirmed) {
         try {
+            const soleInv = porInv.size === 1 ? [...porInv.keys()][0] : null;
             showLoader();
             const res = await API.request('/billing/process-payment-institucion', 'POST', { items });
+            hideLoader();
             if (res.status === 'success') {
-                if (window.Swal) window.Swal.fire(t.pago_procesado || '¡Pago Procesado!', res.message || tf('pago_registrado_ok', 'El pago ha sido registrado.'), 'success');
-                cargarFacturacionInstitucion();
-            } else {
-                if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || tf('error_procesar_corto', 'No se pudo procesar.'), 'error');
+                if (window.Swal) {
+                    await window.Swal.fire(t.pago_procesado || '¡Pago Procesado!', res.message || tf('pago_registrado_ok', 'El pago ha sido registrado.'), 'success');
+                }
+                if (typeof window.refreshBillingReportAfterMutation === 'function') {
+                    await window.refreshBillingReportAfterMutation({ idUsr: soleInv });
+                } else {
+                    await cargarFacturacionInstitucion();
+                }
+            } else if (window.Swal) {
+                await window.Swal.fire(window.txt?.generales?.error || 'Error', res.message || tf('error_procesar_corto', 'No se pudo procesar.'), 'error');
             }
         } catch (e) {
-            console.error(e);
-            if (window.Swal) window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.payment_error_procesar || window.txt?.facturacion?.error_cargar_reporte || 'Error al procesar el pago.', 'error');
-        } finally {
             hideLoader();
+            console.error(e);
+            if (window.Swal) {
+                await window.Swal.fire(window.txt?.generales?.error || 'Error', window.txt?.facturacion?.payment_error_procesar || window.txt?.facturacion?.error_cargar_reporte || 'Error al procesar el pago.', 'error');
+            }
         }
     }
 };

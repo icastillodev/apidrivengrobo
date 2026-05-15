@@ -14,6 +14,7 @@ import {
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
     billingSumInsumosCobrable,
+    billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
     billingDerivadaLiquidacionBadge,
     billingPdfFormularioIdDisplay,
@@ -299,7 +300,20 @@ function renderizarResultados(data) {
     const showAni = document.getElementById('chk-animales').checked;
     const showAlo = document.getElementById('chk-alojamiento').checked;
 
-    deptoProtPage = 1;
+    const restoreProt = window.__billingRestoreProtId;
+    if (restoreProt != null && restoreProt !== '') {
+        const rid = parseInt(String(restoreProt), 10);
+        window.__billingRestoreProtId = null;
+        if (Number.isFinite(rid) && rid >= 0) {
+            const visible = collectVisibleProtocolsDepto(data, showAni, showAlo);
+            const idx = visible.findIndex((pr) => String(pr.idProt) === String(rid));
+            deptoProtPage = idx >= 0 ? Math.floor(idx / DEPT_BILLING_PROTOCOLS_PER_PAGE) + 1 : 1;
+        } else {
+            deptoProtPage = 1;
+        }
+    } else {
+        deptoProtPage = 1;
+    }
 
     let html = '';
     if (showIns && data.insumosGenerales) {
@@ -484,7 +498,7 @@ function getAlojTableHTML(alojamientos, idProt) {
         const tipoAloj = a.caja || bd.aloj_caja_default || 'Alojamiento estándar';
 
     return `
-        <tr onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('ALOJ', ${a.historia})" class="pointer text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
+        <tr onclick="window.billingRowClickOpenAlojModal(event, ${a.historia})" class="pointer text-center align-middle" ${isDone ? 'style="background-color: #f0fff4 !important;"' : ''}>
             <td>
                 <input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${debe}" ${isDone ? 'disabled' : ''}>
             </td>
@@ -579,6 +593,10 @@ return `
                         <b class="fs-6 d-block text-dark">$ ${formatBillingMoney(sumTotal)}</b>
                     </div>
                     <div class="text-center">
+                        <small class="text-muted text-uppercase fw-bold" style="font-size:9px">${tf.pago || 'Pago'}</small>
+                        <b class="fs-6 text-success d-block">$ ${formatBillingMoney(sumPagado)}</b>
+                    </div>
+                    <div class="text-center">
                         <small class="text-muted text-uppercase fw-bold" style="font-size:10px">${tf.falta || 'Falta'}</small>
                         <b class="fs-6 text-danger d-block">$ ${formatBillingMoney(sumDebe)}</b>
                     </div>
@@ -626,16 +644,10 @@ function getInsumosGeneralesTableHTML(insumos) {
     const bi = txBI();
     const exL = bi.pdf_monto_exento || 'Exento';
     const packs = { bd, tf, bi, exL };
-    let sumTotal = 0, sumPagado = 0, sumDebe = 0;
-    for (const i of insumos) {
-        const total = parseFloat(i.total_item || 0);
-        const pagado = parseFloat(i.pagado || 0);
-        const isExento = billingTipoExento(i);
-        const debe = isExento ? 0 : Math.max(0, total - pagado);
-        if (!isExento) {
-            sumTotal += total; sumPagado += pagado; sumDebe += debe;
-        }
-    }
+    const sums = billingSumInsumosCobrable(insumos);
+    const sumTotal = sums.total;
+    const sumPagado = sums.pagado;
+    const sumDebe = sums.debe;
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
@@ -668,7 +680,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th> 
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pago'}</th>
-                            <th style="width:10%">${tf.falta || 'Falta'}</th>
+                            <th style="width:10%">${bd.th_debe_uc || 'DEBE'}</th>
                         </tr>
                     </thead>
                     <tbody>${filas}</tbody>
@@ -765,7 +777,7 @@ window.exportExcelDeptoGlobal = () => {
                 ti: tiInsMark,
                 ids: billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExExcel }),
                 cd: (i.detalle_completo || "").replace(/\|/g, " - "),
-                ct: parseFloat(i.total_item || 0),
+                ct: billingInsumoMontoTotalCobrable(i),
                 mp: parseFloat(i.pagado || 0),
                 da: parseFloat(i.debe || 0)
             }));
@@ -1064,7 +1076,7 @@ window.downloadInsumosPDF = async () => {
     const exL = bi.pdf_monto_exento || 'Exento';
     const marcaExPdfIns = billingPdfMarcaExentoLarga();
     const body = insumos.map(i => {
-        const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), i.total_item || 0, i.pagado || 0, exL);
+        const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), billingInsumoMontoTotalCobrable(i), i.pagado || 0, exL);
         const c = pdfColsPdfOrdenTotalPagadoDebe(m);
         const idPdf = billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExPdfIns });
         return [String(idPdf).substring(0, 26), i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), c[0], c[1], c[2]];

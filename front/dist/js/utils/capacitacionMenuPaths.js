@@ -67,11 +67,13 @@ export const COMUNICACION_ADMIN_SUB_PATHS = [
 /** Habilita manual/tour en subpantallas de comunicación según el hub que el rol tenga en menú. */
 export function expandComunicacionSubpathsIfAllowed(allowedSet) {
   if (!allowedSet || typeof allowedSet.has !== 'function') return;
-  if (allowedSet.has('panel/noticias')) {
+  if (allowedSet.has('panel/noticias') || allowedSet.has('panel/poe')) {
     COMUNICACION_PANEL_SUB_PATHS.forEach((p) => allowedSet.add(p));
   }
   if (allowedSet.has('admin/comunicacion/noticias')) {
     COMUNICACION_ADMIN_SUB_PATHS.forEach((p) => allowedSet.add(p));
+  } else if (allowedSet.has('admin/comunicacion/poe')) {
+    allowedSet.add('admin/comunicacion/poe');
   }
 }
 

@@ -1,6 +1,7 @@
 <?php
 namespace App\Controllers;
 
+use App\Models\Comunicacion\InstitucionDashboardPopupModel;
 use App\Models\Comunicacion\InstitucionPortadaPopupModel;
 use App\Models\Comunicacion\InstitucionPoeModel;
 use App\Models\Comunicacion\MensajeriaModel;
@@ -81,6 +82,22 @@ class ComunicacionB2Controller {
         return isset($f['tmp_name'], $f['error'])
             && (int) $f['error'] === UPLOAD_ERR_OK
             && is_uploaded_file($f['tmp_name']);
+    }
+
+    /** Misma regla que AdminDashboardPopupController::assertPuedePublicar */
+    private function assertPuedeGestionarDashboardPopup(array $sesion, int $instId): void {
+        $role = (int) ($sesion['role'] ?? 0);
+        if ($role === 3) {
+            throw new \Exception('No tiene permiso.');
+        }
+        if (in_array($role, [1, 2, 4], true)) {
+            return;
+        }
+        $nm = new NoticiaModel($this->db);
+        if ($nm->puedePublicarNoticias($instId, $role)) {
+            return;
+        }
+        throw new \Exception('No tiene permiso.');
     }
 
     // --- Subidas (multipart campo `file`) ---
@@ -229,6 +246,14 @@ class ComunicacionB2Controller {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
+            $this->assertPuedeGestionarDashboardPopup($sesion, $instId);
+            $idPopup = isset($_POST['idPopup']) ? (int) $_POST['idPopup'] : 0;
+            if ($idPopup > 0) {
+                $dm = new InstitucionDashboardPopupModel($this->db);
+                if (!$dm->getById($instId, $idPopup)) {
+                    $this->json(['status' => 'error', 'message' => 'Popup no encontrado.'], 404);
+                }
+            }
             if (!self::archivoUploadedOk($_FILES['file'] ?? [])) {
                 $this->json(['status' => 'error', 'message' => 'No se recibió ningún archivo válido.'], 400);
             }
@@ -250,6 +275,34 @@ class ComunicacionB2Controller {
                 $data['PopupAdjunto2Nombre'] = $meta['nombreSeguro'];
             }
             $this->json(['status' => 'success', 'data' => $data]);
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            $this->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function uploadPopupPortadaImagen() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $this->assertPuedeGestionarDashboardPopup($sesion, $instId);
+            if (!self::archivoUploadedOk($_FILES['file'] ?? [])) {
+                $this->json(['status' => 'error', 'message' => 'No se recibió ningún archivo válido.'], 400);
+            }
+            $f = $_FILES['file'];
+            $meta = ComunicacionArchivoValidacion::validarPortadaPopupImagen($f['tmp_name'], (string) ($f['name'] ?? 'file'));
+            $key = ComunicacionArchivoValidacion::construirClaveObjeto('popup/imagen', $instId, $meta['nombreSeguro']);
+            $b2 = new BackblazeB2('NOTICIASPOPUP');
+            $b2->uploadFile($f['tmp_name'], $key, $meta['mime']);
+            $this->json([
+                'status' => 'success',
+                'data' => [
+                    'PopupPortadaImagenB2Key' => $key,
+                    'PopupPortadaImagenNombre' => $meta['nombreSeguro'],
+                    'mime' => $meta['mime'],
+                ],
+            ]);
         } catch (\InvalidArgumentException $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         } catch (\Exception $e) {
@@ -414,7 +467,7 @@ class ComunicacionB2Controller {
     }
 
     /**
-     * tipo: portada_imagen | portada_doc1 | portada_doc2 | popup_doc1 | popup_doc2
+     * tipo: portada_imagen | portada_doc1 | portada_doc2 | popup_imagen | popup_doc1 | popup_doc2
      */
     public function downloadPortadaPopupArchivo($tipo) {
         try {
@@ -431,6 +484,7 @@ class ComunicacionB2Controller {
                 'portada_imagen' => ['k' => 'PortadaImagenB2Key', 'n' => 'PortadaImagenNombre'],
                 'portada_doc1' => ['k' => 'PortadaAdjunto1B2Key', 'n' => 'PortadaAdjunto1Nombre'],
                 'portada_doc2' => ['k' => 'PortadaAdjunto2B2Key', 'n' => 'PortadaAdjunto2Nombre'],
+                'popup_imagen' => ['k' => 'PopupPortadaImagenB2Key', 'n' => 'PopupPortadaImagenNombre'],
                 'popup_doc1' => ['k' => 'PopupAdjunto1B2Key', 'n' => 'PopupAdjunto1Nombre'],
                 'popup_doc2' => ['k' => 'PopupAdjunto2B2Key', 'n' => 'PopupAdjunto2Nombre'],
             ];
@@ -440,11 +494,80 @@ class ComunicacionB2Controller {
                 exit;
             }
 
-            $pm = new InstitucionPortadaPopupModel($this->db);
-            $row = $pm->getByInstitucion($instId);
+            $row = null;
+            if ($tipo === 'popup_imagen' || $tipo === 'popup_doc1' || $tipo === 'popup_doc2') {
+                $dm = new InstitucionDashboardPopupModel($this->db);
+                $row = $dm->getActiveForInstitution($instId);
+            } else {
+                $pm = new InstitucionPortadaPopupModel($this->db);
+                $row = $pm->getByInstitucion($instId);
+            }
             if (!$row) {
                 http_response_code(404);
                 echo 'Sin configuración';
+                exit;
+            }
+
+            $kc = $map[$tipo]['k'];
+            $nc = $map[$tipo]['n'];
+            $key = $row[$kc] ?? null;
+            $nombre = (string) ($row[$nc] ?? 'archivo');
+
+            if ($key === null || $key === '') {
+                http_response_code(404);
+                echo 'Archivo no disponible';
+                exit;
+            }
+
+            $mime = self::mimeDesdeNombreArchivo($nombre);
+            $inline = strpos($mime, 'image/') === 0;
+
+            $b2 = new BackblazeB2('NOTICIASPOPUP');
+            $b2->streamDownloadAttachment((string) $key, $nombre, $mime, $inline);
+        } catch (\Exception $e) {
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            header_remove('Content-Type');
+            http_response_code(500);
+            echo $e->getMessage();
+            exit;
+        }
+    }
+
+    /**
+     * Vista previa admin: adjuntos de un popup concreto (no solo el activo).
+     * tipo: popup_imagen | popup_doc1 | popup_doc2
+     */
+    public function downloadAdminDashboardPopupArchivo($idPopup, $tipo) {
+        try {
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            header_remove('Content-Type');
+
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $this->assertPuedeGestionarDashboardPopup($sesion, $instId);
+
+            $pid = (int) $idPopup;
+            $tipo = strtolower((string) $tipo);
+            if ($pid <= 0 || !in_array($tipo, ['popup_imagen', 'popup_doc1', 'popup_doc2'], true)) {
+                http_response_code(400);
+                echo 'Parámetros inválidos';
+                exit;
+            }
+
+            $map = [
+                'popup_imagen' => ['k' => 'PopupPortadaImagenB2Key', 'n' => 'PopupPortadaImagenNombre'],
+                'popup_doc1' => ['k' => 'PopupAdjunto1B2Key', 'n' => 'PopupAdjunto1Nombre'],
+                'popup_doc2' => ['k' => 'PopupAdjunto2B2Key', 'n' => 'PopupAdjunto2Nombre'],
+            ];
+            $dm = new InstitucionDashboardPopupModel($this->db);
+            $row = $dm->getById($instId, $pid);
+            if (!$row) {
+                http_response_code(404);
+                echo 'Popup no encontrado';
                 exit;
             }
 

@@ -1,6 +1,6 @@
 import { API } from '../../api.js';
-import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js';
 import { createAdminListPageCache, offsetLimitToPagePageSizeQuery } from '../../utils/adminListPageCache.js';
 
 const poeB2 = {
@@ -69,15 +69,38 @@ function renderPoeB2Ui() {
 }
 
 async function openPoeAdjuntoPreview(idPoe, slot) {
+    const t = window.txt?.comunicacion || {};
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const pathRel = `/comunicacion/poe/${idPoe}/adjunto/${slot}`;
     const url = `${API.urlBase}${pathRel}`;
-    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
-    const objUrl = URL.createObjectURL(blob);
-    window.open(objUrl, '_blank', 'noopener,noreferrer');
-    setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
+    const previewWin = window.open('about:blank', '_blank');
+    if (!previewWin) {
+        throw new Error(t.admin_noticia_preview_popup_blocked || t.pp_b2_preview_fail || '');
+    }
+    try {
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) {
+            let detail = String(res.status);
+            try {
+                const txt = await res.clone().text();
+                const plain = String(txt || '').trim();
+                if (plain && plain.length < 500 && !plain.startsWith('{')) {
+                    detail = plain;
+                }
+            } catch (_) {}
+            previewWin.close();
+            throw new Error(detail);
+        }
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        previewWin.location.href = objUrl;
+        setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
+    } catch (e) {
+        try {
+            previewWin.close();
+        } catch (_) {}
+        throw e;
+    }
 }
 
 function escapeHtml(s) {
@@ -96,16 +119,6 @@ function val(id) {
 function setVal(id, v) {
     const el = document.getElementById(id);
     if (el) el.value = v ?? '';
-}
-
-function panelPoeUrlWithId(idPoe) {
-    const base = getCorrectPath('panel/poe');
-    const sep = base.includes('?') ? '&' : '?';
-    try {
-        return new URL(`${base}${sep}id=${encodeURIComponent(String(idPoe))}`, window.location.origin).href;
-    } catch (e) {
-        return `${window.location.origin}/${base}${sep}id=${encodeURIComponent(String(idPoe))}`;
-    }
 }
 
 export async function initAdminPoe() {
@@ -220,7 +233,9 @@ export async function initAdminPoe() {
         const chk = document.getElementById('poe-activo');
         if (chk) chk.checked = true;
         const qrBtn = document.getElementById('btn-poe-admin-qr');
+        const printQrBtn = document.getElementById('btn-poe-admin-print-qr');
         if (qrBtn) qrBtn.disabled = true;
+        if (printQrBtn) printQrBtn.disabled = true;
         const mt = document.getElementById('modal-poe-admin-title');
         if (mt) mt.textContent = t.poe_modal_nuevo || '';
     }
@@ -244,10 +259,10 @@ export async function initAdminPoe() {
         const chk = document.getElementById('poe-activo');
         if (chk) chk.checked = parseInt(d.Activo, 10) === 1;
         const qrBtn = document.getElementById('btn-poe-admin-qr');
-        if (qrBtn) {
-            qrBtn.disabled = parseInt(d.Activo, 10) !== 1;
-            qrBtn.dataset.poePublicUrl = panelPoeUrlWithId(parseInt(d.IdPoe, 10));
-        }
+        const printQrBtn = document.getElementById('btn-poe-admin-print-qr');
+        const activo = parseInt(d.Activo, 10) === 1;
+        if (qrBtn) qrBtn.disabled = !activo;
+        if (printQrBtn) printQrBtn.disabled = !activo;
         hydratePoeB2FromRow(d);
         renderPoeB2Ui();
         const mt = document.getElementById('modal-poe-admin-title');
@@ -295,14 +310,21 @@ export async function initAdminPoe() {
         }
     });
 
-    async function uploadPoeDoc(slot) {
+    /**
+     * Sube instructivo a Backblaze (mismo endpoint que el botón Subir).
+     * @param {1|2} slot
+     * @param {{ silent?: boolean, noLoader?: boolean }} opts silent: no toast de éxito; noLoader: no show/hide loader (p. ej. guardado ya muestra loader)
+     * @returns {Promise<boolean>}
+     */
+    async function uploadPoeDoc(slot, opts = {}) {
+        const { silent = false, noLoader = false } = opts;
         const inp = document.getElementById(slot === 1 ? 'poe-file-d1' : 'poe-file-d2');
         const file = inp?.files?.[0];
         if (!file) {
             await window.Swal?.fire?.({ icon: 'warning', title: t.pp_b2_err_no_file || '', timer: 2000, showConfirmButton: false });
-            return;
+            return false;
         }
-        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        if (!noLoader) showLoader({ upgradeOnly: true, staticPhrase: '' });
         try {
             const fd = new FormData();
             fd.append('file', file);
@@ -320,12 +342,17 @@ export async function initAdminPoe() {
                 setVal('poe-url2', '');
                 if (nom) setVal('poe-nombre2', nom);
             }
+            if (inp) inp.value = '';
             renderPoeB2Ui();
-            await window.Swal?.fire?.({ icon: 'success', title: t.pp_b2_upload_ok || '', timer: 1600, showConfirmButton: false });
+            if (!silent) {
+                await window.Swal?.fire?.({ icon: 'success', title: t.pp_b2_upload_ok || '', timer: 1600, showConfirmButton: false });
+            }
+            return true;
         } catch (e) {
             await window.Swal?.fire?.({ icon: 'error', text: e.message || t.err_generico || '' });
+            return false;
         } finally {
-            hideLoader();
+            if (!noLoader) hideLoader();
         }
     }
 
@@ -350,8 +377,11 @@ export async function initAdminPoe() {
         if (!id) return;
         try {
             await openPoeAdjuntoPreview(id, 1);
-        } catch (_) {
-            await window.Swal?.fire?.({ icon: 'error', text: t.pp_b2_preview_fail || t.err_generico || '' });
+        } catch (err) {
+            await window.Swal?.fire?.({
+                icon: 'error',
+                text: escapeHtml(err?.message || '') || t.pp_b2_preview_fail || t.err_generico || '',
+            });
         }
     });
     document.getElementById('poe-btn-prev-d2')?.addEventListener('click', async () => {
@@ -359,8 +389,11 @@ export async function initAdminPoe() {
         if (!id) return;
         try {
             await openPoeAdjuntoPreview(id, 2);
-        } catch (_) {
-            await window.Swal?.fire?.({ icon: 'error', text: t.pp_b2_preview_fail || t.err_generico || '' });
+        } catch (err) {
+            await window.Swal?.fire?.({
+                icon: 'error',
+                text: escapeHtml(err?.message || '') || t.pp_b2_preview_fail || t.err_generico || '',
+            });
         }
     });
 
@@ -370,37 +403,53 @@ export async function initAdminPoe() {
     });
 
     document.getElementById('btn-poe-guardar')?.addEventListener('click', async () => {
-        const id = parseInt(val('poe-id'), 10);
-        const payload = {
-            Titulo: val('poe-titulo') || null,
-            Resena: val('poe-resena') || null,
-            Cuerpo: val('poe-cuerpo') || null,
-            UrlAdjunto1: val('poe-url1') || null,
-            NombreAdjunto1: val('poe-nombre1') || null,
-            UrlAdjunto2: val('poe-url2') || null,
-            NombreAdjunto2: val('poe-nombre2') || null,
-            Orden: parseInt(val('poe-orden'), 10) || 0,
-            Activo: document.getElementById('poe-activo')?.checked ? 1 : 0,
-        };
-        mergePoeB2IntoPayload(payload);
-        let res;
-        if (id > 0) {
-            res = await API.request('/admin/comunicacion/poe/update', 'POST', { ...payload, IdPoe: id });
-        } else {
-            res = await API.request('/admin/comunicacion/poe', 'POST', payload);
-        }
-        if (res.status === 'success') {
-            await window.Swal?.fire?.({
-                icon: 'success',
-                title: t.poe_save_ok || t.pp_save_ok || '',
-                timer: 1600,
-                showConfirmButton: false,
-            });
-            modal?.hide();
-            invalidatePoeListCache();
-            await cargarTabla();
-        } else {
-            await window.Swal?.fire?.({ icon: 'error', title: t.err_generico || '', text: escapeHtml(res.message || '') });
+        showLoader({ upgradeOnly: true, staticPhrase: '' });
+        try {
+            const f1 = document.getElementById('poe-file-d1')?.files?.[0];
+            const f2 = document.getElementById('poe-file-d2')?.files?.[0];
+            if (f1) {
+                const ok = await uploadPoeDoc(1, { silent: true, noLoader: true });
+                if (!ok) return;
+            }
+            if (f2) {
+                const ok = await uploadPoeDoc(2, { silent: true, noLoader: true });
+                if (!ok) return;
+            }
+
+            const id = parseInt(val('poe-id'), 10);
+            const payload = {
+                Titulo: val('poe-titulo') || null,
+                Resena: val('poe-resena') || null,
+                Cuerpo: val('poe-cuerpo') || null,
+                UrlAdjunto1: val('poe-url1') || null,
+                NombreAdjunto1: val('poe-nombre1') || null,
+                UrlAdjunto2: val('poe-url2') || null,
+                NombreAdjunto2: val('poe-nombre2') || null,
+                Orden: parseInt(val('poe-orden'), 10) || 0,
+                Activo: document.getElementById('poe-activo')?.checked ? 1 : 0,
+            };
+            mergePoeB2IntoPayload(payload);
+            let res;
+            if (id > 0) {
+                res = await API.request('/admin/comunicacion/poe/update', 'POST', { ...payload, IdPoe: id });
+            } else {
+                res = await API.request('/admin/comunicacion/poe', 'POST', payload);
+            }
+            if (res.status === 'success') {
+                await window.Swal?.fire?.({
+                    icon: 'success',
+                    title: t.poe_save_ok || t.pp_save_ok || '',
+                    timer: 1600,
+                    showConfirmButton: false,
+                });
+                modal?.hide();
+                invalidatePoeListCache();
+                await cargarTabla();
+            } else {
+                await window.Swal?.fire?.({ icon: 'error', title: t.err_generico || '', text: escapeHtml(res.message || '') });
+            }
+        } finally {
+            hideLoader();
         }
     });
 
@@ -418,24 +467,21 @@ export async function initAdminPoe() {
     });
 
     document.getElementById('btn-poe-admin-qr')?.addEventListener('click', async () => {
-        const btn = document.getElementById('btn-poe-admin-qr');
-        const url = btn?.dataset?.poePublicUrl || '';
-        if (!url || typeof QRCode === 'undefined') return;
-        await window.Swal?.fire?.({
-            title: t.poe_qr_title || '',
-            html: `<p class="small text-muted mb-3">${escapeHtml(t.poe_qr_hint || '')}</p><div class="d-flex justify-content-center"><div id="swal-qr-poe-admin"></div></div><p class="small text-break mt-3 mb-0">${escapeHtml(url)}</p>`,
-            width: 420,
-            didOpen: () => {
-                const host = document.getElementById('swal-qr-poe-admin');
-                if (!host) return;
-                host.innerHTML = '';
-                try {
-                    new QRCode(host, { text: url, width: 220, height: 220 });
-                } catch (e) {
-                    console.error(e);
-                }
-            },
-        });
+        const id = getPoeEditId();
+        if (!id || typeof QRCode === 'undefined') return;
+        const url = buildPanelPoePublicUrl(id);
+        const titulo = val('poe-titulo') || '';
+        await showPoeQrSwal(t, titulo, url);
+    });
+
+    document.getElementById('btn-poe-admin-print-qr')?.addEventListener('click', () => {
+        const id = getPoeEditId();
+        if (!id) return;
+        const url = buildPanelPoePublicUrl(id);
+        const titulo = val('poe-titulo') || '';
+        if (!printPoeQrSheet(titulo, url)) {
+            window.Swal?.fire?.({ icon: 'warning', text: t.poe_print_blocked || '' });
+        }
     });
 
     await cargarTabla();

@@ -31,6 +31,13 @@ function formatAnimalFechaPrecioRef(iso) {
     return iso;
 }
 
+/** Hay opciones de cepa reales en el modal (más fiable que el flag global ante carreras async). */
+function animalModalHasCepaChoices() {
+    const sel = document.getElementById('select-cepa-modal');
+    if (!sel || sel.disabled) return false;
+    return Array.from(sel.options || []).some((o) => o.value && String(o.value) !== '0');
+}
+
 function buildAnimalesListQuery(extra = {}) {
     const instId = localStorage.getItem('instId');
     const limit = extra.limit != null ? extra.limit : rowsPerPage;
@@ -422,7 +429,7 @@ window.openAnimalModal = async (a) => {
     window._animalModalFrozenFechaPrecio = (a.FechaPrecioReferencia != null && String(a.FechaPrecioReferencia).trim() !== '')
         ? String(a.FechaPrecioReferencia).trim().slice(0, 10) : '';
 
-    const instId = localStorage.getItem('instId');
+    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
     const container = document.getElementById('modal-content-animal');
     const btnPdfFoot = document.getElementById('btn-modal-animal-pdf');
     if (btnPdfFoot) btnPdfFoot.disabled = true;
@@ -490,8 +497,7 @@ window.openAnimalModal = async (a) => {
         const espOk = (document.getElementById('select-especie-modal')?.value || '').trim() !== '';
         const catOk = (document.getElementById('select-categoria-modal')?.value || '').trim() !== '';
         const selCepa = document.getElementById('select-cepa-modal');
-        const help = document.getElementById('cepa-modal-help');
-        const cepaRequired = help && (help.textContent || '').toLowerCase().includes('debe seleccionar');
+        const cepaRequired = animalModalHasCepaChoices();
         const cepaOk = !cepaRequired || (selCepa && String(selCepa.value || '0') !== '0');
 
         statusSel.disabled = !(deptoOk && espOk && catOk && cepaOk);
@@ -515,6 +521,10 @@ window.openAnimalModal = async (a) => {
         bind('select-categoria-modal');
         bind('select-cepa-modal');
     }
+
+    window._animalModalOnCepasLoaded = () => {
+        if (statusSel && isDerivedDest && configIncompleta) updateDerivedEstadoEnablement();
+    };
 
     // Inicialización de eventos
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
@@ -1191,24 +1201,35 @@ window.updateSpeciesPrice = (select) => {
 };
 
 window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
-    const instId = localStorage.getItem('instId');
+    window._animalModalCepasLoadGen = (window._animalModalCepasLoadGen || 0) + 1;
+    const gen = window._animalModalCepasLoadGen;
+    const stale = () => gen !== window._animalModalCepasLoadGen;
+
+    const t = window.txt?.form_animales || {};
+    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
     const sel = document.getElementById('select-cepa-modal');
     const help = document.getElementById('cepa-modal-help');
     if (!sel) return;
-    sel.innerHTML = `<option value="0">-</option>`;
-    sel.disabled = true;
-    if (help) help.textContent = 'Cargando...';
-    if (!idespA) {
-        if (help) help.textContent = window.txt?.form_animales?.seleccione_especie_cepa || 'Seleccione especie.';
-        return;
-    }
+
+    sel.dataset.cepaLoading = '1';
     try {
-        const res = await API.request(`/animals/cepas?inst=${instId}&idespA=${encodeURIComponent(idespA)}`);
+        window._animalModalCepasRequired = false;
+        sel.innerHTML = `<option value="0">-</option>`;
+        sel.disabled = true;
+        if (help) help.textContent = t.cargando_cepas || 'Cargando...';
+        if (!idespA) {
+            if (stale()) return;
+            if (help) help.textContent = t.seleccione_especie_cepa || 'Seleccione especie.';
+            return;
+        }
+        const res = await API.request(`/animals/cepas?inst=${encodeURIComponent(instId)}&idespA=${encodeURIComponent(idespA)}`);
+        if (stale()) return;
         const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
         sel.innerHTML = '';
         if (list.length > 0) {
+            window._animalModalCepasRequired = true;
             sel.disabled = false;
-            sel.innerHTML = `<option value="0">Seleccione...</option>`;
+            sel.innerHTML = `<option value="0">${t.seleccione || 'Seleccione...'}</option>`;
             list.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.idcepaA;
@@ -1216,18 +1237,25 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
                 sel.appendChild(opt);
             });
             if (currentIdCepa) sel.value = String(currentIdCepa);
-            if (help) help.textContent = 'Si existen Cepa/Stock/Raza habilitadas para esta especie, debe seleccionar una.';
+            if (help) help.textContent = t.cepa_help || 'Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.';
         } else {
+            window._animalModalCepasRequired = false;
             sel.disabled = true;
             sel.innerHTML = `<option value="0">-</option>`;
-            if (help) help.textContent = 'No hay Cepa/Stock/Raza a seleccionar.';
+            if (help) help.textContent = t.no_cepa_disponible || 'No hay Cepa/Stock/Raza a seleccionar.';
         }
     } catch (e) {
         console.error(e);
+        if (stale()) return;
+        window._animalModalCepasRequired = false;
         sel.disabled = true;
         sel.innerHTML = `<option value="0">-</option>`;
-        if (help) help.textContent = 'No hay Cepa/Stock/Raza a seleccionar.';
+        if (help) help.textContent = t.no_cepa_disponible || 'No hay Cepa/Stock/Raza a seleccionar.';
+    } finally {
+        if (!stale()) delete sel.dataset.cepaLoading;
     }
+    if (stale()) return;
+    try { window._animalModalOnCepasLoaded?.(); } catch (_) {}
 };
 
 window.handleProtocolChange = async (select) => {
@@ -1261,7 +1289,7 @@ window.filterProtocolList = (input) => {
 window.saveFullAnimalForm = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const instId = localStorage.getItem('instId');
+    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
     const id = fd.get('idformA');
     let row = allAnimals.find(x => Number(x.idformA) === Number(id));
     if (!row) row = await fetchAnimalRowById(id);
@@ -1278,17 +1306,41 @@ window.saveFullAnimalForm = async (e) => {
     }
 
     try {
+        const fa = window.txt?.form_animales || {};
+        const espModalEl = document.getElementById('select-especie-modal');
         const catSel = document.getElementById('select-categoria-modal');
         const cepaSel = document.getElementById('select-cepa-modal');
-        const cepaHelp = document.getElementById('cepa-modal-help');
-        const hasCepas = cepaHelp && (cepaHelp.textContent || '').toLowerCase().includes('debe seleccionar');
-        if (isDerivedActive && !isOriginInst && catSel && !(catSel.value || '').trim()) {
-            const msg = window.txt?.misformularios?.derivacion_especie_requerida || 'Debe seleccionar Especie y Categoría para el formulario derivado.';
-            window.Swal.fire('Falta información', msg, 'warning');
+        if (espModalEl && !(String(espModalEl.value || '').trim())) {
+            window.Swal.fire(
+                fa.debe_seleccionar_cepa_titulo || 'Falta información',
+                fa.seleccione_especie_cepa || 'Seleccione especie.',
+                'warning'
+            );
             return;
         }
+        if (catSel && !(String(catSel.value || '').trim())) {
+            window.Swal.fire(
+                fa.debe_seleccionar_cepa_titulo || 'Falta información',
+                fa.debe_seleccionar_categoria_texto || 'Debe seleccionar la categoría de especie (subespecie).',
+                'warning'
+            );
+            return;
+        }
+        if (cepaSel && cepaSel.dataset.cepaLoading === '1') {
+            window.Swal.fire(
+                fa.cargando_cepas || 'Cargando Cepa/Stock/Raza...',
+                fa.cepa_espere_guardar || 'Las opciones están cargando. Espere un momento e intente de nuevo.',
+                'info'
+            );
+            return;
+        }
+        const hasCepas = animalModalHasCepaChoices();
         if (hasCepas && cepaSel && String(cepaSel.value || '0') === '0') {
-            window.Swal.fire('Falta información', 'Debe seleccionar una Cepa/Stock/Raza.', 'warning');
+            window.Swal.fire(
+                fa.debe_seleccionar_cepa_titulo || 'Falta información',
+                fa.debe_seleccionar_cepa_texto || 'Debe seleccionar una Cepa/Stock/Raza.',
+                'warning'
+            );
             return;
         }
         const instParam = instId || sessionStorage.getItem('instId') || '';

@@ -13,10 +13,23 @@ const basePath = (window.location.hostname === 'localhost' || window.location.ho
 function getContextInstId() {
     let instId = sessionStorage.getItem('target_inst_secreto');
     if (!instId) {
-        instId = localStorage.getItem('instId');
+        instId = localStorage.getItem('instId') || sessionStorage.getItem('instId');
     }
     return instId;
 }
+
+/** idespA en la opción de especie (evita depender solo de dataset con data-idesp-a). */
+function readIdEspFromSpeciesOption(opt) {
+    if (!opt) return null;
+    const raw = opt.getAttribute('data-idesp')
+        || opt.getAttribute('data-idesp-a')
+        || (opt.dataset && (opt.dataset.idesp || opt.dataset.idespA))
+        || '';
+    const s = String(raw).trim();
+    if (!s || s === 'undefined' || s === 'null') return null;
+    return s;
+}
+
 export async function initAnimalForm() {
     // 1. Usamos el ID correcto (URL o Storage)
     const instId = getContextInstId();
@@ -445,7 +458,9 @@ function populateSpeciesSelect() {
         const opt = document.createElement('option');
         opt.value = JSON.stringify(s.subs); 
         opt.text = s.name;
-        opt.setAttribute('data-idesp-a', String(s.id ?? ''));
+        const idEsp = String(s.id ?? '').trim();
+        opt.setAttribute('data-idesp', idEsp);
+        opt.setAttribute('data-idesp-a', idEsp);
         sel.appendChild(opt);
     });
 
@@ -455,7 +470,7 @@ function populateSpeciesSelect() {
         resetCepaSelect();
 
         if (e.target.value) {
-            const idespA = e.target.options[e.target.selectedIndex].dataset.idespA || e.target.options[e.target.selectedIndex].getAttribute('data-idesp-a');
+            const idespA = readIdEspFromSpeciesOption(e.target.options[e.target.selectedIndex]);
             const subs = JSON.parse(e.target.value);
             subs.forEach(sub => {
                 const opt = document.createElement('option');
@@ -464,7 +479,7 @@ function populateSpeciesSelect() {
                 subSel.appendChild(opt);
             });
             subSel.disabled = false;
-            loadCepasForEspecie(idespA);
+            if (idespA) loadCepasForEspecie(idespA);
             if (subs.length === 1) {
                 subSel.selectedIndex = 1;
                 subSel.style.backgroundColor = "#e8f5e9"; 
@@ -473,7 +488,11 @@ function populateSpeciesSelect() {
         }
     };
 
-    subSel.onchange = () => { };
+    subSel.onchange = () => {
+        const selEsp = document.getElementById('select-especie');
+        const idespA = readIdEspFromSpeciesOption(selEsp && selEsp.options[selEsp.selectedIndex]);
+        if (idespA) loadCepasForEspecie(idespA);
+    };
 
     if (speciesData.length === 1) {
         sel.selectedIndex = 1;
@@ -502,6 +521,23 @@ async function handleReview(e) {
     if (!typeSel.value) return Swal.fire('Falta Información', 'Debe seleccionar el Tipo de Solicitud.', 'warning');
     const typeText = typeSel.options[typeSel.selectedIndex].text;
 
+    const selEspecie = document.getElementById('select-especie');
+    const selSub = document.getElementById('select-subespecie');
+    if (!selEspecie || selEspecie.selectedIndex <= 0 || !selEspecie.value) {
+        return Swal.fire(
+            t?.debe_seleccionar_cepa_titulo || 'Falta información',
+            t?.seleccione_especie_cepa || 'Seleccione especie.',
+            'warning'
+        );
+    }
+    if (!selSub || selSub.disabled || selSub.selectedIndex <= 0 || !(selSub.value || '').toString().trim()) {
+        return Swal.fire(
+            t?.debe_seleccionar_cepa_titulo || 'Falta información',
+            t?.debe_seleccionar_categoria_texto || 'Debe seleccionar la categoría de especie (subespecie).',
+            'warning'
+        );
+    }
+
     // Cepa obligatoria si existen cepas configuradas para la especie
     const cepaSel = document.getElementById('select-cepa') || document.getElementById('select-cepa-2');
     const cepaVal = cepaSel ? String(cepaSel.value || '0') : '0';
@@ -523,9 +559,7 @@ async function handleReview(e) {
     const fecha = document.getElementById('input-fecha').value;
     const aclaracion = document.getElementById('input-aclaracion').value || 'Sin observaciones.';
     
-    const selEspecie = document.getElementById('select-especie');
     const txtEspecie = selEspecie.options[selEspecie.selectedIndex].text;
-    const selSub = document.getElementById('select-subespecie');
     const txtSub = selSub.options[selSub.selectedIndex].text;
 
     const peso = document.getElementById('input-peso').value;

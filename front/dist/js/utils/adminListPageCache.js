@@ -39,7 +39,7 @@ export function offsetLimitToPageLimitQuery(rowsPerPage, extra = {}) {
 }
 
 /**
- * Caché por número de página + prefetch en idle para bandejas admin (animales, insumos, reactivos, usuarios, noticias/POE admin, soporte panel vía `offsetLimitToPagePageSizeQuery` / `offsetLimitToPageLimitQuery`).
+ * Caché por número de página + prefetch en idle para bandejas admin (animales, insumos, reactivos, usuarios, noticias/POEs admin, soporte panel vía `offsetLimitToPagePageSizeQuery` / `offsetLimitToPageLimitQuery`).
  * Evita pedir al API miles de filas de una vez cuando hay cientos de páginas.
  *
  * @param {number} rowsPerPage

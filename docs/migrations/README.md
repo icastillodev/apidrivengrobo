@@ -12,6 +12,10 @@ Ejemplos recientes en este repo: `2026-05-09-noticia-orden-fijo.sql` (noticias p
 
 **Un solo archivo con todo el pack maestro (orden correcto + índices opcionales al final):** `2026-05-09-feature-pack-backlog-maestro.sql`.
 
+**Parche sin re-ejecutar el maestro:** si ya aplicaste el maestro viejo y falta solo la tabla de popups del panel → `2026-05-09-patch-institucion-dashboard-popup-idempotente.sql` (seguro repetir).
+
+**Solo copiar y pegar en phpMyAdmin:** `COPIAR-PARCHE-popup-dashboard.sql` (mismo SQL, nombre obvio).
+
 ## Contenido de cada archivo
 
 1. **Cabecera en comentarios**: qué problema resuelve, pantalla/API relacionada, orden de ejecución si hay varios pasos.

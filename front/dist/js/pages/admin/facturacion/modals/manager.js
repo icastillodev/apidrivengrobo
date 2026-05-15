@@ -8,7 +8,7 @@ import { openAnimalModal } from './animalModal.js';
 import { openAlojModal } from './alojamientos/alojModal.js';
 import { openReactiveModal } from './reactiveModal.js';
 import { openInsumoModal } from './insumoModal.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingInsumoMontoTotalCobrable } from '../billingLocale.js';
 
 const txBM = () => window.txt?.facturacion?.billing_modal || {};
 const txBIPdf = () => window.txt?.facturacion?.billing_investigador || {};
@@ -17,6 +17,11 @@ const txPayFail = () =>
     window.txt?.facturacion?.payment_error_procesar ||
     window.txt?.facturacion?.error_procesar_corto ||
     'No se pudo procesar el pago.';
+
+function sleepBillingModal(ms) {
+    const n = Math.max(0, Number(ms) || 0);
+    return new Promise((resolve) => setTimeout(resolve, n));
+}
 function bmTpl(str, map) {
     if (!str) return '';
     return str.replace(/\{(\w+)\}/g, (_, k) => (map[k] != null ? String(map[k]) : `{${k}}`));
@@ -27,19 +32,98 @@ function bmTxt(tx, key, fallbackEn) {
     return tx[key] || window.txt?.facturacion?.billing_modal?.[key] || fallbackEn;
 }
 
+/** Mensaje traducido para errores al fijar total (API devuelve `error_code`). */
+function bmErrFijarPrecio(res) {
+    const tx = txBM();
+    const code = res && res.error_code ? String(res.error_code) : '';
+    if (code && tx[code]) return tx[code];
+    if (res && res.message && String(res.message).trim() !== '') return String(res.message);
+    return tx.billing_fijar_error_generico || 'Error';
+}
+
+/** Evita doble POST si blur y otro evento coinciden. */
+let billingPersistTotalBusy = false;
+
+/**
+ * Guarda el total del modal (animal / reactivo / insumo / aloj) si cambió respecto a `data-billing-total-orig`.
+ * @param {'ANIMAL'|'REACTIVO'|'INSUMO'|'ALOJ'} kind
+ * @param {number|string} id idformA o historia (aloj)
+ * @param {string} inputId id del input
+ * @param {boolean} skipIfUnchanged si true, no llama API si el valor no cambió (blur); el botón azul usa el mismo criterio
+ */
+async function billingPersistTotalFromField(kind, id, inputId, skipIfUnchanged) {
+    if (billingPersistTotalBusy) return;
+    const inp = document.getElementById(inputId);
+    if (!inp || inp.readOnly || inp.disabled) return;
+
+    const orig = parseFloat(String(inp.dataset.billingTotalOrig ?? '').replace(',', '.'));
+    const nuevo = parseFloat(String(inp.value ?? '').replace(',', '.'));
+    if (!Number.isFinite(nuevo) || nuevo < 0) {
+        if (window.Swal) {
+            await Swal.fire(window.txt?.generales?.error || 'Error', bmErrFijarPrecio({ error_code: 'billing_fijar_invalido' }), 'warning');
+        }
+        if (Number.isFinite(orig)) inp.value = orig.toFixed(2);
+        return;
+    }
+    if (skipIfUnchanged && Number.isFinite(orig) && Math.abs(nuevo - orig) < 0.009) return;
+
+    let endpoint;
+    /** @type {Record<string, unknown>} */
+    let body;
+    if (kind === 'ANIMAL') {
+        endpoint = '/billing/update-animal';
+        body = { id, total: nuevo };
+    } else if (kind === 'REACTIVO') {
+        endpoint = '/billing/update-reactive';
+        body = { id, total: nuevo };
+    } else if (kind === 'INSUMO') {
+        endpoint = '/billing/update-insumo';
+        body = { id, total: nuevo };
+    } else if (kind === 'ALOJ') {
+        endpoint = '/billing/update-alojamiento-precio';
+        body = { historia: id, total: nuevo };
+    } else {
+        return;
+    }
+
+    billingPersistTotalBusy = true;
+    showLoader();
+    try {
+        const res = await API.request(endpoint, 'POST', body);
+        if (res.status !== 'success') {
+            if (window.Swal) {
+                await Swal.fire(window.txt?.generales?.error || 'Error', bmErrFijarPrecio(res), 'error');
+            }
+            if (Number.isFinite(orig)) inp.value = orig.toFixed(2);
+            return;
+        }
+        inp.dataset.billingTotalOrig = nuevo.toFixed(2);
+        if (typeof window.recargarGrillaActiva === 'function') {
+            await window.recargarGrillaActiva();
+        }
+    } catch (e) {
+        console.error(e);
+        if (window.Swal) Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
+        if (Number.isFinite(orig)) inp.value = orig.toFixed(2);
+    } finally {
+        billingPersistTotalBusy = false;
+        hideLoader();
+    }
+}
+
+/** Desde HTML: `onblur="window.billingPersistTotalBlur('ANIMAL', id, 'mdl-ani-total')"` */
+window.billingPersistTotalBlur = async (kind, id, inputId) => {
+    await billingPersistTotalFromField(kind, id, inputId, true);
+};
+
 /**
  * Función Inteligente para Recargar la Vista Actual
  * Detecta en qué pestaña del facturador estamos para refrescar la grilla correcta.
+ * @param {{ idUsr?: unknown, idProt?: unknown }} [restoreOpts] — foco tras pintar (opcional; por defecto solo conserva scroll Y).
  */
-window.recargarGrillaActiva = () => {
-    if (document.getElementById('sel-depto') && typeof window.cargarFacturacionDepto === 'function') {
-        window.cargarFacturacionDepto();
-    } else if (document.getElementById('sel-investigador') && typeof window.cargarFacturacionInvestigador === 'function') {
-        window.cargarFacturacionInvestigador();
-    } else if (document.getElementById('sel-protocolo') && typeof window.cargarFacturacionProtocolo === 'function') {
-        window.cargarFacturacionProtocolo();
-    } else if (document.getElementById('billing-results-inst') && typeof window.cargarFacturacionInstitucion === 'function') {
-        window.cargarFacturacionInstitucion();
+window.recargarGrillaActiva = async (restoreOpts) => {
+    if (typeof window.refreshBillingReportAfterMutation === 'function') {
+        await window.refreshBillingReportAfterMutation(restoreOpts);
     }
 };
 
@@ -63,6 +147,38 @@ window.abrirEdicionFina = (tipo, id) => {
     }
 };
 
+/**
+ * Clic en fila de alojamiento (grillas de facturación): evita error si `event.target` es nodo texto (sin `closest`)
+ * y no abre el modal al pulsar el checkbox ni la primera columna.
+ * @param {MouseEvent} ev
+ * @param {string|number} historiaRaw id de historia (alojamiento)
+ */
+window.billingRowClickOpenAlojModal = (ev, historiaRaw) => {
+    const hid = parseInt(String(historiaRaw ?? '').trim(), 10);
+    if (!Number.isFinite(hid) || hid <= 0) return;
+    let n = ev?.target;
+    if (n && n.nodeType === 3) {
+        n = n.parentElement;
+    }
+    if (!(n instanceof Element)) return;
+    if (n.closest('input[type="checkbox"]')) return;
+    if (n.closest('td:first-child')) return;
+    window.abrirEdicionFina('ALOJ', hid);
+};
+
+/**
+ * Bootstrap deja `modal-open` y `.modal-backdrop` en `body` si el nodo del modal se borra sin `dispose()`
+ * (p. ej. `innerHTML` en `#modal-container`). Quitar restos evita pantalla oscura hasta F5.
+ */
+function billingStripOrphanModalUi() {
+    document.querySelectorAll('.modal-backdrop').forEach((n) => {
+        if (n && n.parentNode) n.parentNode.removeChild(n);
+    });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+}
+
 window.renderAndShowModal = (html, modalId) => {
     let container = document.getElementById('modal-container');
     if (!container) {
@@ -70,6 +186,16 @@ window.renderAndShowModal = (html, modalId) => {
         container.id = 'modal-container';
         document.body.appendChild(container);
     }
+    container.querySelectorAll('.modal').forEach((el) => {
+        const inst = typeof bootstrap !== 'undefined' && bootstrap.Modal ? bootstrap.Modal.getInstance(el) : null;
+        if (inst) {
+            try {
+                inst.dispose();
+            } catch (_) { /* ignore */ }
+        }
+    });
+    billingStripOrphanModalUi();
+
     container.innerHTML = html;
     const modalEl = document.getElementById(modalId);
     if (!modalEl) {
@@ -79,6 +205,13 @@ window.renderAndShowModal = (html, modalId) => {
         }
         return;
     }
+    modalEl.addEventListener(
+        'hidden.bs.modal',
+        () => {
+            billingStripOrphanModalUi();
+        },
+        { once: true }
+    );
     const myModal = new bootstrap.Modal(modalEl);
     myModal.show();
 };
@@ -143,11 +276,9 @@ window.ajustarPago = async (accion, id) => {
             if (res.status === 'success') {
                 const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalAnimal'));
                 if (modalInstance) modalInstance.hide();
-                
-                setTimeout(() => {
-                    openAnimalModal(id); // Recarga datos frescos en el modal
-                    window.recargarGrillaActiva(); // Refresca grilla principal
-                }, 300);
+                await sleepBillingModal(300);
+                await openAnimalModal(id);
+                await window.recargarGrillaActiva();
             } else {
                 Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
             }
@@ -161,24 +292,7 @@ window.ajustarPago = async (accion, id) => {
 };
 
 window.toggleEditTotal = async (id) => {
-    const inp = document.getElementById('mdl-ani-total');
-    if (inp.hasAttribute('readonly')) {
-        inp.removeAttribute('readonly');
-        inp.focus();
-    } else {
-        const nuevoTotal = inp.value;
-        showLoader();
-        try {
-            await API.request('/billing/update-total', 'POST', { id, total: nuevoTotal });
-            inp.setAttribute('readonly', true);
-            window.recargarGrillaActiva();
-        } catch (e) {
-            console.error(e);
-            if (window.Swal) Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
-        } finally {
-            hideLoader();
-        }
-    }
+    await billingPersistTotalFromField('ANIMAL', id, 'mdl-ani-total', true);
 };
 
 // ==========================================
@@ -244,11 +358,9 @@ window.ajustarPagoAloj = async (accion, id) => {
             if (res.status === 'success') {
                 const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalAlojamiento'));
                 if (modalInstance) modalInstance.hide();
-
-                setTimeout(() => {
-                    openAlojModal(id);
-                    window.recargarGrillaActiva(); 
-                }, 300);
+                await sleepBillingModal(300);
+                await openAlojModal(id);
+                await window.recargarGrillaActiva();
             } else {
                 Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
             }
@@ -262,26 +374,7 @@ window.ajustarPagoAloj = async (accion, id) => {
 };
 
 window.toggleEditTotalAloj = async (id) => {
-    const inp = document.getElementById('mdl-aloj-total');
-    if (inp.hasAttribute('readonly')) {
-        inp.removeAttribute('readonly');
-        inp.focus();
-        inp.classList.add('border-primary', 'bg-white');
-    } else {
-        const nuevoTotal = inp.value;
-        showLoader();
-        try {
-            await API.request('/billing/update-total-aloj', 'POST', { id, total: nuevoTotal });
-            inp.setAttribute('readonly', true);
-            inp.classList.remove('border-primary', 'bg-white');
-            window.recargarGrillaActiva();
-        } catch (e) {
-            console.error(e);
-            if (window.Swal) Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
-        } finally {
-            hideLoader();
-        }
-    }
+    await billingPersistTotalFromField('ALOJ', id, 'mdl-aloj-total', true);
 };
 
 // ==========================================
@@ -327,11 +420,9 @@ window.ajustarPagoRea = async (accion, id) => {
             if (res.status === 'success') {
                 const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalReactivo'));
                 if (modalInstance) modalInstance.hide();
-                
-                setTimeout(() => {
-                    openReactiveModal(id);
-                    window.recargarGrillaActiva(); 
-                }, 300);
+                await sleepBillingModal(300);
+                await openReactiveModal(id);
+                await window.recargarGrillaActiva();
             } else {
                 Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
             }
@@ -345,24 +436,7 @@ window.ajustarPagoRea = async (accion, id) => {
 };
 
 window.toggleEditTotalRea = async (id) => {
-    const inp = document.getElementById('mdl-rea-total');
-    if (inp.hasAttribute('readonly')) {
-        inp.removeAttribute('readonly');
-        inp.focus();
-    } else {
-        const nuevoTotal = inp.value;
-        showLoader();
-        try {
-            await API.request('/billing/update-total', 'POST', { id, total: nuevoTotal, modulo: 'REACTIVO' });
-            inp.setAttribute('readonly', true);
-            window.recargarGrillaActiva();
-        } catch (e) {
-            console.error(e);
-            if (window.Swal) Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
-        } finally {
-            hideLoader();
-        }
-    }
+    await billingPersistTotalFromField('REACTIVO', id, 'mdl-rea-total', true);
 };
 
 // ==========================================
@@ -415,11 +489,9 @@ window.ajustarPagoIns = async (accion, id) => {
             if (res.status === 'success') {
                 const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalInsumo'));
                 if (modalInstance) modalInstance.hide();
-
-                setTimeout(async () => {
-                    openInsumoModal(id);
-                    window.recargarGrillaActiva(); 
-                }, 300);
+                await sleepBillingModal(300);
+                await openInsumoModal(id);
+                await window.recargarGrillaActiva();
             } else {
                 Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
             }
@@ -433,30 +505,7 @@ window.ajustarPagoIns = async (accion, id) => {
 };
 
 window.toggleEditTotalIns = async (id) => {
-    const inp = document.getElementById('mdl-ins-total');
-    if (inp.hasAttribute('readonly')) {
-        inp.removeAttribute('readonly');
-        inp.focus();
-        inp.classList.add('border-primary');
-    } else {
-        const nuevoTotal = inp.value;
-        showLoader();
-        try {
-            await API.request('/billing/update-total', 'POST', { 
-                id, 
-                total: nuevoTotal, 
-                modulo: 'INSUMO' 
-            });
-            inp.setAttribute('readonly', true);
-            inp.classList.remove('border-primary');
-            window.recargarGrillaActiva();
-        } catch (e) {
-            console.error(e);
-            if (window.Swal) Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
-        } finally {
-            hideLoader();
-        }
-    }
+    await billingPersistTotalFromField('INSUMO', id, 'mdl-ins-total', true);
 };
 
 window.guardarPrecioLineaInsumo = async (idForminsumo, idformA) => {
@@ -476,10 +525,9 @@ window.guardarPrecioLineaInsumo = async (idForminsumo, idformA) => {
         if (res.status === 'success') {
             const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalInsumo'));
             if (modalInstance) modalInstance.hide();
-            setTimeout(async () => {
-                await openInsumoModal(idformA);
-                window.recargarGrillaActiva();
-            }, 200);
+            await sleepBillingModal(200);
+            await openInsumoModal(idformA);
+            await window.recargarGrillaActiva();
         } else {
             Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
         }
@@ -905,7 +953,7 @@ window.descargarFichaInsPDF = async (idformA) => {
         const rowPdfIdIns = { ...d, id: d.id ?? idformA };
         const idSolicitudPdfIns = billingPdfFormularioIdDisplay(rowPdfIdIns, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() });
 
-        const total = parseFloat(d.total_item || 0);
+        const total = billingInsumoMontoTotalCobrable(d);
         const pagado = parseFloat(d.pagado || 0);
         const saldo = parseFloat(d.saldoInv || 0);
         const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();

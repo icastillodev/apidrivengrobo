@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Alojamiento\AlojamientoModel;
 use App\Utils\Auditoria;
+use App\Utils\ModulosInstitucion;
 use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AlojamientoController {
@@ -48,7 +49,22 @@ class AlojamientoController {
         $id = $_GET['historia'] ?? 0;
         try {
             $sesion = Auditoria::getDatosSesion();
-            $this->enforceModuloSesionOrExit($sesion, 'alojamientos');
+            $role = (int) ($sesion['role'] ?? 0);
+            try {
+                ModulosInstitucion::assertModuloSesion($this->db, $sesion, 'alojamientos');
+            } catch (\RuntimeException $e) {
+                $allowFacturacionStaff = in_array($role, [1, 2, 4], true);
+                $allowInvLegacy = ModulosInstitucion::esRolInvestigadorVisibilidadModulos($role)
+                    && ModulosInstitucion::investigatorHasLegacyDataForModule(
+                        $this->db,
+                        (int) ($sesion['userId'] ?? 0),
+                        (int) ($sesion['instId'] ?? 0),
+                        'alojamientos'
+                    );
+                if (!$allowFacturacionStaff && !$allowInvLegacy) {
+                    $this->modulosRespond403($e->getMessage());
+                }
+            }
             echo json_encode(['status' => 'success', 'data' => $this->model->getHistory($id)]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

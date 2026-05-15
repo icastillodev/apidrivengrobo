@@ -1,6 +1,7 @@
 import { API } from '../../api.js';
 import { NotificationManager } from '../../NotificationManager.js';
 import { scheduleCapUiPrefsToBackend } from '../../utils/userCapUiPrefsBackend.js';
+import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../../utils/noticiaPortadaThumb.js';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -24,6 +25,36 @@ function noticiaCategoriaBadgeHtml(r) {
     let v = String(r?.CategoriaBadge ?? 'primary').toLowerCase();
     if (!NOTICIA_BADGE_VARIANTS.includes(v)) v = 'primary';
     return `<span class="badge text-bg-${v}">${escapeHtml(name)}</span>`;
+}
+
+function noticiaPortadaThumbBlockPortal(r) {
+    const id = parseInt(r.IdNoticia, 10) || 0;
+    if (!id || !r.ImagenPortadaB2Key || String(r.ImagenPortadaB2Key).trim() === '') return '';
+    return `<div class="mb-3 rounded overflow-hidden bg-light d-none border d-flex align-items-center justify-content-center p-1" data-noticia-portada-id="${id}" style="max-height:200px;min-height:72px">
+        <img alt="" class="d-block mx-auto" style="max-width:100%;max-height:200px;width:auto;height:auto;object-fit:contain;object-position:center" />
+    </div>`;
+}
+
+function noticiaAdjuntosBlockPortal(r) {
+    const tc = window.txt?.comunicacion || {};
+    const idNoticia = parseInt(r.IdNoticia, 10) || 0;
+    if (!idNoticia) return '';
+    const btns = [];
+    if (r.AdjuntoDoc1B2Key && String(r.AdjuntoDoc1B2Key).trim()) {
+        const nm = escapeHtml(String(r.AdjuntoDoc1Nombre || '').trim() || tc.noticia_adjunto_sin_nombre || '—');
+        btns.push(
+            `<button type="button" class="btn btn-sm btn-outline-secondary" data-open-noticia-archivo="${idNoticia}" data-noticia-tipo="doc1">${nm}</button>`
+        );
+    }
+    if (r.AdjuntoDoc2B2Key && String(r.AdjuntoDoc2B2Key).trim()) {
+        const nm = escapeHtml(String(r.AdjuntoDoc2Nombre || '').trim() || tc.noticia_adjunto_sin_nombre || '—');
+        btns.push(
+            `<button type="button" class="btn btn-sm btn-outline-secondary" data-open-noticia-archivo="${idNoticia}" data-noticia-tipo="doc2">${nm}</button>`
+        );
+    }
+    if (!btns.length) return '';
+    const lab = escapeHtml(tc.noticia_adjuntos_label || '');
+    return `<div class="mb-3"><div class="small text-muted text-uppercase mb-2 fw-semibold" style="font-size:11px;">${lab}</div><div class="d-flex flex-wrap gap-2">${btns.join('')}</div></div>`;
 }
 
 function textoExtracto(r) {
@@ -233,8 +264,9 @@ export async function initPortalNoticias() {
                     const leer = escapeHtml(t.portal_leer_mas || t.ver_mas || '');
                     return `
                 <div class="col d-flex">
-                    <article class="noticia-tarjeta card shadow-sm w-100 h-100">
+                    <article class="noticia-tarjeta card shadow-sm w-100 h-100 overflow-hidden">
                         <div class="card-body d-flex flex-column p-4">
+                            ${noticiaPortadaThumbBlockPortal(r)}
                             <div class="noticia-meta d-flex flex-wrap align-items-center gap-2 text-muted mb-2">
                                 <time datetime="${escapeHtml(String(fp))}">${escapeHtml(formatFecha(fp))}</time>
                                 ${badge ? `<span class="d-flex align-items-center">${badge}</span>` : ''}
@@ -242,6 +274,7 @@ export async function initPortalNoticias() {
                             </div>
                             <h2 class="noticia-titulo fw-bold mb-2">${escapeHtml(r.Titulo || '—')}</h2>
                             <p class="noticia-extracto small text-muted mb-3 flex-grow-1">${extracto || '—'}</p>
+                            ${noticiaAdjuntosBlockPortal(r)}
                             <button type="button" class="btn btn-outline-success btn-sm fw-bold mt-auto align-self-start" data-noticia-id="${id}">
                                 ${leer} <i class="bi bi-arrow-right ms-1"></i>
                             </button>
@@ -251,6 +284,8 @@ export async function initPortalNoticias() {
                 })
                 .join('');
             bindLeerMas(grid, abrirDetalle);
+            hydrateNoticiaPortadaThumbs(grid);
+            bindNoticiaAdjuntoOpenButtons(grid, t.err_generico || '');
         }
 
         if (infoEl) {
@@ -284,6 +319,24 @@ export async function initPortalNoticias() {
             return;
         }
         const row = res.data;
+        const hostPortada = document.getElementById('modal-noticia-portada-host');
+        if (hostPortada) {
+            hostPortada.querySelectorAll('img').forEach((im) => {
+                const u = im.dataset.blobUrl;
+                if (u) URL.revokeObjectURL(u);
+            });
+            hostPortada.innerHTML = '';
+            const nid = parseInt(row.IdNoticia, 10) || id;
+            if (row.ImagenPortadaB2Key && String(row.ImagenPortadaB2Key).trim() !== '') {
+                hostPortada.innerHTML = `<div class="mb-3 rounded overflow-hidden bg-light d-none border d-flex align-items-center justify-content-center p-2 modal-noticia-portada-frame" data-noticia-portada-id="${nid}" data-noticia-portada-modal="1" style="max-height:min(78vh,720px);min-height:80px"><img alt="" class="d-block mx-auto modal-noticia-portada-img" style="max-width:100%;max-height:min(72vh,680px);width:auto;height:auto;object-fit:contain;object-position:center" /></div>`;
+                await hydrateNoticiaPortadaThumbs(hostPortada);
+            }
+        }
+        const hostAdj = document.getElementById('modal-noticia-adjuntos-host');
+        if (hostAdj) {
+            hostAdj.innerHTML = noticiaAdjuntosBlockPortal(row) || '';
+            bindNoticiaAdjuntoOpenButtons(hostAdj, t.err_generico || '');
+        }
         const tit = document.getElementById('modal-noticia-titulo');
         const meta = document.getElementById('modal-noticia-meta');
         const cuerpo = document.getElementById('modal-noticia-cuerpo');

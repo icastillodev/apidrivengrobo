@@ -1,6 +1,6 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
-import { formatBillingMoney, billingDerivadaLiquidacionBadge, billingTipoExento } from './billingLocale.js';
+import { formatBillingMoney, billingDerivadaLiquidacionBadge, billingTipoExento, billingInsumoMontoTotalCobrable } from './billingLocale.js';
 import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
 
 const txF = () => window.txt?.facturacion || {};
@@ -36,7 +36,7 @@ function flattenProtocolItemsForPersona(p) {
     }
     for (const i of p.insumos || []) {
         const isExento = billingTipoExento(i);
-        const total = parseFloat(i.total_item || 0);
+        const total = billingInsumoMontoTotalCobrable(i);
         const pagado = parseFloat(i.pagado || 0);
         const debe = isExento ? 0 : Math.max(0, total - pagado);
         const concepto = String(i.detalle_completo || '').split(' | ')[0]?.trim().slice(0, 140) || (`#${i.id}`);
@@ -288,25 +288,25 @@ window.pagarSeleccionadosPersona = async () => {
                 idUsr: currentInvestigadorId,
                 items: items
             });
+            hideLoader();
             if (res.status === 'success') {
-                Swal.fire(tf.procesado_titulo || 'Procesado', tf.items_liquidados || 'Los ítems han sido liquidados', 'success');
-                window.cargarFacturacionPersona();
+                await Swal.fire(tf.procesado_titulo || 'Procesado', tf.items_liquidados || 'Los ítems han sido liquidados', 'success');
+                await window.cargarFacturacionPersona();
             } else {
-                Swal.fire(
+                await Swal.fire(
                     g().error || 'Error',
                     res.message || tf.payment_error_procesar || window.txt?.facturacion?.payment_error_procesar || 'No se pudo procesar el pago.',
                     'error'
                 );
             }
         } catch (e) {
+            hideLoader();
             console.error(e);
-            Swal.fire(
+            await Swal.fire(
                 g().error || 'Error',
                 tf.payment_error_procesar || window.txt?.facturacion?.payment_error_procesar || 'No se pudo procesar el pago.',
                 'error'
             );
-        } finally {
-            hideLoader();
         }
     }
 };

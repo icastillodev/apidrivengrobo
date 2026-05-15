@@ -83,7 +83,7 @@ class NoticiaModel {
     }
 
     /**
-     * Listado local: primero noticias con OrdenFijo 1..3 (fila destacada), luego el resto.
+     * Listado local: primero noticias con OrdenFijo 1..6 (hasta dos filas de 3 en el panel), luego el resto.
      * Requiere columna noticia.OrdenFijo (ver docs/migrations).
      */
     private function sqlOrderPublicListLocalWithPin(string $sort): string {
@@ -265,8 +265,8 @@ class NoticiaModel {
                 return ['ok' => true, 'orden' => null];
             }
             $v = (int)$raw;
-            if ($v < 1 || $v > 3) {
-                return ['ok' => false, 'message' => 'La posición fija debe ser 1, 2 o 3 (o ninguna).'];
+            if ($v < 1 || $v > 6) {
+                return ['ok' => false, 'message' => 'La posición fija debe ser entre 1 y 6 (o ninguna).'];
             }
             return ['ok' => true, 'orden' => $v];
         }
@@ -278,13 +278,13 @@ class NoticiaModel {
             return ['ok' => true, 'orden' => null];
         }
         $v = (int)$ex;
-        if ($v < 1 || $v > 3) {
+        if ($v < 1 || $v > 6) {
             return ['ok' => true, 'orden' => null];
         }
         return ['ok' => true, 'orden' => $v];
     }
 
-    /** Libera el cupo (1..3) para otra noticia de la misma institución. */
+    /** Libera el cupo (1..6) para otra noticia de la misma institución. */
     private function clearOrdenFijoSlot(int $instId, int $slot, int $excludeIdNoticia): void {
         $stmt = $this->db->prepare(
             'UPDATE noticia SET OrdenFijo = NULL WHERE IdInstitucion = ? AND OrdenFijo = ? AND IdNoticia <> ?'
@@ -374,9 +374,16 @@ class NoticiaModel {
             $cuerpoSel = $fullCuerpoLocal
                 ? 'Cuerpo AS Cuerpo'
                 : 'LEFT(Cuerpo, 400) AS CuerpoResumen';
+            $b2ListExtra = '';
+            if ($this->hasColumnNoticia('ImagenPortadaB2Key')) {
+                $b2ListExtra .= ', ImagenPortadaB2Key';
+            }
+            if ($this->hasColumnNoticia('AdjuntoDoc1B2Key')) {
+                $b2ListExtra .= ', AdjuntoDoc1B2Key, AdjuntoDoc1Nombre, AdjuntoDoc2B2Key, AdjuntoDoc2Nombre';
+            }
             $sql = "
                 SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge, {$cuerpoSel},
-                       FechaPublicacion, FechaCreacion, OrdenFijo
+                       FechaPublicacion, FechaCreacion, OrdenFijo{$b2ListExtra}
                 FROM noticia
                 WHERE IdInstitucion = ? AND Alcance = 'local' AND " . $this->sqlVisiblePublicas() . "
                 {$searchFilterLocal}
@@ -392,11 +399,18 @@ class NoticiaModel {
             }
             $paramsRed[] = $dep;
 
+            $b2ListExtraRed = '';
+            if ($this->hasColumnNoticia('ImagenPortadaB2Key')) {
+                $b2ListExtraRed .= ', n.ImagenPortadaB2Key';
+            }
+            if ($this->hasColumnNoticia('AdjuntoDoc1B2Key')) {
+                $b2ListExtraRed .= ', n.AdjuntoDoc1B2Key, n.AdjuntoDoc1Nombre, n.AdjuntoDoc2B2Key, n.AdjuntoDoc2Nombre';
+            }
             $sql = "
                 SELECT n.IdNoticia, n.IdInstitucion, n.Alcance, n.Titulo, n.Categoria, n.CategoriaBadge,
                        LEFT(n.Cuerpo, 400) AS CuerpoResumen,
                        n.FechaPublicacion, n.FechaCreacion, n.DependenciaRed,
-                       i.NombreInst AS NombreInstitucion
+                       i.NombreInst AS NombreInstitucion{$b2ListExtraRed}
                 FROM noticia n
                 INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
                 WHERE n.Alcance = 'local' AND " . $this->sqlVisiblePublicas('n') . "
@@ -480,11 +494,12 @@ class NoticiaModel {
 
     public function listAdmin(int $instId, int $page, int $pageSize): array {
         $offset = max(0, ($page - 1) * $pageSize);
+        $b2Portada = $this->hasColumnNoticia('ImagenPortadaB2Key') ? ', ImagenPortadaB2Key' : '';
         $sql = "
             SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge,
                    LEFT(Cuerpo, 200) AS CuerpoPreview,
                    Publicado, CompartirEnRed, FechaPublicacion, FechaCreacion, FechaActualizacion, IdUsrAutor, DependenciaRed,
-                   OrdenFijo
+                   OrdenFijo{$b2Portada}
             FROM noticia
             WHERE IdInstitucion = ?
             ORDER BY (OrdenFijo IS NULL) ASC, OrdenFijo ASC, FechaCreacion DESC, IdNoticia DESC

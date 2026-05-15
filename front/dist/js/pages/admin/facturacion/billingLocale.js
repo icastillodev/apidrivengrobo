@@ -98,6 +98,36 @@ export function billingTipoExento(row) {
 }
 
 /**
+ * Total del pedido insumo para columnas y pies: prioriza `total_item`; si viene en 0 pero hay pagado/debe coherentes, usa pagado+debe.
+ * Evita pie «Total Insumos» en $0 cuando el API no rellena `total_item` pero sí pagado/debe.
+ */
+export function billingInsumoMontoTotalCobrable(row) {
+    if (!row || typeof row !== 'object') return 0;
+    const tRaw = Number(row.total_item ?? 0);
+    if (Number.isFinite(tRaw) && tRaw > 0) {
+        return tRaw;
+    }
+    const p = Number(row.pagado ?? 0);
+    const dRaw = row.debe;
+    const d = dRaw != null && dRaw !== '' ? Number(dRaw) : NaN;
+    const pp = Number.isFinite(p) ? p : 0;
+    const dd = Number.isFinite(d) ? Math.max(0, d) : 0;
+    if (pp > 0 || dd > 0) {
+        return pp + dd;
+    }
+    return Number.isFinite(tRaw) ? Math.max(0, tRaw) : 0;
+}
+
+/** Saldo pendiente del pedido insumo (no exento), alineado con `billingInsumoMontoTotalCobrable` y la columna DEBE en grillas. */
+export function billingInsumoDebeCobrable(row) {
+    if (!row || typeof row !== 'object' || billingTipoExento(row)) return 0;
+    const t = billingInsumoMontoTotalCobrable(row);
+    const p = Number(row.pagado ?? 0);
+    const pag = Number.isFinite(p) ? p : 0;
+    return Math.max(0, t - pag);
+}
+
+/**
  * Pedido no exento con total y pagos en cero: no debe mostrarse como «pagado» ni cuadrado (solo el caso exento cuadra en cero).
  * @param {boolean} isExento
  * @param {number|string} total
@@ -137,11 +167,12 @@ export function billingSumInsumosCobrable(insumos) {
     const acc = { total: 0, pagado: 0, debe: 0 };
     for (const i of insumos || []) {
         if (billingTipoExento(i)) continue;
-        const t = Number(i.total_item || 0);
+        const t = billingInsumoMontoTotalCobrable(i);
         const p = Number(i.pagado || 0);
-        acc.total += Number.isFinite(t) ? t : 0;
-        acc.pagado += Number.isFinite(p) ? p : 0;
-        acc.debe += Math.max(0, (Number.isFinite(t) ? t : 0) - (Number.isFinite(p) ? p : 0));
+        const pag = Number.isFinite(p) ? p : 0;
+        acc.total += t;
+        acc.pagado += pag;
+        acc.debe += billingInsumoDebeCobrable(i);
     }
     return acc;
 }
@@ -318,7 +349,7 @@ export function billingHtmlInsumoProtSectionHeader(colspan, label) {
  */
 export function billingHtmlRowInsumoPedidoFacturacion(i, packs, variant, idProt) {
     const { bd, tf, exL } = packs;
-    const total = parseFloat(i.total_item || 0);
+    const total = billingInsumoMontoTotalCobrable(i);
     const pagado = parseFloat(i.pagado || 0);
     const isExento = billingTipoExento(i);
     const debe = isExento ? 0 : Math.max(0, total - pagado);

@@ -3,7 +3,7 @@
  */
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js';
-import { formatBillingMoney, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga } from '../billingLocale.js';
+import { formatBillingMoney, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingInsumoMontoTotalCobrable } from '../billingLocale.js';
 
 export const openInsumoModal = async (idformA) => {
     try {
@@ -19,10 +19,19 @@ export const openInsumoModal = async (idformA) => {
 
         const d = res.data;
         const tituloIdIns = billingPdfFormularioIdDisplay(d, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() });
-        const total = parseFloat(d.total_item || 0);
+        const total = billingInsumoMontoTotalCobrable(d);
         const pagado = parseFloat(d.pagado || 0);
         const saldo = parseFloat(d.saldoInv || 0);
         const debe = Math.max(0, total - pagado);
+
+        const derIns = d.es_facturacion_derivada === true || d.es_facturacion_derivada == 1 || d.es_facturacion_derivada === '1';
+        const puedeTotalIns = d.puede_editar_precios_linea === true || d.puede_editar_precios_linea === 1;
+        const blockTotalIns = (d.is_exento === true || d.is_exento == 1 || d.exento == 1) || derIns || !puedeTotalIns;
+        const hintAutoSaveIns = String(t.hint_total_auto_save || '').replace(/"/g, '&quot;');
+        const hintGuardarBtnIns = String(t.hint_guardar_total_btn || '').replace(/"/g, '&quot;');
+        const totalInputAttrsIns = blockTotalIns
+            ? 'readonly disabled step="0.01" min="0" inputmode="decimal"'
+            : `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('INSUMO',${idformA},'mdl-ins-total')" title="${hintAutoSaveIns}"`;
 
         const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         const lineas = Array.isArray(d.lineas) ? d.lineas : [];
@@ -120,8 +129,8 @@ export const openInsumoModal = async (idformA) => {
                                     <label class="small fw-bold text-primary mb-1">${(t.lbl_costo_total_uc || 'COSTO TOTAL').toUpperCase()}</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
-                                        <input type="number" id="mdl-ins-total" class="form-control fw-bold" value="${total.toFixed(2)}" readonly>
-                                        <button class="btn btn-primary" onclick="window.toggleEditTotalIns(${idformA})"><i class="bi bi-pencil"></i></button>
+                                        <input type="number" id="mdl-ins-total" class="form-control fw-bold" value="${total.toFixed(2)}" ${totalInputAttrsIns}>
+                                        <button class="btn btn-primary" type="button" ${blockTotalIns ? 'disabled' : ''} onclick="window.toggleEditTotalIns(${idformA})" title="${hintGuardarBtnIns}"><i class="bi bi-pencil"></i></button>
                                     </div>
                                 </div>
 

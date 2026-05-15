@@ -22,15 +22,42 @@ function formatDateTime(ds) {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
 }
 
+/**
+ * Misma estrategia que en comunicación admin: abrir pestaña en el clic y luego asignar el blob,
+ * para que el navegador no bloquee la ventana tras await fetch.
+ */
 async function openMensajeAdjuntoDescarga(idMensaje) {
+    const tc = window.txt?.comunicacion || {};
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const url = `${API.urlBase}/comunicacion/mensajes/adjunto/${idMensaje}`;
-    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-    if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
-    const objUrl = URL.createObjectURL(blob);
-    window.open(objUrl, '_blank', 'noopener,noreferrer');
-    setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
+    const previewWin = window.open('about:blank', '_blank');
+    if (!previewWin) {
+        throw new Error(tc.admin_noticia_preview_popup_blocked || tc.pp_b2_preview_fail || '');
+    }
+    try {
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) {
+            let detail = String(res.status);
+            try {
+                const txt = await res.clone().text();
+                const plain = String(txt || '').trim();
+                if (plain && plain.length < 500 && !plain.startsWith('{')) {
+                    detail = plain;
+                }
+            } catch (_) {}
+            previewWin.close();
+            throw new Error(detail);
+        }
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        previewWin.location.href = objUrl;
+        setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
+    } catch (e) {
+        try {
+            previewWin.close();
+        } catch (_) {}
+        throw e;
+    }
 }
 
 const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'reserva', 'lista_usuarios', 'notificacion', 'institucional'];
@@ -1127,8 +1154,14 @@ export async function initMensajes(opts = {}) {
         if (!id) return;
         try {
             await openMensajeAdjuntoDescarga(id);
-        } catch (_) {
-            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', text: t.pp_b2_preview_fail || t.err_generico || '' });
+        } catch (err) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: t.pp_b2_preview_fail || t.err_generico || '',
+                    text: escapeHtml(err?.message || ''),
+                });
+            }
         }
     });
     document.getElementById('btn-hilo-delete')?.addEventListener('click', () => deleteCurrentHilo());

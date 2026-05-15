@@ -57,16 +57,19 @@ class MenuController {
 
         $r = (int) $roleId;
 
-        // Superadmin (1), admin sede (2), subadmin (4): 204 y 205 siempre en sede; 206 solo por menudistr (o forzado sin sede).
+        // Superadmin (1), admin sede (2), subadmin (4): 204/205/207/209 siempre; 206 y 208 solo sin sede (con sede vienen de menudistr en $ids).
         if (in_array($r, [1, 2, 4], true)) {
-            foreach ([204, 205] as $mid) {
+            foreach ([204, 205, 207, 209] as $mid) {
                 if (!in_array($mid, $ids)) {
                     $ids[] = $mid;
                 }
             }
-            // Sin IdInstitución (p. ej. superadmin): portal disponible; con sede, 206 solo si Activo=1 en menudistr (ya en $ids).
-            if ($instId <= 0 && !in_array(206, $ids)) {
-                $ids[] = 206;
+            if ($instId <= 0) {
+                foreach ([206, 208] as $mid) {
+                    if (!in_array($mid, $ids)) {
+                        $ids[] = $mid;
+                    }
+                }
             }
         } else {
             // 204 (mensajería institucional): por defecto ON si no hay fila; Activo = 2 desactiva.
@@ -100,8 +103,36 @@ class MenuController {
                     }
                 }
             }
+
+            // 209 (admin POE): misma regla que 205 (publicar noticias / POE).
+            if ($instId > 0 && !in_array(209, $ids)) {
+                $activo209 = $this->model->getMenudistrActivo($instId, $r, 209);
+                if ($activo209 !== 2) {
+                    $mostrar209 = ($r === 2);
+                    if (!$mostrar209 && $r >= 3 && $r <= 6) {
+                        $mostrar209 = $this->noticiaModel->puedePublicarNoticias($instId, $r);
+                    }
+                    if ($mostrar209) {
+                        $ids[] = 209;
+                    }
+                }
+            }
+
+            // 208 (portal POE en panel): misma lógica que 206.
+            if (!in_array(208, $ids)) {
+                $activo208 = $this->model->getMenudistrActivo($instId, $r, 208);
+                if ($activo208 === null || $activo208 === 1) {
+                    if ($r >= 3 && $r <= 6) {
+                        $ids[] = 208;
+                    }
+                }
+            }
         }
 
+        $ids = array_values(array_unique($ids));
+        if (in_array(205, $ids, true) && !in_array(207, $ids, true)) {
+            $ids[] = 207;
+        }
         $ids = array_values(array_unique($ids));
         $snap = ModulosInstitucion::getSnapshot($this->db, $instId);
 

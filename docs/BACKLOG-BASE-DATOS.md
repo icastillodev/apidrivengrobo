@@ -19,7 +19,7 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 |---------|-----------------|
 | [Noticias fijadas (OrdenFijo)](#sql-noticias-fijo) | `ALTER TABLE noticia` listo para ejecutar |
 | [Anestésicos (pedido / protocolo)](#sql-anestesicos-formulario) | `formularioe` + `protocoloexpe` |
-| [Portada / popup dashboard](#sql-portada-popup) | Tabla `institucion_portada_popup` (URLs adjuntos) |
+| [Portada / popup dashboard](#sql-portada-popup) | `institucion_portada_popup` + tabla `institucion_dashboard_popup` (popups admin) |
 | [Rendimiento superadmin / bitácora](#sql-rendimiento-superadmin-bitacora) | Índices opcionales `bitacora`, `usuarioe`, `modulosactivosinst` |
 | [POE institucional](#sql-poe-institucional) | Tabla `institucion_poe` (texto + hasta 2 URLs) |
 | [Comunicación — adjuntos B2](#sql-comunicacion-b2-adjuntos) | `mensaje`, `noticia`, `institucion_portada_popup`, `institucion_poe` (claves B2) |
@@ -114,6 +114,8 @@ Una fila por institución: texto de portada, hasta **dos URLs de adjuntos**, pop
 
 **Extensión Backblaze (columnas B2):** si vas a usar subida por API, ejecutá también [`docs/migrations/2026-05-09-comunicacion-b2-adjuntos.sql`](migrations/2026-05-09-comunicacion-b2-adjuntos.sql) (bloque `ALTER TABLE institucion_portada_popup`).
 
+**Popups del modal del panel (código actual):** el API y el admin usan la tabla **`institucion_dashboard_popup`** (varios registros por sede, solo uno con `PopupActivo = 1`). Si **ya aplicaste el maestro mayo 2026** y no querés re-ejecutarlo entero, usá solo el parche idempotente **[`docs/migrations/2026-05-09-patch-institucion-dashboard-popup-idempotente.sql`](migrations/2026-05-09-patch-institucion-dashboard-popup-idempotente.sql)** (`CREATE TABLE IF NOT EXISTS` + migración solo donde la sede aún no tiene filas en la nueva tabla). Alternativa: [`2026-05-09-institucion-dashboard-popup.sql`](migrations/2026-05-09-institucion-dashboard-popup.sql) (misma lógica idempotente) o la **Parte 5b** del maestro actualizado **después** del `ALTER` B2 de `institucion_portada_popup`.
+
 **Antes:** backup de la base.
 
 ---
@@ -144,10 +146,11 @@ Añade columnas para **claves de objeto B2** (no URLs públicas obligatorias):
 |-------|-----|
 | `mensaje` | Hasta 1 adjunto por mensaje (`AdjuntoB2Key`, `AdjuntoNombreOriginal`) — perfil **MENSAJES** |
 | `noticia` | Imagen portada + hasta 2 documentos — perfil **NOTICIASPOPUP** |
-| `institucion_portada_popup` | Imagen portada dashboard + hasta 2 documentos portada + 2 documentos popup — mismo bucket |
+| `institucion_portada_popup` | Imagen portada dashboard + hasta 2 documentos portada + columnas legacy del popup — mismo bucket |
+| `institucion_dashboard_popup` | Popups del modal del panel (varios por sede; máx. uno activo) — mismo bucket que portada/noticias según API |
 | `institucion_poe` | Hasta 2 instructivos — perfil **POES** |
 
-**Prerrequisitos:** tablas y migraciones previas ya aplicadas (`institucion_portada_popup`, `institucion_poe`, etc.). **Variables .env:** `B2_KEY_ID_*`, `B2_APPLICATION_KEY_*`, `B2_BUCKET_ID_*`, `B2_BUCKET_NAME_*` con sufijos `MENSAJES`, `NOTICIASPOPUP`, `POES`, `PROTOCOLOS`.
+**Prerrequisitos:** tablas y migraciones previas ya aplicadas (`institucion_portada_popup`, `institucion_dashboard_popup` si usás admin de popups, `institucion_poe`, etc.). **Variables .env:** `B2_KEY_ID_*`, `B2_APPLICATION_KEY_*`, `B2_BUCKET_ID_*`, `B2_BUCKET_NAME_*` con sufijos `MENSAJES`, `NOTICIASPOPUP`, `POES`, `PROTOCOLOS`.
 
 **Antes:** backup de la base. Si *Duplicate column*, omití solo el `ALTER` ya existente.
 
@@ -193,7 +196,7 @@ Las **columnas operativas** para noticias/portada/mensajes/POE están en [`2026-
 | Backlog (resumen) | Impacto BD típico | Estado | Dónde ejecutarlo |
 |-------------------|-------------------|--------|------------------|
 | **Fijar hasta 3 noticias arriba** | `noticia.OrdenFijo` + `UNIQUE (IdInstitucion, OrdenFijo)` | **Código listo** — ejecutar SQL en el servidor antes de usar | [Bloque SQL](#sql-noticias-fijo) · [`snippet_mysql_noticia_orden_fijo.sql`](migrations/snippet_mysql_noticia_orden_fijo.sql) · [`2026-05-09-noticia-orden-fijo.sql`](migrations/2026-05-09-noticia-orden-fijo.sql) |
-| Portada + popup dashboard (URLs) | `institucion_portada_popup` | **Código listo** — ejecutar SQL en servidor | [Bloque](#sql-portada-popup) · [`2026-05-09-institucion-portada-popup.sql`](migrations/2026-05-09-institucion-portada-popup.sql) |
+| Portada + popup dashboard (URLs) | `institucion_portada_popup` + **`institucion_dashboard_popup`** | **Código listo** — ejecutar SQL en servidor | [Bloque](#sql-portada-popup) · Maestro Parte 5b · Parche solo popups: [`2026-05-09-patch-institucion-dashboard-popup-idempotente.sql`](migrations/2026-05-09-patch-institucion-dashboard-popup-idempotente.sql) · [`2026-05-09-institucion-dashboard-popup.sql`](migrations/2026-05-09-institucion-dashboard-popup.sql) |
 | **POE** (portal + admin, URLs) | `institucion_poe` | **Código listo** — ejecutar SQL en servidor | [Bloque](#sql-poe-institucional) · [`2026-05-09-institucion-poe.sql`](migrations/2026-05-09-institucion-poe.sql) |
 | **Comunicación — adjuntos B2** | `mensaje`, `noticia`, `institucion_portada_popup`, `institucion_poe` | **Código listo** — ejecutar SQL + `.env` buckets | [Bloque](#sql-comunicacion-b2-adjuntos) · [`2026-05-09-comunicacion-b2-adjuntos.sql`](migrations/2026-05-09-comunicacion-b2-adjuntos.sql) |
 | Portada + adjuntos noticia / Backblaze (ideas extra) | Plantilla opcional | Ver migración B2 arriba | [Plantilla](#plantilla-backblaze) · [`2026-05-09-noticia-adjuntos-storage-plantilla.sql`](migrations/2026-05-09-noticia-adjuntos-storage-plantilla.sql) |

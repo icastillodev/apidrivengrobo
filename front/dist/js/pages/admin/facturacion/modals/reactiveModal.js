@@ -30,6 +30,14 @@ export const openReactiveModal = async (idformA) => {
         const saldo = parseFloat(d.saldoInv || 0);
         const debe = Math.max(0, total - pagado);
 
+        const derRea = d.es_facturacion_derivada === true || d.es_facturacion_derivada == 1 || d.es_facturacion_derivada === '1';
+        const blockTotalRea = (d.is_exento == 1) || derRea;
+        const hintAutoSaveRea = String(t.hint_total_auto_save || '').replace(/"/g, '&quot;');
+        const hintGuardarBtnRea = String(t.hint_guardar_total_btn || '').replace(/"/g, '&quot;');
+        const totalInputAttrsRea = blockTotalRea
+            ? 'readonly disabled step="0.01" min="0" inputmode="decimal"'
+            : `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('REACTIVO',${idformA},'mdl-rea-total')" title="${hintAutoSaveRea}"`;
+
         // --- LÓGICA DE BADGES ---
         let badgeEstado = d.is_exento == 1 ? `<span class="badge bg-info text-dark shadow-sm">${t.badge_exento || 'EXENTO'}</span>` :
                           (debe <= 0 ? `<span class="badge bg-success shadow-sm">${t.badge_pago_completo || 'PAGO COMPLETO'}</span>` :
@@ -127,8 +135,8 @@ export const openReactiveModal = async (idformA) => {
                                     <label class="form-label fw-bold text-primary small uppercase">${t.lbl_costo_total || 'Costo Total'}</label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
-                                        <input type="number" id="mdl-rea-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" readonly>
-                                        <button class="btn btn-primary" onclick="window.toggleEditTotalRea(${idformA})"><i class="bi bi-pencil-fill"></i></button>
+                                        <input type="number" id="mdl-rea-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" ${totalInputAttrsRea}>
+                                        <button class="btn btn-primary" type="button" ${blockTotalRea ? 'disabled' : ''} onclick="window.toggleEditTotalRea(${idformA})" title="${hintGuardarBtnRea}"><i class="bi bi-pencil-fill"></i></button>
                                     </div>
                                 </div>
 

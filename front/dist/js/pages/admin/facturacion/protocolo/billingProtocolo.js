@@ -17,6 +17,7 @@ import {
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
     billingSumInsumosCobrable,
+    billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
     billingDerivadaLiquidacionBadge,
     billingPdfFormularioIdDisplay,
@@ -297,7 +298,7 @@ function getAlojTableHTML(alojamientos, idProt) {
             </thead>
             <tbody>
                 ${alojamientos.map(a => `
-                    <tr class="text-center align-middle pointer" onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})">
+                    <tr class="text-center align-middle pointer" onclick="window.billingRowClickOpenAlojModal(event, ${a.historia})">
                         <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
                         <td>#${a.historia}</td>
                         <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
@@ -569,7 +570,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             if (currentY > 200) { doc.addPage(); currentY = M; }
             const exL2 = bi.pdf_monto_exento || 'Exento';
             const bodyIns = data.insumos.map(i => {
-                const total = parseFloat(i.total_item || 0);
+                const total = billingInsumoMontoTotalCobrable(i);
                 const pagado = parseFloat(i.pagado || 0);
                 const detalle = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 60);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL2);

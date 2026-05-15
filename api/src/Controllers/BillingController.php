@@ -55,6 +55,35 @@ class BillingController {
         $this->model->applyFacturacionDerivadaToPedidoFacturacionRows($forms, $instId);
     }
 
+    /**
+     * Quita de la tarjeta «Departamento (sin protocolo)» los pedidos que ya aparecen en Insumos generales
+     * (mismo idformA), para no duplicar la vista tipo formulario con columnas que no aplican al formato insumos.
+     */
+    private function filterPedidosSinProtCoveredByInsumosGenerales(array $pedidosSinProt, array $insumosGenerales): array {
+        if ($pedidosSinProt === [] || $insumosGenerales === []) {
+            return $pedidosSinProt;
+        }
+        $covered = [];
+        foreach ($insumosGenerales as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $covered[$id] = true;
+            }
+        }
+        if ($covered === []) {
+            return $pedidosSinProt;
+        }
+        $out = [];
+        foreach ($pedidosSinProt as $form) {
+            $fid = (int) ($form['id'] ?? 0);
+            if ($fid > 0 && isset($covered[$fid])) {
+                continue;
+            }
+            $out[] = $form;
+        }
+        return $out;
+    }
+
     public function getDeptoReport() {
         if (ob_get_length()) ob_clean();
         $f = json_decode(file_get_contents('php://input'), true);
@@ -89,6 +118,7 @@ class BillingController {
             // Formato viejo: pedidos del departamento sin vincular a ningún protocolo
             $pedidosSinProt = $this->model->getPedidosDeptoSinProtocolo($deptoId, $desde, $hasta);
             $this->enrichPedidosFacturacionDerivada($pedidosSinProt, (int) $instId);
+            $pedidosSinProt = $this->filterPedidosSinProtCoveredByInsumosGenerales($pedidosSinProt, $insumosGenerales);
             if (!empty($pedidosSinProt)) {
                 $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
                 foreach ($pedidosSinProt as $form) {
@@ -559,7 +589,25 @@ class BillingController {
         $f = $this->getRequestData();
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad Total
-            $this->model->processPaymentTransaction($f['idUsr'], $f['monto'], $f['items'], $sesion['instId'], $sesion['userId']);
+            $rawComment = $f['comentario'] ?? ($f['comment'] ?? '');
+            $comment = is_string($rawComment) ? trim($rawComment) : '';
+            if ($comment === '') {
+                $comment = null;
+            }
+            $rawTid = $f['transferId'] ?? '';
+            $transferId = is_string($rawTid) ? trim($rawTid) : '';
+            if ($transferId === '') {
+                $transferId = null;
+            }
+            $this->model->processPaymentTransaction(
+                $f['idUsr'],
+                $f['monto'],
+                $f['items'],
+                $sesion['instId'],
+                $sesion['userId'],
+                $transferId,
+                $comment
+            );
             $this->sendSuccess("Pago procesado");
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
     }
@@ -801,6 +849,102 @@ class BillingController {
         }
     }
 
+    /**
+     * Fija el total a cobrar (suma cuentaapagar) repartiendo proporcionalmente entre tramos de la misma historia.
+     * POST JSON: { historia, total }
+     */
+    public function updateAlojamientoPrecio() {
+        $f = $this->getRequestData();
+        if (!isset($f['historia'], $f['total'])) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_invalido', 'message' => 'billing_fijar_invalido']);
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->updateAlojamientoCuentaTotalPorHistoria(
+                (int) $f['historia'],
+                (float) $f['total'],
+                (int) $sesion['instId'],
+                (int) $sesion['userId']
+            );
+
+            return $this->jsonResponse('success', ['ok' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_error_generico', 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Fija precioformulario (animales vivos).
+     * POST JSON: { id: idformA, total }
+     */
+    public function updateAnimal() {
+        return $this->updateFormularioPrecioTotalAction();
+    }
+
+    /**
+     * Fija precioformulario (reactivos / mismo esquema que animales).
+     * POST JSON: { id: idformA, total }
+     */
+    public function updateReactive() {
+        return $this->updateFormularioPrecioTotalAction();
+    }
+
+    /**
+     * Fija preciototal del pedido de insumos y reparte PrecioMomentoInsumo en líneas.
+     * POST JSON: { id: idformA, total }
+     */
+    public function updateInsumo() {
+        $f = $this->getRequestData();
+        if (!isset($f['id'], $f['total'])) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_invalido', 'message' => 'billing_fijar_invalido']);
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->updateInsumoPedidoPrecioTotal(
+                (int) $f['id'],
+                (float) $f['total'],
+                (int) $sesion['instId'],
+                (int) $sesion['userId']
+            );
+
+            return $this->jsonResponse('success', ['ok' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_error_generico', 'message' => $e->getMessage()]);
+        }
+    }
+
+    private function updateFormularioPrecioTotalAction() {
+        $f = $this->getRequestData();
+        if (!isset($f['id'], $f['total'])) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_invalido', 'message' => 'billing_fijar_invalido']);
+        }
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->model->updateFormularioPrecioTotal(
+                (int) $f['id'],
+                (float) $f['total'],
+                (int) $sesion['instId'],
+                (int) $sesion['userId']
+            );
+
+            return $this->jsonResponse('success', ['ok' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse('error', ['code' => $e->getMessage(), 'message' => $e->getMessage()]);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', ['code' => 'billing_fijar_error_generico', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function getInvestigatorBalance($id) {
         try {
             $sesion = Auditoria::getDatosSesion();
@@ -811,7 +955,27 @@ class BillingController {
 
     private function sendSuccess($data) { header('Content-Type: application/json'); echo json_encode(['status' => 'success', 'data' => $data]); exit; }
     private function sendError($message) { header('Content-Type: application/json'); echo json_encode(['status' => 'error', 'message' => $message]); exit; }
-    private function jsonResponse($status, $data = null) { header('Content-Type: application/json'); echo json_encode(['status' => $status, 'data' => ($status === 'success') ? $data : null, 'message' => ($status === 'error') ? $data : '']); exit; }
+    private function jsonResponse($status, $data = null) {
+        header('Content-Type: application/json');
+        $message = '';
+        $errorCode = null;
+        $bodyData = null;
+        if ($status === 'success') {
+            $bodyData = $data;
+        } elseif (is_array($data)) {
+            $message = (string) ($data['message'] ?? 'Error');
+            $errorCode = isset($data['code']) ? (string) $data['code'] : null;
+        } else {
+            $message = (string) ($data ?? '');
+        }
+        echo json_encode([
+            'status' => $status,
+            'data' => $bodyData,
+            'message' => $message,
+            'error_code' => $errorCode,
+        ]);
+        exit;
+    }
     private function getRequestData() { return json_decode(file_get_contents('php://input'), true); }
     public function getAuditHistory() {
         if (ob_get_length()) ob_clean();

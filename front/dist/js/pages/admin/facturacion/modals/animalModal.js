@@ -10,12 +10,13 @@ export const openAnimalModal = async (idformA) => {
     try {
         showLoader();
         const res = await API.request(`/billing/detail-animal/${idformA}`);
-        hideLoader();
 
         const t = window.txt?.facturacion?.billing_modal || {};
         const g = window.txt?.generales || {};
         if (res.status !== 'success') {
-            return Swal.fire(g.error || 'Error', t.err_animal || 'No se pudo cargar el detalle', 'error');
+            hideLoader();
+            await Swal.fire(g.error || 'Error', t.err_animal || 'No se pudo cargar el detalle', 'error');
+            return;
         }
 
         const d = res.data;
@@ -25,6 +26,14 @@ export const openAnimalModal = async (idformA) => {
         const saldo = parseFloat(d.saldoInv || 0);
         const descuento = parseFloat(d.descuento || 0);
         const debe = Math.max(0, total - pagado);
+
+        const derAni = d.es_facturacion_derivada === true || d.es_facturacion_derivada == 1 || d.es_facturacion_derivada === '1';
+        const blockTotalAni = (d.is_exento == 1) || derAni;
+        const hintAutoSave = String(t.hint_total_auto_save || '').replace(/"/g, '&quot;');
+        const hintGuardarBtn = String(t.hint_guardar_total_btn || '').replace(/"/g, '&quot;');
+        const totalInputAttrs = blockTotalAni
+            ? 'readonly disabled step="0.01" min="0" inputmode="decimal"'
+            : `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('ANIMAL',${idformA},'mdl-ani-total')" title="${hintAutoSave}"`;
 
         // --- LÓGICA DE BADGES DE ESTADO Y BENEFICIOS ---
         let badgesHTML = '';
@@ -152,8 +161,8 @@ export const openAnimalModal = async (idformA) => {
                                     <label class="form-label fw-bold text-primary small uppercase">Costo Total del Formulario</label>
                                     <div class="input-group input-group-lg">
                                         <span class="input-group-text bg-white border-end-0 fw-bold text-muted">$</span>
-                                        <input type="number" id="mdl-ani-total" class="form-control border-start-0 fw-bold text-primary fs-4" value="${total.toFixed(2)}" readonly>
-                                        <button class="btn btn-primary" type="button" onclick="window.toggleEditTotal(${idformA})">
+                                        <input type="number" id="mdl-ani-total" class="form-control border-start-0 fw-bold text-primary fs-4" value="${total.toFixed(2)}" ${totalInputAttrs}>
+                                        <button class="btn btn-primary" type="button" ${blockTotalAni ? 'disabled' : ''} onclick="window.toggleEditTotal(${idformA})" title="${hintGuardarBtn}">
                                             <i class="bi bi-pencil-fill"></i>
                                         </button>
                                     </div>
@@ -190,5 +199,9 @@ export const openAnimalModal = async (idformA) => {
 
         window.renderAndShowModal(html, 'modalAnimal');
 
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        hideLoader();
+    }
 };

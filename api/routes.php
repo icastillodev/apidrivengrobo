@@ -138,6 +138,7 @@ $router->post('/comunicacion/b2/upload/noticia-documento', 'ComunicacionB2Contro
 $router->post('/comunicacion/b2/upload/portada-imagen', 'ComunicacionB2Controller@uploadPortadaImagen');
 $router->post('/comunicacion/b2/upload/portada-documento', 'ComunicacionB2Controller@uploadPortadaDocumento');
 $router->post('/comunicacion/b2/upload/popup-documento', 'ComunicacionB2Controller@uploadPopupDocumento');
+$router->post('/comunicacion/b2/upload/popup-portada-imagen', 'ComunicacionB2Controller@uploadPopupPortadaImagen');
 $router->post('/comunicacion/b2/upload/poe-instructivo', 'ComunicacionB2Controller@uploadPoeInstructivo');
 $router->get('/comunicacion/mensajes/adjunto/:id', 'ComunicacionB2Controller@downloadMensajeAdjunto');
 $router->get('/comunicacion/noticias/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivo');
@@ -162,6 +163,14 @@ $router->get('/comunicacion/poe/:id', 'ComunicacionPoeController@getOne');
 
 $router->get('/admin/comunicacion/portada-popup', 'AdminPortadaPopupController@getConfig');
 $router->post('/admin/comunicacion/portada-popup', 'AdminPortadaPopupController@save');
+
+$router->get('/admin/comunicacion/dashboard-popups', 'AdminDashboardPopupController@listItems');
+$router->get('/admin/comunicacion/dashboard-popup/detail', 'AdminDashboardPopupController@getOne');
+$router->post('/admin/comunicacion/dashboard-popup', 'AdminDashboardPopupController@create');
+$router->post('/admin/comunicacion/dashboard-popup/update', 'AdminDashboardPopupController@update');
+$router->post('/admin/comunicacion/dashboard-popup/delete', 'AdminDashboardPopupController@deleteItem');
+$router->post('/admin/comunicacion/dashboard-popup/set-activo', 'AdminDashboardPopupController@setActivo');
+$router->get('/admin/comunicacion/dashboard-popup/archivo/:id/:tipo', 'ComunicacionB2Controller@downloadAdminDashboardPopupArchivo');
 
 $router->get('/admin/comunicacion/poe', 'AdminInstitucionPoeController@listItems');
 $router->get('/admin/comunicacion/poe/detail', 'AdminInstitucionPoeController@getOne');
@@ -376,6 +385,7 @@ $router->post('/billing/update-animal', 'BillingController@updateAnimal');
 $router->post('/billing/update-reactive', 'BillingController@updateReactive');
 $router->post('/billing/update-insumo', 'BillingController@updateInsumo');
 $router->post('/billing/update-alojamiento', 'BillingController@updateAlojamiento');
+$router->post('/billing/update-alojamiento-precio', 'BillingController@updateAlojamientoPrecio');
 
 // Ajustes de Pagos Individuales (Revertir/Pagar forzado)
 $router->post('/billing/ajustar-pago-individual', 'BillingController@ajustarPagoIndividual');

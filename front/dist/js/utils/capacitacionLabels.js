@@ -38,6 +38,8 @@ export const CAPACITACION_MENU_LABEL_KEYS = {
   'admin/comunicacion/noticias': 'menu.news_admin',
   'admin/comunicacion/poe': 'titulos_pagina.poe_admin',
   'admin/comunicacion/portada-popup': 'titulos_pagina.portada_popup_admin',
+  'admin/popup': 'titulos_pagina.dashboard_popups_admin',
+  'admin/comunicacion/popups': 'titulos_pagina.dashboard_popups_admin',
   'panel/noticias': 'menu.news_portal',
   'panel/poe': 'titulos_pagina.poe_portal',
   'panel/perfil': 'menu.config',

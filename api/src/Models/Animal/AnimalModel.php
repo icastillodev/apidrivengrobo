@@ -536,7 +536,7 @@ class AnimalModel {
             FROM cepa c
             INNER JOIN especiee e ON c.idespA = e.idespA
             INNER JOIN subespecie s ON s.idespA = e.idespA
-            WHERE c.Habilitado = 1
+            WHERE (c.Habilitado = 1 OR c.Habilitado IS NULL)
               AND s.idsubespA = ?
               AND e.IdInstitucion = ?
             ORDER BY c.CepaNombreA ASC
@@ -554,7 +554,7 @@ class AnimalModel {
                 c.CepaNombreA
             FROM cepa c
             INNER JOIN especiee e ON c.idespA = e.idespA
-            WHERE c.Habilitado = 1
+            WHERE (c.Habilitado = 1 OR c.Habilitado IS NULL)
               AND c.idespA = ?
               AND e.IdInstitucion = ?
             ORDER BY c.CepaNombreA ASC
@@ -1257,7 +1257,10 @@ public function getDetailsAndSpecies($protId, $instId = null) {
     private function buildSpeciesTree($rows) {
         $tree = [];
         foreach ($rows as $r) {
-            $idEsp = $r['idespA'];
+            $idEsp = $r['idespA'] ?? $r['IDESPA'] ?? null;
+            if ($idEsp === null || $idEsp === '') {
+                continue;
+            }
             
             // Si es la primera vez que vemos esta especie, la creamos
             if (!isset($tree[$idEsp])) {

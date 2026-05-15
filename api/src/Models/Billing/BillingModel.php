@@ -456,7 +456,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
         $hasComment = $this->hasColumn('historialpago', 'Comentario');
         $cols = "IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion";
-        $vals = "?, ?, ?, 0, CURDATE(), 'CARGA_SALDO', ?";
+        $vals = "?, ?, ?, 0, NOW(), 'CARGA_SALDO', ?";
         $params = [$adminId, $monto, $idUsr, $inst];
         if ($hasTransfer) {
             $cols .= ", IdentificadorTransferencia";
@@ -471,6 +471,45 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         $this->db->prepare("INSERT INTO historialpago ($cols) VALUES ($vals)")->execute($params);
 
         return $res;
+    }
+
+    /**
+     * Inserta historialpago con NOW() y metadatos opcionales (columnas si existen).
+     */
+    private function insertHistorialPagoStandard(
+        int $adminId,
+        float $monto,
+        int $idUsr,
+        int $idFormA,
+        int $inst,
+        string $tipoHistorial,
+        ?string $transferId = null,
+        ?string $comment = null
+    ): void {
+        $transferId = $transferId !== null ? trim($transferId) : null;
+        $comment = $comment !== null ? trim($comment) : null;
+        if ($transferId === '') {
+            $transferId = null;
+        }
+        if ($comment === '') {
+            $comment = null;
+        }
+        $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
+        $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $cols = 'IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion';
+        $vals = '?, ?, ?, ?, NOW(), ?, ?';
+        $params = [$adminId, $monto, $idUsr, $idFormA, $tipoHistorial, $inst];
+        if ($hasTransfer) {
+            $cols .= ', IdentificadorTransferencia';
+            $vals .= ', ?';
+            $params[] = $transferId;
+        }
+        if ($hasComment) {
+            $cols .= ', Comentario';
+            $vals .= ', ?';
+            $params[] = $comment;
+        }
+        $this->db->prepare("INSERT INTO historialpago ($cols) VALUES ($vals)")->execute($params);
     }
 
     /**
@@ -594,7 +633,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         ];
     }
 
-    public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId) {
+    public function processPaymentTransaction($idUsr, $monto, $items, $inst, $adminId, ?string $transferId = null, ?string $comment = null) {
         $idUsr = (int) $idUsr;
         $inst = (int) $inst;
         $adminId = (int) $adminId;
@@ -650,19 +689,31 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
                     if ($item['tipo'] === 'FORM') {
                         $this->db->prepare("UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?")->execute([$monto_item, $id]);
                     }
-                    
-                    // CORREGIDO: IdFormA en lugar de IdFromA
-                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                                        VALUES (?, ?, ?, ?, CURDATE(), 'LIQUIDACION', ?)")
-                             ->execute([$adminId, $monto_item, $idUsr, $id, $inst]);
+
+                    $this->insertHistorialPagoStandard(
+                        $adminId,
+                        $monto_item,
+                        $idUsr,
+                        (int) $id,
+                        $inst,
+                        'LIQUIDACION',
+                        $transferId,
+                        $comment
+                    );
 
                 } else if ($item['tipo'] === 'ALOJ') {
                     $this->db->prepare("UPDATE alojamiento SET totalpago = totalpago + ? WHERE historia = ?")->execute([$monto_item, $id]);
-                    
-                    // CORREGIDO: IdFormA en lugar de IdFromA
-                    $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                                        VALUES (?, ?, ?, ?, CURDATE(), 'LIQUIDACION_ALOJ', ?)")
-                             ->execute([$adminId, $monto_item, $idUsr, $id, $inst]);
+
+                    $this->insertHistorialPagoStandard(
+                        $adminId,
+                        $monto_item,
+                        $idUsr,
+                        (int) $id,
+                        $inst,
+                        'LIQUIDACION_ALOJ',
+                        $transferId,
+                        $comment
+                    );
                 }
             }
 
@@ -908,7 +959,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
             $this->db->prepare(
                 "INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
-                 VALUES (?, ?, ?, ?, CURDATE(), ?, ?)"
+                 VALUES (?, ?, ?, ?, NOW(), ?, ?)"
             )->execute([$adminId, $monto, $idUsr, $idformA, $tipoHist, $instCobradora]);
 
             Auditoria::log($this->db, $tipoHist, 'facturacion_formulario_derivado', "Ajuste modal $accion derivado #$idformA: $monto");
@@ -984,7 +1035,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
             $this->db->prepare(
                 'INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
-                                VALUES (?, ?, ?, ?, CURDATE(), ?, ?)'
+                                VALUES (?, ?, ?, ?, NOW(), ?, ?)'
             )->execute([$adminId, $monto, $data['IdUsrA'], $id, $tipoHist, $data['IdInstitucion']]);
 
             $this->db->commit();
@@ -1048,7 +1099,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
             $this->db->prepare(
                 "INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
-                 VALUES (?, ?, ?, ?, CURDATE(), ?, ?)"
+                 VALUES (?, ?, ?, ?, NOW(), ?, ?)"
             )->execute([$adminId, $monto, $data['IdUsrA'], (int)$idformA, $tipoHist, $data['IdInstitucion']]);
 
             Auditoria::log($this->db, $tipoHist, 'precioinsumosformulario', "Ajuste insumo $accion form #$idformA: $monto");
@@ -1094,7 +1145,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             Auditoria::log($this->db, $tipoHist, 'alojamiento', "Ajuste $accion de $$monto en Historia #$historiaId");
 
             $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                                VALUES (?, ?, ?, ?, CURDATE(), ?, ?)")
+                                VALUES (?, ?, ?, ?, NOW(), ?, ?)")
                      ->execute([$adminId, $monto, $idPagador, $historiaId, $tipoHist, $data['IdInstitucion']]);
 
             $this->db->commit();
@@ -2476,7 +2527,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
 
                 $this->db->prepare(
                     "INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
-                     VALUES (?, ?, ?, ?, CURDATE(), 'LIQUIDACION_INST_DERIV', ?)"
+                     VALUES (?, ?, ?, ?, NOW(), 'LIQUIDACION_INST_DERIV', ?)"
                 )->execute([$adminId, $p['monto'], $p['idUsr'], $p['idformA'], $instCobradora]);
             }
 
@@ -2529,6 +2580,280 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 WHERE a.historia = ? AND p.IdInstitucion = ?";
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([(int)$dias, (float)$cuenta, (float)$pago, (int)$historia, (int)$instId]);
+    }
+
+    /**
+     * Fija el total de alojamiento (suma de cuentaapagar por historia) repartiendo entre tramos; no modifica totalpago.
+     *
+     * @throws \InvalidArgumentException|\RuntimeException
+     */
+    public function updateAlojamientoCuentaTotalPorHistoria(int $historia, float $nuevoTotal, int $instId, int $adminId): void {
+        $historia = (int) $historia;
+        $nuevoTotal = round((float) $nuevoTotal, 2);
+        $instId = (int) $instId;
+        $adminId = (int) $adminId;
+        if ($historia <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+        if ($nuevoTotal < 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+
+        $sql = "SELECT a.IdAlojamiento, COALESCE(a.cuentaapagar, 0) AS cuentaapagar, COALESCE(a.totalpago, 0) AS totalpago
+                FROM alojamiento a
+                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                WHERE a.historia = ? AND p.IdInstitucion = ?
+                ORDER BY a.IdAlojamiento ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$historia, $instId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if ($rows === []) {
+            throw new \RuntimeException('billing_fijar_aloj_no_encontrado');
+        }
+
+        $maxPago = 0.0;
+        foreach ($rows as $r) {
+            $maxPago = max($maxPago, (float) ($r['totalpago'] ?? 0));
+        }
+        if ($nuevoTotal + 1e-6 < round($maxPago, 2)) {
+            throw new \RuntimeException('billing_fijar_menor_pagado');
+        }
+
+        $weights = [];
+        foreach ($rows as $r) {
+            $w = (float) ($r['cuentaapagar'] ?? 0);
+            $weights[] = $w > 0 ? $w : 0.0;
+        }
+        $sumW = array_sum($weights);
+        $n = count($rows);
+        $alloc = array_fill(0, $n, 0.0);
+        if ($sumW <= 0) {
+            $each = round($nuevoTotal / $n, 2);
+            for ($i = 0; $i < $n - 1; $i++) {
+                $alloc[$i] = $each;
+            }
+            $alloc[$n - 1] = round($nuevoTotal - $each * ($n - 1), 2);
+        } else {
+            $acc = 0.0;
+            for ($i = 0; $i < $n - 1; $i++) {
+                $part = round($nuevoTotal * ($weights[$i] / $sumW), 2);
+                $alloc[$i] = $part;
+                $acc += $part;
+            }
+            $alloc[$n - 1] = round($nuevoTotal - $acc, 2);
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $upd = $this->db->prepare('UPDATE alojamiento SET cuentaapagar = ? WHERE IdAlojamiento = ?');
+            foreach ($rows as $i => $r) {
+                $upd->execute([max(0.0, (float) $alloc[$i]), (int) $r['IdAlojamiento']]);
+            }
+            Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Fijar total cuenta historia={$historia} inst={$instId} → {$nuevoTotal} (admin {$adminId})");
+            $this->db->commit();
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Fija precioformulario para pedidos animal/reactivo (misma tabla).
+     *
+     * @throws \InvalidArgumentException|\RuntimeException
+     */
+    public function updateFormularioPrecioTotal(int $idformA, float $nuevoTotal, int $instId, int $adminId): void {
+        $idformA = (int) $idformA;
+        $nuevoTotal = round((float) $nuevoTotal, 2);
+        $instId = (int) $instId;
+        $adminId = (int) $adminId;
+        if ($idformA <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+        if ($nuevoTotal < 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+
+        $sql = "SELECT f.IdInstitucion, COALESCE(tf.exento, 0) AS exento
+                FROM formularioe f
+                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                WHERE f.idformA = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            throw new \RuntimeException('billing_fijar_form_no_encontrado');
+        }
+        if ((int) $row['IdInstitucion'] !== $instId) {
+            throw new \RuntimeException('billing_fijar_sin_permiso');
+        }
+        if ((int) ($row['exento'] ?? 0) === 1) {
+            throw new \RuntimeException('billing_fijar_exento');
+        }
+        if ($this->findFacturacionDerivadaForForm($idformA, $instId)) {
+            throw new \RuntimeException('billing_fijar_derivada');
+        }
+
+        $stmtPf = $this->db->prepare('SELECT COALESCE(totalpago, 0) AS totalpago FROM precioformulario WHERE idformA = ?');
+        $stmtPf->execute([$idformA]);
+        $pfRow = $stmtPf->fetch(PDO::FETCH_ASSOC);
+        $totalpago = $pfRow ? round((float) ($pfRow['totalpago'] ?? 0), 2) : 0.0;
+        if ($nuevoTotal + 1e-6 < $totalpago) {
+            throw new \RuntimeException('billing_fijar_menor_pagado');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            if (!$pfRow) {
+                $ins = $this->db->prepare(
+                    'INSERT INTO precioformulario (idformA, precioanimalmomento, precioformulario, totalpago, fechaIniForm) VALUES (?, 0, ?, 0, CURDATE())'
+                );
+                $ins->execute([$idformA, $nuevoTotal]);
+            } else {
+                $this->db->prepare('UPDATE precioformulario SET precioformulario = ? WHERE idformA = ?')->execute([$nuevoTotal, $idformA]);
+            }
+            Auditoria::log($this->db, 'UPDATE', 'precioformulario', "Fijar total formulario #{$idformA} → {$nuevoTotal} (admin {$adminId})");
+            $this->db->commit();
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Fija el total del pedido de insumos (preciototal) y reparte PrecioMomentoInsumo en las líneas.
+     *
+     * @throws \InvalidArgumentException|\RuntimeException
+     */
+    public function updateInsumoPedidoPrecioTotal(int $idformA, float $nuevoTotal, int $instId, int $adminId): void {
+        $idformA = (int) $idformA;
+        $nuevoTotal = round((float) $nuevoTotal, 2);
+        $instId = (int) $instId;
+        $adminId = (int) $adminId;
+        if ($idformA <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+        if ($nuevoTotal < 0) {
+            throw new \InvalidArgumentException('billing_fijar_invalido');
+        }
+
+        $sql = 'SELECT fi.IdForminsumo, fi.cantidad, COALESCE(fi.PrecioMomentoInsumo, 0) AS pu,
+                       pif.idPrecioinsumosformulario, COALESCE(pif.totalpago, 0) AS totalpago,
+                       f.IdInstitucion, COALESCE(tf.exento, 0) AS exento
+                FROM formularioe f
+                INNER JOIN precioinsumosformulario pif ON pif.idformA = f.idformA
+                INNER JOIN forminsumo fi ON fi.idPrecioinsumosformulario = pif.idPrecioinsumosformulario
+                LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                WHERE f.idformA = ?
+                ORDER BY fi.IdForminsumo ASC';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA]);
+        $lines = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        if ($lines === []) {
+            $chk = $this->db->prepare(
+                'SELECT pif.idPrecioinsumosformulario, COALESCE(pif.totalpago, 0) AS totalpago, f.IdInstitucion, COALESCE(tf.exento, 0) AS exento
+                 FROM precioinsumosformulario pif
+                 INNER JOIN formularioe f ON f.idformA = pif.idformA
+                 LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario
+                 WHERE pif.idformA = ? LIMIT 1'
+            );
+            $chk->execute([$idformA]);
+            $hdr = $chk->fetch(PDO::FETCH_ASSOC);
+            if (!$hdr) {
+                throw new \RuntimeException('billing_fijar_form_no_encontrado');
+            }
+            if ((int) $hdr['IdInstitucion'] !== $instId) {
+                throw new \RuntimeException('billing_fijar_sin_permiso');
+            }
+            if ((int) ($hdr['exento'] ?? 0) === 1) {
+                throw new \RuntimeException('billing_fijar_exento');
+            }
+            if ($this->findFacturacionDerivadaForForm($idformA, $instId)) {
+                throw new \RuntimeException('billing_fijar_derivada');
+            }
+            if ($this->formInsumoEsDerivacionDestino($idformA, $instId)) {
+                throw new \RuntimeException('billing_fijar_destino_derivacion');
+            }
+            $totalpago = round((float) ($hdr['totalpago'] ?? 0), 2);
+            if ($nuevoTotal + 1e-6 < $totalpago) {
+                throw new \RuntimeException('billing_fijar_menor_pagado');
+            }
+            $idPif = (int) $hdr['idPrecioinsumosformulario'];
+            $this->db->prepare('UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?')->execute([$nuevoTotal, $idPif]);
+            Auditoria::log($this->db, 'UPDATE', 'precioinsumosformulario', "Fijar total insumo form #{$idformA} (sin líneas) → {$nuevoTotal} (admin {$adminId})");
+
+            return;
+        }
+
+        $row0 = $lines[0];
+        if ((int) ($row0['IdInstitucion'] ?? 0) !== $instId) {
+            throw new \RuntimeException('billing_fijar_sin_permiso');
+        }
+        if ((int) ($row0['exento'] ?? 0) === 1) {
+            throw new \RuntimeException('billing_fijar_exento');
+        }
+        if ($this->findFacturacionDerivadaForForm($idformA, $instId)) {
+            throw new \RuntimeException('billing_fijar_derivada');
+        }
+        if ($this->formInsumoEsDerivacionDestino($idformA, $instId)) {
+            throw new \RuntimeException('billing_fijar_destino_derivacion');
+        }
+
+        $totalpago = round((float) ($row0['totalpago'] ?? 0), 2);
+        if ($nuevoTotal + 1e-6 < $totalpago) {
+            throw new \RuntimeException('billing_fijar_menor_pagado');
+        }
+
+        $idPif = (int) $row0['idPrecioinsumosformulario'];
+        $weights = [];
+        foreach ($lines as $ln) {
+            $c = (float) ($ln['cantidad'] ?? 0);
+            $pu = (float) ($ln['pu'] ?? 0);
+            $weights[] = max(0.0, round($c * $pu, 4));
+        }
+        $sumW = array_sum($weights);
+        $n = count($lines);
+        $newPu = array_fill(0, $n, 0.0);
+        if ($sumW <= 0) {
+            $each = round($nuevoTotal / $n, 2);
+            for ($i = 0; $i < $n; $i++) {
+                $c = max((float) ($lines[$i]['cantidad'] ?? 0), 1e-8);
+                $newPu[$i] = round($each / $c, 4);
+            }
+        } else {
+            $acc = 0.0;
+            for ($i = 0; $i < $n - 1; $i++) {
+                $lineTot = round($nuevoTotal * ($weights[$i] / $sumW), 2);
+                $c = max((float) ($lines[$i]['cantidad'] ?? 0), 1e-8);
+                $newPu[$i] = round($lineTot / $c, 4);
+                $acc += round($c * $newPu[$i], 2);
+            }
+            $lastIdx = $n - 1;
+            $lastTot = round($nuevoTotal - $acc, 2);
+            $cLast = max((float) ($lines[$lastIdx]['cantidad'] ?? 0), 1e-8);
+            $newPu[$lastIdx] = round($lastTot / $cLast, 4);
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $upd = $this->db->prepare('UPDATE forminsumo SET PrecioMomentoInsumo = ? WHERE IdForminsumo = ?');
+            foreach ($lines as $i => $ln) {
+                $upd->execute([(float) $newPu[$i], (int) $ln['IdForminsumo']]);
+            }
+            $this->db->prepare('UPDATE precioinsumosformulario SET preciototal = ? WHERE idPrecioinsumosformulario = ?')->execute([$nuevoTotal, $idPif]);
+            Auditoria::log($this->db, 'UPDATE', 'precioinsumosformulario', "Fijar total insumo form #{$idformA} → {$nuevoTotal} (admin {$adminId})");
+            $this->db->commit();
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     private function tableExists($tableName) {

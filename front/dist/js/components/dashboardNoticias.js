@@ -1,5 +1,6 @@
 import { API } from '../api.js';
 import { getCorrectPath } from './menujs/MenuConfig.js';
+import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260510';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -10,6 +11,36 @@ function escapeHtml(s) {
 }
 
 const NOTICIA_BADGE_VARIANTS = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+
+function noticiaPortadaThumbBlock(row) {
+    const id = parseInt(row.IdNoticia, 10) || 0;
+    if (!id || !row.ImagenPortadaB2Key || String(row.ImagenPortadaB2Key).trim() === '') return '';
+    return `<div class="mb-2 rounded overflow-hidden bg-light d-none border dash-noticia-portada-wrap dash-noticia-portada--adaptive" data-noticia-portada-id="${id}" data-dash-portada-adaptive="1">
+        <img alt="" class="w-100 d-block dash-noticia-portada-img" />
+    </div>`;
+}
+
+function noticiaAdjuntosBlock(row) {
+    const tc = window.txt?.comunicacion || {};
+    const idNoticia = parseInt(row.IdNoticia, 10) || 0;
+    if (!idNoticia) return '';
+    const btns = [];
+    if (row.AdjuntoDoc1B2Key && String(row.AdjuntoDoc1B2Key).trim()) {
+        const nm = escapeHtml(String(row.AdjuntoDoc1Nombre || '').trim() || tc.noticia_adjunto_sin_nombre || '—');
+        btns.push(
+            `<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-open-noticia-archivo="${idNoticia}" data-noticia-tipo="doc1">${nm}</button>`
+        );
+    }
+    if (row.AdjuntoDoc2B2Key && String(row.AdjuntoDoc2B2Key).trim()) {
+        const nm = escapeHtml(String(row.AdjuntoDoc2Nombre || '').trim() || tc.noticia_adjunto_sin_nombre || '—');
+        btns.push(
+            `<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-open-noticia-archivo="${idNoticia}" data-noticia-tipo="doc2">${nm}</button>`
+        );
+    }
+    if (!btns.length) return '';
+    const lab = escapeHtml(tc.noticia_adjuntos_label || '');
+    return `<div class="mt-2 pt-2 border-top border-opacity-50"><div class="small text-muted text-uppercase mb-1" style="font-size:10px;">${lab}</div><div class="d-flex flex-wrap gap-1">${btns.join('')}</div></div>`;
+}
 
 function noticiaCategoriaBadgeHtml(r) {
     const name = String(r?.Categoria ?? '').trim();
@@ -89,12 +120,8 @@ function maybeShowPortadaPopup(pp, t) {
     const cue = (pp.PopupCuerpo || '').trim();
     const adj = pp.popup_adjuntos || [];
     const news = pp.PopupNoticia;
-    if (!tit && !cue && adj.length === 0 && !news) return;
-    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
-    const fu = pp.FechaActualizacion ? String(pp.FechaActualizacion) : '0';
-    const key = `grobo_portada_popup_${instId}_${fu}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, '1');
+    const imgUrl = (pp.PopupImagenUrl || '').trim();
+    if (!tit && !cue && adj.length === 0 && !news && !imgUrl) return;
 
     const modalId = 'grobo-modal-portada-popup';
     document.getElementById(modalId)?.remove();
@@ -119,6 +146,9 @@ function maybeShowPortadaPopup(pp, t) {
               )
               .join('')}</div>`
         : '';
+    const imgHtml = imgUrl
+        ? `<div class="mb-3 text-center"><img src="${escapeHtml(imgUrl)}" class="img-fluid rounded shadow-sm" alt="" loading="lazy"></div>`
+        : '';
 
     document.body.insertAdjacentHTML(
         'beforeend',
@@ -130,6 +160,7 @@ function maybeShowPortadaPopup(pp, t) {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body pt-2">
+                        ${imgHtml}
                         ${cue ? `<div class="small text-dark" style="white-space:pre-wrap">${escapeHtml(cue)}</div>` : ''}
                         ${adjHtml}
                         ${newsHtml}
@@ -152,8 +183,11 @@ function maybeShowPortadaPopup(pp, t) {
 
 const refreshBound = new Set();
 
-/** Listado API: suficientes ítems para hasta 3 destacadas + recientes debajo. */
-const DASH_NOTICIAS_PAGE_SIZE = 12;
+/** Máximo de noticias con `OrdenFijo` visibles en el bloque destacado del panel (dos filas de 3 en `md+`). */
+const DASH_NOTICIAS_PIN_MAX = 6;
+
+/** Listado API: suficientes ítems para destacadas + recientes debajo. */
+const DASH_NOTICIAS_PAGE_SIZE = 14;
 const DASH_MENSAJES_UNREAD_MAX = 5;
 
 function mensajesPanelHref(alcance, hiloId) {
@@ -239,11 +273,13 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         const cuerpoHtml = escapeHtml(cuerpoRaw);
         const idNoticia = parseInt(row.IdNoticia, 10) || 0;
         return `
+            ${noticiaPortadaThumbBlock(row)}
             <div class="d-flex flex-wrap align-items-center gap-2 small text-muted text-uppercase mb-1" style="font-size:10px;">
                 <span>${escapeHtml(String(fp).substring(0, 16))}</span>${noticiaCategoriaBadgeHtml(row)}
             </div>
             <h6 class="fw-bold mb-2">${titulo}</h6>
             <div class="small text-dark dash-noticia-cuerpo" style="white-space: pre-wrap; max-height: 140px; overflow-y: auto;">${cuerpoHtml}</div>
+            ${noticiaAdjuntosBlock(row)}
             ${idNoticia ? `<a href="${portalHref()}?id=${encodeURIComponent(String(idNoticia))}" class="d-inline-block mt-2 small text-success fw-semibold">${escapeHtml(t.dash_abrir_noticia || t.ver_mas || '')}</a>` : ''}`;
     }
 
@@ -251,14 +287,14 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     const rest = [];
     for (const row of rowsLoc) {
         const o = row.OrdenFijo != null && row.OrdenFijo !== '' ? parseInt(row.OrdenFijo, 10) : NaN;
-        if (o >= 1 && o <= 3) {
+        if (o >= 1 && o <= DASH_NOTICIAS_PIN_MAX) {
             pinned.push(row);
         } else {
             rest.push(row);
         }
     }
     pinned.sort((a, b) => parseInt(a.OrdenFijo, 10) - parseInt(b.OrdenFijo, 10));
-    const pinnedShow = pinned.slice(0, 3);
+    const pinnedShow = pinned.slice(0, DASH_NOTICIAS_PIN_MAX);
 
     const bloquePinned =
         pinnedShow.length > 0
@@ -361,7 +397,9 @@ export async function injectDashboardNoticias(mountId, options = {}) {
             </div>
         </div>`;
 
-    maybeShowPortadaPopup(ppConfig, t);
+    if (!silent) {
+        maybeShowPortadaPopup(ppConfig, t);
+    }
 
     mount.querySelectorAll('[data-dash-noticia-id]').forEach((el) => {
         const id = el.getAttribute('data-dash-noticia-id');
@@ -377,6 +415,9 @@ export async function injectDashboardNoticias(mountId, options = {}) {
             }
         });
     });
+
+    await hydrateNoticiaPortadaThumbs(mount);
+    bindNoticiaAdjuntoOpenButtons(mount, t.err_generico || '');
 
     mount.dataset.newsDashboardInjected = '1';
 

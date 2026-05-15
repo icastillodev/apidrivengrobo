@@ -222,7 +222,7 @@ export async function initCapacitacionHelpFab() {
   let menuIds = [];
   try {
     if (roleId === 1 || roleId === 2 || roleId === 4) {
-      menuIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 998, 999];
+      menuIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 207, 208, 209, 998, 999];
       menuIds = filterMenuIdsByModulos(menuIds, roleId, instId);
     } else {
       const resMenu = await API.request(`/menu?role=${roleId}&inst=${instId}`);

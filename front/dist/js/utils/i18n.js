@@ -154,6 +154,7 @@ const PATH_TO_TITLE_KEY = {
     'usuario/perfil': 'perfil', 'panel/perfil': 'perfil',
     'panel/noticias': 'noticias_portal',
     'panel/poe': 'poe_portal',
+    'admin/popup': 'dashboard_popups_admin',
     'admin/comunicacion/noticias': 'noticias_admin',
     'admin/comunicacion/poe': 'poe_admin',
     'superadmin/dashboard': 'superadmin_dashboard', 'superadmin/instituciones': 'superadmin_instituciones',

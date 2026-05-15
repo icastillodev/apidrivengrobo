@@ -1173,9 +1173,9 @@ export const CHAPTERS = {
   },
   panel__poe: {
     overview:
-      'Os procedimentos operacionais padronizados (POE) são documentos de trabalho e referência que a instituição publica para consulta rápida: normas internas, procedimentos ou ligações úteis.\n\nAparecem em cartões; ao abrir um vê o texto completo e até duas URLs externas se a sede as configurou. Complementa o portal de notícias; não substitui mensagens nem avisos longos.',
+      'Os procedimentos operacionais padronizados (POEs) são documentos de trabalho e referência que a instituição publica para consulta rápida: normas internas, procedimentos ou ligações úteis.\n\nAparecem em cartões; ao abrir um vê o texto completo e até duas URLs externas se a sede as configurou. Complementa o portal de notícias; não substitui mensagens nem avisos longos.',
     summary:
-      'Consulta de POE publicados pela instituição.',
+      'Consulta de POEs publicados pela instituição.',
     roles:
       'Utilizadores com acesso ao portal de notícias (mesma área de comunicação).',
     blocks: [
@@ -1183,7 +1183,7 @@ export const CHAPTERS = {
         id: 'intro',
         cat: 'navigation',
         icon: 'journal-richtext',
-        h: 'O que é o POE no painel',
+        h: 'O que são os POEs no painel',
         html: '<p>Listagem de <strong>documentos operacionais</strong> que a administração mantém visíveis. Costuma aceder-se a partir de <strong>Notícias</strong> ou do painel inicial.</p>',
       },
       {
@@ -1197,9 +1197,9 @@ export const CHAPTERS = {
   },
   admin__comunicacion__poe: {
     overview:
-      'A administração de POE permite criar, ordenar e mostrar ou ocultar os documentos que os utilizadores veem no portal.\n\nCada registo tem título, corpo, ordem, visibilidade e até duas URLs de anexo (entrada manual até existir armazenamento na nuvem). Permissões alinhadas com notícias e portada.',
+      'A administração de POEs permite criar, ordenar e mostrar ou ocultar os documentos que os utilizadores veem no portal.\n\nCada registo tem título, corpo, ordem, visibilidade e até duas URLs de anexo (entrada manual até existir armazenamento na nuvem). Permissões alinhadas com notícias e portada.',
     summary:
-      'Criação, edição e listagem de POE institucionais.',
+      'Criação, edição e listagem de POEs institucionais.',
     roles:
       'Perfis com administração de comunicação / notícias.',
     blocks: [
@@ -1208,7 +1208,7 @@ export const CHAPTERS = {
         cat: 'navigation',
         icon: 'journal-richtext',
         h: 'Listagem administrativa',
-        html: '<p>Tabela com título, ordem, estado e ações. Use <strong>Novo</strong> para criar outro POE ou edite uma linha existente.</p>',
+        html: '<p>Tabela com título, ordem, estado e ações. Use <strong>Novo documento</strong> para criar outro ítem em POEs ou edite uma linha existente.</p>',
       },
       {
         id: 'form',

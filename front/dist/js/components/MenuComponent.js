@@ -61,9 +61,9 @@ try {
         let ids = [];
 
         // GeckoDev (1), Superadmin sede (2), Admin (4): lista base completa + sin filtrar por módulos en cliente (el API aplica permisos).
-        // Incluye comunicación (204, 205, 206) — investigadores (3,5,6) siguen usando /menu.
+        // Incluye comunicación (204–209) — investigadores (3–6) siguen usando /menu.
         if (roleId === 1 || roleId === 2 || roleId === 4) {
-            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 998, 999];
+            ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 207, 208, 209, 998, 999];
             ids = filterMenuIdsByModulos(ids, roleId, parseInt(instId, 10) || 0);
         } 
 

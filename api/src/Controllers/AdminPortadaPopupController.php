@@ -2,7 +2,6 @@
 namespace App\Controllers;
 
 use App\Models\Comunicacion\InstitucionPortadaPopupModel;
-use App\Models\Comunicacion\NoticiaModel;
 use App\Utils\Auditoria;
 
 class AdminPortadaPopupController {
@@ -56,29 +55,30 @@ class AdminPortadaPopupController {
             $instId = $this->requireInst($sesion);
             $this->assertPuedePublicar($sesion, $instId);
             $row = $this->model->getByInstitucion($instId);
+            $empty = [
+                'PortadaTitulo' => null,
+                'PortadaCuerpo' => null,
+                'PortadaUrlAdjunto1' => null,
+                'PortadaNombreAdjunto1' => null,
+                'PortadaUrlAdjunto2' => null,
+                'PortadaNombreAdjunto2' => null,
+                'PortadaImagenB2Key' => null,
+                'PortadaImagenNombre' => null,
+                'PortadaAdjunto1B2Key' => null,
+                'PortadaAdjunto1Nombre' => null,
+                'PortadaAdjunto2B2Key' => null,
+                'PortadaAdjunto2Nombre' => null,
+                'FechaActualizacion' => null,
+            ];
             if (!$row) {
-                $this->json([
-                    'status' => 'success',
-                    'data' => [
-                        'PortadaTitulo' => null,
-                        'PortadaCuerpo' => null,
-                        'PortadaUrlAdjunto1' => null,
-                        'PortadaNombreAdjunto1' => null,
-                        'PortadaUrlAdjunto2' => null,
-                        'PortadaNombreAdjunto2' => null,
-                        'PopupActivo' => 0,
-                        'PopupTitulo' => null,
-                        'PopupCuerpo' => null,
-                        'PopupUrlAdjunto1' => null,
-                        'PopupNombreAdjunto1' => null,
-                        'PopupUrlAdjunto2' => null,
-                        'PopupNombreAdjunto2' => null,
-                        'PopupIdNoticia' => null,
-                        'FechaActualizacion' => null,
-                    ],
-                ]);
+                $this->json(['status' => 'success', 'data' => $empty]);
             }
-            $this->json(['status' => 'success', 'data' => $row]);
+            foreach ($empty as $k => $_) {
+                if (array_key_exists($k, $row)) {
+                    $empty[$k] = $row[$k];
+                }
+            }
+            $this->json(['status' => 'success', 'data' => $empty]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 403);
         }
@@ -93,20 +93,13 @@ class AdminPortadaPopupController {
             if (!is_array($input)) {
                 $input = [];
             }
-            $validated = $this->model->validateAndNormalize($input, $instId);
+            $validated = $this->model->validatePortadaPayload($input, $instId);
             if (!$validated['ok']) {
                 $this->json(['status' => 'error', 'message' => $validated['message']], 400);
             }
             $d = $validated['data'];
-            if ($d['PopupIdNoticia'] !== null) {
-                $nm = new NoticiaModel($this->db);
-                $check = $nm->getPublicById($instId, (int)$d['PopupIdNoticia']);
-                if (!$check) {
-                    $this->json(['status' => 'error', 'message' => 'La noticia vinculada no existe o no está visible para su institución.'], 400);
-                }
-            }
-            $this->model->upsert($instId, $d);
-            Auditoria::log($this->db, 'UPDATE', 'institucion_portada_popup', 'IdInstitucion=' . $instId);
+            $this->model->upsertPortadaOnly($instId, $d);
+            Auditoria::log($this->db, 'UPDATE', 'institucion_portada_popup', 'portada-only IdInstitucion=' . $instId);
             $this->json(['status' => 'success']);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 403);

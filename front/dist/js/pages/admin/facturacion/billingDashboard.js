@@ -1,4 +1,32 @@
-import { formatBillingMoney, billingTipoExento } from './billingLocale.js';
+import { formatBillingMoney, billingTipoExento, billingSumInsumosCobrable, billingInsumoDebeCobrable } from './billingLocale.js';
+
+/**
+ * Ajusta `totales` del API: `deudaInsumos` / `globalDeuda` usan `debe` derivado de `total_item`;
+ * si `total_item` viene en 0, recalculamos con la misma regla que la grilla de insumos.
+ * @param {Record<string, unknown>} data payload reporte (insumosGenerales + protocolos[].insumos)
+ * @param {Record<string, unknown>} t objeto `data.totales`
+ */
+function mergeTotalesDashboardConInsumosRecalc(data, t) {
+    const out = { ...t };
+    const rows = [];
+    if (Array.isArray(data.insumosGenerales)) {
+        rows.push(...data.insumosGenerales);
+    }
+    for (const p of data.protocolos || []) {
+        if (Array.isArray(p.insumos)) {
+            rows.push(...p.insumos);
+        }
+    }
+    if (rows.length === 0) {
+        return out;
+    }
+    const s = billingSumInsumosCobrable(rows);
+    const diApi = parseFloat(String(out.deudaInsumos ?? '0')) || 0;
+    const gdApi = parseFloat(String(out.globalDeuda ?? '0')) || 0;
+    out.deudaInsumos = s.debe;
+    out.globalDeuda = gdApi - diApi + s.debe;
+    return out;
+}
 
 function escBillingDash(v) {
     if (v === null || v === undefined) return '';
@@ -31,15 +59,15 @@ export function renderDashboard(data) {
  */
 function renderStatsCards(data) {
     const container = document.getElementById('stats-container');
-    const t = data.totales || {};
+    const t = mergeTotalesDashboardConInsumosRecalc(data, data.totales || {});
     const f = window.txt?.facturacion || {};
     const gd = parseFloat(t.globalDeuda) || 0;
     const tp = parseFloat(t.totalPagado) || 0;
     const totalAgregado = gd + tp;
 
     const configs = [
-        { key: 'deuda', always: true, label: f.deuda_total || 'DEUDA TOTAL', val: gd, col: '#dc3545' },
-        { key: 'totalAgg', always: true, label: f.dashboard_total_agregado || 'TOTAL AGREGADO', val: totalAgregado, col: '#343a40' },
+        { key: 'deuda', always: true, label: f.dashboard_tarjeta_debe_total || f.deuda_total || 'DEBE TOTAL', val: gd, col: '#dc3545' },
+        { key: 'totalAgg', always: true, label: f.dashboard_precio_total || 'PRECIO TOTAL', val: totalAgregado, col: '#343a40' },
         { key: 'pagado', always: false, label: f.total_pagado_lbl || 'TOTAL PAGADO', val: tp, col: '#198754' },
         { key: 'anim', always: false, label: f.debe_animales || 'DEBE ANIMALES', val: parseFloat(t.deudaAnimales) || 0, col: '#ffc107' },
         { key: 'react', always: false, label: f.debe_reactivos || 'DEBE REACTIVOS', val: parseFloat(t.deudaReactivos) || 0, col: '#0dcaf0' },
@@ -82,7 +110,7 @@ export function renderInvestigadoresTable(data) {
                 };
             }
             if (uid) {
-                invMap[uid].deuda += parseFloat(ins.debe || 0);
+                invMap[uid].deuda += billingInsumoDebeCobrable(ins);
                 if (!billingTipoExento(ins)) {
                     invMap[uid].pagado += parseFloat(ins.pagado || 0);
                 }
@@ -100,7 +128,11 @@ export function renderInvestigadoresTable(data) {
                 saldo: parseFloat(p.saldoInv || 0) 
             };
         }
-        invMap[uid].deuda += (parseFloat(p.deudaAnimales || 0) + parseFloat(p.deudaAlojamiento || 0) + parseFloat(p.deudaReactivos || 0) + parseFloat(p.deudaInsumos || 0));
+        let deudaInsProt = parseFloat(p.deudaInsumos || 0);
+        if (Array.isArray(p.insumos) && p.insumos.length > 0) {
+            deudaInsProt = billingSumInsumosCobrable(p.insumos).debe;
+        }
+        invMap[uid].deuda += (parseFloat(p.deudaAnimales || 0) + parseFloat(p.deudaAlojamiento || 0) + parseFloat(p.deudaReactivos || 0) + deudaInsProt);
         
         let pagadoProt = 0;
         (p.formularios || []).forEach(f => {
@@ -135,7 +167,7 @@ export function renderInvestigadoresTable(data) {
             : '';
 
         return `
-            <tr class="text-center align-middle">
+            <tr class="text-center align-middle" data-billing-inv="${uid}">
                 <td class="text-start ps-4">
                     <div class="fw-bold">${escBillingDash(i.nombre)} <span class="text-muted small">(ID: ${escBillingDash(uid)})</span></div>
                 </td>

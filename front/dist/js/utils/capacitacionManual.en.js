@@ -1173,9 +1173,9 @@ export const CHAPTERS = {
   },
   panel__poe: {
     overview:
-      'Standard procedures (POE) are working/reference documents your institution publishes for quick consultation: internal procedures, guidelines, or useful links.\n\nThey appear as cards; opening one shows the full text and up to two external URLs if configured. This complements the news portal; it does not replace messaging or long announcements.',
+      'Standard procedures (POEs) are working/reference documents your institution publishes for quick consultation: internal procedures, guidelines, or useful links.\n\nThey appear as cards; opening one shows the full text and up to two external URLs if configured. This complements the news portal; it does not replace messaging or long announcements.',
     summary:
-      'Reading institution-published POE.',
+      'Reading institution-published POEs.',
     roles:
       'Users with portal news access (same communications area).',
     blocks: [
@@ -1183,7 +1183,7 @@ export const CHAPTERS = {
         id: 'intro',
         cat: 'navigation',
         icon: 'journal-richtext',
-        h: 'What POE is in the panel',
+        h: 'What POEs are in the panel',
         html: '<p>A list of <strong>operational documents</strong> maintained by administration. Usually reached from <strong>News</strong> or the dashboard.</p>',
       },
       {
@@ -1197,9 +1197,9 @@ export const CHAPTERS = {
   },
   admin__comunicacion__poe: {
     overview:
-      'POE administration lets you create, order, and show or hide documents users see in the portal.\n\nEach record has title, body, sort order, visibility, and up to two attachment URLs (manual entry until cloud storage ships). Permissions align with news and landing settings.',
+      'POEs administration lets you create, order, and show or hide documents users see in the portal.\n\nEach record has title, body, sort order, visibility, and up to two attachment URLs (manual entry until cloud storage ships). Permissions align with news and landing settings.',
     summary:
-      'Create, edit, and list institutional POE.',
+      'Create, edit, and list institutional POEs.',
     roles:
       'Profiles with communications / news administration.',
     blocks: [
@@ -1208,7 +1208,7 @@ export const CHAPTERS = {
         cat: 'navigation',
         icon: 'journal-richtext',
         h: 'Admin table',
-        html: '<p>Table with title, order, status, and row actions. Use <strong>New</strong> to add a POE or edit an existing row.</p>',
+        html: '<p>Table with title, order, status, and row actions. Use <strong>New document</strong> to add another entry to POEs or edit an existing row.</p>',
       },
       {
         id: 'form',

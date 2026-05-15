@@ -1,6 +1,7 @@
 <?php
 namespace App\Controllers;
 
+use App\Models\Comunicacion\InstitucionDashboardPopupModel;
 use App\Models\Comunicacion\InstitucionPortadaPopupModel;
 use App\Models\Comunicacion\NoticiaModel;
 use App\Utils\Auditoria;
@@ -80,51 +81,70 @@ class PortadaPopupController {
     /**
      * Respuesta para dashboard: portada, popup (sin datos sensibles) y noticia vinculada si sigue publicada.
      */
-    private function buildPublicDto(?array $row, int $instId): array {
-        if (!$row) {
-            return [
-                'PortadaTitulo' => null,
-                'PortadaCuerpo' => null,
-                'PortadaImagenUrl' => null,
-                'portada_adjuntos' => [],
-                'PopupActivo' => 0,
-                'PopupTitulo' => null,
-                'PopupCuerpo' => null,
-                'popup_adjuntos' => [],
-                'PopupNoticia' => null,
-                'FechaActualizacion' => null,
-            ];
+    private function mergeFechaActualizacion(?array $ippRow, ?array $popupRow): ?string {
+        $a = $ippRow['FechaActualizacion'] ?? null;
+        $b = $popupRow['FechaActualizacion'] ?? null;
+        if (!$a) {
+            return $b ? (string) $b : null;
+        }
+        if (!$b) {
+            return (string) $a;
+        }
+        $ta = strtotime((string) $a);
+        $tb = strtotime((string) $b);
+
+        return ($tb !== false && $ta !== false && $tb >= $ta) ? (string) $b : (string) $a;
+    }
+
+    /**
+     * @param ?array $ippRow institucion_portada_popup
+     * @param ?array $popupRow institucion_dashboard_popup activo (o null)
+     */
+    private function buildPublicDto(?array $ippRow, ?array $popupRow, int $instId): array {
+        if (!$ippRow) {
+            $ippRow = [];
         }
 
         $nm = new NoticiaModel($this->db);
         $popupNoticia = null;
-        $nid = isset($row['PopupIdNoticia']) ? (int)$row['PopupIdNoticia'] : 0;
+        $nid = isset($popupRow['PopupIdNoticia']) ? (int) $popupRow['PopupIdNoticia'] : 0;
         if ($nid > 0) {
             $nr = $nm->getPublicById($instId, $nid);
             if ($nr) {
                 $popupNoticia = [
-                    'IdNoticia' => (int)$nr['IdNoticia'],
-                    'Titulo' => (string)($nr['Titulo'] ?? ''),
+                    'IdNoticia' => (int) $nr['IdNoticia'],
+                    'Titulo' => (string) ($nr['Titulo'] ?? ''),
                 ];
             }
         }
 
         $imgUrl = null;
-        if (!empty($row['PortadaImagenB2Key'])) {
+        if (!empty($ippRow['PortadaImagenB2Key'])) {
             $imgUrl = $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/portada_imagen';
         }
 
+        $popActivo = $popupRow ? (int) ($popupRow['PopupActivo'] ?? 0) : 0;
+
+        $popupImgUrl = null;
+        if ($popupRow && !empty($popupRow['PopupPortadaImagenB2Key'])) {
+            $popupImgUrl = $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/popup_imagen';
+        }
+
         return [
-            'PortadaTitulo' => $row['PortadaTitulo'] ?? null,
-            'PortadaCuerpo' => $row['PortadaCuerpo'] ?? null,
+            'PortadaTitulo' => $ippRow['PortadaTitulo'] ?? null,
+            'PortadaCuerpo' => $ippRow['PortadaCuerpo'] ?? null,
             'PortadaImagenUrl' => $imgUrl,
-            'portada_adjuntos' => $this->adjuntosDocumentosMerge($row, 'Portada'),
-            'PopupActivo' => (int)($row['PopupActivo'] ?? 0),
-            'PopupTitulo' => $row['PopupTitulo'] ?? null,
-            'PopupCuerpo' => $row['PopupCuerpo'] ?? null,
-            'popup_adjuntos' => $this->adjuntosDocumentosMerge($row, 'Popup'),
+            'portada_adjuntos' => $this->adjuntosDocumentosMerge($ippRow, 'Portada'),
+            'PopupActivo' => $popActivo,
+            'PopupTitulo' => $popupRow['PopupTitulo'] ?? null,
+            'PopupCuerpo' => $popupRow['PopupCuerpo'] ?? null,
+            'PopupImagenUrl' => $popupImgUrl,
+            'popup_adjuntos' => $popupRow ? $this->adjuntosDocumentosMerge($popupRow, 'Popup') : [],
             'PopupNoticia' => $popupNoticia,
-            'FechaActualizacion' => $row['FechaActualizacion'] ?? null,
+            'FechaActualizacion' => $this->mergeFechaActualizacion(
+                $ippRow ?: null,
+                $popupRow ?: null
+            ),
         ];
     }
 
@@ -133,8 +153,10 @@ class PortadaPopupController {
             $sesion = Auditoria::getDatosSesion();
             $instId = $this->requireInst($sesion);
             $model = new InstitucionPortadaPopupModel($this->db);
-            $row = $model->getByInstitucion($instId);
-            $this->json(['status' => 'success', 'data' => $this->buildPublicDto($row, $instId)]);
+            $ipp = $model->getByInstitucion($instId);
+            $dpm = new InstitucionDashboardPopupModel($this->db);
+            $pop = $dpm->getActiveForInstitution($instId);
+            $this->json(['status' => 'success', 'data' => $this->buildPublicDto($ipp, $pop, $instId)]);
         } catch (\Exception $e) {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }

@@ -60,7 +60,9 @@ const MENU_DEFINITION = [
     { id: 202, name: "Módulo Contable" },
     { id: 204, i18n: 'menu_204' },
     { id: 205, i18n: 'menu_205' },
-    { id: 206, i18n: 'menu_206' }
+    { id: 206, i18n: 'menu_206' },
+    { id: 208, i18n: 'menu_208' },
+    { id: 209, i18n: 'menu_209' }
 ];
 
 async function loadNoticiasRolesPublicar() {

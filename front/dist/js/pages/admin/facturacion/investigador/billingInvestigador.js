@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 
@@ -355,7 +355,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                 </thead>
                 <tbody>
                     ${alojamientos.map(a => `
-                        <tr onclick="if(!event.target.closest('td:first-child')) window.abrirEdicionFina('ALOJ', ${a.historia})" class="text-center align-middle pointer">
+                        <tr onclick="window.billingRowClickOpenAlojModal(event, ${a.historia})" class="text-center align-middle pointer">
                             <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
                             <td>#${a.historia}</td>
                             <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
@@ -408,7 +408,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pagado'}</th>
-                            <th style="width:10%">${tf.falta || 'Debe'}</th>
+                            <th style="width:10%">${bd.th_debe_uc || 'DEBE'}</th>
                         </tr>
                     </thead>
                     <tbody>${tbody}</tbody>
@@ -425,16 +425,10 @@ function getInsumosGeneralesTableHTML(insumos) {
     const bi = txBI();
     const exL = bi.pdf_monto_exento || 'Exento';
     const packs = { bd, tf, bi, exL };
-    let sumTotal = 0, sumPagado = 0, sumDebe = 0;
-    for (const i of insumos) {
-        const total = parseFloat(i.total_item || 0);
-        const pagado = parseFloat(i.pagado || 0);
-        const isExento = billingTipoExento(i);
-        const debe = isExento ? 0 : Math.max(0, total - pagado);
-        if (!isExento) {
-            sumTotal += total; sumPagado += pagado; sumDebe += debe;
-        }
-    }
+    const sums = billingSumInsumosCobrable(insumos);
+    const sumTotal = sums.total;
+    const sumPagado = sums.pagado;
+    const sumDebe = sums.debe;
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
@@ -471,7 +465,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th>
                             <th style="width:10%">${tf.total || 'Total'}</th>
                             <th style="width:10%">${tf.pago || 'Pago'}</th>
-                            <th style="width:10%">${tf.falta || 'Falta'}</th>
+                            <th style="width:10%">${bd.th_debe_uc || 'DEBE'}</th>
                         </tr>
                     </thead>
                     <tbody>${filas}</tbody>
@@ -761,7 +755,7 @@ window.downloadGlobalPDF = async () => {
                 ];
             }),
             ...(prot.insumos || []).map(i => {
-                const total = parseFloat(i.total_item || 0);
+                const total = billingInsumoMontoTotalCobrable(i);
                 const pagado = parseFloat(i.pagado || 0);
                 const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
@@ -876,7 +870,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             return [`H-${a.historia}`, a.especie, concepto, m[0], m[2], m[1]];
         }),
         ...(prot.insumos || []).map(i => {
-            const total = parseFloat(i.total_item || 0);
+            const total = billingInsumoMontoTotalCobrable(i);
             const pagado = parseFloat(i.pagado || 0);
             const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
             const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);

@@ -1175,9 +1175,9 @@ export const CHAPTERS = {
   },
   panel__poe: {
     overview:
-      'Los protocolos operativos estandarizados (POE) son documentos de trabajo y referencia que su institución publica para consulta rápida: procedimientos, normas internas o enlaces útiles.\n\nSe listan como tarjetas; al abrir uno verá el texto completo y hasta dos enlaces externos si la sede los cargó. Complementa al portal de noticias; no sustituye a la mensajería ni a los avisos largos.',
+      'Los protocolos operativos estandarizados (POEs) son documentos de trabajo y referencia que su institución publica para consulta rápida: procedimientos, normas internas o enlaces útiles.\n\nSe listan como tarjetas; al abrir uno verá el texto completo y hasta dos enlaces externos si la sede los cargó. Complementa al portal de noticias; no sustituye a la mensajería ni a los avisos largos.',
     summary:
-      'Consulta de POE publicados por la institución.',
+      'Consulta de POEs publicados por la institución.',
     roles:
       'Usuarios con acceso al portal de noticias (misma área de comunicación).',
     blocks: [
@@ -1185,7 +1185,7 @@ export const CHAPTERS = {
         id: 'intro',
         cat: 'navigation',
         icon: 'journal-richtext',
-        h: 'Qué es POE en el panel',
+        h: 'Qué son los POEs en el panel',
         html: '<p>Listado de <strong>documentos operativos</strong> que administración mantiene visibles. Suele alcanzarse desde <strong>Noticias</strong> o desde el tablero.</p>',
       },
       {
@@ -1199,9 +1199,9 @@ export const CHAPTERS = {
   },
   admin__comunicacion__poe: {
     overview:
-      'Administración de POE permite crear, ordenar y activar o desactivar los documentos que los usuarios ven en el portal.\n\nCada registro tiene título, cuerpo, orden de aparición, visibilidad y hasta dos URLs de adjunto (entrada manual hasta que exista almacenamiento en nube). Permisos alineados con noticias y portada.',
+      'La administración de POEs permite crear, ordenar y activar o desactivar los documentos que los usuarios ven en el portal.\n\nCada registro tiene título, cuerpo, orden de aparición, visibilidad y hasta dos URLs de adjunto (entrada manual hasta que exista almacenamiento en nube). Permisos alineados con noticias y portada.',
     summary:
-      'Alta, edición y listado de POE institucionales.',
+      'Alta, edición y listado de POEs institucionales.',
     roles:
       'Perfiles con administración de comunicación / noticias.',
     blocks: [
@@ -1210,7 +1210,7 @@ export const CHAPTERS = {
         cat: 'navigation',
         icon: 'journal-richtext',
         h: 'Listado administrativo',
-        html: '<p>Tabla con título, orden, estado y acciones. Use <strong>Nuevo</strong> para crear otro POE o edite una fila existente.</p>',
+        html: '<p>Tabla con título, orden, estado y acciones. Use <strong>Nuevo documento</strong> para dar de alta otro ítem en POEs o edite una fila existente.</p>',
       },
       {
         id: 'form',

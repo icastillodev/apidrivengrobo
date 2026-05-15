@@ -1,6 +1,7 @@
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { formatBillingMoney, formatBillingMoneyLoose } from './billingLocale.js';
+import { billingArmScrollRestore, billingApplyScrollRestore } from './billingScrollRestore.js';
 
 function txF() {
     return window.txt?.facturacion || {};
@@ -12,6 +13,40 @@ window.invalidateDeptoSaldoHistorialPanelsCache = () => {
         el.dataset.histLoaded = '0';
         delete el.dataset.histRefDepto;
     });
+};
+
+/**
+ * Tras pagos o cambios de saldo: recarga el informe de la vista activa (no usa el orden antiguo protocolo→investigador).
+ * @param {{ idUsr?: unknown, idProt?: unknown }} [restoreOpts]
+ */
+window.refreshBillingReportAfterMutation = async function refreshBillingReportAfterMutation(restoreOpts) {
+    const ro = restoreOpts && typeof restoreOpts === 'object' ? restoreOpts : {};
+    if (ro.armScroll !== false) {
+        billingArmScrollRestore(ro);
+    }
+    try {
+        if (typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function' && document.getElementById('sel-depto')) {
+            window.invalidateDeptoSaldoHistorialPanelsCache();
+        }
+        if (document.getElementById('sel-depto') && typeof window.cargarFacturacionDepto === 'function') {
+            await window.cargarFacturacionDepto();
+        } else if (
+            document.getElementById('investigador-results') &&
+            document.getElementById('sel-investigador') &&
+            typeof window.cargarFacturacionPersona === 'function'
+        ) {
+            await window.cargarFacturacionPersona();
+        } else if (document.getElementById('sel-investigador') && typeof window.cargarFacturacionInvestigador === 'function') {
+            await window.cargarFacturacionInvestigador();
+        } else if (document.getElementById('sel-protocolo') && typeof window.cargarFacturacionProtocolo === 'function') {
+            await window.cargarFacturacionProtocolo();
+        } else if (document.getElementById('billing-results-inst') && typeof window.cargarFacturacionInstitucion === 'function') {
+            await window.cargarFacturacionInstitucion();
+        }
+        billingApplyScrollRestore();
+    } catch (e) {
+        console.error(e);
+    }
 };
 
 async function fetchSaldoHistorialData(opts) {
@@ -49,6 +84,79 @@ function escapeHtmlBillingTxt(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function escapeAttrBilling(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
+/** Fecha + hora corta en historial (API puede devolver DATE o DATETIME). */
+function fmtFechaHistorialCell(f, dash) {
+    if (f == null || String(f).trim() === '') return dash;
+    const raw = String(f).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return escapeHtmlBillingTxt(raw);
+    }
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})/);
+    if (m) {
+        return escapeHtmlBillingTxt(`${m[1]} ${m[2]}`);
+    }
+    return escapeHtmlBillingTxt(raw);
+}
+
+async function fetchTransferCommentSuggestionsFromHistorial(idUsr, extraOpts = {}) {
+    const uid = parseInt(String(idUsr), 10) || 0;
+    if (!uid) return { transfers: [], comments: [] };
+    try {
+        const data = await fetchSaldoHistorialData({ idUsr: uid, ...extraOpts });
+        const transferSet = new Set();
+        const commentSet = new Set();
+        const push = (set, v) => {
+            const t = String(v ?? '').trim();
+            if (t) set.add(t);
+        };
+        (data.movimientos_saldo || []).forEach((r) => {
+            push(transferSet, r.IdentificadorTransferencia);
+            push(commentSet, r.Comentario);
+        });
+        (data.pagos || []).forEach((r) => {
+            push(transferSet, r.IdentificadorTransferencia);
+            push(commentSet, r.Comentario);
+        });
+        return {
+            transfers: [...transferSet].slice(0, 24),
+            comments: [...commentSet].slice(0, 24),
+        };
+    } catch (_) {
+        return { transfers: [], comments: [] };
+    }
+}
+
+function buildPaymentMetaSwalFragment(tf, suggestions, uid) {
+    const transfers = suggestions?.transfers || [];
+    const comments = suggestions?.comments || [];
+    const dlT = `dl-pay-tr-${uid}`;
+    const dlC = `dl-pay-cm-${uid}`;
+    const optT = transfers.map((t) => `<option value="${escapeAttrBilling(t)}"></option>`).join('');
+    const optC = comments.map((t) => `<option value="${escapeAttrBilling(t)}"></option>`).join('');
+    const hint = (tf.payment_meta_hint || '').trim();
+    const sec = (tf.payment_meta_section || '').trim();
+    return `
+        <div class="border-top pt-3 mt-3 text-start">
+            ${sec ? `<div class="small fw-bold text-secondary mb-2">${escapeHtmlBillingTxt(sec)}</div>` : ''}
+            ${hint ? `<p class="small text-muted mb-2">${escapeHtmlBillingTxt(hint)}</p>` : ''}
+            <label class="form-label small mb-1">${escapeHtmlBillingTxt(tf.saldo_transfer_id_label || 'Identificador de transferencia')}</label>
+            <input id="swal-pay-transfer-${uid}" class="form-control form-control-sm mb-2" maxlength="120" list="${dlT}"
+                placeholder="${escapeAttrBilling(tf.saldo_transfer_id_ph || '')}">
+            <datalist id="${dlT}">${optT}</datalist>
+            <label class="form-label small mb-1">${escapeHtmlBillingTxt(tf.saldo_comentario_label || 'Comentario')}</label>
+            <input id="swal-pay-comment-${uid}" class="form-control form-control-sm" maxlength="255" list="${dlC}"
+                placeholder="${escapeAttrBilling(tf.saldo_comentario_ph || '')}">
+            <datalist id="${dlC}">${optC}</datalist>
+        </div>`;
 }
 
 /** Etiqueta legible para códigos `TipoHistorial` de `historialpago` (i18n `saldo_hist_tipo_*`). */
@@ -103,7 +211,7 @@ function buildSaldoHistorialInnerHtml(data, histOpts = {}) {
         const sign = v < 0 ? '−' : '+';
         return `<span class="fw-bold ${cls}">${sign} $ ${formatBillingMoney(Math.abs(v))}</span>`;
     };
-    const fmtFecha = (f) => (f ? escapeHtmlBillingTxt(String(f)) : dash);
+    const fmtFecha = (f) => fmtFechaHistorialCell(f, dash);
     const empty = (tf.saldo_hist_empty || 'Sin movimientos.');
 
     const htmlMov = mov.length ? mov.map((r) => `
@@ -233,6 +341,13 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
             comment = (r.value?.comment || '').trim() || null;
         }
 
+        const pidFocus = isFromProtocol && idProt != null ? parseInt(String(idProt), 10) : NaN;
+
+        billingArmScrollRestore({
+            idUsr,
+            idProt: Number.isFinite(pidFocus) ? pidFocus : null,
+        });
+
         showLoader();
         const res = await API.request('/billing/balance', 'POST', {
             idUsr: idUsr,
@@ -241,18 +356,16 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
             transferId,
             comment
         });
+        hideLoader();
 
         if (res.status === 'success') {
-            input.value = ''; 
-            
-            if (typeof window.cargarFacturacionProtocolo === "function") {
-                await window.cargarFacturacionProtocolo();
-            } else if (typeof window.cargarFacturacionInvestigador === "function") {
-                await window.cargarFacturacionInvestigador();
-            } else if (typeof window.cargarFacturacionDepto === "function") {
-                await window.cargarFacturacionDepto();
-            } else if (typeof window.cargarFacturacionInstitucion === "function") {
-                await window.cargarFacturacionInstitucion();
+            input.value = '';
+            if (typeof window.refreshBillingReportAfterMutation === 'function') {
+                await window.refreshBillingReportAfterMutation({
+                    idUsr,
+                    idProt: Number.isFinite(pidFocus) ? pidFocus : null,
+                    armScroll: false,
+                });
             }
 
             Swal.fire({
@@ -270,7 +383,10 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                 'error'
             );
         }
-    } catch (e) { console.error(e); } finally { hideLoader(); }
+    } catch (e) {
+        hideLoader();
+        console.error(e);
+    }
 };
 
 window.openSaldoHistorialPopup = async (opts) => {
@@ -430,7 +546,11 @@ window.procesarPagoProtocolo = async (idProt) => {
     }
 
     const tf = txF();
+    const idUsrPago = prot.idUsr ?? prot.info?.IdUsrA;
+    const sug = await fetchTransferCommentSuggestionsFromHistorial(idUsrPago);
+    const swUid = `prot${idProt}_${Date.now()}`;
     const intro = (tf.payment_confirm_items || 'Se liquidarán <b>{n}</b> ítems.').replace(/\{n\}/g, String(items.length));
+    const metaFrag = buildPaymentMetaSwalFragment(tf, sug, swUid);
     const confirm = await Swal.fire({
         title: tf.confirm_pago || 'Confirmar Liquidación',
         html: `
@@ -447,75 +567,111 @@ window.procesarPagoProtocolo = async (idProt) => {
                         <span>$ ${formatBillingMoney(saldoActual - totalAPagar)}</span>
                     </div>
                 </div>
+                ${metaFrag}
             </div>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: tf.confirmar_pago_btn || 'Sí, pagar ahora',
         confirmButtonColor: '#1a5d3b',
-        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar',
+        preConfirm: () => {
+            const c = Swal.getHtmlContainer();
+            const tid = c?.querySelector(`#swal-pay-transfer-${swUid}`)?.value ?? '';
+            const com = c?.querySelector(`#swal-pay-comment-${swUid}`)?.value ?? '';
+            return { transferId: String(tid).trim(), comment: String(com).trim() };
+        },
     });
 
     if (confirm.isConfirmed) {
-        const idUsrPago = prot.idUsr ?? prot.info?.IdUsrA;
-        ejecutarPagoFinal(idUsrPago, totalAPagar, items);
+        await ejecutarPagoFinal(idUsrPago, totalAPagar, items, idProt, confirm.value || {});
     }
 };
 /**
  * Envío real a la base de datos
  */
-async function ejecutarPagoFinal(idUsr, monto, items) {
+async function ejecutarPagoFinal(idUsr, monto, items, focusProtId = null, paymentMeta = null) {
+    const fp = focusProtId != null ? parseInt(String(focusProtId), 10) : NaN;
+    const tid = paymentMeta && typeof paymentMeta === 'object' ? String(paymentMeta.transferId || '').trim() : '';
+    const com = paymentMeta && typeof paymentMeta === 'object' ? String(paymentMeta.comment || '').trim() : '';
     try {
-        showLoader();
-        const res = await API.request('/billing/process-payment', 'POST', {
-            idUsr, monto, items, instId: localStorage.getItem('instId') || 1
+        billingArmScrollRestore({
+            idUsr,
+            idProt: Number.isFinite(fp) && fp >= 0 ? fp : null,
         });
+        showLoader();
+        const payload = {
+            idUsr,
+            monto,
+            items,
+            instId: localStorage.getItem('instId') || 1,
+        };
+        if (tid) payload.transferId = tid;
+        if (com) payload.comment = com;
+        const res = await API.request('/billing/process-payment', 'POST', payload);
+        // El overlay global va por encima de SweetAlert2: hay que quitarlo antes de cualquier Swal con await.
+        hideLoader();
 
         if (res.status === 'success') {
             const tf = txF();
             await Swal.fire(tf.pago_procesado || '¡Pago Procesado!', tf.payment_saldo_actualizado_msg || 'El saldo ha sido actualizado.', 'success');
 
-            if (typeof window.cargarFacturacionProtocolo === "function") {
-                await window.cargarFacturacionProtocolo();
-            } else if (typeof window.cargarFacturacionInvestigador === "function") {
-                await window.cargarFacturacionInvestigador();
-            } else if (typeof window.cargarFacturacionDepto === "function") {
-                await window.cargarFacturacionDepto();
+            if (typeof window.refreshBillingReportAfterMutation === 'function') {
+                await window.refreshBillingReportAfterMutation({
+                    idUsr,
+                    idProt: Number.isFinite(fp) && fp >= 0 ? fp : null,
+                    armScroll: false,
+                });
             }
         } else {
             await Swal.fire(window.txt?.generales?.error || 'Error', res.message || txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
         }
     } catch (e) {
+        hideLoader();
         console.error(e);
         await Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
-    } finally {
-        hideLoader();
     }
 }
 /**
  * 3. Ejecución final del pago en la API
  */
-window.ejecutarPagoAPI = async (idUsr, monto, items) => {
+window.ejecutarPagoAPI = async (idUsr, monto, items, focusProtId = null, paymentMeta = null) => {
+    const fp = focusProtId != null ? parseInt(String(focusProtId), 10) : NaN;
+    const tid = paymentMeta && typeof paymentMeta === 'object' ? String(paymentMeta.transferId || '').trim() : '';
+    const com = paymentMeta && typeof paymentMeta === 'object' ? String(paymentMeta.comment || '').trim() : '';
     try {
+        billingArmScrollRestore({
+            idUsr,
+            idProt: Number.isFinite(fp) && fp >= 0 ? fp : null,
+        });
         showLoader();
-        const res = await API.request('/billing/process-payment', 'POST', {
+        const payload = {
             idUsr,
             monto,
             items,
-            instId: localStorage.getItem('instId') || 1
-        });
+            instId: localStorage.getItem('instId') || 1,
+        };
+        if (tid) payload.transferId = tid;
+        if (com) payload.comment = com;
+        const res = await API.request('/billing/process-payment', 'POST', payload);
+        hideLoader();
 
         if (res.status === 'success') {
             const tf = txF();
             await Swal.fire(tf.payment_exitoso_titulo || 'Pago exitoso', tf.payment_exitoso_msg || 'Los ítems han sido liquidados y el saldo actualizado.', 'success');
-            await window.cargarFacturacionDepto(); // Refresca tablas y dashboard
+            if (typeof window.refreshBillingReportAfterMutation === 'function') {
+                await window.refreshBillingReportAfterMutation({
+                    idUsr,
+                    idProt: Number.isFinite(fp) && fp >= 0 ? fp : null,
+                    armScroll: false,
+                });
+            }
         } else {
             await Swal.fire(window.txt?.generales?.error || 'Error', res.message || txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
         }
-    } catch (e) { 
-        console.error(e); 
-        Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
-    } finally { 
-        hideLoader(); 
+    } catch (e) {
+        hideLoader();
+        console.error(e);
+        await Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
     }
 };
 
@@ -565,6 +721,10 @@ window.procesarPagoInsumosGenerales = async () => {
     }
 
     const tf = txF();
+    const idInv = primerItem.IdUsrA;
+    const sug = await fetchTransferCommentSuggestionsFromHistorial(idInv);
+    const swUid = `insg_${Date.now()}`;
+    const metaFrag = buildPaymentMetaSwalFragment(tf, sug, swUid);
     const confirm = await Swal.fire({
         title: tf.payment_insumos_confirm_titulo || 'Confirmar liquidación de insumos',
         width: '500px',
@@ -585,15 +745,22 @@ window.procesarPagoInsumosGenerales = async () => {
                         <span>${tf.payment_insumos_saldo_restante || 'Saldo restante:'}</span> <span>$ ${formatBillingMoneyLoose(saldoActual - totalAPagar)}</span>
                     </div>
                 </div>
+                ${metaFrag}
             </div>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: tf.payment_insumos_confirm_btn || 'Sí, liquidar insumos',
         confirmButtonColor: '#0d6efd',
-        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar'
+        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar',
+        preConfirm: () => {
+            const c = Swal.getHtmlContainer();
+            const tid = c?.querySelector(`#swal-pay-transfer-${swUid}`)?.value ?? '';
+            const com = c?.querySelector(`#swal-pay-comment-${swUid}`)?.value ?? '';
+            return { transferId: String(tid).trim(), comment: String(com).trim() };
+        },
     });
 
     if (confirm.isConfirmed) {
-        ejecutarPagoFinal(primerItem.IdUsrA, totalAPagar, items);
+        await ejecutarPagoFinal(idInv, totalAPagar, items, null, confirm.value || {});
     }
 };

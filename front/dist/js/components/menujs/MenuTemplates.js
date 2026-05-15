@@ -53,8 +53,11 @@ export function getMenuTemplates(roleId = 0) {
         203: { label: window.txt.menu.my_protocols, svg: `<svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>`,path: 'panel/misprotocolos' },
         204: { label: window.txt.menu.messages_institucional, svg: `<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4H4V6h16v2z"/></svg>`, path: 'panel/mensajes_institucion' },
         205: { label: window.txt.menu.news_admin, svg: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`, path: 'admin/comunicacion/noticias' },
+        207: { label: window.txt.menu.news_popup_admin, svg: `<svg viewBox="0 0 24 24"><path d="M4 4h16v10H4V4zm2 2v6h12V6H6zm-2 12h16v2H4v-2zm4 2h8v2H8v-2z"/></svg>`, path: 'admin/popup' },
         206: { label: window.txt.menu.news_portal, svg: `<svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h10v2H4v-2zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>`, path: 'panel/noticias' },
-        
+        208: { label: window.txt.menu.poe_portal, svg: `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zm-9-8h8v2H9v-2zm0-4h8v2H9V8z"/></svg>`, path: 'panel/poe' },
+        209: { label: window.txt.menu.poe_admin, svg: `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>`, path: 'admin/comunicacion/poe' },
+
         55: { 
             label: window.txt.menu.investigator_group, 
             svg: `<svg viewBox="0 0 24 24"><path d="M12.75 15.5h5.25v8h-5.25zM15 18h3m0 2h-3m-3.5-4.25h-8v8h5.25zM16 5.75V3.5m2-3.5H6a3 3 0 0 0-3 3v11.25h8v-7.5h-6v-3h12v3.25h-6v7.5h8V3a3 3 0 0 0-3-3z"/></svg>`,

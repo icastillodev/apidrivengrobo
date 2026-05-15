@@ -16,23 +16,35 @@ export const openAlojModal = async (historiaId) => {
         showLoader();
         const t = window.txt?.facturacion?.billing_modal || {};
         const g = window.txt?.generales || {};
-        const dateLoc = localeParaFechasFacturacion();
-
-        const resAloj = await API.request(`/alojamiento/history?historia=${historiaId}`);
-
-        if (resAloj.status !== 'success' || !resAloj.data.length) {
+        const hid = parseInt(String(historiaId ?? '').trim(), 10);
+        if (!Number.isFinite(hid) || hid <= 0) {
             hideLoader();
             return Swal.fire(g.error || 'Error', t.err_aloj_no_estadia || 'No se encontró la estadía.', 'error');
         }
+        const dateLoc = getBillingDateLocale();
 
-        const history = resAloj.data;
+        const resAloj = await API.request(`/alojamiento/history?historia=${hid}`);
+        const historyRows = Array.isArray(resAloj.data) ? resAloj.data : [];
+
+        if (resAloj.status !== 'success' || historyRows.length === 0) {
+            hideLoader();
+            const apiMsg = typeof resAloj.message === 'string' && resAloj.message.trim() !== ''
+                ? resAloj.message.trim()
+                : '';
+            const body = apiMsg || (t.err_aloj_no_estadia || 'No se encontró la estadía.');
+            return Swal.fire(g.error || 'Error', body, 'error');
+        }
+
+        const history = historyRows;
         const first = history[0];
 
-        const idPagador = first.IdTitularProtocolo || first.idprotA;
+        const idPagador = parseInt(String(first.IdTitularProtocolo ?? first.idprotA ?? '0'), 10) || 0;
         const titularNombre = first.TitularNombre || bmTpl(t.aloj_titular_fallback_tpl || 'Titular (ID: {id})', { id: idPagador });
         const respEstadia = first.Investigador || t.aloj_sin_asignar || 'Sin asignar';
 
-        const resSaldo = await API.request(`/billing/get-investigator-balance/${idPagador}`);
+        const resSaldo = idPagador > 0
+            ? await API.request(`/billing/get-investigator-balance/${idPagador}`)
+            : { status: 'success', data: { SaldoDinero: 0 } };
         hideLoader();
 
         const saldoReal = (resSaldo.status === 'success' && resSaldo.data)
@@ -54,7 +66,7 @@ export const openAlojModal = async (historiaId) => {
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                     
-                    ${renderHeader(historiaId, saldoReal, titularNombre, t, g)}
+                    ${renderHeader(hid, saldoReal, titularNombre, t, g)}
 
                     <div class="modal-body p-4 bg-light">
                         <div class="row">
@@ -73,13 +85,13 @@ export const openAlojModal = async (historiaId) => {
                                 ${renderResumenTecnico(first, tipoAlojamiento, precioActual, tramos, t)}
                             </div>
                             <div class="col-lg-5 ps-lg-4">
-                                ${renderGestionCobros(historiaId, diasTotales, costoHistoricoTotal, totalPagadoHistorico, t)}
+                                ${renderGestionCobros(hid, diasTotales, costoHistoricoTotal, totalPagadoHistorico, t)}
                             </div>
                         </div>
                     </div>
 
                     <div class="modal-footer bg-white border-top-0 d-flex justify-content-between p-4">
-                        <button class="btn btn-outline-danger btn-sm px-4 fw-bold" onclick="window.descargarFichaAlojPDF(${historiaId})">
+                        <button class="btn btn-outline-danger btn-sm px-4 fw-bold" onclick="window.descargarFichaAlojPDF(${hid})">
                             <i class="bi bi-file-pdf me-2"></i>${t.btn_pdf || 'PDF'}
                         </button>
                         <button class="btn btn-secondary btn-sm px-4 fw-bold" data-bs-dismiss="modal">${t.btn_cerrar || 'CERRAR'}</button>
@@ -91,8 +103,14 @@ export const openAlojModal = async (historiaId) => {
         window.renderAndShowModal(html, 'modalAlojamiento');
 
     } catch (e) {
-        console.error("Error en AlojModal:", e);
+        console.error('Error en AlojModal:', e);
         hideLoader();
+        const t = window.txt?.facturacion?.billing_modal || {};
+        const g = window.txt?.generales || {};
+        const msg = t.err_aloj_modal_error || 'No se pudo abrir el alojamiento. Recargue la página o intente de nuevo.';
+        if (window.Swal) {
+            Swal.fire(g.error || 'Error', msg, 'error');
+        }
     }
 };
 
@@ -132,7 +150,7 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t) {
         </div>
         <div class="col-12 mt-1">
             <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">${t.aloj_lbl_protocolo || 'Protocolo'}</label>
-            <div id="pdf-aloj-prot" class="form-control-plaintext border-bottom small">${first.nprotA}</div>
+            <div id="pdf-aloj-prot" class="form-control-plaintext border-bottom small">${first.nprotA != null ? String(first.nprotA) : '—'}</div>
         </div>
     </div>
     <div class="table-responsive bg-white rounded border shadow-sm">
@@ -157,6 +175,9 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t) {
 }
 
 function renderGestionCobros(historiaId, dias, total, pagado, t) {
+    const hintAuto = String(t.hint_total_auto_save || '').replace(/"/g, '&quot;');
+    const hintBtn = String(t.hint_guardar_total_btn || '').replace(/"/g, '&quot;');
+    const totalInputAttrs = `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('ALOJ',${historiaId},'mdl-aloj-total')" title="${hintAuto}"`;
     return `
     <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">${t.aloj_sec_control_cobros || 'Control de Cobros'}</h6>
     <div class="p-3 bg-white border rounded mb-3 text-center shadow-sm">
@@ -167,8 +188,8 @@ function renderGestionCobros(historiaId, dias, total, pagado, t) {
         <label class="form-label fw-bold text-primary small uppercase">${t.aloj_lbl_costo_total_pagar || 'Costo Total a Pagar'}</label>
         <div class="input-group input-group-lg">
             <span class="input-group-text">$</span>
-            <input type="number" id="mdl-aloj-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" readonly>
-            <button class="btn btn-primary" onclick="window.toggleEditTotalAloj(${historiaId})"><i class="bi bi-pencil-fill"></i></button>
+            <input type="number" id="mdl-aloj-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" ${totalInputAttrs}>
+            <button class="btn btn-primary" type="button" onclick="window.toggleEditTotalAloj(${historiaId})" title="${hintBtn}"><i class="bi bi-pencil-fill"></i></button>
         </div>
     </div>
     <div class="p-3 border rounded bg-white shadow-sm">
@@ -186,23 +207,46 @@ function renderGestionCobros(historiaId, dias, total, pagado, t) {
     </div>`;
 }
 
+/** Parsea `YYYY-MM-DD` o ISO; devuelve null si no es válida. */
+function parseFechaAlojTramo(s) {
+    if (s == null || String(s).trim() === '') return null;
+    const str = String(s).trim();
+    const d = new Date(str.includes('T') ? str : `${str}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(12, 0, 0, 0);
+    return d;
+}
+
 function procesarTramosFinancieros(history, locale, vigenteLabel) {
     const hoy = new Date();
     hoy.setHours(12, 0, 0, 0);
     let diasTotales = 0;
     let costoHistoricoTotal = 0;
 
-    const tramos = history.map(h => {
-        const pIni = h.fechavisado.split('-');
-        const fIni = new Date(pIni[0], pIni[1] - 1, pIni[2], 12, 0, 0);
-        let fFin = !h.hastafecha ? hoy : new Date(h.hastafecha.split('-')[0], h.hastafecha.split('-')[1] - 1, h.hastafecha.split('-')[2], 12, 0, 0);
+    const tramos = (history || []).map(h => {
+        const fIni = parseFechaAlojTramo(h.fechavisado);
+        if (!fIni) {
+            return {
+                id: h.IdAlojamiento ?? '—',
+                desde: '—',
+                hasta: '—',
+                cajas: parseInt(String(h.CantidadCaja || 0), 10) || 0,
+                dias: 0,
+                subtotal: Math.max(0, parseFloat(String(h.cuentaapagar || 0)) || 0),
+                esVigente: !h.hastafecha
+            };
+        }
+        const fFinRaw = parseFechaAlojTramo(h.hastafecha);
+        const fFin = !h.hastafecha || !fFinRaw ? hoy : fFinRaw;
 
         const dias = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
 
-        const cant = parseInt(h.CantidadCaja || 0);
-        const precio = parseFloat(h.PrecioCajaMomento || 0);
+        const cant = parseInt(String(h.CantidadCaja || 0), 10) || 0;
+        const precio = parseFloat(String(h.PrecioCajaMomento || 0)) || 0;
 
-        const subtotal = parseFloat(h.cuentaapagar) > 0 ? parseFloat(h.cuentaapagar) : (dias * precio * cant);
+        const subtotal = parseFloat(String(h.cuentaapagar || 0)) > 0
+            ? parseFloat(String(h.cuentaapagar))
+            : (dias * precio * cant);
 
         diasTotales += dias;
         costoHistoricoTotal += subtotal;

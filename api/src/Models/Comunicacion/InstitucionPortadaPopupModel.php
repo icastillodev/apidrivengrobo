@@ -224,6 +224,144 @@ class InstitucionPortadaPopupModel {
         ];
     }
 
+    /**
+     * Solo portada del panel (el popup se gestiona en `institucion_dashboard_popup`).
+     *
+     * @return array{ok:bool,data?:array,message?:string}
+     */
+    public function validatePortadaPayload(array $payload, int $instId): array {
+        $portadaTitulo = isset($payload['PortadaTitulo']) ? trim(strip_tags((string) $payload['PortadaTitulo'])) : '';
+        $portadaTitulo = $portadaTitulo === '' ? null : (function_exists('mb_substr') ? mb_substr($portadaTitulo, 0, 255, 'UTF-8') : substr($portadaTitulo, 0, 255));
+        $portadaCuerpo = isset($payload['PortadaCuerpo']) ? trim(strip_tags((string) $payload['PortadaCuerpo'])) : '';
+        $portadaCuerpo = $portadaCuerpo === '' ? null : $portadaCuerpo;
+
+        $p1 = $this->normalizeOptionalUrl($payload['PortadaUrlAdjunto1'] ?? null);
+        if ($p1 === false) {
+            return ['ok' => false, 'message' => 'La URL del adjunto 1 de portada no es válida (use http/https, máx. 768 caracteres).'];
+        }
+        $pn1 = $this->normalizeNombre(isset($payload['PortadaNombreAdjunto1']) ? (string) $payload['PortadaNombreAdjunto1'] : null);
+        $p2 = $this->normalizeOptionalUrl($payload['PortadaUrlAdjunto2'] ?? null);
+        if ($p2 === false) {
+            return ['ok' => false, 'message' => 'La URL del adjunto 2 de portada no es válida.'];
+        }
+        $pn2 = $this->normalizeNombre(isset($payload['PortadaNombreAdjunto2']) ? (string) $payload['PortadaNombreAdjunto2'] : null);
+
+        $pImgK = isset($payload['PortadaImagenB2Key']) ? trim((string) $payload['PortadaImagenB2Key']) : '';
+        $pImgN = $this->normalizeNombre(isset($payload['PortadaImagenNombre']) ? (string) $payload['PortadaImagenNombre'] : null);
+        $pImgK = $pImgK === '' ? null : $pImgK;
+
+        $pad1k = isset($payload['PortadaAdjunto1B2Key']) ? trim((string) $payload['PortadaAdjunto1B2Key']) : '';
+        $pad1n = $this->normalizeNombre(isset($payload['PortadaAdjunto1Nombre']) ? (string) $payload['PortadaAdjunto1Nombre'] : null);
+        $pad2k = isset($payload['PortadaAdjunto2B2Key']) ? trim((string) $payload['PortadaAdjunto2B2Key']) : '';
+        $pad2n = $this->normalizeNombre(isset($payload['PortadaAdjunto2Nombre']) ? (string) $payload['PortadaAdjunto2Nombre'] : null);
+        $pad1k = $pad1k === '' ? null : $pad1k;
+        $pad2k = $pad2k === '' ? null : $pad2k;
+
+        if ($pad1k !== null) {
+            if ($instId <= 0 || !ComunicacionArchivoValidacion::clavePerteneceInstitucion($pad1k, 'portada/doc', $instId)) {
+                return ['ok' => false, 'message' => 'Adjunto de portada 1: archivo no válido para esta sede.'];
+            }
+            $p1 = null;
+        }
+        if ($pad2k !== null) {
+            if ($instId <= 0 || !ComunicacionArchivoValidacion::clavePerteneceInstitucion($pad2k, 'portada/doc', $instId)) {
+                return ['ok' => false, 'message' => 'Adjunto de portada 2: archivo no válido para esta sede.'];
+            }
+            $p2 = null;
+        }
+
+        if (array_key_exists('PortadaUrlAdjunto1', $payload) && $p1 !== null && !array_key_exists('PortadaAdjunto1B2Key', $payload)) {
+            $pad1k = null;
+            $pad1n = null;
+        }
+        if (array_key_exists('PortadaUrlAdjunto2', $payload) && $p2 !== null && !array_key_exists('PortadaAdjunto2B2Key', $payload)) {
+            $pad2k = null;
+            $pad2n = null;
+        }
+
+        if (($p2 !== null || $pn2 !== null || $pad2k !== null || $pad2n !== null) && ($p1 === null && $pad1k === null)) {
+            return ['ok' => false, 'message' => 'Si indica un segundo adjunto en portada, el primero debe estar definido (URL o archivo).'];
+        }
+
+        if (($pImgK !== null || $pImgN !== null) && ($pImgK === null || $pImgN === null)) {
+            return ['ok' => false, 'message' => 'Imagen de portada: indique clave B2 y nombre de archivo.'];
+        }
+        if ($pImgK !== null && ($instId <= 0 || !ComunicacionArchivoValidacion::clavePerteneceInstitucion($pImgK, 'portada/imagen', $instId))) {
+            return ['ok' => false, 'message' => 'Imagen de portada: archivo no válido para esta sede.'];
+        }
+
+        if (($pad2k !== null || $pad2n !== null) && ($pad1k === null && $pad1n === null && $p1 === null && $pn1 === null)) {
+            return ['ok' => false, 'message' => 'Si usa el segundo adjunto documento en portada, el primero debe estar definido.'];
+        }
+
+        return [
+            'ok' => true,
+            'data' => [
+                'PortadaTitulo' => $portadaTitulo,
+                'PortadaCuerpo' => $portadaCuerpo,
+                'PortadaImagenB2Key' => $pImgK,
+                'PortadaImagenNombre' => $pImgN,
+                'PortadaUrlAdjunto1' => $p1,
+                'PortadaNombreAdjunto1' => $pn1,
+                'PortadaUrlAdjunto2' => $p2,
+                'PortadaNombreAdjunto2' => $pn2,
+                'PortadaAdjunto1B2Key' => $pad1k,
+                'PortadaAdjunto1Nombre' => $pad1n,
+                'PortadaAdjunto2B2Key' => $pad2k,
+                'PortadaAdjunto2Nombre' => $pad2n,
+            ],
+        ];
+    }
+
+    /** Persiste solo columnas de portada; no modifica columnas de popup en filas existentes. */
+    public function upsertPortadaOnly(int $instId, array $portada): void {
+        $sql = 'INSERT INTO institucion_portada_popup (
+            IdInstitucion,
+            PortadaTitulo, PortadaCuerpo,
+            PortadaImagenB2Key, PortadaImagenNombre,
+            PortadaUrlAdjunto1, PortadaNombreAdjunto1, PortadaUrlAdjunto2, PortadaNombreAdjunto2,
+            PortadaAdjunto1B2Key, PortadaAdjunto1Nombre, PortadaAdjunto2B2Key, PortadaAdjunto2Nombre,
+            PopupActivo, PopupTitulo, PopupCuerpo,
+            PopupUrlAdjunto1, PopupNombreAdjunto1, PopupUrlAdjunto2, PopupNombreAdjunto2,
+            PopupAdjunto1B2Key, PopupAdjunto1Nombre, PopupAdjunto2B2Key, PopupAdjunto2Nombre,
+            PopupIdNoticia, FechaActualizacion
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+            NOW()
+        ) ON DUPLICATE KEY UPDATE
+            PortadaTitulo = VALUES(PortadaTitulo),
+            PortadaCuerpo = VALUES(PortadaCuerpo),
+            PortadaImagenB2Key = VALUES(PortadaImagenB2Key),
+            PortadaImagenNombre = VALUES(PortadaImagenNombre),
+            PortadaUrlAdjunto1 = VALUES(PortadaUrlAdjunto1),
+            PortadaNombreAdjunto1 = VALUES(PortadaNombreAdjunto1),
+            PortadaUrlAdjunto2 = VALUES(PortadaUrlAdjunto2),
+            PortadaNombreAdjunto2 = VALUES(PortadaNombreAdjunto2),
+            PortadaAdjunto1B2Key = VALUES(PortadaAdjunto1B2Key),
+            PortadaAdjunto1Nombre = VALUES(PortadaAdjunto1Nombre),
+            PortadaAdjunto2B2Key = VALUES(PortadaAdjunto2B2Key),
+            PortadaAdjunto2Nombre = VALUES(PortadaAdjunto2Nombre),
+            FechaActualizacion = NOW()';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([
+            $instId,
+            $portada['PortadaTitulo'],
+            $portada['PortadaCuerpo'],
+            $portada['PortadaImagenB2Key'] ?? null,
+            $portada['PortadaImagenNombre'] ?? null,
+            $portada['PortadaUrlAdjunto1'],
+            $portada['PortadaNombreAdjunto1'],
+            $portada['PortadaUrlAdjunto2'],
+            $portada['PortadaNombreAdjunto2'],
+            $portada['PortadaAdjunto1B2Key'] ?? null,
+            $portada['PortadaAdjunto1Nombre'] ?? null,
+            $portada['PortadaAdjunto2B2Key'] ?? null,
+            $portada['PortadaAdjunto2Nombre'] ?? null,
+        ]);
+    }
+
     public function upsert(int $instId, array $normalized): void {
         $sql = 'INSERT INTO institucion_portada_popup (
             IdInstitucion,
