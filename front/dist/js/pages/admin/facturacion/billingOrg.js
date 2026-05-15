@@ -4,8 +4,17 @@ import { formatBillingMoney } from './billingLocale.js';
 import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
 
 let orgBillingReportLoadedOk = false;
-/** @type {{ organizaciones: unknown[], opts: { desde: string, hasta: string, chkAni: boolean, chkAlo: boolean, chkIns: boolean } } | null} */
+/** @type {{ organizaciones: unknown[], opts: { desde: string, hasta: string, chkAni: boolean, chkAlo: boolean, chkIns: boolean, facturacionDerivacion?: string } } | null} */
 let orgLastSnapshot = null;
+
+function getFacturacionDerivacionSeleccionOrg() {
+    const el = document.getElementById('sel-facturacion-derivacion');
+    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
+    if (v === 'derivados' || v === 'institucionales') {
+        return v;
+    }
+    return 'todos';
+}
 
 export async function initBillingOrg() {
     const hoy = new Date();
@@ -31,7 +40,7 @@ async function cargarFacturacionOrg() {
         return;
     }
 
-    const opts = { desde, hasta, chkAni, chkAlo, chkIns };
+    const opts = { desde, hasta, chkAni, chkAlo, chkIns, facturacionDerivacion: getFacturacionDerivacionSeleccionOrg() };
     const resultsEl = document.getElementById('billing-results-org');
     const prevSnap = orgLastSnapshot;
     const useGlobalLoader = !orgBillingReportLoadedOk;
@@ -42,7 +51,14 @@ async function cargarFacturacionOrg() {
         } else if (resultsEl) {
             setBillingResultsLoadingInline('billing-results-org');
         }
-        const res = await API.request('/billing/org-report', 'POST', { desde, hasta, chkAni, chkAlo, chkIns });
+        const res = await API.request('/billing/org-report', 'POST', {
+            desde,
+            hasta,
+            chkAni,
+            chkAlo,
+            chkIns,
+            facturacionDerivacion: getFacturacionDerivacionSeleccionOrg()
+        });
         if (res.status === 'success' && res.data && res.data.organizaciones) {
             orgLastSnapshot = { organizaciones: res.data.organizaciones, opts };
             renderResultadosOrg(res.data.organizaciones, opts);
@@ -139,6 +155,9 @@ function getDeptoReportLink(deptoId, opts) {
     if (opts.desde) params.set('desde', opts.desde);
     if (opts.hasta) params.set('hasta', opts.hasta);
     if (deptoId) params.set('depto', deptoId);
+    if (opts.facturacionDerivacion && opts.facturacionDerivacion !== 'todos') {
+        params.set('facturacionDerivacion', opts.facturacionDerivacion);
+    }
     const q = params.toString();
     return q ? `${base}?${q}` : base;
 }

@@ -40,6 +40,14 @@ let protocoloLastRenderData = null;
 function txF() {
     return window.txt?.facturacion || {};
 }
+function getFacturacionDerivacionSeleccionProt() {
+    const el = document.getElementById('sel-facturacion-derivacion');
+    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
+    if (v === 'derivados' || v === 'institucionales') {
+        return v;
+    }
+    return 'todos';
+}
 function txBD() {
     return txF().billing_depto || {};
 }
@@ -110,7 +118,8 @@ window.cargarFacturacionProtocolo = async () => {
         const res = await API.request('/billing/protocol-report', 'POST', {
             idProt,
             desde: document.getElementById('f-desde').value,
-            hasta: document.getElementById('f-hasta').value
+            hasta: document.getElementById('f-hasta').value,
+            facturacionDerivacion: getFacturacionDerivacionSeleccionProt()
         });
         if (res.status === 'success') {
             window.currentReportData = { protocolos: [res.data] };

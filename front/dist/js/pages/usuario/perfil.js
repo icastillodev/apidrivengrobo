@@ -17,7 +17,8 @@ async function descargarEstadoCuentaPdfPerfil() {
             desde,
             hasta,
             chkAni: true,
-            chkIns: true
+            chkIns: true,
+            facturacionDerivacion: 'todos'
         });
         if (res.status !== 'success') {
             return Swal.fire(t.swal_error || 'Error', res.message || '', 'error');

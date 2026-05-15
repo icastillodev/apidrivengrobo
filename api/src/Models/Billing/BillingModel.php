@@ -828,6 +828,58 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
     }
 
     /**
+     * Por cada departamento de la institución cobradora, nombres de institución(es) de origen con
+     * facturación derivada pendiente (para etiquetar el selector en facturación por depto/org).
+     *
+     * @return array<int, string> iddeptoA => "Inst A · Inst B"
+     */
+    public function getMapDeptoOrigenesDerivacionPendiente(int $instCobradora): array {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT
+                COALESCE(p.departamento, f.depto) AS iddeptoA,
+                TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
+            FROM facturacion_formulario_derivado ffd
+            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            LEFT JOIN protformr pr ON pr.idformA = f.idformA
+            LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+            LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+            WHERE ffd.IdInstitucionCobradora = ?
+              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+              AND COALESCE(p.departamento, f.depto) IS NOT NULL
+              AND COALESCE(p.departamento, f.depto) > 0
+              AND TRIM(COALESCE(io.NombreInst, '')) <> ''
+            ORDER BY iddeptoA ASC, origen_nombre ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora]);
+        $byDepto = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['iddeptoA'] ?? 0);
+            $nom = trim((string) ($row['origen_nombre'] ?? ''));
+            if ($id <= 0 || $nom === '') {
+                continue;
+            }
+            if (!isset($byDepto[$id])) {
+                $byDepto[$id] = [];
+            }
+            $byDepto[$id][$nom] = true;
+        }
+        $out = [];
+        foreach ($byDepto as $id => $set) {
+            $names = array_keys($set);
+            sort($names, SORT_STRING);
+            $out[$id] = implode(' · ', $names);
+        }
+        return $out;
+    }
+
+    /**
      * Ajusta totales/pagado/debe de filas de insumos cuando existe facturación derivada (misma sede cobradora).
      */
     public function applyFacturacionDerivadaToInsumoRows(array &$rows, int $instCobradora): void {

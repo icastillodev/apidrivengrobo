@@ -80,12 +80,22 @@
             </div>
 
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
-                <div class="col-md-5">
+                <div class="col-md-4">
                     <label class="form-label fw-bold small uppercase text-muted" data-i18n="facturacion.label_protocolo"></label>
                     <div class="d-flex gap-2">
                         <input type="text" id="busqueda-protocolo" class="form-control form-control-sm" data-i18n="facturacion.ph_busqueda_protocolo" placeholder="🔍 N°, título..." style="width: 30%;">
                         <select id="sel-protocolo" class="form-select form-select-sm border-success shadow-sm" style="width: 70%;">
                             <option value="" data-i18n="facturacion.cargando_protocolo">-- CARGANDO... --</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.derivacion_alcance_corto">Ámbito cobro</span>
+                        <select id="sel-facturacion-derivacion" class="form-select form-select-sm border-success shadow-none">
+                            <option value="todos" data-i18n="facturacion.derivacion_todos">Todo (local y derivado)</option>
+                            <option value="derivados" data-i18n="facturacion.derivacion_derivados">Solo facturación derivada</option>
+                            <option value="institucionales" data-i18n="facturacion.derivacion_institucionales">Solo local (no derivada)</option>
                         </select>
                     </div>
                 </div>
@@ -97,7 +107,7 @@
                     <label class="form-label fw-bold small text-muted" data-i18n="generales.hasta">Hasta</label>
                     <input type="date" id="f-hasta" class="form-control form-control-sm shadow-none">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <button type="button" class="btn btn-success btn-sm w-100 fw-bold shadow-sm" onclick="window.cargarFacturacionProtocolo()">
                         <i class="bi bi-search me-1"></i> <span data-i18n="facturacion.btn_consultar"></span>
                     </button>

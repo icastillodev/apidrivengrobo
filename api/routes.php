@@ -356,6 +356,7 @@ $router->get('/alojamiento/public-export', 'AlojamientoExportController@publicEx
 $router->post('/billing/depto-report', 'BillingController@getDeptoReport');
 $router->post('/billing/org-report', 'BillingController@getOrgReport');
 $router->get('/billing/instituciones-derivadas', 'BillingController@getInstitutionsWithDerived');
+$router->get('/billing/deptos-derivacion-origenes', 'BillingController@getDeptosDerivacionOrigenes');
 $router->post('/billing/institucion-report', 'BillingController@getInstitutionReport');
 $router->post('/billing/investigador-report', 'BillingController@getInvestigadorReport');
 $router->post('/billing/protocol-report', 'BillingController@getProtocolReport');

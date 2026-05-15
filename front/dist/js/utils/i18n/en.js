@@ -1514,6 +1514,12 @@ alojamientos: {
         payment_insumos_saldo_restante: "Remaining balance:",
         payment_insumos_confirm_btn: "Yes, settle supplies",
         btn_cancelar_swal: "Cancel",
+        derivacion_alcance_corto: "Billing scope",
+        derivacion_todos: "All (local and derived)",
+        derivacion_derivados: "Derived billing only",
+        derivacion_institucionales: "Local only (non-derived)",
+        derivacion_depto_title_tpl: "Pending derived charges from: {origenes}",
+        derivacion_depto_suffix: " · derived",
         billing_depto: {
             sec_pedidos_formularios: "Orders (forms)",
             th_id: "ID",

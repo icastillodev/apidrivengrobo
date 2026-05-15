@@ -1520,6 +1520,12 @@ export const es = {
         payment_insumos_saldo_restante: "Saldo restante:",
         payment_insumos_confirm_btn: "Sí, liquidar insumos",
         btn_cancelar_swal: "Cancelar",
+        derivacion_alcance_corto: "Ámbito cobro",
+        derivacion_todos: "Todo (local y derivado)",
+        derivacion_derivados: "Solo facturación derivada",
+        derivacion_institucionales: "Solo local (no derivada)",
+        derivacion_depto_title_tpl: "Cobros derivados pendientes desde: {origenes}",
+        derivacion_depto_suffix: " · derivación",
         /** Liquidación por departamento — `billingDepto.js` (lote i18n código) */
         billing_depto: {
             sec_pedidos_formularios: "Pedidos (Formularios)",

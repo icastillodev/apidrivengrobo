@@ -34,6 +34,14 @@ import './modals/manager.js' ;
 function txF() {
     return window.txt?.facturacion || {};
 }
+function getFacturacionDerivacionSeleccion() {
+    const el = document.getElementById('sel-facturacion-derivacion');
+    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
+    if (v === 'derivados' || v === 'institucionales') {
+        return v;
+    }
+    return 'todos';
+}
 function txBD() {
     return txF().billing_depto || {};
 }
@@ -50,6 +58,8 @@ function txBE() {
 let currentReportData = null;
 /** Lista completa de departamentos (para filtrar por ámbito sin nueva petición) */
 let deptosRaw = [];
+/** iddeptoA -> nombres de institución(es) de origen con derivación pendiente (tooltip en selector). */
+let deptosDerivacionOrigenesMap = {};
 /** Tras el primer informe por departamento exitoso, las recargas muestran spinner en el área de resultados. */
 let deptoBillingReportLoadedOk = false;
 
@@ -192,6 +202,13 @@ function aplicarParamsUrlDepto() {
             if (desde && hasta && sel.value === deptoId) setTimeout(() => window.cargarFacturacionDepto && window.cargarFacturacionDepto(), 300);
         }
     }
+    const fd = params.get('facturacionDerivacion');
+    if (fd) {
+        const selFd = document.getElementById('sel-facturacion-derivacion');
+        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd)) {
+            selFd.value = fd;
+        }
+    }
 }
 
 async function cargarListaDeptos() {
@@ -200,11 +217,26 @@ async function cargarListaDeptos() {
         const res = await API.request(`/deptos/list?inst=${instId}`);
         if (res.status === 'success' && res.data) {
             deptosRaw = res.data;
+            await cargarMapaDeptosDerivacionOrigen();
             const filterAmbito = document.getElementById('filter-ambito-depto');
             const ambito = filterAmbito ? filterAmbito.value : 'all';
             renderDeptoOptions(ambito);
         }
     } catch (e) { console.error(e); }
+}
+
+async function cargarMapaDeptosDerivacionOrigen() {
+    try {
+        const res = await API.request('/billing/deptos-derivacion-origenes', 'GET');
+        if (res.status === 'success' && res.data && res.data.map && typeof res.data.map === 'object') {
+            deptosDerivacionOrigenesMap = res.data.map;
+        } else {
+            deptosDerivacionOrigenesMap = {};
+        }
+    } catch (e) {
+        console.warn(e);
+        deptosDerivacionOrigenesMap = {};
+    }
 }
 
 /** Filtra deptos por ámbito (all | interno | externo) y rellena el select. */
@@ -218,10 +250,23 @@ function renderDeptoOptions(ambito) {
     if (ambito === 'interno') list = deptosRaw.filter(d => !isExterno(d));
     if (ambito === 'externo') list = deptosRaw.filter(d => isExterno(d));
 
+    const tf = txF();
+    const suffixNote = tf.derivacion_depto_suffix || '';
+    const titleTpl = tf.derivacion_depto_title_tpl || '';
+
     select.innerHTML = `<option value="">${txF().opcion_seleccionar || '-- SELECCIONAR --'}</option>` +
         list.map(d => {
             const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
-            return `<option value="${d.iddeptoA}">${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})</option>`;
+            const base = `${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})`;
+            const idNum = d.iddeptoA;
+            const origenes = deptosDerivacionOrigenesMap[idNum] ?? deptosDerivacionOrigenesMap[String(idNum)];
+            let titleAttr = '';
+            let label = base;
+            if (origenes) {
+                titleAttr = String(titleTpl).replace(/\{origenes\}/g, String(origenes));
+                label = `${base}${suffixNote}`;
+            }
+            return `<option value="${d.iddeptoA}" title="${escapeHtml(titleAttr)}">${escapeHtml(label)}</option>`;
         }).join('');
 
     if (currentVal && list.some(d => String(d.iddeptoA) === String(currentVal))) {
@@ -257,7 +302,15 @@ window.cargarFacturacionDepto = async () => {
         } else if (resultsEl) {
             setBillingResultsLoadingInline('billing-results');
         }
-        const res = await API.request('/billing/depto-report', 'POST', { depto: deptoId, desde, hasta, chkAni, chkAlo, chkIns });
+        const res = await API.request('/billing/depto-report', 'POST', {
+            depto: deptoId,
+            desde,
+            hasta,
+            chkAni,
+            chkAlo,
+            chkIns,
+            facturacionDerivacion: getFacturacionDerivacionSeleccion()
+        });
         if (res.status === 'success') {
             window.currentReportData = res.data;
             renderizarResultados(window.currentReportData);

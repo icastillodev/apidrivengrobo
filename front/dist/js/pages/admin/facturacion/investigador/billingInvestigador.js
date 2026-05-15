@@ -14,6 +14,14 @@ import '../modals/manager.js';
 function txF() {
     return window.txt?.facturacion || {};
 }
+function getFacturacionDerivacionSeleccionInv() {
+    const el = document.getElementById('sel-facturacion-derivacion');
+    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'todos';
+    if (v === 'derivados' || v === 'institucionales') {
+        return v;
+    }
+    return 'todos';
+}
 function txBD() {
     return txF().billing_depto || {};
 }
@@ -78,6 +86,14 @@ function autoLoadFromUrlParams() {
         if (fHasta) fHasta.value = new Date().toISOString().split('T')[0];
     }
 
+    const fd = params.get('facturacionDerivacion');
+    if (fd) {
+        const selFd = document.getElementById('sel-facturacion-derivacion');
+        if (selFd && ['todos', 'derivados', 'institucionales'].includes(fd)) {
+            selFd.value = fd;
+        }
+    }
+
     setTimeout(() => {
         window.cargarFacturacionInvestigador();
     }, 150);
@@ -137,7 +153,14 @@ window.cargarFacturacionInvestigador = async () => {
         } else if (resultsEl) {
             setBillingResultsLoadingInline('billing-results');
         }
-        const res = await API.request('/billing/investigador-report', 'POST', { idUsr, desde, hasta, chkAni, chkIns });
+        const res = await API.request('/billing/investigador-report', 'POST', {
+            idUsr,
+            desde,
+            hasta,
+            chkAni,
+            chkIns,
+            facturacionDerivacion: getFacturacionDerivacionSeleccionInv()
+        });
         if (res.status === 'success') {
             window.currentReportData = res.data;
             renderizarResultados(res.data);

@@ -1515,6 +1515,12 @@ alojamientos: {
         payment_insumos_saldo_restante: "Saldo restante:",
         payment_insumos_confirm_btn: "Sim, liquidar insumos",
         btn_cancelar_swal: "Cancelar",
+        derivacion_alcance_corto: "âmbito de cobrança",
+        derivacion_todos: "Tudo (local e derivado)",
+        derivacion_derivados: "Somente faturação derivada",
+        derivacion_institucionales: "Somente local (não derivada)",
+        derivacion_depto_title_tpl: "Cobranças derivadas pendentes de: {origenes}",
+        derivacion_depto_suffix: " · derivação",
         billing_depto: {
             sec_pedidos_formularios: "Pedidos (formulários)",
             th_id: "ID",

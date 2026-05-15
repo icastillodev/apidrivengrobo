@@ -110,7 +110,8 @@ window.cargarFacturacionPersona = async () => {
             desde: null,
             hasta: null,
             chkAni: true,
-            chkIns: true
+            chkIns: true,
+            facturacionDerivacion: 'todos'
         });
         if (res.status === 'success') {
             currentData = normalizeInvestigadorReportForPersona(res.data || {});

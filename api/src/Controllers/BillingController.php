@@ -86,7 +86,7 @@ class BillingController {
 
     public function getDeptoReport() {
         if (ob_get_length()) ob_clean();
-        $f = json_decode(file_get_contents('php://input'), true);
+        $f = json_decode(file_get_contents('php://input'), true) ?: [];
         
         try {
             $sesion = Auditoria::getDatosSesion();
@@ -213,7 +213,8 @@ class BillingController {
                 }
             }
 
-            $this->sendSuccess([
+            $scope = $this->normalizeFacturacionDerivacionFiltro($f['facturacionDerivacion'] ?? ($f['facturacion_derivacion'] ?? 'todos'));
+            $payload = [
                 'totales' => [
                     'globalDeuda'      => ($deudaAnimales + $deudaReactivos + $deudaAlojamiento + $deudaInsumos),
                     'deudaAnimales'    => $deudaAnimales,
@@ -224,7 +225,9 @@ class BillingController {
                 ],
                 'insumosGenerales' => $insumosGenerales,
                 'protocolos'       => $reporte
-            ]);
+            ];
+            $this->applyFacturacionDerivacionVistaToDeptoStylePayload($payload, $scope);
+            $this->sendSuccess($payload);
         } catch (\Exception $e) { $this->sendError($e->getMessage()); }
     }
 
@@ -329,6 +332,22 @@ class BillingController {
                     'totales' => $totalesOrg,
                     'departamentos' => $departamentos
                 ];
+            }
+
+            $scope = $this->normalizeFacturacionDerivacionFiltro($f['facturacionDerivacion'] ?? ($f['facturacion_derivacion'] ?? 'todos'));
+            if ($scope !== 'todos') {
+                foreach ($organizaciones as $oi => $org) {
+                    foreach ($org['departamentos'] as $di => $deptoPayload) {
+                        $this->applyFacturacionDerivacionVistaToDeptoStylePayload($organizaciones[$oi]['departamentos'][$di], $scope);
+                    }
+                    $t = ['globalDeuda' => 0, 'deudaAnimales' => 0, 'deudaReactivos' => 0, 'deudaAlojamiento' => 0, 'deudaInsumos' => 0, 'totalPagado' => 0];
+                    foreach ($organizaciones[$oi]['departamentos'] as $d) {
+                        foreach (array_keys($t) as $k) {
+                            $t[$k] += (float) ($d['totales'][$k] ?? 0);
+                        }
+                    }
+                    $organizaciones[$oi]['totales'] = $t;
+                }
             }
 
             $this->sendSuccess(['organizaciones' => $organizaciones]);
@@ -509,7 +528,8 @@ class BillingController {
             $deudaInsGlobal = $deudaInsDirectos + $deudaInsumosProtAcum;
             $totalPagadoGlobal += $pagadoInsGenerales;
 
-            $this->jsonResponse('success', [
+            $scope = $this->normalizeFacturacionDerivacionFiltro($input['facturacionDerivacion'] ?? ($input['facturacion_derivacion'] ?? 'todos'));
+            $resp = [
                 'perfil' => $perfil,
                 'totales' => [
                     'globalDeuda'      => ($deudaAniGlobal + $deudaReaGlobal + $deudaAlojGlobal + $deudaInsGlobal),
@@ -521,7 +541,9 @@ class BillingController {
                 ],
                 'insumosGenerales' => $insumosGenerales,
                 'protocolos'       => $reporteProtocolos
-            ]);
+            ];
+            $this->applyFacturacionDerivacionVistaToInvestigadorPayload($resp, $scope);
+            $this->jsonResponse('success', $resp);
         } catch (\Exception $e) { $this->jsonResponse('error', 'Error al procesar reporte: ' . $e->getMessage()); }
     }
 
@@ -712,7 +734,6 @@ class BillingController {
             }
 
             // Los insumos de pedido van en $insumos; la grilla principal = animales/reactivos (exclusión por id, no por texto).
-            $deudaAni = 0; $deudaRea = 0; $pagadoTotal = 0;
             $formulariosFiltrados = [];
 
             foreach ($formularios as $f) {
@@ -721,37 +742,23 @@ class BillingController {
                     continue;
                 }
 
-                $cat = strtolower($f['categoria'] ?? '');
-
-                if (strpos($cat, 'reactivo') !== false) {
-                    $deudaRea += (float)$f['debe'];
-                } else {
-                    $deudaAni += (float)$f['debe'];
-                }
-
-                $pagadoTotal += (float)$f['pagado'];
                 $formulariosFiltrados[] = $f;
             }
-            
-            $deudaAloj = array_sum(array_column($alojamientos, 'debe'));
-            $pagadoTotal += array_sum(array_column($alojamientos, 'pagado'));
 
-            $deudaInsumos = array_sum(array_column($insumos, 'debe'));
-            $pagadoTotal += array_sum(array_column($insumos, 'pagado'));
-
-            $this->jsonResponse('success', [
-                'info' => $info,
+            $scope = $this->normalizeFacturacionDerivacionFiltro($input['facturacionDerivacion'] ?? ($input['facturacion_derivacion'] ?? 'todos'));
+            $blocks = [
                 'formularios' => $formulariosFiltrados,
                 'alojamientos' => $alojamientos,
                 'insumos' => $insumos,
-                'totales' => [
-                    'deudaAnimales'    => $deudaAni,
-                    'deudaReactivos'   => $deudaRea,
-                    'deudaAlojamiento' => $deudaAloj,
-                    'deudaInsumos'     => $deudaInsumos,
-                    'deudaTotal'       => ($deudaAni + $deudaRea + $deudaAloj + $deudaInsumos),
-                    'totalPagado'      => $pagadoTotal
-                ]
+            ];
+            $this->applyFacturacionDerivacionVistaToProtocolReport($blocks, $scope);
+
+            $this->jsonResponse('success', [
+                'info' => $info,
+                'formularios' => $blocks['formularios'],
+                'alojamientos' => $blocks['alojamientos'],
+                'insumos' => $blocks['insumos'],
+                'totales' => $blocks['totales'],
             ]);
         } catch (\Exception $e) { $this->jsonResponse('error', $e->getMessage()); }
     }
@@ -951,6 +958,310 @@ class BillingController {
             $saldo = $this->model->getSaldoByInvestigador($id, $sesion['instId']);
             return $this->jsonResponse('success', ['SaldoDinero' => $saldo]);
         } catch (\Exception $e) { return $this->jsonResponse('error', 'Error al obtener saldo: ' . $e->getMessage()); }
+    }
+
+    public function getDeptosDerivacionOrigenes() {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        header('Content-Type: application/json');
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = (int) ($sesion['instId'] ?? 0);
+            if ($instId <= 0) {
+                $this->sendError('Institución no válida.');
+                return;
+            }
+            $map = $this->model->getMapDeptoOrigenesDerivacionPendiente($instId);
+            $this->sendSuccess(['map' => $map]);
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
+    /**
+     * facturacionDerivacion: todos | derivados | institucionales (excluye facturación institucional por red).
+     */
+    private function normalizeFacturacionDerivacionFiltro($raw): string {
+        $s = is_string($raw) ? strtolower(trim($raw)) : '';
+        if ($s === 'derivados' || $s === 'institucionales') {
+            return $s;
+        }
+        return 'todos';
+    }
+
+    private function billingRowEsFacturacionDerivada(array $row): bool {
+        return (int) ($row['es_facturacion_derivada'] ?? 0) === 1;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function filterFilasPorAlcanceFacturacionDerivada(array &$rows, string $scope): void {
+        if ($scope === 'todos') {
+            return;
+        }
+        $soloDeriv = ($scope === 'derivados');
+        $rows = array_values(array_filter($rows, function (array $r) use ($soloDeriv) {
+            $d = $this->billingRowEsFacturacionDerivada($r);
+            return $soloDeriv ? $d : !$d;
+        }));
+    }
+
+    /**
+     * Misma forma que getDeptoReport: totales, insumosGenerales, protocolos[].
+     */
+    private function applyFacturacionDerivacionVistaToDeptoStylePayload(array &$payload, string $scope): void {
+        if ($scope === 'todos') {
+            return;
+        }
+        $this->filterFilasPorAlcanceFacturacionDerivada($payload['insumosGenerales'], $scope);
+        $prots = &$payload['protocolos'];
+        foreach ($prots as $i => $prot) {
+            $forms = $prot['formularios'] ?? [];
+            $this->filterFilasPorAlcanceFacturacionDerivada($forms, $scope);
+            $prots[$i]['formularios'] = $forms;
+            if ($scope === 'derivados') {
+                $prots[$i]['alojamientos'] = [];
+            }
+        }
+        $payload['protocolos'] = array_values(array_filter($prots, function ($prot) {
+            return !empty($prot['formularios']) || !empty($prot['alojamientos']);
+        }));
+        $this->rebuildDeptoProtocolCardAggregates($payload);
+        $this->rebuildDeptoReportTotalesGlobales($payload);
+    }
+
+    private function rebuildDeptoProtocolCardAggregates(array &$payload): void {
+        foreach ($payload['protocolos'] as $i => $prot) {
+            $sumDebeAni = 0.0;
+            $sumDebeRea = 0.0;
+            $sumPagadoF = 0.0;
+            foreach ($prot['formularios'] ?? [] as $form) {
+                if ($this->billingFormularioEsExento($form)) {
+                    continue;
+                }
+                $cat = strtolower($form['categoria'] ?? '');
+                $m = (float) ($form['debe'] ?? 0);
+                if (strpos($cat, 'reactivo') !== false) {
+                    $sumDebeRea += $m;
+                } else {
+                    $sumDebeAni += $m;
+                }
+                $sumPagadoF += (float) ($form['pagado'] ?? 0);
+            }
+            $sumDebeAlo = array_sum(array_column($prot['alojamientos'] ?? [], 'debe'));
+            $sumPagadoAlo = array_sum(array_column($prot['alojamientos'] ?? [], 'pagado'));
+            $payload['protocolos'][$i]['deudaAnimales'] = $sumDebeAni;
+            $payload['protocolos'][$i]['deudaReactivos'] = $sumDebeRea;
+            $payload['protocolos'][$i]['deudaAlojamiento'] = $sumDebeAlo;
+        }
+    }
+
+    private function rebuildDeptoReportTotalesGlobales(array &$payload): void {
+        $ins = $payload['insumosGenerales'] ?? [];
+        $deudaInsumos = 0.0;
+        $pagadoInsumos = 0.0;
+        foreach ($ins as $insRow) {
+            if ($this->billingInsumoEsExento($insRow)) {
+                continue;
+            }
+            $deudaInsumos += (float) ($insRow['debe'] ?? 0);
+            $pagadoInsumos += (float) ($insRow['pagado'] ?? 0);
+        }
+        $deudaAnimales = 0.0;
+        $deudaReactivos = 0.0;
+        $deudaAlojamiento = 0.0;
+        $totalPagadoGlobal = $pagadoInsumos;
+        foreach ($payload['protocolos'] ?? [] as $prot) {
+            foreach ($prot['formularios'] ?? [] as $form) {
+                if ($this->billingFormularioEsExento($form)) {
+                    continue;
+                }
+                $cat = strtolower($form['categoria'] ?? '');
+                $m = (float) ($form['debe'] ?? 0);
+                if (strpos($cat, 'reactivo') !== false) {
+                    $deudaReactivos += $m;
+                } else {
+                    $deudaAnimales += $m;
+                }
+                $totalPagadoGlobal += (float) ($form['pagado'] ?? 0);
+            }
+            foreach ($prot['alojamientos'] ?? [] as $a) {
+                $deudaAlojamiento += (float) ($a['debe'] ?? 0);
+                $totalPagadoGlobal += (float) ($a['pagado'] ?? 0);
+            }
+        }
+        $payload['totales'] = [
+            'globalDeuda' => ($deudaAnimales + $deudaReactivos + $deudaAlojamiento + $deudaInsumos),
+            'deudaAnimales' => $deudaAnimales,
+            'deudaReactivos' => $deudaReactivos,
+            'deudaAlojamiento' => $deudaAlojamiento,
+            'deudaInsumos' => $deudaInsumos,
+            'totalPagado' => $totalPagadoGlobal,
+        ];
+    }
+
+    private function applyFacturacionDerivacionVistaToInvestigadorPayload(array &$out, string $scope): void {
+        if ($scope === 'todos') {
+            return;
+        }
+        foreach ($out['protocolos'] as $i => $prot) {
+            $forms = $prot['formularios'] ?? [];
+            $this->filterFilasPorAlcanceFacturacionDerivada($forms, $scope);
+            $out['protocolos'][$i]['formularios'] = $forms;
+            $insP = $prot['insumos'] ?? [];
+            $this->filterFilasPorAlcanceFacturacionDerivada($insP, $scope);
+            $out['protocolos'][$i]['insumos'] = $insP;
+            if ($scope === 'derivados') {
+                $out['protocolos'][$i]['alojamientos'] = [];
+            }
+        }
+        $out['protocolos'] = array_values(array_filter($out['protocolos'], function ($p) {
+            return !empty($p['formularios']) || !empty($p['alojamientos']) || !empty($p['insumos']);
+        }));
+        $insG = &$out['insumosGenerales'];
+        $this->filterFilasPorAlcanceFacturacionDerivada($insG, $scope);
+        $this->rebuildInvestigadorProtocolCardAggregates($out);
+        $this->rebuildInvestigadorTotalesGlobales($out);
+    }
+
+    private function rebuildInvestigadorProtocolCardAggregates(array &$payload): void {
+        foreach ($payload['protocolos'] as $i => $prot) {
+            $sumDebeAni = 0.0;
+            $sumDebeRea = 0.0;
+            $sumPagadoProt = 0.0;
+            foreach ($prot['formularios'] ?? [] as $form) {
+                if ($this->billingFormularioEsExento($form)) {
+                    continue;
+                }
+                $cat = strtolower($form['categoria'] ?? '');
+                $m = (float) ($form['debe'] ?? 0);
+                if (strpos($cat, 'reactivo') !== false) {
+                    $sumDebeRea += $m;
+                } else {
+                    $sumDebeAni += $m;
+                }
+                $sumPagadoProt += (float) ($form['pagado'] ?? 0);
+            }
+            $sumDebeAloj = array_sum(array_column($prot['alojamientos'] ?? [], 'debe'));
+            $sumPagadoAloj = array_sum(array_column($prot['alojamientos'] ?? [], 'pagado'));
+            $sumDebeIns = 0.0;
+            $sumPagadoIns = 0.0;
+            foreach ($prot['insumos'] ?? [] as $insP) {
+                if ($this->billingInsumoEsExento($insP)) {
+                    continue;
+                }
+                $sumDebeIns += (float) ($insP['debe'] ?? 0);
+                $sumPagadoIns += (float) ($insP['pagado'] ?? 0);
+            }
+            $payload['protocolos'][$i]['deudaAnimales'] = $sumDebeAni;
+            $payload['protocolos'][$i]['deudaReactivos'] = $sumDebeRea;
+            $payload['protocolos'][$i]['deudaAlojamiento'] = $sumDebeAloj;
+            $payload['protocolos'][$i]['deudaInsumos'] = $sumDebeIns;
+        }
+    }
+
+    private function rebuildInvestigadorTotalesGlobales(array &$out): void {
+        $deudaAniGlobal = 0.0;
+        $deudaReaGlobal = 0.0;
+        $deudaAlojGlobal = 0.0;
+        $totalPagadoGlobal = 0.0;
+        $deudaInsumosProtAcum = 0.0;
+        foreach ($out['protocolos'] as $prot) {
+            foreach ($prot['formularios'] ?? [] as $form) {
+                if ($this->billingFormularioEsExento($form)) {
+                    continue;
+                }
+                $cat = strtolower($form['categoria'] ?? '');
+                $m = (float) ($form['debe'] ?? 0);
+                if (strpos($cat, 'reactivo') !== false) {
+                    $deudaReaGlobal += $m;
+                } else {
+                    $deudaAniGlobal += $m;
+                }
+                $totalPagadoGlobal += (float) ($form['pagado'] ?? 0);
+            }
+            foreach ($prot['alojamientos'] ?? [] as $a) {
+                $deudaAlojGlobal += (float) ($a['debe'] ?? 0);
+                $totalPagadoGlobal += (float) ($a['pagado'] ?? 0);
+            }
+            foreach ($prot['insumos'] ?? [] as $insP) {
+                if ($this->billingInsumoEsExento($insP)) {
+                    continue;
+                }
+                $deudaInsumosProtAcum += (float) ($insP['debe'] ?? 0);
+                $totalPagadoGlobal += (float) ($insP['pagado'] ?? 0);
+            }
+        }
+        $deudaInsDirectos = 0.0;
+        $pagadoInsGenerales = 0.0;
+        foreach ($out['insumosGenerales'] ?? [] as $ig) {
+            if ($this->billingInsumoEsExento($ig)) {
+                continue;
+            }
+            $deudaInsDirectos += (float) ($ig['debe'] ?? 0);
+            $pagadoInsGenerales += (float) ($ig['pagado'] ?? 0);
+        }
+        $deudaInsGlobal = $deudaInsDirectos + $deudaInsumosProtAcum;
+        $totalPagadoGlobal += $pagadoInsGenerales;
+        $out['totales'] = [
+            'globalDeuda' => ($deudaAniGlobal + $deudaReaGlobal + $deudaAlojGlobal + $deudaInsGlobal),
+            'deudaAnimales' => $deudaAniGlobal,
+            'deudaReactivos' => $deudaReaGlobal,
+            'deudaAlojamiento' => $deudaAlojGlobal,
+            'deudaInsumos' => $deudaInsGlobal,
+            'totalPagado' => $totalPagadoGlobal,
+        ];
+    }
+
+    private function applyFacturacionDerivacionVistaToProtocolReport(array &$blocks, string $scope): void {
+        if (!isset($blocks['formularios']) || !is_array($blocks['formularios'])) {
+            $blocks['formularios'] = [];
+        }
+        if (!isset($blocks['insumos']) || !is_array($blocks['insumos'])) {
+            $blocks['insumos'] = [];
+        }
+        if (!isset($blocks['alojamientos']) || !is_array($blocks['alojamientos'])) {
+            $blocks['alojamientos'] = [];
+        }
+        if ($scope !== 'todos') {
+            $this->filterFilasPorAlcanceFacturacionDerivada($blocks['formularios'], $scope);
+            $this->filterFilasPorAlcanceFacturacionDerivada($blocks['insumos'], $scope);
+            if ($scope === 'derivados') {
+                $blocks['alojamientos'] = [];
+            }
+        }
+        $formularios = $blocks['formularios'] ?? [];
+        $alojList = $blocks['alojamientos'] ?? [];
+        $insList = $blocks['insumos'] ?? [];
+        $deudaAni = 0.0;
+        $deudaRea = 0.0;
+        $pagadoTotal = 0.0;
+        foreach ($formularios as $f) {
+            $cat = strtolower($f['categoria'] ?? '');
+            if (strpos($cat, 'reactivo') !== false) {
+                $deudaRea += (float) $f['debe'];
+            } else {
+                $deudaAni += (float) $f['debe'];
+            }
+            $pagadoTotal += (float) $f['pagado'];
+        }
+        $deudaAloj = array_sum(array_column($alojList, 'debe'));
+        $pagadoTotal += array_sum(array_column($alojList, 'pagado'));
+        $deudaInsumos = array_sum(array_column($insList, 'debe'));
+        $pagadoTotal += array_sum(array_column($insList, 'pagado'));
+        $blocks['formularios'] = $formularios;
+        $blocks['alojamientos'] = $alojList;
+        $blocks['insumos'] = $insList;
+        $blocks['totales'] = [
+            'deudaAnimales' => $deudaAni,
+            'deudaReactivos' => $deudaRea,
+            'deudaAlojamiento' => $deudaAloj,
+            'deudaInsumos' => $deudaInsumos,
+            'deudaTotal' => ($deudaAni + $deudaRea + $deudaAloj + $deudaInsumos),
+            'totalPagado' => $pagadoTotal,
+        ];
     }
 
     private function sendSuccess($data) { header('Content-Type: application/json'); echo json_encode(['status' => 'success', 'data' => $data]); exit; }

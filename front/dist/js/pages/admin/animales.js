@@ -424,6 +424,7 @@ function renderTableBody(pageDataOverride = null) {
  * 2. MODAL DE DETALLE (CORREGIDO)
  */
 window.openAnimalModal = async (a) => {
+    window._animalModalCatalogInstId = '';
     window._animalModalFrozenSubesp = (a.idsubespA != null && a.idsubespA !== '') ? String(a.idsubespA) : null;
     window._animalModalFrozenPrecioUnit = (a.PrecioUnit != null && a.PrecioUnit !== '') ? String(a.PrecioUnit) : null;
     window._animalModalFrozenFechaPrecio = (a.FechaPrecioReferencia != null && String(a.FechaPrecioReferencia).trim() !== '')
@@ -530,6 +531,12 @@ window.openAnimalModal = async (a) => {
     document.getElementById('form-animal-full').onsubmit = (e) => window.saveFullAnimalForm(e);
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
     const useAllLocalSpecies = isDerivedActive && !isOriginInst;
+    // Catálogo taxonómico (especie/categoría/cepa) en destino derivado debe usar la institución dueña del formulario
+    // (IdInstitucionActual), no solo localStorage — si difieren, /animals/cepas con inst equivocado devuelve [].
+    if (useAllLocalSpecies) {
+        const ci = Number(a.IdInstitucionActual || 0) > 0 ? Number(a.IdInstitucionActual) : Number(instId || 0);
+        if (ci > 0) window._animalModalCatalogInstId = String(ci);
+    }
     if (useAllLocalSpecies) {
         await window.loadSpeciesForProtocol(a.idprotA, a.idsubespA, { allLocal: true });
     } else if (a.idprotA) {
@@ -1100,8 +1107,10 @@ window.loadSpeciesForProtocol = async (protId, selectedSubId = null, opts = {}) 
     if (!selEsp || !selCat) return;
 
     try {
-        const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
         const allLocal = !!opts.allLocal;
+        const instId = allLocal
+            ? (window._animalModalCatalogInstId || localStorage.getItem('instId') || sessionStorage.getItem('instId') || '')
+            : (localStorage.getItem('instId') || sessionStorage.getItem('instId') || '');
         const url = allLocal
             ? `/animals/protocol-species?all=1&inst=${encodeURIComponent(instId)}`
             : `/animals/protocol-species?id=${protId}`;
@@ -1206,7 +1215,10 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
     const stale = () => gen !== window._animalModalCepasLoadGen;
 
     const t = window.txt?.form_animales || {};
-    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+    const instId = window._animalModalCatalogInstId
+        || localStorage.getItem('instId')
+        || sessionStorage.getItem('instId')
+        || '';
     const sel = document.getElementById('select-cepa-modal');
     const help = document.getElementById('cepa-modal-help');
     if (!sel) return;
