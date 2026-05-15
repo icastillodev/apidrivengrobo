@@ -981,6 +981,11 @@ class BillingController {
             $deptoIdsLocal = $this->model->getIdsDeptosFacturacionLocalPendienteOEntregada($instId);
             $idUsrLocal = $this->model->getIdsUsuariosFacturacionLocalPendienteOEntregada($instId);
             $idProtLocal = $this->model->getIdsProtocolosFacturacionLocalPendienteOEntregada($instId);
+            $deptoIdsFormularios = $this->model->getIdsDeptosConFormularioEntregadoEnInstitucion($instId);
+            $idUsrFormularios = $this->model->getIdsUsuariosConFormularioEntregadoEnInstitucion($instId);
+            $idProtFormularios = $this->model->getIdsProtocolosConFormularioEntregadoEnInstitucion($instId);
+            $mapUsrDerivados = $this->model->getMapUsuarioOrigenesDerivacionPendiente($instId);
+            $mapProtDerivados = $this->model->getMapProtocoloOrigenesDerivacionPendiente($instId);
             $this->sendSuccess([
                 'map' => $map,
                 'deptoIdsDerivados' => $deptoIdsDerivados,
@@ -990,6 +995,11 @@ class BillingController {
                 'deptoIdsLocal' => $deptoIdsLocal,
                 'idUsrLocal' => $idUsrLocal,
                 'idProtLocal' => $idProtLocal,
+                'deptoIdsFormularios' => $deptoIdsFormularios,
+                'idUsrFormularios' => $idUsrFormularios,
+                'idProtFormularios' => $idProtFormularios,
+                'mapUsrDerivados' => $mapUsrDerivados,
+                'mapProtDerivados' => $mapProtDerivados,
             ]);
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());

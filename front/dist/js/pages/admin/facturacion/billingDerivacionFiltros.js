@@ -34,6 +34,11 @@ function emptyFiltros() {
         deptoIdsLocal: new Set(),
         idUsrLocal: new Set(),
         idProtLocal: new Set(),
+        deptoIdsFormularios: new Set(),
+        idUsrFormularios: new Set(),
+        idProtFormularios: new Set(),
+        mapUsrDerivados: {},
+        mapProtDerivados: {},
         tieneDerivadosPendientes: false,
     };
 }
@@ -50,6 +55,8 @@ export async function fetchFiltrosAlcanceDerivacion() {
         }
         const d = res.data;
         const map = d.map && typeof d.map === 'object' ? d.map : {};
+        const mapUsrDerivados = d.mapUsrDerivados && typeof d.mapUsrDerivados === 'object' ? d.mapUsrDerivados : {};
+        const mapProtDerivados = d.mapProtDerivados && typeof d.mapProtDerivados === 'object' ? d.mapProtDerivados : {};
         filtrosCache = {
             map,
             deptoIdsDerivados: toNumSet(d.deptoIdsDerivados),
@@ -58,6 +65,11 @@ export async function fetchFiltrosAlcanceDerivacion() {
             deptoIdsLocal: toNumSet(d.deptoIdsLocal),
             idUsrLocal: toNumSet(d.idUsrLocal),
             idProtLocal: toNumSet(d.idProtLocal),
+            deptoIdsFormularios: toNumSet(d.deptoIdsFormularios),
+            idUsrFormularios: toNumSet(d.idUsrFormularios),
+            idProtFormularios: toNumSet(d.idProtFormularios),
+            mapUsrDerivados,
+            mapProtDerivados,
             tieneDerivadosPendientes: !!d.tieneDerivadosPendientes,
         };
         return filtrosCache;
@@ -93,4 +105,18 @@ export function getFacturacionDerivacionSeleccionFromDom() {
         return v;
     }
     return 'todos';
+}
+
+/**
+ * Ámbito de organización (depto/protocolo) según el desplegable de la página.
+ * @param {'filter-ambito-depto'|'filter-ambito-investigador'|'filter-ambito-protocolo'} [selectId]
+ * @returns {'all'|'interno'|'externo'}
+ */
+export function getAmbitoInternoExternoFromDom(selectId = 'filter-ambito-depto') {
+    const el = document.getElementById(selectId);
+    const v = el && el.value ? String(el.value).toLowerCase().trim() : 'all';
+    if (v === 'interno' || v === 'externo') {
+        return v;
+    }
+    return 'all';
 }

@@ -33,6 +33,7 @@ import {
     fetchFiltrosAlcanceDerivacion,
     aplicarVisibilidadColumnaFacturacionDerivacion,
     getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionProt,
+    getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from '../billingDerivacionFiltros.js';
 
@@ -58,17 +59,48 @@ function txBP() {
     return txF().billing_protocolo || {};
 }
 
+function escapeHtmlProt(s) {
+    if (s == null || s === '') return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 function listaProtocolosBaseFiltrada() {
     const full = Array.isArray(window.protocolosCacheFull) ? window.protocolosCacheFull : [];
     const fa = getFiltrosAlcanceDerivacionCached();
     const scope = getFacturacionDerivacionSeleccionProt();
-    if (scope === 'derivados' && fa?.idProtDerivados?.size) {
-        return full.filter((p) => fa.idProtDerivados.has(Number(p.idprotA)));
+    const ambOrg = getAmbitoInternoExternoFromDom('filter-ambito-protocolo');
+
+    let list = full;
+    if (ambOrg === 'interno') {
+        list = list.filter((p) => Number(p.ambitoProtExterno) !== 1);
+    } else if (ambOrg === 'externo') {
+        list = list.filter((p) => Number(p.ambitoProtExterno) === 1);
     }
-    if (scope === 'institucionales' && fa?.idProtLocal?.size) {
-        return full.filter((p) => fa.idProtLocal.has(Number(p.idprotA)));
+
+    if (fa?.idProtFormularios?.size) {
+        list = list.filter((p) => fa.idProtFormularios.has(Number(p.idprotA)));
+    } else {
+        list = [];
     }
-    return full;
+
+    if (scope === 'derivados') {
+        if (fa?.idProtDerivados?.size) {
+            list = list.filter((p) => fa.idProtDerivados.has(Number(p.idprotA)));
+        } else {
+            list = [];
+        }
+    } else if (scope === 'institucionales') {
+        if (fa?.idProtLocal?.size) {
+            list = list.filter((p) => fa.idProtLocal.has(Number(p.idprotA)));
+        } else {
+            list = [];
+        }
+    }
+    return list;
 }
 
 export async function initBillingProtocolo() {
@@ -85,6 +117,14 @@ export async function initBillingProtocolo() {
         aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
 
         await cargarListaProtocolos();
+        const filterAmbProt = document.getElementById('filter-ambito-protocolo');
+        if (filterAmbProt) {
+            filterAmbProt.addEventListener('change', () => {
+                const inp = document.getElementById('busqueda-protocolo');
+                if (inp) inp.value = '';
+                renderizarOpciones(listaProtocolosBaseFiltrada());
+            });
+        }
         const selDer = document.getElementById('sel-facturacion-derivacion');
         if (selDer) {
             selDer.addEventListener('change', () => {
@@ -112,8 +152,30 @@ async function cargarListaProtocolos() {
 function renderizarOpciones(lista) {
     const select = document.getElementById('sel-protocolo');
     const ph = txBP().ph_sel_protocolo || '-- SELECCIONAR PROTOCOLO --';
-    select.innerHTML = `<option value="">${ph}</option>` +
-        lista.map(p => `<option value="${p.idprotA}">${p.nprotA} - ${p.tituloA} (ID: ${p.idprotA})</option>`).join('');
+    const fa = getFiltrosAlcanceDerivacionCached();
+    const scope = getFacturacionDerivacionSeleccionProt();
+    const mapProt = fa?.mapProtDerivados || {};
+    let html = `<option value="">${escapeHtmlProt(ph)}</option>`;
+    html += lista.map((p) => {
+        const id = Number(p.idprotA);
+        const nprot = String(p.nprotA || '').trim();
+        const tit = String(p.tituloA || '').trim();
+        const titCorto = tit.length > 48 ? `${tit.slice(0, 45)}…` : tit;
+        let label;
+        let titleAttr = '';
+        if (scope === 'derivados') {
+            const orig = mapProt[id] ?? mapProt[String(id)];
+            label = orig ? `${nprot} — ${orig}` : (titCorto ? `${nprot} — ${titCorto}` : nprot);
+            titleAttr = `${nprot} | ${tit} (ID: ${id})`;
+        } else if (scope === 'institucionales') {
+            label = titCorto ? `${nprot} — ${titCorto}` : nprot;
+            titleAttr = `${nprot} | ${tit} (ID: ${id})`;
+        } else {
+            label = `${p.nprotA} - ${p.tituloA} (ID: ${p.idprotA})`;
+        }
+        return `<option value="${p.idprotA}" title="${escapeHtmlProt(titleAttr)}">${escapeHtmlProt(label)}</option>`;
+    }).join('');
+    select.innerHTML = html;
 }
 
 function vincularFiltro() {

@@ -33,6 +33,7 @@ import {
     fetchFiltrosAlcanceDerivacion,
     aplicarVisibilidadColumnaFacturacionDerivacion,
     getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccion,
+    getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from './billingDerivacionFiltros.js';
 
@@ -171,20 +172,19 @@ export async function initBillingDepto() {
         aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
         await cargarListaDeptos();
         const filterAmbito = document.getElementById('filter-ambito-depto');
-        if (filterAmbito) filterAmbito.addEventListener('change', () => renderDeptoOptions(filterAmbito.value));
+        if (filterAmbito) {
+            filterAmbito.addEventListener('change', () => renderDeptoOptions());
+        }
         const selDer = document.getElementById('sel-facturacion-derivacion');
         if (selDer) {
-            selDer.addEventListener('change', () => {
-                const amb = document.getElementById('filter-ambito-depto')?.value || 'all';
-                renderDeptoOptions(amb);
-            });
+            selDer.addEventListener('change', () => renderDeptoOptions());
         }
         const selDeptoInit = document.getElementById('sel-depto');
         if (selDeptoInit && typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function') {
             selDeptoInit.addEventListener('change', () => window.invalidateDeptoSaldoHistorialPanelsCache());
         }
         aplicarParamsUrlDepto();
-        renderDeptoOptions(filterAmbito ? filterAmbito.value : 'all');
+        renderDeptoOptions();
     } catch (error) { console.error("Error en init:", error); } finally { hideLoader(); }
 }
 
@@ -224,53 +224,73 @@ async function cargarListaDeptos() {
         const res = await API.request(`/deptos/list?inst=${instId}`);
         if (res.status === 'success' && res.data) {
             deptosRaw = res.data;
-            const filterAmbito = document.getElementById('filter-ambito-depto');
-            const ambito = filterAmbito ? filterAmbito.value : 'all';
-            renderDeptoOptions(ambito);
+            renderDeptoOptions();
         }
     } catch (e) { console.error(e); }
 }
 
-/** Filtra deptos por ámbito (all | interno | externo) y rellena el select. */
-function renderDeptoOptions(ambito) {
+/** Filtra departamentos por ámbito org., ámbito de cobro y formularios entregados; etiquetas según modo derivado/local. */
+function renderDeptoOptions() {
     const select = document.getElementById('sel-depto');
     if (!select) return;
     const currentVal = select.value;
+    const ambOrg = getAmbitoInternoExternoFromDom('filter-ambito-depto');
 
     const isExterno = (d) => (d.externodepto == 2) || (d.externoorganismo != null && d.externoorganismo == 2);
     let list = deptosRaw;
-    if (ambito === 'interno') list = deptosRaw.filter(d => !isExterno(d));
-    if (ambito === 'externo') list = deptosRaw.filter(d => isExterno(d));
+    if (ambOrg === 'interno') list = list.filter((d) => !isExterno(d));
+    if (ambOrg === 'externo') list = list.filter((d) => isExterno(d));
 
     const fa = getFiltrosAlcanceDerivacionCached();
     const scope = getFacturacionDerivacionSeleccion();
-    if (scope === 'derivados' && fa?.deptoIdsDerivados?.size) {
-        list = list.filter((d) => fa.deptoIdsDerivados.has(Number(d.iddeptoA)));
-    } else if (scope === 'institucionales' && fa?.deptoIdsLocal?.size) {
-        list = list.filter((d) => fa.deptoIdsLocal.has(Number(d.iddeptoA)));
+
+    if (fa?.deptoIdsFormularios?.size) {
+        list = list.filter((d) => fa.deptoIdsFormularios.has(Number(d.iddeptoA)));
+    } else {
+        list = [];
     }
 
-    const mapOrigenes = fa?.map || {};
+    if (scope === 'derivados') {
+        if (fa?.deptoIdsDerivados?.size) {
+            list = list.filter((d) => fa.deptoIdsDerivados.has(Number(d.iddeptoA)));
+        } else {
+            list = [];
+        }
+    } else if (scope === 'institucionales') {
+        if (fa?.deptoIdsLocal?.size) {
+            list = list.filter((d) => fa.deptoIdsLocal.has(Number(d.iddeptoA)));
+        } else {
+            list = [];
+        }
+    }
+
+    const mapDeptOrigen = fa?.map || {};
     const tf = txF();
-    const suffixNote = tf.derivacion_depto_suffix || '';
     const titleTpl = tf.derivacion_depto_title_tpl || '';
 
     select.innerHTML = `<option value="">${txF().opcion_seleccionar || '-- SELECCIONAR --'}</option>` +
-        list.map(d => {
-            const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
-            const base = `${d.NombreDeptoA}${org} (ID: ${d.iddeptoA})`;
-            const idNum = d.iddeptoA;
-            const origenes = mapOrigenes[idNum] ?? mapOrigenes[String(idNum)];
+        list.map((d) => {
+            const idNum = Number(d.iddeptoA);
+            const nombre = String(d.NombreDeptoA || '').trim() || `ID ${idNum}`;
+            let label;
             let titleAttr = '';
-            let label = base;
-            if (origenes) {
-                titleAttr = String(titleTpl).replace(/\{origenes\}/g, String(origenes));
-                label = `${base}${suffixNote}`;
+            if (scope === 'derivados') {
+                const orig = mapDeptOrigen[idNum] ?? mapDeptOrigen[String(idNum)];
+                label = orig ? `${nombre} — ${orig}` : nombre;
+                if (orig) {
+                    titleAttr = String(titleTpl).replace(/\{origenes\}/g, String(orig));
+                }
+            } else if (scope === 'institucionales') {
+                label = nombre;
+                titleAttr = `${nombre} (ID: ${idNum})`;
+            } else {
+                const org = d.NombreOrganismoSimple ? ` (${d.NombreOrganismoSimple})` : '';
+                label = `${nombre}${org} (ID: ${idNum})`;
             }
             return `<option value="${d.iddeptoA}" title="${escapeHtml(titleAttr)}">${escapeHtml(label)}</option>`;
         }).join('');
 
-    if (currentVal && list.some(d => String(d.iddeptoA) === String(currentVal))) {
+    if (currentVal && list.some((d) => String(d.iddeptoA) === String(currentVal))) {
         select.value = currentVal;
     }
     if (typeof window.invalidateDeptoSaldoHistorialPanelsCache === 'function') {

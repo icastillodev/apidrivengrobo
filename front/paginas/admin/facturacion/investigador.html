@@ -95,11 +95,14 @@
 
             <div class="row align-items-end mb-4 pb-3 border-bottom g-2">
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted uppercase" data-i18n="facturacion.label_investigador_responsable"></label>
-                    <input type="text" id="busqueda-investigador" class="form-control form-control-sm mb-2" data-i18n="facturacion.ph_filtrar_inv" placeholder="Filtrar por nombre o ID...">
-                    <select id="sel-investigador" class="form-select form-select-sm border-primary shadow-sm">
-                        <option value="" data-i18n="facturacion.opcion_seleccionar"></option>
-                    </select>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-light text-muted fw-bold small uppercase" style="font-size: 10px;" data-i18n="facturacion.filtro_ambito">Ámbito:</span>
+                        <select id="filter-ambito-investigador" class="form-select form-select-sm border-primary shadow-none">
+                            <option value="all" data-i18n="facturacion.ambito_todos">TODOS</option>
+                            <option value="interno" data-i18n="facturacion.ambito_internos">INTERNOS</option>
+                            <option value="externo" data-i18n="facturacion.ambito_externos">EXTERNOS</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="col-md-2 col-facturacion-derivacion">
                     <div class="input-group shadow-sm">
@@ -110,6 +113,13 @@
                             <option value="institucionales" data-i18n="facturacion.derivacion_institucionales">Solo local (no derivada)</option>
                         </select>
                     </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted uppercase" data-i18n="facturacion.label_investigador_responsable"></label>
+                    <input type="text" id="busqueda-investigador" class="form-control form-control-sm mb-2" data-i18n="facturacion.ph_filtrar_inv" placeholder="Filtrar por nombre o ID...">
+                    <select id="sel-investigador" class="form-select form-select-sm border-primary shadow-sm">
+                        <option value="" data-i18n="facturacion.opcion_seleccionar"></option>
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <div class="input-group shadow-sm">

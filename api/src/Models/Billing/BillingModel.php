@@ -1099,6 +1099,241 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
     }
 
     /**
+     * IdUsrA => nombres de institución(es) de origen con derivación pendiente (selector facturación por investigador).
+     *
+     * @return array<int, string>
+     */
+    public function getMapUsuarioOrigenesDerivacionPendiente(int $instCobradora): array {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT
+                COALESCE(p.IdUsrA, f.IdUsrA) AS IdUsrA,
+                TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
+            FROM facturacion_formulario_derivado ffd
+            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            LEFT JOIN protformr pr ON pr.idformA = f.idformA
+            LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+            LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+            WHERE ffd.IdInstitucionCobradora = ?
+              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+              AND TRIM(COALESCE(io.NombreInst, '')) <> ''
+              AND COALESCE(p.IdUsrA, f.IdUsrA) IS NOT NULL AND COALESCE(p.IdUsrA, f.IdUsrA) > 0
+            ORDER BY IdUsrA ASC, origen_nombre ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora]);
+        $byUsr = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['IdUsrA'] ?? 0);
+            $nom = trim((string) ($row['origen_nombre'] ?? ''));
+            if ($id <= 0 || $nom === '') {
+                continue;
+            }
+            if (!isset($byUsr[$id])) {
+                $byUsr[$id] = [];
+            }
+            $byUsr[$id][$nom] = true;
+        }
+        $out = [];
+        foreach ($byUsr as $id => $set) {
+            $names = array_keys($set);
+            sort($names, SORT_STRING);
+            $out[$id] = implode(' · ', $names);
+        }
+        return $out;
+    }
+
+    /**
+     * idprotA => nombres de institución(es) de origen con derivación pendiente (selector facturación por protocolo).
+     *
+     * @return array<int, string>
+     */
+    public function getMapProtocoloOrigenesDerivacionPendiente(int $instCobradora): array {
+        $instCobradora = (int) $instCobradora;
+        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT
+                pr.idprotA AS idprotA,
+                TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
+            FROM facturacion_formulario_derivado ffd
+            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            INNER JOIN protformr pr ON pr.idformA = f.idformA
+            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+            LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+            WHERE ffd.IdInstitucionCobradora = ?
+              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+              AND pr.idprotA IS NOT NULL AND pr.idprotA > 0
+              AND TRIM(COALESCE(io.NombreInst, '')) <> ''
+            ORDER BY pr.idprotA ASC, origen_nombre ASC
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora]);
+        $byProt = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['idprotA'] ?? 0);
+            $nom = trim((string) ($row['origen_nombre'] ?? ''));
+            if ($id <= 0 || $nom === '') {
+                continue;
+            }
+            if (!isset($byProt[$id])) {
+                $byProt[$id] = [];
+            }
+            $byProt[$id][$nom] = true;
+        }
+        $out = [];
+        foreach ($byProt as $id => $set) {
+            $names = array_keys($set);
+            sort($names, SORT_STRING);
+            $out[$id] = implode(' · ', $names);
+        }
+        return $out;
+    }
+
+    /**
+     * Departamentos con al menos un formulario entregado en la sede (base selector liquidación).
+     *
+     * @return array<int, int>
+     */
+    public function getIdsDeptosConFormularioEntregadoEnInstitucion(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT COALESCE(p.departamento, f.depto) AS iddepto
+            FROM formularioe f
+            LEFT JOIN protformr pr ON pr.idformA = f.idformA
+            LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+            WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
+              AND COALESCE(p.departamento, f.depto) IS NOT NULL AND COALESCE(p.departamento, f.depto) > 0
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idInstitucion]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['iddepto'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Usuarios con al menos un formulario entregado o actividad equivalente al selector de investigadores.
+     *
+     * @return array<int, int>
+     */
+    public function getIdsUsuariosConFormularioEntregadoEnInstitucion(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT x.id FROM (
+                SELECT p.IdUsrA AS id
+                FROM protocoloexpe p
+                INNER JOIN protformr pf ON p.idprotA = pf.idprotA
+                INNER JOIN formularioe f ON pf.idformA = f.idformA
+                WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
+                  AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
+                UNION
+                SELECT p.IdUsrA AS id
+                FROM protocoloexpe p
+                INNER JOIN alojamiento a ON p.idprotA = a.idprotA
+                WHERE p.IdInstitucion = ?
+                  AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
+                UNION
+                SELECT f.IdUsrA AS id
+                FROM formularioe f
+                WHERE f.estado = 'Entregado' AND f.IdInstitucion = ?
+                  AND f.tipoA IN (SELECT IdTipoFormulario FROM tipoformularios WHERE categoriaformulario LIKE '%insumo%')
+                  AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
+            ) x
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idInstitucion, $idInstitucion, $idInstitucion]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Protocolos con al menos un formulario entregado en la sede.
+     *
+     * @return array<int, int>
+     */
+    public function getIdsProtocolosConFormularioEntregadoEnInstitucion(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        $sql = "
+            SELECT DISTINCT p.idprotA AS id
+            FROM protocoloexpe p
+            INNER JOIN protformr pf ON p.idprotA = pf.idprotA
+            INNER JOIN formularioe f ON pf.idformA = f.idformA
+            WHERE p.IdInstitucion = ? AND f.estado = 'Entregado'
+              AND p.idprotA IS NOT NULL AND p.idprotA > 0
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idInstitucion]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * IdUsrA => 1 si tiene al menos un protocolo en la sede cuyo departamento/organismo es externo.
+     *
+     * @return array<int, int>
+     */
+    public function getMapInvestigadorProtocoloAmbitoExterno(int $idInstitucion): array {
+        $idInstitucion = (int) $idInstitucion;
+        if ($idInstitucion <= 0) {
+            return [];
+        }
+        $sql = "
+            SELECT p.IdUsrA,
+                MAX(CASE WHEN (de.externodepto = 2 OR COALESCE(org.externoorganismo, 0) = 2) THEN 1 ELSE 0 END) AS es_ext
+            FROM protocoloexpe p
+            INNER JOIN departamentoe de ON p.departamento = de.iddeptoA
+            LEFT JOIN organismoe org ON de.organismopertenece = org.IdOrganismo
+            WHERE p.IdInstitucion = ?
+              AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
+            GROUP BY p.IdUsrA
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idInstitucion]);
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $id = (int) ($row['IdUsrA'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = (int) ($row['es_ext'] ?? 0);
+            }
+        }
+        return $out;
+    }
+
+    /**
      * Ajusta totales/pagado/debe de filas de insumos cuando existe facturación derivada (misma sede cobradora).
      */
     public function applyFacturacionDerivadaToInsumoRows(array &$rows, int $instCobradora): void {
@@ -1707,21 +1942,28 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$idInst, $idInst, $idInst, $idInst]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $mapExt = $this->getMapInvestigadorProtocoloAmbitoExterno($idInst);
         foreach ($rows as &$r) {
             $r['SaldoDinero'] = isset($r['SaldoDinero']) ? (float) $r['SaldoDinero'] : 0.0;
+            $uid = (int) ($r['IdUsrA'] ?? 0);
+            $r['ambitoProtExterno'] = ($uid > 0 && !empty($mapExt[$uid])) ? 1 : 0;
         }
         return $rows;
     }
     public function getActiveProtocols($idInst) {
-        $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
-                TRIM(COALESCE(dep.NombreDeptoA, '')) AS nombreDepartamento
+        $sql = "SELECT p.idprotA, MAX(p.nprotA) AS nprotA, MAX(p.tituloA) AS tituloA,
+                MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) AS Investigador,
+                MAX(TRIM(COALESCE(dep.NombreDeptoA, ''))) AS nombreDepartamento,
+                MAX(CASE WHEN (dep.externodepto = 2 OR COALESCE(org.externoorganismo, 0) = 2) THEN 1 ELSE 0 END) AS ambitoProtExterno
                 FROM protocoloexpe p
                 INNER JOIN personae u ON p.IdUsrA = u.IdUsrA
                 INNER JOIN protformr pf ON p.idprotA = pf.idprotA
                 INNER JOIN formularioe f ON pf.idformA = f.idformA
                 LEFT JOIN departamentoe dep ON p.departamento = dep.iddeptoA
+                LEFT JOIN organismoe org ON dep.organismopertenece = org.IdOrganismo
                 WHERE p.IdInstitucion = ? AND f.estado = 'Entregado'
-                ORDER BY p.nprotA DESC";
+                GROUP BY p.idprotA
+                ORDER BY MAX(p.nprotA) DESC";
         $stmt = $this->db->prepare($sql); $stmt->execute([$idInst]); return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     public function getProtocolHeaderInfo($idProt) {

@@ -13,6 +13,7 @@ import {
     fetchFiltrosAlcanceDerivacion,
     aplicarVisibilidadColumnaFacturacionDerivacion,
     getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionInv,
+    getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from '../billingDerivacionFiltros.js';
 
@@ -34,17 +35,48 @@ window.currentReportData = null;
 window.investigadoresCache = [];
 window.investigadoresCacheFull = [];
 
+function escapeHtmlInv(s) {
+    if (s == null || s === '') return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 function listaInvestigadoresBaseFiltrada() {
     const full = Array.isArray(window.investigadoresCacheFull) ? window.investigadoresCacheFull : [];
     const fa = getFiltrosAlcanceDerivacionCached();
     const scope = getFacturacionDerivacionSeleccionInv();
-    if (scope === 'derivados' && fa?.idUsrDerivados?.size) {
-        return full.filter((u) => fa.idUsrDerivados.has(Number(u.IdUsrA)));
+    const ambOrg = getAmbitoInternoExternoFromDom('filter-ambito-investigador');
+
+    let list = full;
+    if (ambOrg === 'interno') {
+        list = list.filter((u) => Number(u.ambitoProtExterno) !== 1);
+    } else if (ambOrg === 'externo') {
+        list = list.filter((u) => Number(u.ambitoProtExterno) === 1);
     }
-    if (scope === 'institucionales' && fa?.idUsrLocal?.size) {
-        return full.filter((u) => fa.idUsrLocal.has(Number(u.IdUsrA)));
+
+    if (fa?.idUsrFormularios?.size) {
+        list = list.filter((u) => fa.idUsrFormularios.has(Number(u.IdUsrA)));
+    } else {
+        list = [];
     }
-    return full;
+
+    if (scope === 'derivados') {
+        if (fa?.idUsrDerivados?.size) {
+            list = list.filter((u) => fa.idUsrDerivados.has(Number(u.IdUsrA)));
+        } else {
+            list = [];
+        }
+    } else if (scope === 'institucionales') {
+        if (fa?.idUsrLocal?.size) {
+            list = list.filter((u) => fa.idUsrLocal.has(Number(u.IdUsrA)));
+        } else {
+            list = [];
+        }
+    }
+    return list;
 }
 
 /** Informe principal ya cargado al menos una vez con éxito (recargas = spinner inline). */
@@ -69,6 +101,14 @@ export async function initBillingInvestigador() {
         aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
 
         await cargarListaInvestigadores();
+        const filterAmbInv = document.getElementById('filter-ambito-investigador');
+        if (filterAmbInv) {
+            filterAmbInv.addEventListener('change', () => {
+                const inputBusqueda = document.getElementById('busqueda-investigador');
+                if (inputBusqueda) inputBusqueda.value = '';
+                renderizarOpcionesInvestigador(listaInvestigadoresBaseFiltrada());
+            });
+        }
         const selDer = document.getElementById('sel-facturacion-derivacion');
         if (selDer) {
             selDer.addEventListener('change', () => {
@@ -145,8 +185,29 @@ function renderizarOpcionesInvestigador(lista) {
     const select = document.getElementById('sel-investigador');
     if (!select) return;
     const ph = txBI().ph_sel_investigador || '-- SELECCIONAR INVESTIGADOR --';
-    let html = `<option value="">${ph}</option>`;
-    html += lista.map(u => `<option value="${u.IdUsrA}">${u.ApellidoA} ${u.NombreA} (ID: ${u.IdUsrA})</option>`).join('');
+    const fa = getFiltrosAlcanceDerivacionCached();
+    const scope = getFacturacionDerivacionSeleccionInv();
+    const mapUsr = fa?.mapUsrDerivados || {};
+    let html = `<option value="">${escapeHtmlInv(ph)}</option>`;
+    html += lista.map((u) => {
+        const id = Number(u.IdUsrA);
+        const ap = String(u.ApellidoA || '').trim();
+        const nom = String(u.NombreA || '').trim();
+        const base = `${ap}, ${nom}`;
+        let label;
+        let titleAttr = '';
+        if (scope === 'derivados') {
+            const orig = mapUsr[id] ?? mapUsr[String(id)];
+            label = orig ? `${base} — ${orig}` : base;
+            titleAttr = orig ? `${base} — ${orig} (ID: ${id})` : `${base} (ID: ${id})`;
+        } else if (scope === 'institucionales') {
+            label = base;
+            titleAttr = `${base} (ID: ${id})`;
+        } else {
+            label = `${base} (ID: ${id})`;
+        }
+        return `<option value="${id}" title="${escapeHtmlInv(titleAttr)}">${escapeHtmlInv(label)}</option>`;
+    }).join('');
     select.innerHTML = html;
 }
 
