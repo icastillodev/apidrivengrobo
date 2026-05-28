@@ -18,6 +18,7 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | Sección | Qué encontrás |
 |---------|-----------------|
 | [Noticias fijadas (OrdenFijo)](#sql-noticias-fijo) | `ALTER TABLE noticia` listo para ejecutar |
+| [Historial de pagos — fecha con hora](#sql-historialpago-fecha-datetime) | `historialpago.fecha` → `DATETIME` |
 | [Anestésicos (pedido / protocolo)](#sql-anestesicos-formulario) | `formularioe` + `protocoloexpe` |
 | [Portada / popup dashboard](#sql-portada-popup) | `institucion_portada_popup` + tabla `institucion_dashboard_popup` (popups admin) |
 | [Rendimiento superadmin / bitácora](#sql-rendimiento-superadmin-bitacora) | Índices opcionales `bitacora`, `usuarioe`, `modulosactivosinst` |
@@ -25,6 +26,21 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | [Comunicación — adjuntos B2](#sql-comunicacion-b2-adjuntos) | `mensaje`, `noticia`, `institucion_portada_popup`, `institucion_poe` (claves B2) |
 | [Adjuntos / Backblaze (plantilla)](#plantilla-backblaze) | Ideas legacy; columnas reales en migración B2 de comunicación |
 | [Inventario backlog](#inventario-backlog) | Tabla resumen + estado |
+
+---
+
+<a id="sql-historialpago-fecha-datetime"></a>
+
+## Historial de pagos — `fecha` con hora (phpMyAdmin)
+
+**Archivo en el repo:** [`docs/migrations/2026-05-09-historialpago-fecha-datetime.sql`](migrations/2026-05-09-historialpago-fecha-datetime.sql)
+
+**Contexto:** la API inserta con `NOW()`; el front (`billingPayments.js`, `historialcontable.js`) muestra hora cuando el valor trae componente temporal. Ejecutar en **staging** antes de producción.
+
+```sql
+ALTER TABLE historialpago
+  MODIFY COLUMN fecha DATETIME NOT NULL;
+```
 
 ---
 
@@ -202,6 +218,7 @@ Las **columnas operativas** para noticias/portada/mensajes/POE están en [`2026-
 | Portada + adjuntos noticia / Backblaze (ideas extra) | Plantilla opcional | Ver migración B2 arriba | [Plantilla](#plantilla-backblaze) · [`2026-05-09-noticia-adjuntos-storage-plantilla.sql`](migrations/2026-05-09-noticia-adjuntos-storage-plantilla.sql) |
 | Atributo formulario **anestésicos** | `formularioe.TieneAnestesicos`, `protocoloexpe.PermiteAnestesicos` | **Código listo** — ejecutar SQL en el servidor antes de usar | [Bloque SQL](#sql-anestesicos-formulario) · [`2026-05-09-formulario-anestesicos.sql`](migrations/2026-05-09-formulario-anestesicos.sql) |
 | Historial de pagos no muestra | Quizá bug; si falta persistencia, `historialpago` | Depto: filtro por `protdeptor` + `formularioe.depto`; JOIN formulario por **`idformA` solo** (`getSaldoHistorialSplit`, 2026-05); **refId** obligatorio API/UI para `depto`/`protocolo`; **UX (2026-05):** textos guía en popup (`saldo_hist_hint_*`, `billingPayments.js`); **manual:** `historial_saldo` (`admin__facturacion__index`) y `vs_historial_saldo_facturacion` (`admin__historialcontable`, no confundir pantallas); si sigue vacío, revisar datos | — |
+| **Historial de pagos — fecha con hora** | `historialpago.fecha` `DATE` → `DATETIME` | **Código listo** — ejecutar SQL en servidor | [Bloque SQL](#sql-historialpago-fecha-datetime) · [`2026-05-09-historialpago-fecha-datetime.sql`](migrations/2026-05-09-historialpago-fecha-datetime.sql) |
 | Facturación institución — depto cobro derivado | Sin migración: `formulario_derivacion.depto_destino` y/o `formularioe.depto` en sede cobradora | **Código listo** — `getInstitutionDerivedReport*` + `billingInstitucion.js` (2026-05); capacitación `derivados_contabilidad` en `admin__facturacion__institucion` | — |
 | POEs (institución, URLs + B2 opcional) | `institucion_poe` + columnas B2 | **Código listo** — base [`2026-05-09-institucion-poe.sql`](migrations/2026-05-09-institucion-poe.sql) + [`2026-05-09-comunicacion-b2-adjuntos.sql`](migrations/2026-05-09-comunicacion-b2-adjuntos.sql) | [POE](#sql-poe-institucional) · [B2](#sql-comunicacion-b2-adjuntos) |
 | **Índices rendimiento superadmin** | `bitacora(id_usuario)`, `usuarioe(IdInstitucion)`, `modulosactivosinst(IdInstitucion)` | **Propuesta** — validar con EXPLAIN en staging; ejecutar si mejora plan | [Bloque](#sql-rendimiento-superadmin-bitacora) · [`2026-05-11-performance-bitacora-modulos-usuarioe.sql`](migrations/2026-05-11-performance-bitacora-modulos-usuarioe.sql) |
@@ -215,4 +232,4 @@ Las **columnas operativas** para noticias/portada/mensajes/POE están en [`2026-
 
 ---
 
-*Última revisión: propuesta índices rendimiento superadmin (`2026-05-11-performance-bitacora-modulos-usuarioe.sql`) en índice + inventario.*
+*Última revisión: `historialpago.fecha` DATETIME (`2026-05-09-historialpago-fecha-datetime.sql`) en índice + inventario.*

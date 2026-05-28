@@ -45,10 +45,11 @@ class GlobalSearchController {
             echo json_encode(['status' => 'success', 'data' => $results]);
 
         } catch (\Exception $e) {
-            http_response_code(401); // Mandamos 401 si falla el token
+            error_log('GlobalSearchController: ' . $e->getMessage());
+            http_response_code(500);
             echo json_encode([
-                'status' => 'error', 
-                'message' => 'Error de Acceso o SQL: ' . $e->getMessage()
+                'status' => 'error',
+                'message' => 'No se pudo completar la búsqueda.',
             ]);
         }
         exit;

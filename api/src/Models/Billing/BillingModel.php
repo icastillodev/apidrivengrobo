@@ -68,20 +68,123 @@ class BillingModel {
                 MAX((SELECT COALESCE(io.NombreInst,'') FROM formulario_derivacion fd LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen WHERE fd.idformA = {$e} AND fd.Activo = 1 ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)) AS derivado_desde_institucion";
     }
 
-    // ... [TODO EL BLOQUE DE GETTERS SE MANTIENE EXACTAMENTE IGUAL HASTA "updateBalance"] ...
-    public function getProtocolosByDepto($deptoId) {
+    private function hasDerivacionDeptoDestino(): bool {
+        return $this->tableExists('formulario_derivacion')
+            && $this->hasColumn('formulario_derivacion', 'depto_destino');
+    }
+
+    /** @return array{0: string, 1: array<int, mixed>} */
+    private function billingSqlAndFormularioEnDepto(int $deptoId, int $instCobradora, string $formAlias = 'f'): array {
+        $deptoId = (int) $deptoId;
+        $instCobradora = (int) $instCobradora;
+        if ($deptoId <= 0) {
+            return ['', []];
+        }
+        $fx = $formAlias;
+        $prot = "EXISTS (
+            SELECT 1 FROM protformr pfr
+            INNER JOIN protocoloexpe px ON px.idprotA = pfr.idprotA
+            WHERE pfr.idformA = {$fx}.idformA AND px.departamento = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM formulario_derivacion fdd_o
+                  WHERE fdd_o.idformA = {$fx}.idformA AND fdd_o.Activo = 1
+                    AND fdd_o.IdInstitucionDestino = ?
+                    AND fdd_o.depto_destino IS NOT NULL AND fdd_o.depto_destino > 0
+              )
+        )";
+        $params = [$deptoId, $instCobradora > 0 ? $instCobradora : 0];
+        $parts = [$prot];
+        if ($this->hasDerivacionDeptoDestino() && $instCobradora > 0) {
+            $parts[] = "EXISTS (
+                SELECT 1 FROM formulario_derivacion fdd
+                WHERE fdd.idformA = {$fx}.idformA AND fdd.Activo = 1
+                  AND fdd.IdInstitucionDestino = ? AND fdd.depto_destino = ?
+            )";
+            array_push($params, $instCobradora, $deptoId);
+        }
+        $parts[] = "(NOT EXISTS (SELECT 1 FROM protformr pfr0 WHERE pfr0.idformA = {$fx}.idformA) AND {$fx}.depto = ?)";
+        $params[] = $deptoId;
+        return [' AND (' . implode(' OR ', $parts) . ')', $params];
+    }
+
+    /** @return array{0: string, 1: array<int, mixed>} */
+    private function billingSqlAndFormularioSinProtocoloEnDepto(int $deptoId, int $instCobradora): array {
+        $deptoId = (int) $deptoId;
+        $instCobradora = (int) $instCobradora;
+        if ($deptoId <= 0) {
+            return ['', []];
+        }
+        if ($this->hasDerivacionDeptoDestino() && $instCobradora > 0) {
+            return [
+                " AND (f.depto = ? OR EXISTS (
+                    SELECT 1 FROM formulario_derivacion fdd
+                    WHERE fdd.idformA = f.idformA AND fdd.Activo = 1
+                      AND fdd.IdInstitucionDestino = ? AND fdd.depto_destino = ?
+                ))",
+                [$deptoId, $instCobradora, $deptoId],
+            ];
+        }
+        return [' AND f.depto = ?', [$deptoId]];
+    }
+
+    public function getProtocolosByDepto($deptoId, $instId = null) {
+        $deptoId = (int) $deptoId;
+        $instId = (int) ($instId ?? 0);
         $sql = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
-                       CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador
-                FROM protocoloexpe p JOIN personae u ON p.IdUsrA = u.IdUsrA
-                WHERE p.departamento = ? AND p.idprotA > 0"; 
-        $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId]); return $stmt->fetchAll(PDO::FETCH_ASSOC);
+                       CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
+                       0 as es_protocolo_derivado,
+                       NULL as derivacion_inst_origen
+                FROM protocoloexpe p
+                JOIN personae u ON p.IdUsrA = u.IdUsrA
+                WHERE p.departamento = ? AND p.idprotA > 0";
+        $params = [$deptoId];
+        if ($instId > 0) {
+            $sql .= ' AND p.IdInstitucion = ?';
+            $params[] = $instId;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $byId = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['idprotA'] ?? 0);
+            if ($id > 0) {
+                $byId[$id] = $row;
+            }
+        }
+        if ($instId > 0 && $this->hasDerivacionDeptoDestino()) {
+            $sqlDeriv = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
+                                CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
+                                1 as es_protocolo_derivado,
+                                COALESCE(io.NombreInst, '') as derivacion_inst_origen
+                         FROM formulario_derivacion fd
+                         INNER JOIN formularioe f ON f.idformA = fd.idformA
+                         INNER JOIN protformr pf ON pf.idformA = f.idformA
+                         INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+                         JOIN personae u ON p.IdUsrA = u.IdUsrA
+                         LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+                         WHERE fd.Activo = 1
+                           AND fd.IdInstitucionDestino = ?
+                           AND fd.depto_destino = ?
+                           AND f.estado = 'Entregado'
+                           AND p.idprotA > 0";
+            $stmtDeriv = $this->db->prepare($sqlDeriv);
+            $stmtDeriv->execute([$instId, $deptoId]);
+            foreach ($stmtDeriv->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $id = (int) ($row['idprotA'] ?? 0);
+                if ($id > 0 && !isset($byId[$id])) {
+                    $byId[$id] = $row;
+                }
+            }
+        }
+        return array_values($byId);
     }
 
     /**
      * Pedidos (formularios) del departamento que NO están vinculados a ningún protocolo (formato viejo).
      */
-    public function getPedidosDeptoSinProtocolo($deptoId, $desde = null, $hasta = null) {
+    public function getPedidosDeptoSinProtocolo($deptoId, $desde = null, $hasta = null, $instCobradora = null) {
         $dDeriv = $this->billingSqlDerivacionCamposSelect('f.idformA');
+        [$deptSql, $deptParams] = $this->billingSqlAndFormularioSinProtocoloEnDepto((int) $deptoId, (int) ($instCobradora ?? 0));
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
                 se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
@@ -97,9 +200,9 @@ class BillingModel {
                 LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
                 LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
-                WHERE f.depto = ? AND f.estado = 'Entregado' AND pf_link.idformA IS NULL";
+                WHERE f.estado = 'Entregado' AND pf_link.idformA IS NULL{$deptSql}";
         
-        $params = [$deptoId];
+        $params = $deptParams;
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -137,7 +240,7 @@ class BillingModel {
         return $rows;
     }
 
-    public function getPedidosProtocolo($idProt, $desde = null, $hasta = null) {
+    public function getPedidosProtocolo($idProt, $desde = null, $hasta = null, $deptoId = null, $instCobradora = null) {
         $dDeriv = $this->billingSqlDerivacionCamposSelect('f.idformA');
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
@@ -157,6 +260,11 @@ class BillingModel {
                 WHERE pf_link.idprotA = ? AND f.estado = 'Entregado'";
         
         $params = [$idProt];
+        if ($deptoId !== null && (int) $deptoId > 0) {
+            [$deptSql, $deptParams] = $this->billingSqlAndFormularioEnDepto((int) $deptoId, (int) ($instCobradora ?? 0));
+            $sql .= $deptSql;
+            array_push($params, ...$deptParams);
+        }
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -193,14 +301,20 @@ class BillingModel {
      * Indica si el protocolo tiene al menos un formulario Entregado vinculado (protformr) en el rango de fechas.
      * Evita llamadas pesadas a getPedidosProtocolo cuando no hay filas.
      */
-    public function protocolTienePedidosEntregadosEnRango(int $idProt, string $desde, string $hasta): bool {
+    public function protocolTienePedidosEntregadosEnRango(int $idProt, string $desde, string $hasta, $deptoId = null, $instCobradora = null): bool {
         $sql = "SELECT 1 FROM formularioe f
                 INNER JOIN protformr pf_link ON f.idformA = pf_link.idformA
                 WHERE pf_link.idprotA = ? AND f.estado = 'Entregado'
-                  AND f.fechainicioA BETWEEN ? AND ?
-                LIMIT 1";
+                  AND f.fechainicioA BETWEEN ? AND ?";
+        $params = [$idProt, $desde, $hasta];
+        if ($deptoId !== null && (int) $deptoId > 0) {
+            [$deptSql, $deptParams] = $this->billingSqlAndFormularioEnDepto((int) $deptoId, (int) ($instCobradora ?? 0));
+            $sql .= $deptSql;
+            array_push($params, ...$deptParams);
+        }
+        $sql .= ' LIMIT 1';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idProt, $desde, $hasta]);
+        $stmt->execute($params);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -370,12 +484,15 @@ class BillingModel {
     }
 
 // 2. INSUMOS POR DEPARTAMENTO: Matemática detallada en el texto
-    public function getInsumosGenerales($deptoId, $desde, $hasta) {
+    public function getInsumosGenerales($deptoId, $desde, $hasta, $instCobradora = null) {
         $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
+        [$deptSql, $deptParams] = $this->billingSqlAndFormularioSinProtocoloEnDepto((int) $deptoId, (int) ($instCobradora ?? 0));
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
                 {$gDeriv},
                 MAX(d.SaldoDinero) as saldoInv,
                 MAX(tf.categoriaformulario) AS categoria,
+                MAX(f.fechainicioA) AS fecha,
+                MAX(f.fecRetiroA) AS fecRetiroA,
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
                 FROM formularioe f JOIN personae u ON f.IdUsrA = u.IdUsrA
@@ -384,9 +501,10 @@ class BillingModel {
                 JOIN precioinsumosformulario pif ON f.idformA = pif.idformA 
                 JOIN forminsumo fi ON pif.idPrecioinsumosformulario = fi.idPrecioinsumosformulario
                 JOIN insumo i ON fi.IdInsumo = i.idInsumo 
-                WHERE f.depto = ? AND f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ? GROUP BY f.idformA";
+                WHERE f.estado = 'Entregado' AND f.fechainicioA BETWEEN ? AND ?{$deptSql} GROUP BY f.idformA";
         
-        $stmt = $this->db->prepare($sql); $stmt->execute([$deptoId, $desde, $hasta]); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $params = array_merge([$desde, $hasta], $deptParams);
+        $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             $r['total_item'] = round((float) $r['total_item'], 2);
             $r['pagado'] = round((float) $r['pagado'], 2);
@@ -405,6 +523,8 @@ class BillingModel {
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
                 {$gDeriv},
                 MAX(tf.categoriaformulario) AS categoria,
+                MAX(f.fechainicioA) AS fecha,
+                MAX(f.fecRetiroA) AS fecRetiroA,
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as exento
                 FROM formularioe f
@@ -839,9 +959,12 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             || !$this->tableExists('formulario_derivacion')) {
             return [];
         }
+        $deptoExpr = $this->hasDerivacionDeptoDestino()
+            ? 'COALESCE(fd.depto_destino, p.departamento, f.depto)'
+            : 'COALESCE(p.departamento, f.depto)';
         $sql = "
             SELECT DISTINCT
-                COALESCE(p.departamento, f.depto) AS iddeptoA,
+                {$deptoExpr} AS iddeptoA,
                 TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
             FROM facturacion_formulario_derivado ffd
             INNER JOIN formularioe f ON f.idformA = ffd.idformA
@@ -851,8 +974,8 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
             WHERE ffd.IdInstitucionCobradora = ?
               AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
-              AND COALESCE(p.departamento, f.depto) IS NOT NULL
-              AND COALESCE(p.departamento, f.depto) > 0
+              AND {$deptoExpr} IS NOT NULL
+              AND {$deptoExpr} > 0
               AND TRIM(COALESCE(io.NombreInst, '')) <> ''
             ORDER BY iddeptoA ASC, origen_nombre ASC
         ";
@@ -1215,8 +1338,19 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
               AND COALESCE(p.departamento, f.depto) IS NOT NULL AND COALESCE(p.departamento, f.depto) > 0
         ";
+        if ($this->hasDerivacionDeptoDestino()) {
+            $sql .= "
+            UNION
+            SELECT DISTINCT fd.depto_destino AS iddepto
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
+              AND fd.depto_destino IS NOT NULL AND fd.depto_destino > 0
+            ";
+        }
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idInstitucion]);
+        $stmt->execute($this->hasDerivacionDeptoDestino() ? [$idInstitucion, $idInstitucion] : [$idInstitucion]);
         $out = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $id = (int) ($row['iddepto'] ?? 0);
@@ -1289,8 +1423,21 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             WHERE p.IdInstitucion = ? AND f.estado = 'Entregado'
               AND p.idprotA IS NOT NULL AND p.idprotA > 0
         ";
+        if ($this->tableExists('formulario_derivacion')) {
+            $sql .= "
+            UNION
+            SELECT DISTINCT p.idprotA AS id
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
+            INNER JOIN protformr pf ON pf.idformA = f.idformA
+            INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
+              AND p.idprotA IS NOT NULL AND p.idprotA > 0
+            ";
+        }
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idInstitucion]);
+        $stmt->execute($this->tableExists('formulario_derivacion') ? [$idInstitucion, $idInstitucion] : [$idInstitucion]);
         $out = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $id = (int) ($row['id'] ?? 0);
@@ -1345,7 +1492,15 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             return;
         }
         foreach ($rows as &$r) {
-            $this->mergeFacturacionDerivadaIntoInsumoRow($r, $instCobradora);
+            $idf = (int) ($r['id'] ?? 0);
+            if ($idf <= 0) {
+                continue;
+            }
+            if ($this->findFacturacionDerivadaForForm($idf, $instCobradora)) {
+                $this->mergeFacturacionDerivadaIntoInsumoRow($r, $instCobradora);
+            } else {
+                $this->mergeFacturacionDerivadaSalienteIntoInsumoRow($r, $instCobradora);
+            }
         }
         unset($r);
     }
@@ -1354,6 +1509,81 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
      * Filas de getPedidosProtocolo / getPedidosDeptoSinProtocolo: alinea total/pagado/debe con facturacion_formulario_derivado
      * cuando la sede cobradora liquida por RED (misma regla que insumos y modal animal/reactivo).
      */
+    /**
+     * Derivación saliente: el pedido se liquida en otra sede (institución cobradora distinta de la que ve el informe).
+     */
+    private function findFacturacionDerivadaSalienteForForm(int $idformA, int $instViewer): ?array {
+        $idformA = (int) $idformA;
+        $instViewer = (int) $instViewer;
+        if ($idformA <= 0 || $instViewer <= 0 || !$this->tableExists('facturacion_formulario_derivado')
+            || !$this->tableExists('formulario_derivacion')) {
+            return null;
+        }
+        $sql = 'SELECT ffd.IdFacturacionFormularioDerivado, ffd.IdInstitucionCobradora,
+                       COALESCE(ic.NombreInst, CONCAT(\'Institución #\', ffd.IdInstitucionCobradora)) AS institucion_cobradora_nombre
+                FROM facturacion_formulario_derivado ffd
+                INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+                LEFT JOIN institucion ic ON ic.IdInstitucion = ffd.IdInstitucionCobradora
+                WHERE ffd.idformA = ?
+                  AND ffd.IdInstitucionCobradora <> ?
+                  AND fd.IdInstitucionOrigen = ?
+                ORDER BY ffd.IdFacturacionFormularioDerivado DESC
+                LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idformA, $instViewer, $instViewer]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
+    /**
+     * En sede origen: el pedido derivado no suma deuda local; se muestra informativo (exento / liquida en destino).
+     */
+    private function mergeFacturacionDerivadaSalienteIntoPedidoFacturacionRow(array &$r, int $instViewer): void {
+        if (!empty($r['es_pedido_depto_sin_protocolo'])) {
+            return;
+        }
+        $idf = (int) ($r['id'] ?? 0);
+        if ($idf <= 0) {
+            return;
+        }
+        $sal = $this->findFacturacionDerivadaSalienteForForm($idf, $instViewer);
+        if (!$sal) {
+            return;
+        }
+        $r['total'] = 0.0;
+        $r['pagado'] = 0.0;
+        $r['debe'] = 0.0;
+        $r['precioformulario'] = 0.0;
+        $r['total_ins'] = 0.0;
+        $r['pago_ani'] = 0.0;
+        $r['pago_ins'] = 0.0;
+        $r['is_exento'] = true;
+        $r['exento'] = 1;
+        $r['es_facturacion_derivada'] = 0;
+        $r['es_facturacion_derivada_saliente'] = 1;
+        $r['derivacion_liquida_en_institucion'] = trim((string) ($sal['institucion_cobradora_nombre'] ?? ''));
+    }
+
+    private function mergeFacturacionDerivadaSalienteIntoInsumoRow(array &$r, int $instViewer): void {
+        $idf = (int) ($r['id'] ?? 0);
+        if ($idf <= 0) {
+            return;
+        }
+        $sal = $this->findFacturacionDerivadaSalienteForForm($idf, $instViewer);
+        if (!$sal) {
+            return;
+        }
+        $r['total_item'] = 0.0;
+        $r['pagado'] = 0.0;
+        $r['debe'] = 0.0;
+        $r['is_exento'] = true;
+        $r['exento'] = 1;
+        $r['es_facturacion_derivada'] = 0;
+        $r['es_facturacion_derivada_saliente'] = 1;
+        $r['derivacion_liquida_en_institucion'] = trim((string) ($sal['institucion_cobradora_nombre'] ?? ''));
+    }
+
     private function mergeFacturacionDerivadaIntoPedidoFacturacionRow(array &$r, int $instCobradora): void {
         if (!empty($r['es_pedido_depto_sin_protocolo'])) {
             return;
@@ -1364,6 +1594,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         }
         $ffd = $this->findFacturacionDerivadaForForm($idf, $instCobradora);
         if (!$ffd) {
+            $this->mergeFacturacionDerivadaSalienteIntoPedidoFacturacionRow($r, $instCobradora);
             return;
         }
         $mt = round((float) ($ffd['monto_total'] ?? 0), 2);
@@ -1891,6 +2122,8 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante, {$gDeriv}, MAX(d.SaldoDinero) as saldoInv,
                 MAX(tf.categoriaformulario) AS categoria,
+                MAX(f.fechainicioA) AS fecha,
+                MAX(f.fecRetiroA) AS fecRetiroA,
                 GROUP_CONCAT(CONCAT(i.NombreInsumo, ': <b>', fi.cantidad, ' ', COALESCE(i.TipoInsumo, 'un.'), '</b> <span class=\"text-muted\">[ $', COALESCE(fi.PrecioMomentoInsumo, 0), ' x 1 ', COALESCE(i.TipoInsumo, 'un.'), ' ]</span> = <b>$', (fi.cantidad * COALESCE(fi.PrecioMomentoInsumo, 0)), '</b>') SEPARATOR ' | ') as detalle_completo,
                 MAX(pif.preciototal) as total_item, MAX(pif.totalpago) as pagado, MAX(tf.exento) as is_exento
                 FROM formularioe f 

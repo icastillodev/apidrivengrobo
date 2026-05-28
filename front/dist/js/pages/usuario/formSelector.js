@@ -1,6 +1,7 @@
 import { API } from '../../api.js';
 import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { esRolInvestigadorVisibilidadModulos, getInstModulesSnapshot } from '../../modulesAccess.js';
+import { applyHotkeyChips } from '../../utils/hotkeyChips.js';
 
 let allSedes = []; 
 let currentInstId = null;
@@ -47,6 +48,7 @@ export async function initFormSelector() {
             }
 
             renderSedesList(allSedes, is_multi_sede);
+            applyHotkeyChips();
 
             if (searchInput) {
                 searchInput.addEventListener('input', (e) => {

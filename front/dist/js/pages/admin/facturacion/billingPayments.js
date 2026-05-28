@@ -507,14 +507,13 @@ window.procesarPagoProtocolo = async (idProt) => {
 
     // Recolectamos selección y EL MONTO EXACTO (incluye insumos de pedido del protocolo)
     const seleccionados = document.querySelectorAll(
-        `input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj):not(.check-all-insumo-prot)`
+        `.check-item-form[data-prot="${idProt}"]:checked, .check-item-aloj[data-prot="${idProt}"]:checked`
     );
     seleccionados.forEach(chk => {
         const montoItem = parseFloat(chk.dataset.monto || 0);
         totalAPagar += montoItem;
         let tipo = 'ALOJ';
         if (chk.classList.contains('check-item-form')) tipo = 'FORM';
-        else if (chk.classList.contains('check-item-insumo-prot')) tipo = 'INSUMO_GRAL';
         items.push({
             tipo,
             id: chk.dataset.id,
@@ -672,6 +671,74 @@ window.ejecutarPagoAPI = async (idUsr, monto, items, focusProtId = null, payment
         hideLoader();
         console.error(e);
         await Swal.fire(window.txt?.generales?.error || 'Error', txF().payment_error_procesar || 'No se pudo procesar el pago.', 'error');
+    }
+};
+
+window.procesarPagoInsumosProtocolo = async (idProt) => {
+    const prot = window.currentReportData?.protocolos?.find((p) =>
+        p.idProt == idProt || p.info?.idprotA == idProt
+    );
+    if (!prot) return;
+
+    const seleccionados = document.querySelectorAll(`.check-item-insumo-prot[data-prot="${idProt}"]:checked`);
+    if (seleccionados.length === 0) {
+        Swal.fire(window.txt?.generales?.swal_atencion || 'Atención', txF().seleccione_insumo_pagar || 'Seleccione al menos un insumo para pagar.', 'info');
+        return;
+    }
+
+    let totalAPagar = 0;
+    const items = [];
+    seleccionados.forEach((chk) => {
+        const monto = parseFloat(chk.dataset.monto || 0);
+        totalAPagar += monto;
+        items.push({ tipo: 'INSUMO_GRAL', id: chk.dataset.id, monto_pago: monto });
+    });
+
+    const saldoActual = parseFloat(prot.saldoInv ?? prot.info?.SaldoPI ?? 0);
+    if (totalAPagar > saldoActual) {
+        const tf = txF();
+        Swal.fire({
+            title: tf.saldo_insuficiente || 'Saldo Insuficiente',
+            html: (tf.payment_exceso_cuerpo || 'El monto seleccionado ({m1}) es mayor al saldo disponible ({m2}).')
+                .replace(/\{m1\}/g, `<b>$ ${formatBillingMoneyLoose(totalAPagar)}</b>`)
+                .replace(/\{m2\}/g, `<b>$ ${formatBillingMoneyLoose(saldoActual)}</b>`),
+            icon: 'error',
+        });
+        return;
+    }
+
+    const tf = txF();
+    const idUsrPago = prot.idUsr ?? prot.info?.IdUsrA;
+    const sug = await fetchTransferCommentSuggestionsFromHistorial(idUsrPago);
+    const swUid = `protins${idProt}_${Date.now()}`;
+    const confirm = await Swal.fire({
+        title: tf.payment_insumos_prot_confirm_titulo || 'Confirmar liquidación de insumos del protocolo',
+        html: `
+            <div class="text-start">
+                <p>${(tf.payment_confirm_items || 'Se liquidarán <b>{n}</b> ítems.').replace(/\{n\}/g, String(items.length))}</p>
+                <div class="p-3 bg-light rounded border">
+                    <div class="d-flex justify-content-between fw-bold">
+                        <span>${tf.payment_insumos_total_pagar || 'Total a pagar:'}</span>
+                        <span>$ ${formatBillingMoney(totalAPagar)}</span>
+                    </div>
+                </div>
+                ${buildPaymentMetaSwalFragment(tf, sug, swUid)}
+            </div>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: tf.confirmar_pago_btn || 'Sí, pagar ahora',
+        cancelButtonText: tf.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar',
+        preConfirm: () => {
+            const c = Swal.getHtmlContainer();
+            return {
+                transferId: String(c?.querySelector(`#swal-pay-transfer-${swUid}`)?.value ?? '').trim(),
+                comment: String(c?.querySelector(`#swal-pay-comment-${swUid}`)?.value ?? '').trim(),
+            };
+        },
+    });
+
+    if (confirm.isConfirmed) {
+        await ejecutarPagoFinal(idUsrPago, totalAPagar, items, idProt, confirm.value || {});
     }
 };
 

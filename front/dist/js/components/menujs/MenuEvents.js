@@ -1,5 +1,11 @@
 import { GeckoSearch } from '../GeckoSearch.js';
-import { HotkeyManager, getHotkeyRowDefinitions } from '../../utils/hotkeys.js';
+import {
+    HotkeyManager,
+    getHotkeyRowDefinitions,
+    isHotkeysDisabled,
+    setHotkeysDisabled,
+} from '../../utils/hotkeys.js';
+import { applyHotkeyChips } from '../../utils/hotkeyChips.js';
 import { GeckoVoice } from '../GeckoVoice.js';
 import { UserPreferences } from './MenuConfig.js';
 import { refreshMenuNotifications } from './MenuNotifications.js';
@@ -11,6 +17,8 @@ export function setupEventListeners() {
     window.GeckoSearch = GeckoSearch;
 
     HotkeyManager.init();
+    applyHotkeyChips();
+    window.addEventListener('grobo-i18n-ready', () => applyHotkeyChips());
 
     // 1. REPARACIÓN DE BOTONES HAMBURGUESA Y CRUZ
     const closeBtn = document.getElementById('gecko-close-sidebar');
@@ -200,6 +208,9 @@ function showHotkeysModal() {
     const footer = t?.modal_footer || 'Flujo rápido solo con teclado en GROBO';
     const closeAria = t?.modal_close_aria || 'Cerrar';
     const tip = t?.modal_tip_browser || '';
+    const prefLabel = t?.pref_disable_label || 'Desactivar atajos de navegación';
+    const prefHint = t?.pref_disable_hint || '';
+    const prefChecked = isHotkeysDisabled();
 
     const oldModal = document.getElementById('modalHotkeys');
     if (oldModal) oldModal.remove();
@@ -221,7 +232,12 @@ function showHotkeysModal() {
                         ${cards}
                     </div>
                 </div>
-                <div class="modal-footer flex-column justify-content-center bg-white border-top-0 py-3">
+                <div class="modal-footer flex-column align-items-stretch bg-white border-top-0 py-3 gap-2">
+                    <div class="form-check px-2">
+                        <input class="form-check-input" type="checkbox" id="hotkeys-disable-pref" ${prefChecked ? 'checked' : ''}>
+                        <label class="form-check-label small" for="hotkeys-disable-pref">${prefLabel}</label>
+                        ${prefHint ? `<div class="form-text small text-muted ms-4">${prefHint}</div>` : ''}
+                    </div>
                     <span class="text-muted small fw-bold text-uppercase text-center" style="font-size: 11px; letter-spacing: 1px;">${footer}</span>
                 </div>
             </div>
@@ -229,6 +245,10 @@ function showHotkeysModal() {
     </div>`;
 
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    const m = new bootstrap.Modal(document.getElementById('modalHotkeys'));
+    const modalEl = document.getElementById('modalHotkeys');
+    modalEl?.querySelector('#hotkeys-disable-pref')?.addEventListener('change', (ev) => {
+        setHotkeysDisabled(!!ev.target?.checked);
+    });
+    const m = new bootstrap.Modal(modalEl);
     m.show();
 }

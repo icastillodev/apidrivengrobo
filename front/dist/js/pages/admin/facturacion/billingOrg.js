@@ -97,8 +97,7 @@ function renderResultadosOrg(organizaciones, opts) {
     let html = '';
     organizaciones.forEach(org => {
         const tot = org.totales || {};
-        const hasData = (tot.globalDeuda > 0) || (tot.totalPagado > 0) || (org.departamentos || []).some(d => (d.totales?.globalDeuda > 0) || (d.totales?.totalPagado > 0));
-        if (!hasData && (org.departamentos || []).length === 0) return;
+        if (!(org.departamentos || []).length) return;
 
         html += `
             <div class="card card-org shadow-sm border-0 mb-4">

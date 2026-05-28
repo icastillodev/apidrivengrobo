@@ -1,5 +1,7 @@
 # Checklist — búsqueda, IA y voz
 
+> **Mayo 2026:** el buscador global pasó a modo **solo SQL (sin IA)**. Seguimiento activo en [`CHECKLIST-PRODUCTO-2026-05-GROBO.md`](CHECKLIST-PRODUCTO-2026-05-GROBO.md) §0 y §3. Este archivo queda como referencia histórica de IA/voz.
+
 Backlog **único** para funcionalidades de **búsqueda**, **inteligencia artificial** y **voz** (extraído del antiguo checklist de sprint).
 
 Convención: `[ ]` pendiente · `[x]` hecho.

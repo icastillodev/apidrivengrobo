@@ -2,13 +2,14 @@
 import { API } from '../../api.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
-import { renderDerivacionTarifariosToolbar } from '../../utils/derivacionTarifariosUI.js';
+import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDerivacionProtocoloDeptoBadge } from '../../utils/derivacionTarifariosUI.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
+import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -597,7 +598,8 @@ function renderModalHeader(a, derivConfig) {
     const derivBox = isDerivedActive
         ? `
         <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-            <span class="badge bg-primary">${lblDerivado}${routeText ? ` · ${routeText}` : ''}</span>
+            ${renderDerivacionRouteBadge(a)}
+            ${renderDerivacionProtocoloDeptoBadge(a)}
             ${isOriginInst
                 ? `<button type="button" class="btn btn-sm btn-outline-danger" onclick="window.resolveDerivacionAnimal('cancel', ${a.IdFormularioDerivacionActiva}, ${a.idformA})">${lblRetirar}</button>`
                 : isPendingAtDestination
@@ -838,7 +840,7 @@ function renderOrderModificationSection(a, sex, cache) {
                     ? `<div class="form-control form-control-sm bg-light">${protLabel}</div><input type="hidden" name="idprotA" value="${a.idprotA || ''}">`
                     : `<input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="Filtrar protocolo..." onkeyup="window.filterProtocolList(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" onchange="window.handleProtocolChange(this)">
-                    ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${p.nprotA} - ${p.tituloA}</option>`).join('')}
+                    ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${formatAdminProtocolOptionLabel(p)}</option>`).join('')}
                 </select>`}
             </div>
             <div class="col-md-12">
@@ -1647,13 +1649,7 @@ function getWorkflowBadgeRow(item) {
     const wf = (item.EstadoWorkflow || '').toString().toUpperCase();
     const isDerived = Number(item.DerivadoActivo || 0) === 1;
     if (isDerived) {
-        const originName = (item.InstitucionOrigenNombre || '').trim();
-        const currentName = (item.InstitucionActualNombre || '').trim();
-        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const routeText = [originName, currentName].filter(Boolean).map(esc).join(' → ');
-        const base = tx.workflow_derivado || 'Derivado';
-        const label = routeText ? `${base} · ${routeText}` : base;
-        return `<span class="badge bg-primary mt-1">${label}</span>`;
+        return renderDerivacionRouteBadge(item);
     }
     if (!wf) return '';
     if (wf.includes('ACEPT')) return `<span class="badge bg-success mt-1">${tx.estado_derivacion_aceptada || 'Aceptada'}</span>`;
@@ -1681,7 +1677,7 @@ function getStatusWithWorkflow(item) {
         estadoBadge = getStatusBadge(item.estado, porInst || undefined);
     }
     if (isDerived) {
-        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${estadoBadge}</div>`;
+        return `<div class="d-inline-flex flex-column align-items-center">${derivBadge}${renderDerivacionProtocoloDeptoBadge(item)}${estadoBadge}</div>`;
     }
     return `<div class="d-inline-flex flex-column align-items-center">${estadoBadge}${derivBadge}</div>`;
 }

@@ -653,6 +653,91 @@ class MensajeriaModel {
     }
 
     /**
+     * Busca texto en asunto o cuerpo de mensajes; solo hilos accesibles para el usuario.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function buscarMensajesEnHilos(int $instId, int $userId, int $role, string $q, string $alcance = 'personal', int $limit = 20): array {
+        $q = trim($q);
+        if (mb_strlen($q) < 2) {
+            return [];
+        }
+        if (mb_strlen($q) > 80) {
+            $q = mb_substr($q, 0, 80);
+        }
+        $like = '%' . $this->escapeLikePattern($q) . '%';
+        $alcance = strtolower(trim($alcance)) === 'institucional' ? 'institucional' : 'personal';
+
+        $stmt = $this->db->prepare("
+            SELECT m.IdMensaje, m.IdMensajeHilo, m.Cuerpo, m.FechaEnvio,
+                   h.Asunto, h.EsInstitucional, h.OrigenTipo
+            FROM mensaje m
+            INNER JOIN mensaje_hilo h ON h.IdMensajeHilo = m.IdMensajeHilo
+            WHERE (m.Cuerpo LIKE :q1 ESCAPE '\\\\' OR h.Asunto LIKE :q2 ESCAPE '\\\\')
+            ORDER BY m.FechaEnvio DESC, m.IdMensaje DESC
+            LIMIT 80
+        ");
+        $stmt->execute([':q1' => $like, ':q2' => $like]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (count($out) >= $limit) {
+                break;
+            }
+            $hid = (int) ($r['IdMensajeHilo'] ?? 0);
+            $mid = (int) ($r['IdMensaje'] ?? 0);
+            if ($hid <= 0 || $mid <= 0) {
+                continue;
+            }
+            $h = $this->getHiloAccesible($hid, $userId, $instId, $role);
+            if (!$h) {
+                continue;
+            }
+            if ($alcance === 'personal' && $this->hiloEsInstitucional($h)) {
+                continue;
+            }
+            $out[] = [
+                'IdMensaje' => $mid,
+                'IdMensajeHilo' => $hid,
+                'Asunto' => (string) ($h['Asunto'] ?? $r['Asunto'] ?? ''),
+                'Snippet' => $this->snippetMensajeBusqueda((string) ($r['Cuerpo'] ?? ''), $q),
+                'FechaEnvio' => (string) ($r['FechaEnvio'] ?? ''),
+                'OrigenTipo' => (string) ($h['OrigenTipo'] ?? $r['OrigenTipo'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    private function escapeLikePattern(string $s): string {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $s);
+    }
+
+    private function snippetMensajeBusqueda(string $cuerpo, string $q): string {
+        $plain = trim(preg_replace('/\s+/u', ' ', strip_tags($cuerpo)) ?? '');
+        if ($plain === '') {
+            return '';
+        }
+        $max = 140;
+        if (mb_strlen($plain) <= $max) {
+            return $plain;
+        }
+        $qNorm = mb_strtolower($q);
+        $plainLower = mb_strtolower($plain);
+        $pos = mb_strpos($plainLower, $qNorm);
+        if ($pos === false) {
+            return mb_substr($plain, 0, $max) . '…';
+        }
+        $start = max(0, $pos - 40);
+        $chunk = mb_substr($plain, $start, $max);
+        $prefix = $start > 0 ? '…' : '';
+        $suffix = mb_strlen($plain) > $start + $max ? '…' : '';
+
+        return $prefix . $chunk . $suffix;
+    }
+
+    /**
      * Para correos de respuesta: el mensaje publicado justo antes del último (el último es el recién insertado).
      *
      * @return array{cuerpo: string, autor: string}|null

@@ -17,6 +17,7 @@ import {
     billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
     billingDerivadaLiquidacionBadge,
+    billingDerivacionSalienteHint,
     billingPdfFormularioIdDisplay,
     billingPdfMarcaExentoCorta,
     billingPdfMarcaExentoLarga,
@@ -24,7 +25,8 @@ import {
     billingPedidoSinMontoNoExento,
     billingHtmlRowInsumoPedidoFacturacion,
     billingHtmlInsumoProtSectionHeader,
-    billingPartitionInsumosPedidoReactivoOtros
+    billingPartitionInsumosPedidoReactivoOtros,
+    billingFormatPedidoFechasPlain
 } from './billingLocale.js';
 import './billingPayments.js';
 
@@ -73,12 +75,13 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-function collectVisibleProtocolsDepto(data, showAni, showAlo) {
+function collectVisibleProtocolsDepto(data, showAni, showAlo, showIns) {
     const list = Array.isArray(data?.protocolos) ? data.protocolos : [];
     return list.filter((prot) => {
         const hasVisibleForms = showAni && prot.formularios && prot.formularios.length > 0;
         const hasVisibleAloj = showAlo && prot.alojamientos && prot.alojamientos.length > 0;
-        return hasVisibleForms || hasVisibleAloj;
+        const hasVisibleIns = showIns && prot.insumos && prot.insumos.length > 0;
+        return hasVisibleForms || hasVisibleAloj || hasVisibleIns;
     });
 }
 
@@ -106,15 +109,17 @@ function buildDeptoProtocolPagerHtml(page, totalPages, totalCards) {
         </nav>`;
 }
 
-function buildDeptoProtocolCardsHtml(visibleSlice, showAni, showAlo) {
+function buildDeptoProtocolCardsHtml(visibleSlice, showAni, showAlo, showIns) {
     let html = '';
     visibleSlice.forEach((prot) => {
         const hasVisibleForms = showAni && prot.formularios && prot.formularios.length > 0;
         const hasVisibleAloj = showAlo && prot.alojamientos && prot.alojamientos.length > 0;
+        const hasVisibleIns = showIns && prot.insumos && prot.insumos.length > 0;
         const header = getHeaderHTML(prot);
         const formsTable = hasVisibleForms ? getFormsTableHTML(prot.formularios, prot.idProt) : '';
         const alojTable = hasVisibleAloj ? getAlojTableHTML(prot.alojamientos, prot.idProt) : '';
-        const footer = getFooterHTML(prot, showAni, showAlo);
+        const insTable = hasVisibleIns ? getInsumosProtocoloTableHTML(prot.insumos, prot.idProt) : '';
+        const footer = getFooterHTML(prot, showAni, showAlo, showIns);
         html += `
                 <div class="card shadow-sm border-0 mb-5 card-protocolo" id="card-prot-${prot.idProt}">
                     ${header}
@@ -124,6 +129,7 @@ function buildDeptoProtocolCardsHtml(visibleSlice, showAni, showAlo) {
                     <div class="card-body p-3">
                         ${formsTable}
                         ${alojTable}
+                        ${insTable}
                     </div>
                     ${footer}
                 </div>`;
@@ -135,7 +141,8 @@ function buildDeptoProtocolCardsHtml(visibleSlice, showAni, showAlo) {
 function buildDeptoProtocolDynamicBlock(data) {
     const showAni = document.getElementById('chk-animales')?.checked;
     const showAlo = document.getElementById('chk-alojamiento')?.checked;
-    const visible = collectVisibleProtocolsDepto(data, showAni, showAlo);
+    const showIns = document.getElementById('chk-insumos')?.checked;
+    const visible = collectVisibleProtocolsDepto(data, showAni, showAlo, showIns);
     const totalCards = visible.length;
     const totalPages = Math.max(1, Math.ceil(totalCards / DEPT_BILLING_PROTOCOLS_PER_PAGE));
     const page = Math.min(Math.max(1, deptoProtPage), totalPages);
@@ -143,7 +150,7 @@ function buildDeptoProtocolDynamicBlock(data) {
     const start = (page - 1) * DEPT_BILLING_PROTOCOLS_PER_PAGE;
     const slice = visible.slice(start, start + DEPT_BILLING_PROTOCOLS_PER_PAGE);
     const pager = buildDeptoProtocolPagerHtml(page, totalPages, totalCards);
-    const cards = buildDeptoProtocolCardsHtml(slice, showAni, showAlo);
+    const cards = buildDeptoProtocolCardsHtml(slice, showAni, showAlo, showIns);
     return pager + `<div id="depto-prot-cards-wrap">${cards}</div>`;
 }
 
@@ -379,7 +386,7 @@ function renderizarResultados(data) {
         const rid = parseInt(String(restoreProt), 10);
         window.__billingRestoreProtId = null;
         if (Number.isFinite(rid) && rid >= 0) {
-            const visible = collectVisibleProtocolsDepto(data, showAni, showAlo);
+            const visible = collectVisibleProtocolsDepto(data, showAni, showAlo, showIns);
             const idx = visible.findIndex((pr) => String(pr.idProt) === String(rid));
             deptoProtPage = idx >= 0 ? Math.floor(idx / DEPT_BILLING_PROTOCOLS_PER_PAGE) + 1 : 1;
         } else {
@@ -394,7 +401,7 @@ function renderizarResultados(data) {
         html += getInsumosGeneralesTableHTML(data.insumosGenerales);
     }
 
-    if (collectVisibleProtocolsDepto(data, showAni, showAlo).length > 0) {
+    if (collectVisibleProtocolsDepto(data, showAni, showAlo, showIns).length > 0) {
         html += `<div id="depto-prot-dynamic">${buildDeptoProtocolDynamicBlock(data)}</div>`;
     }
 
@@ -405,7 +412,33 @@ function renderizarResultados(data) {
     container.innerHTML = html;
     vincularCheckboxes();
     vincularChecksPago();
-    if (showIns) vincularCheckboxesInsumos();
+    if (showIns) {
+        vincularCheckboxesInsumos();
+        vincularChecksPagoInsumosProt();
+    }
+}
+
+function vincularChecksPagoInsumosProt() {
+    document.querySelectorAll('.check-all-insumo-prot').forEach((master) => {
+        master.addEventListener('change', (e) => {
+            const idProt = e.target.dataset.prot;
+            document.querySelectorAll(`.check-item-insumo-prot[data-prot="${idProt}"]:not(:disabled)`)
+                .forEach((c) => { c.checked = e.target.checked; });
+            actualizarMontoInsumosProt(idProt);
+        });
+    });
+    document.querySelectorAll('.check-item-insumo-prot').forEach((chk) => {
+        chk.addEventListener('change', () => actualizarMontoInsumosProt(chk.dataset.prot));
+    });
+}
+
+function actualizarMontoInsumosProt(idProt) {
+    const visor = document.getElementById(`pago-insumos-seleccionado-${idProt}`);
+    if (!visor) return;
+    let total = 0;
+    document.querySelectorAll(`.check-item-insumo-prot[data-prot="${idProt}"]:checked`)
+        .forEach((c) => { total += parseFloat(c.dataset.monto || 0); });
+    visor.innerText = `$ ${formatBillingMoney(total)}`;
 }
 
 function vincularChecksPago() {
@@ -469,6 +502,52 @@ function getHeaderHTML(prot) {
             </div>
         </div>`;
 }
+function getInsumosProtocoloTableHTML(insumos, idProt) {
+    if (!insumos || insumos.length === 0) return '';
+    const bd = txBD();
+    const tf = txF();
+    const bi = txBI();
+    const exL = bi.pdf_monto_exento || 'Exento';
+    const packs = { bd, tf, bi, exL };
+    const titulo = tf.insumos_protocolo ?? 'Insumos del protocolo';
+    const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
+    const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
+    const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
+    const colspan = 10;
+    let tbody = '';
+    if (reactivos.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
+        tbody += reactivos.map((i) => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
+    if (otros.length > 0) {
+        tbody += billingHtmlInsumoProtSectionHeader(colspan, lblDem);
+        tbody += otros.map((i) => billingHtmlRowInsumoPedidoFacturacion(i, packs, 'protocolo', idProt)).join('');
+    }
+    return `
+        <div class="mt-4 border-top pt-3">
+            <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3" style="font-size: 11px;"><i class="bi bi-box-seam me-1"></i>${titulo}</h6>
+            <div class="table-responsive">
+                <table class="table table-bordered table-billing mb-0">
+                    <thead class="table-light text-center">
+                        <tr>
+                            <th style="width:3%"><input type="checkbox" class="check-all-insumo-prot" data-prot="${idProt}"></th>
+                            <th style="width:5%">${bd.th_id || 'ID'}</th>
+                            <th style="width:8%">${bi.th_estado_cap || 'Estado'}</th>
+                            <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
+                            <th style="width:12%">${bi.th_solicitante_cap || 'Solicitante'}</th>
+                            <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
+                            <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>
+                            <th style="width:10%">${tf.total || 'Total'}</th>
+                            <th style="width:10%">${tf.pago || 'Pagado'}</th>
+                            <th style="width:10%">${bd.th_debe_uc || 'DEBE'}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tbody}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
 function getFormsTableHTML(formularios, idProt) {
     if (!formularios || formularios.length === 0) return '';
     const bd = txBD();
@@ -483,15 +562,16 @@ function getFormsTableHTML(formularios, idProt) {
                     <tr>
                         <th style="width:2%"><input type="checkbox" class="check-all-form" data-prot="${idProt}"></th>
                         <th style="width:5%">${bd.th_id || 'ID'}</th>
-                        <th style="width:8%">${bd.th_estado || 'ESTADO'}</th> 
+                        <th style="width:8%">${bd.th_estado || 'ESTADO'}</th>
+                        <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
                         <th style="width:12%">${bd.th_solicitante || 'SOLICITANTE'}</th>
-                        <th style="width:14%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
-                        <th style="width:15%">${bd.th_especie_cepa || 'ESPECIE / CEPA'}</th>
-                        <th style="width:15%">${bd.th_detalle_concepto || 'DETALLE / CONCEPTO'}</th>
-                        <th style="width:18%">${bd.th_cantidad_presentacion || 'CANTIDAD / PRESENTACIÓN'}</th>
-                        <th style="width:8%">${bd.th_total_uc || 'TOTAL'}</th>
-                        <th style="width:8%">${bd.th_pagado_uc || 'PAGADO'}</th>
-                        <th style="width:8%">${bd.th_debe_uc || 'DEBE'}</th>
+                        <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
+                        <th style="width:14%">${bd.th_especie_cepa || 'ESPECIE / CEPA'}</th>
+                        <th style="width:14%">${bd.th_detalle_concepto || 'DETALLE / CONCEPTO'}</th>
+                        <th style="width:14%">${bd.th_cantidad_presentacion || 'CANTIDAD / PRESENTACIÓN'}</th>
+                        <th style="width:7%">${bd.th_total_uc || 'TOTAL'}</th>
+                        <th style="width:7%">${bd.th_pagado_uc || 'PAGADO'}</th>
+                        <th style="width:7%">${bd.th_debe_uc || 'DEBE'}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -521,6 +601,9 @@ function getFormsTableHTML(formularios, idProt) {
 
                         // --- VISUAL: ESPECIE Y ESTADO ---
                         const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `<br><small class="text-muted">${f.nombre_subespecie}</small>` : '');
+                        const fi = bi.fecha_in || 'In:';
+                        const fo = bi.fecha_out || 'Out:';
+                        const fechasDisplay = `<div class="small"><b>${fi}</b> ${f.fecha || '-'}</div><div class="small text-danger"><b>${fo}</b> ${f.fecRetiroA || '-'}</div>`;
                         const dctoHTML = (f.descuento > 0) ? `<br><span class="badge-discount mt-1 d-inline-block">-${f.descuento}%</span>` : '';
                         
                         let estadoBadge = isExento ? `<span class="badge bg-info text-dark shadow-sm">${bd.badge_exento || 'EXENTO'}</span>` :
@@ -535,8 +618,9 @@ function getFormsTableHTML(formularios, idProt) {
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}${billingDerivacionSalienteHint(f)}</td>
                                 <td>${estadoBadge}</td>
+                                <td>${fechasDisplay}</td>
                                 <td class="small fw-bold">${f.solicitante}</td>
                                 <td class="small text-start text-muted">${billingDerivacionPlainText(f) || '—'}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
@@ -611,9 +695,9 @@ function getAlojTableHTML(alojamientos, idProt) {
         </div>`;
 }
 
-function getFooterHTML(prot, showAni, showAlo) {
+function getFooterHTML(prot, showAni, showAlo, showIns) {
     const tf = txF();
-    let totAni = 0, totRea = 0, totOtr = 0, totAlo = 0;
+    let totAni = 0, totRea = 0, totOtr = 0, totAlo = 0, totIns = 0;
     let sumTotal = 0, sumPagado = 0, sumDebe = 0;
 
     if (showAni && prot.formularios) {
@@ -638,7 +722,28 @@ function getFooterHTML(prot, showAni, showAlo) {
         });
     }
 
+    if (showIns && prot.insumos) {
+        const sIns = billingSumInsumosCobrable(prot.insumos);
+        totIns = sIns.total;
+        sumTotal += sIns.total;
+        sumPagado += sIns.pagado;
+        sumDebe += sIns.debe;
+    }
+
     const isSinProtocolo = (prot.idProt === 0);
+    const tieneInsumosProt = showIns && prot.insumos && prot.insumos.length > 0;
+    const lblPagarIns = tf.btn_pagar_insumos_prot || 'Pagar insumos';
+    const bloquePagoInsumos = (!isSinProtocolo && tieneInsumosProt) ? `
+                <div class="d-flex align-items-center gap-2 border-start ps-3 ms-2">
+                    <div class="text-end">
+                        <small class="text-muted d-block fw-bold uppercase" style="font-size: 9px;">${tf.seleccion_insumos_lbl || 'Insumos seleccionados'}:</small>
+                        <span class="fs-6 fw-bold text-primary" id="pago-insumos-seleccionado-${prot.idProt}">$ ${formatBillingMoney(0)}</span>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary fw-bold px-3 shadow-sm" onclick="window.procesarPagoInsumosProtocolo(${prot.idProt})">
+                        <i class="bi bi-box-seam me-1"></i> ${lblPagarIns}
+                    </button>
+                </div>` : '';
+
     const bloquePago = isSinProtocolo ? `
                 <div class="small text-muted">${tf.liquidar_sin_protocolo_ayuda || 'Para liquidar pedidos sin protocolo use Facturación por investigador.'}</div>` : `
                 <div class="d-flex align-items-center gap-3">
@@ -649,6 +754,7 @@ function getFooterHTML(prot, showAni, showAlo) {
                 <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
                         <i class="bi bi-wallet2 me-2"></i> ${tf.btn_pagar_sel || 'Pagar Selección'}
                     </button>
+                    ${bloquePagoInsumos}
                 </div>`;
 
 return `
@@ -658,6 +764,7 @@ return `
                     ${totAlo > 0 ? `<div class="small text-muted">${window.txt?.menu?.accommodations || 'Alojamientos'}: <b>$ ${formatBillingMoney(totAlo)}</b></div>` : ''}
                     ${totAni > 0 ? `<div class="small text-muted">${window.txt?.menu?.animals || 'Animales'}: <b>$ ${formatBillingMoney(totAni)}</b></div>` : ''}
                     ${totRea > 0 ? `<div class="small text-muted">${window.txt?.menu?.reagents || 'Reactivos'}: <b>$ ${formatBillingMoney(totRea)}</b></div>` : ''}
+                    ${totIns > 0 ? `<div class="small text-muted">${tf.filtro_insumos || 'Insumos'}: <b>$ ${formatBillingMoney(totIns)}</b></div>` : ''}
                 </div>
             </div>
             <div class="d-flex justify-content-between align-items-center">
@@ -725,7 +832,7 @@ function getInsumosGeneralesTableHTML(insumos) {
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
-    const colspan = 9;
+    const colspan = 10;
     let filas = '';
     if (reactivos.length > 0) {
         filas += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
@@ -749,6 +856,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th style="width:3%"><input type="checkbox" id="check-all-insumos-gen"></th>
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${window.txt?.generales?.estado || 'Estado'}</th>
+                            <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
                             <th style="width:15%">${bd.th_solicitante || 'Solicitante'}</th>
                             <th style="width:14%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th> 
@@ -813,6 +921,7 @@ window.exportExcelDeptoGlobal = () => {
     const inst = (localStorage.getItem('NombreInst') || 'BIOTERIO').toUpperCase();
     const be = txBE();
     const marcaExExcel = billingPdfMarcaExentoLarga();
+    const biEx = txBI();
     const C = {
         dp: be.excel_depto_prot || 'Departamento / Protocolo',
         iu: be.excel_id_usuario || 'ID Usuario',
@@ -820,6 +929,7 @@ window.exportExcelDeptoGlobal = () => {
         qd: be.excel_quien_derivo || 'Derivado por',
         ti: be.excel_tipo_item || 'Tipo Item',
         ids: be.excel_id_sistema || 'ID Sistema',
+        fe: be.excel_fechas || biEx.th_fechas || 'FECHAS',
         cd: be.excel_concepto_detalle || 'Concepto / Detalle',
         ct: be.excel_costo_total || 'Costo Total',
         mp: be.excel_monto_pagado || 'Monto Pagado',
@@ -830,7 +940,7 @@ window.exportExcelDeptoGlobal = () => {
     const row = (vals) => {
         const o = {};
         o[C.dp] = vals.dp; o[C.iu] = vals.iu; o[C.sol] = vals.sol; o[C.qd] = vals.qd; o[C.ti] = vals.ti;
-        o[C.ids] = vals.ids; o[C.cd] = vals.cd; o[C.ct] = vals.ct; o[C.mp] = vals.mp; o[C.da] = vals.da;
+        o[C.ids] = vals.ids; o[C.fe] = vals.fe; o[C.cd] = vals.cd; o[C.ct] = vals.ct; o[C.mp] = vals.mp; o[C.da] = vals.da;
         return o;
     };
     const tplAloj = (esp, caja) => (be.excel_aloj_concepto_tpl || 'Alojamiento {esp} ({caja})').replace(/\{esp\}/g, esp).replace(/\{caja\}/g, caja);
@@ -850,6 +960,7 @@ window.exportExcelDeptoGlobal = () => {
                 qd: billingDerivacionPlainText(i),
                 ti: tiInsMark,
                 ids: billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExExcel }),
+                fe: billingFormatPedidoFechasPlain(i, biEx),
                 cd: (i.detalle_completo || "").replace(/\|/g, " - "),
                 ct: billingInsumoMontoTotalCobrable(i),
                 mp: parseFloat(i.pagado || 0),
@@ -874,6 +985,7 @@ window.exportExcelDeptoGlobal = () => {
                 qd: billingDerivacionPlainText(f),
                 ti: tiForm,
                 ids: billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: marcaExExcel }),
+                fe: billingFormatPedidoFechasPlain(f, biEx),
                 cd: (f.detalle_display || "").replace(/<[^>]*>/g,''),
                 ct: parseFloat(f.total || 0),
                 mp: parseFloat(f.pagado || 0),
@@ -893,6 +1005,7 @@ window.exportExcelDeptoGlobal = () => {
                 qd: '',
                 ti: be.excel_tipo_aloj || 'ALOJAMIENTO',
                 ids: a.historia,
+                fe: perTxt || '-',
                 cd: cdAloj,
                 ct: parseFloat(a.total || 0),
                 mp: parseFloat(a.pagado || 0),
@@ -930,7 +1043,9 @@ function actualizarMontoVisual(idProt) {
     if (!visor) return;
 
     let total = 0;
-    const seleccionados = document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not(.check-all-form):not(.check-all-aloj)`);
+    const seleccionados = document.querySelectorAll(
+        `.check-item-form[data-prot="${idProt}"]:checked, .check-item-aloj[data-prot="${idProt}"]:checked`
+    );
     seleccionados.forEach(chk => { total += parseFloat(chk.dataset.monto || 0); });
 
     visor.innerText = `$ ${formatBillingMoney(total)}`;
@@ -1033,6 +1148,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
                     billingPdfFormularioIdDisplay(f, { marcaExento: marcaEx }),
+                    billingFormatPedidoFechasPlain(f, bi),
                     f.nombre_especie || '---',
                     (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
                     c[0], c[1], c[2]
@@ -1044,6 +1160,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 margin: { left: M, right: M },
                 head: [[
                     bi.pdf_col_id || 'ID',
+                    bi.pdf_col_fecha || 'Fechas',
                     bi.pdf_col_especie || 'Especie',
                     bi.pdf_col_concepto || 'Concepto',
                     lblTotPdf,
@@ -1054,7 +1171,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 theme: 'grid',
                 headStyles: { fillColor: verdeGecko },
                 styles: { fontSize: 8 },
-                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+                columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
             });
             currentY = doc.lastAutoTable.finalY + 10;
         }
@@ -1153,12 +1270,19 @@ window.downloadInsumosPDF = async () => {
         const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), billingInsumoMontoTotalCobrable(i), i.pagado || 0, exL);
         const c = pdfColsPdfOrdenTotalPagadoDebe(m);
         const idPdf = billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: marcaExPdfIns });
-        return [String(idPdf).substring(0, 26), i.solicitante, (i.detalle_completo || "").split(' | ').join('\n'), c[0], c[1], c[2]];
+        return [
+            String(idPdf).substring(0, 26),
+            billingFormatPedidoFechasPlain(i, bi),
+            i.solicitante,
+            (i.detalle_completo || "").split(' | ').join('\n'),
+            c[0], c[1], c[2]
+        ];
     });
 
     doc.autoTable({
         startY: M + 24, margin: { left: M, right: M }, head: [[
             bi.pdf_col_id || 'ID',
+            bi.pdf_col_fecha || 'Fechas',
             txBD().th_solicitante || 'Solicitante',
             be.pdf_head_detalle_prod || 'Detalle de Productos / Cantidades',
             lblTotPdf,
@@ -1167,7 +1291,7 @@ window.downloadInsumosPDF = async () => {
         ]],
         body: body, theme: 'striped', headStyles: { fillColor: azulInsumos },
         styles: { fontSize: 8, overflow: 'linebreak', cellPadding: 3 },
-        columnStyles: { 2: { cellWidth: 70 }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+        columnStyles: { 3: { cellWidth: 60 }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
     });
 
     const finalY = doc.lastAutoTable.finalY + 10;
@@ -1259,6 +1383,7 @@ window.downloadGlobalPDF = async () => {
 
                 return [
                     { content: idPlain, styles: { fontStyle: isExento ? 'bold' : 'normal', textColor: isExento ? [0, 150, 200] : [0, 0, 0] } },
+                    billingFormatPedidoFechasPlain(f, bi),
                     f.solicitante, esp + sub, f.detalle_display.replace(/<[^>]*>/g, ""), cant,
                     c[0], c[1], c[2]
                 ];
@@ -1267,6 +1392,7 @@ window.downloadGlobalPDF = async () => {
             doc.autoTable({
                 startY: currentY + 10, margin: { left: M, right: M }, head: [[
                     bi.pdf_col_id || 'ID',
+                    bi.pdf_col_fecha || 'Fechas',
                     bd.th_solicitante || 'Solicitante',
                     bi.pdf_col_especie || 'Especie',
                     bi.pdf_col_detalle || 'Detalle',
@@ -1276,7 +1402,7 @@ window.downloadGlobalPDF = async () => {
                     lblDebPdf
                 ]],
                 body: bodyForms, theme: 'grid', headStyles: { fillColor: verdeGrobo },
-                styles: { fontSize: 7 }, columnStyles: { 3: { cellWidth: 50 }, 4: { cellWidth: 55 } }
+                styles: { fontSize: 7 }, columnStyles: { 4: { cellWidth: 45 }, 5: { cellWidth: 50 } }
             });
             currentY = doc.lastAutoTable.finalY + 5;
         }

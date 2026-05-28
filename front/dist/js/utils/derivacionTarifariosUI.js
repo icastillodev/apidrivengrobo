@@ -59,3 +59,36 @@ export function renderDerivacionTarifariosToolbar(record) {
 if (typeof window !== 'undefined') {
     window.openTarifarioDerivacionPdf = openTarifarioDerivacionPdf;
 }
+
+function escapeDerivHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Ruta institucional origen → destino (derivación activa). */
+export function getDerivacionRouteText(item) {
+    const originName = (item?.InstitucionOrigenNombre || '').trim();
+    const currentName = (item?.InstitucionActualNombre || '').trim();
+    return [originName, currentName].filter(Boolean).map(escapeDerivHtml).join(' → ');
+}
+
+/** Departamento del protocolo (origen): de donde provienen / se descuentan los animales. */
+export function getDerivacionProtocoloDepto(item) {
+    const d = (item?.DeptoProtocoloOrigen || item?.DeptoProtocolo || item?.Departamento || '').trim();
+    return (d && d !== 'Sin departamento') ? d : '';
+}
+
+export function renderDerivacionRouteBadge(item) {
+    const tx = window.txt?.misformularios || {};
+    const base = tx.workflow_derivado || 'Derivado';
+    const routeText = getDerivacionRouteText(item);
+    const label = routeText ? `${base} · ${routeText}` : base;
+    return `<span class="badge bg-primary mt-1">${label}</span>`;
+}
+
+export function renderDerivacionProtocoloDeptoBadge(item) {
+    const tx = window.txt?.misformularios || {};
+    const depto = getDerivacionProtocoloDepto(item);
+    if (!depto) return '';
+    const lbl = tx.derivacion_depto_protocolo || 'Depto. protocolo';
+    return `<span class="badge bg-secondary mt-1" style="font-size:9px;font-weight:600;">${escapeDerivHtml(lbl)}: ${escapeDerivHtml(depto)}</span>`;
+}

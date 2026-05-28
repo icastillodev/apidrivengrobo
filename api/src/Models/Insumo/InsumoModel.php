@@ -119,6 +119,7 @@ class InsumoModel {
                     p.EmailA as EmailInvestigador, p.CelularA as CelularInvestigador,
                     CONCAT(p.NombreA, ' ', p.ApellidoA) as Investigador,
                     COALESCE(d.NombreDeptoA, pdpto.NombreDeptoA, 'Sin departamento') as Departamento,
+                    COALESCE(d_prot.NombreDeptoA, pdpto.NombreDeptoA, 'Sin departamento') as DeptoProtocoloOrigen,
                     o.NombreOrganismoSimple as Organizacion,
                     COALESCE(t.nombreTipo, '—') as TipoNombre,
                     {$tipoExpr} as tipoAId,
@@ -141,6 +142,7 @@ class InsumoModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
                 LEFT JOIN protdeptor pd ON prot.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d_prot ON prot.departamento = d_prot.iddeptoA
                 LEFT JOIN departamentoe pdpto ON pd.iddeptoA = pdpto.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA
@@ -169,6 +171,7 @@ class InsumoModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe prot ON pf.idprotA = prot.idprotA
                 LEFT JOIN protdeptor pd ON prot.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d_prot ON prot.departamento = d_prot.iddeptoA
                 LEFT JOIN departamentoe pdpto ON pd.iddeptoA = pdpto.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN precioinsumosformulario pif ON f.idformA = pif.idformA

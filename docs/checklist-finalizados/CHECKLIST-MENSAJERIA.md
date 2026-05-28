@@ -52,7 +52,7 @@ Leyenda: `[x]` hecho en código · `[ ]` pendiente de ejecutar en entorno o de d
 
 - Mensajes **solo texto**: no hay ni habrá adjuntos en hilos institucionales.
 - [ ] Notificación por correo al recibir mensaje (si se define política).
-- [ ] Búsqueda / filtro de hilos por asunto o contraparte.
+- [x] Búsqueda / filtro de hilos por asunto o contraparte (cliente, `hilos-filtro` en `mensajes.js` + i18n es/en/pt).
 
 ---
 

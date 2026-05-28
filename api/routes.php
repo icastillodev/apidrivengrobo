@@ -124,6 +124,7 @@ $router->post('/user/profile/change-password', 'UserProfileController@changePass
 // ============================================================
 $router->get('/comunicacion/mensajes/destinatarios', 'MensajeriaController@getDestinatarios');
 $router->get('/comunicacion/mensajes/hilos', 'MensajeriaController@getHilos');
+$router->get('/comunicacion/mensajes/buscar', 'MensajeriaController@buscarMensajes');
 $router->get('/comunicacion/mensajes/no-leidos', 'MensajeriaController@getUnreadCount');
 $router->get('/comunicacion/mensajes/hilo/:id', 'MensajeriaController@getHilo');
 $router->post('/comunicacion/mensajes/hilo/:id/leer', 'MensajeriaController@markHiloRead');

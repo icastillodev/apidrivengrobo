@@ -191,10 +191,14 @@ const DASH_NOTICIAS_PAGE_SIZE = 14;
 const DASH_MENSAJES_UNREAD_MAX = 5;
 
 function mensajesPanelHref(alcance, hiloId) {
-    const base = getCorrectPath('panel/mensajes');
-    const a = encodeURIComponent(alcance === 'institucional' ? 'institucional' : 'personal');
+    const inst = alcance === 'institucional';
+    const base = getCorrectPath(inst ? 'panel/mensajes_institucion' : 'panel/mensajes');
     const h = encodeURIComponent(String(hiloId));
     const sep = base.includes('?') ? '&' : '?';
+    if (inst) {
+        return `${base}${sep}hilo=${h}`;
+    }
+    const a = encodeURIComponent('personal');
     return `${base}${sep}alcance=${a}&hilo=${h}`;
 }
 

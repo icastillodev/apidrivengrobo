@@ -14,6 +14,10 @@ Ejemplos recientes en este repo: `2026-05-09-noticia-orden-fijo.sql` (noticias p
 
 **Parche sin re-ejecutar el maestro:** si ya aplicaste el maestro viejo y falta solo la tabla de popups del panel → `2026-05-09-patch-institucion-dashboard-popup-idempotente.sql` (seguro repetir).
 
+**Facturación — hora en historial de pagos:** `2026-05-09-historialpago-fecha-datetime.sql` (`historialpago.fecha` → `DATETIME`). Inventario: [`BACKLOG-BASE-DATOS.md`](../BACKLOG-BASE-DATOS.md#sql-historialpago-fecha-datetime).
+
+**Mensajería (tablas):** `20260401_mensajeria_noticias.sql`, `20260405_mensaje_hilo_institucional.sql`. QA: [`CHECKLIST-QA-STAGING-2026-05-GROBO.md`](../CHECKLIST-QA-STAGING-2026-05-GROBO.md).
+
 **Solo copiar y pegar en phpMyAdmin:** `COPIAR-PARCHE-popup-dashboard.sql` (mismo SQL, nombre obvio).
 
 ## Contenido de cada archivo

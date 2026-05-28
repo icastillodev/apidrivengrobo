@@ -75,6 +75,13 @@ export async function initAnimalForm() {
             const typeSel = document.getElementById('select-tipo-form');
             if (typeSel) {
                 typeSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.seleccione_tipo || 'Seleccione tipo...') + '</option>';
+                let hintEl = document.getElementById('tipo-form-hint');
+                if (!hintEl) {
+                    hintEl = document.createElement('p');
+                    hintEl.id = 'tipo-form-hint';
+                    hintEl.className = 'small text-muted mb-0 mt-1';
+                    typeSel.parentNode?.appendChild(hintEl);
+                }
                 if (form_types && form_types.length > 0) {
                     form_types.forEach(t => {
                         const opt = document.createElement('option');
@@ -82,8 +89,16 @@ export async function initAnimalForm() {
                         opt.text = t.nombreTipo;
                         typeSel.appendChild(opt);
                     });
-                    if (form_types.length === 1) typeSel.selectedIndex = 1;
+                    if (form_types.length === 1) {
+                        typeSel.selectedIndex = 1;
+                        hintEl.textContent = window.txt?.form_animales?.tipo_unico_hint || '';
+                        hintEl.classList.remove('d-none');
+                    } else {
+                        hintEl.textContent = window.txt?.form_animales?.tipos_multiples_hint || '';
+                        hintEl.classList.remove('d-none');
+                    }
                 } else {
+                    if (hintEl) hintEl.classList.add('d-none');
                     typeSel.innerHTML = '<option value="">' + (window.txt?.form_animales?.error_sin_tipos || 'Error: Sin tipos configurados') + '</option>';
                     typeSel.disabled = true;
                 }

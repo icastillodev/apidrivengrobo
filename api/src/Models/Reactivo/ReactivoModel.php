@@ -155,6 +155,7 @@ class ReactivoModel {
                     px.protocoloexpe as EsOtrosCeuas,
                     (CASE WHEN d.externodepto = 2 OR (d.externodepto IS NULL AND o.externoorganismo = 2) THEN 2 ELSE 1 END) as DeptoExternoFlag,
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as Departamento,
+                    COALESCE(d_prot.NombreDeptoA, pd_d.NombreDeptoA, 'Sin departamento') as DeptoProtocoloOrigen,
                     {$deptoExpr} as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     COALESCE(t.nombreTipo, '—') as TipoNombre,
@@ -178,6 +179,8 @@ class ReactivoModel {
                 {$originJoin}
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d_prot ON px.departamento = d_prot.iddeptoA
+                LEFT JOIN departamentoe pd_d ON pd.iddeptoA = pd_d.iddeptoA
                 LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
@@ -206,6 +209,8 @@ class ReactivoModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d_prot ON px.departamento = d_prot.iddeptoA
+                LEFT JOIN departamentoe pd_d ON pd.iddeptoA = pd_d.iddeptoA
                 LEFT JOIN departamentoe d ON {$deptoExpr} = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN insumoexperimental ins ON f.reactivo = ins.IdInsumoexp
@@ -438,7 +443,9 @@ class ReactivoModel {
                 ORDER BY p.nprotA DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId, $instId, $instId, $instId]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $local = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $derivModel = new \App\Models\FormDerivacion\FormDerivacionModel($this->db);
+        return $derivModel->mergeProtocolsListWithDerivaciones((int)$instId, $local);
     }
 
     public function getAvailableTypes($instId) {
@@ -671,21 +678,23 @@ class ReactivoModel {
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")
                     ->execute([$newProt, $id]);
 
-            // Devolución y resta de cupos de animales al protocolo
-            if ($oldProt == $newProt) {
-                $diff = $newTotal - $oldTotal;
-                if ($diff != 0 && $newProt) {
-                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                            ->execute([$diff, $newProt]);
-                }
-            } else {
-                if ($oldProt) {
-                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")
-                            ->execute([$oldTotal, $oldProt]);
-                }
-                if ($newProt) {
-                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
-                            ->execute([$newTotal, $newProt]);
+            // Devolución y resta de cupos de animales al protocolo (no en destino derivado: cupo ya descontado en origen)
+            if (!$esDerivadoEnDestino) {
+                if ($oldProt == $newProt) {
+                    $diff = $newTotal - $oldTotal;
+                    if ($diff != 0 && $newProt) {
+                        $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
+                                ->execute([$diff, $newProt]);
+                    }
+                } else {
+                    if ($oldProt) {
+                        $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")
+                                ->execute([$oldTotal, $oldProt]);
+                    }
+                    if ($newProt) {
+                        $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")
+                                ->execute([$newTotal, $newProt]);
+                    }
                 }
             }
 

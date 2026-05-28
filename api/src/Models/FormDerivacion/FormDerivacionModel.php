@@ -1142,4 +1142,71 @@ class FormDerivacionModel
         $this->db->prepare("UPDATE formularioe SET quienvisto = ? WHERE idformA = ?")
             ->execute([trim((string)$quienvisto), $idformA]);
     }
+
+    /**
+     * Protocolos vinculados a formularios con derivación activa hacia la sede destino (combo admin).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function fetchProtocolsFromDerivacionesDestino(int $instId): array
+    {
+        if (!self::tableExists($this->db, 'formulario_derivacion')) {
+            return [];
+        }
+        $instId = (int)$instId;
+        if ($instId <= 0) {
+            return [];
+        }
+        $sql = "SELECT DISTINCT
+                    p.idprotA,
+                    p.nprotA,
+                    p.tituloA,
+                    p.protocoloexpe AS IsExterno,
+                    1 AS es_protocolo_derivado,
+                    COALESCE(io.NombreInst, '') AS derivacion_inst_origen
+                FROM formulario_derivacion fd
+                INNER JOIN formularioe f ON f.idformA = fd.idformA
+                INNER JOIN protformr pf ON pf.idformA = f.idformA
+                INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+                LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
+                WHERE fd.Activo = 1
+                  AND fd.IdInstitucionDestino = ?
+                  AND pf.idprotA IS NOT NULL
+                ORDER BY p.nprotA DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Une protocolos locales con los de derivaciones activas (sin duplicar idprotA).
+     *
+     * @param array<int, array<string, mixed>> $localProtocols
+     * @return array<int, array<string, mixed>>
+     */
+    public function mergeProtocolsListWithDerivaciones(int $instId, array $localProtocols): array
+    {
+        $byId = [];
+        foreach ($localProtocols as $row) {
+            $id = (int)($row['idprotA'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $row['es_protocolo_derivado'] = (int)($row['es_protocolo_derivado'] ?? 0);
+            $row['derivacion_inst_origen'] = $row['derivacion_inst_origen'] ?? null;
+            $byId[$id] = $row;
+        }
+        foreach ($this->fetchProtocolsFromDerivacionesDestino($instId) as $row) {
+            $id = (int)($row['idprotA'] ?? 0);
+            if ($id <= 0 || isset($byId[$id])) {
+                continue;
+            }
+            $byId[$id] = $row;
+        }
+        $out = array_values($byId);
+        usort($out, static function ($a, $b) {
+            return strcmp((string)($b['nprotA'] ?? ''), (string)($a['nprotA'] ?? ''));
+        });
+        return $out;
+    }
 }

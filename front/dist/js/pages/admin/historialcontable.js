@@ -365,8 +365,15 @@ function createPageItem(text, targetPage, disabled = false, active = false) {
 }
 
 function formatDate(dateString) {
-    if (!dateString) return '---';
-    const parts = dateString.split('-');
-    if(parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-    return dateString;
+    if (dateString == null || String(dateString).trim() === '') return '---';
+    const raw = String(dateString).trim();
+    const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoDate) {
+        return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
+    }
+    const isoDt = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+    if (isoDt) {
+        return `${isoDt[3]}/${isoDt[2]}/${isoDt[1]} ${isoDt[4]}:${isoDt[5]}`;
+    }
+    return raw;
 }

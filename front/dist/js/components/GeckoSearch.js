@@ -1,9 +1,22 @@
-import { GeckoVoice } from './GeckoVoice.js';
 import { GeckoSearchEngine } from './GeckoSearchEngine.js';
 import { getPanelOrUsuarioPaginasSegment } from './menujs/MenuConfig.js';
 
-/** Debounce para `/search/global`: evita una petición por tecla (checklist optimización tablas). */
-const OMNI_SEARCH_DEBOUNCE_MS = 350;
+/** Debounce para `/search/global`: evita una petición por tecla. */
+const OMNI_SEARCH_DEBOUNCE_MS = 300;
+
+function omniTx(key, fallback) {
+    const m = window.txt?.menu || {};
+    return m[key] != null && String(m[key]).trim() !== '' ? String(m[key]) : fallback;
+}
+
+function escapeOmniHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 export const GeckoSearch = {
     overlay: null,
@@ -13,7 +26,7 @@ export const GeckoSearch = {
     voiceBtn: null,
     voiceTrainBtn: null,
     aiMessageBox: null,
-    selectedIndex: -1, // Índice para navegación por teclado
+    selectedIndex: -1,
     _omniDebounceTimer: null,
     _omniSearchGeneration: 0,
 
@@ -33,6 +46,12 @@ export const GeckoSearch = {
         }, OMNI_SEARCH_DEBOUNCE_MS);
     },
 
+    _applyNoIaUi() {
+        if (this.voiceBtn) this.voiceBtn.classList.add('d-none');
+        if (this.voiceTrainBtn) this.voiceTrainBtn.classList.add('d-none');
+        if (this.aiMessageBox) this.aiMessageBox.classList.add('d-none');
+    },
+
     init() {
         this.overlay = document.getElementById('gecko-omni-overlay');
         if (!this.overlay) return;
@@ -43,32 +62,11 @@ export const GeckoSearch = {
         this.voiceBtn = document.getElementById('gecko-omni-voice-btn');
         this.voiceTrainBtn = document.getElementById('gecko-omni-voice-train-btn');
         this.aiMessageBox = document.getElementById('gecko-ai-message');
-        
-        // SECUESTRO DIRECTO DEL INPUT PARA EVENTOS DE TECLADO
+        this._applyNoIaUi();
+
         if (this.input) {
-            // Usamos keydown para interceptar las flechas antes de que muevan el cursor de texto
             this.input.addEventListener('keydown', (e) => this.handleKeyDown(e));
             this.input.oninput = (e) => this._scheduleOmniSearchFromInput(e.target.value);
-        }
-
-        // Eventos de Voz
-        if (this.voiceBtn) {
-            this.voiceBtn.onclick = () => {
-                if (GeckoVoice.isListeningCommand) {
-                    GeckoVoice.stop();
-                } else {
-                    GeckoVoice.startListening();
-                }
-            };
-        }
-
-        if (this.voiceTrainBtn) {
-            this.voiceTrainBtn.onclick = (e) => {
-                e.stopPropagation();
-                import('./GeckoVoicePrefsModal.js').then((m) =>
-                    m.openVoiceRefinementModal().catch((err) => console.error('voice prefs', err))
-                );
-            };
         }
     },
 
@@ -78,43 +76,42 @@ export const GeckoSearch = {
         this._omniDebounceTimer = null;
         this._omniSearchGeneration++;
         this.triggerEl = document.getElementById('gecko-search-trigger');
+        this._applyNoIaUi();
 
-        // Animación de apertura (Morphing)
         const rect = this.triggerEl.getBoundingClientRect();
-        
-        this.box.style.transition = 'none'; 
+
+        this.box.style.transition = 'none';
         this.box.style.top = `${rect.top}px`;
         this.box.style.left = `${rect.left}px`;
         this.box.style.width = `${rect.width}px`;
         this.box.style.height = `${rect.height}px`;
-        this.box.style.borderRadius = '50px'; 
-        
+        this.box.style.borderRadius = '50px';
+
         this.overlay.classList.add('show');
-        this.triggerEl.style.opacity = '0'; 
+        this.triggerEl.style.opacity = '0';
 
         void this.box.offsetWidth;
 
         this.box.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
         const finalWidth = Math.min(800, window.innerWidth * 0.95);
         const finalLeft = (window.innerWidth - finalWidth) / 2;
-        
-        this.box.style.top = '100px'; 
+
+        this.box.style.top = '100px';
         this.box.style.left = `${finalLeft}px`;
         this.box.style.width = `${finalWidth}px`;
-        this.box.style.height = 'auto'; 
+        this.box.style.height = 'auto';
         this.box.style.minHeight = '56px';
-        this.box.style.borderRadius = '16px'; 
-        
+        this.box.style.borderRadius = '16px';
+
         this.box.classList.add('open');
 
         setTimeout(() => {
             this.input.focus();
             this.input.value = '';
         }, 100);
-        
-        document.body.style.overflow = 'hidden'; 
+
+        document.body.style.overflow = 'hidden';
         if (this.results) this.results.innerHTML = '';
-        this.hideAiMessage();
         this.selectedIndex = -1;
     },
 
@@ -125,27 +122,26 @@ export const GeckoSearch = {
         this._omniSearchGeneration++;
 
         const rect = this.triggerEl.getBoundingClientRect();
-        this.box.classList.remove('open'); 
-        
+        this.box.classList.remove('open');
+
         this.box.style.top = `${rect.top}px`;
         this.box.style.left = `${rect.left}px`;
         this.box.style.width = `${rect.width}px`;
         this.box.style.height = `${rect.height}px`;
-        this.box.style.borderRadius = '50px'; 
-        this.box.style.opacity = '0'; 
+        this.box.style.borderRadius = '50px';
+        this.box.style.opacity = '0';
 
         setTimeout(() => {
             this.overlay.classList.remove('show');
-            this.triggerEl.style.opacity = '1'; 
+            this.triggerEl.style.opacity = '1';
             document.body.style.overflow = '';
-            
-            if(this.input) this.input.value = '';
-            if(this.results) this.renderEmpty();
-            this.box.style = ''; 
-        }, 380); 
-        
-        GeckoVoice.stop();
-        this.hideAiMessage();
+
+            if (this.input) this.input.value = '';
+            if (this.results) this.renderEmpty();
+            this.box.style = '';
+        }, 380);
+
+        this.selectedIndex = -1;
     },
 
     setInput(text) {
@@ -156,110 +152,55 @@ export const GeckoSearch = {
         this.executeSearch(text, gen);
     },
 
-    setListening(isListening) {
-        if (!this.voiceBtn) return;
-        if (isListening) {
-            this.voiceBtn.classList.add('gecko-listening-pulse'); 
-            this.voiceBtn.style.color = '#d97706';
-        } else {
-            this.voiceBtn.classList.remove('gecko-listening-pulse');
-            this.voiceBtn.style.color = '';
-        }
-    },
-
-    setAiMessage(text) {
-        if (this.aiMessageBox) {
-            this.aiMessageBox.innerText = text;
-            this.aiMessageBox.classList.remove('hidden');
-        }
-    },
-
-    hideAiMessage() {
-        if (this.aiMessageBox) {
-            this.aiMessageBox.innerText = '';
-            this.aiMessageBox.classList.add('hidden');
-        }
-    },
-
-    // --- 🚀 CONTROLADOR DE TECLADO ---
     handleKeyDown(e) {
-        // 1. Esc: Cerrar todo
         if (e.key === 'Escape') {
             this.close();
             return;
         }
 
-        const items = this.results ? this.results.querySelectorAll('.gecko-result-item') : [];
+        const items = this.results ? this.results.querySelectorAll('.gecko-result-item[href]') : [];
 
-        // 2. FLECHAS (Evitando que el cursor de texto se mueva)
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault(); 
-            
+            e.preventDefault();
             if (items.length === 0) return;
 
             if (e.key === 'ArrowDown') {
                 this.selectedIndex++;
-                if (this.selectedIndex >= items.length) this.selectedIndex = 0; // Loop al inicio
+                if (this.selectedIndex >= items.length) this.selectedIndex = 0;
             } else {
                 this.selectedIndex--;
-                if (this.selectedIndex < 0) this.selectedIndex = items.length - 1; // Loop al final
+                if (this.selectedIndex < 0) this.selectedIndex = items.length - 1;
             }
-            
+
             this.updateSelection(items);
             return;
-        } 
-        
-        // 3. ENTER
-                if (e.key === 'Enter') {
-                    e.preventDefault(); 
-                    
-                    // Caso A: El usuario bajó con las flechas y seleccionó algo específico de la lista
-                    if (this.selectedIndex >= 0 && items.length > 0 && items[this.selectedIndex]) {
-                        const link = items[this.selectedIndex].getAttribute('href');
-                        if (link && link !== '#') {
-                            window.location.href = link;
-                        } else {
-                            items[this.selectedIndex].click(); // Simula clic si no es un <a> real
-                        }
-                        this.close();
-                    } 
-                    // Caso B: Escribió algo y le dio Enter directo (Mandarlo a la IA)
-                    else if (this.input.value.trim() !== '') {
-                        const term = this.input.value.trim();
-                        
-                        // Ponemos loader
-                        this.results.innerHTML = `<div class="text-center p-4">
-                            <div class="spinner-border text-success spinner-border-sm mb-2" role="status"></div>
-                            <div class="small fw-bold text-success">Consultando a GROBO IA...</div>
-                        </div>`;
-                        
-                        // Importación dinámica y ejecución
-                        import('./GeckoAiDispatcher.js').then(module => {
-                            module.GeckoAiDispatcher.sendCommand(term);
-                        }).catch(err => {
-                            console.error("Error cargando IA:", err);
-                            this.renderEmpty();
-                        });
-                    }
-                }
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (this.selectedIndex >= 0 && items[this.selectedIndex]) {
+                window.location.href = items[this.selectedIndex].getAttribute('href');
+                this.close();
+                return;
+            }
+            if (items.length > 0) {
+                window.location.href = items[0].getAttribute('href');
+                this.close();
+            }
+        }
     },
 
     updateSelection(items) {
-        // Limpiamos estilos de todos
-        items.forEach(item => {
+        items.forEach((item) => {
             item.classList.remove('active-result', 'bg-success-subtle', 'border-start', 'border-4', 'border-success');
         });
-        
-        // Marcamos el activo
         if (items[this.selectedIndex]) {
             const activeItem = items[this.selectedIndex];
             activeItem.classList.add('active-result', 'bg-success-subtle', 'border-start', 'border-4', 'border-success');
-            // Hacer scroll suave dentro de la caja de resultados
             activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
     },
 
-    // --- MÓDULO DE BÚSQUEDA TRADICIONAL ---
     async executeSearch(term, gen) {
         if (!term || term.length < 1) {
             this.renderEmpty();
@@ -268,11 +209,9 @@ export const GeckoSearch = {
         if (gen !== undefined && gen !== this._omniSearchGeneration) return;
         this.renderSpinner();
 
-        // Análisis léxico simple para detectar intenciones
         const analysis = GeckoSearchEngine.analyze(term);
 
         try {
-            // 🚀 IMPORTACIÓN DINÁMICA HÍBRIDA (Local vs Prod)
             const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
                 ? '/URBE-API-DRIVEN/front/'
                 : '/';
@@ -285,7 +224,7 @@ export const GeckoSearch = {
                 scope: analysis.scope,
                 inst: instId,
                 role: localStorage.getItem('userLevel'),
-                uid: localStorage.getItem('userId')
+                uid: localStorage.getItem('userId'),
             });
 
             const res = await API.request(`/search/global?${params.toString()}`);
@@ -294,89 +233,177 @@ export const GeckoSearch = {
 
             if (res.status === 'success') {
                 this.renderResults(res.data, term);
+            } else if (res.http_status === 401 || res.http_status === 403) {
+                const msg = omniTx('search_omni_session_expired', 'Sesión expirada. Vuelva a iniciar sesión.');
+                this.results.innerHTML = `<div class="p-3 text-center text-warning small">${escapeOmniHtml(msg)}</div>`;
             } else {
-                this.renderNoResults(term);
+                const msg = omniTx('search_omni_error', 'No se pudo completar la búsqueda.');
+                this.results.innerHTML = `<div class="p-3 text-center text-danger small">${escapeOmniHtml(msg)}</div>`;
             }
-        } catch (e) {
+        } catch (err) {
             if (gen !== undefined && gen !== this._omniSearchGeneration) return;
-            this.results.innerHTML = `<div class="p-3 text-center text-danger small">Error de conexión con el motor de búsqueda.</div>`;
+            const msg = omniTx('search_omni_error', 'No se pudo completar la búsqueda.');
+            this.results.innerHTML = `<div class="p-3 text-center text-danger small">${escapeOmniHtml(msg)}</div>`;
         }
     },
 
+    _sectionHeader(label) {
+        return `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">${escapeOmniHtml(label)}</div>`;
+    },
+
+    _resultRow(href, iconClass, iconColor, title, subtitle, badge, tabIndex) {
+        return `
+            <a href="${href}" tabindex="${tabIndex}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
+                <span class="${iconColor}"><i class="bi ${iconClass} fs-5"></i></span>
+                <div class="d-flex flex-column flex-grow-1" style="overflow:hidden;min-width:0;">
+                    <span class="fw-bold text-truncate text-dark" style="font-size: 13px;">${escapeOmniHtml(title)}</span>
+                    <span class="small text-muted text-truncate" style="font-size: 11px;">${escapeOmniHtml(subtitle)}</span>
+                </div>
+                <span class="badge bg-light text-secondary border ms-auto flex-shrink-0">${escapeOmniHtml(badge)}</span>
+            </a>`;
+    },
+
     renderResults(data, term) {
-        this.selectedIndex = -1; // Resetear índice al recibir nueva info
+        this.selectedIndex = -1;
         if (!this.results) return;
 
-        const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
+        const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? '/URBE-API-DRIVEN/front/'
+            : '/';
+        const misFormSeg = getPanelOrUsuarioPaginasSegment();
         let html = '';
         let hasResults = false;
-        let globalIndex = 0; // Para el tabindex correlativo
+        let globalIndex = 0;
 
-        // --- RENDERIZADO DE RESULTADOS ---
-        // (Protocolos)
+        const catProt = omniTx('search_cat_protocolo', 'Protocolos');
+        const catPed = omniTx('search_cat_pedido', 'Pedidos y formularios');
+        const catUsr = omniTx('search_cat_usuario', 'Usuarios');
+        const catAloj = omniTx('search_cat_alojamiento', 'Alojamientos');
+        const catIns = omniTx('search_cat_insumo', 'Insumos');
+        const catDepto = omniTx('search_cat_departamento', 'Departamentos');
+        const catOrg = omniTx('search_cat_organismo', 'Organismos');
+
         if (data.protocolos?.length > 0) {
             hasResults = true;
-            html += `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">Protocolos</div>`;
-            data.protocolos.forEach(p => {
-                html += `
-                    <a href="${basePath}paginas/admin/protocolos.html?id=${p.idprotA}&action=edit" tabindex="${globalIndex++}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
-                        <span class="text-secondary"><i class="bi bi-file-earmark-medical fs-5"></i></span>
-                        <div class="d-flex flex-column" style="overflow:hidden;">
-                            <span class="fw-bold text-truncate text-dark" style="font-size: 13px;">${p.tituloA}</span>
-                            <span class="small text-muted" style="font-size: 11px;">Protocolo #${p.nprotA} | Inv: ${p.ApellidoA}</span>
-                        </div>
-                        <span class="badge bg-light text-secondary border ms-auto">PROT</span>
-                    </a>`;
+            html += this._sectionHeader(catProt);
+            data.protocolos.forEach((p) => {
+                const title = p.tituloA || p.nprotA || `#${p.idprotA}`;
+                const sub = [
+                    p.nprotA ? `N° ${p.nprotA}` : '',
+                    p.ApellidoA ? `Inv: ${p.ApellidoA}` : '',
+                    p.nombre_depto || '',
+                ].filter(Boolean).join(' · ');
+                html += this._resultRow(
+                    `${basePath}paginas/admin/protocolos.html?id=${p.idprotA}&action=edit`,
+                    'bi-file-earmark-medical',
+                    'text-secondary',
+                    title,
+                    sub || catProt,
+                    'PROT',
+                    globalIndex++
+                );
             });
         }
-        
-        // (Formularios)
+
         if (data.formularios?.length > 0) {
             hasResults = true;
-            const misFormSeg = getPanelOrUsuarioPaginasSegment();
-            html += `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">Pedidos & Formularios</div>`;
-            data.formularios.forEach(f => {
-                html += `
-                    <a href="${basePath}paginas/${misFormSeg}/misformularios.html?id=${f.idformA}&action=view" tabindex="${globalIndex++}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
-                        <span class="text-primary"><i class="bi bi-ui-checks fs-5"></i></span>
-                        <div class="d-flex flex-column" style="overflow:hidden;">
-                            <span class="fw-bold text-truncate text-dark" style="font-size: 13px;">Pedido #${f.idformA}</span>
-                            <span class="small text-muted" style="font-size: 11px;">${f.tipoA} | ${f.ApellidoA}</span>
-                        </div>
-                        <span class="badge bg-primary-subtle text-primary ms-auto">${f.estado}</span>
-                    </a>`;
+            html += this._sectionHeader(catPed);
+            data.formularios.forEach((f) => {
+                const catNombre = f.categoria_nombre || f.tipoA || '';
+                const title = `${catNombre || catPed} #${f.idformA}`;
+                const sub = [
+                    f.estado || '',
+                    f.nprotA ? `Prot ${f.nprotA}` : '',
+                    f.ApellidoA ? `${f.ApellidoA}, ${f.NombreA || ''}`.trim() : '',
+                ].filter(Boolean).join(' · ');
+                html += this._resultRow(
+                    `${basePath}paginas/${misFormSeg}/misformularios.html?id=${f.idformA}&action=view`,
+                    'bi-ui-checks',
+                    'text-primary',
+                    title,
+                    sub,
+                    String(f.estado || 'FORM'),
+                    globalIndex++
+                );
             });
         }
 
-        // (Usuarios)
         if (data.usuarios?.length > 0) {
             hasResults = true;
-            html += `<div class="small fw-bold text-muted px-3 py-2 bg-light text-uppercase" style="font-size:10px;">Usuarios</div>`;
-            data.usuarios.forEach(u => {
-                html += `
-                    <a href="${basePath}paginas/admin/usuarios.html?id=${u.IdUsrA}" tabindex="${globalIndex++}" class="gecko-result-item list-group-item list-group-item-action border-0 mb-1 rounded d-flex align-items-center gap-3">
-                        <span class="text-success"><i class="bi bi-person-badge fs-5"></i></span>
-                        <div class="d-flex flex-column" style="overflow:hidden;">
-                            <span class="fw-bold text-truncate text-dark" style="font-size: 13px;">${u.ApellidoA}, ${u.NombreA}</span>
-                            <span class="small text-muted" style="font-size: 11px;">${u.EmailA}</span>
-                        </div>
-                        <span class="badge bg-light text-secondary border ms-auto">ID: ${u.IdUsrA}</span>
-                    </a>`;
+            html += this._sectionHeader(catUsr);
+            data.usuarios.forEach((u) => {
+                html += this._resultRow(
+                    `${basePath}paginas/admin/usuarios.html?id=${u.IdUsrA}`,
+                    'bi-person-badge',
+                    'text-success',
+                    `${u.ApellidoA}, ${u.NombreA}`,
+                    u.EmailA || '',
+                    `ID ${u.IdUsrA}`,
+                    globalIndex++
+                );
             });
         }
 
-        // --- OPCIÓN DE IA AL FINAL DE LA LISTA ---
-        html += `
-            <div class="gecko-result-item list-group-item list-group-item-action mt-2 border-top pt-2 rounded pointer" tabindex="${globalIndex}" onclick="GeckoVoice.executeAction('${term}')">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="text-success"><i class="bi bi-robot fs-5"></i></span>
-                    <div class="d-flex flex-column">
-                        <span class="fw-bold text-success" style="font-size: 13px;">Preguntar a GROBO IA</span>
-                        <span class="small text-muted" style="font-size:10px;">"${term}"</span>
-                    </div>
-                    <span class="badge bg-success ms-auto">ENTER</span>
-                </div>
-            </div>`;
+        if (data.alojamientos?.length > 0) {
+            hasResults = true;
+            html += this._sectionHeader(catAloj);
+            data.alojamientos.forEach((a) => {
+                const title = `${catAloj} #${a.historia}`;
+                const sub = [a.nprotA ? `Prot ${a.nprotA}` : '', a.ApellidoA || ''].filter(Boolean).join(' · ');
+                const href = a.idprotA
+                    ? `${basePath}paginas/admin/facturacion/protocolo.html?prot=${a.idprotA}`
+                    : '#';
+                html += this._resultRow(href, 'bi-house-door', 'text-warning', title, sub, 'ALOJ', globalIndex++);
+            });
+        }
+
+        if (data.insumos?.length > 0) {
+            hasResults = true;
+            html += this._sectionHeader(catIns);
+            data.insumos.forEach((i) => {
+                html += this._resultRow(
+                    `${basePath}paginas/admin/insumos.html`,
+                    'bi-box-seam',
+                    'text-info',
+                    i.NombreInsumo || catIns,
+                    [i.TipoInsumo, i.CantidadInsumo].filter(Boolean).join(' · '),
+                    'INS',
+                    globalIndex++
+                );
+            });
+        }
+
+        if (data.departamentos?.length > 0) {
+            hasResults = true;
+            html += this._sectionHeader(catDepto);
+            data.departamentos.forEach((d) => {
+                html += this._resultRow(
+                    `${basePath}paginas/admin/facturacion/depto.html?depto=${d.iddeptoA}`,
+                    'bi-building',
+                    'text-dark',
+                    d.NombreDeptoA,
+                    d.nombre_organismo || catDepto,
+                    'DEPTO',
+                    globalIndex++
+                );
+            });
+        }
+
+        if (data.organismos?.length > 0) {
+            hasResults = true;
+            html += this._sectionHeader(catOrg);
+            data.organismos.forEach((o) => {
+                html += this._resultRow(
+                    `${basePath}paginas/admin/facturacion/org.html`,
+                    'bi-diagram-3',
+                    'text-info',
+                    o.NombreOrganismo,
+                    catOrg,
+                    'ORG',
+                    globalIndex++
+                );
+            });
+        }
 
         if (!hasResults) {
             this.renderNoResults(term);
@@ -385,25 +412,31 @@ export const GeckoSearch = {
         }
     },
 
-    renderEmpty() { 
-        this.results.innerHTML = `<div class="gecko-omni-empty p-4 text-center text-muted small"><i class="bi bi-search fs-1 d-block mb-2 opacity-25"></i> Escribe para buscar en la base de datos...</div>`; 
+    renderEmpty() {
+        const hint = omniTx(
+            'search_omni_empty_hint',
+            'Escriba para buscar. Prefijos: protocolo, pedido, usuario, alojamiento, insumo, departamento, organismo.'
+        );
+        this.results.innerHTML = `<div class="gecko-omni-empty p-4 text-center text-muted small"><i class="bi bi-search fs-1 d-block mb-2 opacity-25"></i>${escapeOmniHtml(hint)}</div>`;
     },
-    
-    renderSpinner() { 
-        this.results.innerHTML = `<div class="p-4 text-center"><div class="spinner-border text-success spinner-border-sm"></div></div>`; 
+
+    renderSpinner() {
+        this.results.innerHTML = `<div class="p-4 text-center"><div class="spinner-border text-success spinner-border-sm"></div></div>`;
     },
-    
+
     renderNoResults(term) {
+        const noRes = omniTx('search_omni_no_results', 'No hay coincidencias para');
+        const hints = omniTx(
+            'search_omni_prefix_hints',
+            'Pruebe con prefijos: pedido 123 · protocolo ABC · usuario García · insumo micro'
+        );
         this.results.innerHTML = `
             <div class="p-4 text-center">
                 <i class="bi bi-clipboard-x text-muted fs-1 opacity-50 mb-2 d-block"></i>
-                <p class="text-muted small mb-3">No hay coincidencias exactas para <b>"${term}"</b></p>
-                <button class="btn btn-sm btn-outline-success fw-bold px-4 rounded-pill" onclick="GeckoVoice.executeAction('${term}')">
-                    <i class="bi bi-robot me-1"></i> Consultar a GROBO IA
-                </button>
-            </div>
-        `;
-    }
+                <p class="text-muted small mb-2">${escapeOmniHtml(noRes)} <b>${escapeOmniHtml(term)}</b></p>
+                <p class="text-muted small mb-0" style="font-size:11px;">${escapeOmniHtml(hints)}</p>
+            </div>`;
+    },
 };
 
 export function initGlobalSearchUI() {

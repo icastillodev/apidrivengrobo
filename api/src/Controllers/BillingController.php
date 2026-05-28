@@ -59,6 +59,44 @@ class BillingController {
      * Quita de la tarjeta «Departamento (sin protocolo)» los pedidos que ya aparecen en Insumos generales
      * (mismo idformA), para no duplicar la vista tipo formulario con columnas que no aplican al formato insumos.
      */
+    /**
+     * Separa pedidos insumo del listado animal/reactivo del protocolo (evita duplicar en dos grillas).
+     *
+     * @return array{formularios: array<int, array<string, mixed>>, insumos: array<int, array<string, mixed>>}
+     */
+    private function partitionProtocoloPedidosAndInsumos(
+        int $idProt,
+        ?string $desde,
+        ?string $hasta,
+        array $formularios,
+        int $instId,
+        array $mapaSaldos,
+        bool $incluirInsumos = true
+    ): array {
+        if (!$incluirInsumos) {
+            return ['formularios' => $formularios, 'insumos' => []];
+        }
+        $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
+        $this->enrichInsumosFacturacionDerivadaSaldo($insumos, $mapaSaldos, $instId);
+        $insumoIds = [];
+        foreach ($insumos as $rowIns) {
+            $ik = (string) ($rowIns['id'] ?? $rowIns['idformA'] ?? '');
+            if ($ik !== '') {
+                $insumoIds[$ik] = true;
+            }
+        }
+        $formulariosFiltrados = [];
+        foreach ($formularios as $f) {
+            $fid = (string) ($f['id'] ?? '');
+            if ($fid !== '' && isset($insumoIds[$fid])) {
+                continue;
+            }
+            $formulariosFiltrados[] = $f;
+        }
+
+        return ['formularios' => $formulariosFiltrados, 'insumos' => $insumos];
+    }
+
     private function filterPedidosSinProtCoveredByInsumosGenerales(array $pedidosSinProt, array $insumosGenerales): array {
         if ($pedidosSinProt === [] || $insumosGenerales === []) {
             return $pedidosSinProt;
@@ -95,31 +133,40 @@ class BillingController {
             $deptoId = $f['depto'] ?? 0;
             $desde   = $f['desde'] ?? null;
             $hasta   = $f['hasta'] ?? null;
+            $chkAni  = !isset($f['chkAni']) || !empty($f['chkAni']);
+            $chkAlo  = !isset($f['chkAlo']) || !empty($f['chkAlo']);
+            $chkIns  = !isset($f['chkIns']) || !empty($f['chkIns']);
 
             $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
-            $insumosGenerales = $this->model->getInsumosGenerales($deptoId, $desde, $hasta);
-            $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
+            $insumosGenerales = $chkIns
+                ? $this->model->getInsumosGenerales($deptoId, $desde, $hasta, (int) $instId)
+                : [];
+            if ($chkIns) {
+                $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
+            }
 
             $deudaInsumos = 0.0;
             $pagadoInsumos = 0.0;
-            foreach ($insumosGenerales as $insRow) {
-                if ($this->billingInsumoEsExento($insRow)) {
-                    continue;
+            if ($chkIns) {
+                foreach ($insumosGenerales as $insRow) {
+                    if ($this->billingInsumoEsExento($insRow)) {
+                        continue;
+                    }
+                    $deudaInsumos += (float)($insRow['debe'] ?? 0);
+                    $pagadoInsumos += (float)($insRow['pagado'] ?? 0);
                 }
-                $deudaInsumos += (float)($insRow['debe'] ?? 0);
-                $pagadoInsumos += (float)($insRow['pagado'] ?? 0);
             }
 
-            $protocolosRaw = $this->model->getProtocolosByDepto($deptoId);
+            $protocolosRaw = $this->model->getProtocolosByDepto($deptoId, (int) $instId);
             $reporte = [];
             $deudaAnimales = 0; $deudaReactivos = 0; $deudaAlojamiento = 0;
             $totalPagadoGlobal = $pagadoInsumos;
 
             // Formato viejo: pedidos del departamento sin vincular a ningún protocolo
-            $pedidosSinProt = $this->model->getPedidosDeptoSinProtocolo($deptoId, $desde, $hasta);
+            $pedidosSinProt = $this->model->getPedidosDeptoSinProtocolo($deptoId, $desde, $hasta, (int) $instId);
             $this->enrichPedidosFacturacionDerivada($pedidosSinProt, (int) $instId);
             $pedidosSinProt = $this->filterPedidosSinProtCoveredByInsumosGenerales($pedidosSinProt, $insumosGenerales);
-            if (!empty($pedidosSinProt)) {
+            if ($chkAni && !empty($pedidosSinProt)) {
                 $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
                 foreach ($pedidosSinProt as $form) {
                     if ($this->billingFormularioEsExento($form)) {
@@ -157,39 +204,69 @@ class BillingController {
             foreach ($protocolosRaw as $p) {
                 $idProt = (int) $p['idprotA'];
                 if ($rangoFechas) {
-                    $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta);
+                    $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta, $deptoId, (int) $instId);
                     $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta);
                     if (!$hayForms && !$hayAloj) {
                         continue;
                     }
-                    $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta) : [];
+                    $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId) : [];
                     $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta) : [];
                 } else {
-                    $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                    $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId);
                     $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 }
                 $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
+                $part = $this->partitionProtocoloPedidosAndInsumos(
+                    $idProt,
+                    $desde,
+                    $hasta,
+                    $formularios,
+                    (int) $instId,
+                    $mapaSaldos,
+                    $chkIns
+                );
+                $formularios = $part['formularios'];
+                $insumosProt = $part['insumos'];
 
-                if (!empty($formularios) || !empty($alojamientos)) {
-                    $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
+                if (!$chkAlo) {
+                    $alojamientos = [];
+                }
 
-                    foreach ($formularios as $form) {
-                        if ($this->billingFormularioEsExento($form)) {
+                $sumDebeInsProt = 0.0;
+                $sumPagadoInsProt = 0.0;
+                if ($chkIns) {
+                    foreach ($insumosProt as $insP) {
+                        if ($this->billingInsumoEsExento($insP)) {
                             continue;
                         }
-                        $cat = strtolower($form['categoria'] ?? '');
-                        $montoDebe = (float)$form['debe'];
-                        
-                        if (strpos($cat, 'reactivo') !== false) {
-                            $sumDebeRea += $montoDebe;
-                        } else {
-                            $sumDebeAni += $montoDebe;
+                        $sumDebeInsProt += (float) ($insP['debe'] ?? 0);
+                        $sumPagadoInsProt += (float) ($insP['pagado'] ?? 0);
+                    }
+                }
+
+                if (!empty($formularios) || !empty($alojamientos) || !empty($insumosProt)) {
+                    $sumDebeAni = 0;
+                    $sumDebeRea = 0;
+                    $sumPagadoF = 0;
+
+                    if ($chkAni) {
+                        foreach ($formularios as $form) {
+                            if ($this->billingFormularioEsExento($form)) {
+                                continue;
+                            }
+                            $cat = strtolower($form['categoria'] ?? '');
+                            $montoDebe = (float) $form['debe'];
+                            if (strpos($cat, 'reactivo') !== false) {
+                                $sumDebeRea += $montoDebe;
+                            } else {
+                                $sumDebeAni += $montoDebe;
+                            }
+                            $sumPagadoF += (float) $form['pagado'];
                         }
-                        $sumPagadoF += (float)$form['pagado'];
                     }
 
-                    $sumDebeAlo = array_sum(array_column($alojamientos, 'debe'));
-                    $sumPagadoAlo = array_sum(array_column($alojamientos, 'pagado'));
+                    $sumDebeAlo = $chkAlo ? array_sum(array_column($alojamientos, 'debe')) : 0;
+                    $sumPagadoAlo = $chkAlo ? array_sum(array_column($alojamientos, 'pagado')) : 0;
                     $uid = $p['IdUsrA'];
 
                     $reporte[] = [
@@ -198,18 +275,21 @@ class BillingController {
                         'tituloA'          => $p['tituloA'],
                         'investigador'     => $p['Investigador'],
                         'idUsr'            => $uid,
-                        'saldoInv'         => (float)($mapaSaldos[$uid] ?? 0), 
+                        'saldoInv'         => (float)($mapaSaldos[$uid] ?? 0),
                         'deudaAnimales'    => $sumDebeAni,
                         'deudaReactivos'   => $sumDebeRea,
                         'deudaAlojamiento' => $sumDebeAlo,
+                        'deudaInsumos'     => $sumDebeInsProt,
                         'formularios'      => $formularios,
-                        'alojamientos'     => $alojamientos
+                        'alojamientos'     => $alojamientos,
+                        'insumos'          => $insumosProt,
                     ];
 
                     $deudaAnimales += $sumDebeAni;
                     $deudaReactivos += $sumDebeRea;
                     $deudaAlojamiento += $sumDebeAlo;
-                    $totalPagadoGlobal += ($sumPagadoF + $sumPagadoAlo);
+                    $deudaInsumos += $sumDebeInsProt;
+                    $totalPagadoGlobal += ($sumPagadoF + $sumPagadoAlo + $sumPagadoInsProt);
                 }
             }
 
@@ -242,6 +322,9 @@ class BillingController {
             $instId = $sesion['instId'];
             $desde  = $f['desde'] ?? null;
             $hasta  = $f['hasta'] ?? null;
+            $chkAni = !isset($f['chkAni']) || !empty($f['chkAni']);
+            $chkAlo = !isset($f['chkAlo']) || !empty($f['chkAlo']);
+            $chkIns = !isset($f['chkIns']) || !empty($f['chkIns']);
 
             $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
             $organizacionesRaw = $this->model->getOrganizacionesConDeptos($instId);
@@ -253,62 +336,116 @@ class BillingController {
 
                 foreach ($org['departamentos'] as $d) {
                     $deptoId = $d['iddeptoA'];
-                    $insumosGenerales = $this->model->getInsumosGenerales($deptoId, $desde, $hasta);
-                    $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
-                    $deudaInsumos = 0.0;
-                    foreach ($insumosGenerales as $insRow) {
-                        if ($this->billingInsumoEsExento($insRow)) {
-                            continue;
-                        }
-                        $deudaInsumos += (float) ($insRow['debe'] ?? 0);
+                    $insumosGenerales = $chkIns
+                        ? $this->model->getInsumosGenerales($deptoId, $desde, $hasta, (int) $instId)
+                        : [];
+                    if ($chkIns) {
+                        $this->enrichInsumosFacturacionDerivadaSaldo($insumosGenerales, $mapaSaldos, (int) $instId);
                     }
+                    $deudaInsumos = 0.0;
                     $pagadoInsumos = 0.0;
-                    foreach ($insumosGenerales as $insRow) {
-                        if ($this->billingInsumoEsExento($insRow)) {
-                            continue;
+                    if ($chkIns) {
+                        foreach ($insumosGenerales as $insRow) {
+                            if ($this->billingInsumoEsExento($insRow)) {
+                                continue;
+                            }
+                            $deudaInsumos += (float) ($insRow['debe'] ?? 0);
+                            $pagadoInsumos += (float) ($insRow['pagado'] ?? 0);
                         }
-                        $pagadoInsumos += (float) ($insRow['pagado'] ?? 0);
                     }
 
-                    $protocolosRaw = $this->model->getProtocolosByDepto($deptoId);
+                    $protocolosRaw = $this->model->getProtocolosByDepto($deptoId, (int) $instId);
                     $reporte = [];
-                    $deudaAnimales = 0; $deudaReactivos = 0; $deudaAlojamiento = 0; $totalPagadoDepto = $pagadoInsumos;
+                    $deudaAnimales = 0;
+                    $deudaReactivos = 0;
+                    $deudaAlojamiento = 0;
+                    $deudaInsumosProtDepto = 0.0;
+                    $totalPagadoDepto = $pagadoInsumos;
 
                     foreach ($protocolosRaw as $p) {
                         $idProt = $p['idprotA'];
-                        $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                        $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId);
                         $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
-                        $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                        $alojamientos = $chkAlo
+                            ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta)
+                            : [];
+                        $part = $this->partitionProtocoloPedidosAndInsumos(
+                            $idProt,
+                            $desde,
+                            $hasta,
+                            $formularios,
+                            (int) $instId,
+                            $mapaSaldos,
+                            $chkIns
+                        );
+                        $formularios = $part['formularios'];
+                        $insumosProt = $part['insumos'];
 
-                        if (!empty($formularios) || !empty($alojamientos)) {
-                            $sumDebeAni = 0; $sumDebeRea = 0; $sumPagadoF = 0;
-                            foreach ($formularios as $form) {
-                                $cat = strtolower($form['categoria'] ?? '');
-                                $montoDebe = (float)$form['debe'];
-                                if (strpos($cat, 'reactivo') !== false) $sumDebeRea += $montoDebe;
-                                else $sumDebeAni += $montoDebe;
-                                $sumPagadoF += (float)$form['pagado'];
+                        $sumDebeInsProt = 0.0;
+                        $sumPagadoInsProt = 0.0;
+                        if ($chkIns) {
+                            foreach ($insumosProt as $insP) {
+                                if ($this->billingInsumoEsExento($insP)) {
+                                    continue;
+                                }
+                                $sumDebeInsProt += (float) ($insP['debe'] ?? 0);
+                                $sumPagadoInsProt += (float) ($insP['pagado'] ?? 0);
                             }
-                            $sumDebeAlo = array_sum(array_column($alojamientos, 'debe'));
-                            $sumPagadoAlo = array_sum(array_column($alojamientos, 'pagado'));
+                        }
+
+                        if (!empty($formularios) || !empty($alojamientos) || !empty($insumosProt)) {
+                            $sumDebeAni = 0;
+                            $sumDebeRea = 0;
+                            $sumPagadoF = 0;
+                            if ($chkAni) {
+                                foreach ($formularios as $form) {
+                                    if ($this->billingFormularioEsExento($form)) {
+                                        continue;
+                                    }
+                                    $cat = strtolower($form['categoria'] ?? '');
+                                    $montoDebe = (float) $form['debe'];
+                                    if (strpos($cat, 'reactivo') !== false) {
+                                        $sumDebeRea += $montoDebe;
+                                    } else {
+                                        $sumDebeAni += $montoDebe;
+                                    }
+                                    $sumPagadoF += (float) $form['pagado'];
+                                }
+                            }
+                            $sumDebeAlo = $chkAlo ? array_sum(array_column($alojamientos, 'debe')) : 0;
+                            $sumPagadoAlo = $chkAlo ? array_sum(array_column($alojamientos, 'pagado')) : 0;
                             $uid = $p['IdUsrA'];
                             $reporte[] = [
-                                'idProt' => $idProt, 'nprotA' => $p['nprotA'], 'tituloA' => $p['tituloA'],
-                                'investigador' => $p['Investigador'], 'idUsr' => $uid,
-                                'saldoInv' => (float)($mapaSaldos[$uid] ?? 0),
-                                'deudaAnimales' => $sumDebeAni, 'deudaReactivos' => $sumDebeRea, 'deudaAlojamiento' => $sumDebeAlo,
-                                'formularios' => $formularios, 'alojamientos' => $alojamientos
+                                'idProt' => $idProt,
+                                'nprotA' => $p['nprotA'],
+                                'tituloA' => $p['tituloA'],
+                                'investigador' => $p['Investigador'],
+                                'idUsr' => $uid,
+                                'saldoInv' => (float) ($mapaSaldos[$uid] ?? 0),
+                                'deudaAnimales' => $sumDebeAni,
+                                'deudaReactivos' => $sumDebeRea,
+                                'deudaAlojamiento' => $sumDebeAlo,
+                                'deudaInsumos' => $sumDebeInsProt,
+                                'formularios' => $formularios,
+                                'alojamientos' => $alojamientos,
+                                'insumos' => $insumosProt,
                             ];
-                            $deudaAnimales += $sumDebeAni; $deudaReactivos += $sumDebeRea; $deudaAlojamiento += $sumDebeAlo;
-                            $totalPagadoDepto += ($sumPagadoF + $sumPagadoAlo);
+                            $deudaAnimales += $sumDebeAni;
+                            $deudaReactivos += $sumDebeRea;
+                            $deudaAlojamiento += $sumDebeAlo;
+                            $deudaInsumosProtDepto += $sumDebeInsProt;
+                            $totalPagadoDepto += ($sumPagadoF + $sumPagadoAlo + $sumPagadoInsProt);
                         }
                     }
 
+                    $deudaInsumos += $deudaInsumosProtDepto;
                     $totalesDepto = [
                         'globalDeuda' => ($deudaAnimales + $deudaReactivos + $deudaAlojamiento + $deudaInsumos),
-                        'deudaAnimales' => $deudaAnimales, 'deudaReactivos' => $deudaReactivos,
-                        'deudaAlojamiento' => $deudaAlojamiento, 'deudaInsumos' => $deudaInsumos,
-                        'totalPagado' => $totalPagadoDepto
+                        'deudaAnimales' => $deudaAnimales,
+                        'deudaReactivos' => $deudaReactivos,
+                        'deudaAlojamiento' => $deudaAlojamiento,
+                        'deudaInsumos' => $deudaInsumos,
+                        'totalPagado' => $totalPagadoDepto,
                     ];
                     $totalesOrg['globalDeuda'] += $totalesDepto['globalDeuda'];
                     $totalesOrg['deudaAnimales'] += $totalesDepto['deudaAnimales'];
@@ -317,21 +454,30 @@ class BillingController {
                     $totalesOrg['deudaInsumos'] += $totalesDepto['deudaInsumos'];
                     $totalesOrg['totalPagado'] += $totalesDepto['totalPagado'];
 
-                    $departamentos[] = [
-                        'iddeptoA' => $deptoId,
-                        'NombreDeptoA' => $d['NombreDeptoA'],
-                        'totales' => $totalesDepto,
-                        'insumosGenerales' => $insumosGenerales,
-                        'protocolos' => $reporte
-                    ];
+                    $tieneActividad = ($totalesDepto['globalDeuda'] > 0.005)
+                        || ($totalesDepto['totalPagado'] > 0.005)
+                        || $reporte !== []
+                        || ($chkIns && $insumosGenerales !== []);
+
+                    if ($tieneActividad) {
+                        $departamentos[] = [
+                            'iddeptoA' => $deptoId,
+                            'NombreDeptoA' => $d['NombreDeptoA'],
+                            'totales' => $totalesDepto,
+                            'insumosGenerales' => $insumosGenerales,
+                            'protocolos' => $reporte,
+                        ];
+                    }
                 }
 
-                $organizaciones[] = [
-                    'idOrganismo' => $org['idOrganismo'],
-                    'nombre' => $org['nombre'],
-                    'totales' => $totalesOrg,
-                    'departamentos' => $departamentos
-                ];
+                if ($departamentos !== []) {
+                    $organizaciones[] = [
+                        'idOrganismo' => $org['idOrganismo'],
+                        'nombre' => $org['nombre'],
+                        'totales' => $totalesOrg,
+                        'departamentos' => $departamentos,
+                    ];
+                }
             }
 
             $scope = $this->normalizeFacturacionDerivacionFiltro($f['facturacionDerivacion'] ?? ($f['facturacion_derivacion'] ?? 'todos'));

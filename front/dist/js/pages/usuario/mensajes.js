@@ -1,6 +1,8 @@
 import { API } from '../../api.js';
 import { Auth } from '../../auth.js?v=20260409';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
+import { collectMenuPathsFromIds } from '../../utils/capacitacionMenuPaths.js';
+import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../../modulesAccess.js';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -62,6 +64,43 @@ async function openMensajeAdjuntoDescarga(idMensaje) {
 
 const MSG_CAT_ORDER = ['manual', 'formulario', 'alojamiento', 'reserva', 'lista_usuarios', 'notificacion', 'institucional'];
 
+function stripHiloQueryParam() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('hilo')) return;
+    url.searchParams.delete('hilo');
+    const nq = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (nq ? `?${nq}` : '') + url.hash);
+}
+
+function redirectToAppDashboard() {
+    hideLoader({ minVisibleMs: 0 });
+    const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
+    Auth.autoRedirectIfLogged(role);
+}
+
+async function fetchUserMenuIds(role, instId) {
+    await ensureInstModulesLoaded(API.request.bind(API));
+    if ([1, 2, 4].includes(role)) {
+        let ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 55, 202, 204, 205, 206, 207, 208, 209, 998, 999];
+        return filterMenuIdsByModulos(ids, role, instId);
+    }
+    const res = await API.request(`/menu?role=${role}&inst=${instId}`, 'GET');
+    const ids = res?.status === 'success' && Array.isArray(res.data)
+        ? res.data.map((id) => Number(id))
+        : [];
+    return filterMenuIdsByModulos(ids, role, instId);
+}
+
+async function userCanAccessMensajesPage(instMode, role) {
+    const instId = parseInt(sessionStorage.getItem('instId') || localStorage.getItem('instId') || '0', 10) || 0;
+    const menuIds = await fetchUserMenuIds(role, instId);
+    const paths = collectMenuPathsFromIds(menuIds, role);
+    if (instMode) {
+        return menuIds.includes(204) || paths.has('panel/mensajes_institucion');
+    }
+    return paths.has('panel/mensajes') || menuIds.includes(55);
+}
+
 function labelOrigenTipo(ot) {
     const t = window.txt?.comunicacion || {};
     const m = {
@@ -115,6 +154,12 @@ export async function initMensajes(opts = {}) {
     const isStaff = [1, 2, 4, 5, 6].includes(role);
     const alcance = opts.alcance === 'institucional' ? 'institucional' : 'personal';
     const instMode = alcance === 'institucional';
+
+    const canUsePage = await userCanAccessMensajesPage(instMode, role);
+    if (!canUsePage) {
+        redirectToAppDashboard();
+        return;
+    }
 
     const destBlock = document.getElementById('msg-nuevo-dest-block');
     const catBlock = document.getElementById('msg-nuevo-cat-block');
@@ -562,27 +607,49 @@ export async function initMensajes(opts = {}) {
         return parts.join(' · ');
     }
 
-    async function loadHilos(options = {}) {
-        const silent = options.silent === true;
+    let hilosCache = [];
+
+    function normHiloFiltro(s) {
+        return String(s ?? '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function hiloMatchesFiltro(h, qRaw) {
+        const q = normHiloFiltro(String(qRaw || '').trim());
+        if (!q) return true;
+        const ot = String(h.OrigenTipo || '').trim();
+        const hay = [
+            h.Asunto,
+            h.UltimoCuerpoPreview,
+            h.ListaInterNombre,
+            h.ListaInterApellido,
+            h.ListaInterUsuario,
+            h.ListaInterId,
+            labelOrigenTipo(ot),
+            formatListaInterlocutorLine(h),
+        ]
+            .map(normHiloFiltro)
+            .join(' ');
+        return hay.includes(q);
+    }
+
+    function getHilosFiltrados() {
+        const q = document.getElementById('hilos-filtro')?.value || '';
+        return hilosCache.filter((h) => hiloMatchesFiltro(h, q));
+    }
+
+    function renderHilosList(hilos) {
         const list = document.getElementById('lista-hilos');
         if (!list) return;
 
-        if (!silent) {
-            const loadingMsg = escapeHtml(t.msg_cargando || window.txt?.generales?.msg_cargando || '…');
-            list.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadingMsg}</div></div>`;
-        }
-
-        const q = encodeURIComponent(alcance);
-        const res = await API.request(`/comunicacion/mensajes/hilos?alcance=${q}`, 'GET');
-
-        if (res.status !== 'success' || !Array.isArray(res.data)) {
-            list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.err_generico || '')}</div>`;
-            return;
-        }
-
-        const hilos = res.data;
-        if (hilos.length === 0) {
-            list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.msg_hilos_vacio || '')}</div>`;
+        if (!Array.isArray(hilos) || hilos.length === 0) {
+            const vacio =
+                hilosCache.length > 0
+                    ? (t.msg_hilos_filtro_vacio || t.msg_hilos_vacio || '')
+                    : (t.msg_hilos_vacio || '');
+            list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(vacio)}</div>`;
             return;
         }
 
@@ -600,12 +667,20 @@ export async function initMensajes(opts = {}) {
             const interHtml = interLine
                 ? `<div class="text-muted text-break mt-1" style="font-size:11px;line-height:1.35;">${escapeHtml(interLine)}</div>`
                 : '';
+            const previewRaw = String(h.UltimoCuerpoPreview || '').trim();
+            const preview = previewRaw
+                ? previewRaw.replace(/\s+/g, ' ').slice(0, 90) + (previewRaw.length > 90 ? '…' : '')
+                : '';
+            const previewHtml = preview
+                ? `<div class="text-secondary text-break mt-1 msg-hilo-preview">${escapeHtml(preview)}</div>`
+                : '';
             return `
                 <button type="button" class="list-group-item list-group-item-action text-start w-100${active}" data-hilo="${h.IdMensajeHilo}">
                     <div class="d-flex justify-content-between align-items-start gap-2">
                         <div class="small flex-grow-1" style="min-width:0">
                             <div class="text-break"><span class="fw-medium">${escapeHtml(h.Asunto || (t.msg_hilo_sin_asunto || '—'))}</span>${tipoBadge}${badge}</div>
                             ${interHtml}
+                            ${previewHtml}
                         </div>
                         <small class="text-muted text-nowrap flex-shrink-0">${escapeHtml(formatDate(h.FechaUltimoMensaje || h.FechaCreacion))}</small>
                     </div>
@@ -617,6 +692,29 @@ export async function initMensajes(opts = {}) {
                 openHilo(parseInt(btn.getAttribute('data-hilo'), 10));
             });
         });
+    }
+
+    async function loadHilos(options = {}) {
+        const silent = options.silent === true;
+        const list = document.getElementById('lista-hilos');
+        if (!list) return;
+
+        if (!silent) {
+            const loadingMsg = escapeHtml(t.msg_cargando || window.txt?.generales?.msg_cargando || '…');
+            list.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${loadingMsg}</div></div>`;
+        }
+
+        const q = encodeURIComponent(alcance);
+        const res = await API.request(`/comunicacion/mensajes/hilos?alcance=${q}`, 'GET');
+
+        if (res.status !== 'success' || !Array.isArray(res.data)) {
+            hilosCache = [];
+            list.innerHTML = `<div class="p-3 text-muted small">${escapeHtml(t.err_generico || '')}</div>`;
+            return;
+        }
+
+        hilosCache = res.data;
+        renderHilosList(getHilosFiltrados());
     }
 
     function getNuevoSobreUsuarioId() {
@@ -767,6 +865,10 @@ export async function initMensajes(opts = {}) {
             if (ph) ph.classList.remove('d-none');
             const code = String(res.code || '').trim();
             if (code === 'hilo_sin_acceso' || code === 'hilo_no_encontrado') {
+                if (opts.fromDeepLink) {
+                    return false;
+                }
+                hideLoader({ minVisibleMs: 0 });
                 await promptHiloDeepLinkSinAcceso(res);
                 return false;
             }
@@ -927,11 +1029,12 @@ export async function initMensajes(opts = {}) {
         }
 
         const box = document.getElementById('hilo-mensajes');
+        const scrollToMsgId = parseInt(opts.scrollToMsgId || 0, 10);
         if (box) {
             box.innerHTML = mensajes.map((m) => {
                 const mine = parseInt(m.IdUsrRemitente, 10) === uid;
-                const bubble = mine ? 'bg-primary text-white' : 'bg-white border';
-                const align = mine ? 'text-end' : '';
+                const bubble = mine ? 'bg-success text-white' : 'bg-white border shadow-sm';
+                const rowCls = mine ? 'msg-chat-row mine' : 'msg-chat-row theirs';
                 const yo = t.msg_yo || 'Yo';
                 const nom = String(m.RemitenteNombre || '').trim();
                 const ape = String(m.RemitenteApellido || '').trim();
@@ -961,18 +1064,32 @@ export async function initMensajes(opts = {}) {
                 const adjHtml = adjKey && mid > 0
                     ? `<div class="small mt-1"><button type="button" class="btn btn-link p-0 align-baseline msg-adjunto-dl ${linkMine}" data-msg-id="${mid}" title="${escapeHtml(t.msg_adjunto_abrir || '')}" style="font-size:inherit;">${escapeHtml(adjLbl)}</button></div>`
                     : '';
+                const midRow = parseInt(m.IdMensaje || 0, 10);
                 return `
-                    <div class="mb-2 ${align}">
-                        <div class="small ${mine ? 'text-primary' : 'text-muted'}">${escapeHtml(remitente)}</div>
-                        <div class="d-inline-block px-2 py-1 rounded small ${bubble}" style="max-width:85%;text-align:left;">
+                    <div id="msg-row-${midRow}" class="${rowCls}" data-msg-id="${midRow}">
+                        <div class="small fw-semibold ${mine ? 'text-success text-end' : 'text-muted'}">${escapeHtml(remitente)}</div>
+                        <div class="msg-bubble ${bubble}">
                             ${escapeHtml(m.Cuerpo || '')}
                             ${ctxHtml}
                             ${adjHtml}
                         </div>
-                        <div class="small text-muted">${escapeHtml(formatDateTime(m.FechaEnvio))}</div>
+                        <div class="small text-muted ${mine ? 'text-end' : ''}">${escapeHtml(formatDateTime(m.FechaEnvio))}</div>
                     </div>`;
             }).join('');
-            box.scrollTop = box.scrollHeight;
+            if (scrollToMsgId > 0) {
+                requestAnimationFrame(() => {
+                    const target = document.getElementById(`msg-row-${scrollToMsgId}`);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        target.classList.add('msg-highlight');
+                        window.setTimeout(() => target.classList.remove('msg-highlight'), 3000);
+                    } else {
+                        box.scrollTop = box.scrollHeight;
+                    }
+                });
+            } else {
+                box.scrollTop = box.scrollHeight;
+            }
         }
 
         if (!skipLoadHilos) {
@@ -1131,7 +1248,7 @@ export async function initMensajes(opts = {}) {
 
     const replyTa = document.getElementById('reply-text');
     if (replyTa) {
-        replyTa.placeholder = t.msg_placeholder || '';
+        replyTa.placeholder = t.msg_reply_ph || t.msg_placeholder || '';
         replyTa.title = t.msg_reply_shortcut || '';
         replyTa.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -1559,18 +1676,119 @@ export async function initMensajes(opts = {}) {
         modal.show();
     }
 
+    let buscarMensajesGen = 0;
+    let buscarMensajesTimer = null;
+
+    function renderBuscarMensajesDropdown(items, loading, qRaw) {
+        const drop = document.getElementById('msg-buscar-dropdown');
+        if (!drop) return;
+        const q = String(qRaw || '').trim();
+        if (q.length < 2) {
+            drop.classList.add('d-none');
+            drop.innerHTML = '';
+            return;
+        }
+        if (loading) {
+            drop.classList.remove('d-none');
+            drop.innerHTML = `<div class="p-2 small text-muted text-center">${escapeHtml(t.msg_buscar_cargando || '…')}</div>`;
+            return;
+        }
+        if (!Array.isArray(items) || items.length === 0) {
+            drop.classList.remove('d-none');
+            drop.innerHTML = `<div class="p-2 small text-muted">${escapeHtml(t.msg_buscar_sin_resultados || '')}</div>`;
+            return;
+        }
+        const tit = t.msg_buscar_en_mensajes || '';
+        drop.classList.remove('d-none');
+        drop.innerHTML =
+            (tit ? `<div class="px-2 py-1 small fw-bold text-muted text-uppercase" style="font-size:10px;">${escapeHtml(tit)}</div>` : '') +
+            items.map((it) => {
+                const hid = parseInt(it.IdMensajeHilo || 0, 10);
+                const mid = parseInt(it.IdMensaje || 0, 10);
+                const asunto = String(it.Asunto || t.msg_hilo_sin_asunto || '—').trim();
+                const snip = String(it.Snippet || '').trim();
+                return `<button type="button" class="list-group-item list-group-item-action py-2 msg-buscar-hit" data-hilo="${hid}" data-msg="${mid}">
+                    <div class="fw-medium small text-break">${escapeHtml(asunto)}</div>
+                    <div class="text-muted small text-break">${escapeHtml(snip)}</div>
+                    <div class="text-muted" style="font-size:10px;">${escapeHtml(formatDateTime(it.FechaEnvio))}</div>
+                </button>`;
+            }).join('');
+        drop.querySelectorAll('.msg-buscar-hit').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const hid = parseInt(btn.getAttribute('data-hilo') || '0', 10);
+                const mid = parseInt(btn.getAttribute('data-msg') || '0', 10);
+                drop.classList.add('d-none');
+                const inp = document.getElementById('hilos-filtro');
+                if (inp) inp.value = '';
+                renderHilosList(getHilosFiltrados());
+                openHilo(hid, { scrollToMsgId: mid });
+            });
+        });
+    }
+
+    async function runBuscarEnMensajes(qRaw) {
+        const q = String(qRaw || '').trim();
+        if (q.length < 2) {
+            renderBuscarMensajesDropdown([], false, q);
+            return;
+        }
+        const gen = ++buscarMensajesGen;
+        renderBuscarMensajesDropdown([], true, q);
+        const res = await API.request(
+            `/comunicacion/mensajes/buscar?q=${encodeURIComponent(q)}&alcance=${encodeURIComponent(alcance)}`,
+            'GET'
+        );
+        if (gen !== buscarMensajesGen) return;
+        if (res.status === 'success' && Array.isArray(res.data)) {
+            renderBuscarMensajesDropdown(res.data, false, q);
+        } else {
+            renderBuscarMensajesDropdown([], false, q);
+        }
+    }
+
+    const hilosFiltro = document.getElementById('hilos-filtro');
+    if (hilosFiltro) {
+        const ph = t.msg_buscar_conversacion_ph || t.msg_hilos_filtro_ph || '';
+        if (ph) hilosFiltro.placeholder = ph;
+        hilosFiltro.addEventListener('input', () => {
+            renderHilosList(getHilosFiltrados());
+            clearTimeout(buscarMensajesTimer);
+            const q = hilosFiltro.value || '';
+            if (q.trim().length < 2) {
+                buscarMensajesGen++;
+                renderBuscarMensajesDropdown([], false, q);
+                return;
+            }
+            buscarMensajesTimer = window.setTimeout(() => runBuscarEnMensajes(q), 320);
+        });
+        hilosFiltro.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hilosFiltro.value = '';
+                renderHilosList(getHilosFiltrados());
+                renderBuscarMensajesDropdown([], false, '');
+            }
+        });
+    }
+    document.addEventListener('click', (e) => {
+        const wrap = document.querySelector('.msg-conv-search-wrap');
+        const drop = document.getElementById('msg-buscar-dropdown');
+        if (!wrap || !drop || drop.classList.contains('d-none')) return;
+        if (!wrap.contains(e.target)) drop.classList.add('d-none');
+    });
+
     await loadHilos();
 
     async function applyHiloDeepLink() {
         const sp = new URLSearchParams(window.location.search);
         const hid = parseInt(sp.get('hilo') || '0', 10);
         if (!hid) return;
-        const ok = await openHilo(hid);
-        if (!ok) return;
-        const url = new URL(window.location.href);
-        url.searchParams.delete('hilo');
-        const nq = url.searchParams.toString();
-        window.history.replaceState({}, '', url.pathname + (nq ? `?${nq}` : '') + url.hash);
+        hideLoader({ minVisibleMs: 0 });
+        const ok = await openHilo(hid, { fromDeepLink: true });
+        stripHiloQueryParam();
+        if (!ok) {
+            redirectToAppDashboard();
+            return;
+        }
     }
 
     await applyMsgNuevoDeepLink();

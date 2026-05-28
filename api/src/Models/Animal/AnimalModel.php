@@ -180,6 +180,7 @@ class AnimalModel {
                     px.nprotA as NProtocolo, px.tituloA as TituloProtocolo, px.idprotA,
                     px.protocoloexpe as IsExterno, 
                     COALESCE(d.NombreDeptoA, 'Sin departamento') as DeptoProtocolo,
+                    COALESCE(d_prot.NombreDeptoA, pd_prot.NombreDeptoA, 'Sin departamento') as DeptoProtocoloOrigen,
                     COALESCE({$deptoExpr}, pd.iddeptoA) as idDepto,
                     COALESCE(o.NombreOrganismoSimple, '') as Organizacion,
                     COALESCE(CONCAT(e.EspeNombreA, ' - ', se.SubEspeNombreA), '—') as CatEspecie,
@@ -212,6 +213,8 @@ class AnimalModel {
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
                 LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                LEFT JOIN departamentoe d_prot ON px.departamento = d_prot.iddeptoA
+                LEFT JOIN departamentoe pd_prot ON pd.iddeptoA = pd_prot.iddeptoA
                 LEFT JOIN departamentoe d ON COALESCE({$deptoExpr}, pd.iddeptoA) = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 LEFT JOIN sexoe s ON f.idformA = s.idformA
@@ -672,15 +675,28 @@ public function updateStatus($data) {
     // api/src/Models/Animal/AnimalModel.php
 
     public function getFormData($instId) {
-        $stmtTypes = $this->db->prepare("SELECT IdTipoFormulario, nombreTipo, exento, descuento, color FROM tipoformularios WHERE IdInstitucion = ? AND categoriaformulario IN ('Animal', 'Animal vivo')");
+        $stmtTypes = $this->db->prepare(
+            "SELECT IdTipoFormulario, nombreTipo, exento, descuento, color
+             FROM tipoformularios
+             WHERE IdInstitucion = ?
+               AND LOWER(TRIM(categoriaformulario)) IN ('animal', 'animal vivo')
+             ORDER BY nombreTipo ASC"
+        );
         $stmtTypes->execute([$instId]);
-        
-        $stmtProt = $this->db->prepare("SELECT idprotA, nprotA, tituloA, protocoloexpe as IsExterno FROM protocoloexpe WHERE IdInstitucion = ?");
+
+        $stmtProt = $this->db->prepare(
+            "SELECT idprotA, nprotA, tituloA, protocoloexpe AS IsExterno
+             FROM protocoloexpe
+             WHERE IdInstitucion = ?
+             ORDER BY nprotA DESC"
+        );
         $stmtProt->execute([$instId]);
+        $localProtocols = $stmtProt->fetchAll(\PDO::FETCH_ASSOC);
+        $derivModel = new FormDerivacionModel($this->db);
 
         return [
             'types' => $stmtTypes->fetchAll(\PDO::FETCH_ASSOC),
-            'protocols' => $stmtProt->fetchAll(\PDO::FETCH_ASSOC)
+            'protocols' => $derivModel->mergeProtocolsListWithDerivaciones((int)$instId, $localProtocols),
         ];
     }
 
@@ -994,14 +1010,16 @@ public function updateStatus($data) {
 
             $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
 
-            if ($oldProt == $newProt) {
-                $diff = $newTotal - $oldTotal;
-                if ($diff != 0 && $newProt) {
-                    $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$diff, $newProt]);
+            if (!$esDerivadoEnDestino) {
+                if ($oldProt == $newProt) {
+                    $diff = $newTotal - $oldTotal;
+                    if ($diff != 0 && $newProt) {
+                        $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$diff, $newProt]);
+                    }
+                } else {
+                    if ($oldProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$oldTotal, $oldProt]);
+                    if ($newProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$newTotal, $newProt]);
                 }
-            } else {
-                if ($oldProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA + ? WHERE idprotA = ?")->execute([$oldTotal, $oldProt]);
-                if ($newProt) $this->db->prepare("UPDATE protocoloexpe SET CantidadAniA = CantidadAniA - ? WHERE idprotA = ?")->execute([$newTotal, $newProt]);
             }
 
             Auditoria::log($this->db, 'UPDATE_FULL', 'formularioe', "Modificación Administrativa de Pedido de Animales #$id");
@@ -1160,10 +1178,10 @@ public function updateStatus($data) {
         // D. TIPOS DE FORMULARIO (NUEVO)
         // Filtramos por Categoria = 'Animal' e Institución
         $stmtTypes = $this->db->prepare("
-            SELECT IdTipoFormulario, nombreTipo 
-            FROM tipoformularios 
-            WHERE categoriaformulario = 'Animal' 
-            AND IdInstitucion = ?
+            SELECT IdTipoFormulario, nombreTipo
+            FROM tipoformularios
+            WHERE IdInstitucion = ?
+              AND LOWER(TRIM(categoriaformulario)) IN ('animal', 'animal vivo')
             ORDER BY nombreTipo ASC
         ");
         $stmtTypes->execute([$instId]);
@@ -1200,7 +1218,11 @@ public function getDetailsAndSpecies($protId, $instId = null) {
                 END as RedConfigCompleta,
                 COALESCE(CONCAT(per.NombreA, ' ', per.ApellidoA), CONCAT('ID:', COALESCE(pr.IdUsrA, p.IdUsrA))) as Responsable,
                 COALESCE(d.NombreDeptoA, 'Sin departamento') as Depto,
-                (SELECT COALESCE(SUM(s.totalA), 0) FROM protformr pf JOIN sexoe s ON pf.idformA = s.idformA WHERE pf.idprotA = p.idprotA) as usados
+                (SELECT COALESCE(SUM(s.totalA), 0)
+                 FROM protformr pf
+                 JOIN formularioe f2 ON pf.idformA = f2.idformA
+                 JOIN sexoe s ON f2.idformA = s.idformA
+                 WHERE pf.idprotA = p.idprotA AND f2.estado = 'Entregado') as usados
             FROM protocoloexpe p
             LEFT JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
             LEFT JOIN personae per ON per.IdUsrA = COALESCE(pr.IdUsrA, p.IdUsrA)
@@ -1307,7 +1329,11 @@ public function getDetailsAndSpecies($protId, $instId = null) {
 public function saveOrder($data) {
         $this->db->beginTransaction();
         try {
-            $stmtCheck = $this->db->prepare("SELECT IdTipoFormulario FROM tipoformularios WHERE IdTipoFormulario = ? AND categoriaformulario = 'Animal' AND IdInstitucion = ?");
+            $stmtCheck = $this->db->prepare(
+                "SELECT IdTipoFormulario FROM tipoformularios
+                 WHERE IdTipoFormulario = ? AND IdInstitucion = ?
+                   AND LOWER(TRIM(categoriaformulario)) IN ('animal', 'animal vivo')"
+            );
             $stmtCheck->execute([$data['idTipoFormulario'], $data['instId']]);
             
             if (!$stmtCheck->fetchColumn()) throw new \Exception("Error: El tipo de formulario seleccionado no es válido.");

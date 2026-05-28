@@ -139,6 +139,25 @@ class MensajeriaController {
         }
     }
 
+    public function buscarMensajes() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $instId = $this->requireInst($sesion);
+            $uid = (int) $sesion['userId'];
+            $role = (int) ($sesion['role'] ?? 0);
+            $q = trim((string) ($_GET['q'] ?? ''));
+            $alcance = strtolower(trim((string) ($_GET['alcance'] ?? 'personal')));
+            if (mb_strlen($q) < 2) {
+                $this->json(['status' => 'success', 'data' => []]);
+            }
+            $items = $this->model->buscarMensajesEnHilos($instId, $uid, $role, $q, $alcance, 25);
+            $this->json(['status' => 'success', 'data' => $items]);
+        } catch (\Exception $e) {
+            error_log('MensajeriaController::buscarMensajes ' . $e->getMessage());
+            $this->json(['status' => 'error', 'message' => 'No se pudo completar la búsqueda.'], 400);
+        }
+    }
+
     public function getUnreadCount() {
         try {
             $sesion = Auditoria::getDatosSesion();

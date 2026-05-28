@@ -16,7 +16,10 @@ export class GeckoSearchEngine {
             { key: 'alojamiento', words: ['alojamiento', 'aloj', 'caja', 'housing'] },
             { key: 'protocolo', words: ['protocolo', 'prot', 'expediente'] },
             { key: 'pedido', words: ['pedido', 'form', 'formulario', 'solicitud', 'orden'] },
-            { key: 'usuario', words: ['usuario', 'user', 'inv', 'investigador'] }
+            { key: 'usuario', words: ['usuario', 'user', 'inv', 'investigador'] },
+            { key: 'insumo', words: ['insumo', 'insumos', 'material', 'reactivo'] },
+            { key: 'departamento', words: ['departamento', 'depto', 'department'] },
+            { key: 'organismo', words: ['organismo', 'org'] },
         ];
 
         for (const p of patterns) {

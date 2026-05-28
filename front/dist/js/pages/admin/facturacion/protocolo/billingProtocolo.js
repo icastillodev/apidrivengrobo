@@ -424,7 +424,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
-    const colspan = 9;
+    const colspan = 10;
     let tbody = '';
     if (reactivos.length > 0) {
         tbody += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
@@ -445,6 +445,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:3%"><input type="checkbox" class="check-all-insumo-prot" data-prot="${idProt}"></th>
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${bi.th_estado_cap || 'Estado'}</th>
+                            <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
                             <th style="width:12%">${bi.th_solicitante_cap || 'Solicitante'}</th>
                             <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>

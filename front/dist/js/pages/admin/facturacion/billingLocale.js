@@ -236,6 +236,22 @@ export function billingDerivadaLiquidacionBadge(row) {
 }
 
 /**
+ * Pedido derivado saliente: en sede origen no suma deuda; liquida en otra institución.
+ * @param {Record<string, unknown>|null|undefined} row
+ */
+export function billingDerivacionSalienteHint(row) {
+    if (!row || typeof row !== 'object') return '';
+    const v = row.es_facturacion_derivada_saliente;
+    if (v !== true && v !== 1 && v !== '1') return '';
+    const inst = String(row.derivacion_liquida_en_institucion ?? '').trim();
+    const tpl = window.txt?.facturacion?.billing_institucion?.derivacion_saliente_hint
+        ?? 'Liquida en {inst}';
+    const text = tpl.replace(/\{inst\}/g, inst || '—');
+    const safe = String(text).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<br><span class="badge bg-secondary mt-1" style="font-size:8px;">${safe}</span>`;
+}
+
+/**
  * Marca corta de exento en columnas tipo `#123 (EX)` — `facturacion.billing_depto_export.pdf_marca_ex` (ES/EN/PT).
  */
 export function billingPdfMarcaExentoCorta() {
@@ -330,8 +346,30 @@ export function billingPartitionInsumosPedidoReactivoOtros(insumos) {
 /**
  * Subtítulo visual dentro del tbody (agrupa insumos por categoría).
  */
+/**
+ * Celda In/Out para grillas de pedidos (animales, reactivos, insumos).
+ * @param {Record<string, unknown>|null|undefined} row
+ * @param {{ fecha_in?: string, fecha_out?: string }|null|undefined} bi
+ */
+export function billingFormatPedidoFechasCell(row, bi) {
+    const fi = bi?.fecha_in || 'In:';
+    const fo = bi?.fecha_out || 'Out:';
+    const inicio = row?.fecha ?? row?.fecha_inicio ?? row?.fechainicioA ?? '-';
+    const fin = row?.fecRetiroA ?? row?.fecha_fin ?? '-';
+    return `<div class="small"><b>${fi}</b> ${inicio}</div><div class="small text-danger"><b>${fo}</b> ${fin}</div>`;
+}
+
+/** Texto plano In/Out para PDF y Excel (misma lógica que la columna FECHAS en pantalla). */
+export function billingFormatPedidoFechasPlain(row, bi) {
+    const fi = bi?.fecha_in || 'In:';
+    const fo = bi?.fecha_out || 'Out:';
+    const inicio = row?.fecha ?? row?.fecha_inicio ?? row?.fechainicioA ?? '-';
+    const fin = row?.fecRetiroA ?? row?.fecha_fin ?? '-';
+    return `${fi} ${inicio} | ${fo} ${fin}`;
+}
+
 export function billingHtmlInsumoProtSectionHeader(colspan, label) {
-    const n = Math.max(1, parseInt(String(colspan), 10) || 9);
+    const n = Math.max(1, parseInt(String(colspan), 10) || 10);
     const esc = String(label ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -348,7 +386,7 @@ export function billingHtmlInsumoProtSectionHeader(colspan, label) {
  * @param {string|number} [idProt] obligatorio si variant === 'protocolo'
  */
 export function billingHtmlRowInsumoPedidoFacturacion(i, packs, variant, idProt) {
-    const { bd, tf, exL } = packs;
+    const { bd, tf, bi, exL } = packs;
     const total = billingInsumoMontoTotalCobrable(i);
     const pagado = parseFloat(i.pagado || 0);
     const isExento = billingTipoExento(i);
@@ -370,8 +408,9 @@ export function billingHtmlRowInsumoPedidoFacturacion(i, packs, variant, idProt)
             <tr class="text-center align-middle pointer" style="${rowStyle}"
                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('INSUMO', ${i.id})">
                 <td>${chk}</td>
-                <td class="small text-muted fw-bold">#${i.id}${billingDerivadaLiquidacionBadge(i)}</td>
+                <td class="small text-muted fw-bold">#${i.id}${billingDerivadaLiquidacionBadge(i)}${billingDerivacionSalienteHint(i)}</td>
                 <td>${badge}</td>
+                <td>${billingFormatPedidoFechasCell(i, bi)}</td>
                 <td class="small">${i.solicitante || '-'}</td>
                 <td class="small text-start text-muted">${billingDerivacionPlainText(i) || '—'}</td>
                 <td class="text-start ps-3 small" style="line-height: 1.2;">${detalleHTML}</td>

@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 import {
@@ -500,7 +500,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
-    const colspan = 9;
+    const colspan = 10;
     let tbody = '';
     if (reactivos.length > 0) {
         tbody += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
@@ -521,6 +521,7 @@ function getInsumosProtocoloTableHTML(insumos, idProt) {
                             <th style="width:3%"><input type="checkbox" class="check-all-insumo-prot" data-prot="${idProt}"></th>
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${bi.th_estado_cap || 'Estado'}</th>
+                            <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
                             <th style="width:12%">${bi.th_solicitante_cap || 'Solicitante'}</th>
                             <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bi.th_concepto_detalle || 'Concepto / Detalle'}</th>
@@ -550,7 +551,7 @@ function getInsumosGeneralesTableHTML(insumos) {
     const { reactivos, otros } = billingPartitionInsumosPedidoReactivoOtros(insumos);
     const lblRea = tf.insumos_prot_subtitulo_reactivos ?? 'Pedidos insumo — reactivos biológicos';
     const lblDem = tf.insumos_prot_subtitulo_demas ?? 'Pedidos insumo — materiales y otros rubros';
-    const colspan = 9;
+    const colspan = 10;
     let filas = '';
     if (reactivos.length > 0) {
         filas += billingHtmlInsumoProtSectionHeader(colspan, lblRea);
@@ -578,6 +579,7 @@ function getInsumosGeneralesTableHTML(insumos) {
                             <th style="width:3%"><input type="checkbox" id="check-all-insumos-gen"></th>
                             <th style="width:5%">${bd.th_id || 'ID'}</th>
                             <th style="width:8%">${window.txt?.generales?.estado || 'Estado'}</th>
+                            <th style="width:10%">${bi.th_fechas || 'FECHAS'}</th>
                             <th style="width:15%">${bd.th_solicitante || 'Solicitante'}</th>
                             <th style="width:12%" class="small">${bd.th_quien_derivo || 'Derivado por'}</th>
                             <th>${bd.th_conceptos_cantidades || 'Conceptos y Cantidades (Agrupados)'}</th>
@@ -675,6 +677,16 @@ function getFooterHTML(prot) {
                     <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="window.procesarPagoProtocolo(${prot.idProt})">
                         <i class="bi bi-wallet2 me-2"></i> ${tf.btn_pagar_sel || 'Pagar Selección'}
                     </button>
+                    ${(prot.insumos?.length > 0) ? `
+                    <div class="d-flex align-items-center gap-2 border-start ps-3 ms-2">
+                        <div class="text-end">
+                            <small class="text-muted d-block uppercase fw-bold" style="font-size: 9px;">${tf.seleccion_insumos_lbl || 'Insumos seleccionados'}:</small>
+                            <span class="fs-6 fw-bold text-primary" id="pago-insumos-seleccionado-${prot.idProt}">$ ${formatBillingMoney(0)}</span>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary fw-bold px-3 shadow-sm" onclick="window.procesarPagoInsumosProtocolo(${prot.idProt})">
+                            <i class="bi bi-box-seam me-1"></i> ${tf.btn_pagar_insumos_prot || 'Pagar insumos'}
+                        </button>
+                    </div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -688,13 +700,20 @@ function vincularEventosSeleccion() {
             if (e.target.classList.contains('check-all-form')) clase = '.check-item-form';
             else if (e.target.classList.contains('check-all-insumo-prot')) clase = '.check-item-insumo-prot';
             document.querySelectorAll(`${clase}[data-prot="${idProt}"]:not(:disabled)`).forEach(c => c.checked = e.target.checked);
-            actualizarSuma(idProt);
+            if (e.target.classList.contains('check-all-insumo-prot')) {
+                actualizarSumaInsumosProt(idProt);
+            } else {
+                actualizarSuma(idProt);
+            }
         });
     });
 
     document.addEventListener('change', (e) => {
-        if (e.target.matches('.check-item-form, .check-item-aloj, .check-item-insumo-prot')) {
+        if (e.target.matches('.check-item-form, .check-item-aloj')) {
             actualizarSuma(e.target.dataset.prot);
+        }
+        if (e.target.matches('.check-item-insumo-prot')) {
+            actualizarSumaInsumosProt(e.target.dataset.prot);
         }
     });
 
@@ -710,10 +729,18 @@ function vincularEventosSeleccion() {
 
 function actualizarSuma(idProt) {
     let suma = 0;
-    document.querySelectorAll(`input[data-prot="${idProt}"]:checked:not([class*="check-all"])`).forEach(chk => {
-        suma += parseFloat(chk.dataset.monto || 0);
-    });
+    document.querySelectorAll(
+        `.check-item-form[data-prot="${idProt}"]:checked, .check-item-aloj[data-prot="${idProt}"]:checked`
+    ).forEach((chk) => { suma += parseFloat(chk.dataset.monto || 0); });
     const visor = document.getElementById(`pago-seleccionado-${idProt}`);
+    if (visor) visor.innerText = `$ ${formatBillingMoney(suma)}`;
+}
+
+function actualizarSumaInsumosProt(idProt) {
+    let suma = 0;
+    document.querySelectorAll(`.check-item-insumo-prot[data-prot="${idProt}"]:checked`)
+        .forEach((chk) => { suma += parseFloat(chk.dataset.monto || 0); });
+    const visor = document.getElementById(`pago-insumos-seleccionado-${idProt}`);
     if (visor) visor.innerText = `$ ${formatBillingMoney(suma)}`;
 }
 
@@ -853,7 +880,7 @@ window.downloadGlobalPDF = async () => {
 
                 return [
                     billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
-                    f.fecha,
+                    billingFormatPedidoFechasPlain(f, bi),
                     f.nombre_especie,
                     f.detalle_display.replace(/<[^>]*>/g, ""),
                     m[0], m[2], m[1]
@@ -878,7 +905,12 @@ window.downloadGlobalPDF = async () => {
                 const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 40);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
                 const idInsPdf = `I-${billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() })}`;
-                return [String(idInsPdf).substring(0, 28), '-', `${pIns}: ${det}`, m[0], m[2], m[1]];
+                return [
+                    String(idInsPdf).substring(0, 28),
+                    billingFormatPedidoFechasPlain(i, bi),
+                    `${pIns}: ${det}`,
+                    m[0], m[2], m[1]
+                ];
             })
         ];
 
@@ -973,6 +1005,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
             return [
                 billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
+                billingFormatPedidoFechasPlain(f, bi),
                 f.nombre_especie,
                 f.detalle_display.replace(/<[^>]*>/g, ""),
                 m[0], m[2], m[1]
@@ -982,10 +1015,8 @@ window.downloadProtocoloPDF = async (idProt) => {
             const m = pdfColsPrecioDebePagoTotal(false, a.total, a.pagado || 0, exL);
             const diasU = window.txt?.facturacion?.billing_depto_export?.pdf_aloj_dias_unit || 'd';
             const perInf = billingAlojPeriodoParaInforme(a, { diasUnit: diasU });
-            const concepto =
-                `${alojAb} (${a.caja || pEstr})` +
-                (perInf && perInf !== '—' ? `\n${perInf}` : '');
-            return [`H-${a.historia}`, a.especie, concepto, m[0], m[2], m[1]];
+            const concepto = `${alojAb} (${a.caja || pEstr})`;
+            return [`H-${a.historia}`, perInf || '-', a.especie, concepto, m[0], m[2], m[1]];
         }),
         ...(prot.insumos || []).map(i => {
             const total = billingInsumoMontoTotalCobrable(i);
@@ -993,13 +1024,20 @@ window.downloadProtocoloPDF = async (idProt) => {
             const det = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 35);
             const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL);
             const idInsPdf = `I-${billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() })}`;
-            return [String(idInsPdf).substring(0, 28), (i.solicitante || '-').substring(0, 20), `${pIns}: ${det}`, m[0], m[2], m[1]];
+            return [
+                String(idInsPdf).substring(0, 28),
+                billingFormatPedidoFechasPlain(i, bi),
+                '-',
+                `${pIns}: ${det}`,
+                m[0], m[2], m[1]
+            ];
         }),
     ];
 
     doc.autoTable({
         startY: M + 38, margin: { left: M, right: M }, head: [[
             bi.pdf_col_id || 'ID',
+            bi.pdf_col_fecha || 'Fechas',
             bi.pdf_col_especie || 'Especie',
             bi.pdf_col_concepto || 'Concepto',
             lblTotPdf,
@@ -1007,7 +1045,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             lblDebPdf
         ]],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
-        styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+        styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
     });
 
     const sFp = billingSumFormulariosCobrable(prot.formularios);
