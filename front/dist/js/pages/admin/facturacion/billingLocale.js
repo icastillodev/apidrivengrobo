@@ -223,6 +223,19 @@ export function billingDerivacionPlainText(row) {
 }
 
 /**
+ * Etiqueta de selector (depto / investigador / protocolo) en modo «solo derivados».
+ * @param {string} baseLabel
+ * @param {string} origInstName
+ */
+export function billingDerivacionSelectorLabel(baseLabel, origInstName) {
+    const base = String(baseLabel ?? '').trim();
+    const orig = String(origInstName ?? '').trim();
+    if (!base || !orig) return base;
+    const tpl = window.txt?.facturacion?.derivacion_depto_suffix ?? '- derivado ({inst})';
+    return `${base} ${String(tpl).replace(/\{inst\}/g, orig)}`;
+}
+
+/**
  * Cobro liquidado vía `facturacion_formulario_derivado` en la sede actual (badge en grillas contables).
  * @param {Record<string, unknown>|null|undefined} row
  */

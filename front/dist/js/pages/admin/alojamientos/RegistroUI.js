@@ -85,7 +85,7 @@ export const RegistroUI = {
                     <tr id="reg-row-prot-${p.idprotA}" onclick="window.regSelectProtocolo(${p.idprotA})" class="transition-colors">
                         <td class="fw-bold text-muted">#${p.idprotA}</td>
                         <td class="fw-bold text-primary">${p.nprotA}</td>
-                        <td class="text-truncate" style="max-width: 200px;">${p.tituloA || (txt.cfg_sin_titulo || 'Sin Título')}</td>
+                        <td style="max-width: 280px; white-space: normal; word-wrap: break-word; line-height: 1.3;">${p.tituloA || (txt.cfg_sin_titulo || 'Sin Título')}</td>
                         <td class="text-info fw-bold" style="font-size: 10px;">${p.DeptoFormat || '---'}</td>
                         <td class="text-success fw-bold" style="font-size: 10px;">${especies}</td>
                         <td class="text-muted" style="font-size: 10px;"><i class="bi bi-person-fill"></i> ${responsable}</td>
@@ -290,9 +290,10 @@ export const RegistroUI = {
             const res = await API.request('/alojamiento/save', 'POST', data);
             if (res.status === 'success') {
                 bootstrap.Modal.getInstance(document.getElementById('modal-registro')).hide();
+                await loadAlojamientos({ resetPagination: true });
                 const t = window.txt?.alojamientos || {};
                 Swal.fire({ title: t.reg_exito_title || '¡Éxito!', text: t.reg_exito_msg || 'Alojamiento registrado correctamente.', icon: 'success', timer: 1500, showConfirmButton: false});
-                await loadAlojamientos({ resetPagination: true });
+                document.getElementById('tbody-alojamientos')?.closest('.table-responsive')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
                 Swal.fire('Error', res.message, 'error');
             }

@@ -5,6 +5,7 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 **Convención para agentes / equipo:** Cursor → `.cursor/rules/urbe-docs-bd-y-checklists.mdc` (misma página para BD + cómo archivar checklists en `docs/checklist-finalizados/`).
 
 **Lista funcional de producto:** `CHECKLIST-BACKLOG-PRODUCTO-GROBO.md`  
+**Checklist activo (operación G/D/M, mayo 2026):** [`CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md`](CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md) · **SQL pendiente de ese lote:** [`CHECKLIST-BD-2026-05-OPERACION-GDM.md`](CHECKLIST-BD-2026-05-OPERACION-GDM.md)  
 **Proyecto aparte (no forma parte del backlog maestro):** [`PROYECTO-CORREOS-MASIVOS.md`](PROYECTO-CORREOS-MASIVOS.md) — envío masivo de correo (diseño, legal, cola, auditoría).  
 **Seguridad / bitácora / JWT:** `CHECKLIST-SEGURIDAD-Y-AUDITORIA.md` · regla Cursor `.cursor/rules/urbe-seguridad-auditoria.mdc`  
 **Convención de migraciones:** `docs/migrations/README.md`  
@@ -24,6 +25,8 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | [Rendimiento superadmin / bitácora](#sql-rendimiento-superadmin-bitacora) | Índices opcionales `bitacora`, `usuarioe`, `modulosactivosinst` |
 | [POE institucional](#sql-poe-institucional) | Tabla `institucion_poe` (texto + hasta 2 URLs) |
 | [Comunicación — adjuntos B2](#sql-comunicacion-b2-adjuntos) | `mensaje`, `noticia`, `institucion_portada_popup`, `institucion_poe` (claves B2) |
+| [Trazabilidad — flag cirugía (BD-05)](#sql-trazabilidad-con-cirugia) | `especie_alojamiento_unidad.con_cirugia` |
+| [Alojamiento — modo cobro (BD-01)](#sql-alojamiento-modo-cobro) | `institucion.AlojamientoCobroModo`, `tipoalojamiento.PrecioXSujeto`, `alojamiento.PrecioSujetoMomento` |
 | [Adjuntos / Backblaze (plantilla)](#plantilla-backblaze) | Ideas legacy; columnas reales en migración B2 de comunicación |
 | [Inventario backlog](#inventario-backlog) | Tabla resumen + estado |
 
@@ -222,6 +225,51 @@ Las **columnas operativas** para noticias/portada/mensajes/POE están en [`2026-
 | Facturación institución — depto cobro derivado | Sin migración: `formulario_derivacion.depto_destino` y/o `formularioe.depto` en sede cobradora | **Código listo** — `getInstitutionDerivedReport*` + `billingInstitucion.js` (2026-05); capacitación `derivados_contabilidad` en `admin__facturacion__institucion` | — |
 | POEs (institución, URLs + B2 opcional) | `institucion_poe` + columnas B2 | **Código listo** — base [`2026-05-09-institucion-poe.sql`](migrations/2026-05-09-institucion-poe.sql) + [`2026-05-09-comunicacion-b2-adjuntos.sql`](migrations/2026-05-09-comunicacion-b2-adjuntos.sql) | [POE](#sql-poe-institucional) · [B2](#sql-comunicacion-b2-adjuntos) |
 | **Índices rendimiento superadmin** | `bitacora(id_usuario)`, `usuarioe(IdInstitucion)`, `modulosactivosinst(IdInstitucion)` | **Propuesta** — validar con EXPLAIN en staging; ejecutar si mejora plan | [Bloque](#sql-rendimiento-superadmin-bitacora) · [`2026-05-11-performance-bitacora-modulos-usuarioe.sql`](migrations/2026-05-11-performance-bitacora-modulos-usuarioe.sql) |
+| **Operación G/D/M — alojamiento / trazabilidad** (BD-01…BD-05) | Modo cobro, tipos dato, subesp/cepa, inicio por tramo, cirugía | **BD-01 y BD-05 listos en repo** — ejecutar SQL en staging | [`CHECKLIST-BD-2026-05-OPERACION-GDM.md`](CHECKLIST-BD-2026-05-OPERACION-GDM.md) · [BD-01](#sql-alojamiento-modo-cobro) · [BD-05](#sql-trazabilidad-con-cirugia) |
+
+---
+
+<a id="sql-trazabilidad-con-cirugia"></a>
+
+## Trazabilidad — flag «tiene cirugía» (BD-05 / M20)
+
+**Archivo en el repo:** [`docs/migrations/2026-05-21-trazabilidad-con-cirugia.sql`](migrations/2026-05-21-trazabilidad-con-cirugia.sql)
+
+**Contexto:** booleano por sujeto (`especie_alojamiento_unidad.con_cirugia`); editable en inicio trazabilidad, toggle rápido y ficha animal. Ejecutar en **staging** antes de usar guardar cirugía desde inicio.
+
+```sql
+ALTER TABLE especie_alojamiento_unidad
+  ADD COLUMN con_cirugia TINYINT(1) NOT NULL DEFAULT 0
+  COMMENT 'Sujeto con cirugía en el tramo actual (trazabilidad)';
+```
+
+Si la columna ya existe en el servidor (parche manual previo), omitir este `ALTER`.
+
+---
+
+<a id="sql-alojamiento-modo-cobro"></a>
+
+## Alojamiento — modo de cobro sujeto vs contenido (BD-01 / M5)
+
+**Archivo en el repo:** [`docs/migrations/2026-05-21-alojamiento-modo-cobro.sql`](migrations/2026-05-21-alojamiento-modo-cobro.sql)
+
+**Contexto:** modo institución (`AlojamientoCobroModo`), tarifa por sujeto en tipo de alojamiento y snapshot en tramo. UI en precios (solo con trazabilidad ON) y badge en ficha animal (M13). Facturación protocolo usa `AlojamientoCobro`. Ejecutar en **staging** antes de producción.
+
+```sql
+ALTER TABLE institucion
+  ADD COLUMN AlojamientoCobroModo ENUM('SUJETO','CONTENIDO') NOT NULL DEFAULT 'CONTENIDO'
+  COMMENT 'Facturación alojamiento con trazabilidad: por sujeto o por contenido/cantidad';
+
+ALTER TABLE tipoalojamiento
+  ADD COLUMN PrecioXSujeto INT DEFAULT NULL
+  COMMENT 'Tarifa por sujeto/día (modo SUJETO); si NULL se usa PrecioXunidad';
+
+ALTER TABLE alojamiento
+  ADD COLUMN PrecioSujetoMomento DECIMAL(10,2) DEFAULT NULL
+  COMMENT 'Snapshot tarifa/sujeto/día al visar tramo';
+```
+
+Omitir cada `ALTER` si la columna ya existe.
 
 ---
 

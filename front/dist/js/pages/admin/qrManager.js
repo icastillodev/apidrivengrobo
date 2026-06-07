@@ -457,8 +457,13 @@ async function cargarDatosQR(hParam, tParam) {
             localStorage.setItem('instId_temp_qr', first.IdInstitucion || 1);
 
             document.getElementById('txt-historia').innerText = first.historia;
-            document.getElementById('txt-protocolo').innerText = `[${first.nprotA}]`;
-            document.getElementById('txt-titulo').innerText = first.tituloA || '---';
+            const tituloEl = document.getElementById('txt-titulo');
+            const protEl = document.getElementById('txt-protocolo');
+            if (tituloEl) tituloEl.textContent = first.tituloA || txt.cfg_sin_titulo || '---';
+            if (protEl) {
+                const nprot = String(first.nprotA || '').trim();
+                protEl.textContent = nprot ? `[${nprot}]` : '';
+            }
             document.getElementById('txt-tipo-alojamiento').innerText = first.NombreTipoAlojamiento || txt.box_name || 'Caja';
             document.getElementById('txt-especie').innerText = first.EspeNombreA;
             document.getElementById('txt-investigador').innerText = first.Investigador;
@@ -517,7 +522,7 @@ async function cargarDatosQR(hParam, tParam) {
                     <td class="fw-bold fs-6">${cant} <small class="text-muted fw-normal">${h.NombreTipoAlojamiento || ''}</small></td>
                     <td class="fw-bold">${dias}</td>
                     
-                    <td class="small text-muted italic">${h.observaciones || '---'}</td>
+                    <td class="small text-muted italic text-break text-start">${h.observaciones || '---'}</td>
                     
                     <td class="${qrStaff ? '' : 'd-none'}" onclick="event.stopPropagation()">
                         <div class="btn-group shadow-sm">

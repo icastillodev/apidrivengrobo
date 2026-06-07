@@ -126,8 +126,14 @@ async function cargarDatosQR(historiaId) {
 
             // Cabecera Técnica
             document.getElementById('txt-historia').innerText = first.historia;
-            document.getElementById('txt-protocolo').innerText = `[${first.nprotA}]`;
-            document.getElementById('txt-titulo').innerText = first.tituloA || 'Sin título definido';
+            const txt = window.txt?.alojamientos || {};
+            const tituloEl = document.getElementById('txt-titulo');
+            const protEl = document.getElementById('txt-protocolo');
+            if (tituloEl) tituloEl.textContent = first.tituloA || txt.cfg_sin_titulo || 'Sin título definido';
+            if (protEl) {
+                const nprot = String(first.nprotA || '').trim();
+                protEl.textContent = nprot ? `[${nprot}]` : '';
+            }
             document.getElementById('txt-especie').innerText = first.EspeNombreA;
             document.getElementById('txt-investigador').innerText = first.Investigador;
 

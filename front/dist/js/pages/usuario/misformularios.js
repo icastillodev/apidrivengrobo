@@ -11,6 +11,37 @@ let currentPage = 1;
 let protocolsUsedCache = [];
 const rowsPerPage = 12;
 let derivationTargets = [];
+let misFormulariosEventsBound = false;
+
+/** Texto plano para filtro de búsqueda (evita fallos con objetos anidados). */
+function formRowSearchText(f) {
+    const parts = [];
+    const push = (v) => {
+        if (v == null || v === '') return;
+        if (Array.isArray(v)) {
+            v.forEach(push);
+            return;
+        }
+        if (typeof v === 'object') {
+            Object.values(v).forEach(push);
+            return;
+        }
+        parts.push(String(v));
+    };
+    push(f);
+    return parts.join(' ').toLowerCase();
+}
+
+function showMisFormulariosLoadError(message) {
+    const tbody = document.getElementById('table-body');
+    const tmf = window.txt?.misformularios || {};
+    const err = escapeMisFormsHtml(message || window.txt?.misalojamientos?.error_cargar_lista || window.txt?.generales?.error_carga || 'Error');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-4 text-danger small">${err}</td></tr>`;
+    }
+    const ctr = document.getElementById('dynamic-counter');
+    if (ctr) ctr.innerText = err;
+}
 
 function escapeMisFormsHtml(s) {
     return String(s ?? '')
@@ -77,7 +108,14 @@ function getFormPaymentStatusExcelLabel(f) {
 
 export async function initMisFormularios() {
     const userId = localStorage.getItem('userId');
-    const instId = localStorage.getItem('instId');
+    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+
+    const tbodyBoot = document.getElementById('table-body');
+    const tmfBoot = window.txt?.misformularios || {};
+    const bootMsg = escapeMisFormsHtml(tmfBoot.cargando_lista || tmfBoot.cargando || window.txt?.generales?.msg_cargando || '…');
+    if (tbodyBoot) {
+        tbodyBoot.innerHTML = `<tr><td colspan="13" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${bootMsg}</div></td></tr>`;
+    }
 
     if (!misFormulariosEventsBound) {
         misFormulariosEventsBound = true;
@@ -105,13 +143,18 @@ export async function initMisFormularios() {
         showLoader({ upgradeOnly: true, staticPhrase: '' });
         const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
         if (res.status === 'success') {
-            allForms = res.data.list;
+            allForms = Array.isArray(res.data?.list) ? res.data.list : [];
             setupInstitutionFilter();
             setupOriginInstitutionFilter();
             renderTable();
+        } else {
+            allForms = [];
+            showMisFormulariosLoadError(res?.message);
         }
     } catch (e) {
         console.error('Error:', e);
+        allForms = [];
+        showMisFormulariosLoadError(e?.message);
     } finally {
         hideLoader();
     }
@@ -141,7 +184,7 @@ function renderTable() {
     const normEst = (v) => (v == null || String(v).trim() === '' ? 'Sin estado' : String(v).trim());
 
     const filtered = allForms.filter(f => {
-        const matchText = Object.values(f).join(' ').toLowerCase().includes(term);
+        const matchText = formRowSearchText(f).includes(term);
         const matchStatus = statusFilter === 'all'
             || normEst(f.estado) === statusFilter
             || normEst(f.estado_origen) === statusFilter
@@ -684,13 +727,18 @@ function setupInstitutionFilter() {
     ))];
     const container = document.getElementById('container-filter-inst');
     const select = document.getElementById('filter-inst');
+    if (!container || !select) return;
+    const allLabel = window.txt?.misformularios?.filter_todas_inst || 'Todas las instituciones';
+    select.innerHTML = `<option value="all">${allLabel}</option>`;
     if (insts.length > 1) {
         container.classList.remove('d-none');
         insts.sort().forEach(inst => {
             const option = document.createElement('option');
             option.value = inst; option.text = inst; select.appendChild(option);
         });
-    } else { container.classList.add('d-none'); }
+    } else {
+        container.classList.add('d-none');
+    }
 }
 
 function setupOriginInstitutionFilter() {

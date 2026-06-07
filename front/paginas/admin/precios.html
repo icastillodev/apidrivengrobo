@@ -26,6 +26,26 @@
         .precios-seccion-servicios .table-responsive { overflow-x: auto; overflow-y: visible; max-height: none; }
         .precios-seccion-servicios .table td { white-space: normal; word-wrap: break-word; }
         .precios-seccion-servicios .precios-servicios-ayuda { white-space: normal; }
+        .precios-page-shell { padding-bottom: 5.5rem; }
+        .precios-save-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1020;
+            padding: 0.75rem 1.25rem;
+            background: rgba(255, 255, 255, 0.97);
+            border-top: 1px solid #dee2e6;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+            display: flex;
+            justify-content: flex-end;
+        }
+        body.with-sidebar .precios-save-bar {
+            padding-left: calc(var(--gecko-sidebar-width, 250px) + 1.25rem);
+        }
+        @media (max-width: 768px) {
+            body.with-sidebar .precios-save-bar { padding-left: 1.25rem; }
+        }
     </style>
 
     <script type="module">
@@ -79,7 +99,7 @@
         <div class="spinner-border text-success" role="status"></div>
     </div>
 
-    <div class="p-4"> 
+    <div class="p-4 precios-page-shell"> 
         <div class="card shadow-sm border-0 p-4">
             <nav aria-label="breadcrumb" class="mb-4">
                 <ol class="breadcrumb text-uppercase fw-bold" style="font-size: 10px; letter-spacing: 1px;">
@@ -109,6 +129,8 @@
                 <input type="text" id="titulo-precios" class="form-control fw-bold text-primary" placeholder="Ej: LISTA DE PRECIOS 2026">
             </div>
 
+            <div class="bg-light p-3 rounded border mb-4 d-none" id="precios-modo-cobro-wrap"></div>
+
             <div class="row align-items-end mb-4 pb-3 border-bottom">
                 <div class="col-md-8">
                     <div class="input-group shadow-sm">
@@ -131,7 +153,7 @@
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle shadow-sm">
                         <thead class="bg-dark text-white small uppercase">
-                            <tr>
+                            <tr id="thead-precios-animales-row">
                                 <th data-i18n="precios.table.desc_animal">Descripción (Especie / Variedad / Tipo Alojamiento)</th>
                                 <th style="width: 200px;" class="text-center" data-i18n="precios.table.clasificacion">Clasificación</th>
                                 <th style="width: 150px;" data-i18n="precios.table.precio_unidad">Precio Unidad ($)</th>
@@ -188,12 +210,13 @@
                 </div>
             </div>
 
-            <div class="mt-4 border-top pt-4 d-flex justify-content-end">
-                <button class="btn btn-success px-5 fw-bold shadow" onclick="window.saveAllPrices()">
-                    <i class="bi bi-save me-1"></i> <span id="lbl-btn-guardar" data-i18n="precios.btn_save">GUARDAR CAMBIOS</span>
-                </button>
-            </div>
         </div>
+    </div>
+
+    <div id="precios-save-bar" class="precios-save-bar">
+        <button type="button" class="btn btn-success px-5 fw-bold shadow" onclick="window.saveAllPrices()">
+            <i class="bi bi-save me-1"></i> <span id="lbl-btn-guardar-sticky" data-i18n="precios.btn_save">GUARDAR CAMBIOS</span>
+        </button>
     </div>
 </body>
 </html>

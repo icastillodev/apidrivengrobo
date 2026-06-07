@@ -35,6 +35,139 @@ function __ubParseNombreSujeto(full) {
     return { prefijoFijo: `${m[1]} - ${m[2]} - `, etiqueta: m[3] };
 }
 
+/** Campo EAV según TipoDeDato (M9 sexo, M10 text → textarea). */
+function __ubMapInputType(t) {
+    const u = String(t || '').toLowerCase();
+    const d = { int: 'number', text: 'text', date: 'date', varchar: 'text', var: 'text', decimal: 'text', bool: 'text', sexo: 'text', subespecie: 'text', cepa: 'text' };
+    return d[u] || 'text';
+}
+
+function __ubCatsNeedCatalog(cats) {
+    return (cats || []).some((c) => {
+        const t = String(c?.TipoDeDato || '').toLowerCase();
+        return t === 'subespecie' || t === 'cepa';
+    });
+}
+
+const __ubEspecieCatalogCache = {};
+
+async function __ubLoadEspecieCatalog(idEspecie) {
+    const key = String(idEspecie);
+    if (__ubEspecieCatalogCache[key]) return __ubEspecieCatalogCache[key];
+    let cepas = [];
+    let subesps = [];
+    try {
+        const [cr, sr] = await Promise.all([
+            API.request(`/admin/config/cepas/all?idespA=${encodeURIComponent(key)}`, 'GET'),
+            API.request(`/admin/config/subespecies/by-especie?idespA=${encodeURIComponent(key)}`, 'GET'),
+        ]);
+        if (cr.status === 'success' && Array.isArray(cr.data)) {
+            cepas = cr.data.filter((c) => String(c.Habilitado) !== '2');
+        }
+        if (sr.status === 'success' && Array.isArray(sr.data)) {
+            subesps = sr.data.filter((x) => String(x.Existe) !== '2');
+        }
+    } catch (_) {
+        cepas = [];
+        subesps = [];
+    }
+    __ubEspecieCatalogCache[key] = { cepas, subesps };
+    return __ubEspecieCatalogCache[key];
+}
+
+function __ubValCampoTraz(cat, unidad, vin, idCat) {
+    const t = String(cat?.TipoDeDato || '').toLowerCase();
+    if (t === 'subespecie') {
+        return unidad.idsubespA_sujeto != null && unidad.idsubespA_sujeto !== '' ? String(unidad.idsubespA_sujeto) : '';
+    }
+    if (t === 'cepa') {
+        return unidad.idcepaA_sujeto != null && unidad.idcepaA_sujeto !== '' ? String(unidad.idcepaA_sujeto) : '';
+    }
+    const o = vin[idCat] || vin[String(idCat)];
+    return o && o.Valor != null && o.Valor !== '' ? String(o.Valor) : '';
+}
+
+function __ubCollectBioPatchFromForm(formEl, namePrefix = 'inicio_') {
+    const bio = {};
+    if (!formEl) return bio;
+    formEl.querySelectorAll(`[name^="${namePrefix}"][data-traz-bio-field]`).forEach((el) => {
+        const f = el.getAttribute('data-traz-bio-field');
+        if (f) bio[f] = el.value ?? '';
+    });
+    return bio;
+}
+
+function __ubCollectBioPatchFromSwal() {
+    const bio = {};
+    document.querySelectorAll('.swal2-html-container [data-traz-bio-field]').forEach((el) => {
+        const f = el.getAttribute('data-traz-bio-field');
+        if (f) bio[f] = el.value ?? '';
+    });
+    return bio;
+}
+
+function __ubRenderCampoTraz(cat, opts = {}) {
+    const txt = window.txt?.alojamientos || {};
+    const tipo = String(cat?.TipoDeDato || '').toLowerCase();
+    const name = opts.name || `cat_${cat.IdDatosUnidadAloj}`;
+    const id = opts.id || name;
+    const value = opts.value != null ? String(opts.value) : '';
+    const layout = opts.layout || 'stack';
+    const label = opts.label != null ? opts.label : (cat.NombreCatAlojUnidad || '');
+    const labelClass = opts.labelClass || 'form-label small text-start d-block mb-0';
+    const labelStyle = opts.labelStyle || '';
+    const inputClass = opts.inputClass || 'form-control form-control-sm border-secondary';
+    const optional = opts.showOptional
+        ? ` <span class="text-muted fw-normal">(${__ubEsc(txt.trace_campo_opcional || 'opcional')})</span>`
+        : '';
+
+    let control = '';
+    if (tipo === 'text') {
+        control = `<textarea name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${inputClass} mb-2" rows="3">${__ubEsc(value)}</textarea>`;
+    } else if (tipo === 'sexo') {
+        const v = value.trim().toLowerCase();
+        control = `<select name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="form-select form-select-sm mb-2">
+            <option value=""${v === '' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_elegir || '—')}</option>
+            <option value="macho"${v === 'macho' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_macho || 'Macho')}</option>
+            <option value="hembra"${v === 'hembra' ? ' selected' : ''}>${__ubEsc(txt.trace_sexo_hembra || 'Hembra')}</option>
+        </select>`;
+    } else if (tipo === 'bool') {
+        const v = value.trim().toLowerCase();
+        const yes = v === '1' || v === 'si' || v === 'sí' || v === 'true' || v === 'yes';
+        const no = v === '0' || v === 'no' || v === 'false';
+        control = `<select name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="form-select form-select-sm mb-2">
+            <option value=""${!yes && !no ? ' selected' : ''}>—</option>
+            <option value="1"${yes ? ' selected' : ''}>${__ubEsc(txt.trace_bool_si || 'Sí')}</option>
+            <option value="0"${no ? ' selected' : ''}>${__ubEsc(txt.trace_bool_no || 'No')}</option>
+        </select>`;
+    } else if (tipo === 'subespecie' || tipo === 'cepa') {
+        const catalog = opts.catalog || {};
+        const list = tipo === 'subespecie' ? (catalog.subesps || []) : (catalog.cepas || []);
+        const noneLabel = tipo === 'subespecie'
+            ? (txt.trace_subject_subespecie_none || '—')
+            : (txt.trace_subject_ficha_cepa_none || '—');
+        const bioField = tipo === 'subespecie' ? 'idsubespA_sujeto' : 'idcepaA_sujeto';
+        const optHtml = [`<option value="">${__ubEsc(noneLabel)}</option>`].concat(
+            list.map((x) => {
+                const optId = tipo === 'subespecie' ? x.idsubespA : x.idcepaA;
+                const optNm = tipo === 'subespecie' ? x.SubEspeNombreA : x.CepaNombreA;
+                return `<option value="${optId}"${String(optId) === value ? ' selected' : ''}>${__ubEsc(optNm)}</option>`;
+            }),
+        );
+        const selClass = inputClass.includes('form-select') ? inputClass : inputClass.replace('form-control', 'form-select');
+        control = `<select name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${selClass} mb-2" data-traz-bio-field="${bioField}">${optHtml.join('')}</select>`;
+    } else {
+        const inputType = __ubMapInputType(cat.TipoDeDato);
+        const ph = opts.placeholder != null ? opts.placeholder : '—';
+        control = `<input type="${__ubEsc(inputType)}" name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${inputClass} mb-2" value="${__ubEsc(value)}" placeholder="${__ubEsc(ph)}">`;
+    }
+
+    if (layout === 'inline') {
+        return `<label style="${labelStyle}" class="${labelClass}">${__ubEsc(label)}</label>${control.replace(' mb-2', '')}`;
+    }
+    return `<label class="${labelClass}" style="${labelStyle}">${__ubEsc(label)}${optional}</label>${control}`;
+}
+
 async function __ubFetchBundle() {
     if (window.__alojUbicBundle) return window.__alojUbicBundle;
     const res = await API.request('/admin/config/alojamiento/ubicacion/bundle');
@@ -61,7 +194,28 @@ function __ubSinUbicacionParaMostrar(caja) {
     return !(__ubFormatLine(caja) || '').trim();
 }
 
+function __ubCatalogHasPlaces(bundle) {
+    if (!bundle) return false;
+    return (bundle.ubicacionesFisicas || []).some(__ubAct);
+}
+
+function __ubIsAdminConfigUser() {
+    const lv = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '99', 10);
+    return [1, 2, 4, 5, 6].includes(lv);
+}
+
+function __ubNoCatalogHtml(txt) {
+    const body = __ubEsc(txt.trace_sin_lugar_fisico_body || 'No hay lugares físicos configurados en esta institución.');
+    const adminLink = txt.trace_sin_lugar_fisico_admin_link || 'Configurar ubicación';
+    const userHint = __ubEsc(txt.trace_sin_lugar_fisico_user_hint || 'Contacte al administrador del bioterio para habilitar la ubicación física.');
+    const adminPart = __ubIsAdminConfigUser()
+        ? `<a href="configuracion/alojamientos-ubicacion.html" class="alert-link fw-bold">${__ubEsc(adminLink)}</a>`
+        : userHint;
+    return `<div class="alert alert-warning small py-2 mb-2 text-start">${body} ${adminPart}</div>`;
+}
+
 function __ubHtmlFields(bundle) {
+    if (!__ubCatalogHasPlaces(bundle)) return __ubNoCatalogHtml(window.txt?.alojamientos || {});
     const L = bundle.labels || {};
     const optUf = (bundle.ubicacionesFisicas || []).filter(__ubAct)
         .map(u => `<option value="${u.IdUbicacionFisica}">${__ubEsc(u.Nombre)}</option>`).join('');
@@ -197,6 +351,9 @@ function __ubRenderFieldControl(level, idCaja, items, idKey, nameKey, selectedId
 }
 
 function __ubBuildInlineUbicacionHtml(bundle, caja, txt, idAlojamiento, idEspecie) {
+    if (!__ubCatalogHasPlaces(bundle)) {
+        return __ubNoCatalogHtml(txt);
+    }
     const L = bundle.labels || {};
     const id = caja.IdCajaAlojamiento;
     const ufList = bundle.ubicacionesFisicas || [];
@@ -383,6 +540,8 @@ async toggleRow(idAlojamiento, idEspecie) {
         
         // MAGIA DE PERMISOS: Verificamos si estamos en modo lectura
         const isReadOnly = this.isReadOnly || false;
+        const needCatalog = __ubCatsNeedCatalog([...catsInicio, ...catsDatos]);
+        const especieCatalog = needCatalog ? await __ubLoadEspecieCatalog(idEspecie) : { cepas: [], subesps: [] };
         let ubicBundle = null;
         if (!isReadOnly) {
             ubicBundle = await __ubFetchBundle();
@@ -407,6 +566,11 @@ async toggleRow(idAlojamiento, idEspecie) {
                                     <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_btn_tramo_pdf || '')}
                                 </button>
                             </li>
+                            <li>
+                                <button type="button" class="dropdown-item text-success" onclick="window.AnimalFichaUI.downloadExcelAlojamiento(${idAlojamiento})">
+                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>${__ubEsc(txt.animal_ficha_btn_tramo_excel || '')}
+                                </button>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -416,7 +580,7 @@ async toggleRow(idAlojamiento, idEspecie) {
                             <i class="bi bi-box-arrow-in-down"></i> ${(txt.trace_bring_previous || 'Traer {tipo} Anterior').replace('{tipo}', tipoNombre)}
                         </button>
                         ${canAddBox 
-                            ? `<button class="btn btn-sm btn-outline-primary fw-bold" onclick="window.TrazabilidadUI.addCaja(${idAlojamiento}, ${idEspecie})"><i class="bi bi-plus-lg"></i> ${(txt.trace_new_box || 'Nueva {tipo}').replace('{tipo}', tipoNombre)}</button>` 
+                            ? `<button class="btn btn-sm btn-outline-primary fw-bold" onclick="window.TrazabilidadUI.addCaja(${idAlojamiento}, ${idEspecie})"><i class="bi bi-plus-lg"></i> ${__ubEsc(txt.trace_btn_add_structure || 'Agregar unidad')}</button>` 
                             : `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> ${txt.trace_limit_reached || 'Límite alcanzado'}</span>`
                         }
                     ` : ''}
@@ -464,6 +628,11 @@ async toggleRow(idAlojamiento, idEspecie) {
                                                     <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_btn_caja_pdf || '')}
                                                 </button>
                                             </li>
+                                            <li>
+                                                <button type="button" class="dropdown-item text-success" onclick="window.AnimalFichaUI.downloadExcelCaja(${caja.IdCajaAlojamiento})">
+                                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>${__ubEsc(txt.animal_ficha_btn_caja_excel || '')}
+                                                </button>
+                                            </li>
                                         </ul>
                                     </div>
                                 </div>
@@ -497,6 +666,11 @@ async toggleRow(idAlojamiento, idEspecie) {
                                                     <i class="bi bi-file-pdf me-2"></i>${__ubEsc(txt.animal_ficha_pdf || 'PDF')}
                                                 </button>
                                             </li>
+                                            <li>
+                                                <button type="button" class="dropdown-item text-success" onclick="window.AnimalFichaUI.downloadExcel(${unidad.IdEspecieAlojUnidad})">
+                                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>${__ubEsc(txt.animal_ficha_excel || 'Excel')}
+                                                </button>
+                                            </li>
                                         </ul>
                                     </div>
                                     ${!isReadOnly && allowTraz ? `
@@ -520,20 +694,30 @@ async toggleRow(idAlojamiento, idEspecie) {
                         }
 
                         const vin = unidad.valores_inicio || {};
-                        const valIni = (idCat) => {
-                            const o = vin[idCat] || vin[String(idCat)];
-                            return o && o.Valor != null && o.Valor !== '' ? String(o.Valor) : '';
-                        };
-                        if (!isReadOnly && allowTraz && catsInicio.length > 0) {
+                        const valIni = (idCat, cat) => __ubValCampoTraz(cat, unidad, vin, idCat);
+                        if (!isReadOnly && allowTraz && !faltaCfgInicioProt) {
+                            const cxInicioChecked = cxOn ? ' checked' : '';
                             html += `
                             <form class="mb-3 pb-2 border-bottom border-secondary border-opacity-25" onsubmit="event.preventDefault(); window.guardarInicioTraz(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie}, this)">
                                 <div class="small fw-bold text-secondary mb-2 text-uppercase" style="font-size:10px">${__ubEsc(txt.trace_inicio_title || '')}</div>
                                 <p class="small text-muted mb-2" style="font-size:10px">${__ubEsc(txt.trace_inicio_hint || '')}</p>
-                                <div class="row g-2 align-items-end">`;
+                                <div class="row g-2 align-items-end">
+                                <div class="col-auto">
+                                    <div class="form-check mb-1">
+                                        <input class="form-check-input" type="checkbox" name="inicio_con_cirugia" id="inicio-cirugia-${unidad.IdEspecieAlojUnidad}"${cxInicioChecked}>
+                                        <label class="form-check-label small" for="inicio-cirugia-${unidad.IdEspecieAlojUnidad}">${__ubEsc(txt.trace_subject_ficha_con_cirugia || '')}</label>
+                                    </div>
+                                </div>`;
                             catsInicio.forEach((cat) => {
-                                const inputType = this.mapInputType(cat.TipoDeDato);
-                                const iv = __ubEsc(valIni(cat.IdDatosUnidadAloj));
-                                html += `<div class="col-auto"><label style="font-size: 9px;" class="text-uppercase text-secondary fw-bold">${__ubEsc(cat.NombreCatAlojUnidad)}</label><input type="${inputType}" name="inicio_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" value="${iv}"></div>`;
+                                html += `<div class="col-auto">${__ubRenderCampoTraz(cat, {
+                                    name: `inicio_${cat.IdDatosUnidadAloj}`,
+                                    value: valIni(cat.IdDatosUnidadAloj, cat),
+                                    layout: 'inline',
+                                    catalog: especieCatalog,
+                                    labelClass: 'text-uppercase text-secondary fw-bold',
+                                    labelStyle: 'font-size: 9px;',
+                                    inputClass: 'form-control form-control-sm border-secondary',
+                                })}</div>`;
                             });
                             html += `<div class="col-auto"><button type="submit" class="btn btn-sm btn-outline-primary fw-bold shadow-sm">${__ubEsc(txt.trace_inicio_guardar || 'Guardar')}</button></div></div></form>`;
                         }
@@ -549,8 +733,15 @@ async toggleRow(idAlojamiento, idEspecie) {
                             
                             if (catsDatos.length > 0) {
                                 catsDatos.forEach(cat => {
-                                    const inputType = this.mapInputType(cat.TipoDeDato);
-                                    html += `<div class="col-auto"><label style="font-size: 9px;" class="text-uppercase text-muted fw-bold">${cat.NombreCatAlojUnidad}</label><input type="${inputType}" name="cat_${cat.IdDatosUnidadAloj}" class="form-control form-control-sm border-secondary" placeholder="—"></div>`;
+                                    html += `<div class="col-auto">${__ubRenderCampoTraz(cat, {
+                                        name: `cat_${cat.IdDatosUnidadAloj}`,
+                                        layout: 'inline',
+                                        catalog: especieCatalog,
+                                        labelClass: 'text-uppercase text-muted fw-bold',
+                                        labelStyle: 'font-size: 9px;',
+                                        inputClass: 'form-control form-control-sm border-secondary',
+                                        placeholder: '—',
+                                    })}</div>`;
                                 });
                                 html += `<div class="col-auto"><button type="submit" class="btn btn-sm btn-success fw-bold shadow-sm"><i class="bi bi-save"></i></button></div>`;
                             }
@@ -594,9 +785,7 @@ async toggleRow(idAlojamiento, idEspecie) {
         }
     },
     mapInputType(t) {
-        const u = String(t || '').toLowerCase();
-        const d = { int: 'number', text: 'text', date: 'date', varchar: 'text', var: 'text', decimal: 'text', bool: 'text' };
-        return d[u] || 'text';
+        return __ubMapInputType(t);
     },
 
     renderPivotTable(obsPivot, categorias) {
@@ -605,7 +794,11 @@ async toggleRow(idAlojamiento, idEspecie) {
         return obsPivot.map(row => `
             <tr>
                 <td class="fw-bold text-secondary">${row.fechaObs}</td>
-                ${categorias.map(c => `<td>${row.valores[c.NombreCatAlojUnidad] || '-'}</td>`).join('')}
+                ${categorias.map(c => {
+                    const raw = row.valores[c.NombreCatAlojUnidad] || '-';
+                    const isLong = String(c.TipoDeDato || '').toLowerCase() === 'text';
+                    return `<td class="${isLong ? 'text-start text-break' : ''}">${raw}</td>`;
+                }).join('')}
             </tr>
         `).join('');
     },
@@ -614,32 +807,37 @@ async toggleRow(idAlojamiento, idEspecie) {
     async addCaja(idAlojamiento, idEspecie) {
         const txt = window.txt?.alojamientos || {};
         const bundle = await __ubFetchBundle();
+        const hasPlaces = bundle && __ubCatalogHasPlaces(bundle);
         let html = `
-            <input id="swal-box-name" class="form-control mb-2" placeholder="${__ubEsc(txt.trace_nombre_placeholder || 'Nombre')}">
-            <input id="swal-box-units" type="number" class="form-control mb-2" value="1" min="1" placeholder="${__ubEsc(txt.trace_cant_animales || '')}">`;
-        if (bundle) html += __ubHtmlFields(bundle);
-        else html += `<p class="text-muted small mb-0">${__ubEsc(txt.trace_ubicacion_bundle_error || '')}</p>`;
+            <p class="text-muted small text-start mb-2">${__ubEsc(txt.trace_crear_estructura_hint || 'Indique una etiqueta visible. Los sujetos se agregan después manualmente.')}</p>
+            <input id="swal-box-name" class="form-control mb-2" placeholder="${__ubEsc(txt.trace_nombre_placeholder || 'Nombre')}">`;
+        if (hasPlaces) {
+            html += __ubHtmlFields(bundle);
+        } else if (bundle) {
+            html += __ubNoCatalogHtml(txt);
+        } else {
+            html += `<p class="text-muted small mb-0">${__ubEsc(txt.trace_ubicacion_bundle_error || '')}</p>`;
+        }
 
         const { value: formValues } = await Swal.fire({
-            title: txt.trace_crear_caja || 'Crear Caja',
+            title: txt.trace_crear_estructura || 'Agregar unidad',
             target: document.getElementById('modal-historial') || 'body',
             html,
             showCancelButton: true,
             confirmButtonText: txt.trace_crear_btn || 'Crear',
             width: '32rem',
-            didOpen: () => { if (bundle) __ubWireUbicacion(bundle, null); },
+            didOpen: () => { if (hasPlaces) __ubWireUbicacion(bundle, null); },
             preConfirm: () => {
                 const name = document.getElementById('swal-box-name').value;
-                const units = parseInt(document.getElementById('swal-box-units').value, 10) || 1;
-                const ubic = bundle ? __ubReadUbicacionFromForm(false) : {};
-                return { name, units, ubicacion: Object.keys(ubic).length ? ubic : null };
+                const ubic = hasPlaces ? __ubReadUbicacionFromForm(false) : {};
+                return { name, ubicacion: Object.keys(ubic).length ? ubic : null };
             }
         });
         if (formValues) {
             const body = {
                 idAlojamiento,
                 nombreCaja: formValues.name,
-                cantidadUnidades: formValues.units,
+                cantidadUnidades: 0,
                 instId: localStorage.getItem('instId') || 1
             };
             if (formValues.ubicacion && Object.keys(formValues.ubicacion).length) body.ubicacion = formValues.ubicacion;
@@ -683,15 +881,65 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
         const tCom = window.txt?.comunicacion || {};
         const Swal = window.Swal;
         const target = document.getElementById('modal-historial') || 'body';
-        const { value: nombre } = await Swal.fire({
-            title: txt.trace_nombre_sujeto || 'Nombre del Sujeto',
-            input: 'text',
-            inputPlaceholder: txt.trace_nombre_placeholder || '',
+        const arbol = this._lastArbolData[idAlojamiento] || {};
+        const catsInicio = (arbol.categorias_inicio || []).filter((c) => Number(c.Habilitado) !== 2);
+        const needCatalog = __ubCatsNeedCatalog(catsInicio);
+        const especieCatalog = needCatalog ? await __ubLoadEspecieCatalog(idEspecie) : { cepas: [], subesps: [] };
+
+        let html = `<label class="form-label small text-start d-block fw-bold mb-1">${__ubEsc(txt.trace_nombre_sujeto || 'Nombre del Sujeto')}</label>
+            <input id="swal-subject-name" class="form-control mb-2" placeholder="${__ubEsc(txt.trace_nombre_placeholder || '')}">
+            <div class="form-check text-start mb-2">
+                <input class="form-check-input" type="checkbox" id="swal-subject-cirugia">
+                <label class="form-check-label small" for="swal-subject-cirugia">${__ubEsc(txt.trace_subject_ficha_con_cirugia || '')}</label>
+            </div>`;
+        if (catsInicio.length) {
+            html += `<hr class="my-2"><p class="small text-muted text-start mb-2">${__ubEsc(txt.trace_add_inicio_hint || '')}</p>`;
+            catsInicio.forEach((cat) => {
+                html += __ubRenderCampoTraz(cat, {
+                    name: `swal-inicio-${cat.IdDatosUnidadAloj}`,
+                    id: `swal-inicio-${cat.IdDatosUnidadAloj}`,
+                    layout: 'stack',
+                    catalog: especieCatalog,
+                    showOptional: true,
+                });
+            });
+        }
+
+        const rSub = await Swal.fire({
+            title: txt.trace_add_subject || 'Añadir Sujeto',
+            html,
             target,
             showCancelButton: true,
+            confirmButtonText: txt.trace_crear_btn || 'Crear',
+            width: catsInicio.length ? '28rem' : undefined,
+            focusConfirm: false,
+            preConfirm: () => {
+                const nombre = document.getElementById('swal-subject-name')?.value;
+                const nombreTrim = nombre != null ? String(nombre).trim() : '';
+                if (!nombreTrim) {
+                    Swal.showValidationMessage(txt.trace_nombre_requerido || 'El nombre es obligatorio');
+                    return false;
+                }
+                const valores = [];
+                catsInicio.forEach((cat) => {
+                    const el = document.getElementById(`swal-inicio-${cat.IdDatosUnidadAloj}`);
+                    const t = String(cat.TipoDeDato || '').toLowerCase();
+                    if (t === 'subespecie' || t === 'cepa') return;
+                    const v = el ? String(el.value ?? '').trim() : '';
+                    if (v) {
+                        valores.push({ IdDatosUnidadAloj: cat.IdDatosUnidadAloj, valor: v });
+                    }
+                });
+                return {
+                    nombre: nombreTrim,
+                    valores,
+                    conCirugia: !!document.getElementById('swal-subject-cirugia')?.checked,
+                    bio: __ubCollectBioPatchFromSwal(),
+                };
+            },
         });
-        const nombreTrim = nombre != null ? String(nombre).trim() : '';
-        if (!nombreTrim) return;
+        if (!rSub.isConfirmed || !rSub.value) return;
+        const { nombre: nombreTrim, valores: valoresInicio, conCirugia, bio: bioInicio } = rSub.value;
         try {
             const res = await API.request('/trazabilidad/add-subject', 'POST', {
                 idCaja,
@@ -701,8 +949,23 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
             if (res.status !== 'success') {
                 throw new Error(res.message || txt.trace_error || 'Error');
             }
-            await this.refreshArbol(idAlojamiento, idEspecie);
             const idEu = parseInt(res.data?.IdEspecieAlojUnidad, 10) || 0;
+            if (idEu > 0 && valoresInicio.length) {
+                await API.request('/trazabilidad/save-inicio-traz', 'POST', {
+                    IdEspecieAlojUnidad: idEu,
+                    valores: valoresInicio,
+                });
+            }
+            if (idEu > 0 && conCirugia) {
+                await API.request('/trazabilidad/toggle-con-cirugia', 'POST', { idEspecieAlojUnidad: idEu });
+            }
+            if (idEu > 0 && bioInicio && Object.keys(bioInicio).length) {
+                await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', {
+                    IdEspecieAlojUnidad: idEu,
+                    ...bioInicio,
+                });
+            }
+            await this.refreshArbol(idAlojamiento, idEspecie);
             if (idEu > 0) {
                 const follow = await Swal.fire({
                     icon: 'success',
@@ -1044,15 +1307,27 @@ window.guardarObservacion = async (idUnidad, idAlojamiento, idEspecie, formEl) =
 };
 
 window.guardarInicioTraz = async (idUnidad, idAlojamiento, idEspecie, formEl) => {
-    const fd = new FormData(formEl);
     const p = { IdEspecieAlojUnidad: idUnidad, valores: [] };
-    fd.forEach((v, k) => {
-        if (k.startsWith('inicio_')) {
-            p.valores.push({ IdDatosUnidadAloj: k.replace('inicio_', ''), valor: v });
-        }
+    Array.from(formEl.elements || []).forEach((el) => {
+        const k = el.name;
+        if (!k || !k.startsWith('inicio_') || k === 'inicio_con_cirugia') return;
+        if (el.getAttribute('data-traz-bio-field')) return;
+        p.valores.push({ IdDatosUnidadAloj: k.replace('inicio_', ''), valor: el.value ?? '' });
     });
+    const cirugiaEl = formEl.querySelector('[name="inicio_con_cirugia"]');
+    const bioPatch = __ubCollectBioPatchFromForm(formEl);
+    let didSave = false;
     if (p.valores.length > 0) {
         await API.request('/trazabilidad/save-inicio-traz', 'POST', p);
+        didSave = true;
+    }
+    if (cirugiaEl || Object.keys(bioPatch).length) {
+        const body = { IdEspecieAlojUnidad: idUnidad, ...bioPatch };
+        if (cirugiaEl) body.con_cirugia = cirugiaEl.checked ? 1 : 0;
+        await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', body);
+        didSave = true;
+    }
+    if (didSave) {
         await TrazabilidadUI.refreshArbol(idAlojamiento, idEspecie);
     }
 };

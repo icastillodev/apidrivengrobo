@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivadaLiquidacionBadge, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 import {
@@ -198,7 +198,7 @@ function renderizarOpcionesInvestigador(lista) {
         let titleAttr = '';
         if (scope === 'derivados') {
             const orig = mapUsr[id] ?? mapUsr[String(id)];
-            label = orig ? `${base} — ${orig}` : base;
+            label = orig ? billingDerivacionSelectorLabel(base, orig) : base;
             titleAttr = orig ? `${base} — ${orig} (ID: ${id})` : `${base} (ID: ${id})`;
         } else if (scope === 'institucionales') {
             label = base;
@@ -438,7 +438,7 @@ function getFormsTableHTML(formularios, idProt) {
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}${billingDerivacionSalienteHint(f)}</td>
                                 <td>${estadoBadge}</td>
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>

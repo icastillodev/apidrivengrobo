@@ -231,12 +231,17 @@ function setupInstitutionFilter() {
     const insts = [...new Set(allHousings.map(h => h.Institucion))];
     const container = document.getElementById('container-filter-inst');
     const select = document.getElementById('filter-inst');
+    if (!container || !select) return;
+    const allLabel = window.txt?.misalojamientos?.filter_inst_todos || window.txt?.generales?.todas || 'Todas';
+    select.innerHTML = `<option value="all">${allLabel}</option>`;
     if (insts.length > 1) {
         container.classList.remove('d-none');
         insts.sort().forEach(inst => {
             const opt = document.createElement('option');
             opt.value = inst; opt.text = inst; select.appendChild(opt);
         });
+    } else {
+        container.classList.add('d-none');
     }
 }
 

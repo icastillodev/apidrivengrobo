@@ -33,24 +33,334 @@ function ensureHtml2pdf() {
 }
 
 function mountDomForPdf(dom) {
-    // Evitar PDFs en blanco: el nodo debe "pintarse" (no opacity:0) y tener un layout estable.
-    // `visibility:hidden` mantiene el render sin mostrarlo.
-    dom.style.position = 'fixed';
-    dom.style.left = '0';
-    dom.style.top = '0';
-    dom.style.visibility = 'hidden';
-    dom.style.pointerEvents = 'none';
-    dom.style.zIndex = '-1';
-    dom.style.background = '#ffffff';
-    dom.style.width = '210mm';
-    dom.style.maxWidth = '210mm';
+    prepareDomForPdfCapture(dom);
     document.body.appendChild(dom);
     return dom;
 }
 
+/** Ajustes de layout para html2pdf/html2canvas (evita PDF en blanco). */
+function prepareDomForPdfCapture(dom) {
+    dom.style.position = 'fixed';
+    dom.style.left = '-10000px';
+    dom.style.top = '0';
+    dom.style.opacity = '1';
+    dom.style.visibility = 'visible';
+    dom.style.pointerEvents = 'none';
+    dom.style.zIndex = '-1';
+    dom.style.background = '#ffffff';
+    dom.style.color = '#212529';
+    dom.style.width = '794px';
+    dom.style.maxWidth = '794px';
+    dom.querySelectorAll('.row').forEach((row) => {
+        row.style.display = 'block';
+        row.style.width = '100%';
+    });
+    dom.querySelectorAll('[class*="col-"]').forEach((col) => {
+        col.style.width = '100%';
+        col.style.maxWidth = '100%';
+        col.style.flex = 'none';
+    });
+}
+
 async function waitNextFrame() {
+    void domOffsetForceReflow(document.body);
     await new Promise((r) => requestAnimationFrame(() => r()));
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 120));
+}
+
+function domOffsetForceReflow(el) {
+    if (el && el.offsetHeight != null) return el.offsetHeight;
+    return 0;
+}
+
+function filterSingleFichaTramos(data, tramoScope) {
+    if (!data || tramoScope !== 'actual' || !Array.isArray(data.tramos)) return data;
+    const idActual = parseInt(data.IdAlojamientoFicha, 10) || 0;
+    if (!idActual) return data;
+    const tramos = data.tramos.filter((tr) => parseInt(tr.IdAlojamiento, 10) === idActual);
+    let ultimo = data.ultimoTramo;
+    if (ultimo && parseInt(ultimo.IdAlojamiento, 10) !== idActual) {
+        ultimo = tramos.length ? tramos[tramos.length - 1] : null;
+    }
+    return { ...data, tramos, ultimoTramo: ultimo };
+}
+
+function filterFichaForExport(data, exportOpts = {}) {
+    if (!data) return data;
+    const tramoScope = exportOpts.tramoScope === 'actual' ? 'actual' : 'todos';
+    const clone = JSON.parse(JSON.stringify(data));
+    if (clone.scope === 'caja' && Array.isArray(clone.fichasSujetos)) {
+        clone.fichasSujetos = clone.fichasSujetos.map((fd) => filterSingleFichaTramos(fd, tramoScope));
+        return clone;
+    }
+    if (clone.scope === 'alojamiento' && Array.isArray(clone.grupos)) {
+        clone.grupos = clone.grupos.map((g) => ({
+            ...g,
+            fichasSujetos: (g.fichasSujetos || []).map((fd) => filterSingleFichaTramos(fd, tramoScope)),
+        }));
+        return clone;
+    }
+    return filterSingleFichaTramos(clone, tramoScope);
+}
+
+function allowTramoScopePicker(data) {
+    if (!data || data.scope) return false;
+    return (data.tramos || []).length > 1;
+}
+
+async function pickFichaExportOptions(t, opts = {}) {
+    const { format = 'pdf', allowTramoScope = false } = opts;
+    const Swal = window.Swal;
+    if (typeof Swal === 'undefined') {
+        return { mode: 'full', tramoScope: 'todos' };
+    }
+
+    let html = `<p class="small text-muted text-start mb-3">${esc(t.animal_ficha_export_options_hint || '')}</p>`;
+    html += `<div class="text-start mb-3">
+        <label class="form-label fw-bold small mb-1">${esc(t.animal_ficha_pdf_elegir_title || '')}</label>
+        <div class="form-check"><input class="form-check-input" type="radio" name="exp-mode" id="exp-mode-full" value="full" checked>
+        <label class="form-check-label" for="exp-mode-full">${esc(t.animal_ficha_pdf_completa || '')}</label></div>
+        <div class="form-check"><input class="form-check-input" type="radio" name="exp-mode" id="exp-mode-simple" value="simple">
+        <label class="form-check-label" for="exp-mode-simple">${esc(t.animal_ficha_pdf_simple || '')}</label></div>
+    </div>`;
+
+    if (allowTramoScope) {
+        html += `<div class="text-start mb-2">
+            <label class="form-label fw-bold small mb-1">${esc(t.animal_ficha_tramo_scope_title || '')}</label>
+            <div class="form-check"><input class="form-check-input" type="radio" name="exp-tramo" id="exp-tramo-todos" value="todos" checked>
+            <label class="form-check-label" for="exp-tramo-todos">${esc(t.animal_ficha_tramo_todos || '')}</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="exp-tramo" id="exp-tramo-actual" value="actual">
+            <label class="form-check-label" for="exp-tramo-actual">${esc(t.animal_ficha_tramo_actual || '')}</label></div>
+        </div>`;
+    }
+
+    const result = await Swal.fire({
+        title: format === 'excel' ? (t.animal_ficha_excel || 'Excel') : (t.animal_ficha_pdf || 'PDF'),
+        html,
+        showCancelButton: true,
+        confirmButtonText: format === 'excel'
+            ? (t.animal_ficha_excel_descargar || 'Descargar')
+            : (t.animal_ficha_pdf || 'PDF'),
+        cancelButtonText: window.txt?.comunicacion?.modal_cerrar || window.txt?.generales?.cerrar || 'Cerrar',
+        focusConfirm: false,
+        preConfirm: () => {
+            const modeEl = document.querySelector('input[name="exp-mode"]:checked');
+            const tramoEl = document.querySelector('input[name="exp-tramo"]:checked');
+            return {
+                mode: modeEl?.value === 'simple' ? 'simple' : 'full',
+                tramoScope: tramoEl?.value === 'actual' ? 'actual' : 'todos',
+            };
+        },
+    });
+    if (result.isDismissed) return null;
+    return result.value;
+}
+
+function buildFichaExportToolbarHtml(t, toolbarId) {
+    return `<div id="${toolbarId}" class="d-flex flex-wrap gap-2 mb-3 pb-2 border-bottom">
+        <button type="button" class="btn btn-sm btn-outline-danger" data-ficha-export="pdf"><i class="bi bi-file-pdf me-1"></i>${esc(t.animal_ficha_pdf || 'PDF')}</button>
+        <button type="button" class="btn btn-sm btn-outline-success" data-ficha-export="excel"><i class="bi bi-file-earmark-spreadsheet me-1"></i>${esc(t.animal_ficha_excel || 'Excel')}</button>
+    </div>`;
+}
+
+function wireExportToolbar(toolbarId, handlers) {
+    const bar = document.getElementById(toolbarId);
+    if (!bar) return;
+    bar.querySelector('[data-ficha-export="pdf"]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handlers.pdf?.();
+    });
+    bar.querySelector('[data-ficha-export="excel"]')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handlers.excel?.();
+    });
+}
+
+function ensureXlsx() {
+    if (typeof window.XLSX !== 'undefined') {
+        return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-xlsx-loader]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve());
+            existing.addEventListener('error', () => reject(new Error('xlsx')));
+            return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.async = true;
+        s.setAttribute('data-xlsx-loader', '1');
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error(tOrDefault(window.txt?.alojamientos?.export_sheetjs_error, 'xlsx')));
+        document.head.appendChild(s);
+    });
+}
+
+function tOrDefault(v, d) {
+    return v || d;
+}
+
+function excelSheetName(label, fallback) {
+    return String(label || fallback).replace(/[\\/*?:[\]]/g, '_').slice(0, 31);
+}
+
+function collectFichaSubjects(data) {
+    if (!data) return [];
+    if (data.scope === 'caja') return data.fichasSujetos || [];
+    if (data.scope === 'alojamiento') {
+        return (data.grupos || []).flatMap((g) => g.fichasSujetos || []);
+    }
+    return [data];
+}
+
+function buildResumenRows(data, t, tm) {
+    const suj = data.sujeto || {};
+    const prot0 = (data.tramos || [])[0];
+    const rows = [
+        [t.animal_ficha_nombre, suj.NombreEspecieAloj],
+        [t.animal_ficha_id_sujeto, suj.IdUnidadAlojamiento],
+        [t.animal_ficha_especie, data.NombreEspecie],
+        [t.animal_ficha_historia, data.historia],
+        [t.animal_ficha_protocolo, prot0 ? `${prot0.protocolo_titulo || ''}${prot0.protocolo_codigo ? ` (${prot0.protocolo_codigo})` : ''}`.trim() : ''],
+        [t.animal_ficha_fecha_inicio, data.fechaInicioSeguimiento],
+        [t.animal_ficha_nacimiento, data.fechaNacimientoSugerida || suj.FechaNacimientoSujeto],
+        [t.animal_ficha_peso, suj.PesoSujetoKg],
+        [t.animal_ficha_sexo, sexoSujetoLabel(suj.SexoSujeto, t)],
+        [t.animal_ficha_subespecie, [suj.SubespecieNombreSujeto, suj.CepaNombreSujeto, suj.CategoriaRazaSujeto].filter(Boolean).join(' · ')],
+        [t.animal_ficha_detalle, suj.DetalleEspecieAloj],
+        [t.animal_ficha_institucion || 'Institución', data.NombreInstitucion],
+    ];
+    return rows.filter((r) => r[1] != null && String(r[1]).trim() !== '');
+}
+
+function buildInicioRows(data, t) {
+    const cats = data.categorias_inicio || [];
+    const vin = data.valores_inicio || {};
+    const rows = [[t.animal_ficha_excel_col_campo || 'Campo', t.animal_ficha_excel_col_valor || 'Valor']];
+    cats.forEach((c) => {
+        const o = vin[c.IdDatosUnidadAloj] || vin[String(c.IdDatosUnidadAloj)];
+        const v = o?.Valor != null ? String(o.Valor) : '';
+        if (v) rows.push([c.NombreCatAlojUnidad, v]);
+    });
+    return rows.length > 1 ? rows : null;
+}
+
+function buildTrazabilidadRows(data, t, tm) {
+    const cats = data.categorias_datos || data.categorias || [];
+    const tramos = data.tramos || [];
+    const header = [
+        t.animal_ficha_tramo,
+        tm.desde || 'Desde',
+        tm.hasta || 'Hasta',
+        t.animal_ficha_caja,
+        t.animal_ficha_ubicacion,
+        t.trace_fecha,
+        ...cats.map((c) => c.NombreCatAlojUnidad),
+    ];
+    const rows = [header.map((h) => h || '')];
+    tramos.forEach((tr) => {
+        const obsList = tr.observaciones_pivot || [];
+        if (!obsList.length) {
+            rows.push([
+                tr.IdAlojamiento,
+                tr.fechavisado || '',
+                tr.hastafecha || '',
+                tr.NombreCaja || '',
+                tr.ubicacionResumen || '',
+                '',
+                ...cats.map(() => ''),
+            ]);
+            return;
+        }
+        obsList.forEach((obs) => {
+            rows.push([
+                tr.IdAlojamiento,
+                tr.fechavisado || '',
+                tr.hastafecha || '',
+                tr.NombreCaja || '',
+                tr.ubicacionResumen || '',
+                obs.fechaObs || '',
+                ...cats.map((c) => obs.valores?.[c.NombreCatAlojUnidad] ?? ''),
+            ]);
+        });
+    });
+    return rows;
+}
+
+function appendSubjectSheetsToWorkbook(wb, data, exportOpts, t, tm, usedNames, idx) {
+    const filtered = filterSingleFichaTramos(JSON.parse(JSON.stringify(data)), exportOpts.tramoScope || 'todos');
+    const mode = exportOpts.mode || 'full';
+    const idLab = filtered.sujeto?.IdUnidadAlojamiento || idx;
+    const base = excelSheetName(`S${idLab}`, `Sujeto_${idx}`);
+
+    const addSheet = (suffix, rows, fallback) => {
+        let name = excelSheetName(`${base}_${suffix}`, fallback);
+        let n = 1;
+        while (usedNames.has(name)) {
+            n += 1;
+            name = excelSheetName(`${base}_${suffix}_${n}`, `${fallback}_${n}`);
+        }
+        usedNames.add(name);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+    };
+
+    addSheet('Res', buildResumenRows(filtered, t, tm), 'Resumen');
+    const inicio = buildInicioRows(filtered, t);
+    if (inicio) addSheet('Ini', inicio, 'Inicio');
+    if (mode === 'full') addSheet('Traz', buildTrazabilidadRows(filtered, t, tm), 'Trazabilidad');
+}
+
+function buildFichaExcelWorkbook(data, exportOpts) {
+    const t = window.txt?.alojamientos || {};
+    const tm = window.txt?.misalojamientos || {};
+    const wb = XLSX.utils.book_new();
+    const usedNames = new Set();
+    const subjects = collectFichaSubjects(data);
+    if (!subjects.length) {
+        appendSubjectSheetsToWorkbook(wb, data, exportOpts, t, tm, usedNames, 1);
+    } else {
+        subjects.forEach((fd, i) => appendSubjectSheetsToWorkbook(wb, fd, exportOpts, t, tm, usedNames, i + 1));
+    }
+    return wb;
+}
+
+async function writeExcelWorkbook(wb, filename) {
+    await ensureXlsx();
+    window.XLSX.writeFile(wb, filename);
+}
+
+async function resolveExportOptions(t, data, format, preset) {
+    if (preset && typeof preset === 'object') return preset;
+    return pickFichaExportOptions(t, {
+        format,
+        allowTramoScope: allowTramoScopePicker(data),
+    });
+}
+
+async function renderPdfFromDom(dom, filename) {
+    mountDomForPdf(dom);
+    domOffsetForceReflow(dom);
+    await waitNextFrame();
+    const opt = {
+        margin: 10,
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: dom.scrollWidth || 794,
+            windowHeight: dom.scrollHeight || undefined,
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] },
+    };
+    await window.html2pdf().set(opt).from(dom).save();
+    dom.remove();
 }
 
 function sexoSujetoLabel(code, t) {
@@ -128,7 +438,18 @@ function htmlValoresInicio(catsInicio, vin, t) {
     return `<div class="mt-2 mb-3"><h6 class="fw-bold small">${esc(t.animal_ficha_bloque_inicio || '')}</h6><table class="table table-sm table-bordered mb-0" style="font-size:11px">${rows}</table></div>`;
 }
 
-function buildFichaDom(data) {
+function htmlCobroModoBadge(data, t) {
+    if (!data?.trazabilidad_habilitada) return '';
+    const isSujeto = data.alojamiento_cobro_modo === 'SUJETO';
+    const label = isSujeto
+        ? (t.animal_ficha_cobro_sujeto || 'Cobro por sujeto')
+        : (t.animal_ficha_cobro_contenido || 'Cobro por contenido');
+    const cls = isSujeto ? 'bg-success' : 'bg-secondary';
+    return `<span class="badge ${cls} ms-2 align-middle" style="font-size:11px;">${esc(label)}</span>`;
+}
+
+function buildFichaDom(data, options = {}) {
+    const mode = options.mode === 'simple' ? 'simple' : 'full';
     const t = window.txt?.alojamientos || {};
     const tm = window.txt?.misalojamientos || {};
     const suj = data.sujeto || {};
@@ -148,23 +469,21 @@ function buildFichaDom(data) {
         ? `<p class="mb-1"><strong>${esc(t.animal_ficha_protocolo || 'Protocolo')}</strong> ${esc(prot0.protocolo_titulo || '')}${prot0.protocolo_codigo ? ` (${esc(prot0.protocolo_codigo)})` : ''}</p>`
         : '';
 
-    const ultimoBlock = ult ? `
+    const ultimoBlock = mode === 'full' && ult ? `
         <div class="border rounded p-3 mb-3 bg-light">
             <h6 class="fw-bold text-primary mb-2">${esc(t.animal_ficha_ultimo_aloj || 'Último alojamiento')}</h6>
             <p class="mb-1 small"><strong>${esc(t.animal_ficha_tramo || 'Tramo')}</strong> #${ult.IdAlojamiento} · ${esc(ult.NombreTipoAlojamiento || '')}</p>
             <p class="mb-1 small">${esc(tm.desde || 'Desde')}: ${esc(ult.fechavisado || '')} · ${esc(tm.hasta || 'Hasta')}: ${esc(ult.hastafecha || '—')}</p>
-            <p class="mb-1 small"><strong>${esc(t.animal_ficha_caja || 'Caja')}</strong>: ${esc(ult.NombreCaja || '')}</p>
+            <p class="mb-1 small"><strong>${esc(ult.NombreTipoAlojamiento || t.type_box || 'Tipo')}</strong>: ${esc(ult.NombreCaja || '—')}</p>
             <p class="mb-1 small"><strong>${esc(t.animal_ficha_ubicacion || 'Ubicación')}</strong>: ${esc(ult.ubicacionResumen || '—')}</p>
-            ${htmlDatosSujetoTramo(ult, t)}
             ${ult.aloj_obs ? `<p class="mb-0 small"><strong>${esc(t.animal_ficha_obs_aloj || '')}</strong> ${esc(ult.aloj_obs)}</p>` : ''}
         </div>
     ` : '';
 
-    const tramosHtml = tramos.map((tr, idx) => `
+    const tramosHtml = mode === 'full' ? tramos.map((tr, idx) => `
         <div class="mb-4 ${idx > 0 ? 'border-top pt-3' : ''}">
             <h6 class="fw-bold">${esc(t.animal_ficha_tramo || 'Tramo')} #${tr.IdAlojamiento} — ${esc(tr.NombreTipoAlojamiento || '')}</h6>
             <p class="small text-muted mb-2">${esc(tr.fechavisado || '')} → ${esc(tr.hastafecha || '—')} · ${esc(tr.NombreCaja || '')} · ${esc(tr.ubicacionResumen || '')}</p>
-            ${htmlDatosSujetoTramo(tr, t)}
             ${tr.aloj_obs ? `<p class="small mb-2"><em>${esc(tr.aloj_obs)}</em></p>` : ''}
             <div class="table-responsive">
                 <table class="table table-sm table-bordered" style="font-size:11px">
@@ -175,14 +494,18 @@ function buildFichaDom(data) {
                 </table>
             </div>
         </div>
-    `).join('');
+    `).join('') : '';
+
+    const pdfTitle = mode === 'simple'
+        ? (t.animal_ficha_title_simple || t.animal_ficha_title || 'Ficha del animal')
+        : (t.animal_ficha_title || 'Ficha del animal');
 
     const wrap = document.createElement('div');
     wrap.className = 'animal-ficha-pdf-root';
     wrap.innerHTML = `
-        <div class="p-3" style="font-family: Lato, Arial, sans-serif; font-size: 12px;">
+        <div class="p-3" style="font-family: Lato, Arial, sans-serif; font-size: 12px; color: #212529;">
             <div class="mb-3 border-bottom pb-2">
-                <h4 class="fw-black m-0">${esc(t.animal_ficha_title || 'Ficha del animal')}</h4>
+                <h4 class="fw-black m-0">${esc(pdfTitle)}${htmlCobroModoBadge(data, t)}</h4>
                 <div class="small text-muted">${esc(data.NombreInstitucion || '')}</div>
             </div>
             <div class="row mb-3">
@@ -201,11 +524,11 @@ function buildFichaDom(data) {
                     ${fechaNac}
                 </div>
             </div>
-            <p class="small text-muted mb-2">${esc(t.animal_ficha_ideas_hint || '')}</p>
+            ${mode === 'full' ? `<p class="small text-muted mb-2">${esc(t.animal_ficha_ideas_hint || '')}</p>` : ''}
             ${ultimoBlock}
-            <div style="page-break-before: always;"></div>
+            ${mode === 'full' ? `<div style="page-break-before: always;"></div>
             <h5 class="fw-bold border-bottom pb-2 mb-3">${esc(t.animal_ficha_trazabilidad || 'Trazabilidad completa')}</h5>
-            ${tramosHtml || `<p class="text-muted">${esc(t.animal_ficha_sin_tramos || '—')}</p>`}
+            ${tramosHtml || `<p class="text-muted">${esc(t.animal_ficha_sin_tramos || '—')}</p>`}` : ''}
             <div class="mt-4 pt-2 border-top small text-muted">${esc(t.animal_ficha_pdf_footer || '')}</div>
         </div>
     `;
@@ -227,7 +550,7 @@ function countAggregateSubjects(data) {
 }
 
 /** Ficha PDF/modal: varios sujetos (alcance caja o tramo completo). */
-function buildFichaDomAggregate(data) {
+function buildFichaDomAggregate(data, options = {}) {
     const t = window.txt?.alojamientos || {};
     const wrap = document.createElement('div');
     wrap.className = 'animal-ficha-pdf-root';
@@ -257,7 +580,7 @@ function buildFichaDomAggregate(data) {
                 const block = document.createElement('div');
                 block.className = i > 0 ? 'mt-4 pt-3' : 'mt-3';
                 if (i > 0) block.style.pageBreakBefore = 'always';
-                block.appendChild(cloneFichaInnerBlock(buildFichaDom(fd)));
+                block.appendChild(cloneFichaInnerBlock(buildFichaDom(fd, options)));
                 shell.appendChild(block);
             });
         }
@@ -295,7 +618,7 @@ function buildFichaDomAggregate(data) {
                     const block = document.createElement('div');
                     block.className = j > 0 ? 'mt-4 pt-3' : '';
                     if (j > 0) block.style.pageBreakBefore = 'always';
-                    block.appendChild(cloneFichaInnerBlock(buildFichaDom(fd)));
+                    block.appendChild(cloneFichaInnerBlock(buildFichaDom(fd, options)));
                     shell.appendChild(block);
                 });
             });
@@ -342,7 +665,8 @@ export const AnimalFichaUI = {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
             const dom = buildFichaDom(res.data);
-            const html = dom.outerHTML;
+            const toolbarId = `ficha-export-${idEspecieAlojUnidad}-${Date.now()}`;
+            const html = buildFichaExportToolbarHtml(t, toolbarId) + dom.outerHTML;
             const idAloj = parseInt(res.data.IdAlojamientoFicha, 10) || 0;
             const idEsp = parseInt(res.data.IdEspecieFicha, 10) || 0;
             const traceUi = window.TrazabilidadUI;
@@ -357,21 +681,24 @@ export const AnimalFichaUI = {
                 width: 'min(920px, 96vw)',
                 showConfirmButton: true,
                 confirmButtonText: tm.cerrar || window.txt?.comunicacion?.modal_cerrar || 'Cerrar',
-                showDenyButton: true,
-                denyButtonText: t.animal_ficha_pdf || 'PDF',
+                showDenyButton: false,
                 showCancelButton: canModificar,
                 cancelButtonText: t.animal_ficha_modal_modificar || t.trace_edit_subject_ficha || '',
                 reverseButtons: true,
                 focusConfirm: false,
                 customClass: { htmlContainer: 'text-start' },
                 target: document.getElementById('modal-historial') || document.body,
+                didOpen: () => {
+                    wireExportToolbar(toolbarId, {
+                        pdf: () => AnimalFichaUI.downloadPdf(idEspecieAlojUnidad),
+                        excel: () => AnimalFichaUI.downloadExcel(idEspecieAlojUnidad),
+                    });
+                },
             });
 
             const Dr = window.Swal?.DismissReason;
             const fueCancel = result.dismiss === (Dr?.cancel ?? 'cancel');
-            if (result.isDenied) {
-                await AnimalFichaUI.downloadPdf(idEspecieAlojUnidad);
-            } else if (canModificar && fueCancel) {
+            if (canModificar && fueCancel) {
                 await traceUi.editSubjectFicha(idEspecieAlojUnidad, idAloj, idEsp);
             }
         } catch (e) {
@@ -401,24 +728,27 @@ export const AnimalFichaUI = {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
             const dom = buildFichaDomAggregate(res.data);
-            const html = dom.outerHTML;
-            const result = await Swal.fire({
+            const toolbarId = `ficha-export-caja-${idCajaAlojamiento}-${Date.now()}`;
+            const html = buildFichaExportToolbarHtml(t, toolbarId) + dom.outerHTML;
+            await Swal.fire({
                 title: '',
                 html,
                 width: 'min(920px, 96vw)',
                 showConfirmButton: true,
                 confirmButtonText: tm.cerrar || window.txt?.comunicacion?.modal_cerrar || 'Cerrar',
-                showDenyButton: true,
-                denyButtonText: t.animal_ficha_pdf || 'PDF',
+                showDenyButton: false,
                 showCancelButton: false,
                 reverseButtons: true,
                 focusConfirm: false,
                 customClass: { htmlContainer: 'text-start' },
                 target: document.getElementById('modal-historial') || document.body,
+                didOpen: () => {
+                    wireExportToolbar(toolbarId, {
+                        pdf: () => AnimalFichaUI.downloadPdfCaja(idCajaAlojamiento),
+                        excel: () => AnimalFichaUI.downloadExcelCaja(idCajaAlojamiento),
+                    });
+                },
             });
-            if (result.isDenied) {
-                await AnimalFichaUI.downloadPdfCaja(idCajaAlojamiento);
-            }
         } catch (e) {
             Swal.close();
             Swal.fire({ icon: 'error', text: String(e.message || e), target: document.getElementById('modal-historial') || document.body });
@@ -446,31 +776,34 @@ export const AnimalFichaUI = {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
             const dom = buildFichaDomAggregate(res.data);
-            const html = dom.outerHTML;
-            const result = await Swal.fire({
+            const toolbarId = `ficha-export-aloj-${idAlojamiento}-${Date.now()}`;
+            const html = buildFichaExportToolbarHtml(t, toolbarId) + dom.outerHTML;
+            await Swal.fire({
                 title: '',
                 html,
                 width: 'min(920px, 96vw)',
                 showConfirmButton: true,
                 confirmButtonText: tm.cerrar || window.txt?.comunicacion?.modal_cerrar || 'Cerrar',
-                showDenyButton: true,
-                denyButtonText: t.animal_ficha_pdf || 'PDF',
+                showDenyButton: false,
                 showCancelButton: false,
                 reverseButtons: true,
                 focusConfirm: false,
                 customClass: { htmlContainer: 'text-start' },
                 target: document.getElementById('modal-historial') || document.body,
+                didOpen: () => {
+                    wireExportToolbar(toolbarId, {
+                        pdf: () => AnimalFichaUI.downloadPdfAlojamiento(idAlojamiento),
+                        excel: () => AnimalFichaUI.downloadExcelAlojamiento(idAlojamiento),
+                    });
+                },
             });
-            if (result.isDenied) {
-                await AnimalFichaUI.downloadPdfAlojamiento(idAlojamiento);
-            }
         } catch (e) {
             Swal.close();
             Swal.fire({ icon: 'error', text: String(e.message || e), target: document.getElementById('modal-historial') || document.body });
         }
     },
 
-    async downloadPdf(idEspecieAlojUnidad) {
+    async downloadPdf(idEspecieAlojUnidad, preset) {
         const t = window.txt?.alojamientos || {};
         const Swal = window.Swal;
         try {
@@ -481,26 +814,15 @@ export const AnimalFichaUI = {
             if (res.status !== 'success' || !res.data) {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
+            const exportOpts = await resolveExportOptions(t, res.data, 'pdf', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
             await ensureHtml2pdf();
-            const dom = buildFichaDom(res.data);
-            mountDomForPdf(dom);
-            await waitNextFrame();
-            const opt = {
-                margin: 10,
-                filename: `ficha-animal-${idEspecieAlojUnidad}.pdf`,
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    windowWidth: dom.scrollWidth || undefined,
-                    windowHeight: dom.scrollHeight || undefined,
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            };
-            await window.html2pdf().set(opt).from(dom).save();
-            dom.remove();
+            const dom = buildFichaDom(filtered, { mode: exportOpts.mode });
+            await renderPdfFromDom(dom, `ficha-animal-${idEspecieAlojUnidad}.pdf`);
             if (typeof Swal !== 'undefined') Swal.close();
         } catch (e) {
             if (typeof Swal !== 'undefined') Swal.close();
@@ -512,7 +834,37 @@ export const AnimalFichaUI = {
         }
     },
 
-    async downloadPdfCaja(idCajaAlojamiento) {
+    async downloadExcel(idEspecieAlojUnidad, preset) {
+        const t = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        try {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: t.animal_ficha_generando_excel || '...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            }
+            const res = await fetchFicha(idEspecieAlojUnidad);
+            if (res.status !== 'success' || !res.data) {
+                throw new Error(res.message || t.animal_ficha_error || '');
+            }
+            const exportOpts = await resolveExportOptions(t, res.data, 'excel', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
+            const wb = buildFichaExcelWorkbook(filtered, exportOpts);
+            await writeExcelWorkbook(wb, `ficha-animal-${idEspecieAlojUnidad}.xlsx`);
+            if (typeof Swal !== 'undefined') Swal.close();
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.close();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: String(e.message || e) });
+            } else {
+                window.alert(String(e.message || e));
+            }
+        }
+    },
+
+    async downloadPdfCaja(idCajaAlojamiento, preset) {
         const t = window.txt?.alojamientos || {};
         const Swal = window.Swal;
         try {
@@ -523,26 +875,15 @@ export const AnimalFichaUI = {
             if (res.status !== 'success' || !res.data) {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
+            const exportOpts = await resolveExportOptions(t, res.data, 'pdf', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
             await ensureHtml2pdf();
-            const dom = buildFichaDomAggregate(res.data);
-            mountDomForPdf(dom);
-            await waitNextFrame();
-            const opt = {
-                margin: 10,
-                filename: `ficha-caja-${idCajaAlojamiento}.pdf`,
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    windowWidth: dom.scrollWidth || undefined,
-                    windowHeight: dom.scrollHeight || undefined,
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            };
-            await window.html2pdf().set(opt).from(dom).save();
-            dom.remove();
+            const dom = buildFichaDomAggregate(filtered, { mode: exportOpts.mode });
+            await renderPdfFromDom(dom, `ficha-caja-${idCajaAlojamiento}.pdf`);
             if (typeof Swal !== 'undefined') Swal.close();
         } catch (e) {
             if (typeof Swal !== 'undefined') Swal.close();
@@ -554,7 +895,37 @@ export const AnimalFichaUI = {
         }
     },
 
-    async downloadPdfAlojamiento(idAlojamiento) {
+    async downloadExcelCaja(idCajaAlojamiento, preset) {
+        const t = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        try {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: t.animal_ficha_generando_excel || '...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            }
+            const res = await fetchFichaCaja(idCajaAlojamiento);
+            if (res.status !== 'success' || !res.data) {
+                throw new Error(res.message || t.animal_ficha_error || '');
+            }
+            const exportOpts = await resolveExportOptions(t, res.data, 'excel', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
+            const wb = buildFichaExcelWorkbook(filtered, exportOpts);
+            await writeExcelWorkbook(wb, `ficha-caja-${idCajaAlojamiento}.xlsx`);
+            if (typeof Swal !== 'undefined') Swal.close();
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.close();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: String(e.message || e) });
+            } else {
+                window.alert(String(e.message || e));
+            }
+        }
+    },
+
+    async downloadPdfAlojamiento(idAlojamiento, preset) {
         const t = window.txt?.alojamientos || {};
         const Swal = window.Swal;
         try {
@@ -565,26 +936,45 @@ export const AnimalFichaUI = {
             if (res.status !== 'success' || !res.data) {
                 throw new Error(res.message || t.animal_ficha_error || '');
             }
+            const exportOpts = await resolveExportOptions(t, res.data, 'pdf', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
             await ensureHtml2pdf();
-            const dom = buildFichaDomAggregate(res.data);
-            mountDomForPdf(dom);
-            await waitNextFrame();
-            const opt = {
-                margin: 10,
-                filename: `ficha-alojamiento-${idAlojamiento}.pdf`,
-                image: { type: 'jpeg', quality: 0.95 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    logging: false,
-                    windowWidth: dom.scrollWidth || undefined,
-                    windowHeight: dom.scrollHeight || undefined,
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            };
-            await window.html2pdf().set(opt).from(dom).save();
-            dom.remove();
+            const dom = buildFichaDomAggregate(filtered, { mode: exportOpts.mode });
+            await renderPdfFromDom(dom, `ficha-alojamiento-${idAlojamiento}.pdf`);
+            if (typeof Swal !== 'undefined') Swal.close();
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.close();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'error', text: String(e.message || e) });
+            } else {
+                window.alert(String(e.message || e));
+            }
+        }
+    },
+
+    async downloadExcelAlojamiento(idAlojamiento, preset) {
+        const t = window.txt?.alojamientos || {};
+        const Swal = window.Swal;
+        try {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: t.animal_ficha_generando_excel || '...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            }
+            const res = await fetchFichaAlojamiento(idAlojamiento);
+            if (res.status !== 'success' || !res.data) {
+                throw new Error(res.message || t.animal_ficha_error || '');
+            }
+            const exportOpts = await resolveExportOptions(t, res.data, 'excel', preset);
+            if (!exportOpts) {
+                if (typeof Swal !== 'undefined') Swal.close();
+                return;
+            }
+            const filtered = filterFichaForExport(res.data, exportOpts);
+            const wb = buildFichaExcelWorkbook(filtered, exportOpts);
+            await writeExcelWorkbook(wb, `ficha-alojamiento-${idAlojamiento}.xlsx`);
             if (typeof Swal !== 'undefined') Swal.close();
         } catch (e) {
             if (typeof Swal !== 'undefined') Swal.close();

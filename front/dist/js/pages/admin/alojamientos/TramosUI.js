@@ -214,7 +214,7 @@ async guardarNuevoTramo() {
                     timer: 1500, 
                     showConfirmButton: false 
                 });
-                await loadAlojamientos();
+                await loadAlojamientos({ resetPagination: true });
                 setTimeout(() => window.verHistorial(historiaId), 500);
             } else {
                 Swal.fire('Error', res.message, 'error');
@@ -288,7 +288,7 @@ async updateTramoData(event) {
                 const res = await API.request('/alojamiento/delete-row', 'POST', { IdAlojamiento: idAlojamiento, historia: historiaId });
                 if (res.status === 'success') {
                     Swal.fire({ title: txt.tramo_deleted || 'Eliminado', icon: 'success', timer: 1500, showConfirmButton: false });
-                    await loadAlojamientos();
+                    await loadAlojamientos({ resetPagination: true });
                     setTimeout(() => window.verHistorial(historiaId), 500);
                 } else Swal.fire('Error', res.message, 'error');
             } catch (e) { console.error(e); } finally { hideLoader(); }
@@ -315,7 +315,7 @@ async updateTramoData(event) {
                 const res = await API.request('/alojamiento/update-price', 'POST', { IdAlojamiento: idAlojamiento, precio: nuevoPrecio });
                 if (res.status === 'success') {
                     const historiaId = AlojamientoState.currentHistoryData[0].historia;
-                    await loadAlojamientos();
+                    await loadAlojamientos({ resetPagination: true });
                     setTimeout(() => window.verHistorial(historiaId), 500);
                 }
             } catch (e) { console.error(e); } finally { hideLoader(); }

@@ -2,9 +2,13 @@ import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getPdfLogoHeaderHtml } from '../../utils/pdfLogoHeader.js';
 
-let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {} };
+let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {}, trazabilidad_habilitada: false, alojamiento_cobro_modo: 'CONTENIDO' };
 
 const PRECIOS_TBODY_IDS = ['tbody-precios-animales', 'tbody-insumos-exp', 'tbody-insumos-comunes', 'tbody-servicios'];
+
+function __preciosColspanAnimales() {
+    return dataFull.trazabilidad_habilitada ? 4 : 3;
+}
 
 function __preciosEscapeHtml(s) {
     return String(s ?? '')
@@ -17,10 +21,12 @@ function __preciosEscapeHtml(s) {
 /** Spinner solo en las tablas (evita loader de página completa en recargas). */
 function setPreciosTbodiesLoading(active) {
     const msg = __preciosEscapeHtml(window.txt?.generales?.msg_cargando || '…');
+    const colAn = __preciosColspanAnimales();
+    const rowAn = `<tr><td colspan="${colAn}" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
     const row = `<tr><td colspan="3" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success mb-2" role="status"></div><div class="small">${msg}</div></td></tr>`;
     PRECIOS_TBODY_IDS.forEach((id) => {
         const el = document.getElementById(id);
-        if (el && active) el.innerHTML = row;
+        if (el && active) el.innerHTML = id === 'tbody-precios-animales' ? rowAn : row;
     });
 }
 
@@ -67,6 +73,8 @@ export async function initPreciosPage(opts = {}) {
             dataFull = res.data;
             const inputTitulo = document.getElementById('titulo-precios');
             if (inputTitulo) inputTitulo.value = dataFull.institucion.tituloprecios || '';
+            __preciosRenderModoCobro();
+            __preciosSyncAnimalesTableHeader();
             window.renderAllPriceTables();
         }
     } catch (e) {
@@ -77,9 +85,42 @@ export async function initPreciosPage(opts = {}) {
     }
 }
 
+function __preciosRenderModoCobro() {
+    const wrap = document.getElementById('precios-modo-cobro-wrap');
+    if (!wrap) return;
+    const txtP = window.txt?.precios || {};
+    const on = !!dataFull.trazabilidad_habilitada;
+    wrap.classList.toggle('d-none', !on);
+    if (!on) return;
+    const modo = dataFull.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
+    wrap.innerHTML = `
+        <label class="small fw-bold text-muted uppercase mb-1 d-block" data-i18n="precios.modo_cobro_title">${__preciosEscapeHtml(txtP.modo_cobro_title || '')}</label>
+        <p class="small text-muted mb-2" data-i18n="precios.modo_cobro_help">${__preciosEscapeHtml(txtP.modo_cobro_help || '')}</p>
+        <div class="btn-group btn-group-sm" role="group" id="precios-modo-cobro-group">
+            <input type="radio" class="btn-check" name="alojamiento_cobro_modo" id="precios-modo-contenido" value="CONTENIDO" ${modo === 'CONTENIDO' ? 'checked' : ''}>
+            <label class="btn btn-outline-secondary" for="precios-modo-contenido">${__preciosEscapeHtml(txtP.modo_cobro_contenido || '')}</label>
+            <input type="radio" class="btn-check" name="alojamiento_cobro_modo" id="precios-modo-sujeto" value="SUJETO" ${modo === 'SUJETO' ? 'checked' : ''}>
+            <label class="btn btn-outline-success" for="precios-modo-sujeto">${__preciosEscapeHtml(txtP.modo_cobro_sujeto || '')}</label>
+        </div>`;
+}
+
+function __preciosSyncAnimalesTableHeader() {
+    const headRow = document.getElementById('thead-precios-animales-row');
+    if (!headRow) return;
+    const txtP = window.txt?.precios || {};
+    const on = !!dataFull.trazabilidad_habilitada;
+    headRow.innerHTML = `
+        <th data-i18n="precios.table.desc_animal">${__preciosEscapeHtml(txtP.table?.desc_animal || '')}</th>
+        <th style="width: 200px;" class="text-center" data-i18n="precios.table.clasificacion">${__preciosEscapeHtml(txtP.table?.clasificacion || '')}</th>
+        <th style="width: 150px;" data-i18n="precios.table.precio_unidad">${__preciosEscapeHtml(on ? (txtP.table?.precio_contenido || txtP.table?.precio_unidad || '') : (txtP.table?.precio_unidad || ''))}</th>
+        ${on ? `<th style="width: 150px;" data-i18n="precios.table.precio_sujeto">${__preciosEscapeHtml(txtP.table?.precio_sujeto || '')}</th>` : ''}`;
+}
+
 window.renderAllPriceTables = () => {
     const term = document.getElementById('search-input-precios').value.toLowerCase().trim();
     const txtP = window.txt?.precios || {};
+    const trazOn = !!dataFull.trazabilidad_habilitada;
+    const colAn = __preciosColspanAnimales();
     
     // 1. RENDER ANIMALES Y ALOJAMIENTO
     const tbodyAn = document.getElementById('tbody-precios-animales');
@@ -100,6 +141,7 @@ window.renderAllPriceTables = () => {
                     </td>
                     <td class="text-center text-muted small">${txtP.badge_base || 'ESPECIE (BASE)'}</td>
                     <td><input type="number" class="form-control form-control-sm precio-input" value="${e.Panimal}"></td>
+                    ${trazOn ? '<td></td>' : ''}
                 </tr>`;
 
             subs.forEach(s => {
@@ -108,20 +150,23 @@ window.renderAllPriceTables = () => {
                         <td class="ps-5 small"><i class="bi bi-arrow-return-right me-2 text-secondary"></i>${s.SubEspeNombreA}</td>
                         <td class="text-center text-primary small">${txtP.badge_var || 'VAR. / SUBESPECIE'}</td>
                         <td><input type="number" class="form-control form-control-sm precio-input" value="${s.Psubanimal}"></td>
+                        ${trazOn ? '<td></td>' : ''}
                     </tr>`;
             });
 
             alojamientos.forEach(a => {
+                const ps = a.PrecioXSujeto != null && a.PrecioXSujeto !== '' ? a.PrecioXSujeto : '';
                 htmlAn += `
                     <tr data-id="${a.IdTipoAlojamiento}" data-type="alojamiento">
                         <td class="ps-5 small"><i class="bi bi-house-door me-2 text-warning"></i>${a.NombreTipoAlojamiento} <span class="text-muted ms-2" style="font-size:10px;">${a.DetalleTipoAlojamiento || ''}</span></td>
                         <td class="text-center text-warning small fw-bold">${txtP.badge_aloj || 'ALOJAMIENTO'}</td>
                         <td><input type="number" class="form-control form-control-sm precio-input" value="${a.PrecioXunidad}"></td>
+                        ${trazOn ? `<td><input type="number" class="form-control form-control-sm precio-sujeto-input" value="${ps}" placeholder="${__preciosEscapeHtml(txtP.table?.precio_sujeto_ph || '')}"></td>` : ''}
                     </tr>`;
             });
         }
     });
-    tbodyAn.innerHTML = htmlAn || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_data || 'No se encontraron registros.'}</td></tr>`;
+    tbodyAn.innerHTML = htmlAn || `<tr><td colspan="${colAn}" class="text-center p-3 text-muted">${txtP.no_data || 'No se encontraron registros.'}</td></tr>`;
     
     // 2. RENDER INSUMOS
     const renderInsumo = (i, type, idField) => `
@@ -153,17 +198,28 @@ window.saveAllPrices = async () => {
     document.querySelectorAll('tr[data-id]').forEach(tr => {
         const input = tr.querySelector('.precio-input');
         if(input) {
-            items.push({ type: tr.dataset.type, id: tr.dataset.id, precio: input.value || 0 });
+            const item = { type: tr.dataset.type, id: tr.dataset.id, precio: input.value || 0 };
+            if (tr.dataset.type === 'alojamiento') {
+                const psInput = tr.querySelector('.precio-sujeto-input');
+                if (psInput) item.precio_sujeto = psInput.value;
+            }
+            items.push(item);
         }
     });
 
+    const modoRadio = document.querySelector('input[name="alojamiento_cobro_modo"]:checked');
+    const payload = {
+        instId: localStorage.getItem('instId'),
+        tituloprecios: document.getElementById('titulo-precios').value,
+        data: items
+    };
+    if (dataFull.trazabilidad_habilitada && modoRadio) {
+        payload.alojamiento_cobro_modo = modoRadio.value;
+    }
+
     try {
         showLoader();
-        await API.request('/precios/update-all', 'POST', {
-            instId: localStorage.getItem('instId'),
-            tituloprecios: document.getElementById('titulo-precios').value,
-            data: items
-        });
+        await API.request('/precios/update-all', 'POST', payload);
         hideLoader();
         window.Swal.fire(
             window.txt?.precios?.alert_saved || 'Guardado',

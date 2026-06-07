@@ -234,15 +234,19 @@ async function loadDetails() {
 }
 
 function traducirTipoDato(tipo) {
+    const t = window.txt?.config_alojamientos || {};
     const diccionario = {
-        varchar: 'Texto Breve',
-        text: 'Texto Largo',
-        int: 'Num. Entero',
-        decimal: 'Num. Decimal',
-        date: 'Fecha',
-        bool: 'Sí / No',
+        varchar: t.dt_varchar || 'Texto Breve',
+        text: t.dt_text || 'Texto Largo',
+        int: t.dt_int || 'Num. Entero',
+        decimal: t.dt_decimal || 'Num. Decimal',
+        date: t.dt_date || 'Fecha',
+        bool: t.dt_bool || 'Sí / No',
+        sexo: t.dt_sexo || 'Sexo',
+        subespecie: t.dt_subespecie || 'Subespecie',
+        cepa: t.dt_cepa || 'Cepa',
     };
-    return diccionario[tipo] || tipo;
+    return diccionario[String(tipo || '').toLowerCase()] || tipo;
 }
 
 function renderTypes(list) {
@@ -266,9 +270,9 @@ function renderTypes(list) {
                     </span>
                 </td>
                 <td class="text-end">
-                    <button class="btn btn-sm ${isInactive ? 'btn-outline-success' : 'btn-outline-secondary'} border-0"
+                    <button class="btn btn-sm ${isInactive ? 'btn-outline-danger' : 'btn-outline-success'} border-0"
                             onclick="window.toggleType(${t.IdTipoAlojamiento}, ${t.Habilitado})" title="Habilitar/Deshabilitar">
-                        <i class="bi ${isInactive ? 'bi-toggle-off fs-5' : 'bi-toggle-on fs-5'}"></i>
+                        <i class="bi ${isInactive ? 'bi-toggle-off fs-5 text-danger' : 'bi-toggle-on fs-5 text-success'}"></i>
                     </button>
                     <button class="btn btn-sm btn-light border-0 ms-1"
                             onclick="window.openModalType(${t.IdTipoAlojamiento}, '${String(t.NombreTipoAlojamiento || '').replace(/'/g, "\\'")}', '${String(t.DetalleTipoAlojamiento || '').replace(/'/g, "\\'")}', ${t.Habilitado})">
@@ -317,9 +321,9 @@ function renderClinicalRows(list, tbodyId, alcance) {
                     </span>
                 </td>
                 <td class="text-end">
-                    <button class="btn btn-sm ${isInactive ? 'btn-outline-success' : 'btn-outline-secondary'} border-0"
+                    <button class="btn btn-sm ${isInactive ? 'btn-outline-danger' : 'btn-outline-success'} border-0"
                             onclick="window.toggleCat(${c.IdDatosUnidadAloj}, ${c.Habilitado})" title="Habilitar/Deshabilitar">
-                        <i class="bi ${isInactive ? 'bi-toggle-off fs-5' : 'bi-toggle-on fs-5'}"></i>
+                        <i class="bi ${isInactive ? 'bi-toggle-off fs-5 text-danger' : 'bi-toggle-on fs-5 text-success'}"></i>
                     </button>
                     <button class="btn btn-sm btn-light border-0 ms-1"
                             onclick="window.openModalCatIdx(${idx}, '${alcance}')">

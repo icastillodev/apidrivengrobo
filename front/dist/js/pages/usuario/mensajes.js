@@ -72,6 +72,50 @@ function stripHiloQueryParam() {
     window.history.replaceState({}, '', url.pathname + (nq ? `?${nq}` : '') + url.hash);
 }
 
+function ensureMsgMobileStyles() {
+    if (document.getElementById('msg-mobile-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'msg-mobile-styles';
+    style.textContent = `
+        @media (max-width: 991.98px) {
+            #msg-layout-root.msg-thread-open #msg-col-lista { display: none !important; }
+            #msg-layout-root:not(.msg-thread-open) #msg-col-hilo { display: none !important; }
+            #msg-layout-root.msg-thread-open #mensajes-page-header .d-flex.gap-2 { display: none !important; }
+            #panel-hilo-cont {
+                display: flex;
+                flex-direction: column;
+                min-height: min(72dvh, 640px);
+                padding-bottom: env(safe-area-inset-bottom, 0);
+            }
+            #hilo-mensajes {
+                flex: 1 1 auto;
+                max-height: min(58dvh, 520px);
+                min-height: 220px;
+            }
+            #hilo-reply-wrap {
+                position: sticky;
+                bottom: 0;
+                z-index: 2;
+                background: #fff;
+                padding-top: 0.35rem;
+                padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0));
+                border-top: 1px solid rgba(0,0,0,.06);
+            }
+            #panel-hilo-wrap .card-body { padding-bottom: 0.5rem; }
+            #btn-hilo-back { min-height: 2.25rem; }
+            #btn-reply { min-height: 2.5rem; min-width: 5.5rem; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function setMsgMobileThreadOpen(open) {
+    const root = document.getElementById('msg-layout-root');
+    if (root) root.classList.toggle('msg-thread-open', !!open);
+}
+
+let currentHiloId = null;
+
 function redirectToAppDashboard() {
     hideLoader({ minVisibleMs: 0 });
     const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
@@ -214,8 +258,6 @@ export async function initMensajes(opts = {}) {
             ? (t.msg_inst_dest_institucion || t.msg_destinatario || '')
             : (t.msg_inst_dest_usuario || t.msg_destinatario || '');
     }
-
-    let currentHiloId = null;
 
     /** Cache para filtrar destinatarios sin volver a pedir la API */
     let destinatariosCache = { local: [], red: [] };
@@ -857,10 +899,12 @@ export async function initMensajes(opts = {}) {
         const pc = document.getElementById('panel-hilo-cont');
         if (ph) ph.classList.add('d-none');
         if (pc) pc.classList.remove('d-none');
+        setMsgMobileThreadOpen(true);
 
         const res = await API.request(`/comunicacion/mensajes/hilo/${id}?markRead=1`, 'GET');
         if (res.status !== 'success' || !res.data) {
             currentHiloId = null;
+            setMsgMobileThreadOpen(false);
             if (pc) pc.classList.add('d-none');
             if (ph) ph.classList.remove('d-none');
             const code = String(res.code || '').trim();
@@ -1173,6 +1217,7 @@ export async function initMensajes(opts = {}) {
             if (!res.isConfirmed) return;
             await Swal.fire({ icon: 'success', title: t.msg_delete_hilo_success || '', timer: 1500, showConfirmButton: false });
             currentHiloId = null;
+            setMsgMobileThreadOpen(false);
             document.getElementById('panel-hilo-cont')?.classList.add('d-none');
             document.getElementById('panel-hilo-placeholder')?.classList.remove('d-none');
             await loadHilos();
@@ -1777,6 +1822,44 @@ export async function initMensajes(opts = {}) {
     });
 
     await loadHilos();
+
+    function closeHiloToList() {
+        currentHiloId = null;
+        const ph = document.getElementById('panel-hilo-placeholder');
+        const pc = document.getElementById('panel-hilo-cont');
+        if (pc) pc.classList.add('d-none');
+        if (ph) ph.classList.remove('d-none');
+        setMsgMobileThreadOpen(false);
+        renderHilosList(getHilosFiltrados());
+    }
+
+    ensureMsgMobileStyles();
+    const msgLayoutRow = document.getElementById('lista-hilos')?.closest('.row');
+    if (msgLayoutRow && !msgLayoutRow.id) msgLayoutRow.id = 'msg-layout-root';
+    const colLista = document.getElementById('lista-hilos')?.closest('.col-12');
+    const colHilo = document.getElementById('panel-hilo-wrap')?.closest('.col-12');
+    if (colLista && !colLista.id) colLista.id = 'msg-col-lista';
+    if (colHilo && !colHilo.id) colHilo.id = 'msg-col-hilo';
+    const headerRow = document.querySelector('#panel-hilo-cont > .d-flex.justify-content-between');
+    if (headerRow && !document.getElementById('btn-hilo-back')) {
+        const backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.id = 'btn-hilo-back';
+        backBtn.className = 'btn btn-link btn-sm text-success fw-bold px-0 d-lg-none align-self-start flex-shrink-0';
+        backBtn.innerHTML = `<i class="bi bi-arrow-left" aria-hidden="true"></i> <span>${escapeHtml(t.msg_volver_lista || 'Conversaciones')}</span>`;
+        backBtn.addEventListener('click', closeHiloToList);
+        headerRow.insertBefore(backBtn, headerRow.firstChild);
+        headerRow.classList.add('align-items-start');
+    }
+    const pageHeader = document.getElementById('mensajes-page-header');
+    if (pageHeader && !document.getElementById('msg-session-hint')) {
+        const hint = document.createElement('div');
+        hint.id = 'msg-session-hint';
+        hint.className = 'alert alert-light border small py-2 px-3 mb-3 d-lg-none';
+        hint.textContent = t.msg_mobile_sesion_hint || '';
+        pageHeader.insertAdjacentElement('afterend', hint);
+    }
+    setMsgMobileThreadOpen(false);
 
     async function applyHiloDeepLink() {
         const sp = new URLSearchParams(window.location.search);

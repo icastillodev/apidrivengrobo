@@ -13,6 +13,7 @@ Lista de verificación para **cerrar** el índice maestro en [`CHECKLIST-PRODUCT
 | Mensajería (`mensaje_hilo`, `mensaje`, `mensaje_leido`) | [`migrations/20260401_mensajeria_noticias.sql`](migrations/20260401_mensajeria_noticias.sql) | [ ] |
 | Hilos institucionales (si aplica) | [`migrations/20260405_mensaje_hilo_institucional.sql`](migrations/20260405_mensaje_hilo_institucional.sql) | [ ] |
 | `historialpago.fecha` → DATETIME | [`migrations/2026-05-09-historialpago-fecha-datetime.sql`](migrations/2026-05-09-historialpago-fecha-datetime.sql) | [ ] |
+| Trazabilidad `con_cirugia` (M20 / BD-05) | [`migrations/2026-05-21-trazabilidad-con-cirugia.sql`](migrations/2026-05-21-trazabilidad-con-cirugia.sql) | [ ] |
 
 Detalle e inventario: [`BACKLOG-BASE-DATOS.md`](BACKLOG-BASE-DATOS.md).
 
@@ -82,8 +83,38 @@ Detalle e inventario: [`BACKLOG-BASE-DATOS.md`](BACKLOG-BASE-DATOS.md).
 
 ---
 
+## Operación G/D/M — lote mayo 2026
+
+Referencia: [`CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md`](CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md)
+
+### Gabriel — derivados / facturación / mensajería
+
+| # | Paso | OK |
+|---|------|-----|
+| G1 | Formulario derivado en sede destino: cambiar cepa a una de la institución local | [ ] |
+| G2 | Pedido derivado entregado visible en facturación depto, investigador y protocolo (local vs derivado) | [ ] |
+| G5 | Email mensajería: solo link, sin cuerpo del mensaje | [ ] |
+| G6 | Mensajería móvil: volver a lista, composer sticky, safe-area | [ ] |
+
+### Mariela — trazabilidad / ficha / QR
+
+| # | Paso | OK |
+|---|------|-----|
+| M9 | Config tipo dato **Sexo** → dropdown - / macho / hembra en inicio y datos | [ ] |
+| M10 | Tipo **text** → textarea; pivot con word-wrap | [ ] |
+| M16 | PDF ficha: no blanco; selector simple vs completa | [ ] |
+| M20 | Tras migración BD-05: cirugía en alta/inicio, badge y toggle | [ ] |
+| M21 | Excel ficha completa por animal/caja | [ ] |
+| M22 | QR en móvil/tablet: título protocolo completo; trazabilidad expandida usable | [ ] |
+| M18 | Config inicio tipo **Subespecie** / **Cepa** → dropdown catálogo especie | [ ] |
+| M23 | PDF/Excel: tramo actual vs todos los tramos | [ ] |
+| M5 | Tras migración BD-01: precios modo cobro + tarifa sujeto; facturación respeta modo | [ ] |
+| M13 | Ficha animal: badge cobro por sujeto vs contenido | [ ] |
+
+---
+
 ## Cierre
 
 Cuando todas las filas críticas estén **OK**, actualizar §0 del checklist de producto y archivar notas de IDs de prueba en la viñeta correspondiente (sin PII en git).
 
-*Última revisión: 2026-05-21 — alineado con hotkeys Alt+N/J, X+D/F, migración historialpago.*
+*Última revisión: BD-01 modo cobro (`2026-05-21-alojamiento-modo-cobro.sql`) + M5/M13 en código; BD-05 `con_cirugia` pendiente QA.*

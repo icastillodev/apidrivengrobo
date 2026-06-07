@@ -148,7 +148,7 @@ export const TableUI = {
             <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" ${hidNum == null ? '' : `onclick="window.verHistorial(${hidNum}, event)"`}>
                 <td><span class="badge bg-dark">#${hidNum ?? '—'}</span></td>
                 <td class="small fw-bold text-secondary">${fechavisado || '---'}</td> 
-                <td><div class="fw-bold">${(a.nprotA || '').toString()}</div><small class="text-muted">${(a.tituloA || '---').toString().replace(/</g, '&lt;')}</small></td>
+                <td><div class="fw-bold">${(a.nprotA || '').toString()}</div><small class="text-muted d-block" style="white-space:normal;max-width:min(280px,40vw);line-height:1.3" title="${escapeHtml(a.tituloA || '')}">${(a.tituloA || '---').toString().replace(/</g, '&lt;')}</small></td>
                 <td>${(a.Investigador || '---').toString().replace(/</g, '&lt;')}</td>
                 <td>${(a.EspeNombreA || '---').toString().replace(/</g, '&lt;')}</td>
                 <td class="text-center fw-bold">${infoCajas}</td>

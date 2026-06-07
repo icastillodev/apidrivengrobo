@@ -4,7 +4,8 @@
 **Estado:** **alcance maestro cerrado en código** (2026-05); este archivo queda como **registro** de lo entregado. Iniciativas con alcance propio (p. ej. envío masivo de correo) → [`docs/PROYECTO-CORREOS-MASIVOS.md`](PROYECTO-CORREOS-MASIVOS.md).  
 **Relación con otros docs:** no sustituye `checklist-finalizados/CHECKLIST-I18N-REGLA.md` ni migraciones en `docs/migrations/`; es el inventario **funcional/producto** que pediste.
 
-> **Checklist activo (mayo 2026):** nuevo backlog separado — búsqueda sin IA, hotkeys, Gabriel (mensajería / formularios / protocolos derivados), Marie (facturación / insumos / derivados / organismos): **[`CHECKLIST-PRODUCTO-2026-05-GROBO.md`](CHECKLIST-PRODUCTO-2026-05-GROBO.md)**.
+> **Checklist activo (mayo 2026):** lote operación **Gabriel / Diana / Mariela** — **[`CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md`](CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md)** (BD: [`CHECKLIST-BD-2026-05-OPERACION-GDM.md`](CHECKLIST-BD-2026-05-OPERACION-GDM.md)).  
+> **Checklist anterior (mismo mes):** búsqueda, hotkeys, Marie — [`CHECKLIST-PRODUCTO-2026-05-GROBO.md`](CHECKLIST-PRODUCTO-2026-05-GROBO.md).
 
 **Rendimiento — tablas y cargas:** checklist técnico vivo en **`docs/CHECKLIST-OPTIMIZACION-TABLAS-CARGAS.md`** (consultas, paginación API, loader primera carga vs spinner en tabla).
 

@@ -16,6 +16,7 @@ import {
     billingSumInsumosCobrable,
     billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
+    billingDerivacionSelectorLabel,
     billingDerivadaLiquidacionBadge,
     billingDerivacionSalienteHint,
     billingPdfFormularioIdDisplay,
@@ -283,7 +284,7 @@ function renderDeptoOptions() {
             let titleAttr = '';
             if (scope === 'derivados') {
                 const orig = mapDeptOrigen[idNum] ?? mapDeptOrigen[String(idNum)];
-                label = orig ? `${nombre} — ${orig}` : nombre;
+                label = orig ? billingDerivacionSelectorLabel(nombre, orig) : nombre;
                 if (orig) {
                     titleAttr = String(titleTpl).replace(/\{origenes\}/g, String(orig));
                 }

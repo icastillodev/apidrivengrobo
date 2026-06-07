@@ -10,6 +10,7 @@ import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
+import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -545,7 +546,14 @@ window.openAnimalModal = async (a) => {
     }
     const selEsp = document.getElementById('select-especie-modal');
     const idespA = selEsp && selEsp.value ? selEsp.value : null;
-    if (idespA) await window.loadCepasForEspecieModal(idespA, a.idcepaA);
+    let cepaPreselect = a.idcepaA;
+    if (useAllLocalSpecies) {
+        // Evitar preseleccionar cepa del origen (ID distinto en la sede actual).
+        const catSelNow = document.getElementById('select-categoria-modal');
+        const subOk = catSelNow && String(catSelNow.value || '').trim() !== '';
+        cepaPreselect = (subOk && a.idcepaA) ? a.idcepaA : null;
+    }
+    if (idespA) await window.loadCepasForEspecieModal(idespA, cepaPreselect);
     window.calculateAnimalTotals?.();
     window.updateResumenNuevoFormulario?.();
     if (statusSel && isDerivedDest && configIncompleta) updateDerivedEstadoEnablement();
@@ -1236,7 +1244,11 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
             if (help) help.textContent = t.seleccione_especie_cepa || 'Seleccione especie.';
             return;
         }
-        const res = await API.request(`/animals/cepas?inst=${encodeURIComponent(instId)}&idespA=${encodeURIComponent(idespA)}`);
+        const subId = String(document.getElementById('select-categoria-modal')?.value || '').trim();
+        const cepasUrl = subId
+            ? `/animals/cepas?inst=${encodeURIComponent(instId)}&idsubespA=${encodeURIComponent(subId)}`
+            : `/animals/cepas?inst=${encodeURIComponent(instId)}&idespA=${encodeURIComponent(idespA)}`;
+        const res = await API.request(cepasUrl);
         if (stale()) return;
         const list = (res && res.status === 'success' && Array.isArray(res.data)) ? res.data : [];
         sel.innerHTML = '';
@@ -1250,7 +1262,10 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
                 opt.text = c.CepaNombreA;
                 sel.appendChild(opt);
             });
-            if (currentIdCepa) sel.value = String(currentIdCepa);
+            if (currentIdCepa) {
+                const hasOpt = Array.from(sel.options).some((o) => String(o.value) === String(currentIdCepa));
+                if (hasOpt) sel.value = String(currentIdCepa);
+            }
             if (help) help.textContent = t.cepa_help || 'Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.';
         } else {
             window._animalModalCepasRequired = false;
@@ -1358,6 +1373,17 @@ window.saveFullAnimalForm = async (e) => {
             return;
         }
         const instParam = instId || sessionStorage.getItem('instId') || '';
+        if (catSel && String(catSel.value || '').trim()) {
+            fd.set('idsubespA', String(catSel.value).trim());
+        }
+        if (cepaSel) {
+            const cepaVal = String(cepaSel.value || '').trim();
+            if (cepaVal && cepaVal !== '0') {
+                fd.set('idcepaA', cepaVal);
+            } else {
+                fd.delete('idcepaA');
+            }
+        }
         const res = await API.request(`/animals/update-full?inst=${instParam}`, 'POST', fd);
         if (res.status === 'success') {
             sessionStorage.setItem('reopenAnimalId', String(id));
@@ -1369,11 +1395,14 @@ window.saveFullAnimalForm = async (e) => {
                 confirmButtonColor: '#1a5d3b'
             }).then(() => { location.reload(); });
         } else {
-            window.Swal.fire('Error al guardar', res.message || 'No se pudieron guardar los cambios.', 'error');
+            const errTxt = mapAnimalFormCepaApiError(res.message) || fa.error_guardar_texto || 'No se pudieron guardar los cambios.';
+            window.Swal.fire(fa.error_guardar_titulo || 'Error al guardar', errTxt, 'error');
         }
     } catch (err) {
         console.error(err);
-        window.Swal.fire('Error', err?.message || 'Error al guardar. Revise la consola.', 'error');
+        const fa = window.txt?.form_animales || {};
+        const errTxt = mapAnimalFormCepaApiError(err?.message) || fa.error_guardar_texto || 'Error al guardar. Revise la consola.';
+        window.Swal.fire(fa.error_guardar_titulo || 'Error', errTxt, 'error');
     }
 };
 

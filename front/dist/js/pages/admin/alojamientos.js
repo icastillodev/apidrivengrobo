@@ -80,7 +80,11 @@ export async function loadAlojamientos(options = {}) {
             }
         }
 
-            if (resetPagination) TableUI.currentPage = 1;
+            if (resetPagination) {
+                TableUI.currentPage = 1;
+                TableUI._lastSpeciesIdsKey = null;
+                TableUI._lastFilterKey = null;
+            }
             TableUI.poblarFiltroEspecies?.();
         TableUI.render();
         if (res.status === 'success') refreshMenuNotifications();
@@ -91,7 +95,11 @@ export async function loadAlojamientos(options = {}) {
         if (typeof Swal !== 'undefined') {
             Swal.fire({ icon: 'error', text: t?.err_carga_lista || '' });
         }
-            if (resetPagination) TableUI.currentPage = 1;
+            if (resetPagination) {
+                TableUI.currentPage = 1;
+                TableUI._lastSpeciesIdsKey = null;
+                TableUI._lastFilterKey = null;
+            }
             TableUI.poblarFiltroEspecies?.();
         TableUI.render();
     } finally {

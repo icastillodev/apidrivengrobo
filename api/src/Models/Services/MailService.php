@@ -647,35 +647,20 @@ public function sendAnimalOrderConfirmation($to, $nombre, $instName, $data, $lan
         ?array $mensajeAnterior = null
     ): bool {
         $t = MailLang::get($lang);
-        $subject = $asunto . ($instName !== '' ? ' — ' . $instName : '');
-        $cuerpoHtml = nl2br(htmlspecialchars($cuerpoPlano, ENT_QUOTES, 'UTF-8'));
+        $subject = ($t['msg_int_email_subject'] ?? 'Nuevo mensaje') . ': ' . $asunto . ($instName !== '' ? ' — ' . $instName : '');
         $nombreDestHtml = $nombreDest !== '' ? htmlspecialchars($nombreDest, ENT_QUOTES, 'UTF-8') : '';
         $helloTarget = $nombreDestHtml !== '' ? $nombreDestHtml : htmlspecialchars($to, ENT_QUOTES, 'UTF-8');
 
         $mensajeCompleto = $t['msg_int_hello'] . ' <b>' . $helloTarget . '</b>,<br><br>'
             . $t['msg_int_intro'] . '<br><br>'
             . '<b>' . htmlspecialchars($t['msg_int_from'], ENT_QUOTES, 'UTF-8') . '</b> '
-            . htmlspecialchars($nombreRemitente, ENT_QUOTES, 'UTF-8') . '<br><br>'
+            . htmlspecialchars($nombreRemitente, ENT_QUOTES, 'UTF-8') . '<br>'
             . '<b>' . htmlspecialchars($t['msg_int_subject_label'], ENT_QUOTES, 'UTF-8') . '</b> '
-            . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8') . '<br><br>'
-            . '<b>' . htmlspecialchars($t['msg_int_message_label'] ?? 'Mensaje:', ENT_QUOTES, 'UTF-8') . '</b><br>'
-            . '<div style="background:#f8f9fa;padding:14px;border-radius:6px;border:1px solid #e9ecef;margin-top:4px;">'
-            . $cuerpoHtml . '</div>';
+            . htmlspecialchars($asunto, ENT_QUOTES, 'UTF-8');
 
-        $prevCuerpo = isset($mensajeAnterior['cuerpo']) ? trim((string) $mensajeAnterior['cuerpo']) : '';
-        if ($prevCuerpo !== '') {
-            if (strlen($prevCuerpo) > 4000) {
-                $prevCuerpo = substr($prevCuerpo, 0, 4000) . '…';
-            }
-            $prevAutor = isset($mensajeAnterior['autor']) ? trim((string) $mensajeAnterior['autor']) : '';
-            $prevHtml = nl2br(htmlspecialchars($prevCuerpo, ENT_QUOTES, 'UTF-8'));
-            $prevAutorHtml = $prevAutor !== '' ? htmlspecialchars($prevAutor, ENT_QUOTES, 'UTF-8') : '';
-            $mensajeCompleto .= '<br><br><b>' . htmlspecialchars($t['msg_int_previous_heading'] ?? 'Previous', ENT_QUOTES, 'UTF-8') . '</b><br>'
-                . '<div style="background:#fff;padding:12px;border-radius:6px;border:1px dashed #ced4da;margin-top:6px;color:#495057;font-size:13px;">'
-                . ($prevAutorHtml !== ''
-                    ? ('<div style="margin-bottom:8px;"><b>' . htmlspecialchars($t['msg_int_previous_from'] ?? 'From:', ENT_QUOTES, 'UTF-8') . '</b> ' . $prevAutorHtml . '</div>')
-                    : '')
-                . $prevHtml . '</div>';
+        if (!empty($t['msg_int_session_hint'])) {
+            $mensajeCompleto .= '<br><br><p style="font-size:13px;color:#666;margin:0;">'
+                . htmlspecialchars($t['msg_int_session_hint'], ENT_QUOTES, 'UTF-8') . '</p>';
         }
 
         $hid = ($hiloId !== null && $hiloId > 0) ? (int) $hiloId : 0;

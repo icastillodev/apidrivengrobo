@@ -132,7 +132,7 @@ renderSummary(historiaId) {
             
             <div class="col-12 mt-3 pt-2 border-top">
                 <label class="d-block small text-muted fw-bold text-uppercase">${txt.protocol_title || 'TÍTULO DEL PROTOCOLO'}</label>
-                <span class="fw-semibold fst-italic text-secondary">${first.tituloA || '---'}</span>
+                <span class="fw-semibold fst-italic text-secondary d-block" style="white-space:normal;word-wrap:break-word;line-height:1.35">${first.tituloA || '---'}</span>
             </div>
         `;
     },
@@ -427,7 +427,7 @@ renderTable() {
             <tr id="cfg-row-prot-${p.idprotA}" onclick="window.cfgSelectProtocolo(${p.idprotA})" class="transition-colors ${p.idprotA == this.cfgSelections.idprotA ? 'table-primary border-primary' : ''}">
                 <td class="fw-bold text-muted">#${p.idprotA}</td>
                 <td class="fw-bold text-primary">${p.nprotA}</td>
-                <td class="text-truncate" style="max-width: 150px;">${p.tituloA || (window.txt?.alojamientos?.cfg_sin_titulo || 'Sin Título')}</td>
+                <td style="max-width: 220px; white-space: normal; word-wrap: break-word; line-height: 1.3;">${p.tituloA || (window.txt?.alojamientos?.cfg_sin_titulo || 'Sin Título')}</td>
                 <td class="text-info fw-bold" style="font-size: 10px;">${p.DeptoProtocoloFormat || '---'}</td>
                 <td class="text-muted"><i class="bi bi-person-fill"></i> ${p.ResponsableFormat || p.Investigador || (window.txt?.alojamientos?.cfg_sin_asignar || 'Sin Asignar')}</td>
             </tr>

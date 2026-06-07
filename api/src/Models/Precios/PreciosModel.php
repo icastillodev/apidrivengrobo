@@ -1,6 +1,8 @@
 <?php
 namespace App\Models\Precios;
 
+use App\Utils\AlojamientoCobro;
+
 class PreciosModel {
     private $db;
 
@@ -9,14 +11,27 @@ class PreciosModel {
     }
 
     public function getInstData($instId) {
-        $sql = "SELECT tituloprecios, NombreInst, PrecioJornadaTrabajoExp, Logo, LogoEnPdf FROM institucion WHERE IdInstitucion = ?";
+        $cols = 'tituloprecios, NombreInst, PrecioJornadaTrabajoExp, Logo, LogoEnPdf';
+        if (AlojamientoCobro::hasColumn($this->db, 'institucion', 'AlojamientoCobroModo')) {
+            $cols .= ', AlojamientoCobroModo';
+        }
+        $sql = "SELECT {$cols} FROM institucion WHERE IdInstitucion = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$instId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
-            return ['tituloprecios' => '', 'NombreInst' => '', 'PrecioJornadaTrabajoExp' => 0, 'Logo' => null, 'LogoEnPdf' => 0];
+            return [
+                'tituloprecios' => '',
+                'NombreInst' => '',
+                'PrecioJornadaTrabajoExp' => 0,
+                'Logo' => null,
+                'LogoEnPdf' => 0,
+                'alojamiento_cobro_modo' => AlojamientoCobro::MODO_CONTENIDO,
+            ];
         }
         $row['LogoEnPdf'] = isset($row['LogoEnPdf']) ? (int)$row['LogoEnPdf'] : 0;
+        $row['alojamiento_cobro_modo'] = AlojamientoCobro::normalizeModo($row['AlojamientoCobroModo'] ?? null);
+        unset($row['AlojamientoCobroModo']);
         return $row;
     }
 
@@ -39,7 +54,11 @@ class PreciosModel {
     }
 
     public function getTipoAlojamiento($instId) {
-        $sql = "SELECT t.IdTipoAlojamiento, t.NombreTipoAlojamiento, t.DetalleTipoAlojamiento, t.idespA, t.PrecioXunidad
+        $cols = 't.IdTipoAlojamiento, t.NombreTipoAlojamiento, t.DetalleTipoAlojamiento, t.idespA, t.PrecioXunidad';
+        if (AlojamientoCobro::hasColumn($this->db, 'tipoalojamiento', 'PrecioXSujeto')) {
+            $cols .= ', t.PrecioXSujeto';
+        }
+        $sql = "SELECT {$cols}
                 FROM tipoalojamiento t
                 INNER JOIN especiee e ON t.idespA = e.idespA
                 WHERE e.IdInstitucion = ? AND t.Habilitado = 1";
@@ -75,11 +94,19 @@ class PreciosModel {
     }
     // ----------------------------------------
 
-public function updateTariff($items, $tituloprecios, $instId) {
+public function updateTariff($items, $tituloprecios, $instId, ?string $alojamientoCobroModo = null) {
         $this->db->beginTransaction();
         try {
             $this->db->prepare("UPDATE institucion SET tituloprecios = ? WHERE IdInstitucion = ?")
                      ->execute([$tituloprecios, $instId]);
+
+            if ($alojamientoCobroModo !== null
+                && AlojamientoCobro::hasColumn($this->db, 'institucion', 'AlojamientoCobroModo')
+                && AlojamientoCobro::instTrazabilidadHabilitada($this->db, (int) $instId)) {
+                $modo = AlojamientoCobro::normalizeModo($alojamientoCobroModo);
+                $this->db->prepare('UPDATE institucion SET AlojamientoCobroModo = ? WHERE IdInstitucion = ?')
+                    ->execute([$modo, $instId]);
+            }
 
             foreach ($items as $item) {
                 $precio = isset($item['precio']) ? (float)$item['precio'] : 0;
@@ -94,8 +121,15 @@ public function updateTariff($items, $tituloprecios, $instId) {
                     case 'subespecie':
                         $this->db->prepare("UPDATE subespecie SET Psubanimal = ? WHERE idsubespA = ?")->execute([$precio, $id]);
                         break;
-                    case 'alojamiento': 
+                    case 'alojamiento':
                         $this->db->prepare("UPDATE tipoalojamiento SET PrecioXunidad = ? WHERE IdTipoAlojamiento = ?")->execute([$precio, $id]);
+                        if (AlojamientoCobro::hasColumn($this->db, 'tipoalojamiento', 'PrecioXSujeto')
+                            && array_key_exists('precio_sujeto', $item)) {
+                            $ps = $item['precio_sujeto'];
+                            $psVal = ($ps === '' || $ps === null) ? null : (float) $ps;
+                            $this->db->prepare('UPDATE tipoalojamiento SET PrecioXSujeto = ? WHERE IdTipoAlojamiento = ?')
+                                ->execute([$psVal, $id]);
+                        }
                         break;
                     case 'servicio': 
                         $this->db->prepare("UPDATE serviciosinst SET Precio = ? WHERE IdServicioInst = ?")->execute([$precio, $id]);

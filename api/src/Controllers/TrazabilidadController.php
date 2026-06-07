@@ -172,10 +172,14 @@ class TrazabilidadController {
             $sesion = Auditoria::getDatosSesion();
             $this->tryGuardTrazabilidad($sesion);
             $ubic = (isset($data['ubicacion']) && is_array($data['ubicacion'])) ? $data['ubicacion'] : null;
+            $cantUnidades = (int)($data['cantidadUnidades'] ?? 0);
+            if ($cantUnidades < 0) {
+                $cantUnidades = 0;
+            }
             $this->model->crearCajaYUnidades(
                 $data['idAlojamiento'],
                 $data['nombreCaja'] ?? '',
-                (int)($data['cantidadUnidades'] ?? 1),
+                $cantUnidades,
                 $sesion['instId'],
                 $ubic
             );

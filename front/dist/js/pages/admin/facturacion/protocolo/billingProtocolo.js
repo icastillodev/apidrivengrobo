@@ -19,8 +19,11 @@ import {
     billingSumInsumosCobrable,
     billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
+    billingDerivacionSelectorLabel,
     billingDerivadaLiquidacionBadge,
+    billingDerivacionSalienteHint,
     billingPdfFormularioIdDisplay,
+    billingPdfMarcaExentoLarga,
     billingAlojPeriodoParaInforme,
     billingPedidoSinMontoNoExento,
     billingHtmlRowInsumoPedidoFacturacion,
@@ -165,7 +168,8 @@ function renderizarOpciones(lista) {
         let titleAttr = '';
         if (scope === 'derivados') {
             const orig = mapProt[id] ?? mapProt[String(id)];
-            label = orig ? `${nprot} — ${orig}` : (titCorto ? `${nprot} — ${titCorto}` : nprot);
+            const baseProt = titCorto ? `${nprot} — ${titCorto}` : nprot;
+            label = orig ? billingDerivacionSelectorLabel(baseProt, orig) : baseProt;
             titleAttr = `${nprot} | ${tit} (ID: ${id})`;
         } else if (scope === 'institucionales') {
             label = titCorto ? `${nprot} — ${titCorto}` : nprot;
@@ -368,7 +372,7 @@ function getFormsTableHTML(formularios, idProt) {
                             <tr class="text-center align-middle pointer" style="${rowStyle}" 
                                 onclick="if(event.target.tagName !== 'INPUT') window.abrirEdicionFina('${tipoModal}', ${f.id})">
                                 <td><input type="checkbox" class="check-item-form" data-prot="${idProt}" data-monto="${debe}" data-id="${f.id}" ${(debe <= 0 || isExento) ? 'disabled' : ''}></td>
-                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}</td>
+                                <td class="small text-muted fw-bold">#${f.id}${billingDerivadaLiquidacionBadge(f)}${billingDerivacionSalienteHint(f)}</td>
                                 <td>${estadoBadge}</td>
                                 <td>${fechasDisplay}</td>
                                 <td class="small text-secondary">${isRea ? `<span class="badge bg-light text-info border">${bd.badge_reactivo_bio || 'REACTIVO BIOLÓGICO'}</span>` : espDisplay}</td>
@@ -615,7 +619,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const m = pdfColsPrecioDebePagoTotal(isEx, total, pagadoReal, exL);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
-                    billingPdfFormularioIdDisplay(f),
+                    billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
                     f.nombre_especie,
                     (f.detalle_display || '').replace(/<[^>]*>/g, ""),
                     c[0], c[1], c[2]
@@ -678,7 +682,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const detalle = (i.detalle_completo || '').replace(/<[^>]*>/g, '').substring(0, 60);
                 const m = pdfColsPrecioDebePagoTotal(billingTipoExento(i), total, pagado, exL2);
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
-                const idInsPdf = billingPdfFormularioIdDisplay(i, { style: 'hash' });
+                const idInsPdf = `I-${billingPdfFormularioIdDisplay(i, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() })}`;
                 return [String(idInsPdf).substring(0, 22), (i.solicitante || '').substring(0, 25), detalle, c[0], c[1], c[2]];
             });
             doc.autoTable({

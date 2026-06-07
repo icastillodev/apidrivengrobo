@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Ficha Técnica - Bioterios Grobo</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -14,28 +14,66 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        body { background-color: #f0f2f1; font-family: 'Segoe UI', sans-serif; font-size: 0.85rem; }
-        .qr-container { max-width: 950px; margin: auto; }
+        body { background-color: #f0f2f1; font-family: 'Segoe UI', sans-serif; font-size: clamp(0.8rem, 1.6vw, 0.95rem); }
+        .qr-container { max-width: min(950px, 100%); margin: auto; padding-left: 0.75rem; padding-right: 0.75rem; }
         .card-qr { border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .table-xs { font-size: 0.75rem; }
+        .card-qr .card-body-inner { padding: 1rem 1.25rem; }
+        .table-xs { font-size: clamp(0.7rem, 1.4vw, 0.8rem); }
         #qrcode-buffer { display: none; }
-        .admin-only { display: none !important; } 
-        /* NUEVO: CURSOR Y HOVER PARA LA TABLA */
+        .admin-only { display: none !important; }
         .pointer { cursor: pointer; }
         .pointer:hover { background-color: #e9ecef !important; }
-        
+        .qr-protocol-title {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.4;
+            font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+        }
+        .qr-obs-block { white-space: pre-wrap; word-break: break-word; }
+        .qr-toolbar .btn { min-height: 2.25rem; }
+        @media (max-width: 576px) {
+            .qr-toolbar { flex-direction: column; align-items: stretch !important; }
+            .qr-toolbar .d-flex.gap-2 { width: 100%; justify-content: space-between; }
+            .card-qr .card-body-inner { padding: 0.75rem; }
+            .table-xs th, .table-xs td { padding: 0.35rem 0.25rem; }
+        }
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .qr-container { max-width: min(920px, 96vw); }
+        }
+        @media (min-width: 1200px) {
+            .qr-kiosk-wrap { font-size: 1rem; }
+            .qr-kiosk-wrap .table-xs { font-size: 0.85rem; }
+        }
         @media print {
             .no-print { display: none !important; }
             body { background-color: white !important; }
             .qr-container { width: 100%; max-width: 100%; margin: 0; padding: 0; }
         }
+        /* Trazabilidad expandida (Swal) en móvil / kiosk */
+        .swal2-container .swal2-popup {
+            max-width: min(44rem, 96vw) !important;
+            margin: env(safe-area-inset-top, 0) auto env(safe-area-inset-bottom, 0);
+        }
+        .swal2-html-container {
+            max-height: min(72vh, 560px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            text-align: left;
+        }
+        .swal2-html-container .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .swal2-html-container .text-break { word-break: break-word; overflow-wrap: anywhere; }
+        @media (max-width: 576px) {
+            .swal2-container .swal2-popup { width: 96vw !important; padding: 0.75rem; }
+            .swal2-html-container { max-height: min(68vh, 480px); font-size: 0.85rem; }
+        }
     </style>
 </head>
 <body class="gecko-loaded">
-    <div class="container qr-container py-4">
+    <div class="container qr-container py-3 py-md-4 qr-kiosk-wrap">
         <div id="qr-content" class="d-none">
             
-            <div class="bg-white p-3 rounded border shadow-sm mb-3 no-print d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="bg-white p-3 rounded border shadow-sm mb-3 no-print d-flex justify-content-between align-items-center flex-wrap gap-3 qr-toolbar">
                 
                 <div class="d-flex gap-2 align-items-center">
                     <button class="btn btn-sm btn-outline-dark fw-bold shadow-sm" onclick="window.close()">
@@ -75,10 +113,12 @@
                     <span id="badge-estado" class="badge rounded-pill px-3 py-2 fw-bold"></span>
                 </div>
 
+                <div class="card-body-inner">
                 <div class="row mb-4 border-bottom pb-3">
                         <div class="col-12 mb-3">
-                            <h5 id="txt-protocolo" class="fw-bold text-success mb-1"></h5>
-                            <small id="txt-titulo" class="text-muted d-block lh-sm italic"></small>
+                            <label class="d-block small text-muted fw-bold text-uppercase mb-1" data-i18n="alojamientos.protocol_title">TÍTULO DEL PROTOCOLO</label>
+                            <span id="txt-titulo" class="fw-semibold fst-italic text-secondary d-block qr-protocol-title"></span>
+                            <small id="txt-protocolo" class="text-muted d-block mt-1 fw-bold"></small>
                         </div>
                         
                         <div class="col-sm-6 mb-3 mb-sm-0">
@@ -130,7 +170,7 @@
 
                     <div class="bg-light p-3 rounded border">
                         <small class="fw-bold text-muted d-block mb-1 text-uppercase" data-i18n="alojamientos.qr_recent_obs">Observaciones:</small>
-                        <div id="txt-obs" class="text-dark small lh-sm"></div>
+                        <div id="txt-obs" class="text-dark small lh-sm qr-obs-block"></div>
                     </div>
                 </div>
                 <div id="footer-admin" class="card-footer bg-light d-flex justify-content-between admin-only py-3 border-top no-print"></div>
@@ -143,6 +183,8 @@
         </div>
         <div id="qrcode-buffer"></div>
     </div>
+
+    <div id="modal-historial" class="d-none" aria-hidden="true"></div>
 
     <div class="modal fade" id="modal-actualizar-qr" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">

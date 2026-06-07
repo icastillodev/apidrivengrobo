@@ -2,6 +2,7 @@
 namespace App\Models\Alojamiento;
 use PDO;
 use App\Utils\Auditoria;
+use App\Utils\AlojamientoCobro;
 
 class TrazabilidadModel {
     public const TRAZ_ALCANCE_DATOS = 'datos';
@@ -445,6 +446,8 @@ class TrazabilidadModel {
         return [
             'IdAlojamientoFicha' => (int)($base['IdAlojamientoTramoActual'] ?? 0),
             'IdEspecieFicha' => $idEspA,
+            'trazabilidad_habilitada' => AlojamientoCobro::instTrazabilidadHabilitada($this->db, $idInstitucion),
+            'alojamiento_cobro_modo' => AlojamientoCobro::getModoInst($this->db, $idInstitucion),
             'sujeto' => [
                 'IdUnidadAlojamiento' => $idUnidadAloj,
                 'IdEspecieAlojUnidad' => (int)$base['IdEspecieAlojUnidad'],

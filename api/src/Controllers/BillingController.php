@@ -575,11 +575,23 @@ class BillingController {
             $deudaInsumosProtAcum = 0;
             $mapaSaldos = $this->model->getSaldosPorInstitucion($instId);
 
+            $rangoFechas = ($desde && $hasta);
+
             foreach ($protocolosRaw as $p) {
-                $idProt = $p['idprotA'];
-                $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+                $idProt = (int) $p['idprotA'];
+                if ($rangoFechas) {
+                    $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta, null, (int) $instId);
+                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta);
+                    if (!$hayForms && !$hayAloj) {
+                        continue;
+                    }
+                    $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, (int) $instId) : [];
+                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta) : [];
+                } else {
+                    $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, (int) $instId);
+                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                }
                 $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
-                $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
                 $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
                 $this->enrichInsumosFacturacionDerivadaSaldo($insumosProt, $mapaSaldos, (int) $instId);
 
@@ -860,7 +872,7 @@ class BillingController {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int) ($sesion['instId'] ?? 0);
             $info = $this->model->getProtocolHeaderInfo($idProt);
-            $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta);
+            $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, $instId > 0 ? $instId : null);
             if ($instId > 0) {
                 $this->enrichPedidosFacturacionDerivada($formularios, $instId);
             }

@@ -1,5 +1,6 @@
 import { API } from '../../../api.js';
 import { getPanelOrUsuarioPaginasSegment } from '../../../components/menujs/MenuConfig.js';
+import { mapAnimalFormCepaApiError } from '../../../utils/animalFormCepaErrors.js';
 
 let protocolsList = [];
 let speciesData = [];
@@ -8,6 +9,7 @@ let currentUserEmail = "No disponible";
 let protocolHelpConfig = { has_network: false, has_approved_vigent: false };
 let selectedProtocolMeta = { redIncomplete: false };
 let cepasState = { hasCepas: false };
+
 const basePath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/';
 /* --- HELPER: Obtener Institución del Contexto (SEGURO) --- */
 function getContextInstId() {
@@ -686,7 +688,12 @@ async function submitOrder() {
             });
             window.location.href = `${basePath}paginas/${getPanelOrUsuarioPaginasSegment()}/misformularios.html`;
         } else {
-            Swal.fire('Error', res.message, 'error');
+            const fa = window.txt?.form_animales || {};
+            Swal.fire(
+                fa.error_guardar_titulo || window.txt?.generales?.error || 'Error',
+                mapAnimalFormCepaApiError(res.message) || fa.error_guardar_texto || '',
+                'error'
+            );
         }
     } catch (e) { 
         console.error(e);

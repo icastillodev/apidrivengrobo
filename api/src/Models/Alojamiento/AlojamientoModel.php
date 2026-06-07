@@ -2,6 +2,7 @@
 namespace App\Models\Alojamiento;
 use PDO;
 use App\Utils\Auditoria;
+use App\Utils\AlojamientoCobro;
 
 class AlojamientoModel {
     private $db;
@@ -137,28 +138,38 @@ class AlojamientoModel {
             }
 
             $idTipoAlojamiento = (!empty($data['IdTipoAlojamiento']) && $data['IdTipoAlojamiento'] > 0) ? (int)$data['IdTipoAlojamiento'] : 1;
+            $precioMomento = AlojamientoCobro::precioSujetoDesdeTipo($this->db, $idTipoAlojamiento);
             $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
             $stmtPrecio->execute([$idTipoAlojamiento]);
-            $precioMomento = $stmtPrecio->fetchColumn() ?: 0;
+            $precioContenido = (float) ($stmtPrecio->fetchColumn() ?: 0);
 
-            $sql = "INSERT INTO alojamiento (
-                fechavisado, IdUsrA, observaciones, TipoAnimal, idprotA, historia, IdInstitucion,
-                IdTipoAlojamiento, CantidadCaja, PrecioCajaMomento, finalizado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+            $cols = 'fechavisado, IdUsrA, observaciones, TipoAnimal, idprotA, historia, IdInstitucion,
+                IdTipoAlojamiento, CantidadCaja, PrecioCajaMomento';
+            $placeholders = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+            $params = [
+                $data['fechavisado'],
+                (int)$data['IdUsrA'],
+                $data['observaciones'] ?? '',
+                (int)$data['TipoAnimal'],
+                (int)$data['idprotA'],
+                $historia,
+                (int)$data['IdInstitucion'],
+                $idTipoAlojamiento,
+                (int)$data['CantidadCaja'],
+                $precioContenido,
+            ];
+            if (AlojamientoCobro::hasColumn($this->db, 'alojamiento', 'PrecioSujetoMomento')) {
+                $cols .= ', PrecioSujetoMomento';
+                $placeholders .= ', ?';
+                $params[] = $precioMomento;
+            }
+            $cols .= ', finalizado';
+            $placeholders .= ', 0';
+
+            $sql = "INSERT INTO alojamiento ({$cols}) VALUES ({$placeholders})";
             
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                $data['fechavisado'], 
-                (int)$data['IdUsrA'], 
-                $data['observaciones'] ?? '', 
-                (int)$data['TipoAnimal'], 
-                (int)$data['idprotA'], 
-                $historia, 
-                (int)$data['IdInstitucion'], 
-                $idTipoAlojamiento, 
-                (int)$data['CantidadCaja'], 
-                (float)$precioMomento
-            ]);
+            $stmt->execute($params);
             $idNewTramo = $this->db->lastInsertId();
 
             if ($isUpdate && isset($data['continuidad']) && !empty($data['continuidad']['cajas'])) {
@@ -380,24 +391,32 @@ public function recalculateHistory($historiaId) {
             $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
             $stmtPrecio->execute([$idTipoAlojamiento]);
             $nuevoPrecio = $stmtPrecio->fetchColumn() ?: 0;
+            $precioSujeto = AlojamientoCobro::precioSujetoDesdeTipo($this->db, (int) $idTipoAlojamiento);
 
-            $sql = "UPDATE alojamiento SET 
+            $setSql = "UPDATE alojamiento SET 
                         idprotA = :idprotA, 
                         IdUsrA = :idUsrA,
                         TipoAnimal = :idEsp, 
                         IdTipoAlojamiento = :idTipo, 
-                        PrecioCajaMomento = :precio
-                    WHERE historia = :historia";
+                        PrecioCajaMomento = :precio";
+            if (AlojamientoCobro::hasColumn($this->db, 'alojamiento', 'PrecioSujetoMomento')) {
+                $setSql .= ', PrecioSujetoMomento = :precioSujeto';
+            }
+            $setSql .= ' WHERE historia = :historia';
             
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
+            $stmt = $this->db->prepare($setSql);
+            $bind = [
                 ':idprotA'      => $data['idprotA'], 
                 ':idUsrA'       => $data['IdUsrA'],
                 ':idEsp'        => $data['idespA'], 
                 ':idTipo'       => $idTipoAlojamiento, 
                 ':precio'       => $nuevoPrecio, 
                 ':historia'     => $historia
-            ]);
+            ];
+            if (AlojamientoCobro::hasColumn($this->db, 'alojamiento', 'PrecioSujetoMomento')) {
+                $bind[':precioSujeto'] = $precioSujeto;
+            }
+            $stmt->execute($bind);
 
             $this->recalculateHistory($historia);
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Reconfiguró variables base de Historia ID: $historia");

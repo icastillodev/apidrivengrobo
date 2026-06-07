@@ -1111,3 +1111,52 @@ video {
     display: flex;
   }
 }
+
+/* Perillas activo/inactivo (form-switch): verde ON, rojo OFF */
+.form-check.form-switch .form-check-input {
+  --grobo-switch-on: #198754;
+  --grobo-switch-off: #dc3545;
+  background-color: var(--grobo-switch-off);
+  border-color: var(--grobo-switch-off);
+}
+.form-check.form-switch .form-check-input:checked {
+  background-color: var(--grobo-switch-on);
+  border-color: var(--grobo-switch-on);
+}
+.form-check.form-switch .form-check-input:focus {
+  box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+.form-check.form-switch .form-check-input:not(:checked):focus {
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+/* Barra Guardar fija — precios */
+.precios-save-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1020;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid #dee2e6;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+body.with-sidebar .precios-save-bar {
+  padding-left: calc(var(--gecko-sidebar-width, 250px) + 1.25rem);
+}
+@media (max-width: 768px) {
+  body.with-sidebar .precios-save-bar {
+    padding-left: 1.25rem;
+  }
+}
+.precios-page-shell {
+  padding-bottom: 5.5rem;
+}
+[data-bs-theme="dark"] .precios-save-bar {
+  background: rgba(30, 30, 30, 0.97);
+  border-top-color: #444;
+}

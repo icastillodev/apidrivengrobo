@@ -126,7 +126,27 @@ export const translatePage = () => {
     });
 
     applyPageTitle();
+    enhanceGroboSwitchAriaLabels();
 };
+
+/** M1: aria-label traducido en perillas Bootstrap (activo/inactivo). */
+function enhanceGroboSwitchAriaLabels() {
+    const gen = window.txt?.generales || {};
+    const labelOn = gen.switch_estado_activo || 'Activo';
+    const labelOff = gen.switch_estado_inactivo || 'Inactivo';
+    document.querySelectorAll('.form-check.form-switch input.form-check-input').forEach((inp) => {
+        const sync = () => {
+            inp.setAttribute('aria-label', inp.checked ? labelOn : labelOff);
+        };
+        if (!inp.dataset.groboSwitchAriaBound) {
+            inp.dataset.groboSwitchAriaBound = '1';
+            inp.addEventListener('change', sync);
+        }
+        sync();
+    });
+}
+
+export { enhanceGroboSwitchAriaLabels };
 
 const PATH_TO_TITLE_KEY = {
     'admin/dashboard': 'dashboard_admin', 'usuario/dashboard': 'dashboard_usuario', 'panel/dashboard': 'dashboard_usuario',

@@ -2,6 +2,8 @@
 
 **Estado:** lista viva — backlog activo (separado del maestro cerrado en [`CHECKLIST-BACKLOG-PRODUCTO-GROBO.md`](CHECKLIST-BACKLOG-PRODUCTO-GROBO.md)).
 
+> **Checklist activo (lote operación Gabriel / Diana / Mariela):** **[`CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md`](CHECKLIST-PRODUCTO-2026-05-OPERACION-GDM.md)** · BD: [`CHECKLIST-BD-2026-05-OPERACION-GDM.md`](CHECKLIST-BD-2026-05-OPERACION-GDM.md)
+
 **Origen:** pedidos de operación (Gabriel, Marie) + mejora transversal de **búsqueda** y **atajos de teclado**.
 
 **Convención:** `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[?]` bloqueado / decisión pendiente.
