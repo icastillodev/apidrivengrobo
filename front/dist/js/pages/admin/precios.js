@@ -65,7 +65,8 @@ export async function initPreciosPage(opts = {}) {
             document.getElementById('lbl-sec-serv').innerText = window.txt.precios.sec_services;
             const lblServDesc = document.getElementById('lbl-sec-serv-desc');
             if (lblServDesc && window.txt.precios.sec_services_desc) lblServDesc.innerText = window.txt.precios.sec_services_desc;
-            document.getElementById('lbl-btn-guardar').innerText = window.txt.precios.btn_save;
+            const lblBtnGuardar = document.getElementById('lbl-btn-guardar-sticky');
+            if (lblBtnGuardar) lblBtnGuardar.innerText = window.txt.precios.btn_save;
         }
 
         const res = await API.request(`/precios/all-data?inst=${instId}`);

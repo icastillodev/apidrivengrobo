@@ -25,17 +25,41 @@ class AuthModel {
         return $alias . '.' . implode(', ' . $alias . '.', $parts);
     }
 
+    /** Columnas mínimas para login / validate-inst (compatibles con BD antigua en prod). */
+    private function sqlSelectInstitucionLookup(): string {
+        $cols = 'IdInstitucion, NombreInst, NombreCompletoInst, DependenciaInstitucion, Web, Logo';
+        if ($this->institucionHasColumn('LogoEnPdf')) {
+            $cols .= ', LogoEnPdf';
+        }
+        return $cols;
+    }
+
+    private function institucionHasColumn(string $column): bool {
+        static $cache = [];
+        if (array_key_exists($column, $cache)) {
+            return $cache[$column];
+        }
+        try {
+            $stmt = $this->db->prepare('SHOW COLUMNS FROM institucion LIKE ?');
+            $stmt->execute([$column]);
+            $cache[$column] = (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            $cache[$column] = false;
+        }
+        return $cache[$column];
+    }
+
     /**
-     * Resolución por slug de URL (/cupae, ?inst=…). Usa SELECT * para no romper login
-     * si producción aún no aplicó migraciones de columnas nuevas en `institucion`.
+     * Resolución por slug de URL (/cupae, ?inst=…). Solo columnas base + opcionales si existen.
      */
     public function getInstitucionBySlug($slug) {
         $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
         if ($slug === '') {
             return false;
         }
+        $cols = $this->sqlSelectInstitucionLookup();
         $stmt = $this->db->prepare(
-            'SELECT * FROM institucion WHERE LOWER(TRIM(NombreInst)) = LOWER(?) LIMIT 1'
+            "SELECT {$cols} FROM institucion WHERE LOWER(TRIM(NombreInst)) = LOWER(?) LIMIT 1"
         );
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -48,7 +72,8 @@ class AuthModel {
         if ($id <= 0) {
             return null;
         }
-        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+        $cols = $this->sqlSelectInstitucionLookup();
+        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE IdInstitucion = ? LIMIT 1");
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;

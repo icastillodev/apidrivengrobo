@@ -199,34 +199,53 @@ class AuthController {
      * Validación inicial del slug de la sede al cargar la página index.html
      */
     public function validateInstitution($slug) {
-        if (ob_get_length()) ob_clean();
+        if (ob_get_length()) {
+            ob_clean();
+        }
         header('Content-Type: application/json');
 
-        $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
+        $slugNorm = '';
+        try {
+            $slugNorm = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
 
-        // Los slugs reservados para administración maestra devuelven mock data
-        if ($slug === 'superadmin' || $slug === 'admingrobogecko') {
-            echo json_encode(["status" => "success", "data" => ["id" => 0, "nombre" => "MAESTRO"]]);
-            exit;
-        }
+            if ($slugNorm === 'superadmin' || $slugNorm === 'admingrobogecko') {
+                echo json_encode(
+                    ["status" => "success", "data" => ["id" => 0, "nombre" => "MAESTRO"]],
+                    JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+                );
+                exit;
+            }
 
-        $instData = $this->service->validateSlug($slug);
-        
-        if ($instData) {
-            echo json_encode([
-                "status" => "success",
-                "data" => [
-                    "id" => $instData['IdInstitucion'],
-                    "nombre" => $instData['NombreInst'],
-                    "nombre_completo" => $instData['NombreCompletoInst'],
-                    "dependencia" => $instData['DependenciaInstitucion'],
-                    "web" => $instData['Web'],
-                    "Logo" => $instData['Logo'],
-                    "LogoEnPdf" => isset($instData['LogoEnPdf']) ? (int)$instData['LogoEnPdf'] : 0
-                ]
-            ]);
-        } else {
-            echo json_encode(["status" => "error", "message" => "Institución no válida"]);
+            $instData = $this->service->validateSlug($slugNorm);
+
+            if ($instData) {
+                $payload = [
+                    'status' => 'success',
+                    'data' => [
+                        'id' => (int) ($instData['IdInstitucion'] ?? 0),
+                        'nombre' => (string) ($instData['NombreInst'] ?? ''),
+                        'nombre_completo' => (string) ($instData['NombreCompletoInst'] ?? ''),
+                        'dependencia' => (string) ($instData['DependenciaInstitucion'] ?? ''),
+                        'web' => (string) ($instData['Web'] ?? ''),
+                        'Logo' => $instData['Logo'] ?? null,
+                        'LogoEnPdf' => isset($instData['LogoEnPdf']) ? (int) $instData['LogoEnPdf'] : 0,
+                    ],
+                ];
+                echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            } else {
+                http_response_code(404);
+                echo json_encode(
+                    ['status' => 'error', 'message' => 'Institución no válida'],
+                    JSON_UNESCAPED_UNICODE
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('validateInstitution [' . $slugNorm . ']: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(
+                ['status' => 'error', 'message' => 'Error al validar la sede'],
+                JSON_UNESCAPED_UNICODE
+            );
         }
         exit;
     }

@@ -196,7 +196,8 @@ async init() {
 
                 this.renderLogin();
             } else {
-                console.error("❌ Institución no válida o no encontrada en BD.");
+                const detalle = res?.message ? String(res.message) : '';
+                console.error("❌ Institución no válida o no encontrada en BD.", detalle || '(sin detalle API)');
                 this.showErrorState();
             }
         } catch (e) { 

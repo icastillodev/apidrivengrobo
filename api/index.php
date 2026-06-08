@@ -32,12 +32,18 @@ require_once 'config/database.php';
 try {
     $db = (new Database())->getConnection();
 } catch (Exception $e) {
-    // Esto limpia cualquier salida previa (evitando que se rompa el JSON)
-    ob_clean(); 
+    ob_clean();
+    error_log('DB connection failed: ' . $e->getMessage());
     http_response_code(500);
+    $isLocalHost = isset($_SERVER['HTTP_HOST'])
+        && (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false
+            || strpos($_SERVER['HTTP_HOST'], '127.0.0.1') !== false);
+    $clientMsg = $isLocalHost
+        ? ('Error crítico de BD: ' . $e->getMessage())
+        : 'Error crítico de BD: no se pudo conectar al servidor de datos';
     echo json_encode([
-        "status" => "error", 
-        "message" => "Error crítico de BD: " . $e->getMessage()
+        'status' => 'error',
+        'message' => $clientMsg,
     ]);
     exit;
 }
