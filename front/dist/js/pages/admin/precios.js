@@ -52,22 +52,7 @@ export async function initPreciosPage(opts = {}) {
             showLoader();
         }
         
-        // Carga de traducciones en el DOM si no usan data-i18n directo
-        if(window.txt && window.txt.precios) {
-            document.getElementById('lbl-bread-precio').innerText = window.txt.bread.prices;
-            document.getElementById('lbl-titulo-pag').innerText = window.txt.precios.title;
-            document.getElementById('lbl-titulo-pdf').innerText = window.txt.precios.pdf_title;
-            document.getElementById('lbl-buscador').innerText = window.txt.precios.search;
-            document.getElementById('search-input-precios').placeholder = window.txt.precios.search_placeholder;
-            document.getElementById('lbl-sec-ani').innerText = window.txt.precios.sec_animals;
-            document.getElementById('lbl-sec-insexp').innerText = window.txt.precios.sec_ins_exp;
-            document.getElementById('lbl-sec-inscom').innerText = window.txt.precios.sec_ins_com;
-            document.getElementById('lbl-sec-serv').innerText = window.txt.precios.sec_services;
-            const lblServDesc = document.getElementById('lbl-sec-serv-desc');
-            if (lblServDesc && window.txt.precios.sec_services_desc) lblServDesc.innerText = window.txt.precios.sec_services_desc;
-            const lblBtnGuardar = document.getElementById('lbl-btn-guardar-sticky');
-            if (lblBtnGuardar) lblBtnGuardar.innerText = window.txt.precios.btn_save;
-        }
+        // i18n: precios.html ejecuta translatePage() antes de initPreciosPage (data-i18n en el DOM).
 
         const res = await API.request(`/precios/all-data?inst=${instId}`);
         if (res && res.status === 'success') {
