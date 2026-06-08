@@ -25,13 +25,18 @@ class AuthModel {
         return $alias . '.' . implode(', ' . $alias . '.', $parts);
     }
 
+    /**
+     * Resolución por slug de URL (/cupae, ?inst=…). Usa SELECT * para no romper login
+     * si producción aún no aplicó migraciones de columnas nuevas en `institucion`.
+     */
     public function getInstitucionBySlug($slug) {
         $slug = is_string($slug) ? strtolower(trim(rawurldecode($slug), " \t\n\r\0\x0B/")) : '';
         if ($slug === '') {
             return false;
         }
-        $cols = $this->sqlSelectInstitucionAllColumns();
-        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE LOWER(NombreInst) = LOWER(?) LIMIT 1");
+        $stmt = $this->db->prepare(
+            'SELECT * FROM institucion WHERE LOWER(TRIM(NombreInst)) = LOWER(?) LIMIT 1'
+        );
         $stmt->execute([$slug]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -43,8 +48,7 @@ class AuthModel {
         if ($id <= 0) {
             return null;
         }
-        $cols = $this->sqlSelectInstitucionAllColumns();
-        $stmt = $this->db->prepare("SELECT {$cols} FROM institucion WHERE IdInstitucion = ? LIMIT 1");
+        $stmt = $this->db->prepare('SELECT * FROM institucion WHERE IdInstitucion = ? LIMIT 1');
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
