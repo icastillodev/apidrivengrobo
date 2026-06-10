@@ -41,8 +41,105 @@ function __ubParseNombreSujeto(full) {
 /** Campo EAV según TipoDeDato (M9 sexo, M10 text → textarea). */
 function __ubMapInputType(t) {
     const u = String(t || '').toLowerCase();
-    const d = { int: 'number', text: 'text', date: 'date', varchar: 'text', var: 'text', decimal: 'text', bool: 'text', sexo: 'text', subespecie: 'text', cepa: 'text' };
+    const d = {
+        int: 'number',
+        decimal: 'number',
+        text: 'text',
+        date: 'date',
+        varchar: 'text',
+        var: 'text',
+        bool: 'text',
+        sexo: 'text',
+        subespecie: 'text',
+        cepa: 'text',
+    };
     return d[u] || 'text';
+}
+
+function __ubValueForDateInput(value) {
+    const s = String(value ?? '').trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const iso = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+    const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+    return s.replace(/[^\d-]/g, '').slice(0, 10);
+}
+
+function __ubFilterTrazKeydown(e, tipo) {
+    const k = e.key;
+    if (k === 'Tab' || k === 'Enter' || k === 'Escape' || k.startsWith('Arrow') || k === 'Home' || k === 'End' || k === 'Backspace' || k === 'Delete') {
+        return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (tipo === 'int') {
+        if (/^\d$/.test(k)) return;
+        if (k === '-' && e.target.selectionStart === 0 && !String(e.target.value).includes('-')) return;
+        e.preventDefault();
+        return;
+    }
+    if (tipo === 'decimal') {
+        if (/^\d$/.test(k)) return;
+        const v = String(e.target.value).replace(/,/g, '.');
+        if ((k === '.' || k === ',') && !v.includes('.')) return;
+        if (k === '-' && e.target.selectionStart === 0 && !v.includes('-')) return;
+        e.preventDefault();
+    }
+}
+
+function __ubSanitizeTrazInput(el, tipo) {
+    if (!el) return;
+    if (tipo === 'int') {
+        let v = String(el.value ?? '').replace(/[^\d-]/g, '');
+        const neg = v.startsWith('-');
+        v = v.replace(/-/g, '');
+        el.value = neg && v ? `-${v}` : v;
+        return;
+    }
+    if (tipo === 'decimal') {
+        let v = String(el.value ?? '').replace(/,/g, '.').replace(/[^\d.-]/g, '');
+        const neg = v.startsWith('-');
+        v = v.replace(/-/g, '');
+        const dot = v.indexOf('.');
+        if (dot >= 0) {
+            v = `${v.slice(0, dot + 1)}${v.slice(dot + 1).replace(/\./g, '')}`;
+        }
+        if (neg && v !== '' && v !== '.') v = `-${v}`;
+        el.value = v;
+        return;
+    }
+    if (tipo === 'date') {
+        el.value = __ubValueForDateInput(el.value);
+    }
+}
+
+function __ubWireCampoTrazInputs(root) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    scope.querySelectorAll('[data-traz-input-tipo]').forEach((el) => {
+        if (el.dataset.trazInputWired === '1') return;
+        el.dataset.trazInputWired = '1';
+        const tipo = String(el.getAttribute('data-traz-input-tipo') || '').toLowerCase();
+        if (tipo === 'int' || tipo === 'decimal') {
+            el.addEventListener('keydown', (e) => __ubFilterTrazKeydown(e, tipo));
+            el.addEventListener('input', () => __ubSanitizeTrazInput(el, tipo));
+            el.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const clip = e.clipboardData || window.clipboardData;
+                const text = clip ? clip.getData('text') : '';
+                const start = el.selectionStart ?? el.value.length;
+                const end = el.selectionEnd ?? el.value.length;
+                el.value = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`;
+                __ubSanitizeTrazInput(el, tipo);
+            });
+        } else if (tipo === 'date') {
+            el.addEventListener('input', () => __ubSanitizeTrazInput(el, tipo));
+            el.addEventListener('change', () => __ubSanitizeTrazInput(el, tipo));
+            el.addEventListener('paste', () => {
+                window.setTimeout(() => __ubSanitizeTrazInput(el, tipo), 0);
+            });
+        }
+    });
 }
 
 function __ubCatsNeedCatalog(cats) {
@@ -165,6 +262,16 @@ function __ubRenderCampoTraz(cat, opts = {}) {
         );
         const selClass = inputClass.includes('form-select') ? inputClass : inputClass.replace('form-control', 'form-select');
         control = `<select name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${selClass} mb-2" data-traz-bio-field="${bioField}">${optHtml.join('')}</select>`;
+    } else if (tipo === 'int' || tipo === 'decimal' || tipo === 'date') {
+        const inputType = __ubMapInputType(tipo);
+        const displayValue = tipo === 'date' ? __ubValueForDateInput(value) : value;
+        const ph = opts.placeholder != null ? opts.placeholder : (tipo === 'date' ? '' : '—');
+        const extraAttrs = tipo === 'int'
+            ? ' step="1" inputmode="numeric" data-traz-input-tipo="int"'
+            : tipo === 'decimal'
+                ? ' step="any" inputmode="decimal" data-traz-input-tipo="decimal"'
+                : ' data-traz-input-tipo="date"';
+        control = `<input type="${__ubEsc(inputType)}" name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${inputClass} mb-2" value="${__ubEsc(displayValue)}" placeholder="${__ubEsc(ph)}"${extraAttrs}>`;
     } else {
         const inputType = __ubMapInputType(cat.TipoDeDato);
         const ph = opts.placeholder != null ? opts.placeholder : '—';
@@ -792,6 +899,7 @@ async toggleRow(idAlojamiento, idEspecie) {
         }
         html += `</div>`;
         container.innerHTML = html;
+        __ubWireCampoTrazInputs(container);
         if (!isReadOnly && ubicBundle && data.cajas && data.cajas.length) {
             data.cajas.forEach(caja => {
                 __ubWireInlineUbicacion(caja.IdCajaAlojamiento, ubicBundle);
@@ -997,6 +1105,9 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
             cancelButtonText: tCom.modal_cerrar || 'Cerrar',
             width: 'min(28rem, 96vw)',
             focusConfirm: false,
+            didOpen: () => {
+                __ubWireCampoTrazInputs(document.querySelector('.swal2-html-container'));
+            },
             preConfirm: () => {
                 const valores = [];
                 catsInicio.forEach((cat) => {
