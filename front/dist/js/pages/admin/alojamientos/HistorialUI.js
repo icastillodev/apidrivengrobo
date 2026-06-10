@@ -4,6 +4,7 @@ import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
 import { AlojamientoState, loadAlojamientos, resolveDestinatarioAlojamiento } from '../alojamientos.js';
 import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
+import { htmlAlojCobroBadge } from '../facturacion/billingLocale.js';
 /** Cantidad multiplicadora del tramo: cajas (CONTENIDO) o sujetos trazados (SUJETO). */
 function __histCantidadCobro(h, trazOn) {
     const modo = h.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
@@ -89,8 +90,12 @@ renderSummary(historiaId) {
 
         const history = AlojamientoState.currentHistoryData;
         const first = history[0];
+        const lastTramo = history[history.length - 1] || first;
         const hoy = new Date(); hoy.setHours(12,0,0,0);
-        const trazOnCost = showTraz || !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
+        const trazHabilitada = !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
+        const showTrazSummary = showTraz || trazHabilitada;
+        const showTrazCobro = trazHabilitada;
+        const trazOnCost = showTrazSummary;
 
         let totalCosto = 0, totalDias = 0;
 
@@ -127,7 +132,7 @@ renderSummary(historiaId) {
         const txt = window.txt.alojamientos || {};
         const gen = window.txt?.generales || {};
         const tipoCaja = first.NombreTipoAlojamiento || 'Tipo no definido';
-        const trazOn = trazOnCost;
+        const modoCobro = lastTramo.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
         const tipoPagoTxt = (first.tipo_pago && String(first.tipo_pago).trim())
             ? String(first.tipo_pago).trim()
             : (txt.tipo_pago_sin_dato || '—');
@@ -135,16 +140,23 @@ renderSummary(historiaId) {
             ? String(first.nombre_departamento).trim()
             : (txt.reg_sin_depto || '—');
 
+        const colMeta = showTrazCobro ? 'col-md-4' : 'col-md-6';
+        const cobroMetaCol = showTrazCobro ? `
+                <div class="${colMeta}">
+                    <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_tipo_cobro || txt.th_tipo_cobro || 'Tipo cobro alojamiento'}</label>
+                    <div class="mt-1">${htmlAlojCobroBadge(modoCobro)}</div>
+                </div>` : '';
         const metaExtraRow = `
             <div class="col-12 mt-2 pt-2 border-top row g-2 align-items-start">
-                <div class="col-md-6 border-end">
+                <div class="${colMeta} border-end">
                     <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_tipo_pago || txt.th_tipo_pago || 'Tipo de pago'}</label>
                     <span class="text-dark small fw-semibold d-block">${tipoPagoTxt}</span>
                 </div>
-                <div class="col-md-6">
+                <div class="${colMeta}${showTrazCobro ? ' border-end' : ''}">
                     <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_departamento || txt.th_departamento || 'Departamento'}</label>
                     <span class="text-dark small fw-semibold d-block">${deptoTxt}</span>
                 </div>
+                ${cobroMetaCol}
             </div>`;
 
         summaryContainer.innerHTML = `
@@ -178,8 +190,9 @@ renderTable() {
         const txt = window.txt.alojamientos || {};
         const gen = window.txt?.generales || {};
         const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen)
-            || !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
+        const trazHabilitada = !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
+        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen) || trazHabilitada;
+        const showTrazCobro = trazHabilitada;
         const firstRow = history[0] || {};
         const tipoPagoHist = (firstRow.tipo_pago && String(firstRow.tipo_pago).trim())
             ? String(firstRow.tipo_pago).trim()
@@ -200,6 +213,7 @@ renderTable() {
                     <th>${gen.retiro || 'Retiro'}</th>
                     <th>${txt.th_boxes || 'Cant. (Tipo)'}</th>
                     <th class="small">${txt.th_tipo_pago || 'Tipo de pago'}</th>
+                    ${showTrazCobro ? `<th class="small">${txt.th_tipo_cobro || 'Tipo cobro'}</th>` : ''}
                     ${showTraz ? `<th class="small">${txt.th_departamento || 'Departamento'}</th>` : ''}
                     <th>${txt.days_tramo || 'Días'}</th>
                     <th>${txt.price || 'Precio U.'}</th>
@@ -241,7 +255,7 @@ renderTable() {
             const renderCant = cant === 0 
                 ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> STAND BY (0)</span>` 
                 : cant;
-            const colSpanTraz = showTraz ? 11 : 10;
+            const colSpanTraz = 10 + (showTrazCobro ? 1 : 0) + (showTraz ? 1 : 0);
             const renderCantCobro = (showTraz && modoTramo === 'SUJETO')
                 ? `<span class="text-muted small d-block">${cantCobro} ${txt.trace_subjects_short || 'suj.'}</span>`
                 : '';
@@ -253,6 +267,7 @@ renderTable() {
                 <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
                 <td>${renderCant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small>${renderCantCobro}</td>
                 <td class="small">${tipoPagoHist}</td>
+                ${showTrazCobro ? `<td>${htmlAlojCobroBadge(modoTramo)}</td>` : ''}
                 ${showTraz ? `<td class="small">${deptoHist}</td>` : ''}
                 <td class="fw-bold">${diasTramo}</td>
                 <td>$ ${precioUnit.toFixed(2)}</td>

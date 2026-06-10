@@ -1,6 +1,9 @@
 import { API } from '../../../api.js';
 import { AnimalFichaUI } from './animalFicha.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
+import { htmlTextoLargoCompactControl, bindExpandTextoLargoGlobal } from '../../../utils/trazTextoLargoUI.js';
+
+bindExpandTextoLargoGlobal();
 
 function __ubAct(r) {
     return Number(r?.Activo) === 1;
@@ -123,11 +126,13 @@ function __ubRenderCampoTraz(cat, opts = {}) {
 
     let control = '';
     if (tipo === 'text') {
-        const expandTitle = __ubEsc(txt.trace_texto_largo_expand_title || 'Ampliar texto');
-        control = `<div class="d-flex align-items-start gap-1 mb-2 traz-texto-largo-wrap">
-            <textarea name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="${inputClass.replace(' mb-2', '')}" rows="2" style="resize:vertical;min-height:2.6rem;max-width:min(220px,42vw)">${__ubEsc(value)}</textarea>
-            <button type="button" class="btn btn-success btn-sm px-2 py-1 flex-shrink-0 shadow-sm" title="${expandTitle}" aria-label="${expandTitle}" onclick="window.__ubExpandTextoLargo('${__ubJsStr(id)}', '${__ubJsStr(label)}')"><i class="bi bi-plus-lg"></i></button>
-        </div>`;
+        control = htmlTextoLargoCompactControl({
+            id,
+            name,
+            value,
+            inputClass,
+            label,
+        });
     } else if (tipo === 'sexo') {
         const v = value.trim().toLowerCase();
         control = `<select name="${__ubEsc(name)}" id="${__ubEsc(id)}" class="form-select form-select-sm mb-2">
@@ -1377,40 +1382,5 @@ window.guardarInicioTraz = async (idUnidad, idAlojamiento, idEspecie, formEl) =>
         await TrazabilidadUI.refreshArbol(idAlojamiento, idEspecie);
     }
 };
-/** Modal de escritura amplia para campos TipoDeDato=text; al OK copia al textarea compacto del formulario. */
-window.__ubExpandTextoLargo = async (fieldId, fieldLabel) => {
-    const el = document.getElementById(String(fieldId || ''));
-    if (!el) return;
-    const txt = window.txt?.alojamientos || {};
-    const gen = window.txt?.generales || {};
-    const hint = txt.trace_texto_largo_modal_hint
-        || 'Al aceptar, el texto se copia al campo compacto. Debe guardar el formulario para que quede registrado.';
-    const title = (fieldLabel && String(fieldLabel).trim())
-        ? String(fieldLabel).trim()
-        : (txt.trace_texto_largo_titulo || 'Texto largo');
-    const initial = el.value ?? '';
-    const target = document.getElementById('modal-historial') || 'body';
-    const { isConfirmed, value } = await Swal.fire({
-        title,
-        target,
-        width: 'min(720px, 92vw)',
-        html: `<p class="small text-muted text-start mb-2">${__ubEsc(hint)}</p>
-            <textarea id="swal-traz-txt-largo" class="form-control" rows="14" style="min-height:280px">${__ubEsc(initial)}</textarea>`,
-        showCancelButton: true,
-        confirmButtonText: txt.trace_texto_largo_ok || gen.aceptar || 'Aceptar',
-        cancelButtonText: gen.cancelar || 'Cancelar',
-        focusConfirm: false,
-        didOpen: () => {
-            const ta = document.getElementById('swal-traz-txt-largo');
-            if (ta && typeof ta.focus === 'function') ta.focus({ preventScroll: true });
-        },
-        preConfirm: () => document.getElementById('swal-traz-txt-largo')?.value ?? '',
-    });
-    if (isConfirmed) {
-        el.value = value ?? '';
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-};
-
 window.TrazabilidadUI = TrazabilidadUI;
 window.AnimalFichaUI = AnimalFichaUI;

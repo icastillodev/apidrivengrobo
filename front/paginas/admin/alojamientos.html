@@ -28,6 +28,9 @@
         }
         @media (min-width: 1200px) { .modal-xl { max-width: 80%; } }
         .badge-historia { font-size: 1.1rem; padding: 10px 15px; }
+        .swal-traz-quill-wrap .ql-toolbar { border-top-left-radius: .25rem; border-top-right-radius: .25rem; }
+        .swal-traz-quill-wrap .ql-container { border-bottom-left-radius: .25rem; border-bottom-right-radius: .25rem; font-size: 14px; }
+        .swal-traz-quill-wrap .ql-editor { min-height: 280px; }
     </style>
 
     <script type="module">
@@ -41,7 +44,7 @@
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260409';
         
         // Importamos el maestro orquestador de alojamientos (v=rev4 fix estado duplicado)
-        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=20260610';
+        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=20260611';
         
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
