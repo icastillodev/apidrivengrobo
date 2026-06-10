@@ -352,7 +352,7 @@ function __ubRenderFieldControl(level, idCaja, items, idKey, nameKey, selectedId
 
 function __ubBuildInlineUbicacionHtml(bundle, caja, txt, idAlojamiento, idEspecie) {
     if (!__ubCatalogHasPlaces(bundle)) {
-        return __ubNoCatalogHtml(txt);
+        return '';
     }
     const L = bundle.labels || {};
     const id = caja.IdCajaAlojamiento;
@@ -590,10 +590,15 @@ async toggleRow(idAlojamiento, idEspecie) {
         `;
 
         if (cajasActuales === 0) {
+            if (!isReadOnly && ubicBundle && !__ubCatalogHasPlaces(ubicBundle)) {
+                html += `<div class="col-12">${__ubNoCatalogHtml(txt)}</div>`;
+            }
             html += `<div class="col-12 text-center text-muted fst-italic">${txt.trace_no_structures || 'No hay estructuras instanciadas en este tramo.'}</div>`;
         } else {
             if (!isReadOnly && !ubicBundle) {
                 html += `<div class="col-12"><div class="alert alert-warning small py-2 mb-2">${__ubEsc(txt.trace_ubicacion_bundle_error || '')}</div></div>`;
+            } else if (!isReadOnly && ubicBundle && !__ubCatalogHasPlaces(ubicBundle)) {
+                html += `<div class="col-12">${__ubNoCatalogHtml(txt)}</div>`;
             }
             data.cajas.forEach(caja => {
                 const ubicacionResumen = (__ubFormatLine(caja) || '').trim();
@@ -673,9 +678,9 @@ async toggleRow(idAlojamiento, idEspecie) {
                                             </li>
                                         </ul>
                                     </div>
-                                    ${!isReadOnly && allowTraz ? `
+                                    ${!isReadOnly ? `
                                     <button type="button" class="btn btn-xs border ${cxOn ? 'btn-warning text-dark' : 'btn-outline-secondary'}" title="${__ubEsc(txt.trace_surgery_btn_title || '')}" onclick="window.TrazabilidadUI.toggleCirugia(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-heart-pulse"></i></button>
-                                    ${!faltaCfgInicioProt ? `<button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_ficha_btn_title || '')}" onclick="window.TrazabilidadUI.editSubjectFicha(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>` : ''}
+                                    ${!isReadOnly ? `<button type="button" class="btn btn-xs btn-light border text-secondary" title="${__ubEsc(txt.trace_subject_inicio_btn_title || txt.trace_inicio_title || '')}" onclick="window.TrazabilidadUI.openSubjectInicioConfig(${unidad.IdEspecieAlojUnidad}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-clipboard2-pulse"></i></button>` : ''}
                                     <button class="btn btn-xs btn-light border text-primary" onclick="window.TrazabilidadUI.renameSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${idAlojamiento}, ${idEspecie})"><i class="bi bi-pencil-square"></i></button>
                                     <button class="btn btn-xs btn-light border text-danger" onclick="window.TrazabilidadUI.deleteSubject(${unidad.IdEspecieAlojUnidad}, '${__ubJsStr(unidad.NombreEspecieAloj)}', ${unidad.observaciones_pivot ? unidad.observaciones_pivot.length : 0}, ${idAlojamiento}, ${idEspecie})"><i class="bi bi-x-circle"></i></button>` : ''}
                                 </div>
@@ -764,8 +769,8 @@ async toggleRow(idAlojamiento, idEspecie) {
                     });
                 }
                 
-                // Para crear sujetos se requiere configuración completa del protocolo (inicio + datos).
-                if (!isReadOnly && allowTraz && catsInicio.length > 0 && catsDatos.length > 0) {
+                // Sujetos: siempre agregables con caja creada (ubicación y variables inicio/datos son opcionales hasta configurarlas).
+                if (!isReadOnly) {
                     html += `
                         <div class="text-center mt-2">
                             <button class="btn btn-sm btn-outline-success fw-bold shadow-sm" onclick="window.TrazabilidadUI.addSubject(${caja.IdCajaAlojamiento}, ${idAlojamiento}, ${idEspecie})">
@@ -878,40 +883,16 @@ async toggleCirugia(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
 
 async addSubject(idCaja, idAlojamiento, idEspecie) {
         const txt = window.txt?.alojamientos || {};
-        const tCom = window.txt?.comunicacion || {};
         const Swal = window.Swal;
         const target = document.getElementById('modal-historial') || 'body';
-        const arbol = this._lastArbolData[idAlojamiento] || {};
-        const catsInicio = (arbol.categorias_inicio || []).filter((c) => Number(c.Habilitado) !== 2);
-        const needCatalog = __ubCatsNeedCatalog(catsInicio);
-        const especieCatalog = needCatalog ? await __ubLoadEspecieCatalog(idEspecie) : { cepas: [], subesps: [] };
-
-        let html = `<label class="form-label small text-start d-block fw-bold mb-1">${__ubEsc(txt.trace_nombre_sujeto || 'Nombre del Sujeto')}</label>
-            <input id="swal-subject-name" class="form-control mb-2" placeholder="${__ubEsc(txt.trace_nombre_placeholder || '')}">
-            <div class="form-check text-start mb-2">
-                <input class="form-check-input" type="checkbox" id="swal-subject-cirugia">
-                <label class="form-check-label small" for="swal-subject-cirugia">${__ubEsc(txt.trace_subject_ficha_con_cirugia || '')}</label>
-            </div>`;
-        if (catsInicio.length) {
-            html += `<hr class="my-2"><p class="small text-muted text-start mb-2">${__ubEsc(txt.trace_add_inicio_hint || '')}</p>`;
-            catsInicio.forEach((cat) => {
-                html += __ubRenderCampoTraz(cat, {
-                    name: `swal-inicio-${cat.IdDatosUnidadAloj}`,
-                    id: `swal-inicio-${cat.IdDatosUnidadAloj}`,
-                    layout: 'stack',
-                    catalog: especieCatalog,
-                    showOptional: true,
-                });
-            });
-        }
 
         const rSub = await Swal.fire({
             title: txt.trace_add_subject || 'Añadir Sujeto',
-            html,
+            html: `<label class="form-label small text-start d-block fw-bold mb-1">${__ubEsc(txt.trace_nombre_sujeto || 'Nombre del Sujeto')}</label>
+                <input id="swal-subject-name" class="form-control" placeholder="${__ubEsc(txt.trace_nombre_placeholder || '')}">`,
             target,
             showCancelButton: true,
             confirmButtonText: txt.trace_crear_btn || 'Crear',
-            width: catsInicio.length ? '28rem' : undefined,
             focusConfirm: false,
             preConfirm: () => {
                 const nombre = document.getElementById('swal-subject-name')?.value;
@@ -920,26 +901,11 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
                     Swal.showValidationMessage(txt.trace_nombre_requerido || 'El nombre es obligatorio');
                     return false;
                 }
-                const valores = [];
-                catsInicio.forEach((cat) => {
-                    const el = document.getElementById(`swal-inicio-${cat.IdDatosUnidadAloj}`);
-                    const t = String(cat.TipoDeDato || '').toLowerCase();
-                    if (t === 'subespecie' || t === 'cepa') return;
-                    const v = el ? String(el.value ?? '').trim() : '';
-                    if (v) {
-                        valores.push({ IdDatosUnidadAloj: cat.IdDatosUnidadAloj, valor: v });
-                    }
-                });
-                return {
-                    nombre: nombreTrim,
-                    valores,
-                    conCirugia: !!document.getElementById('swal-subject-cirugia')?.checked,
-                    bio: __ubCollectBioPatchFromSwal(),
-                };
+                return nombreTrim;
             },
         });
         if (!rSub.isConfirmed || !rSub.value) return;
-        const { nombre: nombreTrim, valores: valoresInicio, conCirugia, bio: bioInicio } = rSub.value;
+        const nombreTrim = rSub.value;
         try {
             const res = await API.request('/trazabilidad/add-subject', 'POST', {
                 idCaja,
@@ -950,45 +916,121 @@ async addSubject(idCaja, idAlojamiento, idEspecie) {
                 throw new Error(res.message || txt.trace_error || 'Error');
             }
             const idEu = parseInt(res.data?.IdEspecieAlojUnidad, 10) || 0;
-            if (idEu > 0 && valoresInicio.length) {
-                await API.request('/trazabilidad/save-inicio-traz', 'POST', {
-                    IdEspecieAlojUnidad: idEu,
-                    valores: valoresInicio,
-                });
-            }
-            if (idEu > 0 && conCirugia) {
-                await API.request('/trazabilidad/toggle-con-cirugia', 'POST', { idEspecieAlojUnidad: idEu });
-            }
-            if (idEu > 0 && bioInicio && Object.keys(bioInicio).length) {
-                await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', {
-                    IdEspecieAlojUnidad: idEu,
-                    ...bioInicio,
-                });
-            }
             await this.refreshArbol(idAlojamiento, idEspecie);
             if (idEu > 0) {
-                const follow = await Swal.fire({
-                    icon: 'success',
-                    title: txt.trace_subject_added_ok || '',
-                    html: `<p class="text-start small mb-0">${__ubEsc(txt.trace_subject_added_hint || '')}</p>`,
-                    target,
-                    showCancelButton: true,
-                    confirmButtonText: txt.trace_subject_open_ficha_btn || '',
-                    cancelButtonText: tCom.modal_cerrar || '',
-                });
                 this.highlightUnidadCard(idAlojamiento, idEu);
-                if (follow.isConfirmed) {
-                    await this.editSubjectFicha(idEu, idAlojamiento, idEspecie);
-                }
-            } else if (Swal) {
-                await Swal.fire({
-                    icon: 'success',
-                    title: txt.trace_subject_added_ok || '',
-                    timer: 1400,
-                    showConfirmButton: false,
+                await this.openSubjectInicioConfig(idEu, idAlojamiento, idEspecie);
+            }
+        } catch (e) {
+            console.error(e);
+            if (Swal) {
+                Swal.fire({
+                    icon: 'error',
+                    title: txt.trace_error || 'Error',
+                    text: String(e.message || e),
                     target,
                 });
             }
+        }
+    },
+
+    async openSubjectInicioConfig(idEspecieAlojUnidad, idAlojamiento, idEspecie) {
+        const txt = window.txt?.alojamientos || {};
+        const tCom = window.txt?.comunicacion || {};
+        const Swal = window.Swal;
+        const target = document.getElementById('modal-historial') || 'body';
+        const arbol = this._lastArbolData[idAlojamiento] || {};
+        const catsInicio = (arbol.categorias_inicio || []).filter((c) => Number(c.Habilitado) !== 2);
+
+        if (!catsInicio.length) {
+            await Swal.fire({
+                icon: 'info',
+                title: txt.trace_inicio_sin_config_title || '',
+                html: `<p class="text-start small mb-0">${__ubEsc(txt.trace_inicio_sin_config_body || '')}</p>`,
+                target,
+                confirmButtonText: tCom.modal_cerrar || 'Cerrar',
+            });
+            return;
+        }
+
+        let unidad = null;
+        for (const caja of arbol.cajas || []) {
+            unidad = (caja.unidades || []).find((u) => Number(u.IdEspecieAlojUnidad) === Number(idEspecieAlojUnidad));
+            if (unidad) break;
+        }
+        const vin = unidad?.valores_inicio || {};
+        const cxOn = unidad ? Number(unidad.con_cirugia) === 1 : false;
+        const needCatalog = __ubCatsNeedCatalog(catsInicio);
+        const especieCatalog = needCatalog ? await __ubLoadEspecieCatalog(idEspecie) : { cepas: [], subesps: [] };
+
+        let html = `<p class="small text-muted text-start mb-2">${__ubEsc(txt.trace_inicio_popup_hint || txt.trace_inicio_hint || '')}</p>`;
+        html += `<div class="form-check text-start mb-2">
+            <input class="form-check-input" type="checkbox" id="swal-inicio-cirugia"${cxOn ? ' checked' : ''}>
+            <label class="form-check-label small" for="swal-inicio-cirugia">${__ubEsc(txt.trace_subject_ficha_con_cirugia || '')}</label>
+        </div>`;
+        catsInicio.forEach((cat) => {
+            html += __ubRenderCampoTraz(cat, {
+                name: `swal-inicio-${cat.IdDatosUnidadAloj}`,
+                id: `swal-inicio-${cat.IdDatosUnidadAloj}`,
+                value: unidad ? __ubValCampoTraz(cat, unidad, vin, cat.IdDatosUnidadAloj) : '',
+                layout: 'stack',
+                catalog: especieCatalog,
+                showOptional: true,
+            });
+        });
+
+        const r = await Swal.fire({
+            title: txt.trace_inicio_title || '',
+            html,
+            target,
+            showCancelButton: true,
+            confirmButtonText: txt.trace_inicio_guardar || 'Guardar',
+            cancelButtonText: tCom.modal_cerrar || 'Cerrar',
+            width: 'min(28rem, 96vw)',
+            focusConfirm: false,
+            preConfirm: () => {
+                const valores = [];
+                catsInicio.forEach((cat) => {
+                    const el = document.getElementById(`swal-inicio-${cat.IdDatosUnidadAloj}`);
+                    const t = String(cat.TipoDeDato || '').toLowerCase();
+                    if (t === 'subespecie' || t === 'cepa') return;
+                    if (el) {
+                        valores.push({
+                            IdDatosUnidadAloj: cat.IdDatosUnidadAloj,
+                            valor: String(el.value ?? ''),
+                        });
+                    }
+                });
+                return {
+                    valores,
+                    conCirugia: !!document.getElementById('swal-inicio-cirugia')?.checked,
+                    bio: __ubCollectBioPatchFromSwal(),
+                };
+            },
+        });
+        if (!r.isConfirmed || !r.value) return;
+
+        const { valores, conCirugia, bio } = r.value;
+        try {
+            if (valores.length > 0) {
+                const saveRes = await API.request('/trazabilidad/save-inicio-traz', 'POST', {
+                    IdEspecieAlojUnidad: idEspecieAlojUnidad,
+                    valores,
+                });
+                if (saveRes.status !== 'success') {
+                    throw new Error(saveRes.message || txt.trace_error || 'Error');
+                }
+            }
+            const bioPatch = bio && typeof bio === 'object' ? bio : {};
+            if (Object.keys(bioPatch).length > 0 || conCirugia !== cxOn) {
+                const body = { IdEspecieAlojUnidad: idEspecieAlojUnidad, ...bioPatch, con_cirugia: conCirugia ? 1 : 0 };
+                const bioRes = await API.request('/trazabilidad/update-subject-ficha-bio', 'POST', body);
+                if (bioRes.status !== 'success') {
+                    throw new Error(bioRes.message || txt.trace_error || 'Error');
+                }
+            }
+            await this.refreshArbol(idAlojamiento, idEspecie);
+            this.highlightUnidadCard(idAlojamiento, idEspecieAlojUnidad);
         } catch (e) {
             console.error(e);
             if (Swal) {

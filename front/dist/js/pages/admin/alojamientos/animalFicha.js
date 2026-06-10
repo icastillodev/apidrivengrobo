@@ -443,7 +443,7 @@ function htmlCobroModoBadge(data, t) {
     const isSujeto = data.alojamiento_cobro_modo === 'SUJETO';
     const label = isSujeto
         ? (t.animal_ficha_cobro_sujeto || 'Cobro por sujeto')
-        : (t.animal_ficha_cobro_contenido || 'Cobro por contenido');
+        : (t.animal_ficha_cobro_alojamiento || 'Cobro por alojamiento');
     const cls = isSujeto ? 'bg-success' : 'bg-secondary';
     return `<span class="badge ${cls} ms-2 align-middle" style="font-size:11px;">${esc(label)}</span>`;
 }
@@ -670,7 +670,7 @@ export const AnimalFichaUI = {
             const idAloj = parseInt(res.data.IdAlojamientoFicha, 10) || 0;
             const idEsp = parseInt(res.data.IdEspecieFicha, 10) || 0;
             const traceUi = window.TrazabilidadUI;
-            const canModificar = typeof traceUi?.editSubjectFicha === 'function'
+            const canModificar = typeof traceUi?.openSubjectInicioConfig === 'function'
                 && !traceUi?.isReadOnly
                 && idAloj > 0
                 && idEsp > 0;
@@ -683,7 +683,7 @@ export const AnimalFichaUI = {
                 confirmButtonText: tm.cerrar || window.txt?.comunicacion?.modal_cerrar || 'Cerrar',
                 showDenyButton: false,
                 showCancelButton: canModificar,
-                cancelButtonText: t.animal_ficha_modal_modificar || t.trace_edit_subject_ficha || '',
+                cancelButtonText: t.animal_ficha_modal_modificar_inicio || t.trace_inicio_title || '',
                 reverseButtons: true,
                 focusConfirm: false,
                 customClass: { htmlContainer: 'text-start' },
@@ -699,7 +699,7 @@ export const AnimalFichaUI = {
             const Dr = window.Swal?.DismissReason;
             const fueCancel = result.dismiss === (Dr?.cancel ?? 'cancel');
             if (canModificar && fueCancel) {
-                await traceUi.editSubjectFicha(idEspecieAlojUnidad, idAloj, idEsp);
+                await traceUi.openSubjectInicioConfig(idEspecieAlojUnidad, idAloj, idEsp);
             }
         } catch (e) {
             Swal.close();

@@ -1,8 +1,18 @@
 // dist/js/pages/admin/alojamientos/TableUI.js
+import { htmlAlojCobroBadge } from '../facturacion/billingLocale.js';
+
 // Usar referencia global para evitar estado duplicado por doble instancia del módulo
+function getAlojState() {
+    return (typeof window !== 'undefined' && window.__AlojamientoState) ? window.__AlojamientoState : null;
+}
+
 function getDataFull() {
-    const ref = typeof window !== 'undefined' && window.__AlojamientoState;
+    const ref = getAlojState();
     return ref ? (ref.dataFull || []) : [];
+}
+
+function getShowTrazList() {
+    return !!(getAlojState()?.listCobro?.trazabilidad_habilitada);
 }
 
 function escapeHtml(value) {
@@ -23,14 +33,51 @@ export const TableUI = {
     _lastSpeciesIdsKey: null,
 
     init() {
-        document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
+        this.bindSortHandlers();
+        window.renderAlojamientosTable = () => this.render();
+    },
+
+    bindSortHandlers() {
+        const table = document.getElementById('tabla-alojamientos');
+        if (!table) return;
+        table.querySelectorAll('th[data-sortable="true"]').forEach(th => {
             th.style.cursor = 'pointer';
             const label = (th.innerText || th.textContent || '').trim() || th.getAttribute('data-key') || '';
             th.setAttribute('data-label', label);
             th.onclick = () => this.handleSort(th.getAttribute('data-key'));
         });
+    },
 
-        window.renderAlojamientosTable = () => this.render();
+    syncMainTableHead() {
+        const table = document.getElementById('tabla-alojamientos');
+        if (!table) return;
+        const thead = table.querySelector('thead');
+        if (!thead) return;
+
+        const txt = window.txt?.alojamientos || {};
+        const gen = window.txt?.generales || {};
+        const showTraz = getShowTrazList();
+
+        thead.innerHTML = `
+            <tr>
+                <th data-key="historia" data-sortable="true">${escapeHtml(txt.th_history || 'Historia')}</th>
+                <th data-key="nombre_departamento" data-sortable="true">${escapeHtml(txt.th_departamento || 'Departamento')}</th>
+                ${showTraz ? `<th class="text-center">${escapeHtml(txt.th_tipo_cobro || 'Tipo cobro alojamiento')}</th>` : ''}
+                <th data-key="fechavisado" data-sortable="true">${escapeHtml(gen.inicio || 'Inicio')}</th>
+                <th data-key="nprotA" data-sortable="true">${escapeHtml(gen.nprotocolo || 'Protocolo')}</th>
+                <th data-key="Investigador" data-sortable="true">${escapeHtml(gen.investigador || 'Investigador')}</th>
+                <th data-key="EspeNombreA" data-sortable="true">${escapeHtml(gen.especie || 'Especie')}</th>
+                <th class="text-center">${escapeHtml(txt.th_boxes || 'Cajas (Tipo/Cant)')}</th>
+                <th class="text-center">${escapeHtml(txt.th_days || 'Días Aloj.')}</th>
+                <th>${escapeHtml(txt.th_obs || 'Observaciones')}</th>
+                <th data-key="finalizado" data-sortable="true">${escapeHtml(txt.status || 'Estado')}</th>
+                <th class="text-end">${escapeHtml(txt.th_actions || 'Acciones')}</th>
+            </tr>`;
+        this.bindSortHandlers();
+    },
+
+    getColCount() {
+        return 10 + 1 + (getShowTrazList() ? 1 : 0);
     },
 
     poblarFiltroEspecies() {
@@ -90,9 +137,12 @@ export const TableUI = {
 
         if (!tbody) return;
 
+        this.syncMainTableHead();
+
         const txt = window.txt?.alojamientos || {};
         const gen = window.txt?.generales || {};
-        const COL_COUNT = 10;
+        const showTraz = getShowTrazList();
+        const COL_COUNT = this.getColCount();
 
         const filterKey = `${term}|${estadoFiltro}|${especieFiltro}`;
         if (this._lastFilterKey !== filterKey) {
@@ -138,15 +188,30 @@ export const TableUI = {
             const hidNum = Number.isFinite(hid) && hid > 0 ? hid : null;
             const isFinalizado = (a.finalizado == 1 || a.finalizado === "1");
             const nombreTipo = (a.NombreTipoAlojamiento || txt?.box_name || 'Caja').toString();
-            const infoCajas = `${a.CantidadCaja ?? 0} ${nombreTipo}`;
+            const modoCobro = a.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
+            const cant = parseInt(a.CantidadCaja ?? 0, 10) || 0;
+            const cantCobro = parseInt(a.CantSujetos ?? 0, 10) || 0;
+            const renderCant = String(cant);
+            const renderCantCobro = (showTraz && modoCobro === 'SUJETO')
+                ? `<span class="text-muted small d-block">${cantCobro} ${txt.trace_subjects_short || 'suj.'}</span>`
+                : '';
+            const infoCajas = `${renderCant} <small class="text-muted fw-normal">${escapeHtml(nombreTipo)}</small>${renderCantCobro}`;
             const fechavisado = (a.fechavisado || '').toString();
             const diffDays = fechavisado ? Math.max(0, Math.floor((Date.now() - new Date(fechavisado).getTime()) / (1000 * 60 * 60 * 24))) : 0;
             const badgeStatus = isFinalizado ? 'bg-danger' : 'bg-success';
             const textStatus = (isFinalizado ? (txt?.status_finished || 'Finalizado') : (txt?.status_active || 'Vigente')).toString();
+            const deptoTxt = (a.nombre_departamento && String(a.nombre_departamento).trim())
+                ? escapeHtml(String(a.nombre_departamento).trim())
+                : '—';
+            const cobroCell = showTraz
+                ? `<td class="text-center">${htmlAlojCobroBadge(modoCobro)}</td>`
+                : '';
 
             return `
             <tr class="${isFinalizado ? 'status-finalizado' : 'status-vigente'} pointer" ${hidNum == null ? '' : `onclick="window.verHistorial(${hidNum}, event)"`}>
                 <td><span class="badge bg-dark">#${hidNum ?? '—'}</span></td>
+                <td class="small">${deptoTxt}</td>
+                ${cobroCell}
                 <td class="small fw-bold text-secondary">${fechavisado || '---'}</td> 
                 <td><div class="fw-bold">${(a.nprotA || '').toString()}</div><small class="text-muted d-block" style="white-space:normal;max-width:min(280px,40vw);line-height:1.3" title="${escapeHtml(a.tituloA || '')}">${(a.tituloA || '---').toString().replace(/</g, '&lt;')}</small></td>
                 <td>${(a.Investigador || '---').toString().replace(/</g, '&lt;')}</td>

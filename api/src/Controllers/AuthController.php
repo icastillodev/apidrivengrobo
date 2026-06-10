@@ -154,9 +154,14 @@ class AuthController {
         $user = $this->service->verify2FACode($data['userId'], $data['code']);
 
         if ($user) {
-            $finalInstId = $user['IdInstitucion'];
-            if (isset($data['instId']) && $data['instId'] != 'null' && $user['role'] == 1) {
-                $finalInstId = $data['instId'];
+            $finalInstId = (int) $user['IdInstitucion'];
+            if ((int) $user['role'] === 1 && array_key_exists('instId', $data) && $data['instId'] !== 'null') {
+                $clientInstId = (int) $data['instId'];
+                if ($clientInstId > 0) {
+                    $finalInstId = $clientInstId;
+                } elseif ($clientInstId === 0) {
+                    $finalInstId = 0;
+                }
             }
 
             // ¡CREAMOS EL TOKEN SEGURO DESPUÉS DEL 2FA!
@@ -183,7 +188,13 @@ class AuthController {
                 'modulos'  => $snap,
             ]);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Código inválido o expirado']);
+            $reason = $this->service->classify2FAFailure((int) $data['userId'], (string) $data['code']);
+            $codeKey = $reason === 'expired' ? '2fa_expired' : '2fa_invalid';
+            echo json_encode([
+                'status'  => 'error',
+                'code'    => $codeKey,
+                'message' => $codeKey,
+            ]);
         }
         exit;
     }

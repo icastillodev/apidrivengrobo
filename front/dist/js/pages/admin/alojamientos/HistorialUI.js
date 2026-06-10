@@ -1,9 +1,17 @@
 // dist/js/pages/admin/alojamientos/HistorialUI.js
 import { API } from '../../../api.js';
 import { showLoader, hideLoader } from '../../../components/LoaderComponent.js';
-import { AlojamientoState, loadAlojamientos } from '../alojamientos.js';
+import { AlojamientoState, loadAlojamientos, resolveDestinatarioAlojamiento } from '../alojamientos.js';
 import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
+/** Cantidad multiplicadora del tramo: cajas (CONTENIDO) o sujetos trazados (SUJETO). */
+function __histCantidadCobro(h, trazOn) {
+    const modo = h.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
+    if (trazOn && modo === 'SUJETO') {
+        return parseInt(h.CantSujetos || 0, 10) || 0;
+    }
+    return parseInt(h.CantidadCaja || 0, 10) || 0;
+}
 
 export const HistorialUI = {
     init() {
@@ -43,7 +51,8 @@ export const HistorialUI = {
             showLoader(); 
             const res = await API.request(`/alojamiento/history?historia=${historiaId}`);
             if (res.status === 'success') {
-                AlojamientoState.currentHistoryData = res.data; 
+                AlojamientoState.currentHistoryData = res.data;
+                AlojamientoState.historyCobro = res.cobro || {};
                 if (AlojamientoState.currentHistoryData.length === 0) return;
 
                 const hid = parseInt(String(historiaId).trim(), 10);
@@ -81,6 +90,7 @@ renderSummary(historiaId) {
         const history = AlojamientoState.currentHistoryData;
         const first = history[0];
         const hoy = new Date(); hoy.setHours(12,0,0,0);
+        const trazOnCost = showTraz || !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
 
         let totalCosto = 0, totalDias = 0;
 
@@ -101,9 +111,15 @@ renderSummary(historiaId) {
                 dias = Math.max(0, Math.floor((fFin - fIni)/(1000*60*60*24)));
             }
             
-            // LA CLAVE: El Costo Total Superior es LA SUMA ESTRICTA DE LA BD (cuentaapagar). 
-            // Si el tramo está abierto, sumará 0 porque aún no se cerró contablemente.
-            totalCosto += parseFloat(h.cuentaapagar || 0);
+            const precioUnit = parseFloat(h.PrecioCajaMomento || 0);
+            const cantCobro = __histCantidadCobro(h, trazOnCost);
+            if (esAbierto) {
+                totalCosto += dias * precioUnit * cantCobro;
+            } else {
+                totalCosto += parseFloat(h.cuentaapagar || 0) > 0
+                    ? parseFloat(h.cuentaapagar)
+                    : (dias * precioUnit * cantCobro);
+            }
             
             totalDias += dias; // Los días sí se siguen sumando todos
         });
@@ -111,6 +127,25 @@ renderSummary(historiaId) {
         const txt = window.txt.alojamientos || {};
         const gen = window.txt?.generales || {};
         const tipoCaja = first.NombreTipoAlojamiento || 'Tipo no definido';
+        const trazOn = trazOnCost;
+        const tipoPagoTxt = (first.tipo_pago && String(first.tipo_pago).trim())
+            ? String(first.tipo_pago).trim()
+            : (txt.tipo_pago_sin_dato || '—');
+        const deptoTxt = (first.nombre_departamento && String(first.nombre_departamento).trim())
+            ? String(first.nombre_departamento).trim()
+            : (txt.reg_sin_depto || '—');
+
+        const trazExtraRow = trazOn ? `
+            <div class="col-12 mt-2 pt-2 border-top row g-2 align-items-start">
+                <div class="col-md-6 border-end">
+                    <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_tipo_pago || txt.th_tipo_pago || 'Tipo de pago'}</label>
+                    <span class="text-dark small fw-semibold d-block">${tipoPagoTxt}</span>
+                </div>
+                <div class="col-md-6">
+                    <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_departamento || txt.th_departamento || 'Departamento'}</label>
+                    <span class="text-dark small fw-semibold d-block">${deptoTxt}</span>
+                </div>
+            </div>` : '';
 
         summaryContainer.innerHTML = `
             <div class="col-md-2 border-end text-center"><label class="d-block small text-muted fw-bold">${(txt.th_history || 'Historia').toUpperCase()}</label><span class="badge bg-dark fs-6">#${historiaId}</span></div>
@@ -129,7 +164,7 @@ renderSummary(historiaId) {
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(txt.type_box || 'Tipo').toUpperCase()}</label><span class="text-primary small fw-bold">${tipoCaja}</span></div> 
             <div class="col-md-1 border-end text-center"><label class="d-block small text-muted fw-bold text-primary">${(txt.total_days || 'Días').toUpperCase()}</label><span class="fw-bold fs-5">${totalDias}</span></div>
             <div class="col-md-1 text-center"><label class="d-block small text-muted fw-bold text-success">${(txt.total_cost || 'Costo').toUpperCase()}</label><span class="fw-bold fs-6 text-success">$ ${totalCosto.toFixed(2)}</span></div>
-            
+            ${trazExtraRow}
             <div class="col-12 mt-3 pt-2 border-top">
                 <label class="d-block small text-muted fw-bold text-uppercase">${txt.protocol_title || 'TÍTULO DEL PROTOCOLO'}</label>
                 <span class="fw-semibold fst-italic text-secondary d-block" style="white-space:normal;word-wrap:break-word;line-height:1.35">${first.tituloA || '---'}</span>
@@ -143,7 +178,15 @@ renderTable() {
         const txt = window.txt.alojamientos || {};
         const gen = window.txt?.generales || {};
         const roleOpen = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
-        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen);
+        const showTraz = hasTrazabilidadAlojamientosForUser(roleOpen)
+            || !!(AlojamientoState.historyCobro?.trazabilidad_habilitada);
+        const firstRow = history[0] || {};
+        const tipoPagoHist = (firstRow.tipo_pago && String(firstRow.tipo_pago).trim())
+            ? String(firstRow.tipo_pago).trim()
+            : (txt.tipo_pago_sin_dato || '—');
+        const deptoHist = (firstRow.nombre_departamento && String(firstRow.nombre_departamento).trim())
+            ? String(firstRow.nombre_departamento).trim()
+            : (txt.reg_sin_depto || '—');
 
         const tbody = document.getElementById('tbody-historial');
         if (!tbody) return;
@@ -156,6 +199,8 @@ renderTable() {
                     <th>${gen.inicio || 'Inicio'}</th>
                     <th>${gen.retiro || 'Retiro'}</th>
                     <th>${txt.th_boxes || 'Cant. (Tipo)'}</th>
+                    ${showTraz ? `<th class="small">${txt.th_tipo_pago || 'Tipo de pago'}</th>` : ''}
+                    ${showTraz ? `<th class="small">${txt.th_departamento || 'Departamento'}</th>` : ''}
                     <th>${txt.days_tramo || 'Días'}</th>
                     <th>${txt.price || 'Precio U.'}</th>
                     <th>${txt.subtotal || 'Subtotal'}</th>
@@ -172,33 +217,43 @@ renderTable() {
             
             const precioUnit = parseFloat(h.PrecioCajaMomento || 0);
             const cant = parseInt(h.CantidadCaja || 0);
+            const modoTramo = h.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
+            const cantCobro = __histCantidadCobro(h, showTraz);
             let diasTramo, subtotal, txtFin;
 
             if (esAbierto) {
                 // TRAMO VIGENTE
                 txtFin = txt.status_active || 'Vigente';
                 diasTramo = Math.max(0, Math.floor((hoy - fIni) / (1000 * 60 * 60 * 24)));
-                subtotal = (diasTramo * precioUnit * cant);
+                subtotal = diasTramo * precioUnit * cantCobro;
             } else {
                 // TRAMO CERRADO
                 const pFin = h.hastafecha.split('-');
                 const fFin = new Date(pFin[0], pFin[1]-1, pFin[2], 12,0,0);
                 txtFin = fFin.toLocaleDateString();
                 diasTramo = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
-                subtotal = parseFloat(h.cuentaapagar) > 0 ? parseFloat(h.cuentaapagar) : (diasTramo * precioUnit * cant);
+                subtotal = parseFloat(h.cuentaapagar) > 0
+                    ? parseFloat(h.cuentaapagar)
+                    : (diasTramo * precioUnit * cantCobro);
             }
 
             // --- MAGIA VISUAL: LÓGICA DE STAND BY AQUÍ ---
             const renderCant = cant === 0 
                 ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> STAND BY (0)</span>` 
                 : cant;
+            const colSpanTraz = showTraz ? 11 : 9;
+            const renderCantCobro = (showTraz && modoTramo === 'SUJETO')
+                ? `<span class="text-muted small d-block">${cantCobro} ${txt.trace_subjects_short || 'suj.'}</span>`
+                : '';
 
             const trMaster = `
             <tr class="pointer table-light"${showTraz ? ` onclick="window.toggleTrazabilidad(${h.IdAlojamiento}, ${h.TipoAnimal || h.idespA})"` : ''}>
                 <td><span class="badge bg-secondary">#${h.IdAlojamiento}</span></td>
                 <td>${fIni.toLocaleDateString()}</td> 
                 <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
-                <td>${renderCant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small></td>
+                <td>${renderCant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small>${renderCantCobro}</td>
+                ${showTraz ? `<td class="small">${tipoPagoHist}</td>` : ''}
+                ${showTraz ? `<td class="small">${deptoHist}</td>` : ''}
                 <td class="fw-bold">${diasTramo}</td>
                 <td>$ ${precioUnit.toFixed(2)}</td>
                 <td class="fw-bold text-dark">$ ${subtotal.toFixed(2)}</td>
@@ -215,7 +270,7 @@ renderTable() {
             const trDetail = showTraz
                 ? `
             <tr id="trazabilidad-row-${h.IdAlojamiento}" class="d-none bg-white">
-                <td colspan="9" class="p-0 border-0">
+                <td colspan="${colSpanTraz}" class="p-0 border-0">
                     <div id="trazabilidad-content-${h.IdAlojamiento}" class="p-3 border-start border-4 border-primary shadow-inner bg-light">
                         <div class="text-center text-muted small"><div class="spinner-border spinner-border-sm"></div> ${txt.traceability_loading || 'Cargando trazabilidad...'}</div>
                     </div>
@@ -235,8 +290,10 @@ renderTable() {
         const titleEl = document.getElementById('historial-title');
         if (titleEl) titleEl.innerText = txt.history_record || 'Ficha de Alojamiento';
 
+        const destId = resolveDestinatarioAlojamiento(history, historiaId);
+        const destArg = destId > 0 ? String(destId) : 'null';
         const btnMsg = `
-                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm ms-1" onclick="window.openMensajeriaComposeAlojamiento && window.openMensajeriaComposeAlojamiento(${historiaId})">
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm ms-1" onclick="window.openMensajeriaComposeAlojamiento && window.openMensajeriaComposeAlojamiento(${historiaId}, ${destArg})">
                     <i class="bi bi-chat-dots me-1"></i>${txt.btn_msg_responsable || ''}
                 </button>`;
         if (isFinalizado) {

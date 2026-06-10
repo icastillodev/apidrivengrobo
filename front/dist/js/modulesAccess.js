@@ -52,6 +52,11 @@ export function setInstModulesSnapshot(snap) {
 
 export async function ensureInstModulesLoaded(apiRequest) {
     if (getSessionHybrid('instModulos')) return;
+    await refreshInstModulesSnapshot(apiRequest);
+}
+
+/** Siempre vuelve a pedir /session/modulos (corrige snapshot viejo sin Habilitado). */
+export async function refreshInstModulesSnapshot(apiRequest) {
     if (typeof apiRequest !== 'function') return;
     try {
         const res = await apiRequest('/session/modulos', 'GET');
@@ -170,6 +175,29 @@ export function pathVisibleForModules(path, roleId) {
         return rule.anyOf.some((k) => investigadorVeModuloEnMenu(k, byKey, r, invHasData));
     }
     return rule.keys.every((k) => investigadorVeModuloEnMenu(k, byKey, r, invHasData));
+}
+
+/** IdModulosApp trazabilidad en alojamientos (modulosactivosinst.Habilitado = 1). */
+export const ID_MODULO_TRAZABILIDAD_ALOJAMIENTOS = 6;
+
+/** Trazabilidad contratada: IdModulosApp 6 (Habilitado=1 o estado_logico≥2 en snapshot). */
+export function isTrazabilidadAlojamientosInstActiva() {
+    const { byKey, list } = getInstModulesSnapshot();
+    const mod6Activo = (list || []).some((row) => {
+        if (parseInt(row?.IdModulosApp, 10) !== ID_MODULO_TRAZABILIDAD_ALOJAMIENTOS) {
+            return false;
+        }
+        const hab = parseInt(row?.Habilitado, 10);
+        const est = parseInt(row?.estado_logico, 10);
+        return hab === 1 || est >= 2;
+    });
+    if (mod6Activo) return true;
+    if (estadoParaKey(byKey, 'trazabilidad_alojamientos') >= 2) {
+        return true;
+    }
+    return (list || []).some(
+        (row) => row?.key === 'trazabilidad_alojamientos' && parseInt(row.estado_logico, 10) >= 2
+    );
 }
 
 /** Módulo trazabilidad (árbol biológico en alojamientos). */

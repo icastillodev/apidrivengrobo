@@ -94,7 +94,12 @@ async handleLogin(e) {
                 if (res?.status === 'success') {
                     this.completeLogin(res, box);
                 } else {
-                    Swal.fire('Error', 'Código incorrecto o vencido', 'error').then(() => {
+                    const expired = String(res?.code || '').toLowerCase() === '2fa_expired';
+                    const title = expired ? 'El código venció' : 'Código incorrecto';
+                    const text = expired
+                        ? 'Pasaron más de 10 minutos. Iniciá sesión de nuevo para recibir un código nuevo e ingresalo antes de que expire.'
+                        : 'Revisá el código del correo e intentá de nuevo.';
+                    Swal.fire({ icon: expired ? 'info' : 'error', title, text, confirmButtonText: 'Entendido' }).then(() => {
                         window.location.href = getBasePath() + 'geckoadm/login';
                     });
                 }

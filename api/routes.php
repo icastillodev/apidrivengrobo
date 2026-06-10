@@ -295,6 +295,7 @@ $router->post('/insumos-form/save', 'InsumoFormularioController@createOrder');
 $router->get('/precios/all-data', 'PreciosController@getAllData'); 
 // Actualiza precios, nombres de insumos, jornada y título del tarifario
 $router->post('/precios/update-all', 'PreciosController@updateAll');
+$router->post('/precios/alojamiento-cobro-modo', 'PreciosController@updateCobroModo');
 
 
 // ============================================================

@@ -4,7 +4,7 @@
  */
 import { API } from '../../../../../api.js';
 import { hideLoader, showLoader } from '../../../../../components/LoaderComponent.js';
-import { formatBillingMoney, getBillingDateLocale } from '../../billingLocale.js';
+import { formatBillingMoney, getBillingDateLocale, htmlAlojCobroBadge } from '../../billingLocale.js';
 
 function bmTpl(str, map) {
     if (!str) return '';
@@ -36,6 +36,9 @@ export const openAlojModal = async (historiaId) => {
         }
 
         const history = historyRows;
+        const cobro = resAloj.cobro || {};
+        const trazHabilitada = !!cobro.trazabilidad_habilitada;
+        const modoEstadia = first.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
         const first = history[0];
 
         const idPagador = parseInt(String(first.IdTitularProtocolo ?? first.idprotA ?? '0'), 10) || 0;
@@ -54,7 +57,12 @@ export const openAlojModal = async (historiaId) => {
         const tipoAlojamiento = first.NombreTipoAlojamiento || t.aloj_estructura_default || 'Estructura Estándar';
         const precioActual = parseFloat(first.PrecioCajaMomento || 0);
 
-        const { tramos, diasTotales, costoHistoricoTotal } = procesarTramosFinancieros(history, dateLoc, t.aloj_estado_vigente || 'VIGENTE');
+        const { tramos, diasTotales, costoHistoricoTotal } = procesarTramosFinancieros(
+            history,
+            dateLoc,
+            t.aloj_estado_vigente || 'VIGENTE',
+            trazHabilitada
+        );
 
         let totalPagadoHistorico = 0;
         history.forEach(h => {
@@ -82,7 +90,7 @@ export const openAlojModal = async (historiaId) => {
                                         <span class="fs-6 fw-semibold text-secondary">${respEstadia}</span>
                                     </div>
                                 </div>
-                                ${renderResumenTecnico(first, tipoAlojamiento, precioActual, tramos, t)}
+                                ${renderResumenTecnico(first, tipoAlojamiento, precioActual, tramos, t, { trazabilidad_habilitada: trazHabilitada, alojamiento_cobro_modo: modoEstadia })}
                             </div>
                             <div class="col-lg-5 ps-lg-4">
                                 ${renderGestionCobros(hid, diasTotales, costoHistoricoTotal, totalPagadoHistorico, t)}
@@ -132,10 +140,17 @@ function renderHeader(id, saldo, titularNombre, t, g) {
     </div>`;
 }
 
-function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t) {
+function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t, cobro = {}) {
+    const cobroBadge = cobro?.trazabilidad_habilitada
+        ? `<div class="col-12"><span class="small text-muted me-2">${t.aloj_lbl_como_se_cobra || ''}</span>${htmlAlojCobroBadge(cobro.alojamiento_cobro_modo)}</div>`
+        : '';
+    const cantTh = cobro?.trazabilidad_habilitada && cobro.alojamiento_cobro_modo === 'SUJETO'
+        ? (t.aloj_th_sujetos || 'Sujetos')
+        : (t.aloj_th_cant || 'Cant.');
     return `
     <h6 class="text-info fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">${t.aloj_sec_resumen_tecnico || 'Resumen Técnico'}</h6>
     <div class="row g-3 mb-4">
+        ${cobroBadge}
         <div class="col-md-6">
             <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">${t.aloj_lbl_inv_resp_estadia || 'Investigador Resp. Estadía'}</label>
             <div id="pdf-aloj-inv" class="form-control-plaintext border-bottom fw-bold text-dark">${first.Investigador || (t.na || 'N/A')}</div>
@@ -156,7 +171,7 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t) {
     <div class="table-responsive bg-white rounded border shadow-sm">
         <table id="table-aloj-tramos" class="table table-sm table-hover align-middle mb-0 text-center">
             <thead class="bg-light text-muted small uppercase">
-                <tr><th>${t.aloj_th_id || 'ID'}</th><th>${t.aloj_th_desde || 'Desde'}</th><th>${t.aloj_th_hasta || 'Hasta'}</th><th>${t.aloj_th_cant || 'Cant.'}</th><th>${t.aloj_th_dias || 'Días'}</th><th class="text-end pe-2">${t.aloj_th_subtotal || 'Subtotal'}</th></tr>
+                <tr><th>${t.aloj_th_id || 'ID'}</th><th>${t.aloj_th_desde || 'Desde'}</th><th>${t.aloj_th_hasta || 'Hasta'}</th><th>${cantTh}</th><th>${t.aloj_th_dias || 'Días'}</th><th class="text-end pe-2">${t.aloj_th_subtotal || 'Subtotal'}</th></tr>
             </thead>
             <tbody class="small">
                 ${tramos.map(tr => `
@@ -217,7 +232,7 @@ function parseFechaAlojTramo(s) {
     return d;
 }
 
-function procesarTramosFinancieros(history, locale, vigenteLabel) {
+function procesarTramosFinancieros(history, locale, vigenteLabel, trazHabilitada = false) {
     const hoy = new Date();
     hoy.setHours(12, 0, 0, 0);
     let diasTotales = 0;
@@ -230,7 +245,9 @@ function procesarTramosFinancieros(history, locale, vigenteLabel) {
                 id: h.IdAlojamiento ?? '—',
                 desde: '—',
                 hasta: '—',
-                cajas: parseInt(String(h.CantidadCaja || 0), 10) || 0,
+                cajas: (trazHabilitada && h.alojamiento_cobro_modo === 'SUJETO')
+                    ? (parseInt(String(h.CantSujetos || 0), 10) || 0)
+                    : (parseInt(String(h.CantidadCaja || 0), 10) || 0),
                 dias: 0,
                 subtotal: Math.max(0, parseFloat(String(h.cuentaapagar || 0)) || 0),
                 esVigente: !h.hastafecha
@@ -241,7 +258,9 @@ function procesarTramosFinancieros(history, locale, vigenteLabel) {
 
         const dias = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
 
-        const cant = parseInt(String(h.CantidadCaja || 0), 10) || 0;
+        const cant = (trazHabilitada && h.alojamiento_cobro_modo === 'SUJETO')
+            ? (parseInt(String(h.CantSujetos || 0), 10) || 0)
+            : (parseInt(String(h.CantidadCaja || 0), 10) || 0);
         const precio = parseFloat(String(h.PrecioCajaMomento || 0)) || 0;
 
         const subtotal = parseFloat(String(h.cuentaapagar || 0)) > 0

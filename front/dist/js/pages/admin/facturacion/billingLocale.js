@@ -180,6 +180,21 @@ export function billingSumInsumosCobrable(insumos) {
 /**
  * @param {unknown[]|null|undefined} alojamientos
  */
+/** Etiqueta del modo de cobro de alojamiento (único precio × cantidad según modo). */
+export function getAlojCobroModoLabel(modo) {
+    const bi = window.txt?.facturacion?.billing_investigador || {};
+    const al = window.txt?.alojamientos || {};
+    return modo === 'SUJETO'
+        ? (bi.cobro_modo_sujeto || al.animal_ficha_cobro_sujeto || 'Por sujeto')
+        : (bi.cobro_modo_alojamiento || al.animal_ficha_cobro_alojamiento || 'Por alojamiento');
+}
+
+export function htmlAlojCobroBadge(modo) {
+    const label = getAlojCobroModoLabel(modo);
+    const cls = modo === 'SUJETO' ? 'bg-success' : 'bg-secondary';
+    return `<span class="badge ${cls} small">${label}</span>`;
+}
+
 export function billingSumAlojamientos(alojamientos) {
     const acc = { total: 0, pagado: 0, debe: 0 };
     for (const a of alojamientos || []) {

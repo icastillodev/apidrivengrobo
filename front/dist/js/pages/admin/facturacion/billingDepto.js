@@ -23,6 +23,7 @@ import {
     billingPdfMarcaExentoCorta,
     billingPdfMarcaExentoLarga,
     billingAlojPeriodoParaInforme,
+    htmlAlojCobroBadge,
     billingPedidoSinMontoNoExento,
     billingHtmlRowInsumoPedidoFacturacion,
     billingHtmlInsumoProtSectionHeader,
@@ -641,6 +642,10 @@ function getAlojTableHTML(alojamientos, idProt) {
     const tf = txF();
     const bp = txBP();
     const thDep = bp.th_aloj_departamento || txBI().col_departamento || 'DEPTO';
+    const bi = txBI();
+    const thCobro = bi.th_cobro_modo || 'Cobro';
+    const modoInst = alojamientos[0]?.alojamiento_cobro_modo;
+    const cobroHdr = modoInst ? ` ${htmlAlojCobroBadge(modoInst)}` : '';
 
     const filas = alojamientos.map(a => {
         const total = parseFloat(a.total || 0);
@@ -666,6 +671,7 @@ function getAlojTableHTML(alojamientos, idProt) {
             <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
             <td class="text-start ps-3 small fw-bold">${investigador}</td>
             <td>${a.especie} <br><span class="badge bg-light text-primary border mt-1">${tipoAloj}</span></td>
+            ${a.alojamiento_cobro_modo ? `<td>${htmlAlojCobroBadge(a.alojamiento_cobro_modo)}</td>` : ''}
             <td class="fw-bold">${a.dias}</td>
             <td class="text-end">$ ${formatBillingMoney(total)}</td>
             <td class="text-end text-success">$ ${formatBillingMoney(pagado)}</td>
@@ -675,7 +681,7 @@ function getAlojTableHTML(alojamientos, idProt) {
 
     return `
         <div class="mt-4">
-            <h6 class="fw-bold text-muted mb-3 uppercase" style="font-size: 10px;">${bd.sec_estadias_aloj || 'Estadías / Alojamientos'}</h6>
+            <h6 class="fw-bold text-muted mb-3 uppercase" style="font-size: 10px;">${bd.sec_estadias_aloj || 'Estadías / Alojamientos'}${cobroHdr}</h6>
             <table class="table table-bordered table-billing mb-0">
                 <thead class="table-dark text-center">
                     <tr>
@@ -685,6 +691,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                         <th style="width:10%" class="small">${thDep}</th>
                         <th>${tf.titular_paga || 'Titular (Responsable Financiero)'}</th>
                         <th style="width:15%">${tf.esp_tipo_aloj || 'Especie / Tipo Aloj.'}</th>
+                        ${modoInst ? `<th style="width:8%" class="small">${thCobro}</th>` : ''}
                         <th style="width:5%">${tf.dias || 'Días'}</th>
                         <th style="width:8%">${tf.total || 'Total'}</th>
                         <th style="width:8%">${tf.pago || 'Pago'}</th>

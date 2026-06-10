@@ -9,6 +9,9 @@ use PDO;
  */
 class ModulosInstitucion
 {
+    /** Trazabilidad en alojamientos (`modulosapp.IdModulosApp`). */
+    public const ID_MODULO_TRAZABILIDAD_ALOJAMIENTOS = 6;
+
     /** Claves semánticas alineadas con `NombreModulo` en `modulosapp`. */
     public const SEMANTIC_KEYS = [
         'animales',
@@ -101,6 +104,7 @@ class ModulosInstitucion
                 'NombreModulo' => $row['NombreModulo'],
                 'key' => $key,
                 'estado_logico' => $estado,
+                'Habilitado' => $row['Habilitado'] !== null ? (int) $row['Habilitado'] : null,
             ];
             if ($key !== null) {
                 if (!isset($byKey[$key]) || $estado > $byKey[$key]) {
@@ -126,6 +130,49 @@ class ModulosInstitucion
     public static function estadoParaKey(array $byKey, string $key): int
     {
         return isset($byKey[$key]) ? (int) $byKey[$key] : 1;
+    }
+
+    /** Módulo contratado: modulosactivosinst.Habilitado = 1 para el IdModulosApp dado. */
+    public static function instModuloIdHabilitado(PDO $db, int $instId, int $idModulosApp): bool
+    {
+        if ($instId <= 0 || $idModulosApp <= 0) {
+            return false;
+        }
+        $stmt = $db->prepare(
+            'SELECT 1 FROM modulosactivosinst
+             WHERE IdInstitucion = ? AND IdModulosApp = ? AND Habilitado = 1 LIMIT 1'
+        );
+        $stmt->execute([$instId, $idModulosApp]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Módulo contratado en la sede: fila en modulosactivosinst con Habilitado = 1.
+     * Clave semántica alojamientos/trazabilidad: trazabilidad_alojamientos (ver nombreModuloToKey).
+     */
+    public static function instModuloHabilitado(PDO $db, int $instId, string $semanticKey): bool
+    {
+        if ($instId <= 0 || !in_array($semanticKey, self::SEMANTIC_KEYS, true)) {
+            return false;
+        }
+        if ($semanticKey === 'trazabilidad_alojamientos') {
+            if (self::instModuloIdHabilitado($db, $instId, self::ID_MODULO_TRAZABILIDAD_ALOJAMIENTOS)) {
+                return true;
+            }
+        }
+        $stmt = $db->prepare(
+            'SELECT app.NombreModulo
+             FROM modulosactivosinst ma
+             INNER JOIN modulosapp app ON app.IdModulosApp = ma.IdModulosApp
+             WHERE ma.IdInstitucion = ? AND ma.Habilitado = 1'
+        );
+        $stmt->execute([$instId]);
+        while (($nombre = $stmt->fetchColumn()) !== false) {
+            if (self::nombreModuloToKey((string) $nombre) === $semanticKey) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static function rolEsAdminSede(int $roleId): bool

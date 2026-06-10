@@ -23,6 +23,8 @@ function resolveAlojamientosInstId() {
 export const AlojamientoState = {
     dataFull: [],
     currentHistoryData: [],
+    /** Metadatos de cobro del listado (`trazabilidad_habilitada`, etc.). */
+    listCobro: {},
     instId: resolveAlojamientosInstId(),
     /** Última historia con modal de ficha abierta correctamente (para QR / PDF sin pasar ID en onclick). */
     historiaContextoQR: null
@@ -71,8 +73,10 @@ export async function loadAlojamientos(options = {}) {
         if (res.status === 'success') {
             const raw = res.data;
             AlojamientoState.dataFull = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.data) ? raw.data : []);
+            AlojamientoState.listCobro = res.cobro || {};
         } else {
             AlojamientoState.dataFull = [];
+            AlojamientoState.listCobro = {};
             const t = window.txt?.alojamientos;
             const msg = (res.message && String(res.message).trim()) || t?.err_carga_lista || '';
             if (msg && typeof Swal !== 'undefined') {
@@ -91,6 +95,7 @@ export async function loadAlojamientos(options = {}) {
     } catch (e) {
         console.error("Error cargando alojamientos:", e);
         AlojamientoState.dataFull = [];
+        AlojamientoState.listCobro = {};
         const t = window.txt?.alojamientos;
         if (typeof Swal !== 'undefined') {
             Swal.fire({ icon: 'error', text: t?.err_carga_lista || '' });
@@ -183,54 +188,109 @@ window.verPaginaQR = async (historiaId = null) => {
     }
 };
 
-function parseIdUsrAlojamientoRow(row) {
-    if (!row || typeof row !== 'object') return 0;
-    const raw =
-        row.IdUsrResponsableAlojamiento ??
-        row.idUsrResponsableAlojamiento ??
-        row.IdUsrA ??
-        row.idUsrA;
-    const n = parseInt(raw, 10);
+function parsePositiveUserId(raw) {
+    const n = parseInt(String(raw ?? '').trim(), 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function parseIdTitularRow(row) {
+/** IdUsrA del alojamiento (responsable de la estadía), último tramo con dato válido. */
+export function resolveDestinatarioAlojamiento(tramos, historiaId = null) {
+    const rows = Array.isArray(tramos) ? tramos : [];
+    const state = (typeof window !== 'undefined' && window.__AlojamientoState) ? window.__AlojamientoState : AlojamientoState;
+
+    const pickFromRow = (row) => {
+        if (!row || typeof row !== 'object') return 0;
+        const candidates = [
+            row.IdUsrResponsableAlojamiento,
+            row.idUsrResponsableAlojamiento,
+            row.IdUsrA,
+            row.idUsrA,
+            row.idusuario,
+            row.IdUsuario,
+        ];
+        for (const c of candidates) {
+            const id = parsePositiveUserId(c);
+            if (id) return id;
+        }
+        return 0;
+    };
+
+    for (let i = rows.length - 1; i >= 0; i--) {
+        const id = pickFromRow(rows[i]);
+        if (id) return id;
+    }
+
+    const hid = parsePositiveUserId(historiaId);
+    if (hid) {
+        const list = state.dataFull || [];
+        const rowList = list.find((r) => parsePositiveUserId(r.historia ?? r.Historia ?? r.HISTORIA) === hid);
+        const idList = pickFromRow(rowList);
+        if (idList) return idList;
+    }
+
+    return 0;
+}
+
+function pickUserIdFromRow(row) {
     if (!row || typeof row !== 'object') return 0;
-    const raw = row.IdTitularProtocolo ?? row.idTitularProtocolo;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    const candidates = [
+        row.IdUsrResponsableAlojamiento,
+        row.idUsrResponsableAlojamiento,
+        row.IdUsrA,
+        row.idUsrA,
+        row.idusuario,
+        row.IdUsuario,
+    ];
+    for (const c of candidates) {
+        const id = parsePositiveUserId(c);
+        if (id) return id;
+    }
+    return 0;
+}
+
+/** Nombre del responsable del alojamiento (IdUsrA), último tramo que coincide con destId. */
+export function resolveDestinatarioNombreAlojamiento(tramos, destId, historiaId = null) {
+    const id = parsePositiveUserId(destId);
+    if (!id) return '';
+    const rows = Array.isArray(tramos) ? tramos : [];
+    const state = (typeof window !== 'undefined' && window.__AlojamientoState) ? window.__AlojamientoState : AlojamientoState;
+
+    for (let i = rows.length - 1; i >= 0; i--) {
+        const row = rows[i];
+        if (pickUserIdFromRow(row) !== id) continue;
+        const nom = row.nombre_responsable ?? row.NombreResponsable;
+        if (nom && String(nom).trim()) return String(nom).trim();
+        const inv = row.Investigador;
+        if (inv && String(inv).trim() && inv !== 'Sin Investigador') return String(inv).trim();
+    }
+
+    const hid = parsePositiveUserId(historiaId);
+    if (hid) {
+        const rowList = (state.dataFull || []).find(
+            (r) => parsePositiveUserId(r.historia ?? r.Historia ?? r.HISTORIA) === hid
+        );
+        if (rowList && pickUserIdFromRow(rowList) === id) {
+            const inv = rowList.Investigador;
+            if (inv && String(inv).trim() && inv !== 'Sin Investigador') return String(inv).trim();
+        }
+    }
+
+    return '';
 }
 
 /**
- * @param {number} [historiaIdDesdeModal] Id de historia pasado desde el footer del modal (más fiable que depender solo del último tramo).
+ * @param {number} [historiaIdDesdeModal] Id de historia pasado desde el footer del modal.
+ * @param {number} [destIdExplicit] IdUsrA del responsable (tramo vigente), embebido en el botón del modal.
  */
-window.openMensajeriaComposeAlojamiento = async (historiaIdDesdeModal) => {
-    const hist = AlojamientoState.currentHistoryData;
+window.openMensajeriaComposeAlojamiento = async (historiaIdDesdeModal, destIdExplicit) => {
+    const state = (typeof window !== 'undefined' && window.__AlojamientoState) ? window.__AlojamientoState : AlojamientoState;
+    const hist = state.currentHistoryData || [];
     const tc = window.txt?.comunicacion || {};
     const ta = window.txt?.alojamientos || {};
-    if (!hist || hist.length === 0) {
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({ icon: 'warning', text: tc.msg_err_sin_dest || '' });
-        }
-        return;
-    }
-    const first = hist[0];
-    const last = hist[hist.length - 1];
 
-    let destId = 0;
-    for (let i = hist.length - 1; i >= 0; i--) {
-        const id = parseIdUsrAlojamientoRow(hist[i]);
-        if (id > 0) {
-            destId = id;
-            break;
-        }
-    }
+    let destId = parsePositiveUserId(destIdExplicit);
     if (!destId) {
-        destId = parseIdTitularRow(first);
-    }
-    if (!destId) {
-        const rowTit = hist.find((r) => parseIdTitularRow(r) > 0);
-        destId = rowTit ? parseIdTitularRow(rowTit) : 0;
+        destId = resolveDestinatarioAlojamiento(hist, historiaIdDesdeModal);
     }
     if (!destId) {
         if (typeof Swal !== 'undefined') {
@@ -239,6 +299,8 @@ window.openMensajeriaComposeAlojamiento = async (historiaIdDesdeModal) => {
         return;
     }
 
+    const first = hist[0] || {};
+    const last = hist[hist.length - 1] || first;
     const hidFromArg = parseInt(historiaIdDesdeModal, 10);
     const hidFromData = parseInt(last.historia ?? first.historia, 10);
     const hid =
@@ -249,8 +311,10 @@ window.openMensajeriaComposeAlojamiento = async (historiaIdDesdeModal) => {
               : null;
 
     const asunto = `${tc.msg_asunto || ''} · ${ta.history_record || ''}${hid ? ' #' + hid : ''}`;
+    const destinatarioNombre = resolveDestinatarioNombreAlojamiento(hist, destId, historiaIdDesdeModal);
     await openMensajeriaCompose({
         destinatarioId: destId,
+        destinatarioNombre,
         origenTipo: 'alojamiento',
         origenId: hid,
         origenEtiqueta: hid ? `Historia #${hid}` : null,

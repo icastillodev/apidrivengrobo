@@ -374,8 +374,11 @@ class BillingModel {
         if (AlojamientoCobro::hasColumn($this->db, 'tipoalojamiento', 'PrecioXSujeto')) {
             $extraCols .= ', ta.PrecioXSujeto';
         }
+        if (AlojamientoCobro::hasColumn($this->db, 'tipoalojamiento', 'AlojamientoCobroModo')) {
+            $extraCols .= ', ta.AlojamientoCobroModo';
+        }
 
-        $sql = "SELECT a.IdAlojamiento, a.historia, a.fechavisado, a.hastafecha, a.finalizado,
+        $sql = "SELECT a.IdAlojamiento, a.IdTipoAlojamiento, a.historia, a.fechavisado, a.hastafecha, a.finalizado,
                 a.CantidadCaja, a.PrecioCajaMomento, a.cuentaapagar, a.totalpago, a.IdInstitucion,
                 e.EspeNombreA as especie,
                 COALESCE(ta.NombreTipoAlojamiento, 'Estructura') as caja
@@ -426,7 +429,7 @@ class BillingModel {
             $stmtInst->execute([(int) $idProt]);
             $instIdFact = (int) ($stmtInst->fetchColumn() ?: 0);
         }
-        $cobroPorSujeto = AlojamientoCobro::cobroPorSujeto($this->db, $instIdFact);
+        $trazAloj = AlojamientoCobro::instTrazabilidadHabilitada($this->db, $instIdFact);
 
         $stmtDeptProt = $this->db->prepare(
             'SELECT TRIM(COALESCE(dep.NombreDeptoA, \'\')) FROM protocoloexpe p
@@ -460,18 +463,8 @@ class BillingModel {
                     $caja = (string) $r['caja'];
                 }
 
-                $cantCaja = (int) ($r['CantidadCaja'] ?? 0);
-                if ($cantCaja <= 0) {
-                    continue;
-                }
-
-                if ($cobroPorSujeto) {
-                    $qty = AlojamientoCobro::countSujetosTramo($this->db, (int) ($r['IdAlojamiento'] ?? 0));
-                    $precio = AlojamientoCobro::precioSujetoTramo($this->db, $r);
-                } else {
-                    $qty = $cantCaja;
-                    $precio = (float) ($r['PrecioCajaMomento'] ?? 0);
-                }
+                $precio = AlojamientoCobro::precioUnitarioTramo($r);
+                $qty = AlojamientoCobro::cantidadCobroTramo($this->db, $instIdFact, $r);
                 if ($qty <= 0) {
                     continue;
                 }
@@ -523,6 +516,11 @@ class BillingModel {
             $fechaInicioRes = $payRanges !== [] ? (string) $payRanges[0]['desde'] : null;
             $fechaFinRes = $payRanges !== [] ? (string) $payRanges[count($payRanges) - 1]['hasta'] : null;
 
+            $idTipoHist = 0;
+            if (!empty($rows[0]['IdTipoAlojamiento'])) {
+                $idTipoHist = (int) $rows[0]['IdTipoAlojamiento'];
+            }
+
             $out[] = [
                 'last_id' => $lastId,
                 'historia' => $historia,
@@ -539,6 +537,9 @@ class BillingModel {
                 'IdUsrA' => $idUsrTit,
                 'TitularProtocolo' => $titularProt,
                 'nombre_departamento' => $nombreDepartamentoProt,
+                'alojamiento_cobro_modo' => $trazAloj
+                    ? AlojamientoCobro::getModoTipo($this->db, $idTipoHist, $instIdFact)
+                    : null,
             ];
         }
 

@@ -117,6 +117,10 @@ public function attemptSuperAdminLogin($user, $pass) {
         return false;
     }
 
+    public function classify2FAFailure(int $userId, string $code): string {
+        return $this->model->classify2FAFailure($userId, $code);
+    }
+
     // --- HELPER PRIVADO: Manejo de 2FA ---
     private function handle2FALogic($user, $instName) {
         // Generar Código Numérico

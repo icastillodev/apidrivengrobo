@@ -16,6 +16,7 @@ import {
     getBillingNombreInstitucion,
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
+    htmlAlojCobroBadge,
     billingSumInsumosCobrable,
     billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
@@ -393,13 +394,16 @@ function getAlojTableHTML(alojamientos, idProt) {
     const tf = txF();
     const secA = bi.sec_alojamientos || 'Alojamientos';
     const thDep = bp.th_aloj_departamento || bi.col_departamento || 'DEPTO';
+    const thCobro = bi.th_cobro_modo || 'Cobro';
+    const modoInst = alojamientos[0]?.alojamiento_cobro_modo;
+    const cobroHdr = modoInst ? ` ${htmlAlojCobroBadge(modoInst)}` : '';
     return `
-        <h6 class="fw-bold text-muted mb-2 small uppercase">${secA}</h6>
+        <h6 class="fw-bold text-muted mb-2 small uppercase">${secA}${cobroHdr}</h6>
         <table class="table table-bordered table-billing mb-0">
             <thead class="table-dark text-center">
                 <tr>
                     <th style="width:3%"><input type="checkbox" class="check-all-aloj" data-prot="${idProt}"></th>
-                    <th>${bi.th_historia || 'HISTORIA'}</th><th class="small">${thDep}</th><th>${bp.th_especie || 'ESPECIE'}</th><th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
+                    <th>${bi.th_historia || 'HISTORIA'}</th><th class="small">${thDep}</th><th>${bp.th_especie || 'ESPECIE'}</th>${modoInst ? `<th class="small">${thCobro}</th>` : ''}<th>${tf.dias || 'DÍAS'}</th><th>${bd.th_total_uc || 'TOTAL'}</th><th>${bd.th_pagado_uc || 'PAGADO'}</th><th>${bd.th_debe_uc || 'DEBE'}</th>
                 </tr>
             </thead>
             <tbody>
@@ -408,7 +412,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                         <td><input type="checkbox" class="check-item-aloj" data-prot="${idProt}" data-id="${a.historia}" data-monto="${a.debe}" ${a.debe <= 0 ? 'disabled' : ''}></td>
                         <td>#${a.historia}</td>
                         <td class="small text-start">${(a.nombre_departamento && String(a.nombre_departamento).trim()) ? a.nombre_departamento : '—'}</td>
-                        <td>${a.especie}</td><td class="fw-bold">${a.dias ?? ''}</td>
+                        <td>${a.especie}</td>${a.alojamiento_cobro_modo ? `<td>${htmlAlojCobroBadge(a.alojamiento_cobro_modo)}</td>` : ''}<td class="fw-bold">${a.dias ?? ''}</td>
                         <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                         <td class="text-end text-success">$ ${formatBillingMoney(a.pagado)}</td>
                         <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}</td>

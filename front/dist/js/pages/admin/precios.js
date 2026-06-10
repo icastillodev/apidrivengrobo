@@ -1,14 +1,32 @@
 import { API } from '../../api.js';
+import { Auth } from '../../auth.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getPdfLogoHeaderHtml } from '../../utils/pdfLogoHeader.js';
+import { isTrazabilidadAlojamientosInstActiva, refreshInstModulesSnapshot } from '../../modulesAccess.js';
+import {
+    htmlAlojCobroSwitchRow,
+    isTrazabilidadCobroInstActiva,
+} from '../../utils/alojamientoCobroModo.js';
 
-let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {}, trazabilidad_habilitada: false, alojamiento_cobro_modo: 'CONTENIDO' };
+let dataFull = { especies: [], subespecies: [], tiposAlojamiento: [], insumos: [], insumosExp: [], servicios: [], institucion: {}, trazabilidad_habilitada: false };
 
 const PRECIOS_TBODY_IDS = ['tbody-precios-animales', 'tbody-insumos-exp', 'tbody-insumos-comunes', 'tbody-servicios'];
 
 function __preciosColspanAnimales() {
-    return dataFull.trazabilidad_habilitada ? 4 : 3;
+    return __preciosCobroSwitchVisible() ? 4 : 3;
 }
+
+function __preciosCobroTdEmpty() {
+    return __preciosCobroSwitchVisible() ? '<td></td>' : '';
+}
+
+window.__preciosSyncCobroLbl = (sw) => {
+    const lbl = sw?.closest('.d-flex')?.querySelector('.aloj-cobro-lbl');
+    if (!lbl) return;
+    const a = lbl.getAttribute('data-lbl-aloj') || '';
+    const s = lbl.getAttribute('data-lbl-suj') || '';
+    lbl.textContent = sw.checked ? s : a;
+};
 
 function __preciosEscapeHtml(s) {
     return String(s ?? '')
@@ -16,6 +34,85 @@ function __preciosEscapeHtml(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function __preciosNorm(s) {
+    return String(s ?? '').toLowerCase().trim();
+}
+
+function __preciosParseInstId(raw) {
+    const n = parseInt(String(raw ?? '').trim(), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function __preciosInstIdFromJwt() {
+    try {
+        const token = typeof Auth?.getVal === 'function' ? Auth.getVal('token') : null;
+        if (!token || !String(token).includes('.')) return null;
+        const b64 = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(atob(b64));
+        return __preciosParseInstId(payload?.instId);
+    } catch (_) {
+        return null;
+    }
+}
+
+/** Primera sede válida (>0); ignora target_inst_secreto=0 que tapaba localStorage. */
+function __preciosResolveInstId() {
+    if (typeof Auth?.hydrateSession === 'function') Auth.hydrateSession();
+
+    const candidates = [
+        sessionStorage.getItem('target_inst_secreto'),
+        sessionStorage.getItem('instId'),
+        localStorage.getItem('instId'),
+        typeof Auth?.getVal === 'function' ? Auth.getVal('instId') : null,
+    ];
+
+    for (const raw of candidates) {
+        const id = __preciosParseInstId(raw);
+        if (id) return id;
+    }
+
+    return __preciosInstIdFromJwt();
+}
+
+function __preciosAllDataEndpoint(instId) {
+    return instId ? `/precios/all-data?inst=${instId}` : '/precios/all-data';
+}
+
+/** Switch visible: API, snapshot módulo 6 o sondeo alojamiento/list. */
+function __preciosCobroSwitchVisible() {
+    return (
+        isTrazabilidadCobroInstActiva(dataFull.trazabilidad_habilitada)
+        || isTrazabilidadAlojamientosInstActiva()
+    );
+}
+
+async function __preciosProbeCobroDesdeAlojamiento(instId) {
+    if (dataFull.trazabilidad_habilitada) return;
+    const id = parseInt(String(instId ?? '').trim(), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    try {
+        const r = await API.request(`/alojamiento/list?inst=${id}`);
+        if (r?.cobro?.trazabilidad_habilitada) {
+            dataFull.trazabilidad_habilitada = true;
+        }
+    } catch (_) {
+        /* ignore */
+    }
+}
+
+function __preciosApplyDataPayload(payload) {
+    dataFull = {
+        especies: Array.isArray(payload?.especies) ? payload.especies : [],
+        subespecies: Array.isArray(payload?.subespecies) ? payload.subespecies : [],
+        tiposAlojamiento: Array.isArray(payload?.tiposAlojamiento) ? payload.tiposAlojamiento : [],
+        insumos: Array.isArray(payload?.insumos) ? payload.insumos : [],
+        insumosExp: Array.isArray(payload?.insumosExp) ? payload.insumosExp : [],
+        servicios: Array.isArray(payload?.servicios) ? payload.servicios : [],
+        institucion: payload?.institucion && typeof payload.institucion === 'object' ? payload.institucion : {},
+        trazabilidad_habilitada: !!payload?.trazabilidad_habilitada,
+    };
 }
 
 /** Spinner solo en las tablas (evita loader de página completa en recargas). */
@@ -32,10 +129,12 @@ function setPreciosTbodiesLoading(active) {
 
 function setPreciosTbodiesError() {
     const err = __preciosEscapeHtml(window.txt?.generales?.error_carga || 'Error');
-    const row = `<tr><td colspan="3" class="text-center py-4 text-danger">${err}</td></tr>`;
+    const colAn = __preciosColspanAnimales();
     PRECIOS_TBODY_IDS.forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = row;
+        if (!el) return;
+        const col = id === 'tbody-precios-animales' ? colAn : 3;
+        el.innerHTML = `<tr><td colspan="${col}" class="text-center py-4 text-danger">${err}</td></tr>`;
     });
 }
 
@@ -44,68 +143,53 @@ function setPreciosTbodiesError() {
  */
 export async function initPreciosPage(opts = {}) {
     const inlineReload = opts.inline === true;
-    const instId = sessionStorage.getItem('target_inst_secreto') || localStorage.getItem('instId');
+    const instId = __preciosResolveInstId();
     try {
+        await refreshInstModulesSnapshot(API.request);
         if (inlineReload) {
             setPreciosTbodiesLoading(true);
         } else {
             showLoader();
         }
-        
-        // i18n: precios.html ejecuta translatePage() antes de initPreciosPage (data-i18n en el DOM).
 
-        const res = await API.request(`/precios/all-data?inst=${instId}`);
-        if (res && res.status === 'success') {
-            dataFull = res.data;
+        const res = await API.request(__preciosAllDataEndpoint(instId));
+        if (res && res.status === 'success' && res.data) {
+            __preciosApplyDataPayload(res.data);
+            await __preciosProbeCobroDesdeAlojamiento(instId);
             const inputTitulo = document.getElementById('titulo-precios');
             if (inputTitulo) inputTitulo.value = dataFull.institucion.tituloprecios || '';
-            __preciosRenderModoCobro();
             __preciosSyncAnimalesTableHeader();
             window.renderAllPriceTables();
+        } else {
+            console.error('Error cargando precios:', res?.message || res);
+            setPreciosTbodiesError();
         }
     } catch (e) {
         console.error('Error cargando precios:', e);
-        if (inlineReload) setPreciosTbodiesError();
+        setPreciosTbodiesError();
     } finally {
         if (!inlineReload) hideLoader();
     }
-}
-
-function __preciosRenderModoCobro() {
-    const wrap = document.getElementById('precios-modo-cobro-wrap');
-    if (!wrap) return;
-    const txtP = window.txt?.precios || {};
-    const on = !!dataFull.trazabilidad_habilitada;
-    wrap.classList.toggle('d-none', !on);
-    if (!on) return;
-    const modo = dataFull.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
-    wrap.innerHTML = `
-        <label class="small fw-bold text-muted uppercase mb-1 d-block" data-i18n="precios.modo_cobro_title">${__preciosEscapeHtml(txtP.modo_cobro_title || '')}</label>
-        <p class="small text-muted mb-2" data-i18n="precios.modo_cobro_help">${__preciosEscapeHtml(txtP.modo_cobro_help || '')}</p>
-        <div class="btn-group btn-group-sm" role="group" id="precios-modo-cobro-group">
-            <input type="radio" class="btn-check" name="alojamiento_cobro_modo" id="precios-modo-contenido" value="CONTENIDO" ${modo === 'CONTENIDO' ? 'checked' : ''}>
-            <label class="btn btn-outline-secondary" for="precios-modo-contenido">${__preciosEscapeHtml(txtP.modo_cobro_contenido || '')}</label>
-            <input type="radio" class="btn-check" name="alojamiento_cobro_modo" id="precios-modo-sujeto" value="SUJETO" ${modo === 'SUJETO' ? 'checked' : ''}>
-            <label class="btn btn-outline-success" for="precios-modo-sujeto">${__preciosEscapeHtml(txtP.modo_cobro_sujeto || '')}</label>
-        </div>`;
 }
 
 function __preciosSyncAnimalesTableHeader() {
     const headRow = document.getElementById('thead-precios-animales-row');
     if (!headRow) return;
     const txtP = window.txt?.precios || {};
-    const on = !!dataFull.trazabilidad_habilitada;
+    const cobroTh = __preciosCobroSwitchVisible()
+        ? `<th style="min-width: 115px; width: 115px;" class="text-center small" data-i18n="precios.table.th_cobro">${__preciosEscapeHtml(txtP.table?.th_cobro || '')}</th>`
+        : '';
     headRow.innerHTML = `
         <th data-i18n="precios.table.desc_animal">${__preciosEscapeHtml(txtP.table?.desc_animal || '')}</th>
         <th style="width: 200px;" class="text-center" data-i18n="precios.table.clasificacion">${__preciosEscapeHtml(txtP.table?.clasificacion || '')}</th>
-        <th style="width: 150px;" data-i18n="precios.table.precio_unidad">${__preciosEscapeHtml(on ? (txtP.table?.precio_contenido || txtP.table?.precio_unidad || '') : (txtP.table?.precio_unidad || ''))}</th>
-        ${on ? `<th style="width: 150px;" data-i18n="precios.table.precio_sujeto">${__preciosEscapeHtml(txtP.table?.precio_sujeto || '')}</th>` : ''}`;
+        <th style="width: 150px;" data-i18n="precios.table.precio_unidad">${__preciosEscapeHtml(txtP.table?.precio_unidad || '')}</th>${cobroTh}`;
 }
 
 window.renderAllPriceTables = () => {
-    const term = document.getElementById('search-input-precios').value.toLowerCase().trim();
+    try {
+    const searchEl = document.getElementById('search-input-precios');
+    const term = __preciosNorm(searchEl?.value);
     const txtP = window.txt?.precios || {};
-    const trazOn = !!dataFull.trazabilidad_habilitada;
     const colAn = __preciosColspanAnimales();
     
     // 1. RENDER ANIMALES Y ALOJAMIENTO
@@ -116,7 +200,7 @@ window.renderAllPriceTables = () => {
         const subs = dataFull.subespecies.filter(s => String(s.idespA) === String(e.idespA) && String(s.Existe) !== "2");
         const alojamientos = dataFull.tiposAlojamiento.filter(a => String(a.idespA) === String(e.idespA));
 
-        const cumpleBusqueda = e.EspeNombreA.toLowerCase().includes(term);
+        const cumpleBusqueda = __preciosNorm(e.EspeNombreA).includes(term);
         const tieneHijos = subs.length > 0 || alojamientos.length > 0;
 
         if (cumpleBusqueda || tieneHijos) {
@@ -127,7 +211,7 @@ window.renderAllPriceTables = () => {
                     </td>
                     <td class="text-center text-muted small">${txtP.badge_base || 'ESPECIE (BASE)'}</td>
                     <td><input type="number" class="form-control form-control-sm precio-input" value="${e.Panimal}"></td>
-                    ${trazOn ? '<td></td>' : ''}
+                    ${__preciosCobroTdEmpty()}
                 </tr>`;
 
             subs.forEach(s => {
@@ -136,23 +220,28 @@ window.renderAllPriceTables = () => {
                         <td class="ps-5 small"><i class="bi bi-arrow-return-right me-2 text-secondary"></i>${s.SubEspeNombreA}</td>
                         <td class="text-center text-primary small">${txtP.badge_var || 'VAR. / SUBESPECIE'}</td>
                         <td><input type="number" class="form-control form-control-sm precio-input" value="${s.Psubanimal}"></td>
-                        ${trazOn ? '<td></td>' : ''}
+                        ${__preciosCobroTdEmpty()}
                     </tr>`;
             });
 
             alojamientos.forEach(a => {
-                const ps = a.PrecioXSujeto != null && a.PrecioXSujeto !== '' ? a.PrecioXSujeto : '';
+                const modo = a.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
+                const cobroTd = __preciosCobroSwitchVisible()
+                    ? `<td class="text-center align-middle">${htmlAlojCobroSwitchRow(a.IdTipoAlojamiento, modo)}</td>`
+                    : '';
                 htmlAn += `
                     <tr data-id="${a.IdTipoAlojamiento}" data-type="alojamiento">
                         <td class="ps-5 small"><i class="bi bi-house-door me-2 text-warning"></i>${a.NombreTipoAlojamiento} <span class="text-muted ms-2" style="font-size:10px;">${a.DetalleTipoAlojamiento || ''}</span></td>
                         <td class="text-center text-warning small fw-bold">${txtP.badge_aloj || 'ALOJAMIENTO'}</td>
                         <td><input type="number" class="form-control form-control-sm precio-input" value="${a.PrecioXunidad}"></td>
-                        ${trazOn ? `<td><input type="number" class="form-control form-control-sm precio-sujeto-input" value="${ps}" placeholder="${__preciosEscapeHtml(txtP.table?.precio_sujeto_ph || '')}"></td>` : ''}
+                        ${cobroTd}
                     </tr>`;
             });
         }
     });
-    tbodyAn.innerHTML = htmlAn || `<tr><td colspan="${colAn}" class="text-center p-3 text-muted">${txtP.no_data || 'No se encontraron registros.'}</td></tr>`;
+    if (tbodyAn) {
+        tbodyAn.innerHTML = htmlAn || `<tr><td colspan="${colAn}" class="text-center p-3 text-muted">${txtP.no_data || 'No se encontraron registros.'}</td></tr>`;
+    }
     
     // 2. RENDER INSUMOS
     const renderInsumo = (i, type, idField) => `
@@ -162,13 +251,19 @@ window.renderAllPriceTables = () => {
             <td><input type="number" class="form-control form-control-sm precio-input" value="${i.PrecioInsumo}"></td>
         </tr>`;
 
-    document.getElementById('tbody-insumos-exp').innerHTML = dataFull.insumosExp.filter(i => i.NombreInsumo.toLowerCase().includes(term)).map(i => renderInsumo(i, 'insumo-exp', 'IdInsumoexp')).join('');
-    document.getElementById('tbody-insumos-comunes').innerHTML = dataFull.insumos.filter(i => i.NombreInsumo.toLowerCase().includes(term)).map(i => renderInsumo(i, 'insumo', 'idInsumo')).join('');
+    const tbodyExp = document.getElementById('tbody-insumos-exp');
+    const tbodyCom = document.getElementById('tbody-insumos-comunes');
+    if (tbodyExp) {
+        tbodyExp.innerHTML = dataFull.insumosExp.filter(i => __preciosNorm(i.NombreInsumo).includes(term)).map(i => renderInsumo(i, 'insumo-exp', 'IdInsumoexp')).join('');
+    }
+    if (tbodyCom) {
+        tbodyCom.innerHTML = dataFull.insumos.filter(i => __preciosNorm(i.NombreInsumo).includes(term)).map(i => renderInsumo(i, 'insumo', 'idInsumo')).join('');
+    }
 
     // 3. RENDER SERVICIOS
     const tbodyServ = document.getElementById('tbody-servicios');
     let htmlServ = '';
-    (dataFull.servicios || []).filter(s => (s?.NombreServicioInst || '').toLowerCase().includes(term)).forEach(s => {
+    (dataFull.servicios || []).filter(s => __preciosNorm(s?.NombreServicioInst).includes(term)).forEach(s => {
         htmlServ += `
             <tr data-id="${s.IdServicioInst}" data-type="servicio">
                 <td class="fw-bold text-dark">${s.NombreServicioInst}</td>
@@ -176,32 +271,33 @@ window.renderAllPriceTables = () => {
                 <td><input type="number" class="form-control form-control-sm precio-input fw-bold text-dark" value="${s.Precio}"></td>
             </tr>`;
     });
-    tbodyServ.innerHTML = htmlServ || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_services || 'Sin servicios configurados.'}</td></tr>`;
+    if (tbodyServ) {
+        tbodyServ.innerHTML = htmlServ || `<tr><td colspan="3" class="text-center p-3 text-muted">${txtP.no_services || 'Sin servicios configurados.'}</td></tr>`;
+    }
+    } catch (e) {
+        console.error('Error renderizando tarifario:', e);
+        setPreciosTbodiesError();
+    }
 };
 
 window.saveAllPrices = async () => {
     const items = [];
     document.querySelectorAll('tr[data-id]').forEach(tr => {
         const input = tr.querySelector('.precio-input');
-        if(input) {
-            const item = { type: tr.dataset.type, id: tr.dataset.id, precio: input.value || 0 };
-            if (tr.dataset.type === 'alojamiento') {
-                const psInput = tr.querySelector('.precio-sujeto-input');
-                if (psInput) item.precio_sujeto = psInput.value;
-            }
-            items.push(item);
+        if (!input) return;
+        const item = { type: tr.dataset.type, id: tr.dataset.id, precio: input.value || 0 };
+        if (tr.dataset.type === 'alojamiento' && __preciosCobroSwitchVisible()) {
+            const sw = tr.querySelector('.aloj-cobro-switch');
+            if (sw) item.cobro_modo = sw.checked ? 'SUJETO' : 'CONTENIDO';
         }
+        items.push(item);
     });
 
-    const modoRadio = document.querySelector('input[name="alojamiento_cobro_modo"]:checked');
     const payload = {
-        instId: localStorage.getItem('instId'),
+        instId: __preciosResolveInstId() || localStorage.getItem('instId'),
         tituloprecios: document.getElementById('titulo-precios').value,
         data: items
     };
-    if (dataFull.trazabilidad_habilitada && modoRadio) {
-        payload.alojamiento_cobro_modo = modoRadio.value;
-    }
 
     try {
         showLoader();

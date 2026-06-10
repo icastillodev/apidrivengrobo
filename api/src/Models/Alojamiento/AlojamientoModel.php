@@ -68,7 +68,12 @@ class AlojamientoModel {
 
     public function getAllGrouped($instId) {
         $aCols = $this->sqlSelectAlojamientoAllColumns('a');
-        $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, e.EspeNombreA, e.idespA,
+        $deptoJoinOn = 'p.departamento = dep.iddeptoA';
+        if ($this->hasColumn('alojamiento', 'departamento')) {
+            $deptoJoinOn = 'dep.iddeptoA = COALESCE(NULLIF(a.departamento, \'\'), p.departamento)';
+        }
+        $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, p.departamento, e.EspeNombreA, e.idespA,
+                       TRIM(COALESCE(dep.NombreDeptoA, '')) as nombre_departamento,
                        t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), 'Sin Asignar') as Investigador
                 FROM alojamiento a
@@ -78,6 +83,7 @@ class AlojamientoModel {
                     GROUP BY historia
                 ) last_a ON a.IdAlojamiento = last_a.max_id
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                LEFT JOIN departamentoe dep ON {$deptoJoinOn}
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
                 LEFT JOIN personae pers ON a.IdUsrA = pers.IdUsrA
@@ -90,8 +96,15 @@ class AlojamientoModel {
 
     public function getHistory($historiaId) {
         $aCols = $this->sqlSelectAlojamientoAllColumns('a');
+        $deptoJoinOn = 'p.departamento = dep.iddeptoA';
+        if ($this->hasColumn('alojamiento', 'departamento')) {
+            $deptoJoinOn = 'dep.iddeptoA = COALESCE(NULLIF(a.departamento, \'\'), p.departamento)';
+        }
         $sql = "SELECT {$aCols}, p.nprotA, p.tituloA, p.IdUsrA as IdTitularProtocolo,
+                       p.departamento, p.encargaprot as tipo_pago,
+                       TRIM(COALESCE(dep.NombreDeptoA, '')) as nombre_departamento,
                        a.IdUsrA AS IdUsrResponsableAlojamiento,
+                       TRIM(COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), '')) as nombre_responsable,
                        ins_bi.NombreInst as QrNombreInstFolder,
                        e.EspeNombreA, t.NombreTipoAlojamiento,
                        COALESCE(CONCAT(u_resp.NombreA, ' ', u_resp.ApellidoA), CONCAT(u_tit.NombreA, ' ', u_tit.ApellidoA), 'Sin Investigador') as Investigador,
@@ -101,6 +114,7 @@ class AlojamientoModel {
                 FROM alojamiento a
                 LEFT JOIN institucion ins_bi ON ins_bi.IdInstitucion = a.IdInstitucion
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                LEFT JOIN departamentoe dep ON {$deptoJoinOn}
                 INNER JOIN especiee e ON a.TipoAnimal = e.idespA 
                 LEFT JOIN tipoalojamiento t ON a.IdTipoAlojamiento = t.IdTipoAlojamiento
                 LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA 
@@ -138,10 +152,8 @@ class AlojamientoModel {
             }
 
             $idTipoAlojamiento = (!empty($data['IdTipoAlojamiento']) && $data['IdTipoAlojamiento'] > 0) ? (int)$data['IdTipoAlojamiento'] : 1;
-            $precioMomento = AlojamientoCobro::precioSujetoDesdeTipo($this->db, $idTipoAlojamiento);
-            $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
-            $stmtPrecio->execute([$idTipoAlojamiento]);
-            $precioContenido = (float) ($stmtPrecio->fetchColumn() ?: 0);
+            $precioContenido = AlojamientoCobro::precioDesdeTipo($this->db, $idTipoAlojamiento);
+            $precioMomento = $precioContenido;
 
             $cols = 'fechavisado, IdUsrA, observaciones, TipoAnimal, idprotA, historia, IdInstitucion,
                 IdTipoAlojamiento, CantidadCaja, PrecioCajaMomento';
@@ -258,9 +270,9 @@ class AlojamientoModel {
             $diff = strtotime($newDate) - strtotime($prev['fechavisado']);
             $diasDefinidos = max(0, floor($diff / 86400));
             
-            // USANDO LAS NUEVAS VARIABLES DE PRECIO Y CANTIDAD
             $precio = (float)$prev['PrecioCajaMomento'];
-            $cantidad = (int)$prev['CantidadCaja'];
+            $instId = (int)($prev['IdInstitucion'] ?? 0);
+            $cantidad = AlojamientoCobro::cantidadCobroTramo($this->db, $instId, $prev);
             
             // 'cuentaapagar' es la variable moderna que la base de datos usa para guardar la deuda
             $totalDeudaTramo = $diasDefinidos * $precio * $cantidad;
@@ -309,7 +321,8 @@ public function recalculateHistory($historiaId) {
             $next = $rows[$i + 1] ?? null;
             
             $precio = (float)$row['PrecioCajaMomento'];
-            $cajas = (int)$row['CantidadCaja'];
+            $instId = (int)($row['IdInstitucion'] ?? 0);
+            $cajas = AlojamientoCobro::cantidadCobroTramo($this->db, $instId, $row);
 
             if ($next) {
                 // Hay un tramo siguiente -> Este tramo está CERRADO.
@@ -390,8 +403,8 @@ public function recalculateHistory($historiaId) {
 
             $stmtPrecio = $this->db->prepare("SELECT PrecioXunidad FROM tipoalojamiento WHERE IdTipoAlojamiento = ?");
             $stmtPrecio->execute([$idTipoAlojamiento]);
-            $nuevoPrecio = $stmtPrecio->fetchColumn() ?: 0;
-            $precioSujeto = AlojamientoCobro::precioSujetoDesdeTipo($this->db, (int) $idTipoAlojamiento);
+            $nuevoPrecio = (float) ($stmtPrecio->fetchColumn() ?: 0);
+            $precioSujeto = $nuevoPrecio;
 
             $setSql = "UPDATE alojamiento SET 
                         idprotA = :idprotA, 

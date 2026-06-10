@@ -35,7 +35,26 @@ class AlojamientoController {
             if ($targetInst === null) {
                 $targetInst = isset($sesion['instId']) ? (int) $sesion['instId'] : 0;
             }
-            echo json_encode(['status' => 'success', 'data' => $this->model->getAllGrouped($targetInst)]);
+            $data = $this->model->getAllGrouped($targetInst);
+            foreach ($data as &$row) {
+                $idUsrAloj = (int) ($row['IdUsrA'] ?? 0);
+                $row['idusuario'] = $idUsrAloj;
+                $row['IdUsrResponsableAlojamiento'] = $idUsrAloj;
+                $row['CantSujetos'] = \App\Utils\AlojamientoCobro::countSujetosTramo(
+                    $this->db,
+                    (int) ($row['IdAlojamiento'] ?? 0)
+                );
+                $row['alojamiento_cobro_modo'] = \App\Utils\AlojamientoCobro::getModoTipo(
+                    $this->db,
+                    (int) ($row['IdTipoAlojamiento'] ?? 0),
+                    (int) $targetInst
+                );
+            }
+            unset($row);
+            $cobro = [
+                'trazabilidad_habilitada' => \App\Utils\AlojamientoCobro::instTrazabilidadHabilitada($this->db, (int) $targetInst),
+            ];
+            echo json_encode(['status' => 'success', 'data' => $data, 'cobro' => $cobro]);
         } catch (\Exception $e) {
             http_response_code(401);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -65,7 +84,27 @@ class AlojamientoController {
                     $this->modulosRespond403($e->getMessage());
                 }
             }
-            echo json_encode(['status' => 'success', 'data' => $this->model->getHistory($id)]);
+            $rows = $this->model->getHistory($id);
+            $instId = !empty($rows[0]['IdInstitucion']) ? (int) $rows[0]['IdInstitucion'] : 0;
+            foreach ($rows as &$row) {
+                $idUsrAloj = (int) ($row['IdUsrResponsableAlojamiento'] ?? $row['IdUsrA'] ?? 0);
+                $row['idusuario'] = $idUsrAloj;
+                $row['IdUsrResponsableAlojamiento'] = $idUsrAloj;
+                $row['CantSujetos'] = \App\Utils\AlojamientoCobro::countSujetosTramo(
+                    $this->db,
+                    (int) ($row['IdAlojamiento'] ?? 0)
+                );
+                $row['alojamiento_cobro_modo'] = \App\Utils\AlojamientoCobro::getModoTipo(
+                    $this->db,
+                    (int) ($row['IdTipoAlojamiento'] ?? 0),
+                    $instId
+                );
+            }
+            unset($row);
+            $cobro = [
+                'trazabilidad_habilitada' => \App\Utils\AlojamientoCobro::instTrazabilidadHabilitada($this->db, $instId),
+            ];
+            echo json_encode(['status' => 'success', 'data' => $rows, 'cobro' => $cobro]);
         } catch (\Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

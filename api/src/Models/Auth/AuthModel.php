@@ -218,6 +218,32 @@ public function verifyAndGetUser2FA($userId, $code) {
         return $this->db->prepare($sql)->execute([$userId]);
     }
 
+    /**
+     * Motivo del fallo 2FA: expired (venció o no hay pendiente), invalid (código distinto).
+     */
+    public function classify2FAFailure(int $userId, string $code): string {
+        $stmt = $this->db->prepare(
+            'SELECT two_factor_code, two_factor_expires FROM usuarioe WHERE IdUsrA = ? LIMIT 1'
+        );
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || $row['two_factor_code'] === null || $row['two_factor_code'] === '') {
+            return 'expired';
+        }
+
+        if ((string) $row['two_factor_code'] !== (string) $code) {
+            return 'invalid';
+        }
+
+        $expires = strtotime((string) $row['two_factor_expires']);
+        if ($expires !== false && $expires <= time()) {
+            return 'expired';
+        }
+
+        return 'invalid';
+    }
+
     // --- MANTENIMIENTO ---
     public function runMaintenance($instId) {
         $stmt = $this->db->prepare("SELECT FechaDepuracion FROM institucion WHERE IdInstitucion = ?");

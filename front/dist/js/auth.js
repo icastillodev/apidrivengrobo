@@ -51,6 +51,8 @@ export const Auth = {
     slug: null,
     tempRemember: false,
     resendTimer: null,
+    twoFactorExpiryTimer: null,
+    TWO_FA_VALID_MS: 10 * 60 * 1000,
 
     getVal(key) {
         return sessionStorage.getItem(key) || localStorage.getItem(key);
@@ -59,6 +61,50 @@ export const Auth = {
     getBasePath() {
         return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
         ? '/URBE-API-DRIVEN/front/' : '/';
+    },
+
+    _parsePositiveInstId(raw) {
+        const n = parseInt(String(raw ?? '').trim(), 10);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    },
+
+    _instIdFromJwt() {
+        try {
+            const token = this.getVal('token');
+            if (!token || !String(token).includes('.')) return 0;
+            const b64 = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(atob(b64));
+            return this._parsePositiveInstId(payload?.instId);
+        } catch (_) {
+            return 0;
+        }
+    },
+
+    /** Alinea sessionStorage/localStorage cuando validate-inst actualizó solo local o quedó residuo de superadmin. */
+    syncInstitutionContext() {
+        const globalNames = new Set(['sistema_global', 'sistema global', 'master', 'superadmin', 'panel maestro']);
+        const isGlobalName = (name) => globalNames.has(String(name ?? '').trim().toLowerCase());
+
+        const fromSession = this._parsePositiveInstId(sessionStorage.getItem('instId'));
+        const fromLocal = this._parsePositiveInstId(localStorage.getItem('instId'));
+        const fromJwt = this._instIdFromJwt();
+        const winner = fromSession || fromLocal || fromJwt;
+
+        if (winner > 0) {
+            const sid = String(winner);
+            sessionStorage.setItem('instId', sid);
+            localStorage.setItem('instId', sid);
+
+            const sessName = sessionStorage.getItem('NombreInst');
+            const localName = localStorage.getItem('NombreInst');
+            if (isGlobalName(sessName) && localName && !isGlobalName(localName)) {
+                sessionStorage.setItem('NombreInst', localName);
+            } else if (!sessName && localName) {
+                sessionStorage.setItem('NombreInst', localName);
+            } else if (sessName && !localName) {
+                localStorage.setItem('NombreInst', sessName);
+            }
+        }
     },
 
     hydrateSession() {
@@ -76,6 +122,7 @@ export const Auth = {
                 });
             }
         }
+        this.syncInstitutionContext();
     },
 
 async init() {
@@ -164,10 +211,9 @@ async init() {
                 localStorage.setItem('NombreInst', this.slug);
                 localStorage.setItem('instLogo', inst.Logo || '');
                 localStorage.setItem('instLogoEnPdf', (inst.LogoEnPdf == 1 || inst.LogoEnPdf === '1') ? '1' : '0');
-                if (!storedToken) {
-                    sessionStorage.setItem('instId', inst.id);
-                    sessionStorage.setItem('NombreInst', this.slug);
-                }
+                // Siempre ambos storages: getSession prioriza sessionStorage y antes solo se actualizaba sin token.
+                sessionStorage.setItem('instId', String(inst.id));
+                sessionStorage.setItem('NombreInst', this.slug);
 
                 const cleanShortName = inst.nombre.replace(/APP\s+/i, '').toUpperCase();
                 const displayName = shouldShowFullName(inst.nombre, inst.nombre_completo) ? inst.nombre_completo : cleanShortName;
@@ -340,6 +386,7 @@ async init() {
                     modal.classList.add('flex');
                     document.getElementById('code-2fa').focus();
                     document.getElementById('form-2fa').onsubmit = (ev) => this.handle2FA(ev);
+                    this.start2FAExpiryTimer();
                     
                     const resendLink = document.getElementById('resend-link');
                     if(resendLink) resendLink.onclick = (ev) => { ev.preventDefault(); this.resendCode(res.userId); };
@@ -361,6 +408,60 @@ async init() {
     async resendCode(userId) {
         window.Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Reenviando código...', showConfirmButton: false, timer: 1500 });
         this.startResendTimer(180);
+    },
+
+    start2FAExpiryTimer() {
+        if (this.twoFactorExpiryTimer) clearTimeout(this.twoFactorExpiryTimer);
+        this.twoFactorExpiryTimer = setTimeout(() => {
+            this.reset2FAToLogin({ expired: true });
+        }, this.TWO_FA_VALID_MS);
+    },
+
+    reset2FAToLogin({ expired = false, invalid = false } = {}) {
+        if (this.resendTimer) clearInterval(this.resendTimer);
+        if (this.twoFactorExpiryTimer) clearTimeout(this.twoFactorExpiryTimer);
+        this.resendTimer = null;
+        this.twoFactorExpiryTimer = null;
+
+        const modal = document.getElementById('modal-2fa');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        const loginForm = document.getElementById('login-form');
+        if (loginForm) loginForm.classList.remove('hidden');
+        const codeInput = document.getElementById('code-2fa');
+        if (codeInput) codeInput.value = '';
+        const tempUser = document.getElementById('temp-user-id');
+        if (tempUser) tempUser.value = '';
+        this.tempRemember = false;
+
+        const t = window.txt?.login?.twofa || {};
+        let title;
+        let text;
+        let icon = 'warning';
+
+        if (expired) {
+            title = t.codigo_expirado || 'El código venció';
+            text = t.codigo_expirado_detalle
+                || 'Pasaron más de 10 minutos. Volvé a iniciar sesión para recibir un código nuevo e ingresalo antes de que expire.';
+            icon = 'info';
+        } else if (invalid) {
+            title = t.codigo_incorrecto || 'Código incorrecto';
+            text = t.codigo_incorrecto_detalle
+                || 'Revisá el código del correo e intentá de nuevo. Recordá que vence a los 10 minutos.';
+            icon = 'error';
+        } else {
+            return;
+        }
+
+        window.Swal.fire({
+            icon,
+            title,
+            text,
+            confirmButtonText: t.entendido || 'Entendido',
+            confirmButtonColor: '#1a5d3b',
+        });
     },
 
     startResendTimer(seconds) {
@@ -396,33 +497,34 @@ async init() {
             const res = await API.request('/verify-2fa', 'POST', { userId, code, instId });
             if (res?.status === 'success') {
                 if (this.resendTimer) clearInterval(this.resendTimer);
+                if (this.twoFactorExpiryTimer) clearTimeout(this.twoFactorExpiryTimer);
                 await this.completeLoginProcess(res, this.tempRemember);
             } else {
-                const modal = document.getElementById('modal-2fa');
-                if (modal) {
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
+                const apiCode = String(res?.code || '').toLowerCase();
+                const expired = apiCode === '2fa_expired';
+                if (expired) {
+                    this.reset2FAToLogin({ expired: true });
+                } else {
+                    const codeInput = document.getElementById('code-2fa');
+                    if (codeInput) {
+                        codeInput.value = '';
+                        codeInput.focus();
+                    }
+                    const t = window.txt?.login?.twofa || {};
+                    window.Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'error',
+                        title: t.codigo_incorrecto || 'Código incorrecto',
+                        text: t.codigo_incorrecto_corto || 'Revisá el código e intentá de nuevo.',
+                        showConfirmButton: false,
+                        timer: 4500,
+                    });
                 }
-                const loginForm = document.getElementById('login-form');
-                if (loginForm) loginForm.classList.remove('hidden');
-                window.Swal.fire({
-                    icon: 'error',
-                    title: (window.txt?.login?.twofa?.codigo_incorrecto) || 'Código incorrecto',
-                    text: (window.txt?.login?.twofa?.vuelve_login) || 'Serás redirigido al login.'
-                }).then(() => {
-                    this.redirectToLogin(this.slug || this.getVal('NombreInst'));
-                });
-                document.getElementById('code-2fa').value = '';
             }
         } catch (err) {
-            const modal = document.getElementById('modal-2fa');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }
-            const loginForm = document.getElementById('login-form');
-            if (loginForm) loginForm.classList.remove('hidden');
-            this.redirectToLogin(this.slug || this.getVal('NombreInst'));
+            console.error('Error verificando 2FA:', err);
+            this.reset2FAToLogin({ expired: true });
         }
     },
 

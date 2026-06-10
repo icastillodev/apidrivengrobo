@@ -22,6 +22,8 @@ import { tryAutoStartCapacitacionTour } from '../utils/capacitacionTourAuto.js?v
 export { refreshMenuNotifications }; 
 
 export async function initMenu() {
+    if (typeof Auth?.syncInstitutionContext === 'function') Auth.syncInstitutionContext();
+
     const roleId = parseInt(getSession('userLevel')); 
     const instId = getSession('instId') || 0; 
     

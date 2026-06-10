@@ -118,6 +118,8 @@ async function mostrarResultadoEnvio(t, emailN) {
 
  * @param {boolean} [opts.lockCategory] - Si true, no muestra el selector de categoría
 
+ * @param {string} [opts.destinatarioNombre] - Nombre visible del destinatario (compose con destino fijo)
+
  * @returns {Promise<boolean>} true si se envió correctamente
 
  */
@@ -178,6 +180,15 @@ export async function openMensajeriaCompose(opts) {
 
     const lockCategory = opts.lockCategory === true;
 
+    const destinatarioNombre = String(opts.destinatarioNombre ?? '').trim();
+
+    const destDisplay = destinatarioNombre || `#${destinatarioId}`;
+
+    const destinatarioHtml = (lockCategory || destinatarioNombre)
+        ? `<label class="form-label small mb-1 fw-bold text-muted">${esc(t.msg_destinatario || 'Destinatario')}</label>
+            <div class="form-control form-control-sm bg-light text-dark fw-semibold mb-2 user-select-all" aria-readonly="true">${esc(destDisplay)}</div>`
+        : '';
+
 
 
     let categoryHtml = '';
@@ -207,6 +218,8 @@ export async function openMensajeriaCompose(opts) {
     const html = `
 
         <div class="text-start">
+
+            ${destinatarioHtml}
 
             ${categoryHtml}
 

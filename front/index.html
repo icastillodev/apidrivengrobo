@@ -13,6 +13,14 @@
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+    (function () {
+        var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        var base = document.createElement('base');
+        base.href = local ? '/URBE-API-DRIVEN/front/' : '/';
+        document.head.appendChild(base);
+    })();
+    </script>
     <title>GROBO - Acceso Institucional</title>
     
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
