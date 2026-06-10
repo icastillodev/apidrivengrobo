@@ -135,7 +135,7 @@ renderSummary(historiaId) {
             ? String(first.nombre_departamento).trim()
             : (txt.reg_sin_depto || '—');
 
-        const trazExtraRow = trazOn ? `
+        const metaExtraRow = `
             <div class="col-12 mt-2 pt-2 border-top row g-2 align-items-start">
                 <div class="col-md-6 border-end">
                     <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_tipo_pago || txt.th_tipo_pago || 'Tipo de pago'}</label>
@@ -145,7 +145,7 @@ renderSummary(historiaId) {
                     <label class="d-block small text-muted fw-bold text-uppercase">${txt.summary_departamento || txt.th_departamento || 'Departamento'}</label>
                     <span class="text-dark small fw-semibold d-block">${deptoTxt}</span>
                 </div>
-            </div>` : '';
+            </div>`;
 
         summaryContainer.innerHTML = `
             <div class="col-md-2 border-end text-center"><label class="d-block small text-muted fw-bold">${(txt.th_history || 'Historia').toUpperCase()}</label><span class="badge bg-dark fs-6">#${historiaId}</span></div>
@@ -164,7 +164,7 @@ renderSummary(historiaId) {
             <div class="col-md-2 border-end"><label class="d-block small text-muted fw-bold">${(txt.type_box || 'Tipo').toUpperCase()}</label><span class="text-primary small fw-bold">${tipoCaja}</span></div> 
             <div class="col-md-1 border-end text-center"><label class="d-block small text-muted fw-bold text-primary">${(txt.total_days || 'Días').toUpperCase()}</label><span class="fw-bold fs-5">${totalDias}</span></div>
             <div class="col-md-1 text-center"><label class="d-block small text-muted fw-bold text-success">${(txt.total_cost || 'Costo').toUpperCase()}</label><span class="fw-bold fs-6 text-success">$ ${totalCosto.toFixed(2)}</span></div>
-            ${trazExtraRow}
+            ${metaExtraRow}
             <div class="col-12 mt-3 pt-2 border-top">
                 <label class="d-block small text-muted fw-bold text-uppercase">${txt.protocol_title || 'TÍTULO DEL PROTOCOLO'}</label>
                 <span class="fw-semibold fst-italic text-secondary d-block" style="white-space:normal;word-wrap:break-word;line-height:1.35">${first.tituloA || '---'}</span>
@@ -199,7 +199,7 @@ renderTable() {
                     <th>${gen.inicio || 'Inicio'}</th>
                     <th>${gen.retiro || 'Retiro'}</th>
                     <th>${txt.th_boxes || 'Cant. (Tipo)'}</th>
-                    ${showTraz ? `<th class="small">${txt.th_tipo_pago || 'Tipo de pago'}</th>` : ''}
+                    <th class="small">${txt.th_tipo_pago || 'Tipo de pago'}</th>
                     ${showTraz ? `<th class="small">${txt.th_departamento || 'Departamento'}</th>` : ''}
                     <th>${txt.days_tramo || 'Días'}</th>
                     <th>${txt.price || 'Precio U.'}</th>
@@ -241,7 +241,7 @@ renderTable() {
             const renderCant = cant === 0 
                 ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> STAND BY (0)</span>` 
                 : cant;
-            const colSpanTraz = showTraz ? 11 : 9;
+            const colSpanTraz = showTraz ? 11 : 10;
             const renderCantCobro = (showTraz && modoTramo === 'SUJETO')
                 ? `<span class="text-muted small d-block">${cantCobro} ${txt.trace_subjects_short || 'suj.'}</span>`
                 : '';
@@ -252,7 +252,7 @@ renderTable() {
                 <td>${fIni.toLocaleDateString()}</td> 
                 <td class="${esAbierto ? 'text-primary fw-bold' : ''}">${txtFin}</td>
                 <td>${renderCant} <small class="text-muted">${h.NombreTipoAlojamiento || ''}</small>${renderCantCobro}</td>
-                ${showTraz ? `<td class="small">${tipoPagoHist}</td>` : ''}
+                <td class="small">${tipoPagoHist}</td>
                 ${showTraz ? `<td class="small">${deptoHist}</td>` : ''}
                 <td class="fw-bold">${diasTramo}</td>
                 <td>$ ${precioUnit.toFixed(2)}</td>
