@@ -1,4 +1,4 @@
-import { API } from '../api.js';
+import { API, buildPanelPoePublicPageRelativeUrl } from '../api.js';
 import { getCorrectPath } from './menujs/MenuConfig.js';
 import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260510';
 
@@ -55,7 +55,7 @@ function portalHref() {
 }
 
 function poePortalHref() {
-    return getCorrectPath('panel/poe');
+    return buildPanelPoePublicPageRelativeUrl();
 }
 
 function renderPoeDashboardBlock(poeRows, t) {
@@ -69,7 +69,7 @@ function renderPoeDashboardBlock(poeRows, t) {
             const id = parseInt(r.IdPoe, 10) || 0;
             if (!id) return '';
             const title = escapeHtml(r.Titulo || '—');
-            const href = `${poePortalHref()}?id=${encodeURIComponent(String(id))}`;
+            const href = buildPanelPoePublicPageRelativeUrl(id);
             return `<li class="list-group-item py-2"><a href="${href}" class="fw-semibold text-success text-decoration-none">${title}</a></li>`;
         })
         .join('');

@@ -27,6 +27,7 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | [Comunicación — adjuntos B2](#sql-comunicacion-b2-adjuntos) | `mensaje`, `noticia`, `institucion_portada_popup`, `institucion_poe` (claves B2) |
 | [Trazabilidad — flag cirugía (BD-05)](#sql-trazabilidad-con-cirugia) | `especie_alojamiento_unidad.con_cirugia` |
 | [Alojamiento — modo cobro (BD-01)](#sql-alojamiento-modo-cobro) | `institucion.AlojamientoCobroModo`, `tipoalojamiento.PrecioXSujeto`, `alojamiento.PrecioSujetoMomento` |
+| [Institución — precios visibles a investigadores](#sql-institucion-usuarios-ven-precios) | `institucion.UsuariosVenPreciosFacturacion` |
 | [Adjuntos / Backblaze (plantilla)](#plantilla-backblaze) | Ideas legacy; columnas reales en migración B2 de comunicación |
 | [Inventario backlog](#inventario-backlog) | Tabla resumen + estado |
 
@@ -244,6 +245,21 @@ ALTER TABLE especie_alojamiento_unidad
 ```
 
 Si la columna ya existe en el servidor (parche manual previo), omitir este `ALTER`.
+
+---
+
+<a id="sql-institucion-usuarios-ven-precios"></a>
+
+## Institución — investigadores ven precios de facturación
+
+**Archivo en el repo:** [`docs/migrations/2026-05-21-institucion-usuarios-ven-precios.sql`](migrations/2026-05-21-institucion-usuarios-ven-precios.sql)
+
+**Contexto:** toggle en admin configuración institución; si `UsuariosVenPreciosFacturacion = 1`, investigadores (rol 3) ven la tarjeta de estado de cuenta en perfil.
+
+```sql
+ALTER TABLE institucion
+    ADD COLUMN UsuariosVenPreciosFacturacion TINYINT(1) NOT NULL DEFAULT 0;
+```
 
 ---
 

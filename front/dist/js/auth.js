@@ -211,6 +211,7 @@ async init() {
                 localStorage.setItem('NombreInst', this.slug);
                 localStorage.setItem('instLogo', inst.Logo || '');
                 localStorage.setItem('instLogoEnPdf', (inst.LogoEnPdf == 1 || inst.LogoEnPdf === '1') ? '1' : '0');
+                localStorage.setItem('instUsuariosVenPrecios', (inst.UsuariosVenPreciosFacturacion == 1 || inst.UsuariosVenPreciosFacturacion === '1') ? '1' : '0');
                 // Siempre ambos storages: getSession prioriza sessionStorage y antes solo se actualizaba sin token.
                 sessionStorage.setItem('instId', String(inst.id));
                 sessionStorage.setItem('NombreInst', this.slug);

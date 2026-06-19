@@ -57,7 +57,9 @@ export async function initProfile() {
 
             const role = parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10);
             const cardBilling = document.getElementById('perfil-card-billing');
-            if (cardBilling && role === 3) {
+            const venPrecios = d.UsuariosVenPreciosFacturacion == 1
+                || localStorage.getItem('instUsuariosVenPrecios') === '1';
+            if (cardBilling && role === 3 && venPrecios) {
                 const hoy = new Date();
                 const fd = document.getElementById('perfil-billing-desde');
                 const fh = document.getElementById('perfil-billing-hasta');

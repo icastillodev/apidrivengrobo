@@ -1,4 +1,4 @@
-import { getCorrectPath } from '../components/menujs/MenuConfig.js';
+import { buildPanelPoePublicPageAbsoluteUrl } from '../api.js';
 
 function escapeHtmlAttr(s) {
     return String(s ?? '')
@@ -10,14 +10,7 @@ function escapeHtmlAttr(s) {
 
 /** URL absoluta al portal POEs con ancla de documento (?id=). */
 export function buildPanelPoePublicUrl(idPoe) {
-    const base = getCorrectPath('panel/poe');
-    const sep = base.includes('?') ? '&' : '?';
-    const id = encodeURIComponent(String(idPoe));
-    try {
-        return new URL(`${base}${sep}id=${id}`, window.location.origin).href;
-    } catch (e) {
-        return `${window.location.origin}/${base}${sep}id=${id}`;
-    }
+    return buildPanelPoePublicPageAbsoluteUrl(idPoe);
 }
 
 /**

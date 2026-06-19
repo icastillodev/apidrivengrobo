@@ -8,7 +8,7 @@ import { openAnimalModal } from './animalModal.js';
 import { openAlojModal } from './alojamientos/alojModal.js';
 import { openReactiveModal } from './reactiveModal.js';
 import { openInsumoModal } from './insumoModal.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingInsumoMontoTotalCobrable } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingInsumoMontoTotalCobrable, billingPdfFormularioTaxonomia } from '../billingLocale.js';
 
 const txBM = () => window.txt?.facturacion?.billing_modal || {};
 const txBIPdf = () => window.txt?.facturacion?.billing_investigador || {};
@@ -605,120 +605,142 @@ window.descargarFichaAlojLegacyPDF = async (historiaId) => {
 // ==========================================
 // GENERACIÓN DE PDF DESDE MODAL (Formularios)
 // ==========================================
-window.descargarFichaPDF = async (id, tipo) => {
+window.descargarFichaPDF = async (id, tipo, opts = {}) => {
     if (tipo === 'ALOJ') return window.descargarFichaAlojLegacyPDF(id);
     if (tipo !== 'ANIMAL') return;
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const M = 18;
-    const pageW = doc.internal.pageSize.getWidth();
-    const right = pageW - M;
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const tx = txBM();
+    const g = window.txt?.generales || {};
+    const errPdf = window.txt?.facturacion?.error_pdf || 'Could not generate PDF document.';
     const na = bmTxt(tx, 'na', 'N/A');
+    const chkPrecios = document.getElementById('check-pdf-animal-precios');
+    const showPrices = opts.showPrices !== false && (chkPrecios ? chkPrecios.checked : true);
 
-    const findValue = (labelTxt) => {
-        if (!labelTxt) return na;
-        const labels = Array.from(document.querySelectorAll('#modalAnimal label'));
-        const target = labels.find(l => (l.innerText || '').includes(labelTxt));
-        return target ? target.nextElementSibling?.innerText || na : na;
-    };
+    showLoader();
+    try {
+        const res = await API.request(`/billing/detail-animal/${id}`);
+        if (res.status !== 'success' || !res.data) {
+            hideLoader();
+            return Swal.fire(window.txt?.generales?.error || g.error || 'Error', bmTxt(tx, 'err_animal', 'Could not load details.'), 'error');
+        }
+        const d = res.data;
+        hideLoader();
 
-    const investigador = document.querySelector('#modalAnimal .text-primary.fw-bold')?.innerText || na;
-    const protocoloID = findValue(bmTxt(tx, 'lbl_id_protocolo', 'PROTOCOL ID:'));
-    const protocoloNom = findValue(bmTxt(tx, 'lbl_nombre_protocolo', 'PROTOCOL NAME'));
-    const tipoPedido = findValue(bmTxt(tx, 'lbl_tipo_pedido', 'ORDER TYPE'));
-    const especie = findValue(bmTxt(tx, 'lbl_especie_sub', 'SPECIES / SUBSPECIES'));
-    const fechaEntregado = findValue(bmTxt(tx, 'lbl_fecha_retiro', 'PICKUP DATE (ACTUAL)'));
+        const taxonomiaTxt = billingPdfFormularioTaxonomia(d);
+        const especieTxt = String(d.nombre_especie || '').trim() || na;
+        const subespecieTxt = String(d.nombre_subespecie || '').trim() || na;
+        const cepaTxt = String(d.nombre_cepa || '').trim() || na;
 
-    const counts = Array.from(document.querySelectorAll('#modalAnimal .row.g-2.text-center b, #modalAnimal .row.g-2.text-center span'));
-    const m = counts[0]?.innerText || '0';
-    const h = counts[1]?.innerText || '0';
-    const i = counts[2]?.innerText || '0';
-    const total = counts[3]?.innerText || '0';
+        const investigador = d.titular_nombre || d.solicitante || na;
+        const protocoloNom = d.protocolo_info || na;
+        const protocoloID = d.id_protocolo != null ? String(d.id_protocolo) : na;
+        const tipoPedido = d.nombre_tipo || na;
+        const m = String(d.machos ?? 0);
+        const h = String(d.hembras ?? 0);
+        const ind = String(d.indistintos ?? 0);
+        const total = String(d.cantidad ?? 0);
+        const fechaInicio = d.fecha_inicio || na;
+        const fechaEntregado = d.fecha_fin || na;
 
-    const costoTotalNum = parseFloat(document.getElementById('mdl-ani-total')?.value || 0);
-    const pagadoNum = parseFloat(document.getElementById('mdl-ani-pagado-val')?.value || 0);
-    const isExAnimal = document.getElementById('mdl-ani-exento')?.value === '1';
-    const derivadaAnimal = document.getElementById('mdl-ani-derivada')?.value === '1';
-    const idPdfAnimal = billingPdfFormularioIdDisplay(
-        { id, is_exento: isExAnimal, es_facturacion_derivada: derivadaAnimal },
-        { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }
-    );
-    const biPdf = txBIPdf();
-    const exL = biPdf.pdf_monto_exento || window.txt?.facturacion?.billing_investigador?.pdf_monto_exento || 'Exempt';
-    const montosRow = pdfColsPrecioDebePagoTotal(isExAnimal, costoTotalNum, pagadoNum, exL);
+        const costoTotalNum = parseFloat(d.total_calculado || 0);
+        const pagadoNum = parseFloat(d.totalpago || 0);
+        const isExAnimal = d.is_exento == 1 || d.is_exento === true;
+        const idPdfAnimal = billingPdfFormularioIdDisplay(
+            { id, is_exento: isExAnimal, es_facturacion_derivada: d.es_facturacion_derivada },
+            { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }
+        );
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(26, 93, 59);
-    doc.text(`GROBO - ${inst}`, 105, M + 2, { align: "center" });
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const M = 18;
+        const pageW = doc.internal.pageSize.getWidth();
+        const right = pageW - M;
+        const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
+        const biPdf = txBIPdf();
+        const exL = biPdf.pdf_monto_exento || window.txt?.facturacion?.billing_investigador?.pdf_monto_exento || 'Exempt';
+        const montosRow = pdfColsPrecioDebePagoTotal(isExAnimal, costoTotalNum, pagadoNum, exL);
 
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(bmTxt(tx, 'pdf_pedido_animal_titulo', 'ORDER FORM: LABORATORY ANIMALS'), 105, M + 10, { align: "center" });
-    doc.setDrawColor(26, 93, 59);
-    doc.line(M, M + 14, right, M + 14);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.setTextColor(26, 93, 59);
+        doc.text(`GROBO - ${inst}`, 105, M + 2, { align: "center" });
 
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.text(bmTpl(bmTxt(tx, 'pdf_id_solicitud_tpl', 'REQUEST ID: {id}'), { id: idPdfAnimal }), 20, 42);
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text(bmTxt(tx, 'pdf_pedido_animal_titulo', 'ORDER FORM: LABORATORY ANIMALS'), 105, M + 10, { align: "center" });
+        doc.setDrawColor(26, 93, 59);
+        doc.line(M, M + 14, right, M + 14);
 
-    doc.text(bmTxt(tx, 'pdf_sec_datos_inv_prot', 'RESEARCHER AND PROTOCOL DATA'), 20, 52);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${bmTxt(tx, 'pdf_investigador_lbl', 'Researcher:')} ${investigador}`, 20, 58);
-    doc.text(bmTpl(bmTxt(tx, 'pdf_protocolo_nom_id_tpl', 'Protocol: {nom} (ID: {id})'), { nom: protocoloNom, id: protocoloID }), 20, 64);
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont("helvetica", "bold");
+        doc.text(bmTpl(bmTxt(tx, 'pdf_id_solicitud_tpl', 'REQUEST ID: {id}'), { id: idPdfAnimal }), 20, 42);
 
-    doc.setFont("helvetica", "bold");
-    doc.text(bmTxt(tx, 'pdf_sec_detalle_pedido', 'ORDER DETAILS'), 20, 74);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${bmTxt(tx, 'pdf_tipo_pedido_lbl', 'Order type:')} ${tipoPedido}`, 20, 80);
-    doc.text(`${bmTxt(tx, 'pdf_especie_lbl', 'Species / subspecies:')} ${especie}`, 20, 86);
-    doc.setTextColor(200, 0, 0);
-    doc.text(`${bmTxt(tx, 'pdf_fecha_retiro_entregado', 'Pickup date (delivered):')} ${fechaEntregado}`, 20, 92);
-    doc.setTextColor(0);
+        doc.text(bmTxt(tx, 'pdf_sec_datos_inv_prot', 'RESEARCHER AND PROTOCOL DATA'), 20, 52);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${bmTxt(tx, 'pdf_investigador_lbl', 'Researcher:')} ${investigador}`, 20, 58);
+        doc.text(bmTpl(bmTxt(tx, 'pdf_protocolo_nom_id_tpl', 'Protocol: {nom} (ID: {id})'), { nom: protocoloNom, id: protocoloID }), 20, 64);
 
-    doc.autoTable({
-        startY: 98, margin: { left: M, right: M },
-        head: [[bmTxt(tx, 'lbl_machos', 'MALES'), bmTxt(tx, 'lbl_hembras', 'FEMALES'), bmTxt(tx, 'lbl_indistintos', 'UNSEXED'), bmTxt(tx, 'lbl_total_animales', 'TOTAL ANIMALES')]],
-        body: [[m, h, i, total]],
-        headStyles: { fillColor: [26, 93, 59], halign: 'center' },
-        styles: { halign: 'center', fontSize: 11, fontStyle: 'bold' },
-        theme: 'grid'
-    });
+        doc.setFont("helvetica", "bold");
+        doc.text(bmTxt(tx, 'pdf_sec_detalle_pedido', 'ORDER DETAILS'), 20, 74);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${bmTxt(tx, 'pdf_tipo_pedido_lbl', 'Order type:')} ${tipoPedido}`, 20, 80);
+        doc.text(`${bmTxt(tx, 'pdf_especie_lbl', 'Species:')} ${especieTxt}`, 20, 86);
+        doc.text(`${bmTxt(tx, 'lbl_subespecie', 'Subspecies')}: ${subespecieTxt}`, 20, 92);
+        doc.text(`${bmTxt(tx, 'lbl_cepa', 'Strain')}: ${cepaTxt}`, 20, 98);
+        doc.text(`${bmTxt(tx, 'pdf_taxonomia_lbl', 'Taxonomy')}: ${taxonomiaTxt}`, 20, 104);
+        doc.text(`${bmTxt(tx, 'pdf_fecha_inicio', 'Start date:')} ${fechaInicio}`, 20, 110);
+        doc.setTextColor(200, 0, 0);
+        doc.text(`${bmTxt(tx, 'pdf_fecha_retiro_entregado', 'Pickup date (delivered):')} ${fechaEntregado}`, 20, 116);
+        doc.setTextColor(0);
 
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text(bmTxt(tx, 'pdf_control_fin', 'FINANCIAL SUMMARY'), M, finalY);
-    doc.autoTable({
-        startY: finalY + 4,
-        margin: { left: M, right: M },
-        head: [[
-            biPdf.pdf_col_precio || window.txt?.facturacion?.billing_investigador?.pdf_col_precio || 'Price',
-            biPdf.pdf_col_debe || window.txt?.facturacion?.billing_investigador?.pdf_col_debe || 'Owing',
-            biPdf.pdf_col_pago_total || window.txt?.facturacion?.billing_investigador?.pdf_col_pago_total || 'Total paid'
-        ]],
-        body: [[montosRow[0], montosRow[1], montosRow[2]]],
-        theme: 'grid',
-        headStyles: { fillColor: [26, 93, 59] },
-        styles: { fontSize: 9 },
-        columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
-    });
+        doc.autoTable({
+            startY: 122, margin: { left: M, right: M },
+            head: [[bmTxt(tx, 'lbl_machos', 'MALES'), bmTxt(tx, 'lbl_hembras', 'FEMALES'), bmTxt(tx, 'lbl_indistintos', 'UNSEXED'), bmTxt(tx, 'lbl_total_animales', 'TOTAL ANIMALES')]],
+            body: [[m, h, ind, total]],
+            headStyles: { fillColor: [26, 93, 59], halign: 'center' },
+            styles: { halign: 'center', fontSize: 11, fontStyle: 'bold' },
+            theme: 'grid'
+        });
 
-    const footerY = 265;
-    doc.setDrawColor(150);
-    doc.line(30, footerY, 85, footerY);
-    doc.line(125, footerY, 180, footerY);
-    doc.setFontSize(8);
-    doc.setTextColor(100);
-    doc.text(bmTxt(tx, 'pdf_firma_resp', 'Facility manager signature'), 57, footerY + 5, { align: "center" });
-    doc.text(bmTxt(tx, 'pdf_sello_fecha', 'Institutional stamp / date'), 152, footerY + 5, { align: "center" });
+        let finalY = doc.lastAutoTable.finalY + 10;
+        if (showPrices) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(0);
+            doc.text(bmTxt(tx, 'pdf_control_fin', 'FINANCIAL SUMMARY'), M, finalY);
+            doc.autoTable({
+                startY: finalY + 4,
+                margin: { left: M, right: M },
+                head: [[
+                    biPdf.pdf_col_precio || window.txt?.facturacion?.billing_investigador?.pdf_col_precio || 'Price',
+                    biPdf.pdf_col_debe || window.txt?.facturacion?.billing_investigador?.pdf_col_debe || 'Owing',
+                    biPdf.pdf_col_pago_total || window.txt?.facturacion?.billing_investigador?.pdf_col_pago_total || 'Total paid'
+                ]],
+                body: [[montosRow[0], montosRow[1], montosRow[2]]],
+                theme: 'grid',
+                headStyles: { fillColor: [26, 93, 59] },
+                styles: { fontSize: 9 },
+                columnStyles: { 0: { halign: 'right' }, 1: { halign: 'right' }, 2: { halign: 'right', fontStyle: 'bold' } }
+            });
+            finalY = doc.lastAutoTable.finalY + 10;
+        }
 
-    doc.save(`Pedido_Animal_${id}.pdf`);
+        const footerY = 265;
+        doc.setDrawColor(150);
+        doc.line(30, footerY, 85, footerY);
+        doc.line(125, footerY, 180, footerY);
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(bmTxt(tx, 'pdf_firma_resp', 'Facility manager signature'), 57, footerY + 5, { align: "center" });
+        doc.text(bmTxt(tx, 'pdf_sello_fecha', 'Institutional stamp / date'), 152, footerY + 5, { align: "center" });
+
+        doc.save(`Pedido_Animal_${id}.pdf`);
+    } catch (e) {
+        hideLoader();
+        console.error(e);
+        Swal.fire(window.txt?.generales?.error || g.error || 'Error', errPdf, 'error');
+    }
 };
 
 // ==========================================

@@ -28,7 +28,9 @@ import {
     billingHtmlRowInsumoPedidoFacturacion,
     billingHtmlInsumoProtSectionHeader,
     billingPartitionInsumosPedidoReactivoOtros,
-    billingFormatPedidoFechasPlain
+    billingFormatPedidoFechasPlain,
+    billingPdfFormularioTaxonomia,
+    billingPdfFormularioCantidad
 } from './billingLocale.js';
 import './billingPayments.js';
 
@@ -1157,8 +1159,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                 return [
                     billingPdfFormularioIdDisplay(f, { marcaExento: marcaEx }),
                     billingFormatPedidoFechasPlain(f, bi),
-                    f.nombre_especie || '---',
+                    billingPdfFormularioTaxonomia(f),
                     (f.detalle_display || "").replace(/<\/?[^>]+(>|$)/g, ""),
+                    billingPdfFormularioCantidad(f),
                     c[0], c[1], c[2]
                 ];
             });
@@ -1169,8 +1172,9 @@ window.downloadProtocoloPDF = async (idProt) => {
                 head: [[
                     bi.pdf_col_id || 'ID',
                     bi.pdf_col_fecha || 'Fechas',
-                    bi.pdf_col_especie || 'Especie',
+                    bi.pdf_col_especie || 'Taxonomía',
                     bi.pdf_col_concepto || 'Concepto',
+                    be.pdf_th_cantidad || 'Cantidad',
                     lblTotPdf,
                     lblPagPdf,
                     lblDebPdf
@@ -1179,7 +1183,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 theme: 'grid',
                 headStyles: { fillColor: verdeGecko },
                 styles: { fontSize: 8 },
-                columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
+                columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' } }
             });
             currentY = doc.lastAutoTable.finalY + 10;
         }
@@ -1378,10 +1382,7 @@ window.downloadGlobalPDF = async () => {
         if (prot.formularios?.length > 0) {
             const bodyForms = prot.formularios.map(f => {
                 const isExento = billingTipoExento(f);
-                const isRea = f.categoria?.toLowerCase().includes('reactivo');
-                const esp = f.nombre_especie || '---';
-                const sub = (f.nombre_subespecie && f.nombre_subespecie !== 'N/A') ? `:${f.nombre_subespecie}` : '';
-                const cant = isRea ? `${f.NombreInsumo} (${f.TipoInsumo}) ${f.CantidadInsumo} - ${f.cant_organo} ${unAb}` : `${f.cant_animal} ${unAb}`;
+                const cant = billingPdfFormularioCantidad(f);
                 const idPlain = billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: marcaExFull });
                 const total = parseFloat(f.total || 0);
                 const pagadoReal = parseFloat(f.pagado || 0);
@@ -1392,7 +1393,7 @@ window.downloadGlobalPDF = async () => {
                 return [
                     { content: idPlain, styles: { fontStyle: isExento ? 'bold' : 'normal', textColor: isExento ? [0, 150, 200] : [0, 0, 0] } },
                     billingFormatPedidoFechasPlain(f, bi),
-                    f.solicitante, esp + sub, f.detalle_display.replace(/<[^>]*>/g, ""), cant,
+                    f.solicitante, billingPdfFormularioTaxonomia(f), f.detalle_display.replace(/<[^>]*>/g, ""), cant,
                     c[0], c[1], c[2]
                 ];
             });

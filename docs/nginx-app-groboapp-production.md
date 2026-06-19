@@ -25,7 +25,7 @@ location /panel/ {
 }
 ```
 
-mandaba **todo** `/panel/...` a `paginas/usuario/...`. Páginas que solo existen en **`paginas/panel/`** (p. ej. capacitación, ventas, soporte, noticias) pedían un `.html` inexistente bajo `usuario/` → **404**.
+mandaba **todo** `/panel/...` a `paginas/usuario/...`. Páginas que solo existen en **`paginas/panel/`** (p. ej. capacitación, ventas, soporte, noticias, POE) pedían un `.html` inexistente bajo `usuario/` → **404**.
 
 La versión nueva añade **antes** un `location` que mapea esas rutas a `paginas/panel/$1.html`.
 
@@ -241,7 +241,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Configuración nueva (completa, lista para pegar)
 
-Este es el bloque `server { ... }` vigente recomendado (incluye fix `/panel/` para capacitación, ventas, soporte, noticias).
+Este es el bloque `server { ... }` vigente recomendado (incluye fix `/panel/` para capacitación, ventas, soporte, noticias, POE).
 
 ```nginx
 server {
@@ -320,7 +320,7 @@ server {
     # ============================================================
     # 4. PANEL: solo paginas/panel/ (¡antes del /panel/ genérico!)
     # ============================================================
-    location ~ ^/panel/(capacitacion|ventas|soporte|noticias)/?$ {
+    location ~ ^/panel/(capacitacion|ventas|soporte|noticias|poe)/?$ {
         rewrite ^/panel/([a-zA-Z0-9_-]+)/?$ /paginas/panel/$1.html last;
     }
 
@@ -390,8 +390,9 @@ server {
 ## Comprobación rápida
 
 - `/panel/capacitacion` debe resolver a `paginas/panel/capacitacion.html` (HTTP 200).
+- `/panel/poe?id=1` debe resolver a `paginas/panel/poe.html` (HTTP 200). Los QR POE usan además la ruta explícita `/paginas/panel/poe.html?id=…` en el front.
 - Si usáis Cloudflare, purgar caché tras cambios.
 
 ## Nota sobre nuevas páginas “solo panel”
 
-Si añadís un `.html` solo bajo `paginas/panel/` y la URL lógica es `/panel/nombre`, añadid `nombre` al grupo `(capacitacion|ventas|soporte|noticias|...)` o una regla dedicada **antes** de `location /panel/`.
+Si añadís un `.html` solo bajo `paginas/panel/` y la URL lógica es `/panel/nombre`, añadid `nombre` al grupo `(capacitacion|ventas|soporte|noticias|poe|...)` o una regla dedicada **antes** de `location /panel/`.

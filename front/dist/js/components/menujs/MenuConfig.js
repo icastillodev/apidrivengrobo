@@ -48,6 +48,17 @@ export function getCorrectPath(rawPath) {
         return `${basePath}paginas/usuario/formularios/${sub}.html`;
     }
 
+    // Producción: HTML solo en paginas/panel/ (nginx /panel/X genérico apunta a usuario/)
+    const panelOnlySlugs = ['capacitacion', 'ventas', 'soporte', 'noticias', 'poe'];
+    if (rawPath.startsWith('panel/')) {
+        const rest = rawPath.slice('panel/'.length);
+        const slug = rest.replace(/\.html$/i, '').split('/')[0];
+        if (panelOnlySlugs.includes(slug)) {
+            const pathPart = /\.html$/i.test(rest) ? rest : `${slug}.html`;
+            return `${basePath}paginas/panel/${pathPart}`;
+        }
+    }
+
     return basePath + rawPath;
 }
 

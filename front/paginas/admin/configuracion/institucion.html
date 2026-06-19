@@ -52,7 +52,7 @@
         import { checkUrlParamsAndOpen } from '../../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260409';
         // Lógica específica de configuración de la institución (Datos legales, logo, etc.)
-        import { initConfigInstitution } from '../../../dist/js/pages/admin/configuracion/config_institucion.js';
+        import { initConfigInstitution } from '../../../dist/js/pages/admin/configuracion/config_institucion.js?v=20260521';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -240,6 +240,20 @@
                                     <option value="EUR" data-i18n="config_institucion.opcion_eur"></option>
                                     <option value="BRL" data-i18n="config_institucion.opcion_brl"></option>
                                 </select>
+                            </div>
+
+                            <hr class="text-muted opacity-10 my-4">
+
+                            <div class="mb-2" id="sec-contabilidad-usuarios">
+                                <label class="form-label small fw-bold text-muted uppercase d-flex align-items-center gap-2 mb-2">
+                                    <i class="bi bi-cash-coin text-success"></i>
+                                    <span data-i18n="config_institucion.contabilidad_usuarios_seccion"></span>
+                                </label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="check-usuarios-precios" name="UsuariosVenPreciosFacturacion">
+                                    <label class="form-check-label small fw-semibold" for="check-usuarios-precios" data-i18n="config_institucion.usuarios_ven_precios_label"></label>
+                                </div>
+                                <p class="small text-muted mb-0 mt-2 ps-1" data-i18n="config_institucion.usuarios_ven_precios_help"></p>
                             </div>
 
                             <hr class="text-muted opacity-10 my-4">

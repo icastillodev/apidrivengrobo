@@ -13,7 +13,7 @@ export const DashboardUI = {
 
             this.renderAdminDashboard(stats);
             try {
-                const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20260511');
+                const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20260613');
                 await injectDashboardNoticias('dashboard-noticias-mount');
             } catch (e) {
                 console.warn('Dashboard noticias:', e);

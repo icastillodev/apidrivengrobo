@@ -107,6 +107,7 @@ export async function initConfigInstitution(instId) {
 
         fd.append('otrosceuas', 0);
         fd.append('LogoEnPdf', document.getElementById('check-logopdf').checked ? 1 : 0);
+        fd.append('UsuariosVenPreciosFacturacion', document.getElementById('check-usuarios-precios').checked ? 1 : 0);
 
         const t = tf();
         Swal.fire({ title: t.swal_guardando || '…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
@@ -247,6 +248,9 @@ export async function initConfigInstitution(instId) {
 
                 document.getElementById('check-logopdf').checked = (d.LogoEnPdf == 1);
                 localStorage.setItem('instLogoEnPdf', d.LogoEnPdf == 1 ? '1' : '0');
+                const chkPrecios = document.getElementById('check-usuarios-precios');
+                if (chkPrecios) chkPrecios.checked = (d.UsuariosVenPreciosFacturacion == 1);
+                localStorage.setItem('instUsuariosVenPrecios', d.UsuariosVenPreciosFacturacion == 1 ? '1' : '0');
 
                 const currentLogoBox = document.getElementById('current-logo-container');
                 const imgCurrent = document.getElementById('img-current');

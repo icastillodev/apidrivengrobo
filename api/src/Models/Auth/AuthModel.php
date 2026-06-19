@@ -31,6 +31,9 @@ class AuthModel {
         if ($this->institucionHasColumn('LogoEnPdf')) {
             $cols .= ', LogoEnPdf';
         }
+        if ($this->institucionHasColumn('UsuariosVenPreciosFacturacion')) {
+            $cols .= ', UsuariosVenPreciosFacturacion';
+        }
         return $cols;
     }
 

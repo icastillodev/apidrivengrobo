@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge, billingPdfFormularioTaxonomia, billingPdfFormularioCantidad } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 import {
@@ -885,8 +885,9 @@ window.downloadGlobalPDF = async () => {
                 return [
                     billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
                     billingFormatPedidoFechasPlain(f, bi),
-                    f.nombre_especie,
+                    billingPdfFormularioTaxonomia(f),
                     f.detalle_display.replace(/<[^>]*>/g, ""),
+                    billingPdfFormularioCantidad(f),
                     m[0], m[2], m[1]
                 ];
             }),
@@ -898,6 +899,7 @@ window.downloadGlobalPDF = async () => {
                     billingAlojPeriodoParaInforme(a, { diasUnit: diasU }),
                     a.especie,
                     `${pAloj} (${a.caja || pEstr})`,
+                    '-',
                     m[0],
                     m[2],
                     m[1],
@@ -912,7 +914,9 @@ window.downloadGlobalPDF = async () => {
                 return [
                     String(idInsPdf).substring(0, 28),
                     billingFormatPedidoFechasPlain(i, bi),
+                    '-',
                     `${pIns}: ${det}`,
+                    '-',
                     m[0], m[2], m[1]
                 ];
             })
@@ -923,8 +927,9 @@ window.downloadGlobalPDF = async () => {
             head: [[
                 bi.pdf_col_id || 'ID',
                 bi.pdf_col_fecha || 'Fecha',
-                bi.pdf_col_especie || 'Especie',
+                bi.pdf_col_especie || 'Taxonomía',
                 bi.pdf_col_detalle || 'Detalle',
+                window.txt?.facturacion?.billing_depto_export?.pdf_th_cantidad || 'Cantidad',
                 lblTotPdf,
                 lblPagPdf,
                 lblDebPdf
@@ -933,7 +938,7 @@ window.downloadGlobalPDF = async () => {
             theme: 'striped',
             headStyles: { fillColor: azulGecko },
             styles: { fontSize: 7 },
-            columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
+            columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' } }
         });
 
         const sF = billingSumFormulariosCobrable(prot.formularios);
@@ -1010,8 +1015,9 @@ window.downloadProtocoloPDF = async (idProt) => {
             return [
                 billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
                 billingFormatPedidoFechasPlain(f, bi),
-                f.nombre_especie,
+                billingPdfFormularioTaxonomia(f),
                 f.detalle_display.replace(/<[^>]*>/g, ""),
+                billingPdfFormularioCantidad(f),
                 m[0], m[2], m[1]
             ];
         }),
@@ -1020,7 +1026,7 @@ window.downloadProtocoloPDF = async (idProt) => {
             const diasU = window.txt?.facturacion?.billing_depto_export?.pdf_aloj_dias_unit || 'd';
             const perInf = billingAlojPeriodoParaInforme(a, { diasUnit: diasU });
             const concepto = `${alojAb} (${a.caja || pEstr})`;
-            return [`H-${a.historia}`, perInf || '-', a.especie, concepto, m[0], m[2], m[1]];
+            return [`H-${a.historia}`, perInf || '-', a.especie, concepto, '-', m[0], m[2], m[1]];
         }),
         ...(prot.insumos || []).map(i => {
             const total = billingInsumoMontoTotalCobrable(i);
@@ -1033,6 +1039,7 @@ window.downloadProtocoloPDF = async (idProt) => {
                 billingFormatPedidoFechasPlain(i, bi),
                 '-',
                 `${pIns}: ${det}`,
+                '-',
                 m[0], m[2], m[1]
             ];
         }),
@@ -1042,14 +1049,15 @@ window.downloadProtocoloPDF = async (idProt) => {
         startY: M + 38, margin: { left: M, right: M }, head: [[
             bi.pdf_col_id || 'ID',
             bi.pdf_col_fecha || 'Fechas',
-            bi.pdf_col_especie || 'Especie',
+            bi.pdf_col_especie || 'Taxonomía',
             bi.pdf_col_concepto || 'Concepto',
+            window.txt?.facturacion?.billing_depto_export?.pdf_th_cantidad || 'Cantidad',
             lblTotPdf,
             lblPagPdf,
             lblDebPdf
         ]],
         body: bodyAll, theme: 'grid', headStyles: { fillColor: [26, 93, 59] },
-        styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' } }
+        styles: { fontSize: 8 }, columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' } }
     });
 
     const sFp = billingSumFormulariosCobrable(prot.formularios);

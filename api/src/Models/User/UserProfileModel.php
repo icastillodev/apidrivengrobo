@@ -11,7 +11,25 @@ class UserProfileModel {
         $this->db = $db;
     }
 
+    private function institucionHasColumn(string $column): bool {
+        static $cache = [];
+        if (array_key_exists($column, $cache)) {
+            return $cache[$column];
+        }
+        try {
+            $stmt = $this->db->prepare('SHOW COLUMNS FROM institucion LIKE ?');
+            $stmt->execute([$column]);
+            $cache[$column] = (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            $cache[$column] = false;
+        }
+        return $cache[$column];
+    }
+
     public function getUserData($userId) {
+        $preciosCol = $this->institucionHasColumn('UsuariosVenPreciosFacturacion')
+            ? 'COALESCE(i.UsuariosVenPreciosFacturacion, 0) AS UsuariosVenPreciosFacturacion'
+            : '0 AS UsuariosVenPreciosFacturacion';
         $sql = "SELECT 
                     u.IdUsrA, 
                     u.UsrA as Usuario, 
@@ -20,7 +38,8 @@ class UserProfileModel {
                     p.EmailA, 
                     p.CelularA, 
                     p.PaisA,
-                    i.NombreInst
+                    i.NombreInst,
+                    {$preciosCol}
                 FROM usuarioe u
                 JOIN personae p ON u.IdUsrA = p.IdUsrA
                 JOIN institucion i ON u.IdInstitucion = i.IdInstitucion

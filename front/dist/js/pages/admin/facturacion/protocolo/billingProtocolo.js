@@ -29,7 +29,10 @@ import {
     billingPedidoSinMontoNoExento,
     billingHtmlRowInsumoPedidoFacturacion,
     billingHtmlInsumoProtSectionHeader,
-    billingPartitionInsumosPedidoReactivoOtros
+    billingPartitionInsumosPedidoReactivoOtros,
+    billingFormatPedidoFechasPlain,
+    billingPdfFormularioTaxonomia,
+    billingPdfFormularioCantidad
 } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
@@ -624,8 +627,10 @@ window.downloadProtocoloPDF = async (idProt) => {
                 const c = pdfColsPdfOrdenTotalPagadoDebe(m);
                 return [
                     billingPdfFormularioIdDisplay(f, { style: 'plain', marcaExento: billingPdfMarcaExentoLarga() }),
-                    f.nombre_especie,
+                    billingFormatPedidoFechasPlain(f, bi),
+                    billingPdfFormularioTaxonomia(f),
                     (f.detalle_display || '').replace(/<[^>]*>/g, ""),
+                    billingPdfFormularioCantidad(f),
                     c[0], c[1], c[2]
                 ];
             });
@@ -635,15 +640,17 @@ window.downloadProtocoloPDF = async (idProt) => {
                 margin: { left: M, right: M },
                 head: [[
                     bi.pdf_col_id || 'ID',
-                    bi.pdf_col_especie || 'Especie',
+                    bi.pdf_col_fecha || 'Fechas',
+                    bi.pdf_col_especie || 'Taxonomía',
                     bi.pdf_col_concepto || 'Concepto',
+                    bd.pdf_th_cantidad || 'Cantidad',
                     lblTotPdf,
                     lblPagPdf,
                     lblDebPdf
                 ]],
                 body: bodyForms,
                 theme: 'grid', headStyles: { fillColor: verdeGecko }, styles: { fontSize: 8 },
-                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } }
+                columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' } }
             });
             currentY = doc.lastAutoTable.finalY + 10;
         }

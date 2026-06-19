@@ -23,6 +23,18 @@ export function buildQrAlojamientoPublicPageAbsoluteUrl(code) {
     return window.location.origin + buildQrAlojamientoPublicPageRelativeUrl(code);
 }
 
+/** Portal POE con `?id=` opcional — ruta explícita a paginas/panel/poe.html (no depende del rewrite nginx /panel/poe). */
+export function buildPanelPoePublicPageRelativeUrl(idPoe) {
+    const base = `${getGroboFrontBasePath()}paginas/panel/poe.html`;
+    const id = String(idPoe ?? '').trim();
+    if (!id) return base;
+    return `${base}?id=${encodeURIComponent(id)}`;
+}
+
+export function buildPanelPoePublicPageAbsoluteUrl(idPoe) {
+    return window.location.origin + buildPanelPoePublicPageRelativeUrl(idPoe);
+}
+
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO
     urlBase: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 

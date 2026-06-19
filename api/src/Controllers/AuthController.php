@@ -240,6 +240,7 @@ class AuthController {
                         'web' => (string) ($instData['Web'] ?? ''),
                         'Logo' => $instData['Logo'] ?? null,
                         'LogoEnPdf' => isset($instData['LogoEnPdf']) ? (int) $instData['LogoEnPdf'] : 0,
+                        'UsuariosVenPreciosFacturacion' => isset($instData['UsuariosVenPreciosFacturacion']) ? (int) $instData['UsuariosVenPreciosFacturacion'] : 0,
                     ],
                 ];
                 echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);

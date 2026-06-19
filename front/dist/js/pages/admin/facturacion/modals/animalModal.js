@@ -187,10 +187,16 @@ export const openAnimalModal = async (idformA) => {
                         </div>
                     </div>
 
-                    <div class="modal-footer bg-white border-top-0 d-flex justify-content-between p-4">
-                        <button class="btn btn-outline-danger btn-sm px-4 fw-bold" onclick="window.descargarFichaPDF(${idformA}, 'ANIMAL')">
-                            <i class="bi bi-file-pdf me-2"></i>PDF
-                        </button>
+                    <div class="modal-footer bg-white border-top-0 d-flex justify-content-between align-items-center p-4">
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" id="check-pdf-animal-precios" checked>
+                                <label class="form-check-label small" for="check-pdf-animal-precios">${t.pdf_incluir_precios || 'Incluir precios en PDF'}</label>
+                            </div>
+                            <button class="btn btn-outline-danger btn-sm px-4 fw-bold" onclick="window.descargarFichaPDF(${idformA}, 'ANIMAL')">
+                                <i class="bi bi-file-pdf me-2"></i>PDF
+                            </button>
+                        </div>
                         <button class="btn btn-secondary btn-sm px-4 fw-bold" data-bs-dismiss="modal">${t.btn_cerrar || 'CERRAR'}</button>
                     </div>
                 </div>

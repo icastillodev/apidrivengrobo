@@ -82,17 +82,21 @@ async function fetchUsuariosList(opts = {}) {
         return;
     }
 
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
+    if (!instId) {
+        console.error('❌ Error crítico: No se identificó la institución en la sesión.');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
+        }
+        return;
+    }
+
     if (loading === 'inline' && tbody) {
         const msg =
             window.txt?.admin_usuarios?.cargando_lista ||
             window.txt?.generales?.msg_cargando ||
             '…';
         tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
-    }
-    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId');
-    if (!instId) {
-        console.error('❌ Error crítico: No se identificó la institución en la sesión.');
-        return;
     }
     try {
         const res = await usuariosPageCacheApi.fetchPage(currentPage);
@@ -118,6 +122,8 @@ async function fetchUsuariosList(opts = {}) {
                 pageUsersFull = pageUsers;
             }
             usuariosPageCacheApi.schedulePrefetchAround(totalUsuariosList, currentPage, prefetchGen);
+        } else if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">${window.txt?.generales?.error_carga || 'Error al cargar datos.'}</td></tr>`;
         }
     } catch (error) {
         console.error('❌ Error cargando usuarios:', error);

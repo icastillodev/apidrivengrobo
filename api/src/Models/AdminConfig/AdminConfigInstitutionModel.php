@@ -13,19 +13,38 @@ class AdminConfigInstitutionModel {
         $this->db = $db;
     }
 
+    private function institucionHasColumn(string $column): bool {
+        static $cache = [];
+        if (array_key_exists($column, $cache)) {
+            return $cache[$column];
+        }
+        try {
+            $stmt = $this->db->prepare('SHOW COLUMNS FROM institucion LIKE ?');
+            $stmt->execute([$column]);
+            $cache[$column] = (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            $cache[$column] = false;
+        }
+        return $cache[$column];
+    }
+
     public function getInstitution($id) {
-        $sql = "SELECT 
-                    IdInstitucion, NombreInst, NombreCompletoInst, InstDir, 
-                    InstContacto, InstCorreo, Web, Pais, Localidad, Moneda, 
-                    otrosceuas, Logo, LogoEnPdf, idioma
-                FROM institucion 
-                WHERE IdInstitucion = ?";
+        $cols = 'IdInstitucion, NombreInst, NombreCompletoInst, InstDir, '
+            . 'InstContacto, InstCorreo, Web, Pais, Localidad, Moneda, '
+            . 'otrosceuas, Logo, LogoEnPdf, idioma';
+        if ($this->institucionHasColumn('UsuariosVenPreciosFacturacion')) {
+            $cols .= ', UsuariosVenPreciosFacturacion';
+        }
+        $sql = "SELECT {$cols} FROM institucion WHERE IdInstitucion = ?";
         
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$data) throw new Exception("Institución no encontrada");
+        if (!array_key_exists('UsuariosVenPreciosFacturacion', $data)) {
+            $data['UsuariosVenPreciosFacturacion'] = 0;
+        }
         return $data;
     }
 
@@ -44,8 +63,13 @@ class AdminConfigInstitutionModel {
         $params = [
             $data['NombreCompletoInst'], $data['InstDir'], $data['InstContacto'],
             $data['InstCorreo'], $data['Web'], $data['Pais'], $data['Localidad'],
-            $data['Moneda'], $data['otrosceuas'], $data['idioma'], $data['LogoEnPdf']
+            $data['Moneda'], $data['otrosceuas'], $data['idioma'], $data['LogoEnPdf'],
         ];
+        $sqlPrecios = '';
+        if ($this->institucionHasColumn('UsuariosVenPreciosFacturacion')) {
+            $sqlPrecios = ', UsuariosVenPreciosFacturacion = ?';
+            $params[] = isset($data['UsuariosVenPreciosFacturacion']) ? (int) $data['UsuariosVenPreciosFacturacion'] : 0;
+        }
 
         if (isset($files['LogoInst']) && $files['LogoInst']['error'] === UPLOAD_ERR_OK) {
             $logoName = $this->handleLogoUpload($files['LogoInst'], $instId);
@@ -59,6 +83,7 @@ class AdminConfigInstitutionModel {
                     NombreCompletoInst = ?, InstDir = ?, InstContacto = ?, 
                     InstCorreo = ?, Web = ?, Pais = ?, Localidad = ?, 
                     Moneda = ?, otrosceuas = ?, idioma = ?, LogoEnPdf = ? 
+                    $sqlPrecios
                     $sqlLogo
                 WHERE IdInstitucion = ?";
         

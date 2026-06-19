@@ -322,6 +322,40 @@ export function billingPdfFormularioIdDisplay(f, opt = {}) {
 }
 
 /**
+ * Taxonomía animal para PDF/Excel: esp / sub / cepa (texto plano).
+ * @param {Record<string, unknown>|null|undefined} f
+ */
+export function billingPdfFormularioTaxonomia(f) {
+    const row = f && typeof f === 'object' ? f : {};
+    if (row.taxonomia && String(row.taxonomia).trim() !== '' && String(row.taxonomia).trim() !== '-') {
+        return String(row.taxonomia).trim();
+    }
+    const parts = [row.nombre_especie, row.nombre_subespecie, row.nombre_cepa]
+        .map(v => (v != null ? String(v).trim() : ''))
+        .filter(v => v !== '' && v.toUpperCase() !== 'N/A');
+    return parts.length ? parts.join(' / ') : '-';
+}
+
+/**
+ * Cantidad display para filas de formulario en PDF.
+ * @param {Record<string, unknown>|null|undefined} f
+ */
+export function billingPdfFormularioCantidad(f) {
+    const row = f && typeof f === 'object' ? f : {};
+    const cat = String(row.categoria ?? '').toLowerCase();
+    const unAb = window.txt?.facturacion?.billing_depto_export?.un_abbr || 'un.';
+    if (cat.includes('reactivo')) {
+        const nom = row.NombreInsumo || '';
+        const tipo = row.TipoInsumo || '';
+        const cantIns = row.CantidadInsumo ?? '';
+        const organos = row.cant_organo ?? 0;
+        return `${nom} (${tipo}) ${cantIns} - ${organos} ${unAb}`.trim();
+    }
+    const cant = row.cant_animal ?? row.cantidad ?? 0;
+    return `${cant} ${unAb}`.trim();
+}
+
+/**
  * Texto de estadía para informes (PDF/Excel): usa `periodo` del API (tramos unidos) o fallback inicio–fin.
  * @param {Record<string, unknown>|null|undefined} a fila alojamiento de facturación
  * @param {{ includeDias?: boolean, diasUnit?: string, emptyLabel?: string }} [opt]

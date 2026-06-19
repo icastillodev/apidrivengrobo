@@ -212,7 +212,7 @@ class BillingModel {
         [$deptSql, $deptParams] = $this->billingSqlAndFormularioSinProtocoloEnDepto((int) $deptoId, (int) ($instCobradora ?? 0));
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
-                se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
+                se.SubEspeNombreA as nombre_subespecie, c.CepaNombreA as nombre_cepa, tf.categoriaformulario as categoria,
                 tf.nombreTipo as nombre_tipo, tf.exento, tf.descuento, ie.NombreInsumo,
                 ie.CantidadInsumo, ie.TipoInsumo, s.totalA as cant_animal, s.organo as cant_organo,
                 pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado,
@@ -225,6 +225,7 @@ class BillingModel {
                 LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
                 LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
+                LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
                 WHERE f.estado = 'Entregado' AND pf_link.idformA IS NULL{$deptSql}";
         
         $params = $deptParams;
@@ -255,7 +256,11 @@ class BillingModel {
                  $r['cantidad_display'] = "{$r['cant_animal']} un.";
                  $r['detalle_display'] = ($cat === $nom) ? "<b>$cat</b>$dcto" : "<b>$cat</b> - $nom$dcto";
             }
-            $r['taxonomia'] = ($r['nombre_especie'] ?? '-') . ($r['nombre_subespecie'] ? " : {$r['nombre_subespecie']}" : "");
+            $r['taxonomia'] = self::billingFormularioTaxonomiaPlain(
+                $r['nombre_especie'] ?? null,
+                $r['nombre_subespecie'] ?? null,
+                $r['nombre_cepa'] ?? null
+            );
             // Formato viejo (solo depto, sin protformr): no es liquidación por red / «formulario derivado» en contabilidad.
             $r['es_pedido_depto_sin_protocolo'] = 1;
             $r['derivado_por_id'] = null;
@@ -269,7 +274,7 @@ class BillingModel {
         $dDeriv = $this->billingSqlDerivacionCamposSelect('f.idformA');
         $sql = "SELECT f.idformA as id, CONCAT(u.NombreA, ' ', u.ApellidoA) as solicitante,
                 f.fechainicioA as fecha, f.fecRetiroA, e.EspeNombreA as nombre_especie,
-                se.SubEspeNombreA as nombre_subespecie, tf.categoriaformulario as categoria,
+                se.SubEspeNombreA as nombre_subespecie, c.CepaNombreA as nombre_cepa, tf.categoriaformulario as categoria,
                 tf.nombreTipo as nombre_tipo, tf.exento, tf.descuento, ie.NombreInsumo,
                 ie.CantidadInsumo, ie.TipoInsumo, s.totalA as cant_animal, s.organo as cant_organo,
                 pf.precioformulario, pf.totalpago as pago_ani, pif.preciototal as total_ins, pif.totalpago as pago_ins, pf.precioanimalmomento, f.estado,
@@ -282,6 +287,7 @@ class BillingModel {
                 LEFT JOIN insumoexperimental ie ON f.reactivo = ie.IdInsumoexp
                 LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA
                 LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA
+                LEFT JOIN cepa c ON f.idcepaA = c.idcepaA
                 WHERE pf_link.idprotA = ? AND f.estado = 'Entregado'";
         
         $params = [$idProt];
@@ -321,9 +327,27 @@ class BillingModel {
                  $r['cantidad_display'] = "{$r['cant_animal']} un.";
                  $r['detalle_display'] = ($cat === $nom) ? "<b>$cat</b>$dcto" : "<b>$cat</b> - $nom$dcto";
             }
-            $r['taxonomia'] = ($r['nombre_especie'] ?? '-') . ($r['nombre_subespecie'] ? " : {$r['nombre_subespecie']}" : "");
+            $r['taxonomia'] = self::billingFormularioTaxonomiaPlain(
+                $r['nombre_especie'] ?? null,
+                $r['nombre_subespecie'] ?? null,
+                $r['nombre_cepa'] ?? null
+            );
         }
         return $rows;
+    }
+
+    /**
+     * Taxonomía animal para informes: esp / sub / cepa (texto plano).
+     */
+    private static function billingFormularioTaxonomiaPlain(?string $esp, ?string $sub, ?string $cepa): string {
+        $parts = [];
+        foreach ([$esp, $sub, $cepa] as $v) {
+            $t = trim((string) ($v ?? ''));
+            if ($t !== '' && strcasecmp($t, 'N/A') !== 0) {
+                $parts[] = $t;
+            }
+        }
+        return $parts ? implode(' / ', $parts) : '-';
     }
 
     /**
@@ -2024,10 +2048,17 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     }
 
     public function getAnimalDetailById($id, $instCobradora = null) {
-        $sql = "SELECT f.idformA, p.idprotA as id_protocolo, p.IdUsrA as id_usr_protocolo, f.tipoA as id_tipo_form, tf.nombreTipo as nombre_tipo, CONCAT(p.nprotA, ' - ', p.tituloA) as protocolo_info, CONCAT(e.EspeNombreA, ' : ', COALESCE(se.SubEspeNombreA, 'N/A')) as taxonomia, f.edadA as edad, f.pesoa as peso, tf.exento as is_exento, COALESCE(s.machoA, 0) as machos, COALESCE(s.hembraA, 0) as hembras, COALESCE(s.indistintoA, 0) as indistintos, COALESCE(s.totalA, 0) as cantidad, f.fechainicioA as fecha_inicio, f.fecRetiroA as fecha_fin, f.aclaraA as aclaracion_usuario, COALESCE(f.aclaracionadm, 'No hay aclaraciones del administrador.') as nota_admin, COALESCE(pf.precioanimalmomento, 0) as precio_unitario, COALESCE(pf.precioformulario, 0) as total_calculado, COALESCE(pf.totalpago, 0) as totalpago, COALESCE(tf.descuento, 0) as descuento, COALESCE(d.SaldoDinero, 0) as saldoInv, CONCAT(u_tit.ApellidoA, ', ', u_tit.NombreA) as titular_nombre, CONCAT(u_sol.ApellidoA, ', ', u_sol.NombreA) as solicitante FROM formularioe f INNER JOIN personae u_sol ON f.IdUsrA = u_sol.IdUsrA LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr rf ON f.idformA = rf.idformA LEFT JOIN protocoloexpe p ON rf.idprotA = p.idprotA LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA LEFT JOIN precioformulario pf ON f.idformA = pf.idformA LEFT JOIN sexoe s ON f.idformA = s.idformA LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA LEFT JOIN dinero d ON p.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion WHERE f.idformA = ?";
+        $sql = "SELECT f.idformA, p.idprotA as id_protocolo, p.IdUsrA as id_usr_protocolo, f.tipoA as id_tipo_form, tf.nombreTipo as nombre_tipo, CONCAT(p.nprotA, ' - ', p.tituloA) as protocolo_info, e.EspeNombreA as nombre_especie, se.SubEspeNombreA as nombre_subespecie, c.CepaNombreA as nombre_cepa, f.edadA as edad, f.pesoa as peso, tf.exento as is_exento, COALESCE(s.machoA, 0) as machos, COALESCE(s.hembraA, 0) as hembras, COALESCE(s.indistintoA, 0) as indistintos, COALESCE(s.totalA, 0) as cantidad, f.fechainicioA as fecha_inicio, f.fecRetiroA as fecha_fin, f.aclaraA as aclaracion_usuario, COALESCE(f.aclaracionadm, 'No hay aclaraciones del administrador.') as nota_admin, COALESCE(pf.precioanimalmomento, 0) as precio_unitario, COALESCE(pf.precioformulario, 0) as total_calculado, COALESCE(pf.totalpago, 0) as totalpago, COALESCE(tf.descuento, 0) as descuento, COALESCE(d.SaldoDinero, 0) as saldoInv, CONCAT(u_tit.ApellidoA, ', ', u_tit.NombreA) as titular_nombre, CONCAT(u_sol.ApellidoA, ', ', u_sol.NombreA) as solicitante FROM formularioe f INNER JOIN personae u_sol ON f.IdUsrA = u_sol.IdUsrA LEFT JOIN tipoformularios tf ON f.tipoA = tf.IdTipoFormulario LEFT JOIN protformr rf ON f.idformA = rf.idformA LEFT JOIN protocoloexpe p ON rf.idprotA = p.idprotA LEFT JOIN personae u_tit ON p.IdUsrA = u_tit.IdUsrA LEFT JOIN precioformulario pf ON f.idformA = pf.idformA LEFT JOIN sexoe s ON f.idformA = s.idformA LEFT JOIN formespe fe ON f.idformA = fe.idformA LEFT JOIN especiee e ON fe.idespA = e.idespA LEFT JOIN subespecie se ON f.idsubespA = se.idsubespA LEFT JOIN cepa c ON f.idcepaA = c.idcepaA LEFT JOIN dinero d ON p.IdUsrA = d.IdUsrA AND f.IdInstitucion = d.IdInstitucion WHERE f.idformA = ?";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$id]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($row) {
+            $row['taxonomia'] = self::billingFormularioTaxonomiaPlain(
+                $row['nombre_especie'] ?? null,
+                $row['nombre_subespecie'] ?? null,
+                $row['nombre_cepa'] ?? null
+            );
+        }
         if ($row && $instCobradora) {
             $this->mergeFacturacionDerivadaIntoAnimalReactiveRow($row, (int)$instCobradora);
         }

@@ -119,9 +119,14 @@ class UserModel {
                     $paramsData[] = $pat;
                     break;
                 default:
-                    $searchSql = '(LOWER(CONCAT_WS(\' \', u.UsrA, p.ApellidoA, p.NombreA, COALESCE(p.EmailA, \'\'), COALESCE(p.CelularA, \'\'), CAST(u.IdUsrA AS CHAR), COALESCE(d.NombreDeptoA, \'\'), COALESCE(TRIM(p.LabA), \'\'))) LIKE LOWER(?))';
-                    $paramsCount[] = $pat;
-                    $paramsData[] = $pat;
+                    $searchSql = '(LOWER(u.UsrA) LIKE LOWER(?) OR LOWER(p.ApellidoA) LIKE LOWER(?) OR LOWER(p.NombreA) LIKE LOWER(?)'
+                        . ' OR LOWER(COALESCE(p.EmailA, \'\')) LIKE LOWER(?) OR LOWER(COALESCE(p.CelularA, \'\')) LIKE LOWER(?)'
+                        . ' OR CAST(u.IdUsrA AS CHAR) LIKE ? OR LOWER(COALESCE(d.NombreDeptoA, \'\')) LIKE LOWER(?)'
+                        . ' OR LOWER(COALESCE(TRIM(p.LabA), \'\')) LIKE LOWER(?))';
+                    for ($i = 0; $i < 8; $i++) {
+                        $paramsCount[] = $pat;
+                        $paramsData[] = $pat;
+                    }
                     break;
             }
         }
@@ -134,7 +139,7 @@ class UserModel {
                     AND d.iddeptoA = CAST(NULLIF(NULLIF(TRIM(p.LabA), ''), 'null') AS UNSIGNED)
                 WHERE u.IdInstitucion = ? AND ($searchSql)";
 
-        $sqlCount = "SELECT COUNT(*) AS c $fromSql";
+        $sqlCount = "SELECT COUNT(DISTINCT u.IdUsrA) AS c $fromSql";
         $stCount = $this->db->prepare($sqlCount);
         $stCount->execute($paramsCount);
         $total = (int) ($stCount->fetchColumn() ?: 0);
