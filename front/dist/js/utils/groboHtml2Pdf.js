@@ -4,22 +4,38 @@
 
 function prepareDomForPdfCapture(dom) {
     dom.style.position = 'fixed';
-    dom.style.left = '-10000px';
+    dom.style.left = '0';
     dom.style.top = '0';
     dom.style.opacity = '1';
     dom.style.visibility = 'visible';
     dom.style.pointerEvents = 'none';
-    dom.style.zIndex = '-1';
+    dom.style.zIndex = '2147483640';
     dom.style.background = '#ffffff';
     dom.style.color = '#212529';
     dom.style.width = '794px';
     dom.style.maxWidth = '794px';
+    dom.style.padding = '16px';
+    dom.style.boxSizing = 'border-box';
+    dom.querySelectorAll('[style*="display: flex"], [style*="display:flex"]').forEach((el) => {
+        el.style.display = 'block';
+    });
+    dom.querySelectorAll('table').forEach((t) => {
+        t.style.width = '100%';
+        t.style.borderCollapse = 'collapse';
+    });
 }
 
 async function waitPdfPaint(dom) {
     void dom.offsetHeight;
+    if (document.fonts?.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {
+            /* ignore */
+        }
+    }
     await new Promise((r) => requestAnimationFrame(() => r()));
-    await new Promise((r) => setTimeout(r, 120));
+    await new Promise((r) => setTimeout(r, 200));
 }
 
 function getHtml2PdfFn() {
@@ -40,21 +56,30 @@ export async function saveHtmlStringAsPdf(html, opt = {}) {
         throw err;
     }
 
-    const wrap = document.createElement('div');
-    wrap.innerHTML = html;
-    prepareDomForPdfCapture(wrap);
-    document.body.appendChild(wrap);
+    const host = document.createElement('div');
+    host.innerHTML = String(html || '').trim();
+    const target = host.firstElementChild || host;
+    prepareDomForPdfCapture(target);
+    document.body.appendChild(target);
 
     const defaults = {
-        margin: [18, 18, 18, 18],
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        margin: [12, 12, 12, 12],
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
     try {
-        await waitPdfPaint(wrap);
-        await fn().set({ ...defaults, ...opt }).from(wrap).save();
+        await waitPdfPaint(target);
+        await fn().set({ ...defaults, ...opt }).from(target).save();
     } finally {
-        wrap.remove();
+        target.remove();
     }
 }

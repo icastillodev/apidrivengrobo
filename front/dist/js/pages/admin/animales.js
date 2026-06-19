@@ -8,10 +8,29 @@ import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../.
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
-import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
 import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
+
+function ensureAdminAnimalesPdfLibs() {
+    const g = window.txt?.generales || {};
+    const errPdf = g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.';
+    if (!window.jspdf?.jsPDF) {
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+        return false;
+    }
+    try {
+        const probe = new window.jspdf.jsPDF();
+        if (typeof probe.autoTable !== 'function') {
+            window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+            return false;
+        }
+    } catch (_) {
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+        return false;
+    }
+    return true;
+}
 
 let allAnimals = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -1740,16 +1759,18 @@ window.downloadAnimalPDFFromModal = () => {
  * Versión final con corrección de campos y lógica de exención.
  */
 window.downloadAnimalPDF = async (id) => {
+    if (!ensureAdminAnimalesPdfLibs()) return;
+
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    
-    // Captura mejorada de selectores por 'name' para evitar el problema de Edad/Peso
+    const g = window.txt?.generales || {};
+    const errPdf = g.err_pdf_generar || 'No se pudo generar el PDF.';
+
     const getValByName = (name) => document.querySelector(`input[name="${name}"], textarea[name="${name}"]`)?.value || '---';
-    const getSel = (id) => {
-        const sel = document.getElementById(id);
+    const getSel = (selId) => {
+        const sel = document.getElementById(selId);
         return sel ? sel.options[sel.selectedIndex]?.text : '---';
     };
 
-    // Datos principales
     const investigador = document.querySelector('#modal-content-animal h5 + span')?.innerText || '---';
     const contacto = document.querySelector('#modal-content-animal .row.g-2.mb-3')?.innerText || '---';
     const tipoPedido = getSel('select-type-modal');
@@ -1757,116 +1778,132 @@ window.downloadAnimalPDF = async (id) => {
     const especie = getSel('select-especie-modal');
     const categoria = getSel('select-categoria-modal');
     const estado = getSel('modal-status');
-    
-    // Corrección Edad y Peso
     const edad = getValByName('edadA');
     const peso = getValByName('pesoA');
     const raza = getValByName('razaA');
-
-    
     const machos = getValByName('machoA') || '0';
     const hembras = getValByName('hembraA') || '0';
     const indistintos = getValByName('indistintoA') || '0';
     const total = document.getElementById('total-animals-modal')?.value || '0';
-    
     const precioUnit = document.getElementById('price-unit-modal')?.value || '0';
     const precioTotalRaw = document.getElementById('price-total-modal')?.value || '0';
-    
-    // Lógica Exento de Pago
-    let precioFinalDisplay = `$${precioTotalRaw}`;
-    if (parseFloat(precioTotalRaw) === 0) {
-        precioFinalDisplay = `$${precioTotalRaw} (Exento de pago)`;
-    }
-
+    const precioFinalDisplay = parseFloat(precioTotalRaw) === 0
+        ? `$${precioTotalRaw} (Exento de pago)`
+        : `$${precioTotalRaw}`;
     const fInicio = getValByName('fechainicioA');
     const fRetiro = getValByName('fecRetiroA');
     const aclaracion = document.querySelector('#form-animal-full .bg-light.small')?.innerText || 'Sin aclaraciones.';
 
-    // HTML del Template para PDF
-    const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 10px; background: #ffffff;">
-            <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0; color: #444;">FICHA DE PEDIDO: ANIMAL</h4>
-                <p style="margin: 0; font-size: 12px; color: #666;">ID Pedido: ${id} | Generado: ${new Date().toLocaleString()}</p>
-            </div>
-
-            <div style="margin-bottom: 20px;">
-                <p style="font-size: 12px; margin: 5px 0;"><strong>Investigador:</strong> ${investigador}</p>
-                <p style="font-size: 11px; margin: 5px 0; color: #555;">${contacto}</p>
-                <p style="font-size: 14px; margin: 15px 0;"><strong>ESTADO DEL PEDIDO:</strong> <span style="color: #1a5d3b; font-weight: bold;">${estado}</span></p>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; width: 50%;"><strong>Tipo de Pedido:</strong><br>${tipoPedido}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>N° Protocolo:</strong><br>${nProtocolo}</td>
-                </tr>
-            <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Especie:</strong><br>${especie}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Categoría:</strong><br>${categoria}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;" colspan="2">
-                        <strong>Cepa/Stock/Raza:</strong> ${raza} &nbsp;|&nbsp; <strong>Edad:</strong> ${edad} &nbsp;|&nbsp; <strong>Peso:</strong> ${peso}
-                    </td>
-                </tr>
-            </table>
-
-            <table style="width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
-                <thead>
-                    <tr style="background-color: #f2f2f2;">
-                        <th style="padding: 10px; border: 1px solid #ddd;">Machos</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">Hembras</th>
-                        <th style="padding: 10px; border: 1px solid #ddd;">Indistintos</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; background-color: #e9f5ee;">TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;">${machos}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">${hembras}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">${indistintos}</td>
-                        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">${total}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #eee;">
-                <p style="margin: 5px 0; font-size: 12px;"><strong>Precio Unitario:</strong> $${precioUnit}</p>
-                <p style="margin: 5px 0; font-size: 18px; color: #1a5d3b;"><strong>PRECIO TOTAL: ${precioFinalDisplay}</strong></p>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px;">
-                    <strong>Fecha Inicio:</strong><br>${fInicio}
-                </div>
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px;">
-                    <strong>Fecha Retiro:</strong><br>${fRetiro}
-                </div>
-            </div>
-
-            <div style="border-top: 1px solid #eee; padding-top: 10px;">
-                <p style="font-size: 11px; margin-bottom: 5px;"><strong>Aclaración del Usuario:</strong></p>
-                <p style="font-size: 11px; font-style: italic; color: #555; background: #fff; padding: 5px; border: 1px dashed #ccc;">${aclaracion}</p>
-            </div>
-        </div>
-    `;
-
-    const g = window.txt?.generales || {};
     try {
-        await saveHtmlStringAsPdf(pdfTemplate, {
-            filename: `GROBO_${inst}_Pedido_${id}.pdf`,
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const M = 18;
+        const pageW = doc.internal.pageSize.getWidth();
+        const right = pageW - M;
+        let y = M;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(26, 93, 59);
+        doc.text(`GROBO - ${inst}`, pageW / 2, y, { align: 'center' });
+        y += 8;
+        doc.setFontSize(12);
+        doc.setTextColor(80);
+        doc.text('FICHA DE PEDIDO: ANIMAL', pageW / 2, y, { align: 'center' });
+        y += 6;
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`ID Pedido: ${id} | Generado: ${new Date().toLocaleString()}`, pageW / 2, y, { align: 'center' });
+        y += 4;
+        doc.setDrawColor(26, 93, 59);
+        doc.line(M, y, right, y);
+        y += 8;
+
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Investigador: ${investigador}`, M, y);
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        const contactoLines = doc.splitTextToSize(String(contacto), right - M);
+        doc.text(contactoLines, M, y);
+        y += contactoLines.length * 4.5 + 3;
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Estado del pedido: ${estado}`, M, y);
+        y += 8;
+
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            body: [
+                ['Tipo de pedido', tipoPedido, 'N° Protocolo', nProtocolo],
+                ['Especie', especie, 'Categoría', categoria],
+                ['Cepa/Stock/Raza', raza, 'Edad', edad],
+                ['Peso', peso, '', ''],
+            ],
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 38 },
+                2: { fontStyle: 'bold', cellWidth: 38 },
+            },
         });
+
+        y = doc.lastAutoTable.finalY + 6;
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            head: [['Machos', 'Hembras', 'Indistintos', 'TOTAL']],
+            body: [[machos, hembras, indistintos, total]],
+            headStyles: { fillColor: [242, 242, 242], textColor: [0, 0, 0], halign: 'center' },
+            styles: { halign: 'center', fontSize: 10, fontStyle: 'bold' },
+            theme: 'grid',
+        });
+
+        y = doc.lastAutoTable.finalY + 8;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Precio unitario: $${precioUnit}`, M, y);
+        y += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(26, 93, 59);
+        doc.text(`Precio total: ${precioFinalDisplay}`, M, y);
+        y += 10;
+
+        doc.setTextColor(0);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            body: [
+                ['Fecha inicio', fInicio],
+                ['Fecha retiro', fRetiro],
+            ],
+            theme: 'grid',
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
+        });
+
+        y = doc.lastAutoTable.finalY + 8;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Aclaración del usuario:', M, y);
+        y += 5;
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        const aclLines = doc.splitTextToSize(String(aclaracion), right - M);
+        doc.text(aclLines, M, y);
+
+        doc.save(`GROBO_${inst}_Pedido_${id}.pdf`);
     } catch (error) {
         console.error('Error al generar PDF:', error);
-        if (!window.Swal) return;
-        if (error?.code === 'html2pdf_not_loaded') {
-            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
-        } else {
-            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
-        }
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
     }
 };
 

@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Página no encontrada - GROBO</title>
+    <script>
+        (function () {
+            var p = location.pathname.replace(/\\/g, '/');
+            var m = p.match(/(?:^|\/)panel\/(capacitacion|ventas|soporte|noticias|poe)(?:\.html)?\/?$/i);
+            if (!m) return;
+            var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            var base = isLocal ? '/URBE-API-DRIVEN/front/' : '/';
+            location.replace(base + 'paginas/panel/' + m[1].toLowerCase() + '.html' + location.search + location.hash);
+        })();
+    </script>
     <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>

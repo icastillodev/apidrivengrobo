@@ -39,7 +39,8 @@ export function buildPanelOnlyPageRelativeUrl(slug) {
  */
 export function tryResolveLegacyPanelCleanUrl(pathname, search = '', hash = '') {
     const path = String(pathname || '').replace(/\\/g, '/');
-    const m = path.match(/(?:^|\/)panel\/([a-z]+)\/?$/i);
+    // /panel/poe y /panel/poe.html (nginx añade .html → usuario/poe.html.html)
+    const m = path.match(/(?:^|\/)panel\/([a-z]+)(?:\.html)?\/?$/i);
     if (!m) return null;
     const base = buildPanelOnlyPageRelativeUrl(m[1]);
     if (!base) return null;
