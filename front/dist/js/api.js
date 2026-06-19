@@ -48,16 +48,10 @@ export function tryResolveLegacyPanelCleanUrl(pathname, search = '', hash = '') 
 }
 
 /** Portal POE con `?id=` opcional — ruta explícita a paginas/panel/poe.html (no depende del rewrite nginx /panel/poe). */
-export function buildPanelPoePublicPageRelativeUrl(idPoe) {
-    const base = buildPanelOnlyPageRelativeUrl('poe') || `${getGroboFrontBasePath()}paginas/panel/poe.html`;
-    const id = String(idPoe ?? '').trim();
-    if (!id) return base;
-    return `${base}?id=${encodeURIComponent(id)}`;
-}
-
-export function buildPanelPoePublicPageAbsoluteUrl(idPoe) {
-    return window.location.origin + buildPanelPoePublicPageRelativeUrl(idPoe);
-}
+export {
+    buildPanelPoePublicPageRelativeUrl,
+    buildPanelPoePublicPageAbsoluteUrl,
+} from './utils/panelPoeUrl.js';
 
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO

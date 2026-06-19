@@ -2,7 +2,12 @@
 import { API } from '../../api.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
-import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDerivacionProtocoloDeptoBadge } from '../../utils/derivacionTarifariosUI.js';
+import {
+    renderDerivacionTarifariosToolbar,
+    renderDerivacionRouteBadge,
+    renderDerivacionProtocoloDeptoBadge,
+    getDerivacionProtocoloDepto,
+} from '../../utils/derivacionTarifariosUI.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { translatePage } from '../../utils/i18n.js';
@@ -489,6 +494,7 @@ window.openAnimalModal = async (a) => {
     if (derivConfig?.enviadoPor && (derivConfig.enviadoPor.nombre || derivConfig.enviadoPor.institucion)) {
         html += renderEnviadoPor(derivConfig.enviadoPor);
     }
+    html += renderDerivacionInstSummary(a, derivConfig);
     html += renderDerivacionTarifariosToolbar(a);
     html += renderResearcherContact(a);
     html += `<input type="hidden" id="current-idformA" value="${a.idformA}">`;
@@ -591,6 +597,104 @@ function renderEnviadoPor(ep) {
     if (ep.correo || ep.telefono) html += ` | ${ep.correo || ''} ${ep.telefono ? (ep.correo ? '· ' : '') + ep.telefono : ''}`;
     html += '</div>';
     return html;
+}
+
+function isAnimalDerivacionActiva(a) {
+    return Number(a?.DerivadoActivo || 0) === 1 && Number(a?.IdFormularioDerivacionActiva || 0) > 0;
+}
+
+function escapeHtmlAttr(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function getAnimalDerivacionMeta(a, derivConfig) {
+    if (!isAnimalDerivacionActiva(a)) return null;
+    const tx = window.txt?.misformularios || {};
+    const originName = (a.InstitucionOrigenNombre || '').trim() || '—';
+    const currentName = (a.InstitucionActualNombre || '').trim() || '—';
+    const routeText = [originName, currentName].filter((n) => n && n !== '—').join(' → ') || '—';
+    const deptoProt = getDerivacionProtocoloDepto(a);
+    const wfRaw = (a.EstadoWorkflow || '').trim();
+    let wfLabel = wfRaw || '—';
+    const wfUp = wfRaw.toUpperCase();
+    if (wfUp.includes('PENDIENT')) wfLabel = tx.estado_derivacion_pendiente || wfRaw;
+    else if (wfUp.includes('ACEPT')) wfLabel = tx.estado_derivacion_aceptada || wfRaw;
+    else if (wfUp.includes('DEVUEL')) wfLabel = tx.estado_derivacion_devuelta || wfRaw;
+    else if (wfUp.includes('RECHAZ')) wfLabel = tx.estado_derivacion_rechazada || wfRaw;
+    else if (wfUp.includes('CANCEL')) wfLabel = tx.estado_derivacion_cancelada || wfRaw;
+    let enviadoPor = '';
+    if (derivConfig?.enviadoPor) {
+        enviadoPor = [derivConfig.enviadoPor.nombre, derivConfig.enviadoPor.institucion].filter(Boolean).join(', ');
+    }
+    return { originName, currentName, routeText, deptoProt, wfLabel, enviadoPor };
+}
+
+function renderDerivacionInstSummary(a, derivConfig) {
+    const meta = getAnimalDerivacionMeta(a, derivConfig);
+    if (!meta) return '';
+    const ta = window.txt?.admin_animales || {};
+    const tx = window.txt?.misformularios || {};
+    const lblTitulo = ta.derivacion_resumen_inst || 'Derivación en red';
+    const lblOrigen = ta.derivacion_inst_origen || 'Derivado de la institución';
+    const lblActual = ta.derivacion_inst_actual || 'En gestión en';
+    const lblRuta = ta.derivacion_inst_ruta || 'Ruta institucional';
+    const lblWf = ta.derivacion_estado_workflow || 'Estado de derivación';
+    const lblDepto = tx.derivacion_depto_protocolo || 'Depto. protocolo';
+    const lblEnviado = tx.derivacion_enviado_por || 'Enviado por';
+    let rows = `
+        <div class="col-md-6"><strong data-i18n="admin_animales.derivacion_inst_origen">${lblOrigen}:</strong> ${meta.originName}</div>
+        <div class="col-md-6"><strong data-i18n="admin_animales.derivacion_inst_actual">${lblActual}:</strong> ${meta.currentName}</div>
+        <div class="col-12"><strong data-i18n="admin_animales.derivacion_inst_ruta">${lblRuta}:</strong> ${meta.routeText}</div>`;
+    if (meta.deptoProt) {
+        rows += `<div class="col-md-6"><strong data-i18n="misformularios.derivacion_depto_protocolo">${lblDepto}:</strong> ${meta.deptoProt}</div>`;
+    }
+    if (meta.wfLabel && meta.wfLabel !== '—') {
+        rows += `<div class="col-md-6"><strong data-i18n="admin_animales.derivacion_estado_workflow">${lblWf}:</strong> ${meta.wfLabel}</div>`;
+    }
+    if (meta.enviadoPor) {
+        rows += `<div class="col-12"><strong data-i18n="misformularios.derivacion_enviado_por">${lblEnviado}:</strong> ${meta.enviadoPor}</div>`;
+    }
+    return `
+    <div id="modal-derivacion-inst-resumen" class="alert alert-primary border-primary mb-3 py-3">
+        <h6 class="fw-bold mb-2"><i class="bi bi-arrow-left-right me-2"></i><span data-i18n="admin_animales.derivacion_resumen_inst">${lblTitulo}</span></h6>
+        <div class="row g-2 small">${rows}</div>
+    </div>
+    <input type="hidden" id="animal-pdf-deriv-origen" value="${escapeHtmlAttr(meta.originName)}">
+    <input type="hidden" id="animal-pdf-deriv-actual" value="${escapeHtmlAttr(meta.currentName)}">
+    <input type="hidden" id="animal-pdf-deriv-ruta" value="${escapeHtmlAttr(meta.routeText)}">
+    <input type="hidden" id="animal-pdf-deriv-depto" value="${escapeHtmlAttr(meta.deptoProt || '')}">
+    <input type="hidden" id="animal-pdf-deriv-workflow" value="${escapeHtmlAttr(meta.wfLabel)}">
+    <input type="hidden" id="animal-pdf-deriv-enviado" value="${escapeHtmlAttr(meta.enviadoPor)}">`;
+}
+
+function renderDerivacionInstFormLine(a) {
+    if (!isAnimalDerivacionActiva(a)) return '';
+    const ta = window.txt?.admin_animales || {};
+    const originName = (a.InstitucionOrigenNombre || '').trim() || '—';
+    const lbl = ta.derivacion_form_de || 'Derivado de la institución';
+    return `
+    <div class="alert alert-light border-primary mb-3 py-2 px-3 small" id="form-derivacion-inst-line">
+        <i class="bi bi-building me-1"></i>
+        <strong data-i18n="admin_animales.derivacion_form_de">${lbl}:</strong> ${originName}
+    </div>`;
+}
+
+function readAnimalDerivacionForPdf() {
+    const origenEl = document.getElementById('animal-pdf-deriv-origen');
+    const origen = origenEl?.value?.trim();
+    if (!origen || origen === '—') return null;
+    return {
+        origen,
+        actual: document.getElementById('animal-pdf-deriv-actual')?.value?.trim() || '',
+        ruta: document.getElementById('animal-pdf-deriv-ruta')?.value?.trim() || '',
+        depto: document.getElementById('animal-pdf-deriv-depto')?.value?.trim() || '',
+        workflow: document.getElementById('animal-pdf-deriv-workflow')?.value?.trim() || '',
+        enviadoPor: document.getElementById('animal-pdf-deriv-enviado')?.value?.trim() || '',
+    };
 }
 
 function renderConfigFaltaBanner(faltantes) {
@@ -848,6 +952,7 @@ function renderOrderModificationSection(a, sex, cache) {
     ${panelOrigen}
     <form id="form-animal-full" class="bg-white p-3 border rounded shadow-sm">
         <input type="hidden" name="idformA" value="${a.idformA}">
+        ${renderDerivacionInstFormLine(a)}
         <div class="row g-3">
             
             <div class="col-md-12">
@@ -1818,6 +1923,40 @@ window.downloadAnimalPDF = async (id) => {
         doc.setDrawColor(26, 93, 59);
         doc.line(M, y, right, y);
         y += 8;
+
+        const derivPdf = readAnimalDerivacionForPdf();
+        if (derivPdf) {
+            const ta = window.txt?.admin_animales || {};
+            const tx = window.txt?.misformularios || {};
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(13, 110, 253);
+            doc.text(ta.derivacion_resumen_inst || 'Derivación en red', M, y);
+            y += 6;
+            const derivBody = [
+                [ta.derivacion_inst_origen || 'Derivado de la institución', derivPdf.origen],
+                [ta.derivacion_inst_actual || 'En gestión en', derivPdf.actual || '—'],
+                [ta.derivacion_inst_ruta || 'Ruta institucional', derivPdf.ruta || '—'],
+            ];
+            if (derivPdf.depto) {
+                derivBody.push([tx.derivacion_depto_protocolo || 'Depto. protocolo', derivPdf.depto]);
+            }
+            if (derivPdf.workflow && derivPdf.workflow !== '—') {
+                derivBody.push([ta.derivacion_estado_workflow || 'Estado de derivación', derivPdf.workflow]);
+            }
+            if (derivPdf.enviadoPor) {
+                derivBody.push([tx.derivacion_enviado_por || 'Enviado por', derivPdf.enviadoPor]);
+            }
+            doc.autoTable({
+                startY: y,
+                margin: { left: M, right: M },
+                body: derivBody,
+                theme: 'grid',
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: { 0: { fontStyle: 'bold', cellWidth: 52 } },
+            });
+            y = doc.lastAutoTable.finalY + 8;
+        }
 
         doc.setFontSize(10);
         doc.setTextColor(0);

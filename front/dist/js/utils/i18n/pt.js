@@ -3124,6 +3124,12 @@ alojamientos: {
                 "O protocolo não permite gerir anestésicos nos pedidos. Ative na ficha do protocolo (Permite anestésicos).",
             anestesicos_guardado_ok: "Estado de anestésicos atualizado"
         },
+        derivacion_resumen_inst: "Derivação em rede",
+        derivacion_inst_origen: "Derivado da instituição",
+        derivacion_inst_actual: "Em gestão em",
+        derivacion_inst_ruta: "Rota institucional",
+        derivacion_estado_workflow: "Estado da derivação",
+        derivacion_form_de: "Derivado da instituição",
         derivacion_legacy_titulo: "Derivação antiga (formulário duplicado)",
         derivacion_legacy_banner_copia: "Este pedido foi criado como formulário novo (fluxo antigo). Não o use para seguir na rede: peça devolução ou cancele o trâmite e volte a derivar a partir do formulário original com o processo atual (um único formulário partilhado).",
         derivacion_legacy_banner_origen: "Há um trâmite em rede feito com cópia de formulário (versão antiga). Encerre ou cancele essa derivação conforme o caso e volte a derivar com o fluxo atual.",

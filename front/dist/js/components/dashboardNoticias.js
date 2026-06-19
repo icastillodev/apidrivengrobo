@@ -1,4 +1,5 @@
-import { API, buildPanelPoePublicPageRelativeUrl } from '../api.js';
+import { API } from '../api.js';
+import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js';
 import { getCorrectPath } from './menujs/MenuConfig.js';
 import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260510';
 

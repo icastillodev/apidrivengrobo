@@ -1,4 +1,4 @@
-import { buildPanelPoePublicPageAbsoluteUrl } from '../api.js';
+import { buildPanelPoePublicPageAbsoluteUrl } from './panelPoeUrl.js';
 
 function escapeHtmlAttr(s) {
     return String(s ?? '')

@@ -3123,6 +3123,12 @@ alojamientos: {
                 "The protocol does not allow managing anesthetics on orders. Enable it on the protocol record (Allow anesthetics).",
             anestesicos_guardado_ok: "Anesthetics status updated"
         },
+        derivacion_resumen_inst: "Network derivation",
+        derivacion_inst_origen: "Derived from institution",
+        derivacion_inst_actual: "Currently managed at",
+        derivacion_inst_ruta: "Institutional route",
+        derivacion_estado_workflow: "Derivation status",
+        derivacion_form_de: "Derived from institution",
         derivacion_legacy_titulo: "Legacy derivation (duplicate form)",
         derivacion_legacy_banner_copia: "This order was created as a new form (old flow). Do not use it to continue on the network: have the case returned or cancelled, then derive again from the original form using the current process (one shared form).",
         derivacion_legacy_banner_origen: "There is an active network case that used a copied form (old version). Close or cancel that derivation as appropriate and derive again using the current flow.",

@@ -3135,6 +3135,12 @@ export const es = {
                 "El protocolo no permite gestionar anestésicos en pedidos. Actívelo en la ficha del protocolo (Permite anestésicos).",
             anestesicos_guardado_ok: "Estado de anestésicos actualizado"
         },
+        derivacion_resumen_inst: "Derivación en red",
+        derivacion_inst_origen: "Derivado de la institución",
+        derivacion_inst_actual: "En gestión en",
+        derivacion_inst_ruta: "Ruta institucional",
+        derivacion_estado_workflow: "Estado de derivación",
+        derivacion_form_de: "Derivado de la institución",
         derivacion_legacy_titulo: "Derivación antigua (formulario duplicado)",
         derivacion_legacy_banner_copia: "Este pedido se creó como formulario nuevo (flujo antiguo). No lo use para continuar la red: pida que se devuelva o cancele ese trámite, y vuelva a derivar desde el formulario original con el proceso actual (un solo formulario compartido).",
         derivacion_legacy_banner_origen: "Hay un trámite en red hecho con copia de formulario (versión antigua). Cierre o cancele esa derivación en dest/origen según corresponda y vuelva a derivar con el flujo actual.",
