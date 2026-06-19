@@ -3,6 +3,7 @@
  * Sistema: GROBO 2026
  */
 import { API } from '../../api.js';
+import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
@@ -1008,13 +1009,21 @@ window.downloadReactivoPDF = async (id) => {
         </div>
     `;
 
-    const opt = { 
-        margin: [18, 18, 18, 18], 
-        filename: `Pedido_Reactivo_${id}.pdf`, 
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }
-    };
-    html2pdf().set(opt).from(pdfTemplate).save();
+    const g = window.txt?.generales || {};
+    try {
+        await saveHtmlStringAsPdf(pdfTemplate, {
+            filename: `Pedido_Reactivo_${id}.pdf`,
+            html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true },
+        });
+    } catch (error) {
+        console.error('Error al generar PDF reactivo:', error);
+        if (!window.Swal) return;
+        if (error?.code === 'html2pdf_not_loaded') {
+            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
+        } else {
+            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
+        }
+    }
 };
 /**
  * AUXILIARES (TABLA)

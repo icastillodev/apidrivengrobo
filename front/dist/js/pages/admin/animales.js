@@ -8,6 +8,7 @@ import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../.
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
 import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
@@ -1852,33 +1853,20 @@ window.downloadAnimalPDF = async (id) => {
         </div>
     `;
 
-    // Configuración de html2pdf
-    const opt = {
-        margin: [18, 18, 18, 18],
-        filename: `GROBO_${inst}_Pedido_${id}.pdf`,
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
     const g = window.txt?.generales || {};
-    if (typeof html2pdf !== 'function') {
-        if (window.Swal) Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
-        return;
-    }
-    const wrap = document.createElement('div');
-    wrap.style.position = 'absolute';
-    wrap.style.left = '-9999px';
-    wrap.style.top = '0';
-    wrap.style.width = '210mm';
-    wrap.innerHTML = pdfTemplate;
-    document.body.appendChild(wrap);
     try {
-        await html2pdf().set(opt).from(wrap).save();
+        await saveHtmlStringAsPdf(pdfTemplate, {
+            filename: `GROBO_${inst}_Pedido_${id}.pdf`,
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        });
     } catch (error) {
         console.error('Error al generar PDF:', error);
-        if (window.Swal) Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
-    } finally {
-        wrap.remove();
+        if (!window.Swal) return;
+        if (error?.code === 'html2pdf_not_loaded') {
+            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
+        } else {
+            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
+        }
     }
 };
 

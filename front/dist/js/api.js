@@ -23,9 +23,32 @@ export function buildQrAlojamientoPublicPageAbsoluteUrl(code) {
     return window.location.origin + buildQrAlojamientoPublicPageRelativeUrl(code);
 }
 
+/** Páginas que viven en paginas/panel/ pero nginx /panel/X las mapea a paginas/usuario/. */
+export const PANEL_ONLY_PAGE_SLUGS = ['capacitacion', 'ventas', 'soporte', 'noticias', 'poe'];
+
+/** Ruta relativa al HTML real bajo paginas/panel/ (producción sin depender de rewrite nginx). */
+export function buildPanelOnlyPageRelativeUrl(slug) {
+    const s = String(slug ?? '').replace(/\.html$/i, '').trim().toLowerCase();
+    if (!PANEL_ONLY_PAGE_SLUGS.includes(s)) return null;
+    return `${getGroboFrontBasePath()}paginas/panel/${s}.html`;
+}
+
+/**
+ * Si la URL limpia es /panel/{slug} de una página solo-panel, devuelve paginas/panel/{slug}.html + query/hash.
+ * @returns {string|null}
+ */
+export function tryResolveLegacyPanelCleanUrl(pathname, search = '', hash = '') {
+    const path = String(pathname || '').replace(/\\/g, '/');
+    const m = path.match(/(?:^|\/)panel\/([a-z]+)\/?$/i);
+    if (!m) return null;
+    const base = buildPanelOnlyPageRelativeUrl(m[1]);
+    if (!base) return null;
+    return `${base}${search || ''}${hash || ''}`;
+}
+
 /** Portal POE con `?id=` opcional — ruta explícita a paginas/panel/poe.html (no depende del rewrite nginx /panel/poe). */
 export function buildPanelPoePublicPageRelativeUrl(idPoe) {
-    const base = `${getGroboFrontBasePath()}paginas/panel/poe.html`;
+    const base = buildPanelOnlyPageRelativeUrl('poe') || `${getGroboFrontBasePath()}paginas/panel/poe.html`;
     const id = String(idPoe ?? '').trim();
     if (!id) return base;
     return `${base}?id=${encodeURIComponent(id)}`;

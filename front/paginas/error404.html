@@ -41,6 +41,21 @@
 
         async function run404() {
             try {
+                const { tryResolveLegacyPanelCleanUrl } = await import(basePath + 'dist/js/api.js');
+                const panelFix = tryResolveLegacyPanelCleanUrl(
+                    window.location.pathname,
+                    window.location.search,
+                    window.location.hash
+                );
+                if (panelFix) {
+                    window.location.replace(panelFix);
+                    return;
+                }
+            } catch (e) {
+                console.warn('panel redirect:', e);
+            }
+
+            try {
                 const { loadLanguage, translatePage } = await import(basePath + 'dist/js/utils/i18n.js');
                 const lang = localStorage.getItem('lang') || localStorage.getItem('idioma') || null;
                 await loadLanguage(lang);

@@ -8,7 +8,10 @@ export function getPreservableAppReturnHref() {
         if (!path.includes('/paginas/')) return '';
         const sp = new URLSearchParams(window.location.search);
         const keys = ['hilo', 'msgnuevo', 'asunto', 'origen', 'instid', 'form', 'idform', 'historia', 'token', 'alcance', 'id'];
-        if (path.includes('poe.html') && sp.has('id')) {
+        const isPoeDeepLink =
+            sp.has('id') &&
+            (path.includes('poe.html') || /\/panel\/poe(?:\.html)?(?:\/|$)/i.test(path));
+        if (isPoeDeepLink) {
             return window.location.origin + window.location.pathname + window.location.search + window.location.hash;
         }
         for (let i = 0; i < keys.length; i++) {

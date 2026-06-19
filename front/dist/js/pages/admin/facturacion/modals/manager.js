@@ -27,6 +27,26 @@ function bmTpl(str, map) {
     return str.replace(/\{(\w+)\}/g, (_, k) => (map[k] != null ? String(map[k]) : `{${k}}`));
 }
 
+function ensureBillingModalPdfLibs() {
+    const g = window.txt?.generales || {};
+    const errPdf = window.txt?.facturacion?.error_pdf || 'Could not generate PDF document.';
+    if (!window.jspdf?.jsPDF) {
+        Swal.fire(g.error || 'Error', g.err_pdf_lib || errPdf, 'error');
+        return false;
+    }
+    try {
+        const probe = new window.jspdf.jsPDF();
+        if (typeof probe.autoTable !== 'function') {
+            Swal.fire(g.error || 'Error', g.err_pdf_lib || errPdf, 'error');
+            return false;
+        }
+    } catch (_) {
+        Swal.fire(g.error || 'Error', errPdf, 'error');
+        return false;
+    }
+    return true;
+}
+
 /** Plantilla `billing_modal`: objeto local `tx`, luego `window.txt`, último recurso EN (paridad con `en.js`). */
 function bmTxt(tx, key, fallbackEn) {
     return tx[key] || window.txt?.facturacion?.billing_modal?.[key] || fallbackEn;
@@ -608,6 +628,7 @@ window.descargarFichaAlojLegacyPDF = async (historiaId) => {
 window.descargarFichaPDF = async (id, tipo, opts = {}) => {
     if (tipo === 'ALOJ') return window.descargarFichaAlojLegacyPDF(id);
     if (tipo !== 'ANIMAL') return;
+    if (!ensureBillingModalPdfLibs()) return;
 
     const tx = txBM();
     const g = window.txt?.generales || {};
@@ -831,6 +852,7 @@ window.descargarFichaAlojPDF = async (historiaId) => {
 };
 
 window.descargarFichaReaPDF = async (idformA) => {
+    if (!ensureBillingModalPdfLibs()) return;
     const tx = txBM();
     const g = window.txt?.generales || {};
     const errPdf = window.txt?.facturacion?.error_pdf || 'Could not generate PDF document.';
@@ -959,6 +981,7 @@ window.descargarFichaReaPDF = async (idformA) => {
 };
 
 window.descargarFichaInsPDF = async (idformA) => {
+    if (!ensureBillingModalPdfLibs()) return;
     const tx = txBM();
     const g = window.txt?.generales || {};
     const errPdf = window.txt?.facturacion?.error_pdf || 'Could not generate PDF document.';

@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
@@ -996,8 +997,6 @@ window.showDerivHistoryInsumo = async (idformA) => {
 };
 
 
-// Stubs para evitar errores de referencia
-window.downloadInsumoPDF = (id) => { console.log("Generando PDF para ID:", id); };
 window.openNotifyPopupInsumo = (id) => { console.log("Abriendo popup notificación para ID:", id); };
 
 
@@ -1279,15 +1278,22 @@ window.downloadInsumoPDF = async (id) => {
         </div>
     `;
 
-    const opt = { 
-        margin: [18, 18, 18, 18], 
-        filename: `Pedido_Insumos_${id}_${new Date().getTime()}.pdf`, 
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(pdfTemplate).save();
+    const g = window.txt?.generales || {};
+    try {
+        await saveHtmlStringAsPdf(pdfTemplate, {
+            filename: `Pedido_Insumos_${id}_${new Date().getTime()}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 3, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', logging: false },
+        });
+    } catch (error) {
+        console.error('Error al generar PDF insumo:', error);
+        if (!window.Swal) return;
+        if (error?.code === 'html2pdf_not_loaded') {
+            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
+        } else {
+            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
+        }
+    }
 };
 
 /**
