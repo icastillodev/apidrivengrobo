@@ -1,3 +1,6 @@
+/** @see assetVersion.js POE_ASSET_VERSION */
+export const PANEL_POE_URL_VERSION = '20260521';
+
 /** Base del front (local vs producción). Módulo liviano: no depende de api.js. */
 export function getGroboFrontBasePathForPoe() {
     return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'

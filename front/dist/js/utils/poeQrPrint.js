@@ -1,4 +1,11 @@
-import { buildPanelPoePublicPageAbsoluteUrl } from './panelPoeUrl.js';
+/** @see assetVersion.js POE_ASSET_VERSION */
+export const POE_QR_PRINT_VERSION = '20260521';
+
+function groboFrontBasePath() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? '/URBE-API-DRIVEN/front/'
+        : '/';
+}
 
 function escapeHtmlAttr(s) {
     return String(s ?? '')
@@ -8,9 +15,12 @@ function escapeHtmlAttr(s) {
         .replace(/"/g, '&quot;');
 }
 
-/** URL absoluta al portal POEs con ancla de documento (?id=). */
+/** URL absoluta al portal POEs con ancla de documento (?id=). Sin import de api.js (evita desfase de deploy). */
 export function buildPanelPoePublicUrl(idPoe) {
-    return buildPanelPoePublicPageAbsoluteUrl(idPoe);
+    const base = `${groboFrontBasePath()}paginas/panel/poe.html`;
+    const id = String(idPoe ?? '').trim();
+    const rel = id ? `${base}?id=${encodeURIComponent(id)}` : base;
+    return window.location.origin + rel;
 }
 
 /**

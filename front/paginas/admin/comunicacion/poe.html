@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="grobo-asset-version" content="20260521">
+    <meta name="grobo-poe-version" content="20260521">
     <title>POE (admin) - GROBO</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -16,9 +18,13 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260409';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js?v=20260409';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260409';
-        import { initAdminPoe } from '../../../dist/js/pages/admin/comunicacion_poe.js?v=20260613';
+        import { initAdminPoe } from '../../../dist/js/pages/admin/comunicacion_poe.js?v=20260521';
+        import { POE_ASSET_VERSION } from '../../../dist/js/assetVersion.js?v=20260521';
 
         document.addEventListener('DOMContentLoaded', async () => {
+            if (typeof POE_ASSET_VERSION === 'string') {
+                document.documentElement.dataset.groboPoeVersion = POE_ASSET_VERSION;
+            }
             showLoader();
             try {
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);

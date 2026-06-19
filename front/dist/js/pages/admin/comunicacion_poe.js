@@ -1,7 +1,11 @@
-import { API } from '../../api.js';
+import { API } from '../../api.js?v=20260521';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
-import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20260521';
+import { exposePoeAssetVersion } from '../../assetVersion.js?v=20260521';
 import { createAdminListPageCache, offsetLimitToPagePageSizeQuery } from '../../utils/adminListPageCache.js';
+
+/** @see assetVersion.js POE_ASSET_VERSION */
+export const COMUNICACION_POE_VERSION = '20260521';
 
 const poeB2 = {
     Adjunto1B2Key: null,
@@ -122,6 +126,7 @@ function setVal(id, v) {
 }
 
 export async function initAdminPoe() {
+    exposePoeAssetVersion();
     const t = window.txt?.comunicacion || {};
     const tbody = document.getElementById('admin-poe-tbody');
     const infoEl = document.getElementById('admin-poe-pag-info');

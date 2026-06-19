@@ -1,5 +1,9 @@
-import { API } from '../../api.js';
-import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js';
+import { API } from '../../api.js?v=20260521';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20260521';
+import { exposePoeAssetVersion } from '../../assetVersion.js?v=20260521';
+
+/** @see assetVersion.js POE_ASSET_VERSION */
+export const POE_PORTAL_VERSION = '20260521';
 
 function escapeHtml(s) {
     return String(s ?? '')
@@ -33,6 +37,7 @@ async function openPoeAdjunto(idPoe, slot) {
 }
 
 export async function initPortalPoe() {
+    exposePoeAssetVersion();
     const t = window.txt?.comunicacion || {};
     const grid = document.getElementById('poe-portal-grid');
     const modalEl = document.getElementById('modal-poe-portal-detalle');
