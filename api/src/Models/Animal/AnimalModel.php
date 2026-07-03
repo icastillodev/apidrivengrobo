@@ -745,7 +745,9 @@ public function updateStatus($data) {
         $oldProt = $old['oldProt'];
         $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
 
-        // Formulario derivado (en destino): el protocolo queda fijo y no se puede cambiar.
+        // Formulario derivado (en destino): el protocolo queda fijo y no se puede cambiar,
+        // pero el destino SÍ puede editar las cantidades de animales. En el modelo sin copia
+        // se sobrescribe `sexoe` (el original queda preservado en formulario_datos_originales).
         if ($esDerivadoEnDestino) {
             $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
             $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
@@ -753,12 +755,6 @@ public function updateStatus($data) {
                 throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");
             }
             $newProt = $oldProtNorm;
-            $data['fechainicioA'] = $old['oldInicio'] ?? ($data['fechainicioA'] ?? null);
-            $data['fecRetiroA'] = $old['oldRetiro'] ?? ($data['fecRetiroA'] ?? null);
-            $data['machoA'] = (int)($old['oldMacho'] ?? 0);
-            $data['hembraA'] = (int)($old['oldHembra'] ?? 0);
-            $data['indistintoA'] = (int)($old['oldIndistinto'] ?? 0);
-            $newTotal = (int)($old['oldTotal'] ?? $newTotal);
         }
 
         $this->db->beginTransaction();
@@ -865,27 +861,41 @@ public function updateStatus($data) {
                         $idDeriv
                     ]);
 
-                // Facturación derivada: solo recalcular desde tarifario si cambió la categoría (subespecie destino) o es primera configuración.
+                // El destino puede editar las cantidades de animales (modelo sin copia:
+                // se sobrescribe `sexoe`, compartido por origen y destino).
+                $this->db->prepare("UPDATE sexoe SET machoA = ?, hembraA = ?, indistintoA = ?, totalA = ? WHERE idformA = ?")
+                    ->execute([
+                        (int)($data['machoA'] ?? 0),
+                        (int)($data['hembraA'] ?? 0),
+                        (int)($data['indistintoA'] ?? 0),
+                        $newTotal,
+                        $id
+                    ]);
+
+                // Facturación derivada: precio unitario congelado salvo cambio de categoría
+                // (subespecie destino) o primera configuración; el total SIEMPRE se recalcula
+                // con la cantidad vigente (permite editar animales en destino).
                 $oldSubDest = (int)($cfgActual['idsubespA_destino'] ?? 0);
                 $cambioCatDest = ($subespDestino !== $oldSubDest);
                 if ($cambioCatDest || $oldSubDest <= 0) {
                     $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
                     $stmtPrecio->execute([$subespDestino]);
-                    $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
-                    $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                    $precioUnitDest = (float)$stmtPrecio->fetchColumn();
                 } else {
+                    // Mantener el unitario ya facturado (derivado del monto previo / cantidad previa).
                     $stmtM = $this->db->prepare("SELECT monto_total FROM facturacion_formulario_derivado WHERE IdFormularioDerivacion = ? AND IdInstitucionCobradora = ? LIMIT 1");
                     $stmtM->execute([$idDeriv, $instIdRequest]);
                     $prevMonto = (float)($stmtM->fetchColumn() ?: 0);
-                    if ($prevMonto > 0) {
-                        $nuevoCostoTotal = $prevMonto;
+                    if ($prevMonto > 0 && $oldTotal > 0) {
+                        $precioUnitDest = $prevMonto / $oldTotal;
                     } else {
                         $stmtPrecio = $this->db->prepare("SELECT Psubanimal FROM subespecie WHERE idsubespA = ?");
                         $stmtPrecio->execute([$subespDestino]);
-                        $nuevoPrecioUnitario = (float)$stmtPrecio->fetchColumn();
-                        $nuevoCostoTotal = $nuevoPrecioUnitario * $newTotal;
+                        $precioUnitDest = (float)$stmtPrecio->fetchColumn();
                     }
                 }
+                $nuevoCostoTotal = $precioUnitDest * $newTotal;
+
                 if ($this->hasTable('facturacion_formulario_derivado')) {
                     $this->db->prepare("UPDATE facturacion_formulario_derivado
                                         SET monto_total = ?

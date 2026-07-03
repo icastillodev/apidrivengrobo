@@ -473,7 +473,7 @@ export async function initAdminPoe() {
 
     document.getElementById('btn-poe-admin-qr')?.addEventListener('click', async () => {
         const id = getPoeEditId();
-        if (!id || typeof QRCode === 'undefined') return;
+        if (!id) return;
         const url = buildPanelPoePublicUrl(id);
         const titulo = val('poe-titulo') || '';
         await showPoeQrSwal(t, titulo, url);

@@ -272,11 +272,16 @@ class UsuarioTodosProtocolosModel {
                     $size     = isset($f['size']) ? (int)$f['size'] : 0;
                     $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
 
-                    if ($ext !== 'pdf') {
+                    $badType = ($ext !== 'pdf');
+                    $badSize = ($size <= 0 || $size > (5 * 1024 * 1024));
+                    if ($badType && $badSize) {
+                        throw new Exception('El adjunto debe ser PDF y no superar 5 MB.');
+                    }
+                    if ($badType) {
                         throw new Exception('Solo se aceptan archivos PDF como adjuntos de protocolo.');
                     }
-                    if ($size <= 0 || $size > (2 * 1024 * 1024)) {
-                        throw new Exception('Cada archivo adjunto debe pesar como máximo 2 MB.');
+                    if ($badSize) {
+                        throw new Exception('Cada archivo adjunto debe pesar como máximo 5 MB.');
                     }
                     $safeName = preg_replace('/[^\w\.\-]+/u', '_', $original);
                     if ($safeName === '' || $safeName === null) {
@@ -345,11 +350,16 @@ class UsuarioTodosProtocolosModel {
                     $size     = isset($f['size']) ? (int)$f['size'] : 0;
                     $ext      = strtolower(pathinfo($original, PATHINFO_EXTENSION));
 
-                    if ($ext !== 'pdf') {
+                    $badType = ($ext !== 'pdf');
+                    $badSize = ($size <= 0 || $size > (5 * 1024 * 1024));
+                    if ($badType && $badSize) {
+                        throw new Exception('El adjunto debe ser PDF y no superar 5 MB.');
+                    }
+                    if ($badType) {
                         throw new Exception('Solo se aceptan archivos PDF como adjuntos de protocolo.');
                     }
-                    if ($size <= 0 || $size > (2 * 1024 * 1024)) {
-                        throw new Exception('Cada archivo adjunto debe pesar como máximo 2 MB.');
+                    if ($badSize) {
+                        throw new Exception('Cada archivo adjunto debe pesar como máximo 5 MB.');
                     }
 
                     $safeName = preg_replace('/[^\w\.\-]+/u', '_', $original);

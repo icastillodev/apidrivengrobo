@@ -902,6 +902,9 @@ function renderOrderModificationSection(a, sex, cache) {
     const wf = (a.EstadoWorkflow || '').toString().toUpperCase();
     const lockProtocol = isDerivedActive && !isOriginInst;
     const lockImmutable = isDerivedActive && !isOriginInst;
+    // El destino con derivación ACEPTADA puede editar las cantidades de animales
+    // (se sobrescriben; el original queda en formulario_datos_originales).
+    const lockCantidades = lockImmutable && wf.includes('PENDIENTE');
     // En derivación destino queremos que el usuario pueda ajustar el tipo/formulario,
     // aunque otros elementos del formulario puedan quedar bloqueados.
     const lockTipo = false;
@@ -1029,15 +1032,15 @@ function renderOrderModificationSection(a, sex, cache) {
 
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Machos</label>
-                <input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
+                <input type="number" name="machoA" class="form-control form-control-sm" value="${sex.machoA}" oninput="window.calculateAnimalTotals()" ${lockCantidades ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Hembras</label>
-                <input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
+                <input type="number" name="hembraA" class="form-control form-control-sm" value="${sex.hembraA}" oninput="window.calculateAnimalTotals()" ${lockCantidades ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Indistintos</label>
-                <input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()" ${lockImmutable ? 'readonly' : ''}>
+                <input type="number" name="indistintoA" class="form-control form-control-sm" value="${sex.indistintoA}" oninput="window.calculateAnimalTotals()" ${lockCantidades ? 'readonly' : ''}>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold uppercase text-muted mb-1">Total</label>

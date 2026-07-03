@@ -14,18 +14,25 @@ export async function saveProtocol(e) {
         form.querySelector('#adj-adjunto3')?.files?.[0],
     ].filter(Boolean);
 
-    const maxSize = 2 * 1024 * 1024;
+    const maxSize = 5 * 1024 * 1024;
+    const tp = window.txt?.misprotocolos || {};
     for (const f of files) {
         const name = f.name || '';
         const size = f.size || 0;
         const ext = name.split('.').pop().toLowerCase();
+        const badType = ext !== 'pdf';
+        const badSize = size > maxSize;
 
-        if (ext !== 'pdf') {
-            window.Swal.fire('Formato no permitido', 'Solo se aceptan archivos PDF en los adjuntos.', 'warning');
-            return;
-        }
-        if (size > maxSize) {
-            window.Swal.fire('Archivo demasiado grande', 'Cada archivo adjunto debe pesar como máximo 2 MB.', 'warning');
+        if (badType || badSize) {
+            let msg;
+            if (badType && badSize) {
+                msg = tp.adj_err_tipo_size || 'El archivo debe ser PDF y no superar 5 MB.';
+            } else if (badType) {
+                msg = tp.adj_err_tipo || 'Solo se aceptan archivos PDF en los adjuntos.';
+            } else {
+                msg = tp.adj_err_size || 'Cada archivo adjunto debe pesar como máximo 5 MB.';
+            }
+            window.Swal.fire(tp.adj_err_titulo || 'Adjunto no válido', msg, 'warning');
             return;
         }
     }

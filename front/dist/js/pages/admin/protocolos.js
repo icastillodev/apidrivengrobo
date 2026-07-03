@@ -33,14 +33,18 @@ function escapeHtml(v) {
 
 function validateProtocolAttachmentInput(file) {
     if (!file) return { ok: true };
+    const MAX = 5 * 1024 * 1024;
     const isPdfExt = /\.pdf$/i.test(file.name || '');
-    const isPdfMime = (file.type || '').toLowerCase() === 'application/pdf';
-    if (!isPdfExt || !isPdfMime) {
-        return { ok: false, reason: 'type' };
-    }
-    if (Number(file.size || 0) > (2 * 1024 * 1024)) {
-        return { ok: false, reason: 'size' };
-    }
+    // El MIME que reporta el navegador (file.type) es poco fiable: puede llegar
+    // vacío o como application/octet-stream para PDFs válidos. Validamos por
+    // extensión y solo rechazamos por MIME si trae uno explícito y distinto.
+    const mime = (file.type || '').toLowerCase();
+    const mimeOk = mime === '' || mime === 'application/pdf' || mime === 'application/octet-stream';
+    const badType = !isPdfExt || !mimeOk;
+    const badSize = Number(file.size || 0) > MAX;
+    if (badType && badSize) return { ok: false, reason: 'both' };
+    if (badType) return { ok: false, reason: 'type' };
+    if (badSize) return { ok: false, reason: 'size' };
     return { ok: true };
 }
 
@@ -374,7 +378,12 @@ function renderTable() {
         let origenTd = '';
         if (formDataCache && formDataCache.has_network) {
             let origenText = `<span class="badge bg-light text-secondary border">PROPIA</span>`;
-            if (isRedProtocol(p)) {
+            if (Number(p.EsDerivadoEntrante) === 1) {
+                const labelDeriv = window.txt?.admin_protocolos?.origen_derivado || 'DERIVADO';
+                const creadaEn = window.txt?.admin_protocolos?.origen_creada_en || 'Creado en';
+                origenText = `<span class="badge bg-warning text-dark" title="${labelDeriv}">${labelDeriv}</span>` +
+                    (p.InstitucionOrigen ? `<br><span class="small text-muted" style="font-size:9px">${creadaEn}: ${p.InstitucionOrigen}</span>` : '');
+            } else if (isRedProtocol(p)) {
                 origenText = `<span class="badge bg-info text-white" title="Protocolo de Red">RED</span><br><span class="small text-muted" style="font-size:9px">Creada en: ${p.InstitucionOrigen}</span>`;
             }
             origenTd = `<td class="text-center px-2 align-middle">${origenText}</td>`;
@@ -635,7 +644,7 @@ window.openProtocolModal = async (p = null) => {
                         <input type="file" name="adjunto3" class="form-control form-control-sm" accept="application/pdf,.pdf">
                     </div>
                 </div>
-                <div class="small text-muted mt-2">${txtProt.adjuntos_help || 'Solo PDF, máximo 2MB por archivo.'}</div>
+                <div class="small text-muted mt-2">${txtProt.adjuntos_help || 'Solo PDF, máximo 5MB por archivo.'}</div>
             </div>
     ` : '';
     const attachmentsBlock = p ? `
@@ -977,10 +986,12 @@ async function saveProtocol(e, id) {
         if (!file || !(file instanceof File) || !file.name) continue;
         const val = validateProtocolAttachmentInput(file);
         if (!val.ok) {
-            if (val.reason === 'type') {
+            if (val.reason === 'both') {
+                alert(txtProt.error_adjunto_tipo_size || 'El adjunto debe ser PDF y no superar 5MB.');
+            } else if (val.reason === 'type') {
                 alert(txtProt.error_adjunto_tipo || 'Solo se permiten archivos PDF.');
             } else {
-                alert(txtProt.error_adjunto_size || 'Cada adjunto debe ser PDF y no superar 2MB.');
+                alert(txtProt.error_adjunto_size || 'Cada adjunto debe ser PDF y no superar 5MB.');
             }
             return;
         }

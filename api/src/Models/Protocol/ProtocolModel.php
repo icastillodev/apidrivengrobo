@@ -27,6 +27,17 @@ class ProtocolModel {
         }
     }
 
+    private function hasTable(string $tableName): bool {
+        try {
+            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt->execute([$tableName]);
+
+            return (bool)$stmt->fetch(PDO::FETCH_NUM);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private function protocoloexpeHasPermiteAnestesicos(): bool {
         if ($this->protocoloexpeHasPermiteAnestesicos === null) {
             $this->protocoloexpeHasPermiteAnestesicos = $this->hasColumn('protocoloexpe', 'PermiteAnestesicos');
@@ -62,7 +73,35 @@ class ProtocolModel {
 
     public function getByInstitution($instId) {
         $peCols = $this->sqlSelectProtocoloexpeBasePrefixed('pe');
+        $hasDeriv = $this->hasTable('formulario_derivacion');
+
+        // Flag para el front: el protocolo es de otra institución pero tiene un
+        // formulario derivado (entrante) hacia esta institución.
+        $derivSelect = $hasDeriv
+            ? "(CASE WHEN pe.IdInstitucion <> ? AND EXISTS (
+                        SELECT 1
+                        FROM protformr pfrDerivSel
+                        INNER JOIN formulario_derivacion fdDerivSel ON fdDerivSel.idformA = pfrDerivSel.idformA
+                        WHERE pfrDerivSel.idprotA = pe.idprotA
+                          AND fdDerivSel.Activo = 1
+                          AND fdDerivSel.IdInstitucionDestino = ?
+                    ) THEN 1 ELSE 0 END) as EsDerivadoEntrante,"
+            : "0 as EsDerivadoEntrante,";
+
+        // Rama WHERE: incluir protocolos con un formulario derivado (entrante) a esta institución.
+        $derivWhere = $hasDeriv
+            ? "OR EXISTS (
+                    SELECT 1
+                    FROM protformr pfrDeriv
+                    INNER JOIN formulario_derivacion fdDeriv ON fdDeriv.idformA = pfrDeriv.idformA
+                    WHERE pfrDeriv.idprotA = pe.idprotA
+                      AND fdDeriv.Activo = 1
+                      AND fdDeriv.IdInstitucionDestino = ?
+                )"
+            : "";
+
         $sql = "SELECT DISTINCT
+                    {$derivSelect}
                     {$peCols}, 
                     pe.CantidadAniA as SaldoAnimales, 
                     pe.encargaprot as RespProt, 
@@ -263,11 +302,24 @@ class ProtocolModel {
                             )
                         )
                     )
+                    {$derivWhere}
                 )
                 ORDER BY pe.idprotA DESC";
 
+        // Params base del SELECT/JOIN/WHERE (7 placeholders fijos):
+        //  1) RedConfigCompleta CASE, 2) TipoAprobacion CASE, 3) JOIN protocoloexpered,
+        //  4) WHERE propios, 5) WHERE red pi, 6) WHERE red pe<>, 7) WHERE red spRedOk.
+        $params = [$instId, $instId, $instId, $instId, $instId, $instId, $instId];
+
+        if ($hasDeriv) {
+            // Placeholders del SELECT EsDerivadoEntrante (2) van primero por posición.
+            array_unshift($params, $instId, $instId);
+            // Placeholder de la rama WHERE de derivación entrante.
+            $params[] = $instId;
+        }
+
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId, $instId, $instId, $instId, $instId, $instId, $instId]);
+        $stmt->execute($params);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
@@ -570,14 +622,18 @@ class ProtocolModel {
                 $tmp = (string)($file['tmp_name'] ?? '');
                 $origName = trim((string)($file['name'] ?? 'archivo.pdf'));
                 $size = (int)($file['size'] ?? 0);
-                if ($size <= 0 || $size > (2 * 1024 * 1024)) {
-                    throw new Exception('Cada adjunto debe ser PDF y no superar 2MB.');
-                }
-
                 $mime = (string)finfo_file($finfo, $tmp);
                 $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-                if ($mime !== 'application/pdf' || $ext !== 'pdf') {
+                $badType = ($mime !== 'application/pdf' || $ext !== 'pdf');
+                $badSize = ($size <= 0 || $size > (5 * 1024 * 1024));
+                if ($badType && $badSize) {
+                    throw new Exception('El adjunto debe ser PDF y no superar 5MB.');
+                }
+                if ($badType) {
                     throw new Exception('Solo se permiten archivos PDF en adjuntos de protocolo.');
+                }
+                if ($badSize) {
+                    throw new Exception('Cada adjunto debe ser PDF y no superar 5MB.');
                 }
 
                 $safeBase = preg_replace('/[^\w\.\-]+/u', '_', $origName);

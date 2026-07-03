@@ -201,6 +201,32 @@ class BillingModel {
                 }
             }
         }
+        // RED: protocolos de otra sede con formulario Entregado en esta institución
+        // y departamento local configurado en protocoloexpered.
+        if ($instId > 0 && $this->tableExists('protocoloexpered')) {
+            $sqlRed = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
+                                CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
+                                0 as es_protocolo_derivado,
+                                NULL as derivacion_inst_origen
+                         FROM formularioe f
+                         INNER JOIN protformr pf ON pf.idformA = f.idformA
+                         INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+                         INNER JOIN protocoloexpered pr ON pr.idprotA = p.idprotA AND pr.IdInstitucion = ?
+                         JOIN personae u ON p.IdUsrA = u.IdUsrA
+                         WHERE f.IdInstitucion = ?
+                           AND f.estado = 'Entregado'
+                           AND pr.iddeptoA = ?
+                           AND p.idprotA > 0
+                           AND p.IdInstitucion <> ?";
+            $stmtRed = $this->db->prepare($sqlRed);
+            $stmtRed->execute([$instId, $instId, $deptoId, $instId]);
+            foreach ($stmtRed->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $id = (int) ($row['idprotA'] ?? 0);
+                if ($id > 0 && !isset($byId[$id])) {
+                    $byId[$id] = $row;
+                }
+            }
+        }
         return array_values($byId);
     }
 
@@ -1042,27 +1068,23 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
      */
     public function getMapDeptoOrigenesDerivacionPendiente(int $instCobradora): array {
         $instCobradora = (int) $instCobradora;
-        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
-            || !$this->tableExists('formulario_derivacion')) {
+        if ($instCobradora <= 0 || !$this->tableExists('formulario_derivacion')
+            || !$this->hasDerivacionDeptoDestino()) {
             return [];
         }
-        $deptoExpr = $this->hasDerivacionDeptoDestino()
-            ? 'COALESCE(fd.depto_destino, p.departamento, f.depto)'
-            : 'COALESCE(p.departamento, f.depto)';
+        // Regla: se cuenta como derivado todo formulario derivado entrante entregado
+        // (no depende del saldo de facturación derivada). El depto es el configurado
+        // en destino (`depto_destino`), consistente con el conjunto base por depto.
         $sql = "
             SELECT DISTINCT
-                {$deptoExpr} AS iddeptoA,
+                fd.depto_destino AS iddeptoA,
                 TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
-            FROM facturacion_formulario_derivado ffd
-            INNER JOIN formularioe f ON f.idformA = ffd.idformA
-            LEFT JOIN protformr pr ON pr.idformA = f.idformA
-            LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
-            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
             LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
-            WHERE ffd.IdInstitucionCobradora = ?
-              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
-              AND {$deptoExpr} IS NOT NULL
-              AND {$deptoExpr} > 0
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
+              AND fd.depto_destino IS NOT NULL AND fd.depto_destino > 0
               AND TRIM(COALESCE(io.NombreInst, '')) <> ''
             ORDER BY iddeptoA ASC, origen_nombre ASC
         ";
@@ -1190,23 +1212,26 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         if ($idInstitucion <= 0) {
             return [];
         }
+        // "Propio/institucional": protocolos con formulario Entregado que PERTENECE a esta
+        // institución (f.IdInstitucion), incluidos los protocolos de RED cuyo dueño es otra
+        // sede. Se excluyen los formularios derivados con facturación derivada pendiente.
         if (!$this->tableExists('facturacion_formulario_derivado')) {
             $sql = "
                 SELECT DISTINCT p.idprotA AS id
-                FROM protocoloexpe p
-                INNER JOIN protformr pr ON p.idprotA = pr.idprotA
-                INNER JOIN formularioe f ON pr.idformA = f.idformA
-                WHERE p.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
+                FROM formularioe f
+                INNER JOIN protformr pr ON pr.idformA = f.idformA
+                INNER JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
             ";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$idInstitucion]);
         } else {
             $sql = "
                 SELECT DISTINCT p.idprotA AS id
-                FROM protocoloexpe p
-                INNER JOIN protformr pr ON p.idprotA = pr.idprotA
-                INNER JOIN formularioe f ON pr.idformA = f.idformA
-                WHERE p.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
+                FROM formularioe f
+                INNER JOIN protformr pr ON pr.idformA = f.idformA
+                INNER JOIN protocoloexpe p ON p.idprotA = pr.idprotA
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado' AND p.idprotA IS NOT NULL AND p.idprotA > 0
                   AND NOT EXISTS (
                       SELECT 1 FROM facturacion_formulario_derivado x
                       WHERE x.idformA = f.idformA AND x.IdInstitucionCobradora = ?
@@ -1233,30 +1258,29 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
      */
     public function getIdsUsuariosDerivacionPendiente(int $instCobradora): array {
         $instCobradora = (int) $instCobradora;
-        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
-            || !$this->tableExists('formulario_derivacion')) {
+        if ($instCobradora <= 0 || !$this->tableExists('formulario_derivacion')) {
             return [];
         }
+        // Regla: se cuenta como derivado todo formulario derivado entrante entregado
+        // (no depende del saldo de facturación derivada).
         $sql = "
             SELECT DISTINCT x.IdUsrA AS id
             FROM (
                 SELECT p.IdUsrA
-                FROM facturacion_formulario_derivado ffd
-                INNER JOIN formularioe f ON f.idformA = ffd.idformA
+                FROM formulario_derivacion fd
+                INNER JOIN formularioe f ON f.idformA = fd.idformA
                 INNER JOIN protformr pr ON pr.idformA = f.idformA
                 INNER JOIN protocoloexpe p ON p.idprotA = pr.idprotA
-                INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
-                WHERE ffd.IdInstitucionCobradora = ?
-                  AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+                WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+                  AND f.estado = 'Entregado'
                   AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
                 UNION
                 SELECT f.IdUsrA
-                FROM facturacion_formulario_derivado ffd
-                INNER JOIN formularioe f ON f.idformA = ffd.idformA
+                FROM formulario_derivacion fd2
+                INNER JOIN formularioe f ON f.idformA = fd2.idformA
                 LEFT JOIN protformr pr ON pr.idformA = f.idformA
-                INNER JOIN formulario_derivacion fd2 ON fd2.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd2.Activo = 1
-                WHERE ffd.IdInstitucionCobradora = ?
-                  AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+                WHERE fd2.Activo = 1 AND fd2.IdInstitucionDestino = ?
+                  AND f.estado = 'Entregado'
                   AND (pr.idprotA IS NULL OR pr.idprotA = 0)
                   AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
             ) x
@@ -1275,24 +1299,28 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
     }
 
     /**
-     * Protocolos con al menos un formulario en facturación derivada pendiente (cobro en esta sede).
+     * Protocolos que se cuentan como DERIVADOS para la facturación de esta sede.
+     *
+     * Regla: se considera derivado todo protocolo con al menos un FORMULARIO derivado
+     * entrante (formulario_derivacion.IdInstitucionDestino = sede) que ya esté 'Entregado',
+     * independientemente del saldo/estado de cobro. Antes solo contaban los que tenían
+     * `facturacion_formulario_derivado` con saldo pendiente, por lo que un formulario
+     * derivado sin esa fila (o ya pagado) quedaba clasificado como "propio".
      *
      * @return array<int, int> lista de idprotA
      */
     public function getIdsProtocolosDerivacionPendiente(int $instCobradora): array {
         $instCobradora = (int) $instCobradora;
-        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
-            || !$this->tableExists('formulario_derivacion')) {
+        if ($instCobradora <= 0 || !$this->tableExists('formulario_derivacion')) {
             return [];
         }
         $sql = "
             SELECT DISTINCT pr.idprotA AS id
-            FROM facturacion_formulario_derivado ffd
-            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
             INNER JOIN protformr pr ON pr.idformA = f.idformA
-            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
-            WHERE ffd.IdInstitucionCobradora = ?
-              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
               AND pr.idprotA IS NOT NULL AND pr.idprotA > 0
             ORDER BY pr.idprotA ASC
         ";
@@ -1315,22 +1343,21 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
      */
     public function getMapUsuarioOrigenesDerivacionPendiente(int $instCobradora): array {
         $instCobradora = (int) $instCobradora;
-        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
-            || !$this->tableExists('formulario_derivacion')) {
+        if ($instCobradora <= 0 || !$this->tableExists('formulario_derivacion')) {
             return [];
         }
+        // Regla: se cuenta como derivado todo formulario derivado entrante entregado.
         $sql = "
             SELECT DISTINCT
                 COALESCE(p.IdUsrA, f.IdUsrA) AS IdUsrA,
                 TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
-            FROM facturacion_formulario_derivado ffd
-            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
             LEFT JOIN protformr pr ON pr.idformA = f.idformA
             LEFT JOIN protocoloexpe p ON p.idprotA = pr.idprotA
-            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
             LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
-            WHERE ffd.IdInstitucionCobradora = ?
-              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
               AND TRIM(COALESCE(io.NombreInst, '')) <> ''
               AND COALESCE(p.IdUsrA, f.IdUsrA) IS NOT NULL AND COALESCE(p.IdUsrA, f.IdUsrA) > 0
             ORDER BY IdUsrA ASC, origen_nombre ASC
@@ -1365,21 +1392,20 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
      */
     public function getMapProtocoloOrigenesDerivacionPendiente(int $instCobradora): array {
         $instCobradora = (int) $instCobradora;
-        if ($instCobradora <= 0 || !$this->tableExists('facturacion_formulario_derivado')
-            || !$this->tableExists('formulario_derivacion')) {
+        if ($instCobradora <= 0 || !$this->tableExists('formulario_derivacion')) {
             return [];
         }
+        // Regla: se cuenta como derivado todo formulario derivado entrante entregado.
         $sql = "
             SELECT DISTINCT
                 pr.idprotA AS idprotA,
                 TRIM(COALESCE(io.NombreInst, '')) AS origen_nombre
-            FROM facturacion_formulario_derivado ffd
-            INNER JOIN formularioe f ON f.idformA = ffd.idformA
+            FROM formulario_derivacion fd
+            INNER JOIN formularioe f ON f.idformA = fd.idformA
             INNER JOIN protformr pr ON pr.idformA = f.idformA
-            INNER JOIN formulario_derivacion fd ON fd.IdFormularioDerivacion = ffd.IdFormularioDerivacion AND fd.Activo = 1
             LEFT JOIN institucion io ON io.IdInstitucion = fd.IdInstitucionOrigen
-            WHERE ffd.IdInstitucionCobradora = ?
-              AND (ffd.monto_total - COALESCE(ffd.monto_pagado, 0)) > 0.005
+            WHERE fd.Activo = 1 AND fd.IdInstitucionDestino = ?
+              AND f.estado = 'Entregado'
               AND pr.idprotA IS NOT NULL AND pr.idprotA > 0
               AND TRIM(COALESCE(io.NombreInst, '')) <> ''
             ORDER BY pr.idprotA ASC, origen_nombre ASC
@@ -1460,12 +1486,11 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         }
         $sql = "
             SELECT DISTINCT x.id FROM (
-                SELECT p.IdUsrA AS id
-                FROM protocoloexpe p
-                INNER JOIN protformr pf ON p.idprotA = pf.idprotA
-                INNER JOIN formularioe f ON pf.idformA = f.idformA
-                WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
-                  AND p.IdUsrA IS NOT NULL AND p.IdUsrA > 0
+                SELECT f.IdUsrA AS id
+                FROM formularioe f
+                INNER JOIN protformr pf ON pf.idformA = f.idformA
+                WHERE f.estado = 'Entregado' AND f.IdInstitucion = ?
+                  AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
                 UNION
                 SELECT p.IdUsrA AS id
                 FROM protocoloexpe p
@@ -1529,12 +1554,15 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         if ($idInstitucion <= 0) {
             return [];
         }
+        // Base: protocolos con al menos un formulario Entregado que PERTENECE a esta
+        // institución (f.IdInstitucion), no al dueño del protocolo. Así se incluyen los
+        // protocolos de RED cuyo dueño es otra sede pero cuyos formularios son de esta sede.
         $sql = "
             SELECT DISTINCT p.idprotA AS id
-            FROM protocoloexpe p
-            INNER JOIN protformr pf ON p.idprotA = pf.idprotA
-            INNER JOIN formularioe f ON pf.idformA = f.idformA
-            WHERE p.IdInstitucion = ? AND f.estado = 'Entregado'
+            FROM formularioe f
+            INNER JOIN protformr pf ON pf.idformA = f.idformA
+            INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+            WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
               AND p.idprotA IS NOT NULL AND p.idprotA > 0
         ";
         if ($this->tableExists('formulario_derivacion')) {
@@ -2251,6 +2279,23 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 $byId[$id] = $row;
             }
         }
+        // Formularios entregados de esta sede vinculados a protocolo (incluye RED).
+        $sqlForms = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA,
+                            CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
+                            0 as es_protocolo_derivado, NULL as derivacion_inst_origen
+                     FROM formularioe f
+                     INNER JOIN protformr pf ON pf.idformA = f.idformA
+                     INNER JOIN protocoloexpe p ON p.idprotA = pf.idprotA
+                     JOIN personae u ON p.IdUsrA = u.IdUsrA
+                     WHERE f.IdInstitucion = ? AND f.IdUsrA = ? AND f.estado = 'Entregado' AND p.idprotA > 0";
+        $stmtForms = $this->db->prepare($sqlForms);
+        $stmtForms->execute([$idInst, $idUsr]);
+        foreach ($stmtForms->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int) ($row['idprotA'] ?? 0);
+            if ($id > 0 && !isset($byId[$id])) {
+                $byId[$id] = $row;
+            }
+        }
         if ($idInst > 0 && $this->tableExists('formulario_derivacion')) {
             $sqlDeriv = "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA,
                                 CONCAT(u.ApellidoA, ', ', u.NombreA) as Investigador,
@@ -2311,10 +2356,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     public function getActiveInvestigators($idInst) {
         $idInst = (int) $idInst;
         $sql = "SELECT DISTINCT u.IdUsrA, u.ApellidoA, u.NombreA FROM personae u WHERE u.IdUsrA IN (
-            SELECT p.IdUsrA FROM protocoloexpe p
-            JOIN protformr pf ON p.idprotA = pf.idprotA
-            JOIN formularioe f ON pf.idformA = f.idformA
-            WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
+            SELECT f.IdUsrA FROM formularioe f
+            INNER JOIN protformr pf ON pf.idformA = f.idformA
+            WHERE f.estado = 'Entregado' AND f.IdInstitucion = ?
+              AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
             UNION
             SELECT p.IdUsrA FROM protocoloexpe p
             JOIN alojamiento a ON p.idprotA = a.idprotA
@@ -2358,10 +2403,10 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 FROM personae u
                 LEFT JOIN dinero d ON u.IdUsrA = d.IdUsrA AND d.IdInstitucion = ?
                 WHERE u.IdUsrA IN (
-                    SELECT p.IdUsrA FROM protocoloexpe p
-                    JOIN protformr pf ON p.idprotA = pf.idprotA
-                    JOIN formularioe f ON pf.idformA = f.idformA
-                    WHERE f.estado = 'Entregado' AND p.IdInstitucion = ?
+                    SELECT f.IdUsrA FROM formularioe f
+                    INNER JOIN protformr pf ON pf.idformA = f.idformA
+                    WHERE f.estado = 'Entregado' AND f.IdInstitucion = ?
+                      AND f.IdUsrA IS NOT NULL AND f.IdUsrA > 0
                     UNION
                     SELECT p.IdUsrA FROM protocoloexpe p
                     JOIN alojamiento a ON p.idprotA = a.idprotA
@@ -2420,7 +2465,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
                 INNER JOIN formularioe f ON pf.idformA = f.idformA
                 LEFT JOIN departamentoe dep ON p.departamento = dep.iddeptoA
                 LEFT JOIN organismoe org ON dep.organismopertenece = org.IdOrganismo
-                WHERE p.IdInstitucion = ? AND f.estado = 'Entregado'
+                WHERE f.IdInstitucion = ? AND f.estado = 'Entregado'
                 GROUP BY p.idprotA";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$idInst]);

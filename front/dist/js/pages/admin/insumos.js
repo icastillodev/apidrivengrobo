@@ -1,5 +1,4 @@
 import { API } from '../../api.js';
-import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
@@ -8,6 +7,27 @@ import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
+
+/** Verifica que jsPDF + autoTable estén disponibles antes de generar la ficha. */
+function ensureAdminInsumosPdfLibs() {
+    const g = window.txt?.generales || {};
+    const errPdf = g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.';
+    if (!window.jspdf?.jsPDF) {
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+        return false;
+    }
+    try {
+        const probe = new window.jspdf.jsPDF();
+        if (typeof probe.autoTable !== 'function') {
+            window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+            return false;
+        }
+    } catch (_) {
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
+        return false;
+    }
+    return true;
+}
 
 let allInsumos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -1189,110 +1209,246 @@ window.openNotifyPopupInsumo = async (idformA) => {
 };
 
 /**
- * GENERACIÓN DE PDF - INSUMOS EXPERIMENTALES
- * Captura la lista dinámica de productos y datos del departamento.
+ * GENERACIÓN DE FICHA PDF - INSUMOS EXPERIMENTALES (jsPDF + autoTable)
+ * Mismo patrón que la ficha de Animales: genera un PDF nativo y desglosa
+ * la lista de productos solicitados en una tabla.
  */
 window.downloadInsumoPDF = async (id) => {
+    if (!ensureAdminInsumosPdfLibs()) return;
+
     const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    
-    // 1. Helpers para captura de datos del DOM
-    const getVal = (name) => document.querySelector(`[name="${name}"]`)?.value || '---';
-    
-    const getSelTextByName = (name) => {
-        const s = document.querySelector(`select[name="${name}"]`);
-        if (!s || s.selectedIndex === -1) return '---';
-        return s.options[s.selectedIndex].text;
+    const g = window.txt?.generales || {};
+    const ta = window.txt?.admin_animales || {};
+    const errPdf = g.err_pdf_generar || 'No se pudo generar el PDF.';
+    const sinOrg = g.sin_organizacion || '– (sin organización)';
+
+    const row = allInsumos.find(x => Number(x.idformA) === Number(id)) || {};
+
+    const getValByName = (name) => document.querySelector(`input[name="${name}"], textarea[name="${name}"]`)?.value || '---';
+    const getSelTextById = (selId) => {
+        const s = document.getElementById(selId);
+        if (!s || s.selectedIndex < 0) return '';
+        return s.options[s.selectedIndex]?.text || '';
     };
 
-    // 2. Captura de información de cabecera y contacto
-    const invHeader = document.querySelector('#modal-content-insumo h5 + span + strong')?.innerText 
-                      || document.querySelector('#modal-content-insumo h5')?.innerText || '---';
-    
-    // Capturamos el bloque de contacto (Investigador, Email, Celular)
-    const contactoInfo = Array.from(document.querySelectorAll('#modal-content-insumo .row.g-2.p-3 div'))
-                              .map(div => div.innerText.replace('\n', ': ')).join(' | ');
+    // Cabecera / contacto (desde la fila cargada, más fiable que el DOM)
+    const investigador = (row.Investigador && String(row.Investigador).trim()) || '---';
+    const email = (row.EmailInvestigador && String(row.EmailInvestigador).trim()) || '---';
+    const celular = (row.CelularInvestigador && String(row.CelularInvestigador).trim()) || '---';
 
-    const estadoActual = document.getElementById('insumo-status')?.options[document.getElementById('insumo-status').selectedIndex]?.text || '---';
-    const deptoNombre = getSelTextByName('depto');
-    const orgNombre = (document.getElementById('insumo-org-display')?.innerText || '').replace(/Organización:\s*/i, '').trim() || (window.txt?.generales?.sin_organizacion || '– (sin organización)');
+    // Datos editables del formulario (leídos del modal por si el admin los modificó)
+    const estado = getSelTextById('insumo-status') || row.estado || '---';
+    const deptoSel = document.getElementById('modal-depto-insumo');
+    const deptoNombre = (deptoSel && deptoSel.selectedIndex >= 0 && deptoSel.value)
+        ? deptoSel.options[deptoSel.selectedIndex].text
+        : (row.Departamento || '---');
+    const orgNombre = (document.getElementById('modal-org-insumo')?.innerText || '').trim()
+        || (row.Organizacion && String(row.Organizacion).trim()) || sinOrg;
+    const tipoSel = document.querySelector('select[name="tipoA"]');
+    const tipoPedido = (tipoSel && tipoSel.selectedIndex >= 0)
+        ? tipoSel.options[tipoSel.selectedIndex].text
+        : (row.TipoNombre || '---');
+    const protSel = document.getElementById('insumo-prot-select');
+    const protocolo = (protSel && protSel.selectedIndex >= 0 && protSel.value)
+        ? protSel.options[protSel.selectedIndex].text
+        : ((row.NProtocolo && row.TituloProtocolo) ? `#${row.NProtocolo} - ${row.TituloProtocolo}` : '---');
+    const fInicio = getValByName('fechainicioA');
+    const fRetiro = getValByName('fecRetiroA');
+    const aclaracion = (row.AclaracionUsuario && String(row.AclaracionUsuario).trim()) || 'Sin observaciones.';
 
-    // 3. CAPTURA DINÁMICA DE PRODUCTOS (La tabla del modal)
-    const productRows = document.querySelectorAll('#tbody-items-edit tr');
-    let itemsHtml = '';
-    
-    productRows.forEach(row => {
-        const select = row.querySelector('select');
-        const nombre = select.options[select.selectedIndex]?.text || '---';
-        const cantidad = row.querySelector('input[type="number"]')?.value || '0';
-        
-        itemsHtml += `
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: left;">${nombre}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${cantidad}</td>
-            </tr>`;
-    });
+    const fmtMoney = (n) => Number(n || 0).toFixed(2);
 
-    const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 20px; line-height: 1.4; background: #ffffff;">
-            <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0; text-transform: uppercase;">Ficha de Pedido: Insumos Experimentales</h4>
-                <p style="margin: 0; font-size: 11px; color: #666;">Solicitud ID: #${id} | Generado: ${new Date().toLocaleString()}</p>
-            </div>
-
-            <div style="margin-bottom: 20px; background: #f9f9f9; padding: 15px; border-radius: 5px;">
-                <p style="margin: 5px 0;"><strong>Investigador Responsable:</strong> ${invHeader}</p>
-                <p style="margin: 5px 0; font-size: 11px; color: #555;">${contactoInfo}</p>
-                <p style="margin: 10px 0 0 0;"><strong>Departamento Destino:</strong> <span style="color: #0d6efd;">${deptoNombre}</span></p>
-                <p style="margin: 6px 0 0 0;"><strong>Organización:</strong> <span style="color: #0d6efd;">${orgNombre}</span></p>
-                <p style="margin: 15px 0 0 0; font-size: 14px;"><strong>ESTADO DEL PEDIDO:</strong> <span style="color: #1a5d3b; font-weight: bold; text-transform: uppercase;">${estadoActual}</span></p>
-            </div>
-
-            <p style="font-size: 12px; font-weight: bold; margin-bottom: 10px; color: #1a5d3b;">DETALLE DE PRODUCTOS SOLICITADOS:</p>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
-                <thead>
-                    <tr style="background-color: #1a5d3b; color: white;">
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Descripción del Producto / Insumo</th>
-                        <th style="width: 100px; padding: 10px; border: 1px solid #ddd; text-align: center;">Cantidad</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${itemsHtml}
-                </tbody>
-            </table>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px; background: #fff;">
-                    <strong style="font-size: 10px; color: #666;">FECHA ESTIMADA INICIO:</strong><br>${getVal('fechainicioA')}
-                </div>
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px; background: #fff;">
-                    <strong style="font-size: 10px; color: #666;">FECHA ESTIMADA RETIRO:</strong><br>${getVal('fecRetiroA')}
-                </div>
-            </div>
-
-
-
-            <div style="margin-top: 30px; text-align: center; font-size: 9px; color: #999;">
-                Documento generado por GROBO - Sistema de Gestión de Bioterios
-            </div>
-        </div>
-    `;
-
-    const g = window.txt?.generales || {};
+    // Desglose de productos + precios: preferimos el detalle de facturación
+    // (precios congelados por línea) y caemos al DOM si no está disponible.
+    const itemsBody = [];
+    let totalPedido = 0;
+    let esExento = false;
+    let hayPrecios = false;
     try {
-        await saveHtmlStringAsPdf(pdfTemplate, {
-            filename: `Pedido_Insumos_${id}_${new Date().getTime()}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 3, useCORS: true, letterRendering: true, backgroundColor: '#ffffff', logging: false },
+        const resDet = await API.request(`/billing/detail-insumo/${id}`);
+        if (resDet?.status === 'success' && resDet.data) {
+            const det = resDet.data;
+            esExento = det.is_exento === true || det.is_exento == 1 || det.exento == 1;
+            const lineas = Array.isArray(det.lineas) ? det.lineas : [];
+            if (lineas.length) {
+                hayPrecios = true;
+                lineas.forEach(ln => {
+                    const nombre = String(ln.nombre_insumo || '').trim() || '---';
+                    const um = String(ln.unidad_medida || '').trim();
+                    const cant = String(ln.cantidad ?? '0');
+                    itemsBody.push([
+                        um ? `${nombre} (${um})` : nombre,
+                        cant,
+                        `$ ${fmtMoney(ln.precio_unitario)}`,
+                        `$ ${fmtMoney(ln.subtotal_linea)}`,
+                    ]);
+                });
+            }
+            totalPedido = Number(det.total_item || 0);
+        }
+    } catch (_) { /* fallback a DOM abajo */ }
+
+    // Fallback: si no obtuvimos líneas con precio, usamos la tabla del modal (sin precio)
+    if (!hayPrecios) {
+        const productRows = document.querySelectorAll('#tbody-items-edit tr');
+        productRows.forEach(r => {
+            const sel = r.querySelector('select');
+            const nombre = (sel && sel.selectedIndex >= 0) ? (sel.options[sel.selectedIndex]?.text || '') : '';
+            const cantidad = r.querySelector('input[type="number"]')?.value || '0';
+            const nombreLimpio = String(nombre || '').trim();
+            if (nombreLimpio && nombreLimpio !== 'Seleccione insumo...') {
+                itemsBody.push([nombreLimpio, String(cantidad), '—', '—']);
+            }
         });
+    }
+    if (!itemsBody.length) itemsBody.push(['---', '0', '—', '—']);
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const M = 18;
+        const pageW = doc.internal.pageSize.getWidth();
+        const right = pageW - M;
+        let y = M;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(26, 93, 59);
+        doc.text(`GROBO - ${inst}`, pageW / 2, y, { align: 'center' });
+        y += 8;
+        doc.setFontSize(12);
+        doc.setTextColor(80);
+        doc.text('FICHA DE PEDIDO: INSUMOS', pageW / 2, y, { align: 'center' });
+        y += 6;
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`ID Pedido: ${id} | Generado: ${new Date().toLocaleString()}`, pageW / 2, y, { align: 'center' });
+        y += 4;
+        doc.setDrawColor(26, 93, 59);
+        doc.line(M, y, right, y);
+        y += 8;
+
+        // Bloque de derivación (si aplica)
+        const isDeriv = Number(row.DerivadoActivo || 0) === 1;
+        const origenName = (row.InstitucionOrigenNombre || '').trim();
+        if (isDeriv && origenName) {
+            const actualName = (row.InstitucionActualNombre || '').trim();
+            const ruta = [origenName, actualName].filter(Boolean).join(' → ');
+            const workflow = (row.EstadoWorkflow || '').toString().trim();
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(13, 110, 253);
+            doc.text(ta.derivacion_resumen_inst || 'Derivación en red', M, y);
+            y += 6;
+            const derivBody = [
+                [ta.derivacion_inst_origen || 'Derivado de la institución', origenName],
+                [ta.derivacion_inst_actual || 'En gestión en', actualName || '—'],
+                [ta.derivacion_inst_ruta || 'Ruta institucional', ruta || '—'],
+            ];
+            if (workflow) derivBody.push([ta.derivacion_estado_workflow || 'Estado de derivación', workflow]);
+            doc.autoTable({
+                startY: y,
+                margin: { left: M, right: M },
+                body: derivBody,
+                theme: 'grid',
+                styles: { fontSize: 9, cellPadding: 3 },
+                columnStyles: { 0: { fontStyle: 'bold', cellWidth: 52 } },
+            });
+            y = doc.lastAutoTable.finalY + 8;
+        }
+
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Investigador: ${investigador}`, M, y);
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        const contactoLines = doc.splitTextToSize(`Email: ${email}  |  Celular: ${celular}`, right - M);
+        doc.text(contactoLines, M, y);
+        y += contactoLines.length * 4.5 + 3;
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Estado del pedido: ${estado || '---'}`, M, y);
+        y += 8;
+
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            body: [
+                ['Tipo de pedido', tipoPedido, 'N° Protocolo', protocolo],
+                ['Departamento', deptoNombre, 'Organización', orgNombre],
+            ],
+            theme: 'grid',
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 34 },
+                2: { fontStyle: 'bold', cellWidth: 34 },
+            },
+        });
+        y = doc.lastAutoTable.finalY + 8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(26, 93, 59);
+        doc.text('Detalle de productos solicitados', M, y);
+        y += 4;
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            head: [['Producto / Insumo', 'Cant.', 'P. unit.', 'Subtotal']],
+            body: itemsBody,
+            theme: 'grid',
+            headStyles: { fillColor: [26, 93, 59], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                1: { halign: 'center', cellWidth: 20, fontStyle: 'bold' },
+                2: { halign: 'right', cellWidth: 30 },
+                3: { halign: 'right', cellWidth: 32, fontStyle: 'bold' },
+            },
+        });
+        y = doc.lastAutoTable.finalY + 6;
+
+        // Total del pedido
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(26, 93, 59);
+        const totalTxt = esExento
+            ? `Total del pedido: $ ${fmtMoney(totalPedido)} (Exento de pago)`
+            : `Total del pedido: $ ${fmtMoney(totalPedido)}`;
+        doc.text(totalTxt, right, y, { align: 'right' });
+        y += 10;
+
+        doc.setTextColor(0);
+        doc.autoTable({
+            startY: y,
+            margin: { left: M, right: M },
+            body: [
+                ['Fecha inicio', fInicio],
+                ['Fecha retiro', fRetiro],
+            ],
+            theme: 'grid',
+            styles: { fontSize: 9 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
+        });
+        y = doc.lastAutoTable.finalY + 8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('Aclaración del usuario:', M, y);
+        y += 5;
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        const aclLines = doc.splitTextToSize(String(aclaracion), right - M);
+        doc.text(aclLines, M, y);
+
+        doc.save(`GROBO_${inst}_Pedido_Insumos_${id}.pdf`);
     } catch (error) {
         console.error('Error al generar PDF insumo:', error);
-        if (!window.Swal) return;
-        if (error?.code === 'html2pdf_not_loaded') {
-            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
-        } else {
-            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
-        }
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
     }
 };
 

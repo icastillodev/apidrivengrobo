@@ -1,5 +1,6 @@
 import { API } from '../api.js';
 import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js?v=20260521';
+import { openPoeDashboardModal } from '../utils/poeDetailUi.js?v=20260703';
 import { getCorrectPath } from './menujs/MenuConfig.js';
 import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260510';
 
@@ -70,8 +71,9 @@ function renderPoeDashboardBlock(poeRows, t) {
             const id = parseInt(r.IdPoe, 10) || 0;
             if (!id) return '';
             const title = escapeHtml(r.Titulo || '—');
-            const href = buildPanelPoePublicPageRelativeUrl(id);
-            return `<li class="list-group-item py-2"><a href="${href}" class="fw-semibold text-success text-decoration-none">${title}</a></li>`;
+            return `<li class="list-group-item py-2">
+                <button type="button" class="btn btn-link p-0 fw-semibold text-success text-decoration-none text-start" data-dash-poe-open="${id}">${title}</button>
+            </li>`;
         })
         .join('');
     return `
@@ -423,6 +425,14 @@ export async function injectDashboardNoticias(mountId, options = {}) {
 
     await hydrateNoticiaPortadaThumbs(mount);
     bindNoticiaAdjuntoOpenButtons(mount, t.err_generico || '');
+
+    mount.querySelectorAll('[data-dash-poe-open]').forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const id = parseInt(btn.getAttribute('data-dash-poe-open'), 10);
+            if (id > 0) openPoeDashboardModal(id);
+        });
+    });
 
     mount.dataset.newsDashboardInjected = '1';
 

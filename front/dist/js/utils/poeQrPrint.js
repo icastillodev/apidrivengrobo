@@ -56,14 +56,36 @@ export function printPoeQrSheet(docTitle, targetUrl) {
     return true;
 }
 
+/** Carga qrcodejs bajo demanda si la página no lo incluyó en el HTML. */
+function ensureQrCodeLib() {
+    if (typeof QRCode !== 'undefined') return Promise.resolve(true);
+    const existing = document.querySelector('script[data-grobo-qrcode]');
+    if (existing) {
+        return new Promise((resolve) => {
+            existing.addEventListener('load', () => resolve(typeof QRCode !== 'undefined'), { once: true });
+            existing.addEventListener('error', () => resolve(false), { once: true });
+        });
+    }
+    return new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.async = true;
+        s.dataset.groboQrcode = '1';
+        s.onload = () => resolve(typeof QRCode !== 'undefined');
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+    });
+}
+
 /**
  * Muestra el QR en SweetAlert2; confirmar = imprimir hoja dedicada.
- * Requiere `QRCode` global (qrcodejs) en la página.
+ * Carga qrcodejs bajo demanda si hace falta.
  */
 export async function showPoeQrSwal(tc, docTitle, targetUrl) {
     const t = tc || window.txt?.comunicacion || {};
     const hint = escapeHtmlAttr(t.poe_qr_hint || '');
     const urlHtml = escapeHtmlAttr(targetUrl);
+    const qrReady = await ensureQrCodeLib();
     const result = await window.Swal?.fire?.({
         title: t.poe_qr_title || '',
         html: `<p class="small text-muted mb-3">${hint}</p><div class="d-flex justify-content-center"><div id="swal-qr-poe-shared"></div></div><p class="small text-break mt-3 mb-0">${urlHtml}</p>`,
@@ -71,14 +93,19 @@ export async function showPoeQrSwal(tc, docTitle, targetUrl) {
         showCancelButton: true,
         confirmButtonText: t.poe_btn_imprimir_qr || '',
         cancelButtonText: t.admin_cancelar || '',
-        didOpen: () => {
+        didOpen: async () => {
             const host = document.getElementById('swal-qr-poe-shared');
-            if (!host || typeof QRCode === 'undefined') return;
+            if (!host) return;
+            if (!qrReady || typeof QRCode === 'undefined') {
+                host.innerHTML = `<p class="small text-danger mb-0">${escapeHtmlAttr(t.poe_qr_no_lib || '')}</p>`;
+                return;
+            }
             host.innerHTML = '';
             try {
                 new QRCode(host, { text: targetUrl, width: 220, height: 220 });
             } catch (e) {
                 console.error(e);
+                host.innerHTML = `<p class="small text-danger mb-0">${escapeHtmlAttr(t.poe_qr_no_lib || '')}</p>`;
             }
         },
     });
