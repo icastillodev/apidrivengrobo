@@ -1,4 +1,4 @@
-import { API } from './api.js?v=20260409';
+import { API } from './api.js?v=20260703';
 import { extractInstitutionSlugFromPath } from './utils/instSlugFromPath.js';
 import { getPreservableAppReturnHref } from './utils/loginReturnUrl.js';
 import { setInstModulesSnapshot } from './modulesAccess.js';

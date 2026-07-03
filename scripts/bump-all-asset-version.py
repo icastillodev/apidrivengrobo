@@ -1,16 +1,15 @@
-"""Sustituye ?v=20260406 por un nuevo token en front/**/*.html y front/**/*.js (cache-bust global)."""
+"""Sustituye ?v=YYYYMMDD por un nuevo token en front/**/*.html y front/**/*.js (cache-bust global)."""
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "front"
-# Próximo bump: p.ej. 20260409 -> 20260410
-OLD_V = "?v=20260409"
-NEW_V = "?v=20260410"
+NEW_V = "20260703"
 
 
 def bump_text(t: str) -> str:
-    t = t.replace(OLD_V, NEW_V)
-    t = t.replace("ASSET_VERSION = '20260409'", "ASSET_VERSION = '20260410'")
-    t = t.replace("buscar 20260409", "buscar 20260410")
+    t = re.sub(r"\?v=20\d{6}[a-z]?", f"?v={NEW_V}", t)
+    t = re.sub(r"ASSET_VERSION = '20\d{6}'", f"ASSET_VERSION = '{NEW_V}'", t)
+    t = re.sub(r"POE_ASSET_VERSION = '20\d{6}'", f"POE_ASSET_VERSION = '{NEW_V}'", t)
     return t
 
 
@@ -27,7 +26,7 @@ def main() -> None:
             p.write_text(t2, encoding="utf-8")
             n += 1
             print("updated", p.relative_to(ROOT.parent))
-    print("bump-all-asset-version:", n, "files", OLD_V, "->", NEW_V)
+    print("bump-all-asset-version:", n, "files -> ?v=" + NEW_V)
 
 
 if __name__ == "__main__":

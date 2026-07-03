@@ -1,5 +1,5 @@
 import { API } from '../../api.js';
-import { Auth } from '../../auth.js?v=20260409';
+import { Auth } from '../../auth.js?v=20260703';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { collectMenuPathsFromIds } from '../../utils/capacitacionMenuPaths.js';
 import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../../modulesAccess.js';

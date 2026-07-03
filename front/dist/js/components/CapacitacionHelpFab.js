@@ -6,15 +6,15 @@ import {
   pathnameToMenuPath,
   menuPathToSlug,
   isCapacitacionAppPath,
-} from '../utils/capacitacionPaths.js?v=20260409';
+} from '../utils/capacitacionPaths.js?v=20260703';
 import { labelCapacitacionMenuPath } from '../utils/capacitacionLabels.js';
 import {
   collectMenuPathsFromIds,
   expandComunicacionSubpathsIfAllowed,
   expandConfigSubpathsIfAllowed,
   expandFacturacionPathsIfAllowed,
-} from '../utils/capacitacionMenuPaths.js?v=20260409';
-import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260409';
+} from '../utils/capacitacionMenuPaths.js?v=20260703';
+import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260703';
 
 export const FAB_HIDDEN_KEY = 'gecko_hide_capacitacion_fab';
 

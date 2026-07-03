@@ -1,8 +1,8 @@
 import { API } from '../api.js';
-import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js?v=20260521';
+import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js?v=20260703';
 import { openPoeDashboardModal } from '../utils/poeDetailUi.js?v=20260703';
 import { getCorrectPath } from './menujs/MenuConfig.js';
-import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260510';
+import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260703';
 
 function escapeHtml(s) {
     return String(s ?? '')

@@ -2,10 +2,10 @@
  * Versiones de cache-bust del front GROBO.
  * Al desplegar: bump la sección que cambió y los ?v= en HTML/imports que la referencian.
  */
-export const ASSET_VERSION = '20260521';
+export const ASSET_VERSION = '20260703';
 
 /** Portal POE, QR e URLs (poe_portal, poeQrPrint, panelPoeUrl, comunicacion_poe). */
-export const POE_ASSET_VERSION = '20260521';
+export const POE_ASSET_VERSION = '20260703';
 
 export const MODULE_VERSIONS = {
     core: ASSET_VERSION,

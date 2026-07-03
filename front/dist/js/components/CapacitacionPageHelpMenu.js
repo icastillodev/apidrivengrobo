@@ -1,12 +1,12 @@
-import { pathnameToMenuPath } from '../utils/capacitacionPaths.js?v=20260409';
-import { menuPathToSlug } from '../utils/capacitacionPaths.js?v=20260409';
+import { pathnameToMenuPath } from '../utils/capacitacionPaths.js?v=20260703';
+import { menuPathToSlug } from '../utils/capacitacionPaths.js?v=20260703';
 import { Auth } from '../auth.js';
-import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260409';
+import { startCapacitacionInteractiveTour } from './CapacitacionInteractiveTour.js?v=20260703';
 import {
   isCapacitacionFabHidden,
   setCapacitacionFabHidden,
   refreshCapacitacionHelpFab,
-} from './CapacitacionHelpFab.js?v=20260409';
+} from './CapacitacionHelpFab.js?v=20260703';
 import { clearRouteTourSeen } from '../utils/capacitacionTourPrefs.js';
 
 const MENU_ID = 'gecko-cap-page-help-popover';

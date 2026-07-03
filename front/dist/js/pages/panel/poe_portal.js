@@ -1,7 +1,7 @@
-import { API } from '../../api.js?v=20260521';
-import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20260521';
+import { API } from '../../api.js?v=20260703';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20260703';
 import { escapePoeHtml, formatPoeFecha, paintPoeDetail, poeCleanText } from '../../utils/poeDetailUi.js?v=20260703';
-import { exposePoeAssetVersion } from '../../assetVersion.js?v=20260521';
+import { exposePoeAssetVersion } from '../../assetVersion.js?v=20260703';
 
 /** @see assetVersion.js POE_ASSET_VERSION */
 export const POE_PORTAL_VERSION = '20260521';
