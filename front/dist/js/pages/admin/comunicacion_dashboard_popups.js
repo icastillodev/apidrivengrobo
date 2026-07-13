@@ -61,6 +61,33 @@ function syncDpPortadaPreview() {
     wrap.classList.remove('d-none');
 }
 
+/** Carga la miniatura de una imagen ya guardada en B2 (edición). */
+async function hydrateSavedPortadaThumb(idPopup) {
+    const wrap = document.getElementById('dp-wrap-preview-portada');
+    const img = document.getElementById('dp-preview-portada');
+    if (!wrap || !img || !idPopup) return;
+    if (!b2.PopupPortadaImagenB2Key) {
+        wrap.classList.add('d-none');
+        return;
+    }
+    if (document.getElementById('dp-file-portada')?.files?.[0]) return;
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    const url = `${API.urlBase}/admin/comunicacion/dashboard-popup/archivo/${idPopup}/popup_imagen`;
+    try {
+        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (!blob.size) return;
+        revokeDpPortadaPreview();
+        dpPortadaObjUrl = URL.createObjectURL(blob);
+        img.src = dpPortadaObjUrl;
+        img.alt = window.txt?.comunicacion?.admin_img_preview_alt || '';
+        wrap.classList.remove('d-none');
+    } catch (_) {
+        /* sin miniatura: el botón Vista previa sigue disponible */
+    }
+}
+
 function hasPendingDpB2Files() {
     return !!(
         document.getElementById('dp-file-portada')?.files?.[0]
@@ -70,7 +97,15 @@ function hasPendingDpB2Files() {
 }
 
 function hydrateB2FromRow(d) {
-    if (!d || typeof d !== 'object') return;
+    if (!d || typeof d !== 'object') {
+        b2.PopupPortadaImagenB2Key = null;
+        b2.PopupPortadaImagenNombre = null;
+        b2.PopupAdjunto1B2Key = null;
+        b2.PopupAdjunto1Nombre = null;
+        b2.PopupAdjunto2B2Key = null;
+        b2.PopupAdjunto2Nombre = null;
+        return;
+    }
     b2.PopupPortadaImagenB2Key = d.PopupPortadaImagenB2Key || null;
     b2.PopupPortadaImagenNombre = d.PopupPortadaImagenNombre || null;
     b2.PopupAdjunto1B2Key = d.PopupAdjunto1B2Key || null;
@@ -326,8 +361,14 @@ export async function initDashboardPopupsAdmin() {
     const tbody = document.getElementById('dp-tbody');
     const modalEl = document.getElementById('modal-dashboard-popup');
     let modal = null;
-    if (modalEl && window.bootstrap) {
+    if (modalEl && window.bootstrap?.Modal) {
         modal = new window.bootstrap.Modal(modalEl);
+    } else if (!window.bootstrap?.Modal) {
+        console.error('Bootstrap Modal no disponible: la administración de popups no podrá abrir el formulario.');
+        window.Swal?.fire?.({
+            icon: 'error',
+            text: tc.err_generico || 'No se pudo inicializar el modal (Bootstrap). Recargue la página.',
+        });
     }
 
     let editingId = 0;
@@ -359,6 +400,9 @@ export async function initDashboardPopupsAdmin() {
             if (el) el.value = '';
         });
         renderB2Ui(tc);
+        if (editingId) {
+            hydrateSavedPortadaThumb(editingId);
+        }
         const mt = document.getElementById('dp-modal-title');
         if (mt) {
             mt.textContent = editingId

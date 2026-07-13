@@ -126,8 +126,9 @@ export function anyFormularioActivoOlegacyInv(byKey, roleId, invHasData) {
 export function filterMenuIdsByModulos(ids, roleId, instId) {
     const r = parseInt(roleId, 10);
     const inst = parseInt(instId, 10);
-    // GeckoDev (1), Superadmin sede (2), Admin (4): menú completo; el API sigue aplicando permisos reales.
-    if (inst <= 0 || [1, 2, 4].includes(r)) return ids;
+    // Sin sede (p. ej. GeckoDev global): no filtrar. Con sede: respetar estado_logico del módulo
+    // también para admin sede (2/4) y Gecko con institución activa (1).
+    if (inst <= 0) return ids;
 
     const { byKey, invHasData } = getInstModulesSnapshot();
     const out = [];
@@ -163,9 +164,6 @@ const PATH_RULES = [
 export function pathVisibleForModules(path, roleId) {
     const p = String(path || '').replace(/\.html$/i, '').replace(/^\//, '');
     const r = parseInt(roleId, 10);
-    if ([1, 2, 4].includes(r)) {
-        return true;
-    }
     const { byKey, invHasData } = getInstModulesSnapshot();
 
     const rule = PATH_RULES.find((x) => p === x.path || p.startsWith(`${x.path}/`));

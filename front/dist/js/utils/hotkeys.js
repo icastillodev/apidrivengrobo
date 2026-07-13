@@ -4,8 +4,23 @@ import {
     getCorrectPath,
     UserPreferences,
 } from '../components/menujs/MenuConfig.js';
+import { getInstModulesSnapshot, rolPuedeModulo } from '../modulesAccess.js';
 
 const HOTKEYS_DISABLED_KEY = 'grobo_hotkeys_disabled';
+
+function moduloReservasVisibleParaSesion() {
+    const r = parseInt(
+        sessionStorage.getItem('roleId')
+            || localStorage.getItem('roleId')
+            || sessionStorage.getItem('userLevel')
+            || localStorage.getItem('userLevel')
+            || '0',
+        10
+    );
+    const { byKey } = getInstModulesSnapshot();
+    const est = byKey.reservas != null ? parseInt(byKey.reservas, 10) : 1;
+    return rolPuedeModulo(est, r);
+}
 
 export function isHotkeysDisabled() {
     return localStorage.getItem(HOTKEYS_DISABLED_KEY) === '1';
@@ -305,6 +320,7 @@ export const HotkeyManager = {
                 window.location.href = getCorrectPath(`${seg}/perfil.html`);
             },
             r: () => {
+                if (!moduloReservasVisibleParaSesion()) return;
                 window.location.href = getCorrectPath(`${seg}/misreservas.html`);
             },
             t: () => UserPreferences.toggleTheme(),
@@ -330,7 +346,10 @@ export const HotkeyManager = {
             xi: () => adminSede && (window.location.href = getCorrectPath('admin/insumos.html')),
             xk: () => adminSede && (window.location.href = getCorrectPath('admin/reactivos.html')),
             xj: () => adminSede && (window.location.href = getCorrectPath('admin/animales.html')),
-            xv: () => adminSede && (window.location.href = getCorrectPath('admin/reservas.html')),
+            xv: () =>
+                adminSede
+                && moduloReservasVisibleParaSesion()
+                && (window.location.href = getCorrectPath('admin/reservas.html')),
             xn: () =>
                 adminSede &&
                 (window.location.href = getCorrectPath('admin/comunicacion/noticias.html')),

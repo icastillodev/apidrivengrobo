@@ -377,6 +377,7 @@ export const es = {
         noticia_adjunto_sin_nombre: "Documento",
         dash_poe_label: "Protocolos operativos (POEs)",
         dash_poe_ver_todos: "Ver todos",
+        dash_poe_empty: "No hay POEs publicados (activos) para esta sede.",
         poe_link_corto: "POEs",
         poe_admin_link: "POEs",
         poe_portal_titulo: "Protocolos operativos",

@@ -377,6 +377,7 @@ export const en = {
         noticia_adjunto_sin_nombre: "Document",
         dash_poe_label: "Standard procedures (POEs)",
         dash_poe_ver_todos: "View all",
+        dash_poe_empty: "No published (active) POEs for this site.",
         poe_link_corto: "POEs",
         poe_admin_link: "POEs",
         poe_portal_titulo: "Standard procedures",

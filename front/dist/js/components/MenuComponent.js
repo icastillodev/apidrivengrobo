@@ -11,7 +11,7 @@ import { renderTopMenuStructure, renderSideMenuStructure } from './menujs/MenuRe
 import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle, translatePage } from '../utils/i18n.js';
-import { ensureInstModulesLoaded, filterMenuIdsByModulos } from '../modulesAccess.js';
+import { refreshInstModulesSnapshot, filterMenuIdsByModulos } from '../modulesAccess.js';
 import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20260703';
 import {
   initCapacitacionPageHelpDelegation,
@@ -29,7 +29,7 @@ export async function initMenu() {
     
     console.log("🚀 InitMenu -> Rol:", roleId, "| Inst:", instId);
 
-    await ensureInstModulesLoaded(API.request.bind(API));
+    await refreshInstModulesSnapshot(API.request.bind(API));
 
     if (isNaN(roleId)) {
         console.warn("Menú detenido: No hay rol de usuario definido.");

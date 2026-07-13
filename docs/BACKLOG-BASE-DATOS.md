@@ -136,6 +136,8 @@ Una fila por institución: texto de portada, hasta **dos URLs de adjuntos**, pop
 
 **Popups del modal del panel (código actual):** el API y el admin usan la tabla **`institucion_dashboard_popup`** (varios registros por sede, solo uno con `PopupActivo = 1`). Si **ya aplicaste el maestro mayo 2026** y no querés re-ejecutarlo entero, usá solo el parche idempotente **[`docs/migrations/2026-05-09-patch-institucion-dashboard-popup-idempotente.sql`](migrations/2026-05-09-patch-institucion-dashboard-popup-idempotente.sql)** (`CREATE TABLE IF NOT EXISTS` + migración solo donde la sede aún no tiene filas en la nueva tabla). Alternativa: [`2026-05-09-institucion-dashboard-popup.sql`](migrations/2026-05-09-institucion-dashboard-popup.sql) (misma lógica idempotente) o la **Parte 5b** del maestro actualizado **después** del `ALTER` B2 de `institucion_portada_popup`.
 
+**Imagen B2 del popup (2026-07-12):** si la tabla existe pero fallan guardar/vista previa de la imagen del modal, aplicá [`docs/migrations/2026-07-12-dashboard-popup-imagen-b2.sql`](migrations/2026-07-12-dashboard-popup-imagen-b2.sql) (`PopupPortadaImagenB2Key` + `PopupPortadaImagenNombre`).
+
 **Antes:** backup de la base.
 
 ---

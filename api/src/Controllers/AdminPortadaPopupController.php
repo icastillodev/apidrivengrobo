@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Comunicacion\InstitucionPortadaPopupModel;
+use App\Models\Comunicacion\NoticiaModel;
 use App\Utils\Auditoria;
 
 class AdminPortadaPopupController {

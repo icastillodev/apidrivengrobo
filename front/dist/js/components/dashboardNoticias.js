@@ -61,11 +61,22 @@ function poePortalHref() {
 }
 
 function renderPoeDashboardBlock(poeRows, t) {
-    if (!poeRows || !poeRows.length) return '';
-    const max = 5;
-    const slice = poeRows.slice(0, max);
     const tit = escapeHtml(t.dash_poe_label || '');
     const ver = escapeHtml(t.dash_poe_ver_todos || '');
+    if (!poeRows || !poeRows.length) {
+        return `
+        <div class="col-12 mb-3">
+            <div class="border rounded-3 overflow-hidden bg-white shadow-sm">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2 border-bottom bg-light">
+                    <div class="fw-black text-uppercase small text-muted mb-0">${tit}</div>
+                    <a href="${poePortalHref()}" class="btn btn-sm btn-outline-success fw-bold">${ver}</a>
+                </div>
+                <div class="px-3 py-3 text-muted small mb-0">${escapeHtml(t.dash_poe_empty || t.poe_empty || '')}</div>
+            </div>
+        </div>`;
+    }
+    const max = 5;
+    const slice = poeRows.slice(0, max);
     const lines = slice
         .map((r) => {
             const id = parseInt(r.IdPoe, 10) || 0;
@@ -141,16 +152,19 @@ function maybeShowPortadaPopup(pp, t) {
             : '';
     const adjHtml = adj.length
         ? `<div class="d-flex flex-wrap gap-2 mt-3">${adj
-              .map(
-                  (a) =>
-                      `<a href="${escapeHtml(a.url)}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">${escapeHtml(
-                          a.nombre || a.url
-                      )}</a>`
-              )
+              .map((a) => {
+                  const url = String(a?.url || '').trim();
+                  const nombre = escapeHtml(a?.nombre || a?.url || 'adjunto');
+                  const isB2 = a?.origen === 'b2' || /\/comunicacion\/portada-popup\/archivo\//.test(url);
+                  if (isB2 && url) {
+                      return `<button type="button" class="btn btn-sm btn-outline-secondary" data-popup-auth-file="${escapeHtml(url)}">${nombre}</button>`;
+                  }
+                  return `<a href="${escapeHtml(url)}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener noreferrer">${nombre}</a>`;
+              })
               .join('')}</div>`
         : '';
     const imgHtml = imgUrl
-        ? `<div class="mb-3 text-center"><img src="${escapeHtml(imgUrl)}" class="img-fluid rounded shadow-sm" alt="" loading="lazy"></div>`
+        ? `<div class="mb-3 text-center"><img data-popup-auth-img="${escapeHtml(imgUrl)}" class="img-fluid rounded shadow-sm d-none" alt="" loading="lazy"></div>`
         : '';
 
     document.body.insertAdjacentHTML(
@@ -181,7 +195,68 @@ function maybeShowPortadaPopup(pp, t) {
         const m = new window.bootstrap.Modal(el);
         el.addEventListener('hidden.bs.modal', () => el.remove(), { once: true });
         m.show();
+        hydratePopupAuthAssets(el, t.err_generico || '');
     }
+}
+
+function popupAuthHeaders() {
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Imagen/adjuntos B2 del popup requieren JWT: no se pueden poner en src/href crudo. */
+async function hydratePopupAuthAssets(root, errFallback) {
+    if (!root) return;
+    const imgs = [...root.querySelectorAll('[data-popup-auth-img]')];
+    await Promise.all(
+        imgs.map(async (img) => {
+            const url = img.getAttribute('data-popup-auth-img');
+            if (!url) return;
+            try {
+                const res = await fetch(url, { headers: popupAuthHeaders() });
+                if (!res.ok) {
+                    img.remove();
+                    return;
+                }
+                const blob = await res.blob();
+                if (!blob.size || !(blob.type || '').startsWith('image/')) {
+                    img.remove();
+                    return;
+                }
+                const objUrl = URL.createObjectURL(blob);
+                img.src = objUrl;
+                img.classList.remove('d-none');
+                img.addEventListener('load', () => URL.revokeObjectURL(objUrl), { once: true });
+            } catch (_) {
+                img.remove();
+            }
+        })
+    );
+
+    root.querySelectorAll('[data-popup-auth-file]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const url = btn.getAttribute('data-popup-auth-file');
+            if (!url) return;
+            const previewWin = window.open('about:blank', '_blank');
+            try {
+                const res = await fetch(url, { headers: popupAuthHeaders() });
+                if (!res.ok) throw new Error(String(res.status));
+                const blob = await res.blob();
+                const objUrl = URL.createObjectURL(blob);
+                if (previewWin) {
+                    previewWin.location.href = objUrl;
+                } else {
+                    window.location.href = objUrl;
+                }
+                setTimeout(() => URL.revokeObjectURL(objUrl), 120000);
+            } catch (e) {
+                try {
+                    previewWin?.close();
+                } catch (_) {}
+                window.Swal?.fire?.({ icon: 'error', text: errFallback || String(e?.message || e) });
+            }
+        });
+    });
 }
 
 const refreshBound = new Set();
@@ -265,9 +340,29 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     const ppConfig = ppRes?.status === 'success' && ppRes.data ? ppRes.data : null;
     const poeRows = poeRes?.status === 'success' && poeRes.data?.rows ? poeRes.data.rows : [];
 
+    const wirePoeButtons = () => {
+        mount.querySelectorAll('[data-dash-poe-open]').forEach((btn) => {
+            btn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                const id = parseInt(btn.getAttribute('data-dash-poe-open'), 10);
+                if (id > 0) openPoeDashboardModal(id);
+            });
+        });
+    };
+
     if (loc?.status !== 'success') {
         if (silent && hadInjected) return;
-        mount.innerHTML = `<div class="alert alert-warning border-0 shadow-sm small mb-0">${escapeHtml(t.dash_noticias_error || t.err_generico || '')}</div>`;
+        const bloquePortadaErr = renderPortadaDashboardBlock(ppConfig, t);
+        const bloquePoeErr = renderPoeDashboardBlock(poeRows, t);
+        mount.innerHTML = `
+            ${bloquePortadaErr}
+            ${bloquePoeErr}
+            <div class="alert alert-warning border-0 shadow-sm small mb-0">${escapeHtml(t.dash_noticias_error || t.err_generico || '')}</div>`;
+        if (!silent) {
+            maybeShowPortadaPopup(ppConfig, t);
+        }
+        wirePoeButtons();
+        mount.dataset.newsDashboardInjected = '1';
         return;
     }
 
@@ -426,13 +521,7 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     await hydrateNoticiaPortadaThumbs(mount);
     bindNoticiaAdjuntoOpenButtons(mount, t.err_generico || '');
 
-    mount.querySelectorAll('[data-dash-poe-open]').forEach((btn) => {
-        btn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            const id = parseInt(btn.getAttribute('data-dash-poe-open'), 10);
-            if (id > 0) openPoeDashboardModal(id);
-        });
-    });
+    wirePoeButtons();
 
     mount.dataset.newsDashboardInjected = '1';
 

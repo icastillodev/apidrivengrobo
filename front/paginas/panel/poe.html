@@ -1,17 +1,17 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="grobo-asset-version" content="20260521">
-    <meta name="grobo-poe-version" content="20260521">
+    <meta name="grobo-asset-version" content="20260712">
+    <meta name="grobo-poe-version" content="20260712">
     <title>POE - GROBO</title>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../../dist/style/css/tailwind.css?v=20260703">
+    <link rel="stylesheet" href="../../dist/style/css/tailwind.css?v=20260712">
     <style>
         .poe-portal-card {
             border-radius: 12px;
@@ -25,13 +25,13 @@
         }
     </style>
     <script type="module">
-        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js?v=20260703';
-        import { Auth } from '../../dist/js/auth.js?v=20260703';
-        import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260703';
-        import { NotificationManager } from '../../dist/js/NotificationManager.js?v=20260703';
-        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260703';
-        import { initPortalPoe } from '../../dist/js/pages/panel/poe_portal.js?v=20260703';
-        import { POE_ASSET_VERSION } from '../../dist/js/assetVersion.js?v=20260703';
+        import { showLoader, hideLoader } from '../../dist/js/components/LoaderComponent.js?v=20260712';
+        import { Auth } from '../../dist/js/auth.js?v=20260712';
+        import { initMenu } from '../../dist/js/components/MenuComponent.js?v=20260712';
+        import { NotificationManager } from '../../dist/js/NotificationManager.js?v=20260712';
+        import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260712';
+        import { initPortalPoe } from '../../dist/js/pages/panel/poe_portal.js?v=20260712';
+        import { POE_ASSET_VERSION } from '../../dist/js/assetVersion.js?v=20260712';
 
         document.addEventListener('DOMContentLoaded', async () => {
             if (typeof POE_ASSET_VERSION === 'string') {
@@ -42,11 +42,9 @@
                 await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
                 if (window.txt) translatePage();
                 Auth.checkAccess([1, 2, 3, 4, 5, 6]);
-                if (window.txt) {
-                    await initMenu();
-                    NotificationManager.init();
-                    await initPortalPoe();
-                }
+                await initMenu();
+                NotificationManager.init();
+                await initPortalPoe();
             } catch (e) {
                 console.error(e);
             } finally {

@@ -3,16 +3,22 @@ namespace App\Controllers;
 
 use App\Models\AdminReservas\AdminReservasSeriesModel;
 use App\Utils\Auditoria;
+use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
 class AdminReservasSeriesController {
+    use ModuloInstitucionGuardTrait;
+
+    private $db;
     private $model;
 
     public function __construct($db) {
+        $this->db = $db;
         $this->model = new AdminReservasSeriesModel($db);
     }
 
     public function createSerie() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $input['IdInstitucion'] = $sesion['instId'];
@@ -23,6 +29,7 @@ class AdminReservasSeriesController {
 
     public function cancelOcurrencia() {
         $sesion = Auditoria::getDatosSesion();
+        $this->enforceModuloSesionOrExit($sesion, 'reservas');
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) $input = [];
         $out = $this->model->cancelOcurrencia($sesion['instId'], $sesion['userId'], $input);

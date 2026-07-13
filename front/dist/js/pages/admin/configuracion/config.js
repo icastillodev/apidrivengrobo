@@ -11,6 +11,20 @@ export function initConfigDashboard() {
         : '/admin/configuracion/';
 
     const btnCfg = t.btn_configurar || 'Configurar';
+    const roleId = parseInt(localStorage.getItem('roleId') || localStorage.getItem('userLevel') || '0', 10);
+    let reservasOk = true;
+    try {
+        // Lazy import path: config hub is a classic script-ish module; use dynamic snapshot from window if modulesAccess already loaded via menu.
+        const snapRaw = sessionStorage.getItem('instModulos') || localStorage.getItem('instModulos');
+        if (snapRaw) {
+            const o = JSON.parse(snapRaw);
+            const est = o?.byKey?.reservas != null ? parseInt(o.byKey.reservas, 10) : 1;
+            // estado_logico: 1=off, 2=solo admin, 3=todos. Admin sede ve si >= 2.
+            reservasOk = est >= 2 && ([1, 2, 4].includes(roleId) || est >= 3);
+        }
+    } catch (_) {
+        reservasOk = true;
+    }
 
     const modules = [
         {
@@ -49,12 +63,14 @@ export function initConfigDashboard() {
             icon: 'bi-geo-alt', theme: 'theme-info', border: 'border-info',
             link: `${basePath}alojamientos-ubicacion`
         },
-        {
-            title: t.card_reservas_title || 'Reservas y Espacios',
-            desc: t.card_reservas_desc || 'Gestión de Salones, Instrumentos y horarios disponibles (L-V).',
-            icon: 'bi-calendar-range', theme: 'theme-pink', border: 'border-danger',
-            link: `${basePath}reservas`
-        },
+        ...(reservasOk
+            ? [{
+                title: t.card_reservas_title || 'Reservas y Espacios',
+                desc: t.card_reservas_desc || 'Gestión de Salones, Instrumentos y horarios disponibles (L-V).',
+                icon: 'bi-calendar-range', theme: 'theme-pink', border: 'border-danger',
+                link: `${basePath}reservas`
+            }]
+            : []),
         {
             title: t.card_protocolos_config_title || 'Protocolos Config',
             desc: t.card_protocolos_config_desc || 'Reglas de severidad, tipos de protocolos y validaciones.',

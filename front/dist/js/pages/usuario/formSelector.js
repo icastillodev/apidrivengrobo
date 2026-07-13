@@ -1,12 +1,19 @@
 import { API } from '../../api.js';
 import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
-import { esRolInvestigadorVisibilidadModulos, getInstModulesSnapshot } from '../../modulesAccess.js';
+import {
+    esRolInvestigadorVisibilidadModulos,
+    getInstModulesSnapshot,
+    rolPuedeModulo,
+} from '../../modulesAccess.js';
 import { applyHotkeyChips } from '../../utils/hotkeyChips.js';
 
 let allSedes = []; 
 let currentInstId = null;
 // Obtenemos el nivel del usuario (1=Super, 2=Admin, 3=Investigador)
-const userRole = parseInt(localStorage.getItem('userLevel') || '3');
+const userRole = parseInt(
+    localStorage.getItem('roleId') || localStorage.getItem('userLevel') || '3',
+    10
+);
 
 export async function initFormSelector() {
     // 🚀 NUEVO: Limpiamos cualquier selección anterior por seguridad al entrar aquí
@@ -123,21 +130,32 @@ function renderSedesList(sedes, isMulti) {
  * 0 = Módulo apagado para toda la institución.
  * 1 = Solo admin sede (1,2,4).
  * 2 = Abierto a investigadores.
- * Investigador: si 0 en la sede pero tiene datos propios en SU sede (invHasData), sigue viendo la tarjeta solo al elegir esa sede.
+ * Admin sede ya NO bypasea: si el módulo está apagado (0) no se muestra la tarjeta.
  */
 function checkPermission(flagValue, moduleKey, idInstSede) {
-    if ([1, 2, 4].includes(userRole)) {
-        return true;
-    }
     const val = parseInt(flagValue, 10);
+    const isAdminSede = [1, 2, 4].includes(userRole);
+
+    if (isAdminSede) {
+        if (val >= 1) return true;
+        // Fallback: snapshot de /session/modulos (por si el LIKE del SQL no matchea el nombre).
+        if (String(idInstSede) === String(currentInstId) && moduleKey) {
+            const { byKey } = getInstModulesSnapshot();
+            const est = byKey[moduleKey] !== undefined && byKey[moduleKey] !== null
+                ? parseInt(byKey[moduleKey], 10)
+                : 1;
+            return rolPuedeModulo(est, userRole);
+        }
+        return false;
+    }
 
     if (val === 2) return true;
 
     if (val === 1) {
-        return [1, 2, 4].includes(userRole);
+        return false;
     }
 
-    if (val === 0) {
+    if (val === 0 || Number.isNaN(val)) {
         if (!esRolInvestigadorVisibilidadModulos(userRole) || !moduleKey) return false;
         if (String(idInstSede) !== String(currentInstId)) return false;
         const { invHasData } = getInstModulesSnapshot();
@@ -194,7 +212,7 @@ function renderActionButtons(sede) {
             t?.reserva_salas || 'Reserva de Salas', 
             'bi bi-calendar-check', 
             'bg-info text-dark', 
-            'panel/formularios/reservas', 
+            'panel/misreservas', 
             target
         );
     }

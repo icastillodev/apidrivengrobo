@@ -65,8 +65,8 @@ class FormSelectorModel {
                     
                     COALESCE(MAX(
                         CASE 
-                            WHEN app.NombreModulo LIKE '%Reservas%' AND ma.Habilitado = 1 AND ma.ActivoInvestigador = 1 THEN 2 
-                            WHEN app.NombreModulo LIKE '%Reservas%' AND ma.Habilitado = 1 THEN 1 
+                            WHEN app.NombreModulo LIKE '%Reserva%' AND ma.Habilitado = 1 AND ma.ActivoInvestigador = 1 THEN 2 
+                            WHEN app.NombreModulo LIKE '%Reserva%' AND ma.Habilitado = 1 THEN 1 
                             ELSE 0 
                         END
                     ), 0) as flag_reservas
