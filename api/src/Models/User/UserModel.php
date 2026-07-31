@@ -272,17 +272,20 @@ class UserModel {
                 return ['status' => false, 'message' => 'username_duplicate_institution'];
             }
 
-            $token = bin2hex(random_bytes(32));
+            $skipEmailAuth = \App\Models\Auth\AuthService::skipEmailAuth();
+            $token = $skipEmailAuth ? null : bin2hex(random_bytes(32));
+            $confirmado = $skipEmailAuth ? 1 : 0;
             $passHash = password_hash($data['contrasena'], PASSWORD_BCRYPT);
 
             $sqlUser = "INSERT INTO usuarioe (UsrA, password_secure, IdInstitucion, token_confirmacion, confirmado)
-                        VALUES (?, ?, ?, ?, 0)";
+                        VALUES (?, ?, ?, ?, ?)";
             $stmtUser = $this->db->prepare($sqlUser);
             $stmtUser->execute([
                 $usuario, 
                 $passHash, 
                 $data['IdInstitucion'], 
-                $token
+                $token,
+                $confirmado,
             ]);
             $userId = $this->db->lastInsertId();
 
@@ -305,10 +308,17 @@ class UserModel {
             $this->db->prepare($sqlAct)->execute([$userId]);
 
             // Auditoría Manual (No hay token porque es un registro público)
-            Auditoria::logManual($this->db, $userId, 'INSERT', 'usuarioe', "Registro público completado (Pendiente activación)");
+            $auditMsg = $skipEmailAuth
+                ? 'Registro público completado (auto-confirmado; GROBO_SKIP_EMAIL_AUTH)'
+                : 'Registro público completado (Pendiente activación)';
+            Auditoria::logManual($this->db, $userId, 'INSERT', 'usuarioe', $auditMsg);
 
             $this->db->commit();
-            return ['status' => true, 'token' => $token];
+            return [
+                'status' => true,
+                'token' => $token,
+                'auto_confirmed' => $skipEmailAuth,
+            ];
 
         } catch (\Exception $e) {
             $this->db->rollBack();

@@ -11,6 +11,19 @@ class AuthService {
         $this->model = $model; 
     }
 
+    /**
+     * Emergencia Hostinger / SMTP caído: sin 2FA por correo ni bloqueo por mail.
+     * GROBO_SKIP_EMAIL_AUTH=1|true|yes|on
+     */
+    public static function skipEmailAuth(): bool {
+        $v = getenv('GROBO_SKIP_EMAIL_AUTH');
+        if ($v === false || $v === '') {
+            return false;
+        }
+        $v = strtolower(trim((string) $v));
+        return in_array($v, ['1', 'true', 'yes', 'on'], true);
+    }
+
     public function validateSlug($slug) {
         return $this->model->getInstitucionBySlug($slug);
     }
@@ -123,6 +136,14 @@ public function attemptSuperAdminLogin($user, $pass) {
 
     // --- HELPER PRIVADO: Manejo de 2FA ---
     private function handle2FALogic($user, $instName) {
+        // Temporal: sin correo no se puede completar 2FA → login directo (reactivar quitando GROBO_SKIP_EMAIL_AUTH).
+        if (self::skipEmailAuth()) {
+            $this->model->clear2FACode((int) $user['IdUsrA']);
+            $this->model->updateActivityMetadata($user['IdUsrA']);
+            error_log('AuthService: 2FA omitido (GROBO_SKIP_EMAIL_AUTH) userId=' . (int) $user['IdUsrA']);
+            return ['status' => true, 'user' => $user];
+        }
+
         // Generar Código Numérico
         $code = rand(100000, 999999);
         

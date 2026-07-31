@@ -184,23 +184,40 @@ export async function initRegistro() {
 
             if (res.status === 'success') {
                 const t = window.txt?.registro || {};
-                Swal.fire({
-                    title: t.swal_enviado || '¡REGISTRO ENVIADO!',
-                    html: `
-                        <div class="text-center">
-                            <p>${t.swal_mail_a || 'Se ha enviado un mail a'} <b>${data.EmailA}</b>.</p>
-                            <p class="mt-2 text-sm italic">${t.swal_confirmar || 'Confirme su cuenta para activar su acceso.'}</p>
-                            <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-700 font-bold uppercase text-[10px]">
-                                ${t.swal_spam || 'IMPORTANTE: Si no lo recibes, revisa tu carpeta de CORREO NO DESEADO (SPAM).'}
+                if (res.auto_confirmed) {
+                    Swal.fire({
+                        title: t.swal_listo || '¡CUENTA LISTA!',
+                        html: `
+                            <div class="text-center">
+                                <p>${t.swal_sin_verificacion || 'Tu cuenta ya está activa. Podés iniciar sesión de inmediato.'}</p>
+                                <p class="mt-2 text-sm italic">${t.swal_sin_mail_temp || 'La verificación por correo está temporalmente desactivada.'}</p>
                             </div>
-                        </div>
-                    `,
-                    icon: 'success',
-                    confirmButtonColor: '#000',
-                    confirmButtonText: t.swal_volver_login || 'VOLVER AL LOGIN'
-                }).then(() => {
-                    window.location.href = `${basePath}${instSlug}/`;
-                });
+                        `,
+                        icon: 'success',
+                        confirmButtonColor: '#000',
+                        confirmButtonText: t.swal_volver_login || 'VOLVER AL LOGIN'
+                    }).then(() => {
+                        window.location.href = `${basePath}${instSlug}/`;
+                    });
+                } else {
+                    Swal.fire({
+                        title: t.swal_enviado || '¡REGISTRO ENVIADO!',
+                        html: `
+                            <div class="text-center">
+                                <p>${t.swal_mail_a || 'Se ha enviado un mail a'} <b>${data.EmailA}</b>.</p>
+                                <p class="mt-2 text-sm italic">${t.swal_confirmar || 'Confirme su cuenta para activar su acceso.'}</p>
+                                <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-700 font-bold uppercase text-[10px]">
+                                    ${t.swal_spam || 'IMPORTANTE: Si no lo recibes, revisa tu carpeta de CORREO NO DESEADO (SPAM).'}
+                                </div>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonColor: '#000',
+                        confirmButtonText: t.swal_volver_login || 'VOLVER AL LOGIN'
+                    }).then(() => {
+                        window.location.href = `${basePath}${instSlug}/`;
+                    });
+                }
             } else {
                 btnSubmit.disabled = false;
                 const t = window.txt?.registro || {};

@@ -557,21 +557,28 @@ class UserController {
             // Log manual público
             Auditoria::logManual($this->db, 0, 'INSERT', 'usuarioe', "Nuevo Registro Público: " . strtolower(trim($data['usuario'] ?? '')));
 
-            $mailService = new MailService();
-            $instInfo = $this->model->getInstitutionName($data['IdInstitucion']);
-            $rawName = $instInfo['NombreInst'] ?? $slug;
-            $instNameReal = strtoupper(str_replace(['APP ', 'App ', 'app '], '', $rawName));
+            $autoConfirmed = !empty($res['auto_confirmed']);
+            $mailSent = false;
 
-            $mailSent = $mailService->sendRegistrationEmail(
-                $data['EmailA'], $data['NombreA'], $data['usuario'], 
-                $res['token'], $instNameReal, $slug,
-                $data['lang'] ?? $_GET['lang'] ?? 'es'
-            );
+            // Sin correo confiable: no exigir confirmación por email (reactivable quitando GROBO_SKIP_EMAIL_AUTH).
+            if (!$autoConfirmed && !empty($res['token'])) {
+                $mailService = new MailService();
+                $instInfo = $this->model->getInstitutionName($data['IdInstitucion']);
+                $rawName = $instInfo['NombreInst'] ?? $slug;
+                $instNameReal = strtoupper(str_replace(['APP ', 'App ', 'app '], '', $rawName));
+
+                $mailSent = $mailService->sendRegistrationEmail(
+                    $data['EmailA'], $data['NombreA'], $data['usuario'],
+                    $res['token'], $instNameReal, $slug,
+                    $data['lang'] ?? $_GET['lang'] ?? 'es'
+                );
+            }
 
             echo json_encode([
                 'status' => 'success',
                 'message' => 'Usuario registrado exitosamente',
-                'mail' => $mailSent ? 'enviado' : 'error_envio'
+                'mail' => $autoConfirmed ? 'omitido' : ($mailSent ? 'enviado' : 'error_envio'),
+                'auto_confirmed' => $autoConfirmed,
             ]);
         } else {
             echo json_encode(['status' => 'error', 'message' => $res['message']]);
