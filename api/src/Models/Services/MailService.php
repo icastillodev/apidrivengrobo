@@ -228,6 +228,17 @@ class MailService {
     }
 
 public function executeSend($to, $subject, $body, $replyTo = null) {
+        // Kill switch: Hostinger u otro SMTP suspendido / mantenimiento.
+        // MAIL_ENABLED=0|false|off → no intenta SMTP (evita re-suspensión por reintentos).
+        $mailEnabled = getenv('MAIL_ENABLED');
+        if ($mailEnabled !== false && $mailEnabled !== '') {
+            $v = strtolower(trim((string) $mailEnabled));
+            if (in_array($v, ['0', 'false', 'off', 'no'], true)) {
+                error_log('MailService: envío omitido (MAIL_ENABLED=' . $v . ') to=' . (string) $to);
+                return false;
+            }
+        }
+
         $mail = new PHPMailer(true);
         try {
             $mail->isSMTP();
