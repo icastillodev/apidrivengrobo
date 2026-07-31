@@ -328,7 +328,13 @@ window.ajustarPagoAloj = async (accion, id) => {
     
     const deudaPendiente = Math.max(0, totalCosto - yaPagado);
 
-    if (montoIngresado <= 0) return;
+    if (montoIngresado <= 0) {
+        return Swal.fire(
+            window.txt?.generales?.swal_atencion || 'Atención',
+            window.txt?.facturacion?.billing_modal?.ph_monto || 'Ingrese un monto mayor a 0.',
+            'warning'
+        );
+    }
 
     let montoAProcesar = montoIngresado;
     let notaAjuste = '';

@@ -38,10 +38,13 @@ export const openAlojModal = async (historiaId) => {
         const history = historyRows;
         const cobro = resAloj.cobro || {};
         const trazHabilitada = !!cobro.trazabilidad_habilitada;
-        const modoEstadia = first.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
         const first = history[0];
+        const modoEstadia = (cobro.alojamiento_cobro_modo || first.alojamiento_cobro_modo) === 'SUJETO'
+            ? 'SUJETO'
+            : 'CONTENIDO';
 
-        const idPagador = parseInt(String(first.IdTitularProtocolo ?? first.idprotA ?? '0'), 10) || 0;
+        // Titular del protocolo (quien paga). No usar idprotA como fallback: es ID de protocolo, no de usuario.
+        const idPagador = parseInt(String(first.IdTitularProtocolo ?? first.IdUsrTitular ?? '0'), 10) || 0;
         const titularNombre = first.TitularNombre || bmTpl(t.aloj_titular_fallback_tpl || 'Titular (ID: {id})', { id: idPagador });
         const respEstadia = first.Investigador || t.aloj_sin_asignar || 'Sin asignar';
 
@@ -66,7 +69,8 @@ export const openAlojModal = async (historiaId) => {
 
         let totalPagadoHistorico = 0;
         history.forEach(h => {
-            totalPagadoHistorico += parseFloat(h.totalpago || 0);
+            // Misma semántica que la grilla de facturación: un totalpago por historia (MAX), no suma de tramos.
+            totalPagadoHistorico = Math.max(totalPagadoHistorico, parseFloat(h.totalpago || 0) || 0);
         });
 
         const html = `

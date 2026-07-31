@@ -139,8 +139,24 @@ class ComunicacionArchivoValidacion
         return ['ext' => $extDeclarada, 'mime' => self::mimeParaRespuesta($extDeclarada, $mimeNorm), 'nombreSeguro' => $nombreSeguro];
     }
 
+    /** @return array{ext:string, mime:string, nombreSeguro:string} */
+    public static function validarComprobanteFacturacion(string $tmpPath, string $originalName): array
+    {
+        return self::validarArchivo(
+            $tmpPath,
+            $originalName,
+            153600, // 150 KB
+            ['pdf'],
+            ['application/pdf'],
+            'comprobante_facturacion'
+        );
+    }
+
     private static function msgTamano(int $maxBytes, string $contexto): string
     {
+        if ($contexto === 'comprobante_facturacion') {
+            return 'El comprobante PDF no puede superar 150 KB.';
+        }
         if ($contexto === 'mensaje') {
             return 'El adjunto no puede superar 50 KB.';
         }
@@ -212,6 +228,9 @@ class ComunicacionArchivoValidacion
             }
 
             return false;
+        }
+        if ($contexto === 'comprobante_facturacion') {
+            return $ext === 'pdf' && $mimeNorm === 'application/pdf';
         }
         if ($contexto === 'imagen_noticia') {
             return ($ext === 'jpg' || $ext === 'jpeg') && $mimeNorm === 'image/jpeg';

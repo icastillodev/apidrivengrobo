@@ -5,7 +5,8 @@ export const pt = {
         3: "Pesquisador",
         4: "Admin",
         5: "Assistente",
-        6: "Laboratório"
+        6: "Laboratório",
+        7: "Contador"
     },
     menu: {
         users: "Usuários",
@@ -1558,7 +1559,14 @@ alojamientos: {
         saldo_hist_sub: "Movimentos de saldo vs pagamentos",
         saldo_hist_mov_lbl: "Movimentos (somar / subtrair)",
         saldo_hist_pagos_lbl: "Pagamentos (gastos)",
+        billing_readonly_contador: "O papel Contador é só leitura: não pode alterar saldos nem pagamentos.",
         saldo_hist_empty: "Sem movimentos.",
+        saldo_hist_grupo_n_forms: "{n} formulários/itens",
+        saldo_hist_grupo_total: "Total liquidado: $ {m}",
+        saldo_comprobante_pdf_lbl: "Comprovante PDF (opcional, máx. 150 KB)",
+        saldo_comprobante_pdf_ver: "Ver comprovante",
+        saldo_comprobante_pdf_adjuntar: "Anexar comprovante",
+        saldo_comprobante_pdf_err: "Somente PDF de até 150 KB.",
         saldo_hist_col_id: "ID",
         saldo_hist_col_fecha: "Data e hora",
         saldo_hist_err_id_usuario: "Usuário inválido.",

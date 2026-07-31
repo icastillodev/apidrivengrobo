@@ -1280,6 +1280,17 @@ export async function initMensajes(opts = {}) {
                     renderRefSelectOptions(rs0, []);
                 }
                 syncReplyRefUi();
+                if (typeof Swal !== 'undefined') {
+                    const tm = window.txt?.comunicacion || window.txt?.mensajeria || {};
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: tm.msg_enviado_ok || tm.reply_enviado_ok || 'Mensaje enviado',
+                        showConfirmButton: false,
+                        timer: 2200,
+                    });
+                }
                 avisoCorreoMensajeSiFallo(res);
                 await openHilo(currentHiloId);
             } else if (typeof Swal !== 'undefined') {

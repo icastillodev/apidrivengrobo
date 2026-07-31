@@ -29,7 +29,29 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | [Alojamiento — modo cobro (BD-01)](#sql-alojamiento-modo-cobro) | `institucion.AlojamientoCobroModo`, `tipoalojamiento.PrecioXSujeto`, `alojamiento.PrecioSujetoMomento` |
 | [Institución — precios visibles a investigadores](#sql-institucion-usuarios-ven-precios) | `institucion.UsuariosVenPreciosFacturacion` |
 | [Adjuntos / Backblaze (plantilla)](#plantilla-backblaze) | Ideas legacy; columnas reales en migración B2 de comunicación |
+| [Comprobante PDF historial + rol Contador](#sql-comprobante-pdf-contador) | `historialpago` PDF B2 + `tipousuarioe` 7 |
 | [Inventario backlog](#inventario-backlog) | Tabla resumen + estado |
+
+---
+
+<a id="sql-comprobante-pdf-contador"></a>
+
+## Comprobante PDF en historialpago + rol Contador (2026-07-26)
+
+**Archivo ejecutable:** [`docs/migrations/2026-07-26-comprobante-pdf-historialpago-y-rol-contador.sql`](migrations/2026-07-26-comprobante-pdf-historialpago-y-rol-contador.sql)  
+**Guía humana:** [`docs/SQL-PARA-EJECUTAR-2026-07-26.md`](SQL-PARA-EJECUTAR-2026-07-26.md)
+
+```sql
+ALTER TABLE historialpago
+  ADD COLUMN ComprobantePdfB2Key VARCHAR(768) NULL AFTER Comentario,
+  ADD COLUMN ComprobantePdfNombre VARCHAR(255) NULL AFTER ComprobantePdfB2Key;
+
+INSERT INTO tipousuarioe (IdTipousrA, NombretipoA, NombreCompleto)
+SELECT 7, 'contador', 'Contador'
+WHERE NOT EXISTS (SELECT 1 FROM tipousuarioe WHERE IdTipousrA = 7);
+```
+
+Env: `B2_*_FACTURACION`. Menú 202/999 vía el `.sql` completo.
 
 ---
 

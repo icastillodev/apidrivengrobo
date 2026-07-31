@@ -214,24 +214,49 @@ function buildSaldoHistorialInnerHtml(data, histOpts = {}) {
     const fmtFecha = (f) => fmtFechaHistorialCell(f, dash);
     const empty = (tf.saldo_hist_empty || 'Sin movimientos.');
 
-    const htmlMov = mov.length ? mov.map((r) => `
+    const htmlMov = mov.length ? mov.map((r) => {
+        const idH = parseInt(String(r.IdHistoPago ?? ''), 10) || 0;
+        const hasPdf = !!(r.ComprobantePdfB2Key && String(r.ComprobantePdfB2Key).trim());
+        const btnPdf = hasPdf
+            ? `<button type="button" class="btn btn-link btn-sm p-0" onclick="window.openBillingComprobantePdf(${idH})">${escapeHtmlBillingTxt(tf.saldo_comprobante_pdf_ver || 'Ver')}</button>`
+            : `<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" onclick="window.attachBillingComprobantePdf(${idH})">${escapeHtmlBillingTxt(tf.saldo_comprobante_pdf_adjuntar || 'PDF')}</button>`;
+        return `
             <tr>
-                <td class="text-muted small">#${parseInt(String(r.IdHistoPago ?? ''), 10) || 0}</td>
+                <td class="text-muted small">#${idH}</td>
                 <td class="small">${fmtFecha(r.fecha)}</td>
                 <td>${fmtMonto(r.Monto)}</td>
                 <td class="small text-muted">${cellHistorialApiText(r.IdentificadorTransferencia)}</td>
-                <td class="small">${cellHistorialApiText(r.Comentario)}</td>
+                <td class="small">${cellHistorialApiText(r.Comentario)} <span class="ms-1">${btnPdf}</span></td>
             </tr>
-        `).join('') : `<tr><td colspan="5" class="text-center text-muted small py-3">${empty}</td></tr>`;
+        `;
+    }).join('') : `<tr><td colspan="5" class="text-center text-muted small py-3">${empty}</td></tr>`;
 
-    const htmlPagos = pagos.length ? pagos.map((r) => {
-        const tipoCode = String(r.TipoHistorial ?? '').trim();
-        const tipoLbl = saldoHistorialTipoDisplay(tipoCode);
-        const tipoTitle = tipoCode ? escapeHtmlBillingTxt(tipoCode) : '';
-        const tipoHtml = `<span class="badge bg-secondary"${tipoTitle ? ` title="${tipoTitle}"` : ''}>${escapeHtmlBillingTxt(tipoLbl)}</span>`;
-        const idFormNum = parseInt(String(r.IdFormA ?? ''), 10);
-        const refForm = Number.isFinite(idFormNum) && idFormNum > 0 ? `#${idFormNum}` : dash;
-        return `
+    const htmlPagos = (() => {
+        if (!pagos.length) {
+            return `<tr><td colspan="7" class="text-center text-muted small py-3">${empty}</td></tr>`;
+        }
+        // Agrupa liquidaciones del mismo lote (misma transferencia + comentario + minuto).
+        const groups = new Map();
+        pagos.forEach((r, idx) => {
+            const tid = String(r.IdentificadorTransferencia ?? '').trim();
+            const com = String(r.Comentario ?? '').trim();
+            const fKey = String(r.fecha ?? '').trim().slice(0, 16);
+            const key = (tid || com) ? `${tid}|${com}|${fKey}` : `__single_${idx}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(r);
+        });
+
+        const rows = [];
+        let accordionIdx = 0;
+        groups.forEach((items) => {
+            const renderOne = (r) => {
+                const tipoCode = String(r.TipoHistorial ?? '').trim();
+                const tipoLbl = saldoHistorialTipoDisplay(tipoCode);
+                const tipoTitle = tipoCode ? escapeHtmlBillingTxt(tipoCode) : '';
+                const tipoHtml = `<span class="badge bg-secondary"${tipoTitle ? ` title="${tipoTitle}"` : ''}>${escapeHtmlBillingTxt(tipoLbl)}</span>`;
+                const idFormNum = parseInt(String(r.IdFormA ?? ''), 10);
+                const refForm = Number.isFinite(idFormNum) && idFormNum > 0 ? `#${idFormNum}` : dash;
+                return `
             <tr>
                 <td class="text-muted small">#${parseInt(String(r.IdHistoPago ?? ''), 10) || 0}</td>
                 <td class="small">${fmtFecha(r.fecha)}</td>
@@ -240,9 +265,47 @@ function buildSaldoHistorialInnerHtml(data, histOpts = {}) {
                 <td class="small text-muted">${cellHistorialApiText(r.IdentificadorTransferencia)}</td>
                 <td class="small">${cellHistorialApiText(r.Comentario)}</td>
                 <td>${fmtMonto(0 - Math.abs(parseFloat(r.Monto || 0)))}</td>
-            </tr>
-        `;
-    }).join('') : `<tr><td colspan="7" class="text-center text-muted small py-3">${empty}</td></tr>`;
+            </tr>`;
+            };
+
+            if (items.length === 1) {
+                rows.push(renderOne(items[0]));
+                return;
+            }
+
+            const totalGrupo = items.reduce((s, r) => s + Math.abs(parseFloat(r.Monto || 0)), 0);
+            const sample = items[0];
+            const nForms = items.length;
+            const lblN = (tf.saldo_hist_grupo_n_forms || '{n} formularios/ítems').replace(/\{n\}/g, String(nForms));
+            const lblTot = (tf.saldo_hist_grupo_total || 'Total liquidado: $ {m}').replace(/\{m\}/g, formatBillingMoney(totalGrupo));
+            const aid = `saldo-hist-acc-${accordionIdx++}`;
+            rows.push(`
+            <tr class="table-light">
+                <td colspan="7" class="p-0">
+                    <div class="accordion accordion-flush" id="${aid}">
+                        <div class="accordion-item border-0">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2 px-3 small fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#${aid}-c" aria-expanded="false">
+                                    <span class="me-2">${fmtFecha(sample.fecha)}</span>
+                                    <span class="badge bg-primary me-2">${escapeHtmlBillingTxt(lblN)}</span>
+                                    <span class="text-muted me-2">${cellHistorialApiText(sample.IdentificadorTransferencia)}</span>
+                                    <span class="text-success">${escapeHtmlBillingTxt(lblTot)}</span>
+                                </button>
+                            </h2>
+                            <div id="${aid}-c" class="accordion-collapse collapse" data-bs-parent="#${aid}">
+                                <div class="accordion-body p-0">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>${items.map(renderOne).join('')}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>`);
+        });
+        return rows.join('');
+    })();
 
     return `
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -309,6 +372,7 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
         const tf = txF();
         let transferId = null;
         let comment = null;
+        let pdfFile = null;
         if (typeof Swal !== 'undefined') {
             const title = (action === 'sub')
                 ? (tf.saldo_ajuste_restar_title || 'Restar saldo')
@@ -320,7 +384,9 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                         <label class="form-label small mb-1">${tf.saldo_transfer_id_label || 'Identificador de transferencia'}</label>
                         <input id="swal-saldo-transfer" class="form-control form-control-sm mb-2" maxlength="120" placeholder="${tf.saldo_transfer_id_ph || 'Ej.: TRANSF-123 / comprobante…'}">
                         <label class="form-label small mb-1">${tf.saldo_comentario_label || 'Comentario'}</label>
-                        <input id="swal-saldo-comment" class="form-control form-control-sm" maxlength="255" placeholder="${tf.saldo_comentario_ph || 'Ej.: ajuste, reintegro, origen…'}">
+                        <input id="swal-saldo-comment" class="form-control form-control-sm mb-2" maxlength="255" placeholder="${tf.saldo_comentario_ph || 'Ej.: ajuste, reintegro, origen…'}">
+                        <label class="form-label small mb-1">${tf.saldo_comprobante_pdf_lbl || 'Comprobante PDF (opcional, máx. 150 KB)'}</label>
+                        <input id="swal-saldo-pdf" type="file" accept="application/pdf,.pdf" class="form-control form-control-sm">
                     </div>
                 `,
                 icon: 'question',
@@ -330,15 +396,28 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
                 confirmButtonColor: '#1a5d3b',
                 preConfirm: () => {
                     const c = Swal.getHtmlContainer();
+                    const file = c?.querySelector('#swal-saldo-pdf')?.files?.[0] || null;
+                    if (file) {
+                        if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name || '')) {
+                            Swal.showValidationMessage(tf.saldo_comprobante_pdf_err || 'Solo PDF de hasta 150 KB.');
+                            return false;
+                        }
+                        if (file.size > 153600) {
+                            Swal.showValidationMessage(tf.saldo_comprobante_pdf_err || 'Solo PDF de hasta 150 KB.');
+                            return false;
+                        }
+                    }
                     return {
                         transferId: c?.querySelector('#swal-saldo-transfer')?.value || '',
                         comment: c?.querySelector('#swal-saldo-comment')?.value || '',
+                        file,
                     };
                 }
             });
             if (!r.isConfirmed) return;
             transferId = (r.value?.transferId || '').trim() || null;
             comment = (r.value?.comment || '').trim() || null;
+            pdfFile = r.value?.file || null;
         }
 
         const pidFocus = isFromProtocol && idProt != null ? parseInt(String(idProt), 10) : NaN;
@@ -349,13 +428,24 @@ window.updateBalance = async (idUsr, action, isFromProtocol = false, idProt = nu
         });
 
         showLoader();
-        const res = await API.request('/billing/balance', 'POST', {
-            idUsr: idUsr,
-            instId: localStorage.getItem('instId') || 1,
-            monto: monto,
-            transferId,
-            comment
-        });
+        let res;
+        if (pdfFile) {
+            const fd = new FormData();
+            fd.append('idUsr', String(idUsr));
+            fd.append('monto', String(monto));
+            if (transferId) fd.append('transferId', transferId);
+            if (comment) fd.append('comment', comment);
+            fd.append('comprobante', pdfFile);
+            res = await API.request('/billing/ajustar-saldo', 'POST', fd);
+        } else {
+            res = await API.request('/billing/balance', 'POST', {
+                idUsr: idUsr,
+                instId: localStorage.getItem('instId') || 1,
+                monto: monto,
+                transferId,
+                comment
+            });
+        }
         hideLoader();
 
         if (res.status === 'success') {
@@ -426,7 +516,7 @@ window.openSaldoHistorialPopup = async (opts) => {
         Swal.fire({
             title: histTitle,
             html: loadingHtml,
-            width: 980,
+            width: '80%',
             showConfirmButton: false,
             allowOutsideClick: false,
         });
@@ -440,8 +530,8 @@ window.openSaldoHistorialPopup = async (opts) => {
         Swal.close();
         await Swal.fire({
             title: histTitle,
-            width: 980,
-            html: `<div class="text-start">${buildSaldoHistorialInnerHtml(data, { scope })}</div>`,
+            width: '80%',
+            html: `<div class="text-start" style="max-height:75vh;overflow:auto">${buildSaldoHistorialInnerHtml(data, { scope })}</div>`,
             showConfirmButton: true,
             confirmButtonText: gen.cerrar || 'Cerrar',
         });
@@ -557,8 +647,12 @@ window.procesarPagoProtocolo = async (idProt) => {
                 <p>${intro}</p>
                 <div class="p-3 bg-light rounded border shadow-sm">
                     <div class="d-flex justify-content-between mb-2">
+                        <span>${tf.payment_insumos_saldo_actual || tf.saldo_actual || 'Saldo actual:'}</span>
+                        <span class="fw-bold">$ ${formatBillingMoney(saldoActual)}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
                         <span>${tf.payment_total_a_pagar_lbl || 'Total a pagar:'}</span> 
-                        <span class="fw-bold">$ ${formatBillingMoney(totalAPagar)}</span>
+                        <span class="fw-bold text-primary">$ ${formatBillingMoney(totalAPagar)}</span>
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between text-success fw-bold">
@@ -717,9 +811,18 @@ window.procesarPagoInsumosProtocolo = async (idProt) => {
             <div class="text-start">
                 <p>${(tf.payment_confirm_items || 'Se liquidarán <b>{n}</b> ítems.').replace(/\{n\}/g, String(items.length))}</p>
                 <div class="p-3 bg-light rounded border">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>${tf.payment_insumos_saldo_actual || 'Saldo actual:'}</span>
+                        <b>$ ${formatBillingMoney(saldoActual)}</b>
+                    </div>
                     <div class="d-flex justify-content-between fw-bold">
                         <span>${tf.payment_insumos_total_pagar || 'Total a pagar:'}</span>
                         <span>$ ${formatBillingMoney(totalAPagar)}</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between text-success fw-bold">
+                        <span>${tf.payment_saldo_despues_lbl || 'Saldo después del pago:'}</span>
+                        <span>$ ${formatBillingMoney(saldoActual - totalAPagar)}</span>
                     </div>
                 </div>
                 ${buildPaymentMetaSwalFragment(tf, sug, swUid)}
@@ -831,3 +934,107 @@ window.procesarPagoInsumosGenerales = async () => {
         await ejecutarPagoFinal(idInv, totalAPagar, items, null, confirm.value || {});
     }
 };
+
+function billingIsContadorReadOnly() {
+    return parseInt(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel') || '0', 10) === 7;
+}
+
+function billingGuardContadorWritable() {
+    if (!billingIsContadorReadOnly()) return true;
+    const tf = txF();
+    Swal.fire(
+        window.txt?.generales?.swal_atencion || 'Atención',
+        tf.billing_readonly_contador || 'El rol Contador es solo lectura: no puede modificar saldos ni pagos.',
+        'info'
+    );
+    return false;
+}
+
+window.openBillingComprobantePdf = async (idHistoPago) => {
+    const id = parseInt(idHistoPago, 10) || 0;
+    if (!id) return;
+    try {
+        const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+        const res = await fetch(`${API.urlBase}/billing/historial/comprobante?id=${id}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (e) {
+        console.error(e);
+        Swal.fire(window.txt?.generales?.error || 'Error', txF().saldo_comprobante_pdf_err || 'No se pudo abrir el PDF.', 'error');
+    }
+};
+
+window.attachBillingComprobantePdf = async (idHistoPago) => {
+    if (!billingGuardContadorWritable()) return;
+    const id = parseInt(idHistoPago, 10) || 0;
+    if (!id) return;
+    const tf = txF();
+    const { value: file } = await Swal.fire({
+        title: tf.saldo_comprobante_pdf_adjuntar || 'Adjuntar comprobante',
+        html: `<input id="swal-attach-pdf" type="file" accept="application/pdf,.pdf" class="form-control form-control-sm">`,
+        showCancelButton: true,
+        confirmButtonText: window.txt?.generales?.confirmar || 'Confirmar',
+        cancelButtonText: window.txt?.generales?.cerrar || 'Cancelar',
+        preConfirm: () => {
+            const f = Swal.getHtmlContainer()?.querySelector('#swal-attach-pdf')?.files?.[0];
+            if (!f) {
+                Swal.showValidationMessage(tf.saldo_comprobante_pdf_err || 'PDF requerido');
+                return false;
+            }
+            if (f.size > 153600 || (f.type && f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name || ''))) {
+                Swal.showValidationMessage(tf.saldo_comprobante_pdf_err || 'Solo PDF de hasta 150 KB.');
+                return false;
+            }
+            return f;
+        },
+    });
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('IdHistoPago', String(id));
+    fd.append('comprobante', file);
+    showLoader();
+    try {
+        const res = await API.request('/billing/historial/comprobante', 'POST', fd);
+        hideLoader();
+        if (res.status === 'success') {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: tf.saldo_act || 'OK', showConfirmButton: false, timer: 1800 });
+        } else {
+            Swal.fire(window.txt?.generales?.error || 'Error', res.message || '', 'error');
+        }
+    } catch (e) {
+        hideLoader();
+        console.error(e);
+    }
+};
+
+const _updBal = window.updateBalance;
+window.updateBalance = async (...args) => {
+    if (!billingGuardContadorWritable()) return;
+    return _updBal(...args);
+};
+const _pagoProt = window.procesarPagoProtocolo;
+if (typeof _pagoProt === 'function') {
+    window.procesarPagoProtocolo = async (...args) => {
+        if (!billingGuardContadorWritable()) return;
+        return _pagoProt(...args);
+    };
+}
+const _pagoInsP = window.procesarPagoInsumosProtocolo;
+if (typeof _pagoInsP === 'function') {
+    window.procesarPagoInsumosProtocolo = async (...args) => {
+        if (!billingGuardContadorWritable()) return;
+        return _pagoInsP(...args);
+    };
+}
+const _pagoInsG = window.procesarPagoInsumosGenerales;
+if (typeof _pagoInsG === 'function') {
+    window.procesarPagoInsumosGenerales = async (...args) => {
+        if (!billingGuardContadorWritable()) return;
+        return _pagoInsG(...args);
+    };
+}

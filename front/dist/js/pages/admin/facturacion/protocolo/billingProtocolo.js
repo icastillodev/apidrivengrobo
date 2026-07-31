@@ -32,7 +32,8 @@ import {
     billingPartitionInsumosPedidoReactivoOtros,
     billingFormatPedidoFechasPlain,
     billingPdfFormularioTaxonomia,
-    billingPdfFormularioCantidad
+    billingPdfFormularioCantidad,
+    billingEspCepaDisplayHtml
 } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
@@ -358,7 +359,7 @@ function getFormsTableHTML(formularios, idProt) {
                             cantidadDisplay = `<b class="fs-5 text-dark">${f.cant_animal || 0}</b> <small class="text-muted">${bd.un_abbr || 'un.'}</small>`;
                         }
 
-                        const espDisplay = f.nombre_especie + (f.nombre_subespecie && f.nombre_subespecie !== 'N/A' ? `<br><small class="text-muted">${f.nombre_subespecie}</small>` : '');
+                        const espDisplay = billingEspCepaDisplayHtml(f);
                         const fi = bi.fecha_in || 'In:';
                         const fo = bi.fecha_out || 'Out:';
                         const fechasDisplay = `<div class="small"><b>${fi}</b> ${f.fecha || '-'}</div><div class="small text-danger"><b>${fo}</b> ${f.fecRetiroA || '-'}</div>`;

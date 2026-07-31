@@ -3,15 +3,47 @@ namespace App\Controllers;
 
 use App\Models\Billing\BillingModel;
 use App\Utils\Auditoria;
+use App\Utils\BackblazeB2;
+use App\Utils\ComunicacionArchivoValidacion;
 
 class BillingController {
     
     private $model;
     private $db;
 
+    /** Rol Contador: solo lectura en facturación. */
+    private const ROLE_CONTADOR = 7;
+
     public function __construct($db) {
         $this->db = $db;
         $this->model = new BillingModel($db);
+    }
+
+    private function assertBillingWritable(array $sesion): void {
+        $role = (int) ($sesion['role'] ?? 0);
+        if ($role === self::ROLE_CONTADOR) {
+            http_response_code(403);
+            $this->sendError('Su rol (Contador) es solo lectura: no puede modificar saldos ni pagos.');
+        }
+    }
+
+    /** @return array{0:?string,1:?string} [b2Key, nombre] */
+    private function uploadComprobantePdfIfPresent(int $instId): array {
+        if (empty($_FILES['comprobante']) || !is_array($_FILES['comprobante'])) {
+            return [null, null];
+        }
+        $f = $_FILES['comprobante'];
+        if (($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return [null, null];
+        }
+        if (($f['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || empty($f['tmp_name'])) {
+            throw new \InvalidArgumentException('Error al subir el comprobante PDF.');
+        }
+        $meta = ComunicacionArchivoValidacion::validarComprobanteFacturacion($f['tmp_name'], (string) ($f['name'] ?? 'comprobante.pdf'));
+        $key = ComunicacionArchivoValidacion::construirClaveObjeto('facturacion', $instId, $meta['nombreSeguro']);
+        $b2 = new BackblazeB2('FACTURACION');
+        $b2->uploadFile($f['tmp_name'], $key, $meta['mime']);
+        return [$key, $meta['nombreSeguro']];
     }
 
     /** Formulario exento (tipo de formulario): no entra al total pagado global ni a subtotales cobrables. */
@@ -708,7 +740,8 @@ class BillingController {
     public function updateBalance() {
         $f = $this->getRequestData() ?: [];
         try {
-            $sesion = Auditoria::getDatosSesion(); // Extraemos del Token
+            $sesion = Auditoria::getDatosSesion();
+            $this->assertBillingWritable($sesion);
             $idUsr = (int) ($f['idUsr'] ?? 0);
             $monto = (float) ($f['monto'] ?? 0);
             if ($idUsr <= 0) {
@@ -719,7 +752,18 @@ class BillingController {
             }
             $transferId = $f['transferId'] ?? null;
             $comment = $f['comment'] ?? null;
-            $res = $this->model->updateBalance($idUsr, $sesion['instId'], $monto, $sesion['userId'], $transferId, $comment);
+            $pdfKey = isset($f['ComprobantePdfB2Key']) ? (string) $f['ComprobantePdfB2Key'] : null;
+            $pdfName = isset($f['ComprobantePdfNombre']) ? (string) $f['ComprobantePdfNombre'] : null;
+            $res = $this->model->updateBalance(
+                $idUsr,
+                $sesion['instId'],
+                $monto,
+                $sesion['userId'],
+                $transferId,
+                $comment,
+                $pdfKey,
+                $pdfName
+            );
             if ($res) {
                 $this->sendSuccess('Saldo actualizado');
             } else {
@@ -737,6 +781,7 @@ class BillingController {
     public function ajustarSaldo() {
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertBillingWritable($sesion);
             $idUsr = isset($_POST['idUsr']) ? (int) $_POST['idUsr'] : 0;
             $monto = isset($_POST['monto']) ? (float) $_POST['monto'] : 0.0;
             if ($idUsr <= 0) {
@@ -755,11 +800,81 @@ class BillingController {
             if ($transferId === '') {
                 $transferId = null;
             }
-            $res = $this->model->updateBalance($idUsr, $sesion['instId'], $monto, $sesion['userId'], $transferId, $comment);
+            [$pdfKey, $pdfName] = $this->uploadComprobantePdfIfPresent((int) $sesion['instId']);
+            $res = $this->model->updateBalance(
+                $idUsr,
+                $sesion['instId'],
+                $monto,
+                $sesion['userId'],
+                $transferId,
+                $comment,
+                $pdfKey,
+                $pdfName
+            );
             if ($res) {
-                $this->sendSuccess(['ok' => true]);
+                Auditoria::log($this->db, 'UPDATE', 'historialpago', 'CARGA_SALDO idUsr=' . $idUsr . ($pdfKey ? ' con comprobante PDF' : ''));
+                $this->sendSuccess(['ok' => true, 'ComprobantePdfB2Key' => $pdfKey, 'ComprobantePdfNombre' => $pdfName]);
             }
             $this->sendError('No se pudo actualizar el saldo.');
+        } catch (\InvalidArgumentException $e) {
+            $this->sendError($e->getMessage());
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
+    /** POST multipart: IdHistoPago + file comprobante — adjunta PDF a línea existente del historial. */
+    public function attachComprobanteHistorial() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $this->assertBillingWritable($sesion);
+            $idHisto = isset($_POST['IdHistoPago']) ? (int) $_POST['IdHistoPago'] : 0;
+            if ($idHisto <= 0) {
+                $this->sendError('IdHistoPago inválido.');
+            }
+            $row = $this->model->getHistorialPagoRow($idHisto, (int) $sesion['instId']);
+            if (!$row) {
+                $this->sendError('Movimiento no encontrado.');
+            }
+            [$pdfKey, $pdfName] = $this->uploadComprobantePdfIfPresent((int) $sesion['instId']);
+            if (!$pdfKey) {
+                $this->sendError('Debe adjuntar un PDF (máx. 150 KB).');
+            }
+            $ok = $this->model->attachComprobanteHistorial($idHisto, (int) $sesion['instId'], $pdfKey, (string) $pdfName);
+            if ($ok) {
+                Auditoria::log($this->db, 'UPDATE', 'historialpago', 'Comprobante PDF IdHistoPago=' . $idHisto);
+                $this->sendSuccess(['ok' => true, 'ComprobantePdfB2Key' => $pdfKey, 'ComprobantePdfNombre' => $pdfName]);
+            }
+            $this->sendError('No se pudo guardar el comprobante.');
+        } catch (\InvalidArgumentException $e) {
+            $this->sendError($e->getMessage());
+        } catch (\Exception $e) {
+            $this->sendError($e->getMessage());
+        }
+    }
+
+    /** GET ?id= — descarga comprobante PDF de una línea del historial (auth Bearer). */
+    public function downloadComprobanteHistorial() {
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $idHisto = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($idHisto <= 0) {
+                $this->sendError('Id inválido.');
+            }
+            $row = $this->model->getHistorialPagoRow($idHisto, (int) $sesion['instId']);
+            if (!$row || empty($row['ComprobantePdfB2Key'])) {
+                http_response_code(404);
+                $this->sendError('Comprobante no encontrado.');
+            }
+            $key = (string) $row['ComprobantePdfB2Key'];
+            if (!ComunicacionArchivoValidacion::clavePerteneceInstitucion($key, (int) $sesion['instId'])) {
+                http_response_code(403);
+                $this->sendError('Acceso denegado.');
+            }
+            $nombre = (string) ($row['ComprobantePdfNombre'] ?? 'comprobante.pdf');
+            $b2 = new BackblazeB2('FACTURACION');
+            $b2->streamDownloadAttachment($key, $nombre, 'application/pdf', true);
+            exit;
         } catch (\Exception $e) {
             $this->sendError($e->getMessage());
         }
@@ -768,7 +883,8 @@ class BillingController {
     public function processPayment() {
         $f = $this->getRequestData();
         try {
-            $sesion = Auditoria::getDatosSesion(); // Seguridad Total
+            $sesion = Auditoria::getDatosSesion();
+            $this->assertBillingWritable($sesion);
             $rawComment = $f['comentario'] ?? ($f['comment'] ?? '');
             $comment = is_string($rawComment) ? trim($rawComment) : '';
             if ($comment === '') {
@@ -845,6 +961,7 @@ class BillingController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertBillingWritable($sesion);
             $res = $this->model->procesarAjustePagoAloj($input['id'], $input['monto'], $input['accion'], $sesion['userId']);
             if ($res) $this->jsonResponse('success', 'Transacción de alojamiento completada');
             else $this->jsonResponse('error', 'No se pudo procesar');

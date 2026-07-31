@@ -5,7 +5,8 @@ export const en = {
         3: "Researcher",
         4: "Admin",
         5: "Assistant",
-        6: "Laboratory"
+        6: "Laboratory",
+        7: "Accountant"
     },
     menu: {
         users: "Users",
@@ -1557,7 +1558,14 @@ alojamientos: {
         saldo_hist_sub: "Balance movements vs payments",
         saldo_hist_mov_lbl: "Movements (add / subtract)",
         saldo_hist_pagos_lbl: "Payments (spend)",
+        billing_readonly_contador: "Accountant role is read-only: cannot change balances or payments.",
         saldo_hist_empty: "No movements.",
+        saldo_hist_grupo_n_forms: "{n} forms/items",
+        saldo_hist_grupo_total: "Total paid: $ {m}",
+        saldo_comprobante_pdf_lbl: "Receipt PDF (optional, max 150 KB)",
+        saldo_comprobante_pdf_ver: "View receipt",
+        saldo_comprobante_pdf_adjuntar: "Attach receipt",
+        saldo_comprobante_pdf_err: "PDF only, up to 150 KB.",
         saldo_hist_col_id: "ID",
         saldo_hist_col_fecha: "Date & time",
         saldo_hist_err_id_usuario: "Invalid user.",

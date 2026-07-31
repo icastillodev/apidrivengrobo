@@ -332,8 +332,35 @@ export function billingPdfFormularioTaxonomia(f) {
     }
     const parts = [row.nombre_especie, row.nombre_subespecie, row.nombre_cepa]
         .map(v => (v != null ? String(v).trim() : ''))
-        .filter(v => v !== '' && v.toUpperCase() !== 'N/A');
+        .filter(v => v !== '' && v.toLowerCase() !== 'null' && v.toUpperCase() !== 'N/A');
     return parts.length ? parts.join(' / ') : '-';
+}
+
+/**
+ * Celda HTML especie/cepa para tablas de facturación (nunca imprime el literal "null").
+ * @param {Record<string, unknown>|null|undefined} f
+ */
+export function billingEspCepaDisplayHtml(f) {
+    const row = f && typeof f === 'object' ? f : {};
+    const clean = (v) => {
+        if (v == null) return '';
+        const s = String(v).trim();
+        if (!s || s.toLowerCase() === 'null' || s.toUpperCase() === 'N/A') return '';
+        return s;
+    };
+    const esp = clean(row.nombre_especie);
+    const sub = clean(row.nombre_subespecie);
+    const cepa = clean(row.nombre_cepa);
+    if (!esp && !sub && !cepa) return '';
+    const esc = (s) => String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    let html = esc(esp);
+    if (sub) html += `<br><small class="text-muted">${esc(sub)}</small>`;
+    if (cepa) html += `<br><small class="text-muted">${esc(cepa)}</small>`;
+    return html;
 }
 
 /**

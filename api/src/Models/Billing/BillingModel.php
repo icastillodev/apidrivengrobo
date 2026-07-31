@@ -666,7 +666,7 @@ class BillingModel {
     // LOGICA TRANSACCIONAL: ACTUALIZACIÓN DE SALDOS Y PAGOS
     // ========================================================
 
-public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transferId = null, ?string $comment = null) {
+public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transferId = null, ?string $comment = null, ?string $comprobanteKey = null, ?string $comprobanteNombre = null) {
         $check = $this->db->prepare("SELECT IdDinero FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ?");
         $check->execute([$idUsr, $inst]);
         $exists = $check->fetch();
@@ -685,9 +685,15 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         $comment = $comment !== null ? trim($comment) : null;
         if ($transferId === '') $transferId = null;
         if ($comment === '') $comment = null;
+        $comprobanteKey = $comprobanteKey !== null ? trim($comprobanteKey) : null;
+        $comprobanteNombre = $comprobanteNombre !== null ? trim($comprobanteNombre) : null;
+        if ($comprobanteKey === '') $comprobanteKey = null;
+        if ($comprobanteNombre === '') $comprobanteNombre = null;
 
         $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
         $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $hasPdfKey = $this->hasColumn('historialpago', 'ComprobantePdfB2Key');
+        $hasPdfName = $this->hasColumn('historialpago', 'ComprobantePdfNombre');
         $cols = "IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion";
         $vals = "?, ?, ?, 0, NOW(), 'CARGA_SALDO', ?";
         $params = [$adminId, $monto, $idUsr, $inst];
@@ -701,9 +707,36 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
             $vals .= ", ?";
             $params[] = $comment;
         }
+        if ($hasPdfKey) {
+            $cols .= ", ComprobantePdfB2Key";
+            $vals .= ", ?";
+            $params[] = $comprobanteKey;
+        }
+        if ($hasPdfName) {
+            $cols .= ", ComprobantePdfNombre";
+            $vals .= ", ?";
+            $params[] = $comprobanteNombre;
+        }
         $this->db->prepare("INSERT INTO historialpago ($cols) VALUES ($vals)")->execute($params);
 
         return $res;
+    }
+
+    /** Adjunta/reemplaza comprobante PDF en una línea de historial de la institución. */
+    public function attachComprobanteHistorial(int $idHistoPago, int $instId, string $b2Key, string $nombre): bool {
+        if (!$this->hasColumn('historialpago', 'ComprobantePdfB2Key')) {
+            throw new \RuntimeException('Columnas de comprobante PDF no migradas en historialpago.');
+        }
+        $sql = "UPDATE historialpago SET ComprobantePdfB2Key = ?, ComprobantePdfNombre = ?
+                WHERE IdHistoPago = ? AND IdInstitucion = ?";
+        return $this->db->prepare($sql)->execute([$b2Key, $nombre, $idHistoPago, $instId]);
+    }
+
+    public function getHistorialPagoRow(int $idHistoPago, int $instId): ?array {
+        $stmt = $this->db->prepare('SELECT * FROM historialpago WHERE IdHistoPago = ? AND IdInstitucion = ? LIMIT 1');
+        $stmt->execute([$idHistoPago, $instId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     /**
@@ -760,11 +793,17 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
         $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
         $hasComment = $this->hasColumn('historialpago', 'Comentario');
+        $hasPdfKey = $this->hasColumn('historialpago', 'ComprobantePdfB2Key');
+        $hasPdfName = $this->hasColumn('historialpago', 'ComprobantePdfNombre');
         $selExtra = '';
         if ($hasTransfer) $selExtra .= ", h.IdentificadorTransferencia";
         else $selExtra .= ", NULL as IdentificadorTransferencia";
         if ($hasComment) $selExtra .= ", h.Comentario";
         else $selExtra .= ", NULL as Comentario";
+        if ($hasPdfKey) $selExtra .= ", h.ComprobantePdfB2Key";
+        else $selExtra .= ", NULL as ComprobantePdfB2Key";
+        if ($hasPdfName) $selExtra .= ", h.ComprobantePdfNombre";
+        else $selExtra .= ", NULL as ComprobantePdfNombre";
 
         if ($from !== null && $from !== '') {
             $from = trim((string) $from);
@@ -935,7 +974,15 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
                     );
 
                 } else if ($item['tipo'] === 'ALOJ') {
-                    $this->db->prepare("UPDATE alojamiento SET totalpago = totalpago + ? WHERE historia = ?")->execute([$monto_item, $id]);
+                    // totalpago canónico por historia (varios tramos): MAX + SET, no sumar por cada fila.
+                    $stmtMax = $this->db->prepare(
+                        'SELECT COALESCE(MAX(COALESCE(totalpago, 0)), 0) FROM alojamiento WHERE historia = ?'
+                    );
+                    $stmtMax->execute([(int) $id]);
+                    $pagadoActual = (float) $stmtMax->fetchColumn();
+                    $nuevoPagado = $pagadoActual + (float) $monto_item;
+                    $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ?')
+                        ->execute([$nuevoPagado, (int) $id]);
 
                     $this->insertHistorialPagoStandard(
                         $adminId,
@@ -1995,41 +2042,85 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         try {
             $this->db->beginTransaction();
-            
-            // CORRECCIÓN CRÍTICA: Traemos el IdTitular del protocolo, no el IdUsrA del alojamiento (que es el técnico)
-            $sqlInfo = "SELECT a.IdInstitucion, p.IdUsrA as IdTitular 
-                        FROM alojamiento a 
-                        INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA 
-                        WHERE a.historia = ? LIMIT 1";
-            $stmtInfo = $this->db->prepare($sqlInfo); $stmtInfo->execute([$historiaId]);
-            $data = $stmtInfo->fetch(\PDO::FETCH_ASSOC);
 
-            if (!$data) throw new \Exception("Historia no encontrada");
-            
-            $idPagador = $data['IdTitular'];
-
-            if ($accion === 'PAGAR') {
-                $sqlAloj = "UPDATE alojamiento SET totalpago = totalpago + ? WHERE historia = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "PAGO_ALOJ";
-            } else {
-                $sqlAloj = "UPDATE alojamiento SET totalpago = totalpago - ? WHERE historia = ?";
-                $sqlSaldo = "UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?";
-                $tipoHist = "DEVOLUCION_ALOJ";
+            $monto = (float) $monto;
+            $historiaId = (int) $historiaId;
+            if ($monto <= 0) {
+                throw new \InvalidArgumentException('Monto inválido.');
             }
 
-            $this->db->prepare($sqlAloj)->execute([$monto, $historiaId]);
-            $this->db->prepare($sqlSaldo)->execute([$monto, $idPagador, $data['IdInstitucion']]);
+            // Titular del protocolo (billetera), no el técnico del alojamiento.
+            $sqlInfo = "SELECT a.IdInstitucion, p.IdUsrA AS IdTitular
+                        FROM alojamiento a
+                        INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
+                        WHERE a.historia = ?
+                        LIMIT 1";
+            $stmtInfo = $this->db->prepare($sqlInfo);
+            $stmtInfo->execute([$historiaId]);
+            $data = $stmtInfo->fetch(\PDO::FETCH_ASSOC);
 
-            Auditoria::log($this->db, $tipoHist, 'alojamiento', "Ajuste $accion de $$monto en Historia #$historiaId");
+            if (!$data) {
+                throw new \RuntimeException('Historia no encontrada');
+            }
 
-            $this->db->prepare("INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion) 
-                                VALUES (?, ?, ?, ?, NOW(), ?, ?)")
-                     ->execute([$adminId, $monto, $idPagador, $historiaId, $tipoHist, $data['IdInstitucion']]);
+            $idPagador = (int) $data['IdTitular'];
+            $instId = (int) $data['IdInstitucion'];
+
+            // Un valor canónico por historia (varios tramos): igual que la grilla (MAX), no SUM.
+            $stmtSum = $this->db->prepare(
+                'SELECT COALESCE(MAX(COALESCE(totalpago, 0)), 0) FROM alojamiento WHERE historia = ?'
+            );
+            $stmtSum->execute([$historiaId]);
+            $totalPagado = (float) $stmtSum->fetchColumn();
+
+            if ($accion === 'PAGAR') {
+                $nuevoPagado = $totalPagado + $monto;
+                $stmtS = $this->db->prepare(
+                    'UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ? AND SaldoDinero >= ?'
+                );
+                $stmtS->execute([$monto, $idPagador, $instId, $monto]);
+                if ($stmtS->rowCount() !== 1) {
+                    throw new \RuntimeException('Saldo insuficiente en la billetera.');
+                }
+                $tipoHist = 'PAGO_ALOJ';
+            } elseif ($accion === 'QUITAR') {
+                if ($monto > $totalPagado + 0.0001) {
+                    throw new \RuntimeException('No se puede quitar más de lo ya pagado en este alojamiento.');
+                }
+                $nuevoPagado = max(0.0, $totalPagado - $monto);
+                $stmtS = $this->db->prepare(
+                    'UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?'
+                );
+                $stmtS->execute([$monto, $idPagador, $instId]);
+                if ($stmtS->rowCount() === 0) {
+                    $this->db->prepare('INSERT INTO dinero (IdUsrA, IdInstitucion, SaldoDinero) VALUES (?, ?, ?)')
+                        ->execute([$idPagador, $instId, $monto]);
+                }
+                $tipoHist = 'DEVOLUCION_ALOJ';
+            } else {
+                throw new \InvalidArgumentException('Acción no válida.');
+            }
+
+            // Todas las filas de la historia quedan con el mismo totalpago (evita SUM inflado en el modal).
+            $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ?')
+                ->execute([$nuevoPagado, $historiaId]);
+
+            Auditoria::log($this->db, $tipoHist, 'alojamiento', "Ajuste $accion de $$monto en Historia #$historiaId (totalpago=$nuevoPagado)");
+
+            // Convención del sistema: en alojamiento IdFormA guarda el nº de historia (no idformA).
+            $this->db->prepare(
+                'INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
+                 VALUES (?, ?, ?, ?, NOW(), ?, ?)'
+            )->execute([$adminId, $monto, $idPagador, $historiaId, $tipoHist, $instId]);
 
             $this->db->commit();
             return true;
-        } catch (\Exception $e) { $this->db->rollBack(); return false; }
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     // ... [TODO EL RESTO DEL BLOQUE DE GETTERS SIGUE IGUAL] ...
@@ -3616,7 +3707,7 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         }
         $sql = "SELECT COALESCE(SUM(a.totaldiasdefinidos), 0) AS totaldiasdefinidos,
                        COALESCE(SUM(a.cuentaapagar), 0) AS cuentaapagar,
-                       COALESCE(SUM(a.totalpago), 0) AS totalpago
+                       COALESCE(MAX(COALESCE(a.totalpago, 0)), 0) AS totalpago
                 FROM alojamiento a
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 WHERE a.historia = ? AND p.IdInstitucion = ?";

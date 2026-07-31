@@ -25,10 +25,14 @@ export function buildPanelPoePublicUrl(idPoe) {
 
 /**
  * Abre una ventana lista para imprimir: título, QR y URL en texto.
+ * @param {string} docTitle
+ * @param {string} targetUrl
+ * @param {Window|null} [existingWin] ventana ya abierta (p. ej. desde gesto de Swal)
  * @returns {boolean} false si el navegador bloqueó la ventana
  */
-export function printPoeQrSheet(docTitle, targetUrl) {
-    const w = window.open('', '_blank', 'noopener,noreferrer');
+export function printPoeQrSheet(docTitle, targetUrl, existingWin = null) {
+    // No usar "noopener" en features: el navegador devuelve null y no se puede document.write.
+    const w = existingWin || window.open('about:blank', '_blank');
     if (!w) return false;
     const title = String(docTitle ?? '').trim() || 'POEs';
     const url = String(targetUrl ?? '');
@@ -48,7 +52,7 @@ export function printPoeQrSheet(docTitle, targetUrl) {
 (function(){
   var u=${JSON.stringify(url)};
   try{ new QRCode(document.getElementById('rq'),{text:u,width:220,height:220}); }catch(e){}
-  setTimeout(function(){ window.focus(); window.print(); },400);
+  setTimeout(function(){ window.focus(); window.print(); },600);
 })();
 <\/script>
 </body></html>`);
@@ -108,9 +112,18 @@ export async function showPoeQrSwal(tc, docTitle, targetUrl) {
                 host.innerHTML = `<p class="small text-danger mb-0">${escapeHtmlAttr(t.poe_qr_no_lib || '')}</p>`;
             }
         },
+        preConfirm: () => {
+            // Abrir en el mismo gesto del clic (antes del await) para no perder el popup.
+            const w = window.open('about:blank', '_blank');
+            if (!w) {
+                window.Swal?.showValidationMessage?.(t.poe_print_blocked || '');
+                return false;
+            }
+            return w;
+        },
     });
     if (result?.isConfirmed) {
-        if (!printPoeQrSheet(docTitle, targetUrl)) {
+        if (!printPoeQrSheet(docTitle, targetUrl, result.value || null)) {
             await window.Swal?.fire?.({ icon: 'warning', text: t.poe_print_blocked || '' });
         }
     }

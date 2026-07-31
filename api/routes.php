@@ -366,7 +366,9 @@ $router->post('/billing/protocol-report', 'BillingController@getProtocolReport')
 // Gestión de Saldos
 $router->get('/billing/get-investigator-balance/:id', 'BillingController@getInvestigatorBalance');
 $router->post('/billing/balance', 'BillingController@updateBalance'); // Carga manual de saldo
-$router->post('/billing/ajustar-saldo', 'BillingController@ajustarSaldo'); // Ajuste técnico
+$router->post('/billing/ajustar-saldo', 'BillingController@ajustarSaldo'); // Ajuste técnico (+ PDF opcional)
+$router->post('/billing/historial/comprobante', 'BillingController@attachComprobanteHistorial');
+$router->get('/billing/historial/comprobante', 'BillingController@downloadComprobanteHistorial');
 
 // Procesamiento de Pagos
 $router->post('/billing/process-payment', 'BillingController@processPayment'); // Pago masivo
