@@ -15,7 +15,7 @@
         import { initMenu } from '../../../dist/js/components/MenuComponent.js?v=20260703';
         import { NotificationManager } from '../../../dist/js/NotificationManager.js?v=20260703';
         import { loadLanguage, translatePage } from '../../../dist/js/utils/i18n.js?v=20260703';
-        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260703';
+        import { initAdminNoticias } from '../../../dist/js/pages/admin/comunicacion_noticias.js?v=20260804';
 
         document.addEventListener('DOMContentLoaded', async () => {
             showLoader();
@@ -163,7 +163,17 @@
                             <input class="form-check-input" type="checkbox" id="edit-compartir-red" checked>
                             <label class="form-check-label" for="edit-compartir-red" data-i18n="comunicacion.admin_compartir_red"></label>
                         </div>
-                        <p class="small text-muted mb-3" data-i18n="comunicacion.admin_compartir_red_help"></p>
+                        <p class="small text-muted mb-2" data-i18n="comunicacion.admin_compartir_red_help"></p>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="edit-oculta-listado">
+                            <label class="form-check-label" for="edit-oculta-listado" data-i18n="comunicacion.admin_oculta_listado"></label>
+                        </div>
+                        <p class="small text-muted mb-2" data-i18n="comunicacion.admin_oculta_listado_help"></p>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="edit-acceso-publico">
+                            <label class="form-check-label" for="edit-acceso-publico" data-i18n="comunicacion.admin_acceso_publico"></label>
+                        </div>
+                        <p class="small text-muted mb-3" data-i18n="comunicacion.admin_acceso_publico_help"></p>
                     </div>
                     <div id="wrap-orden-fijo" class="d-none">
                         <label class="form-label small fw-bold" data-i18n="comunicacion.admin_orden_fijo_label"></label>
@@ -171,10 +181,24 @@
                             <option value="" data-i18n="comunicacion.admin_orden_fijo_none"></option>
                             <option value="1">1</option>
                             <option value="2">2</option>
+                            <option value="3">3</option>
                             <option value="4">4</option>
                             <option value="5">5</option>
                             <option value="6">6</option>
+                        </select>
                         <p class="small text-muted mb-3" data-i18n="comunicacion.admin_orden_fijo_help"></p>
+                    </div>
+                    <div id="wrap-noticia-enlace" class="d-none border rounded p-3 mb-3 bg-light">
+                        <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.admin_noticia_enlace_titulo"></p>
+                        <p class="small text-muted mb-2" data-i18n="comunicacion.admin_noticia_enlace_help"></p>
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="text" class="form-control" id="edit-noticia-link" readonly>
+                            <button type="button" class="btn btn-outline-success" id="btn-copiar-noticia-link" data-i18n="comunicacion.admin_noticia_copiar_link"></button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-dark" id="btn-noticia-qr" data-i18n="comunicacion.admin_noticia_qr"></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-noticia-imprimir-qr" data-i18n="comunicacion.admin_noticia_imprimir_qr"></button>
+                        </div>
                     </div>
                     <hr class="text-muted opacity-25" />
                     <p class="small fw-bold text-uppercase text-muted mb-2" data-i18n="comunicacion.admin_noticia_b2_section"></p>

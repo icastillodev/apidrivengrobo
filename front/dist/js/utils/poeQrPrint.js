@@ -23,6 +23,32 @@ export function buildPanelPoePublicUrl(idPoe) {
     return window.location.origin + rel;
 }
 
+/** URL absoluta al portal noticias con ancla (?id=) — requiere login. */
+export function buildPanelNoticiaPublicUrl(idNoticia) {
+    const base = `${groboFrontBasePath()}paginas/panel/noticias.html`;
+    const id = String(idNoticia ?? '').trim();
+    const rel = id ? `${base}?id=${encodeURIComponent(id)}` : base;
+    return window.location.origin + rel;
+}
+
+/** Página anónima (sin login) para noticias con AccesoPublico=1. */
+export function buildNoticiaAnonPublicUrl(idNoticia) {
+    const base = `${groboFrontBasePath()}paginas/noticia-publica.html`;
+    const id = String(idNoticia ?? '').trim();
+    const rel = id ? `${base}?id=${encodeURIComponent(id)}` : base;
+    return window.location.origin + rel;
+}
+
+/**
+ * Enlace a compartir / QR: público sin login si AccesoPublico; si no, portal con sesión.
+ * @param {number|string} idNoticia
+ * @param {boolean|number} accesoPublico
+ */
+export function buildNoticiaShareUrl(idNoticia, accesoPublico) {
+    const pub = accesoPublico === true || accesoPublico === 1 || accesoPublico === '1';
+    return pub ? buildNoticiaAnonPublicUrl(idNoticia) : buildPanelNoticiaPublicUrl(idNoticia);
+}
+
 /**
  * Abre una ventana lista para imprimir: título, QR y URL en texto.
  * @param {string} docTitle

@@ -467,6 +467,68 @@ class ComunicacionB2Controller {
     }
 
     /**
+     * Descarga adjunto de noticia con AccesoPublico=1 — sin JWT.
+     * tipo: imagen | doc1 | doc2
+     */
+    public function downloadNoticiaArchivoPublic($idNoticia, $tipo) {
+        try {
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            header_remove('Content-Type');
+
+            $nid = (int) $idNoticia;
+            $tipo = strtolower((string) $tipo);
+            if ($nid <= 0 || !in_array($tipo, ['imagen', 'doc1', 'doc2'], true)) {
+                http_response_code(400);
+                echo 'Parámetros inválidos';
+                exit;
+            }
+
+            $nm = new NoticiaModel($this->db);
+            $row = $nm->getAnonPublicById($nid);
+            if (!$row) {
+                http_response_code(404);
+                echo 'Noticia no encontrada';
+                exit;
+            }
+
+            $key = null;
+            $nombre = 'archivo';
+            if ($tipo === 'imagen') {
+                $key = $row['ImagenPortadaB2Key'] ?? null;
+                $nombre = (string) ($row['ImagenPortadaNombre'] ?? 'portada.jpg');
+            } elseif ($tipo === 'doc1') {
+                $key = $row['AdjuntoDoc1B2Key'] ?? null;
+                $nombre = (string) ($row['AdjuntoDoc1Nombre'] ?? 'adjunto');
+            } else {
+                $key = $row['AdjuntoDoc2B2Key'] ?? null;
+                $nombre = (string) ($row['AdjuntoDoc2Nombre'] ?? 'adjunto');
+            }
+
+            if ($key === null || $key === '') {
+                http_response_code(404);
+                echo 'Archivo no disponible';
+                exit;
+            }
+
+            $mime = self::mimeDesdeNombreArchivo($nombre);
+            $inline = strpos($mime, 'image/') === 0;
+
+            $b2 = new BackblazeB2('NOTICIASPOPUP');
+            $b2->streamDownloadAttachment((string) $key, $nombre, $mime, $inline);
+        } catch (\Exception $e) {
+            if (ob_get_length()) {
+                ob_clean();
+            }
+            header_remove('Content-Type');
+            http_response_code(500);
+            echo 'Error al descargar';
+            exit;
+        }
+    }
+
+    /**
      * tipo: portada_imagen | portada_doc1 | portada_doc2 | popup_imagen | popup_doc1 | popup_doc2
      */
     public function downloadPortadaPopupArchivo($tipo) {

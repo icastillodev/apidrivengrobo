@@ -355,9 +355,9 @@ export async function injectDashboardNoticias(mountId, options = {}) {
         const bloquePortadaErr = renderPortadaDashboardBlock(ppConfig, t);
         const bloquePoeErr = renderPoeDashboardBlock(poeRows, t);
         mount.innerHTML = `
-            ${bloquePortadaErr}
+            <div class="alert alert-warning border-0 shadow-sm small mb-3">${escapeHtml(t.dash_noticias_error || t.err_generico || '')}</div>
             ${bloquePoeErr}
-            <div class="alert alert-warning border-0 shadow-sm small mb-0">${escapeHtml(t.dash_noticias_error || t.err_generico || '')}</div>`;
+            ${bloquePortadaErr}`;
         if (!silent) {
             maybeShowPortadaPopup(ppConfig, t);
         }
@@ -487,8 +487,6 @@ export async function injectDashboardNoticias(mountId, options = {}) {
     const bloquePoe = renderPoeDashboardBlock(poeRows, t);
 
     mount.innerHTML = `
-        ${bloquePortada}
-        ${bloquePoe}
         ${bloqueMensajes}
         <div class="col-12">
             ${bloquePinned}
@@ -497,7 +495,9 @@ export async function injectDashboardNoticias(mountId, options = {}) {
                 <a href="${portalHref()}" class="btn btn-sm btn-outline-success fw-bold">${escapeHtml(t.dash_ver_todas || '')}</a>
                 <a href="${portalHref()}?alcance=red" class="btn btn-sm btn-outline-secondary fw-bold">${escapeHtml(t.dash_ver_noticias_red || '')}</a>
             </div>
-        </div>`;
+        </div>
+        ${bloquePoe}
+        ${bloquePortada}`;
 
     if (!silent) {
         maybeShowPortadaPopup(ppConfig, t);

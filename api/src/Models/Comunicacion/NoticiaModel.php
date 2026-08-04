@@ -61,7 +61,12 @@ class NoticiaModel {
     /** Solo noticias ya visibles en portal (publicadas y fecha efectiva <= ahora). */
     private function sqlVisiblePublicas(string $alias = ''): string {
         $p = $alias !== '' ? $alias . '.' : '';
-        return "{$p}Publicado = 1 AND ({$p}FechaPublicacion IS NULL OR {$p}FechaPublicacion <= NOW())";
+        $vis = "{$p}Publicado = 1 AND ({$p}FechaPublicacion IS NULL OR {$p}FechaPublicacion <= NOW())";
+        if ($this->hasColumnNoticia('OcultaEnListado')) {
+            $vis .= " AND COALESCE({$p}OcultaEnListado, 0) = 0";
+        }
+
+        return $vis;
     }
 
     /**
@@ -108,6 +113,12 @@ class NoticiaModel {
             . "{$p}Cuerpo, {$p}Publicado, {$p}CompartirEnRed, {$p}FechaPublicacion, {$p}IdUsrAutor, {$p}FechaCreacion, "
             . "{$p}FechaActualizacion, {$p}OrdenFijo";
         $extra = [];
+        if ($this->hasColumnNoticia('OcultaEnListado')) {
+            $extra[] = "{$p}OcultaEnListado";
+        }
+        if ($this->hasColumnNoticia('AccesoPublico')) {
+            $extra[] = "{$p}AccesoPublico";
+        }
         if ($this->hasColumnNoticia('ImagenPortadaB2Key')) {
             $extra[] = "{$p}ImagenPortadaB2Key";
             $extra[] = "{$p}ImagenPortadaNombre";
@@ -252,8 +263,8 @@ class NoticiaModel {
      * Resuelve OrdenFijo al guardar: borrador => siempre NULL; publicado => payload o valor previo.
      * @return array{ok:true, orden:?int}|array{ok:false, message:string}
      */
-    private function resolveOrdenFijoForSave(array $payload, ?array $existingRow, int $publicado): array {
-        if ($publicado !== 1) {
+    private function resolveOrdenFijoForSave(array $payload, ?array $existingRow, int $publicado, int $ocultaEnListado = 0): array {
+        if ($publicado !== 1 || $ocultaEnListado === 1) {
             return ['ok' => true, 'orden' => null];
         }
         if (array_key_exists('OrdenFijo', $payload)) {
@@ -282,6 +293,42 @@ class NoticiaModel {
             return ['ok' => true, 'orden' => null];
         }
         return ['ok' => true, 'orden' => $v];
+    }
+
+    /** 1 = no listados/dashboard; detalle por ?id= si Publicado=1. */
+    private function resolveOcultaEnListado(array $payload, ?array $existingRow, int $publicado): int {
+        if (!$this->hasColumnNoticia('OcultaEnListado')) {
+            return 0;
+        }
+        if ($publicado !== 1) {
+            return 0;
+        }
+        if (array_key_exists('OcultaEnListado', $payload)) {
+            return !empty($payload['OcultaEnListado']) ? 1 : 0;
+        }
+        if ($existingRow === null) {
+            return 0;
+        }
+
+        return (int) ($existingRow['OcultaEnListado'] ?? 0) === 1 ? 1 : 0;
+    }
+
+    /** 1 = enlace/QR sin JWT (página pública); 0 = solo app logueada. */
+    private function resolveAccesoPublico(array $payload, ?array $existingRow, int $publicado): int {
+        if (!$this->hasColumnNoticia('AccesoPublico')) {
+            return 0;
+        }
+        if ($publicado !== 1) {
+            return 0;
+        }
+        if (array_key_exists('AccesoPublico', $payload)) {
+            return !empty($payload['AccesoPublico']) ? 1 : 0;
+        }
+        if ($existingRow === null) {
+            return 0;
+        }
+
+        return (int) ($existingRow['AccesoPublico'] ?? 0) === 1 ? 1 : 0;
     }
 
     /** Libera el cupo (1..6) para otra noticia de la misma institución. */
@@ -492,14 +539,46 @@ class NoticiaModel {
         return null;
     }
 
+    /**
+     * Detalle anónimo: Publicado=1, AccesoPublico=1, fecha efectiva.
+     * Sin JWT — no filtra por institución de sesión (IdNoticia es PK global).
+     */
+    public function getAnonPublicById(int $idNoticia): ?array {
+        if ($idNoticia <= 0 || !$this->hasColumnNoticia('AccesoPublico')) {
+            return null;
+        }
+        $cols = $this->sqlSelectNoticiaAllColumns('n');
+        $stmt = $this->db->prepare("
+            SELECT {$cols}, i.NombreInst AS NombreInstitucion
+            FROM noticia n
+            INNER JOIN institucion i ON i.IdInstitucion = n.IdInstitucion
+            WHERE n.IdNoticia = ? AND n.Publicado = 1 AND COALESCE(n.AccesoPublico, 0) = 1
+            LIMIT 1
+        ");
+        $stmt->execute([$idNoticia]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $fp = $row['FechaPublicacion'] ?? null;
+        if ($fp !== null && $fp !== '' && strtotime((string) $fp) > time()) {
+            return null;
+        }
+        unset($row['IdUsrAutor']);
+
+        return $row;
+    }
+
     public function listAdmin(int $instId, int $page, int $pageSize): array {
         $offset = max(0, ($page - 1) * $pageSize);
         $b2Portada = $this->hasColumnNoticia('ImagenPortadaB2Key') ? ', ImagenPortadaB2Key' : '';
+        $ocultaCol = $this->hasColumnNoticia('OcultaEnListado') ? ', OcultaEnListado' : '';
+        $publicoCol = $this->hasColumnNoticia('AccesoPublico') ? ', AccesoPublico' : '';
         $sql = "
             SELECT IdNoticia, IdInstitucion, Alcance, Titulo, Categoria, CategoriaBadge,
                    LEFT(Cuerpo, 200) AS CuerpoPreview,
                    Publicado, CompartirEnRed, FechaPublicacion, FechaCreacion, FechaActualizacion, IdUsrAutor, DependenciaRed,
-                   OrdenFijo{$b2Portada}
+                   OrdenFijo{$b2Portada}{$ocultaCol}{$publicoCol}
             FROM noticia
             WHERE IdInstitucion = ?
             ORDER BY (OrdenFijo IS NULL) ASC, OrdenFijo ASC, FechaCreacion DESC, IdNoticia DESC
@@ -540,7 +619,9 @@ class NoticiaModel {
 
         [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, null);
 
-        $ordenResolved = $this->resolveOrdenFijoForSave($payload, null, $publicado);
+        $ocultaEnListado = $this->resolveOcultaEnListado($payload, null, $publicado);
+        $accesoPublico = $this->resolveAccesoPublico($payload, null, $publicado);
+        $ordenResolved = $this->resolveOrdenFijoForSave($payload, null, $publicado, $ocultaEnListado);
         if (!$ordenResolved['ok']) {
             return ['status' => 'error', 'message' => $ordenResolved['message']];
         }
@@ -551,23 +632,44 @@ class NoticiaModel {
             return ['status' => 'error', 'message' => $adjResCreate['message'] ?? 'Adjuntos inválidos.'];
         }
 
+        $extraCols = [];
+        $extraPlaceholders = [];
+        $extraVals = [];
+        if ($this->hasColumnNoticia('OcultaEnListado')) {
+            $extraCols[] = 'OcultaEnListado';
+            $extraPlaceholders[] = '?';
+            $extraVals[] = $ocultaEnListado;
+        }
+        if ($this->hasColumnNoticia('AccesoPublico')) {
+            $extraCols[] = 'AccesoPublico';
+            $extraPlaceholders[] = '?';
+            $extraVals[] = $accesoPublico;
+        }
+        $extraColSql = $extraCols !== [] ? ', ' . implode(', ', $extraCols) : '';
+        $extraPhSql = $extraPlaceholders !== [] ? ', ' . implode(', ', $extraPlaceholders) : '';
+
         $stmt = $this->db->prepare("
             INSERT INTO noticia
-            (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed, FechaPublicacion, IdUsrAutor, FechaCreacion, OrdenFijo)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NULL)
+            (IdInstitucion, Alcance, DependenciaRed, Titulo, Categoria, CategoriaBadge, Cuerpo, Publicado, CompartirEnRed{$extraColSql}, FechaPublicacion, IdUsrAutor, FechaCreacion, OrdenFijo)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?{$extraPhSql}, ?, ?, NOW(), NULL)
         ");
-        $stmt->execute([
-            $instId,
-            $alcance,
-            $titulo,
-            $categoria,
-            $categoriaBadge,
-            $cuerpo,
-            $publicado,
-            $compartirEnRed,
-            $fechaPub,
-            $idAutor,
-        ]);
+        $stmt->execute(array_merge(
+            [
+                $instId,
+                $alcance,
+                $titulo,
+                $categoria,
+                $categoriaBadge,
+                $cuerpo,
+                $publicado,
+                $compartirEnRed,
+            ],
+            $extraVals,
+            [
+                $fechaPub,
+                $idAutor,
+            ]
+        ));
         $newId = (int)$this->db->lastInsertId();
 
         $this->persistAdjuntosNoticia($instId, $newId, $adjResCreate['adjuntos'] ?? []);
@@ -628,7 +730,9 @@ class NoticiaModel {
 
         [$categoria, $categoriaBadge] = $this->resolveCategoriaFields($payload, $row);
 
-        $ordenResolved = $this->resolveOrdenFijoForSave($payload, $row, $publicado);
+        $ocultaEnListado = $this->resolveOcultaEnListado($payload, $row, $publicado);
+        $accesoPublico = $this->resolveAccesoPublico($payload, $row, $publicado);
+        $ordenResolved = $this->resolveOrdenFijoForSave($payload, $row, $publicado, $ocultaEnListado);
         if (!$ordenResolved['ok']) {
             return ['status' => 'error', 'message' => $ordenResolved['message']];
         }
@@ -639,6 +743,18 @@ class NoticiaModel {
             return ['status' => 'error', 'message' => $adjResUpd['message'] ?? 'Adjuntos inválidos.'];
         }
 
+        $extraSet = [];
+        $extraVals = [];
+        if ($this->hasColumnNoticia('OcultaEnListado')) {
+            $extraSet[] = 'OcultaEnListado = ?';
+            $extraVals[] = $ocultaEnListado;
+        }
+        if ($this->hasColumnNoticia('AccesoPublico')) {
+            $extraSet[] = 'AccesoPublico = ?';
+            $extraVals[] = $accesoPublico;
+        }
+        $extraSetSql = $extraSet !== [] ? ', ' . implode(', ', $extraSet) : '';
+
         $this->db->beginTransaction();
         try {
             if ($ordenFijo !== null) {
@@ -647,23 +763,28 @@ class NoticiaModel {
             $stmt = $this->db->prepare("
                 UPDATE noticia SET
                 Alcance = ?, DependenciaRed = ?, Titulo = ?, Categoria = ?, CategoriaBadge = ?, Cuerpo = ?,
-                Publicado = ?, CompartirEnRed = ?, FechaPublicacion = ?, OrdenFijo = ?
+                Publicado = ?, CompartirEnRed = ?{$extraSetSql}, FechaPublicacion = ?, OrdenFijo = ?
                 WHERE IdNoticia = ? AND IdInstitucion = ?
             ");
-            $stmt->execute([
-                $alcance,
-                $depRed,
-                $titulo,
-                $categoria,
-                $categoriaBadge,
-                $cuerpo,
-                $publicado,
-                $compartirEnRed,
-                $fechaPub,
-                $ordenFijo,
-                $idNoticia,
-                $instId,
-            ]);
+            $stmt->execute(array_merge(
+                [
+                    $alcance,
+                    $depRed,
+                    $titulo,
+                    $categoria,
+                    $categoriaBadge,
+                    $cuerpo,
+                    $publicado,
+                    $compartirEnRed,
+                ],
+                $extraVals,
+                [
+                    $fechaPub,
+                    $ordenFijo,
+                    $idNoticia,
+                    $instId,
+                ]
+            ));
             $this->persistAdjuntosNoticia($instId, $idNoticia, $adjResUpd['adjuntos'] ?? []);
             $this->db->commit();
         } catch (\Throwable $e) {

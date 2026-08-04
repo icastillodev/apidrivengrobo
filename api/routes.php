@@ -142,6 +142,7 @@ $router->post('/comunicacion/b2/upload/popup-documento', 'ComunicacionB2Controll
 $router->post('/comunicacion/b2/upload/popup-portada-imagen', 'ComunicacionB2Controller@uploadPopupPortadaImagen');
 $router->post('/comunicacion/b2/upload/poe-instructivo', 'ComunicacionB2Controller@uploadPoeInstructivo');
 $router->get('/comunicacion/mensajes/adjunto/:id', 'ComunicacionB2Controller@downloadMensajeAdjunto');
+$router->get('/comunicacion/noticias/public/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivoPublic');
 $router->get('/comunicacion/noticias/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivo');
 $router->get('/comunicacion/portada-popup/archivo/:tipo', 'ComunicacionB2Controller@downloadPortadaPopupArchivo');
 $router->get('/comunicacion/poe/:id/adjunto/:slot', 'ComunicacionB2Controller@downloadPoeAdjunto');
@@ -156,6 +157,7 @@ $router->post('/support/tickets/:id/cerrar', 'SupportTicketController@cerrarTick
 // Consulta comercial (correo a ventas@groboapp.com, categoría venta)
 $router->post('/sales/inquiry', 'SalesContactController@sendInquiry');
 
+$router->get('/comunicacion/noticias/public/:id', 'ComunicacionNoticiaController@getOnePublic');
 $router->get('/comunicacion/noticias', 'ComunicacionNoticiaController@getList');
 $router->get('/comunicacion/noticias/:id', 'ComunicacionNoticiaController@getOne');
 $router->get('/comunicacion/portada-popup', 'PortadaPopupController@getConfig');

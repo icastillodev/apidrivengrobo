@@ -954,19 +954,52 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
             foreach ($items as $item) {
                 $id = $item['id'];
-                $monto_item = (float)$item['monto_pago'];
+                $monto_item = round((float) $item['monto_pago'], 2);
 
                 if ($item['tipo'] === 'INSUMO_GRAL' || $item['tipo'] === 'FORM') {
-                    $this->db->prepare("UPDATE precioinsumosformulario SET totalpago = totalpago + ? WHERE idformA = ?")->execute([$monto_item, $id]);
-                    if ($item['tipo'] === 'FORM') {
-                        $this->db->prepare("UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?")->execute([$monto_item, $id]);
+                    $idForm = (int) $id;
+                    // Pedidos derivados (red): la deuda canónica está en facturacion_formulario_derivado.
+                    // Sin esto, "Pagar selección" solo tocaba precio* + historial y el reporte seguía en SIN PAGAR.
+                    $ffd = $this->findFacturacionDerivadaForForm($idForm, $inst);
+                    if ($ffd) {
+                        $totalFfd = round((float) ($ffd['monto_total'] ?? 0), 2);
+                        $pagadoFfd = round((float) ($ffd['monto_pagado'] ?? 0), 2);
+                        $debeFfd = max(0.0, round($totalFfd - $pagadoFfd, 2));
+                        if ($monto_item - $debeFfd > 0.009) {
+                            throw new \RuntimeException(
+                                'El monto supera la deuda pendiente del pedido derivado #' . $idForm . '.'
+                            );
+                        }
+                        $nuevoPagadoFfd = round($pagadoFfd + $monto_item, 2);
+                        $estadoCobro = ($nuevoPagadoFfd >= $totalFfd - 0.009) ? 3 : (($nuevoPagadoFfd > 0) ? 2 : 1);
+                        $this->db->prepare(
+                            'UPDATE facturacion_formulario_derivado SET monto_pagado = ?, estado_cobro = ? WHERE IdFacturacionFormularioDerivado = ?'
+                        )->execute([
+                            $nuevoPagadoFfd,
+                            $estadoCobro,
+                            (int) $ffd['IdFacturacionFormularioDerivado'],
+                        ]);
+                        // Alinea tablas clásicas al pagado canónico (evita divergencia si alguien mira precio* crudo).
+                        if ($item['tipo'] === 'FORM') {
+                            $this->db->prepare('UPDATE precioformulario SET totalpago = ? WHERE idformA = ?')
+                                ->execute([$nuevoPagadoFfd, $idForm]);
+                        }
+                        $this->db->prepare('UPDATE precioinsumosformulario SET totalpago = ? WHERE idformA = ?')
+                            ->execute([$nuevoPagadoFfd, $idForm]);
+                    } else {
+                        $this->db->prepare('UPDATE precioinsumosformulario SET totalpago = totalpago + ? WHERE idformA = ?')
+                            ->execute([$monto_item, $idForm]);
+                        if ($item['tipo'] === 'FORM') {
+                            $this->db->prepare('UPDATE precioformulario SET totalpago = totalpago + ? WHERE idformA = ?')
+                                ->execute([$monto_item, $idForm]);
+                        }
                     }
 
                     $this->insertHistorialPagoStandard(
                         $adminId,
                         $monto_item,
                         $idUsr,
-                        (int) $id,
+                        $idForm,
                         $inst,
                         'LIQUIDACION',
                         $transferId,
@@ -975,20 +1008,32 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
                 } else if ($item['tipo'] === 'ALOJ') {
                     // totalpago canónico por historia (varios tramos): MAX + SET, no sumar por cada fila.
+                    $histId = (int) $id;
                     $stmtMax = $this->db->prepare(
                         'SELECT COALESCE(MAX(COALESCE(totalpago, 0)), 0) FROM alojamiento WHERE historia = ?'
                     );
-                    $stmtMax->execute([(int) $id]);
-                    $pagadoActual = (float) $stmtMax->fetchColumn();
-                    $nuevoPagado = $pagadoActual + (float) $monto_item;
+                    $stmtMax->execute([$histId]);
+                    $pagadoActual = round((float) $stmtMax->fetchColumn(), 2);
+                    $stmtCuenta = $this->db->prepare(
+                        'SELECT COALESCE(SUM(COALESCE(cuentaapagar, 0)), 0) FROM alojamiento WHERE historia = ?'
+                    );
+                    $stmtCuenta->execute([$histId]);
+                    $cuentaTotal = round((float) $stmtCuenta->fetchColumn(), 2);
+                    $debeAloj = max(0.0, round($cuentaTotal - $pagadoActual, 2));
+                    if ($monto_item - $debeAloj > 0.009) {
+                        throw new \RuntimeException(
+                            'El monto supera la deuda pendiente del alojamiento (historia #' . $histId . ').'
+                        );
+                    }
+                    $nuevoPagado = round($pagadoActual + $monto_item, 2);
                     $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ?')
-                        ->execute([$nuevoPagado, (int) $id]);
+                        ->execute([$nuevoPagado, $histId]);
 
                     $this->insertHistorialPagoStandard(
                         $adminId,
                         $monto_item,
                         $idUsr,
-                        (int) $id,
+                        $histId,
                         $inst,
                         'LIQUIDACION_ALOJ',
                         $transferId,

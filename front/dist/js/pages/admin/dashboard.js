@@ -5,7 +5,7 @@ export const DashboardUI = {
         try {
             this.renderAdminDashboard();
             try {
-                const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20260712');
+                const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20260804');
                 await injectDashboardNoticias('dashboard-noticias-mount');
             } catch (e) {
                 console.warn('Dashboard noticias:', e);

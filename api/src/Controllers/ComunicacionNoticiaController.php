@@ -76,4 +76,20 @@ class ComunicacionNoticiaController {
             $this->json(['status' => 'error', 'message' => $e->getMessage()], 400);
         }
     }
+
+    /**
+     * GET /comunicacion/noticias/public/:id — sin JWT.
+     * Solo si AccesoPublico=1 y publicada (fecha efectiva).
+     */
+    public function getOnePublic($id) {
+        try {
+            $row = $this->model->getAnonPublicById((int) $id);
+            if (!$row) {
+                $this->json(['status' => 'error', 'message' => 'Noticia no encontrada.'], 404);
+            }
+            $this->json(['status' => 'success', 'data' => $row]);
+        } catch (\Exception $e) {
+            $this->json(['status' => 'error', 'message' => 'No se pudo cargar la noticia.'], 400);
+        }
+    }
 }

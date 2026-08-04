@@ -21,6 +21,12 @@
         @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); } 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); } }
         .stat-item { border-right: 1px solid #dee2e6; padding-right: 15px; margin-right: 15px; }
         .stat-item:last-child { border-right: none; }
+        /* Swal encima de modal Bootstrap: poder tipear en textarea/password */
+        .swal2-container { z-index: 11000 !important; }
+        .swal2-container .swal2-input,
+        .swal2-container .swal2-textarea,
+        .swal2-container input,
+        .swal2-container textarea { pointer-events: auto !important; }
     </style>
 
     <script type="module">
@@ -32,7 +38,7 @@
         import { checkUrlParamsAndOpen } from '../../dist/js/components/UrlRouter.js';
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260703';
         // Lógica administrativa de protocolos (Gestión de revisiones y aprobaciones)
-        import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js?v=20260703';
+        import { initProtocolosPage } from '../../dist/js/pages/admin/protocolos.js?v=20260804';
 
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {

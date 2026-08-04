@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noticia - GROBO</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="../dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <style>
+        body {
+            font-family: Lato, system-ui, sans-serif;
+            background: linear-gradient(165deg, #eef5f0 0%, #f7f8f6 45%, #e8eef0 100%);
+            min-height: 100vh;
+        }
+        .noticia-publica-shell {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        .noticia-publica-card {
+            border: none;
+            border-radius: 14px;
+            box-shadow: 0 8px 28px rgba(20, 60, 40, 0.08);
+        }
+        #noticia-publica-cuerpo {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.55;
+            font-size: 1.05rem;
+        }
+        .brand-mark {
+            letter-spacing: 0.12em;
+            font-weight: 900;
+            color: #198754;
+        }
+    </style>
+    <script type="module">
+        import { loadLanguage, translatePage } from '../dist/js/utils/i18n.js?v=20260804';
+        import { initNoticiaPublica } from '../dist/js/pages/noticia_publica.js?v=20260804';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadLanguage(localStorage.getItem('lang') || localStorage.getItem('idioma') || null);
+            if (window.txt) translatePage();
+            await initNoticiaPublica();
+        });
+    </script>
+</head>
+<body>
+    <div class="container py-4 py-md-5 noticia-publica-shell">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="brand-mark small text-uppercase">GROBO</span>
+            <a class="small text-muted text-decoration-none" href="../index.html" data-i18n="comunicacion.noticia_publica_ir_app">Ir a GROBO</a>
+        </div>
+
+        <div id="noticia-publica-loading" class="text-center text-muted py-5">
+            <div class="spinner-border text-success mb-3" role="status"></div>
+            <p class="mb-0" data-i18n="comunicacion.noticia_publica_cargando">Cargando…</p>
+        </div>
+
+        <div id="noticia-publica-error" class="alert alert-warning d-none" role="alert"></div>
+
+        <article id="noticia-publica-article" class="card noticia-publica-card d-none">
+            <div class="card-body p-4 p-md-5">
+                <div id="noticia-publica-portada"></div>
+                <p id="noticia-publica-meta" class="small text-muted mb-2"></p>
+                <h1 id="noticia-publica-titulo" class="h3 fw-bold mb-3"></h1>
+                <div id="noticia-publica-adjuntos"></div>
+                <div id="noticia-publica-cuerpo" class="text-dark"></div>
+            </div>
+        </article>
+    </div>
+</body>
+</html>

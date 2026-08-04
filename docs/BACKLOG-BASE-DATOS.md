@@ -30,7 +30,58 @@ Este documento es la **hoja de ruta de BD**: aquí ves qué toca el backlog y **
 | [Institución — precios visibles a investigadores](#sql-institucion-usuarios-ven-precios) | `institucion.UsuariosVenPreciosFacturacion` |
 | [Adjuntos / Backblaze (plantilla)](#plantilla-backblaze) | Ideas legacy; columnas reales en migración B2 de comunicación |
 | [Comprobante PDF historial + rol Contador](#sql-comprobante-pdf-contador) | `historialpago` PDF B2 + `tipousuarioe` 7 |
+| [Reparar pagos derivados (lote vs FFD)](#sql-reparar-pagos-derivados-lote) | Alinear `facturacion_formulario_derivado.monto_pagado` tras liquidaciones viejas |
+| [Noticia oculta en listado](#sql-noticia-oculta-listado) | `noticia.OcultaEnListado` (visible solo por enlace/`?id=` en app) |
+| [Noticia acceso público](#sql-noticia-acceso-publico) | `noticia.AccesoPublico` (enlace/QR sin login) |
 | [Inventario backlog](#inventario-backlog) | Tabla resumen + estado |
+
+---
+
+<a id="sql-noticia-acceso-publico"></a>
+
+## Noticia acceso público sin login (2026-08-04)
+
+**Archivo:** [`docs/migrations/2026-08-04-noticia-acceso-publico.sql`](migrations/2026-08-04-noticia-acceso-publico.sql)
+
+Requiere haber aplicado antes `OcultaEnListado` (columna `AFTER`).
+
+```sql
+ALTER TABLE `noticia`
+  ADD COLUMN `AccesoPublico` TINYINT(1) NOT NULL DEFAULT 0
+    COMMENT '1=detalle y adjuntos vía URL pública sin JWT; 0=solo usuarios logueados en GROBO'
+    AFTER `OcultaEnListado`;
+```
+
+- `0` (default): link/QR abre el portal con login (`paginas/panel/noticias.html?id=`).
+- `1`: link/QR abre `paginas/noticia-publica.html?id=` + API `GET /comunicacion/noticias/public/:id` (sin sesión).
+- Compatible con `OcultaEnListado=1` (compartir fuera sin aparecer en listados).
+
+---
+
+<a id="sql-noticia-oculta-listado"></a>
+
+## Noticia oculta en listado (2026-08-04)
+
+**Archivo:** [`docs/migrations/2026-08-04-noticia-oculta-en-listado.sql`](migrations/2026-08-04-noticia-oculta-en-listado.sql)
+
+```sql
+ALTER TABLE `noticia`
+  ADD COLUMN `OcultaEnListado` TINYINT(1) NOT NULL DEFAULT 0
+    COMMENT '1=no aparece en listados/portal/dashboard; sí por URL ?id= si Publicado=1'
+    AFTER `CompartirEnRed`;
+```
+
+Admin: checkbox + copiar enlace + QR (mismo patrón que POE).
+
+---
+
+<a id="sql-reparar-pagos-derivados-lote"></a>
+
+## Reparar pagos derivados liquidados en lote (2026-08-04)
+
+**Contexto:** «Pagar selección» debitaba saldo e historial pero no actualizaba `facturacion_formulario_derivado` (el dashboard/reporte leen esa tabla). El código ya corrige liquidaciones nuevas; este SQL alinea casos viejos.
+
+**Archivo:** [`docs/migrations/2026-08-04-reparar-pagos-derivados-lote-ffd.sql`](migrations/2026-08-04-reparar-pagos-derivados-lote-ffd.sql) — correr primero el SELECT de diagnóstico, luego el UPDATE en phpMyAdmin.
 
 ---
 

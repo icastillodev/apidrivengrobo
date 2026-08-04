@@ -7,6 +7,15 @@ function authHeaders() {
 
 const txCom = () => window.txt?.comunicacion || {};
 
+function noticiaArchivoEndpoint(idNoticia, tipo, publicAccess) {
+    const id = encodeURIComponent(String(idNoticia));
+    const t = encodeURIComponent(String(tipo));
+    if (publicAccess) {
+        return `${API.urlBase}/comunicacion/noticias/public/${id}/archivo/${t}`;
+    }
+    return `${API.urlBase}/comunicacion/noticias/${id}/archivo/${t}`;
+}
+
 /**
  * Rellena una ventana ya abierta (p. ej. `about:blank` abierta en el mismo clic del usuario)
  * con el archivo de la noticia: GET autenticado → Blob → object URL en `location`.
@@ -15,13 +24,16 @@ const txCom = () => window.txt?.comunicacion || {};
  * @param {Window} previewWin
  * @param {number|string} idNoticia
  * @param {'imagen'|'doc1'|'doc2'} tipo
+ * @param {{ publicAccess?: boolean }} [opts]
  */
-export async function fillNoticiaPreviewWindow(previewWin, idNoticia, tipo) {
+export async function fillNoticiaPreviewWindow(previewWin, idNoticia, tipo, opts = null) {
     if (!previewWin || previewWin.closed) throw new Error(txCom().pp_b2_preview_fail || '');
     const id = parseInt(String(idNoticia), 10);
     if (!id || id <= 0) throw new Error('ID inválido');
-    const url = `${API.urlBase}/comunicacion/noticias/${id}/archivo/${tipo}`;
-    const res = await fetch(url, { headers: authHeaders() });
+    const publicAccess = !!(opts && opts.publicAccess);
+    const url = noticiaArchivoEndpoint(id, tipo, publicAccess);
+    const headers = publicAccess ? {} : authHeaders();
+    const res = await fetch(url, { headers });
     const mimeHeader = (res.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
     const buf = await res.arrayBuffer();
 
@@ -57,15 +69,16 @@ export async function fillNoticiaPreviewWindow(previewWin, idNoticia, tipo) {
  *
  * @param {number|string} idNoticia
  * @param {'imagen'|'doc1'|'doc2'} tipo
+ * @param {{ publicAccess?: boolean }} [opts]
  */
-export async function openNoticiaArchivoInNewTab(idNoticia, tipo) {
+export async function openNoticiaArchivoInNewTab(idNoticia, tipo, opts = null) {
     const tc = txCom();
     const previewWin = window.open('about:blank', '_blank');
     if (!previewWin) {
         throw new Error(tc.admin_noticia_preview_popup_blocked || tc.pp_b2_preview_fail || '');
     }
     try {
-        await fillNoticiaPreviewWindow(previewWin, idNoticia, tipo);
+        await fillNoticiaPreviewWindow(previewWin, idNoticia, tipo, opts);
     } catch (e) {
         try {
             previewWin.close();
@@ -77,9 +90,10 @@ export async function openNoticiaArchivoInNewTab(idNoticia, tipo) {
 }
 
 /** Botones `data-open-noticia-archivo` + `data-noticia-tipo` (doc1|doc2). */
-export function bindNoticiaAdjuntoOpenButtons(root, errFallback) {
+export function bindNoticiaAdjuntoOpenButtons(root, errFallback, opts = null) {
     if (!root || typeof root.querySelectorAll !== 'function') return;
     const tc = txCom();
+    const publicAccess = !!(opts && opts.publicAccess);
     root.querySelectorAll('button[data-open-noticia-archivo]').forEach((btn) => {
         btn.addEventListener('click', (ev) => {
             ev.preventDefault();
@@ -94,7 +108,7 @@ export function bindNoticiaAdjuntoOpenButtons(root, errFallback) {
             }
             void (async () => {
                 try {
-                    await fillNoticiaPreviewWindow(previewWin, id, tipo);
+                    await fillNoticiaPreviewWindow(previewWin, id, tipo, { publicAccess });
                 } catch (e) {
                     try {
                         previewWin.close();
@@ -169,11 +183,14 @@ function applyDashPortadaAdaptiveLayout(wrap, img) {
 }
 
 /**
- * Carga imágenes de portada vía GET autenticado (B2 proxy) y las muestra en wraps
+ * Carga imágenes de portada vía GET (B2 proxy) y las muestra en wraps
  * `[data-noticia-portada-id]` con un `<img>` hijo.
+ * @param {ParentNode} root
+ * @param {{ publicAccess?: boolean }} [opts]
  */
-export async function hydrateNoticiaPortadaThumbs(root) {
+export async function hydrateNoticiaPortadaThumbs(root, opts = null) {
     if (!root || typeof root.querySelectorAll !== 'function') return;
+    const publicAccess = !!(opts && opts.publicAccess);
     ensureDashPortadaAdaptiveStyles();
     const wraps = [...root.querySelectorAll('[data-noticia-portada-id]')];
     await Promise.all(
@@ -182,8 +199,9 @@ export async function hydrateNoticiaPortadaThumbs(root) {
             const img = wrap.querySelector('img');
             if (!id || !img) return;
             try {
-                const url = `${API.urlBase}/comunicacion/noticias/${id}/archivo/imagen`;
-                const res = await fetch(url, { headers: authHeaders() });
+                const url = noticiaArchivoEndpoint(id, 'imagen', publicAccess);
+                const headers = publicAccess ? {} : authHeaders();
+                const res = await fetch(url, { headers });
                 const mimeHeader = (res.headers.get('content-type') || '').split(';')[0].trim();
                 const buf = await res.arrayBuffer();
                 if (!res.ok || !buf.byteLength) {

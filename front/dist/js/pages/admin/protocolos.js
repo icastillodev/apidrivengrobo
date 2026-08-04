@@ -156,6 +156,16 @@ export async function initProtocolosPage(opts = {}) {
     console.group('[PROTO-DEBUG] initProtocolosPage');
     console.log('instId:', instId, 'instName:', instName, 'inline:', inline);
 
+    // Blindaje teclado SweetAlert sobre modal Bootstrap (rechazo / password borrar)
+    if (!window.__groboProtoSwalFocusGuard) {
+        window.__groboProtoSwalFocusGuard = true;
+        document.addEventListener('focusin', (e) => {
+            if (e.target.closest('.swal2-container')) {
+                e.stopImmediatePropagation();
+            }
+        }, true);
+    }
+
     updateRequestsBadge();
 
     try {
