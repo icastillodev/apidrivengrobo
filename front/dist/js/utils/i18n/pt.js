@@ -796,12 +796,14 @@ alojamientos: {
         title: "Gestão de Alojamentos",
         btn_register: "REGISTRAR ALOJAMENTO",
         search_global: "Busca Global",
+        search_historia: "História",
         status: "Status",
         status_active: "Vigentes",
         status_finished: "Finalizados",
         filter_species: "Tipo de Espécie",
         filter_species_all: "Todas as espécies",
         ph_buscar_global: "Digite para buscar...",
+        ph_buscar_historia: "Nº da história...",
         ph_buscar_prot_reg: "Buscar por ID, N° Protocolo, Título ou pesquisador...",
         ph_buscar_user_reg: "Buscar por ID, Usuário, Nome ou Sobrenome...",
         ph_obs_opcional: "Anotações administrativas opcionais...",
@@ -4997,7 +4999,7 @@ alojamientos: {
             "{{i:houses}} Vista de lotação e gestão de espaços (gaiolas, salas, lotes).\n\nCostuma mostrar:\n- Resumo ou KPIs no cabeçalho se existirem.\n- Atalhos a relatórios ou {{i:plus-lg}} novas entradas na barra superior.\n\nObjectivo:\n- Foto operativa de onde há lugar e o que está reservado ou bloqueado.",
         tour_alojamientos_s2_title: "Pesquisa e filtros",
         tour_alojamientos_s2_body:
-            "{{i:search}} Caixa de texto livre mais filtros ({{i:bug}} espécie, {{i:activity}} estado do espaço, rack, sala…).\n\nComo usar:\n- Escreva código parcial ou escolha filtros e aplique/pesquise conforme o ecrã.\n- A grelha reduz-se às coincidências.",
+            "{{i:search}} Texto livre (protocolo, investigador) e campo à parte de {{i:hash}} história, mais filtros ({{i:bug}} espécie, {{i:activity}} estado).\n\nComo usar:\n- Escreva texto parcial ou o nº da história; escolha filtros. A grelha actualiza na hora.\n- A história é o identificador único da estadia (o mesmo da pesquisa global do menu).",
         tour_alojamientos_s3_title: "Exportar Excel",
         tour_alojamientos_s3_body:
             "{{i:file-earmark-excel}} Descarga do snapshot filtrado para folhas ou reuniões.\n\n{{i:info-circle}} Se não vê o botão, o perfil pode não ter permissão de exportação aqui.",

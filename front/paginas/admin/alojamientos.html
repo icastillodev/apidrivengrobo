@@ -44,7 +44,7 @@
         import { loadLanguage, translatePage } from '../../dist/js/utils/i18n.js?v=20260703';
         
         // Importamos el maestro orquestador de alojamientos (v=rev4 fix estado duplicado)
-        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=20260703';
+        import { initAlojamientosPage } from '../../dist/js/pages/admin/alojamientos.js?v=20260828';
         
         showLoader();
         document.addEventListener('DOMContentLoaded', async () => {
@@ -126,10 +126,14 @@
                 </div>
             </div>
 
-            <div class="row g-2 mb-4 p-3 bg-light rounded shadow-sm">
-                <div class="col-md-6">
-                    <label class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.search_global">Búsqueda Global</label>
+            <div id="filtros-alojamiento" class="row g-2 mb-4 p-3 bg-light rounded shadow-sm">
+                <div class="col-md-4">
+                    <label for="search-alojamiento" class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.search_global">Búsqueda Global</label>
                     <input type="text" id="search-alojamiento" class="form-control form-control-sm" data-i18n="alojamientos.ph_buscar_global" placeholder="Escribe para buscar..." oninput="window.renderAlojamientosTable()">
+                </div>
+                <div class="col-md-2">
+                    <label for="search-historia" class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.search_historia">Historia</label>
+                    <input type="text" id="search-historia" class="form-control form-control-sm" inputmode="numeric" autocomplete="off" data-i18n="alojamientos.ph_buscar_historia" placeholder="N° de historia..." oninput="window.renderAlojamientosTable()">
                 </div>
                 <div class="col-md-3">
                     <label for="filter-estado" class="small fw-bold text-muted text-uppercase" style="font-size: 9px;" data-i18n="alojamientos.status">Estado</label>

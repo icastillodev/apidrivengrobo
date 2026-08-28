@@ -4,7 +4,7 @@ import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 
 // Importación de Submódulos
-import { TableUI } from './alojamientos/TableUI.js';
+import { TableUI } from './alojamientos/TableUI.js?v=20260828';
 import { HistorialUI } from './alojamientos/HistorialUI.js';
 import { TramosUI } from './alojamientos/TramosUI.js';
 import { RegistroUI } from './alojamientos/RegistroUI.js';

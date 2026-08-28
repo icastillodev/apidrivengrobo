@@ -131,6 +131,7 @@ export const TableUI = {
         const dataFull = getDataFull();
 
         const term = (document.getElementById('search-alojamiento')?.value || '').toLowerCase().trim();
+        const termHist = (document.getElementById('search-historia')?.value || '').trim().replace(/^#+/, '').replace(/\s+/g, '');
         const estadoFiltro = (document.getElementById('filter-estado')?.value || '').toString();
         const especieFiltro = (document.getElementById('filter-especie')?.value || '').toString();
         const tbody = document.getElementById('tbody-alojamientos');
@@ -144,7 +145,7 @@ export const TableUI = {
         const showTraz = getShowTrazList();
         const COL_COUNT = this.getColCount();
 
-        const filterKey = `${term}|${estadoFiltro}|${especieFiltro}`;
+        const filterKey = `${term}|${termHist}|${estadoFiltro}|${especieFiltro}`;
         if (this._lastFilterKey !== filterKey) {
             this._lastFilterKey = filterKey;
             this.currentPage = 1;
@@ -156,11 +157,12 @@ export const TableUI = {
             const hist = String(a.historia ?? a.Historia ?? a.HISTORIA ?? a.idHistoria ?? '');
             const termLower = term.toLowerCase();
             const matchesSearch = !termLower || nprot.includes(termLower) || inv.includes(termLower) || hist.includes(termLower);
+            const matchesHistoria = !termHist || hist === termHist || hist.startsWith(termHist);
             const isFinalizado = (a.finalizado == 1 || a.finalizado === "1");
             const matchesEstado = estadoFiltro === "" || (isFinalizado ? "1" : "0") === estadoFiltro;
             const idEsp = String(a.idespA ?? a.TipoAnimal ?? '').toString();
             const matchesEspecie = especieFiltro === "" || idEsp === especieFiltro;
-            return matchesSearch && matchesEstado && matchesEspecie;
+            return matchesSearch && matchesHistoria && matchesEstado && matchesEspecie;
         });
 
         if (this.sortConfig.direction !== 'none') {

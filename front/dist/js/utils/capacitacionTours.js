@@ -764,7 +764,7 @@ export const CAPACITACION_TOUR_STEPS = {
       bodyKey: 'tour_alojamientos_s1_body',
     },
     {
-      selector: '#search-alojamiento',
+      selector: '#filtros-alojamiento',
       titleKey: 'tour_alojamientos_s2_title',
       bodyKey: 'tour_alojamientos_s2_body',
     },

@@ -800,12 +800,14 @@ export const es = {
         title: "Gestión de Alojamientos",
         btn_register: "REGISTRAR ALOJAMIENTO",
         search_global: "Búsqueda Global",
+        search_historia: "Historia",
         status: "Estado",
         status_active: "Vigentes",
         status_finished: "Finalizados",
         filter_species: "Tipo de Especie",
         filter_species_all: "Todas las especies",
         ph_buscar_global: "Escribe para buscar...",
+        ph_buscar_historia: "N° de historia...",
         ph_buscar_prot_reg: "Buscar por ID, N° Protocolo, Título o Investigador...",
         ph_buscar_user_reg: "Buscar por ID, Usuario, Nombre o Apellido...",
         ph_obs_opcional: "Anotaciones administrativas opcionales...",
@@ -5008,7 +5010,7 @@ export const es = {
             "{{i:houses}} Vista de ocupación y gestión de espacios (jaulas, salas, lotes) del bioterio.\n\nQué suele mostrar:\n- Resumen o KPIs en cabecera si existen.\n- Accesos a informes o a {{i:plus-lg}} altas desde la barra superior.\n\nObjetivo:\n- Tener una foto operativa de dónde hay cupo y qué está reservado o bloqueado.",
         tour_alojamientos_s2_title: "Búsqueda y filtros",
         tour_alojamientos_s2_body:
-            "{{i:search}} Cuadro de búsqueda libre más filtros desplegables ({{i:bug}} especie, {{i:activity}} estado del espacio, rack, sala…).\n\nCómo usarlo:\n- Escriba texto parcial (código, protocolo) o elija filtros y pulse aplicar/buscar según indique la pantalla.\n- La grilla se reduce a coincidencias: ideal para inspecciones puntuales.",
+            "{{i:search}} Búsqueda libre (protocolo, investigador) y campo aparte de {{i:hash}} historia, más filtros ({{i:bug}} especie, {{i:activity}} estado).\n\nCómo usarlo:\n- Escriba texto parcial o el N° de historia; elija filtros. La grilla se actualiza al instante.\n- La historia es el identificador único de la estadía (el mismo que en la búsqueda global del menú).",
         tour_alojamientos_s3_title: "Exportar a Excel",
         tour_alojamientos_s3_body:
             "{{i:file-earmark-excel}} Descarga del snapshot filtrado para planillas internas o reuniones.\n\n{{i:info-circle}} Si no ve el botón, su perfil puede no tener permiso de exportación en este módulo.",

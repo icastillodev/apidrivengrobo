@@ -13,7 +13,7 @@ export class GeckoSearchEngine {
 
         // Si escribes "caja 1", limpia el término a "1" y fija el scope
         const patterns = [
-            { key: 'alojamiento', words: ['alojamiento', 'aloj', 'caja', 'housing'] },
+            { key: 'alojamiento', words: ['alojamiento', 'aloj', 'caja', 'housing', 'historia', 'history'] },
             { key: 'protocolo', words: ['protocolo', 'prot', 'expediente'] },
             { key: 'pedido', words: ['pedido', 'form', 'formulario', 'solicitud', 'orden'] },
             { key: 'usuario', words: ['usuario', 'user', 'inv', 'investigador'] },

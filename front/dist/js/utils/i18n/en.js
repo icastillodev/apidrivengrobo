@@ -796,12 +796,14 @@ alojamientos: {
         title: "Accommodation Management",
         btn_register: "REGISTER ACCOMMODATION",
         search_global: "Global Search",
+        search_historia: "History",
         status: "Status",
         status_active: "Active",
         status_finished: "Finished",
         filter_species: "Species Type",
         filter_species_all: "All species",
         ph_buscar_global: "Type to search...",
+        ph_buscar_historia: "History No....",
         ph_buscar_prot_reg: "Search by ID, Protocol No., Title or Investigator...",
         ph_buscar_user_reg: "Search by ID, User, First or Last Name...",
         ph_obs_opcional: "Optional administrative notes...",
@@ -4995,7 +4997,7 @@ alojamientos: {
             "{{i:houses}} Occupancy and space management (cages, rooms, batches).\n\nOften shows:\n- Summary or KPIs in the header when present.\n- Shortcuts to reports or {{i:plus-lg}} create actions on the top bar.\n\nGoal:\n- Operational picture of capacity, reservations, and holds.",
         tour_alojamientos_s2_title: "Search and filters",
         tour_alojamientos_s2_body:
-            "{{i:search}} Free-text box plus dropdowns ({{i:bug}} species, {{i:activity}} space status, rack, room…).\n\nHow:\n- Type partial codes or pick filters, then apply/search as the UI indicates.\n- The grid narrows to matches—useful for spot checks.",
+            "{{i:search}} Free-text (protocol, investigator) plus a dedicated {{i:hash}} history field, and dropdowns ({{i:bug}} species, {{i:activity}} status).\n\nHow:\n- Type partial text or the history number; pick filters. The grid updates instantly.\n- History is the stay’s unique ID (same as in the menu global search).",
         tour_alojamientos_s3_title: "Export to Excel",
         tour_alojamientos_s3_body:
             "{{i:file-earmark-excel}} Download the filtered snapshot for spreadsheets or meetings.\n\n{{i:info-circle}} If the button is missing, your profile may lack export permission here.",
