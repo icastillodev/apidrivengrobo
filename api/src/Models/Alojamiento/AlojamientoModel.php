@@ -147,7 +147,8 @@ class AlojamientoModel {
                 $stmtMax = $this->db->query("SELECT MAX(historia) FROM alojamiento");
                 $historia = (int)$stmtMax->fetchColumn() + 1;
             } else {
-                // AQUÍ ES DONDE SE CERRABA EL TRAMO VIEJO ANTES DE CREAR EL NUEVO
+                // Continuar la estadía (incl. stand by con 0 cajas) no es finalizar.
+                $this->db->prepare('UPDATE alojamiento SET finalizado = 0 WHERE historia = ?')->execute([$historia]);
                 $this->closePreviousRecord($historia, $data['fechavisado']);
             }
 
@@ -300,7 +301,16 @@ class AlojamientoModel {
         try {
             $sql = "UPDATE alojamiento SET fechavisado = ?, CantidadCaja = ?, observaciones = ? WHERE IdAlojamiento = ?";
             $this->db->prepare($sql)->execute([$data['fechavisado'], (int)$data['CantidadCaja'], $data['observaciones'], (int)$data['IdAlojamiento']]);
-            
+
+            $stmtLast = $this->db->prepare('SELECT MAX(IdAlojamiento) FROM alojamiento WHERE historia = ?');
+            $stmtLast->execute([(int) $data['historia']]);
+            $lastId = (int) $stmtLast->fetchColumn();
+            if ($lastId === (int) $data['IdAlojamiento'] && (int) $data['CantidadCaja'] === 0) {
+                $this->db->prepare(
+                    'UPDATE alojamiento SET finalizado = 0 WHERE historia = ? AND IdAlojamiento < ?'
+                )->execute([(int) $data['historia'], $lastId]);
+            }
+
             $this->recalculateHistory($data['historia']);
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Editó tramo ID: " . $data['IdAlojamiento']);
             
@@ -368,6 +378,7 @@ public function recalculateHistory($historiaId) {
                 throw new \Exception("La fecha de cierre está fuera del rango permitido.");
             }
 
+            $this->db->prepare('UPDATE alojamiento SET finalizado = 0 WHERE historia = ?')->execute([$historiaId]);
             $sql = "UPDATE alojamiento SET finalizado = 1, hastafecha = ? WHERE historia = ? ORDER BY IdAlojamiento DESC LIMIT 1";
             $this->db->prepare($sql)->execute([$fechaCierre, $historiaId]);
             $this->recalculateHistory($historiaId);

@@ -1,4 +1,5 @@
 import { API } from '../../api.js';
+import { isHistoriaFinalizada, isStandByTramo } from './alojamientos/tramoHelpers.js';
 
 function qrViewEsc(s) {
     return String(s ?? '')
@@ -159,7 +160,10 @@ async function cargarDatosQR(historiaId) {
                 const cant = esChica ? parseInt(h.totalcajachica) : parseInt(h.totalcajagrande);
                 const subtotal = esAbierto ? (dias * precioUnit * cant) : parseFloat(h.totalpago || 0);
 
-                totalDias += dias; totalDinero += subtotal;
+                if (!isStandByTramo(h)) {
+                    totalDias += dias;
+                    totalDinero += subtotal;
+                }
 
                 return `
                 <tr>
@@ -184,7 +188,7 @@ async function cargarDatosQR(historiaId) {
             document.getElementById('txt-total-pago').innerText = `$${totalDinero.toFixed(2)}`;
 
             // Badge de Estado y Footer Admin
-            const isFinalizado = currentHistoryData.some(h => String(h.finalizado) === "1");
+            const isFinalizado = isHistoriaFinalizada(currentHistoryData);
             const badge = document.getElementById('badge-estado');
             if (badge) {
                 badge.innerText = isFinalizado ? 'FINALIZADO' : 'ESTADÍA VIGENTE';

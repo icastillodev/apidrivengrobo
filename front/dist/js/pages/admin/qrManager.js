@@ -1,6 +1,7 @@
 import { API, buildQrAlojamientoPublicPageAbsoluteUrl, getGroboFrontBasePath } from '../../api.js';
 import { TrazabilidadUI } from './alojamientos/trazabilidad.js';
 import { AnimalFichaUI } from './alojamientos/animalFicha.js';
+import { isHistoriaFinalizada, isStandByTramo } from './alojamientos/tramoHelpers.js';
 
 function qrEsc(s) {
     return String(s ?? '')
@@ -510,7 +511,9 @@ async function cargarDatosQR(hParam, tParam) {
 
                 let dias = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
                 const cant = parseInt(h.CantidadCaja || 0);
-                totalDias += dias;
+                if (!isStandByTramo(h)) {
+                    totalDias += dias;
+                }
 
                 const espId = h.TipoAnimal || h.idespA || first.TipoAnimal || first.idespA || 0;
 
@@ -540,7 +543,7 @@ async function cargarDatosQR(hParam, tParam) {
 
             document.getElementById('txt-total-dias').innerText = totalDias;
 
-            const isFinalizado = currentHistoryData.some(h => String(h.finalizado) === "1");
+            const isFinalizado = isHistoriaFinalizada(currentHistoryData);
             const badge = document.getElementById('badge-estado');
             if (badge) {
                 badge.innerText = isFinalizado ? (txt.status_finished || 'FINALIZADO') : (txt.status_active || 'VIGENTE');

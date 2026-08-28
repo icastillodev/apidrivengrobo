@@ -5,6 +5,7 @@ import { AlojamientoState, loadAlojamientos, resolveDestinatarioAlojamiento } fr
 import { sortUsersByApellidoNombre, formatUsuarioApellidoNombre, escListText } from './institutionUsersList.js';
 import { hasTrazabilidadAlojamientosForUser } from '../../../modulesAccess.js';
 import { htmlAlojCobroBadge } from '../facturacion/billingLocale.js';
+import { isHistoriaFinalizada, isStandByTramo } from './tramoHelpers.js';
 /** Cantidad multiplicadora del tramo: cajas (CONTENIDO) o sujetos trazados (SUJETO). */
 function __histCantidadCobro(h, trazOn) {
     const modo = h.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
@@ -118,6 +119,10 @@ renderSummary(historiaId) {
             
             const precioUnit = parseFloat(h.PrecioCajaMomento || 0);
             const cantCobro = __histCantidadCobro(h, trazOnCost);
+            // Stand by: los días se ven en la fila, no entran al total de la estadía.
+            if (isStandByTramo(h)) {
+                return;
+            }
             if (esAbierto) {
                 totalCosto += dias * precioUnit * cantCobro;
             } else {
@@ -126,7 +131,7 @@ renderSummary(historiaId) {
                     : (dias * precioUnit * cantCobro);
             }
             
-            totalDias += dias; // Los días sí se siguen sumando todos
+            totalDias += dias;
         });
 
         const txt = window.txt.alojamientos || {};
@@ -224,6 +229,9 @@ renderTable() {
             `;
         }
 
+        const historiaFin = isHistoriaFinalizada(history);
+        const badgeSb = txt.badge_standby || 'STAND BY (0)';
+
         tbody.innerHTML = history.map(h => {
             const esAbierto = !h.hastafecha;
             const pIni = h.fechavisado.split('-');
@@ -251,9 +259,9 @@ renderTable() {
                     : (diasTramo * precioUnit * cantCobro);
             }
 
-            // --- MAGIA VISUAL: LÓGICA DE STAND BY AQUÍ ---
-            const renderCant = cant === 0 
-                ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> STAND BY (0)</span>` 
+            // Stand by solo si la estadía sigue vigente (el finalizado no deja pausa abierta).
+            const renderCant = (cant === 0 && !historiaFin)
+                ? `<span class="badge bg-warning text-dark px-2 py-1 shadow-sm"><i class="bi bi-pause-circle me-1"></i> ${badgeSb}</span>`
                 : cant;
             const colSpanTraz = 10 + (showTrazCobro ? 1 : 0) + (showTraz ? 1 : 0);
             const renderCantCobro = (showTraz && modoTramo === 'SUJETO')
@@ -298,7 +306,7 @@ renderTable() {
     },
     renderFooter(historiaId) {
         const history = AlojamientoState.currentHistoryData;
-        const isFinalizado = history.some(h => String(h.finalizado) === "1");
+        const isFinalizado = isHistoriaFinalizada(history);
         const footer = document.getElementById('historial-footer');
         const txt = window.txt?.alojamientos || {};
         

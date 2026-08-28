@@ -43,11 +43,16 @@ class UserHousingModel {
                     SUM(a.cuentaapagar) as CostoTotal,
                     
                     CASE 
-                        WHEN MIN(a.finalizado) = 0 THEN 'Vigente' 
-                        ELSE 'Finalizado' 
+                        WHEN MAX(CASE WHEN a.IdAlojamiento = last_a.max_id THEN a.finalizado ELSE NULL END) = 1 THEN 'Finalizado'
+                        ELSE 'Vigente'
                     END as Estado
 
                 FROM alojamiento a
+                INNER JOIN (
+                    SELECT historia, MAX(IdAlojamiento) as max_id
+                    FROM alojamiento
+                    GROUP BY historia
+                ) last_a ON a.historia = last_a.historia
                 INNER JOIN institucion i ON a.IdInstitucion = i.IdInstitucion
                 LEFT JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 -- JOIN con Especie
@@ -95,6 +100,9 @@ class UserHousingModel {
         $totalCosto = 0;
         $totalDias = 0;
         foreach ($rows as $r) {
+            if ((int) ($r['CantidadCaja'] ?? 0) === 0) {
+                continue;
+            }
             $totalCosto += $r['cuentaapagar'];
             $dias = $r['totaldiasdefinidos'] > 0 ? $r['totaldiasdefinidos'] : 0;
             $totalDias += $dias;

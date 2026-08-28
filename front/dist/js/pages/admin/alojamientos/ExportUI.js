@@ -1,6 +1,7 @@
 // dist/js/pages/admin/alojamientos/ExportUI.js
 import { API } from '../../../api.js';
 import { AlojamientoState } from '../alojamientos.js';
+import { isHistoriaFinalizada, isStandByTramo } from './tramoHelpers.js';
 
 function formatCajaUbicacionTxt(caja) {
     const parts = [];
@@ -128,7 +129,7 @@ export const ExportUI = {
 
         if (!options) return;
 
-        const isFinalizado = historyData.some(h => String(h.finalizado) === "1");
+        const isFinalizado = isHistoriaFinalizada(historyData);
         const statusTxt = isFinalizado ? 'FINALIZADO' : 'VIGENTE';
 
         let tableRows = '';
@@ -143,8 +144,10 @@ export const ExportUI = {
             const precio = parseFloat(h.PrecioCajaMomento || 0);
             const subtotal = parseFloat(h.totalpago || 0);
 
-            totalDias += parseInt(dias);
-            totalCosto += subtotal;
+            if (!isStandByTramo(h)) {
+                totalDias += parseInt(dias);
+                totalCosto += subtotal;
+            }
 
             tableRows += `
                 <tr>

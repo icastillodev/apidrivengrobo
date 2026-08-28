@@ -5,6 +5,7 @@
 import { API } from '../../../../../api.js';
 import { hideLoader, showLoader } from '../../../../../components/LoaderComponent.js';
 import { formatBillingMoney, getBillingDateLocale, htmlAlojCobroBadge } from '../../billingLocale.js';
+import { isStandByTramo } from '../../../alojamientos/tramoHelpers.js';
 
 function bmTpl(str, map) {
     if (!str) return '';
@@ -271,8 +272,10 @@ function procesarTramosFinancieros(history, locale, vigenteLabel, trazHabilitada
             ? parseFloat(String(h.cuentaapagar))
             : (dias * precio * cant);
 
-        diasTotales += dias;
-        costoHistoricoTotal += subtotal;
+        if (!isStandByTramo(h)) {
+            diasTotales += dias;
+            costoHistoricoTotal += subtotal;
+        }
 
         return {
             id: h.IdAlojamiento,

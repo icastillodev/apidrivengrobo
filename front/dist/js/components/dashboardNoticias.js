@@ -155,7 +155,7 @@ function maybeShowPortadaPopup(pp, t) {
               .map((a) => {
                   const url = String(a?.url || '').trim();
                   const nombre = escapeHtml(a?.nombre || a?.url || 'adjunto');
-                  const isB2 = a?.origen === 'b2' || /\/comunicacion\/portada-popup\/archivo\//.test(url);
+                  const isB2 = a?.origen === 'b2' || /\/comunicacion\/(portada-popup|dashboard-popup)\/archivo\//.test(url);
                   if (isB2 && url) {
                       return `<button type="button" class="btn btn-sm btn-outline-secondary" data-popup-auth-file="${escapeHtml(url)}">${nombre}</button>`;
                   }
@@ -164,7 +164,7 @@ function maybeShowPortadaPopup(pp, t) {
               .join('')}</div>`
         : '';
     const imgHtml = imgUrl
-        ? `<div class="mb-3 text-center"><img data-popup-auth-img="${escapeHtml(imgUrl)}" class="img-fluid rounded shadow-sm d-none" alt="" loading="lazy"></div>`
+        ? `<div class="mb-3 text-center" data-popup-img-wrap><img data-popup-auth-img="${escapeHtml(imgUrl)}" class="img-fluid rounded shadow-sm d-none" alt=""></div>`
         : '';
 
     document.body.insertAdjacentHTML(
@@ -177,8 +177,8 @@ function maybeShowPortadaPopup(pp, t) {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body pt-2">
+                        ${cue ? `<div class="small text-dark mb-3" style="white-space:pre-wrap">${escapeHtml(cue)}</div>` : ''}
                         ${imgHtml}
-                        ${cue ? `<div class="small text-dark" style="white-space:pre-wrap">${escapeHtml(cue)}</div>` : ''}
                         ${adjHtml}
                         ${newsHtml}
                     </div>
@@ -204,38 +204,88 @@ function popupAuthHeaders() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Prefija con API.urlBase (evita http/https o host distinto al del SPA). */
+function resolveComunicacionFetchUrl(url) {
+    const s = String(url || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) {
+        try {
+            const u = new URL(s);
+            const idx = u.pathname.indexOf('/comunicacion/');
+            if (idx >= 0) {
+                return `${API.urlBase}${u.pathname.slice(idx)}${u.search || ''}`;
+            }
+        } catch (_) {
+            /* URL pública http(s) de adjunto */
+        }
+        return s;
+    }
+    if (s.startsWith('/comunicacion/')) {
+        return `${API.urlBase}${s}`;
+    }
+    return s;
+}
+
+function mimeFromImageMagic(buf) {
+    const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    if (u8.length >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff) return 'image/jpeg';
+    if (u8.length >= 8 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47) return 'image/png';
+    if (u8.length >= 6 && u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) return 'image/gif';
+    if (u8.length >= 12 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46
+        && u8[8] === 0x57 && u8[9] === 0x45 && u8[10] === 0x42 && u8[11] === 0x50) return 'image/webp';
+    try {
+        const text = new TextDecoder('utf-8').decode(u8).replace(/^\uFEFF/, '');
+        if (/<svg[\s>]/i.test(text)) return 'image/svg+xml';
+    } catch (_) {
+        /* ignore */
+    }
+    return '';
+}
+
 /** Imagen/adjuntos B2 del popup requieren JWT: no se pueden poner en src/href crudo. */
 async function hydratePopupAuthAssets(root, errFallback) {
     if (!root) return;
     const imgs = [...root.querySelectorAll('[data-popup-auth-img]')];
     await Promise.all(
         imgs.map(async (img) => {
-            const url = img.getAttribute('data-popup-auth-img');
-            if (!url) return;
+            const wrap = img.closest('[data-popup-img-wrap]') || img.parentElement;
+            const url = resolveComunicacionFetchUrl(img.getAttribute('data-popup-auth-img'));
+            if (!url) {
+                wrap?.remove();
+                return;
+            }
             try {
                 const res = await fetch(url, { headers: popupAuthHeaders() });
                 if (!res.ok) {
-                    img.remove();
+                    wrap?.remove();
                     return;
                 }
-                const blob = await res.blob();
-                if (!blob.size || !(blob.type || '').startsWith('image/')) {
-                    img.remove();
+                const buf = await res.arrayBuffer();
+                if (!buf.byteLength) {
+                    wrap?.remove();
                     return;
                 }
+                let mime = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+                const sniffed = mimeFromImageMagic(buf.slice(0, 512));
+                if (sniffed) mime = sniffed;
+                if (!mime.startsWith('image/')) {
+                    wrap?.remove();
+                    return;
+                }
+                const blob = new Blob([buf], { type: mime });
                 const objUrl = URL.createObjectURL(blob);
                 img.src = objUrl;
                 img.classList.remove('d-none');
                 img.addEventListener('load', () => URL.revokeObjectURL(objUrl), { once: true });
             } catch (_) {
-                img.remove();
+                wrap?.remove();
             }
         })
     );
 
     root.querySelectorAll('[data-popup-auth-file]').forEach((btn) => {
         btn.addEventListener('click', async () => {
-            const url = btn.getAttribute('data-popup-auth-file');
+            const url = resolveComunicacionFetchUrl(btn.getAttribute('data-popup-auth-file'));
             if (!url) return;
             const previewWin = window.open('about:blank', '_blank');
             try {

@@ -13,8 +13,9 @@ echo "📦 Actualizando Frontend..."
 sudo rsync -a --delete front/ /var/www/html/app/
 
 # 4. Copiamos la API a la carpeta oculta 'core-backend-gem'
+# --exclude=.env: el secreto vive solo en el servidor, no en Git; --delete no debe borrarlo.
 echo "⚙️ Actualizando Backend API..."
-sudo rsync -a --delete api/ /var/www/html/core-backend-gem/
+sudo rsync -a --delete --exclude='.env' --exclude='.env.*' api/ /var/www/html/core-backend-gem/
 
 # 5. Aseguramos permisos correctos
 sudo chown -R www-data:www-data /var/www/html/app

@@ -145,6 +145,7 @@ $router->get('/comunicacion/mensajes/adjunto/:id', 'ComunicacionB2Controller@dow
 $router->get('/comunicacion/noticias/public/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivoPublic');
 $router->get('/comunicacion/noticias/:id/archivo/:tipo', 'ComunicacionB2Controller@downloadNoticiaArchivo');
 $router->get('/comunicacion/portada-popup/archivo/:tipo', 'ComunicacionB2Controller@downloadPortadaPopupArchivo');
+$router->get('/comunicacion/dashboard-popup/archivo/:tipo', 'ComunicacionB2Controller@downloadDashboardPopupArchivo');
 $router->get('/comunicacion/poe/:id/adjunto/:slot', 'ComunicacionB2Controller@downloadPoeAdjunto');
 
 // Tickets de soporte Gecko (turnos 1:1, correo a soporte@appgrobo.com)

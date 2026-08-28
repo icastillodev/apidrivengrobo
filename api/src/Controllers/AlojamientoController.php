@@ -117,7 +117,7 @@ class AlojamientoController {
         $data = json_decode(file_get_contents('php://input'), true);
 
         $historiaId = $data['historia'] ?? null;
-        $fechaFin = $data['fechaFin'] ?? date('Y-m-d'); 
+        $fechaFin = $data['fechaFin'] ?? $data['hastafecha'] ?? date('Y-m-d'); 
 
         if (!$historiaId) {
             echo json_encode(['status' => 'error', 'message' => 'Falta ID de historia']);

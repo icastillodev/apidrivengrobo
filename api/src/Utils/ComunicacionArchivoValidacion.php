@@ -32,8 +32,13 @@ class ComunicacionArchivoValidacion
             $tmpPath,
             $originalName,
             self::MAX_NOTICIA_IMAGEN,
-            ['jpg', 'jpeg'],
-            ['image/jpeg'],
+            ['jpg', 'jpeg', 'png', 'svg', 'webp'],
+            [
+                'image/jpeg',
+                'image/png',
+                'image/svg+xml',
+                'image/webp',
+            ],
             'imagen_noticia'
         );
     }
@@ -202,6 +207,12 @@ class ComunicacionArchivoValidacion
             case 'jpg':
             case 'jpeg':
                 return 'image/jpeg';
+            case 'png':
+                return 'image/png';
+            case 'svg':
+                return 'image/svg+xml';
+            case 'webp':
+                return 'image/webp';
             case 'pdf':
                 return 'application/pdf';
             case 'xlsx':
@@ -233,10 +244,35 @@ class ComunicacionArchivoValidacion
             return $ext === 'pdf' && $mimeNorm === 'application/pdf';
         }
         if ($contexto === 'imagen_noticia') {
-            return ($ext === 'jpg' || $ext === 'jpeg') && $mimeNorm === 'image/jpeg';
+            return self::mimeEsImagenComunicacion($mimeNorm, $ext);
         }
         if ($contexto === 'doc_noticia' || $contexto === 'poe') {
             return self::mimeEsDocumentoOffice($mimeNorm, $ext);
+        }
+
+        return false;
+    }
+
+    private static function mimeEsImagenComunicacion(string $mimeNorm, string $ext): bool
+    {
+        if ($ext === 'jpg' || $ext === 'jpeg') {
+            return $mimeNorm === 'image/jpeg';
+        }
+        if ($ext === 'png') {
+            return $mimeNorm === 'image/png';
+        }
+        if ($ext === 'webp') {
+            return $mimeNorm === 'image/webp';
+        }
+        if ($ext === 'svg') {
+            return in_array($mimeNorm, [
+                'image/svg+xml',
+                'image/svg',
+                'text/xml',
+                'application/xml',
+                'text/plain',
+                'text/html',
+            ], true);
         }
 
         return false;
@@ -297,7 +333,7 @@ class ComunicacionArchivoValidacion
         if ($h === false) {
             return false;
         }
-        $head = fread($h, 8);
+        $head = fread($h, 1024);
         fclose($h);
         if ($head === false || $head === '') {
             return false;
@@ -305,6 +341,22 @@ class ComunicacionArchivoValidacion
 
         if ($ext === 'jpg' || $ext === 'jpeg') {
             return strlen($head) >= 3 && $head[0] === "\xFF" && $head[1] === "\xD8" && $head[2] === "\xFF";
+        }
+        if ($ext === 'png') {
+            return strlen($head) >= 8 && substr($head, 0, 8) === "\x89PNG\r\n\x1A\n";
+        }
+        if ($ext === 'webp') {
+            return strlen($head) >= 12
+                && substr($head, 0, 4) === 'RIFF'
+                && substr($head, 8, 4) === 'WEBP';
+        }
+        if ($ext === 'svg') {
+            $sample = $head;
+            if (strncmp($sample, "\xEF\xBB\xBF", 3) === 0) {
+                $sample = substr($sample, 3);
+            }
+
+            return stripos($sample, '<svg') !== false;
         }
         if ($ext === 'pdf') {
             return strncmp($head, '%PDF', 4) === 0;

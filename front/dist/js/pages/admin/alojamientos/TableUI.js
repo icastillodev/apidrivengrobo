@@ -191,7 +191,10 @@ export const TableUI = {
             const modoCobro = a.alojamiento_cobro_modo === 'SUJETO' ? 'SUJETO' : 'CONTENIDO';
             const cant = parseInt(a.CantidadCaja ?? 0, 10) || 0;
             const cantCobro = parseInt(a.CantSujetos ?? 0, 10) || 0;
-            const renderCant = String(cant);
+            const badgeSb = txt?.badge_standby || 'STAND BY (0)';
+            const renderCant = (!isFinalizado && cant === 0)
+                ? `<span class="badge bg-warning text-dark px-2 py-1">${badgeSb}</span>`
+                : String(cant);
             const renderCantCobro = (showTraz && modoCobro === 'SUJETO')
                 ? `<span class="text-muted small d-block">${cantCobro} ${txt.trace_subjects_short || 'suj.'}</span>`
                 : '';

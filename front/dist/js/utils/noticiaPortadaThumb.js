@@ -51,9 +51,22 @@ export async function fillNoticiaPreviewWindow(previewWin, idNoticia, tipo, opts
 
     let mime = mimeHeader || 'application/octet-stream';
     if (tipo === 'imagen') {
-        const u8 = new Uint8Array(buf.slice(0, 4));
+        const u8 = new Uint8Array(buf.slice(0, 512));
         const isJpeg = u8.length >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff;
+        const isPng = u8.length >= 8 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
+        const isWebp = u8.length >= 12 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46
+            && u8[8] === 0x57 && u8[9] === 0x45 && u8[10] === 0x42 && u8[11] === 0x50;
+        let isSvg = false;
+        try {
+            const text = new TextDecoder('utf-8').decode(u8).replace(/^\uFEFF/, '');
+            isSvg = /<svg[\s>]/i.test(text);
+        } catch (_) {
+            isSvg = false;
+        }
         if (isJpeg) mime = 'image/jpeg';
+        else if (isPng) mime = 'image/png';
+        else if (isWebp) mime = 'image/webp';
+        else if (isSvg) mime = 'image/svg+xml';
     }
 
     const blob = new Blob([buf], { type: mime });
@@ -208,14 +221,28 @@ export async function hydrateNoticiaPortadaThumbs(root, opts = null) {
                     wrap.remove();
                     return;
                 }
-                const u8 = new Uint8Array(buf.slice(0, 3));
+                const u8 = new Uint8Array(buf.slice(0, 512));
                 const isJpeg = u8.length >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff;
-                const mimeOk = isJpeg || mimeHeader.startsWith('image/');
+                const isPng = u8.length >= 8 && u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47;
+                const isWebp = u8.length >= 12 && u8[0] === 0x52 && u8[1] === 0x49 && u8[2] === 0x46 && u8[3] === 0x46
+                    && u8[8] === 0x57 && u8[9] === 0x45 && u8[10] === 0x42 && u8[11] === 0x50;
+                let isSvg = false;
+                try {
+                    const text = new TextDecoder('utf-8').decode(u8).replace(/^\uFEFF/, '');
+                    isSvg = /<svg[\s>]/i.test(text);
+                } catch (_) {
+                    isSvg = false;
+                }
+                const mimeOk = isJpeg || isPng || isWebp || isSvg || mimeHeader.startsWith('image/');
                 if (!mimeOk) {
                     wrap.remove();
                     return;
                 }
-                const mime = isJpeg ? 'image/jpeg' : mimeHeader || 'image/jpeg';
+                const mime = isJpeg ? 'image/jpeg'
+                    : isPng ? 'image/png'
+                    : isWebp ? 'image/webp'
+                    : isSvg ? 'image/svg+xml'
+                    : (mimeHeader || 'image/jpeg');
                 const prev = img.dataset.blobUrl;
                 if (prev) URL.revokeObjectURL(prev);
                 const blob = new Blob([buf], { type: mime });

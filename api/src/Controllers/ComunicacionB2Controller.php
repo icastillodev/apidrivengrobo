@@ -61,10 +61,14 @@ class ComunicacionB2Controller {
             case 'jpg':
             case 'jpeg':
                 return 'image/jpeg';
-            case 'pdf':
-                return 'application/pdf';
             case 'png':
                 return 'image/png';
+            case 'svg':
+                return 'image/svg+xml';
+            case 'webp':
+                return 'image/webp';
+            case 'pdf':
+                return 'application/pdf';
             case 'xlsx':
                 return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
             case 'xls':
@@ -526,6 +530,20 @@ class ComunicacionB2Controller {
             echo 'Error al descargar';
             exit;
         }
+    }
+
+    /**
+     * Imagen/adjuntos del popup ACTIVO del panel (JWT de cualquier usuario de la sede).
+     * tipo: popup_imagen | popup_doc1 | popup_doc2
+     */
+    public function downloadDashboardPopupArchivo($tipo) {
+        $tipo = strtolower((string) $tipo);
+        if (!in_array($tipo, ['popup_imagen', 'popup_doc1', 'popup_doc2'], true)) {
+            http_response_code(400);
+            echo 'Tipo inválido';
+            exit;
+        }
+        $this->downloadPortadaPopupArchivo($tipo);
     }
 
     /**

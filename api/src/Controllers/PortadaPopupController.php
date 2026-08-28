@@ -34,10 +34,6 @@ class PortadaPopupController {
         return $instId;
     }
 
-    private function apiDownloadBase(): string {
-        return ComunicacionB2Controller::absoluteApiPrefix();
-    }
-
     /**
      * Combina adjuntos por URL (legacy) y archivos en B2 (NOTICIASPOPUP).
      *
@@ -57,8 +53,11 @@ class PortadaPopupController {
                 : ($row['PopupAdjunto' . $i . 'Nombre'] ?? null);
             if ($bk !== null && $bk !== '') {
                 $tipo = ($bloque === 'Portada' ? 'portada_doc' : 'popup_doc') . $i;
+                $base = $bloque === 'Portada'
+                    ? '/comunicacion/portada-popup/archivo/'
+                    : '/comunicacion/dashboard-popup/archivo/';
                 $out[] = [
-                    'url' => $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/' . $tipo,
+                    'url' => $base . $tipo,
                     'nombre' => ($bn !== null && $bn !== '') ? (string) $bn : 'adjunto',
                     'origen' => 'b2',
                 ];
@@ -120,14 +119,14 @@ class PortadaPopupController {
 
         $imgUrl = null;
         if (!empty($ippRow['PortadaImagenB2Key'])) {
-            $imgUrl = $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/portada_imagen';
+            $imgUrl = '/comunicacion/portada-popup/archivo/portada_imagen';
         }
 
         $popActivo = $popupRow ? (int) ($popupRow['PopupActivo'] ?? 0) : 0;
 
         $popupImgUrl = null;
         if ($popupRow && !empty($popupRow['PopupPortadaImagenB2Key'])) {
-            $popupImgUrl = $this->apiDownloadBase() . '/comunicacion/portada-popup/archivo/popup_imagen';
+            $popupImgUrl = '/comunicacion/dashboard-popup/archivo/popup_imagen';
         }
 
         return [
@@ -136,6 +135,7 @@ class PortadaPopupController {
             'PortadaImagenUrl' => $imgUrl,
             'portada_adjuntos' => $this->adjuntosDocumentosMerge($ippRow, 'Portada'),
             'PopupActivo' => $popActivo,
+            'IdDashboardPopup' => $popupRow ? (int) ($popupRow['IdDashboardPopup'] ?? 0) : 0,
             'PopupTitulo' => $popupRow['PopupTitulo'] ?? null,
             'PopupCuerpo' => $popupRow['PopupCuerpo'] ?? null,
             'PopupImagenUrl' => $popupImgUrl,

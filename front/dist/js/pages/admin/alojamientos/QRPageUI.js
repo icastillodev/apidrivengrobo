@@ -1,4 +1,5 @@
 import { API } from '../../../api.js';
+import { isHistoriaFinalizada, isStandByTramo } from './tramoHelpers.js';
 
 export const QRPageUI = {
     async init() {
@@ -31,7 +32,7 @@ export const QRPageUI = {
             const res = await API.request(`/alojamiento/history?id=${historiaId}`);
             const data = res.data;
             const first = data[0];
-            const isFinalizado = data.some(h => String(h.finalizado) === "1");
+            const isFinalizado = isHistoriaFinalizada(data);
             const txt = window.txt.alojamientos;
 
             // Renderizar Información General (Ocultando precios)
@@ -65,11 +66,20 @@ export const QRPageUI = {
 
     calcularDias(historyArray) {
         if (!historyArray || historyArray.length === 0) return (window.txt?.alojamientos?.qr_dias_placeholder || '0') + ' ' + (window.txt?.alojamientos?.days_suffix || 'Días');
-        const first = historyArray[0];
-        const last = historyArray[historyArray.length - 1];
-        const inicio = new Date(first.fechavisado);
-        const fin = last.hastafecha ? new Date(last.hastafecha) : new Date();
-        const dias = Math.max(0, Math.floor((fin - inicio) / (1000 * 60 * 60 * 24)));
+        const hoy = new Date();
+        hoy.setHours(12, 0, 0, 0);
+        let dias = 0;
+        historyArray.forEach((h) => {
+            if (isStandByTramo(h) || !h.fechavisado) return;
+            const pIni = String(h.fechavisado).split('-');
+            const fIni = new Date(pIni[0], pIni[1] - 1, pIni[2], 12, 0, 0);
+            let fFin = hoy;
+            if (h.hastafecha) {
+                const pFin = String(h.hastafecha).split('-');
+                fFin = new Date(pFin[0], pFin[1] - 1, pFin[2], 12, 0, 0);
+            }
+            dias += Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
+        });
         return `${dias} ${window.txt?.alojamientos?.qr_dias_placeholder || 'Días'}`;
     }
 };
