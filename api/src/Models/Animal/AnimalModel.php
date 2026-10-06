@@ -527,6 +527,23 @@ class AnimalModel {
         return (bool)$stmt->fetchColumn();
     }
 
+    private function hasActiveFormDerivation(int $idformA): bool {
+        if ($idformA <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $stmt = $this->db->prepare("SELECT 1 FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 LIMIT 1");
+        $stmt->execute([$idformA]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private function syncFormularioProtocolo(int $idformA, $idprotA): void {
+        $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idformA]);
+        $prot = ($idprotA === null || $idprotA === '' || (string)$idprotA === '0') ? 0 : (int)$idprotA;
+        if ($prot > 0) {
+            $this->db->prepare("INSERT INTO protformr (idprotA, idformA) VALUES (?, ?)")->execute([$prot, $idformA]);
+        }
+    }
+
     public function getCepasBySubespecie($instId, $idSubespA) {
         // IMPORTANTE:
         // La tabla cepa ahora es subordinada a especiee (idespA), no a subespecie.
@@ -685,12 +702,26 @@ public function updateStatus($data) {
         $stmtTypes->execute([$instId]);
 
         $stmtProt = $this->db->prepare(
-            "SELECT idprotA, nprotA, tituloA, protocoloexpe AS IsExterno
-             FROM protocoloexpe
-             WHERE IdInstitucion = ?
-             ORDER BY nprotA DESC"
+            "SELECT DISTINCT p.idprotA, p.nprotA, p.tituloA, p.protocoloexpe AS IsExterno
+             FROM protocoloexpe p
+             LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+             WHERE (
+                    p.IdInstitucion = ?
+                    OR (
+                        pi.IdInstitucion = ?
+                        AND p.IdInstitucion <> ?
+                        AND EXISTS (
+                            SELECT 1 FROM solicitudprotocolo sr
+                            WHERE sr.idprotA = p.idprotA
+                              AND sr.TipoPedido = 2
+                              AND sr.IdInstitucion = ?
+                              AND sr.Aprobado = 1
+                        )
+                    )
+             )
+             ORDER BY p.nprotA DESC"
         );
-        $stmtProt->execute([$instId]);
+        $stmtProt->execute([$instId, $instId, $instId, $instId]);
         $localProtocols = $stmtProt->fetchAll(\PDO::FETCH_ASSOC);
         $derivModel = new FormDerivacionModel($this->db);
 
@@ -744,11 +775,10 @@ public function updateStatus($data) {
         $oldTotal = (int)($old['oldTotal'] ?? 0);
         $oldProt = $old['oldProt'];
         $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
+        $esRedActiva = $this->hasActiveFormDerivation((int)$id);
 
-        // Formulario derivado (en destino): el protocolo queda fijo y no se puede cambiar,
-        // pero el destino SÍ puede editar las cantidades de animales. En el modelo sin copia
-        // se sobrescribe `sexoe` (el original queda preservado en formulario_datos_originales).
-        if ($esDerivadoEnDestino) {
+        // Pedidos de red (origen o destino): el protocolo queda fijo.
+        if ($esRedActiva) {
             $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
             $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
             if ($newProtNorm !== $oldProtNorm) {
@@ -1018,7 +1048,7 @@ public function updateStatus($data) {
                 }
             }
 
-            $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")->execute([$newProt, $id]);
+            $this->syncFormularioProtocolo((int)$id, $newProt);
 
             if (!$esDerivadoEnDestino) {
                 if ($oldProt == $newProt) {

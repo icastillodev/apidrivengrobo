@@ -358,6 +358,15 @@ class InsumoModel {
         return (bool)$stmt->fetchColumn();
     }
 
+    private function hasActiveFormDerivation(int $idformA): bool {
+        if ($idformA <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $stmt = $this->db->prepare("SELECT 1 FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 LIMIT 1");
+        $stmt->execute([$idformA]);
+        return (bool)$stmt->fetchColumn();
+    }
+
         public function getInsumosDetails($idPrecioInsumo) {
             $sql = "SELECT fi.idInsumo, fi.cantidad, i.NombreInsumo, i.TipoInsumo
                     FROM forminsumo fi
@@ -556,7 +565,7 @@ public function updateFullInsumo($data) {
             // Asociar / actualizar protocolo si se envió idProt (solo para insumos por protocolo)
             if (!empty($data['idProt'])) {
                 $idProt = (int)$data['idProt'];
-                if ($instIdRequest > 0 && $this->isDestinationWithActiveDerivation($idForm, $instIdRequest)) {
+                if ($this->hasActiveFormDerivation($idForm)) {
                     $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
                     if ($oldProtNorm !== null && $idProt !== $oldProtNorm) {
                         throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");

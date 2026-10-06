@@ -408,6 +408,24 @@ class ReactivoModel {
         $stmt->execute([$idformA, $instId]);
         return (bool)$stmt->fetchColumn();
     }
+
+    private function hasActiveFormDerivation(int $idformA): bool {
+        if ($idformA <= 0 || !$this->hasTable('formulario_derivacion')) {
+            return false;
+        }
+        $stmt = $this->db->prepare("SELECT 1 FROM formulario_derivacion WHERE idformA = ? AND Activo = 1 LIMIT 1");
+        $stmt->execute([$idformA]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private function syncFormularioProtocolo(int $idformA, $idprotA): void {
+        $this->db->prepare("DELETE FROM protformr WHERE idformA = ?")->execute([$idformA]);
+        $prot = ($idprotA === null || $idprotA === '' || (string)$idprotA === '0') ? 0 : (int)$idprotA;
+        if ($prot > 0) {
+            $this->db->prepare("INSERT INTO protformr (idprotA, idformA) VALUES (?, ?)")->execute([$prot, $idformA]);
+        }
+    }
+
     public function getAvailableInsumos($instId) {
         $sql = "SELECT IdInsumoexp as idInsumo, NombreInsumo, TipoInsumo, CantidadInsumo, PrecioInsumo 
                 FROM insumoexperimental 
@@ -573,14 +591,16 @@ class ReactivoModel {
         $oldProt = $old['oldProt'];
 
         $esDerivadoEnDestino = $instIdRequest > 0 && $this->isDestinationWithActiveDerivation((int)$id, $instIdRequest);
-        // En destino derivado, el protocolo del formulario queda congelado.
-        if ($esDerivadoEnDestino) {
+        $esRedActiva = $this->hasActiveFormDerivation((int)$id);
+        if ($esRedActiva) {
             $oldProtNorm = ($oldProt === null || $oldProt === '') ? null : (int)$oldProt;
             $newProtNorm = ($newProt === null || $newProt === '' || (string)$newProt === '0') ? null : (int)$newProt;
             if ($newProtNorm !== $oldProtNorm) {
                 throw new \Exception("En un formulario derivado no se puede cambiar el protocolo.");
             }
             $newProt = $oldProtNorm;
+        }
+        if ($esDerivadoEnDestino) {
             $data['fechainicioA'] = $old['oldInicio'] ?? ($data['fechainicioA'] ?? null);
             $data['fecRetiroA'] = $old['oldRetiro'] ?? ($data['fecRetiroA'] ?? null);
             $nuevaCantidadReactivo = (float)($old['oldOrgano'] ?? $nuevaCantidadReactivo);
@@ -675,8 +695,7 @@ class ReactivoModel {
                 }
             }
 
-            $this->db->prepare("UPDATE protformr SET idprotA = ? WHERE idformA = ?")
-                    ->execute([$newProt, $id]);
+            $this->syncFormularioProtocolo((int)$id, $newProt);
 
             // Devolución y resta de cupos de animales al protocolo (no en destino derivado: cupo ya descontado en origen)
             if (!$esDerivadoEnDestino) {

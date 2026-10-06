@@ -6,6 +6,7 @@ import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDe
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
 /** Verifica que jsPDF + autoTable estén disponibles antes de generar la ficha. */
@@ -616,7 +617,7 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
     const isDerivedActive = Number(f.DerivadoActivo || 0) === 1 && Number(f.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(f.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const wf = (f.EstadoWorkflow || '').toString().toUpperCase();
-    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockProtocol = isDerivedActive;
     const lockImmutable = isDerivedActive && !isOriginInst;
     const lockSaveBtn = isDerivedActive && (isOriginInst || (!isOriginInst && wf.includes('PENDIENTE')));
     const canEditTipo = isDerivedActive && !isOriginInst && !wf.includes('PENDIENTE');
@@ -652,18 +653,7 @@ function renderOrderModificationSection(f, items, deptos, protocolos) {
         return `<option value="${tp.IdTipoFormulario}"${sel}>${tp.nombreTipo || ''}</option>`;
     }).join('');
 
-    // Aseguramos que el protocolo actual siempre esté en la lista (aunque ya no esté activo)
-    let listaProtFinal = Array.isArray(listaProt) ? [...listaProt] : [];
-    if (currentProtId && !listaProtFinal.some(p => String(p.idprotA) === String(currentProtId))) {
-        if (f.NProtocolo && f.TituloProtocolo) {
-            listaProtFinal.unshift({
-                idprotA: currentProtId,
-                nprotA: f.NProtocolo,
-                tituloA: f.TituloProtocolo,
-                Investigador: f.Investigador || ''
-            });
-        }
-    }
+    const listaProtFinal = withCurrentProtocolOption(listaProt, currentProtId, f);
 
     return `
     <div class="p-4 bg-white">

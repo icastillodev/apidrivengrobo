@@ -14,7 +14,7 @@ import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
-import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
+import { formatAdminProtocolOptionLabel, withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
 import {
     ensureJsPdfAutoTable,
@@ -896,7 +896,7 @@ function renderOrderModificationSection(a, sex, cache) {
     const isDerivedActive = Number(a.DerivadoActivo || 0) === 1 && Number(a.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(a.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const wf = (a.EstadoWorkflow || '').toString().toUpperCase();
-    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockProtocol = isDerivedActive;
     const lockImmutable = isDerivedActive && !isOriginInst;
     // El destino con derivación ACEPTADA puede editar las cantidades de animales
     // (se sobrescriben; el original queda en formulario_datos_originales).
@@ -921,6 +921,7 @@ function renderOrderModificationSection(a, sex, cache) {
         return `<option value="${d.iddeptoA}" data-org="${(org || '').replace(/"/g, '&quot;')}" data-externo="${ext}"${sel}>${d.NombreDeptoA || ''}</option>`;
     }).join('');
     const protLabel = (a.NProtocolo || '') + (a.TituloProtocolo ? ` - ${a.TituloProtocolo}` : '') || '—';
+    const protocolosPedido = withCurrentProtocolOption(cache.protocols, a.idprotA, a);
     const panelOrigen = lockImmutable ? `
     <div class="alert alert-info border-info mb-3 py-3">
         <h6 class="fw-bold text-dark mb-2"><i class="bi bi-file-earmark-text me-2"></i>1. ${tx.derivacion_datos_origen || 'Datos del formulario original (derivado)'}</h6>
@@ -972,7 +973,7 @@ function renderOrderModificationSection(a, sex, cache) {
                     ? `<div class="form-control form-control-sm bg-light">${protLabel}</div><input type="hidden" name="idprotA" value="${a.idprotA || ''}">`
                     : `<input type="text" class="form-control form-control-sm mb-1 bg-light border-0" placeholder="Filtrar protocolo..." onkeyup="window.filterProtocolList(this)">
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" onchange="window.handleProtocolChange(this)">
-                    ${cache.protocols.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${a.idprotA == p.idprotA ? 'selected' : ''}>${formatAdminProtocolOptionLabel(p)}</option>`).join('')}
+                    ${protocolosPedido.map(p => `<option value="${p.idprotA}" data-externo="${p.protocoloexpe}" ${String(a.idprotA) === String(p.idprotA) ? 'selected' : ''}>${formatAdminProtocolOptionLabel(p)}</option>`).join('')}
                 </select>`}
             </div>
             <div class="col-md-12">

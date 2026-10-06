@@ -22,7 +22,7 @@ import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDe
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
-import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
+import { formatAdminProtocolOptionLabel, withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 
 let allReactivos = [];
 /** Total de filas que cumplen filtros (servidor). */
@@ -520,11 +520,11 @@ function renderOrderModificationSection(r, usage, cache) {
     const isDerivedActive = Number(r.DerivadoActivo || 0) === 1 && Number(r.IdFormularioDerivacionActiva || 0) > 0;
     const isOriginInst = Number(r.IdInstitucionOrigen || 0) === currentInst && currentInst > 0;
     const wf = (r.EstadoWorkflow || '').toString().toUpperCase();
-    const lockProtocol = isDerivedActive && !isOriginInst;
+    const lockProtocol = isDerivedActive;
     const lockSaveBtn = isDerivedActive && (isOriginInst || (!isOriginInst && wf.includes('PENDIENTE')));
     const lockImmutable = isDerivedActive && !isOriginInst;
     const canEditTipo = isDerivedActive && !isOriginInst && !wf.includes('PENDIENTE');
-    const protocolos = cache.protocols || cache.protocolos || [];
+    const protocolos = withCurrentProtocolOption(cache.protocols || cache.protocolos || [], r.idprotA, r);
     const reactivos = cache.insumos || [];
     const tipos = Array.isArray(cache.types) ? cache.types : [];
     const deptos = Array.isArray(cache.deptos) ? cache.deptos : [];
@@ -577,7 +577,7 @@ function renderOrderModificationSection(r, usage, cache) {
                 <select id="select-protocol-modal" name="idprotA" class="form-select form-select-sm" ${lockProtocol ? 'disabled' : ''}>
                     <option value="">${t.select_proto}</option>
                     ${protocolos.map(p => {
-                        const isSelected = (p.idprotA == r.idprotA) ? 'selected' : '';
+                        const isSelected = String(p.idprotA) === String(r.idprotA) ? 'selected' : '';
                         return `<option value="${p.idprotA}" ${isSelected}>${formatAdminProtocolOptionLabel(p)}</option>`;
                     }).join('')}
                 </select>
