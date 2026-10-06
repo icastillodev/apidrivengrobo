@@ -58,17 +58,48 @@ function capacitacionHref(slug) {
   return `${root}paginas/panel/capacitacion.html${hash}`;
 }
 
+const HELP_BAR_STACK_CSS =
+  'body.gecko-capacitacion-fab-pad{padding-bottom:88px!important;}' +
+  '#gecko-capacitacion-fab .gecko-fab-actions{flex-wrap:wrap;}' +
+  /* Por debajo de backdrop (1050), modal (1055) y SweetAlert (1060). */
+  '#gecko-capacitacion-fab{z-index:1025!important;}' +
+  '#gecko-capacitacion-modal-help{display:none!important;pointer-events:none!important;}' +
+  'body.modal-open #gecko-capacitacion-fab,' +
+  'body.swal2-shown #gecko-capacitacion-fab,' +
+  'html.swal2-shown #gecko-capacitacion-fab,' +
+  'body:has(.modal.show) #gecko-capacitacion-fab,' +
+  'body:has(.swal2-container) #gecko-capacitacion-fab,' +
+  'body:has(.offcanvas.show) #gecko-capacitacion-fab,' +
+  'body:has(#gecko-cap-tour-overlay) #gecko-capacitacion-fab,' +
+  'body.gecko-help-bar-under-overlay #gecko-capacitacion-fab{' +
+  'visibility:hidden!important;pointer-events:none!important;}';
+
 function ensureFabStyles() {
-  if (document.getElementById('gecko-capacitacion-fab-style')) return;
-  const s = document.createElement('style');
-  s.id = 'gecko-capacitacion-fab-style';
-  s.textContent =
-    'body.gecko-capacitacion-fab-pad{padding-bottom:88px!important;}' +
-    '#gecko-capacitacion-fab .gecko-fab-actions{flex-wrap:wrap;}' +
-    '#gecko-capacitacion-modal-help{position:fixed;left:0;right:0;bottom:0;z-index:1060;padding:8px 12px;' +
-    'backdrop-filter:saturate(1.2) blur(6px);}' +
-    '#gecko-capacitacion-modal-help .gecko-modal-help-actions{flex-wrap:wrap;}';
-  document.head.appendChild(s);
+  let s = document.getElementById('gecko-capacitacion-fab-style');
+  if (!s) {
+    s = document.createElement('style');
+    s.id = 'gecko-capacitacion-fab-style';
+    document.head.appendChild(s);
+  }
+  s.textContent = HELP_BAR_STACK_CSS;
+}
+
+function overlayBlocksHelpBar() {
+  return !!(
+    document.querySelector('.modal.show') ||
+    document.querySelector('.swal2-container') ||
+    document.querySelector('.offcanvas.show') ||
+    document.getElementById('gecko-cap-tour-overlay')
+  );
+}
+
+function syncHelpBarUnderOverlays() {
+  const blocked = overlayBlocksHelpBar();
+  document.body.classList.toggle('gecko-help-bar-under-overlay', blocked);
+  if (blocked) removeModalHelpStrip();
+  const fab = document.getElementById(FAB_ID);
+  if (fab) fab.setAttribute('aria-hidden', blocked ? 'true' : 'false');
+  syncModalsTourEntrypoints();
 }
 
 let modalHelpDelegationBound = false;
@@ -87,107 +118,23 @@ export function syncModalsTourEntrypoints() {
 }
 
 /**
- * Misma preferencia que la barra inferior: si la barra está oculta, no se muestra esta franja sobre modales.
+ * La barra de ayuda nunca se superpone a modales, SweetAlert ni offcanvas.
  */
 export function initCapacitacionModalHelpDelegation() {
   if (modalHelpDelegationBound) return;
   modalHelpDelegationBound = true;
-
-  document.addEventListener('shown.bs.modal', () => {
-    if (isCapacitacionFabHidden()) return;
-    if (!window.__geckoCapHelpCtx?.menuPath) return;
-    if (!document.querySelector('.modal.show')) return;
-    mountCapacitacionModalHelpStrip();
-    syncModalsTourEntrypoints();
-  });
-
-  document.addEventListener('hidden.bs.modal', () => {
-    if (!document.querySelector('.modal.show')) removeModalHelpStrip();
-    syncModalsTourEntrypoints();
-  });
-
-  syncModalsTourEntrypoints();
-}
-
-function mountCapacitacionModalHelpStrip() {
-  if (isCapacitacionFabHidden()) return;
-  const ctx = window.__geckoCapHelpCtx;
-  if (!ctx?.menuPath || !ctx.slug) return;
-  if (document.getElementById(MODAL_HELP_ID)) return;
-
   ensureFabStyles();
 
-  const topicTitle = ctx.topicTitle || '';
-  const linkAriaRaw = t('capacitacion.fab_open_topic_aria', 'Abrir en capacitación el documento de ayuda: {title}').replace(
-    /\{title\}/g,
-    topicTitle
-  );
-  const linkAria = linkAriaRaw.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const modalTitle = t('capacitacion.modal_help_title', 'Ayuda con esta ventana');
-  const modalSub = t(
-    'capacitacion.modal_help_sub',
-    'La barra inferior queda detrás del fondo oscuro; aquí puede abrir el manual o el tutorial sobre ventanas emergentes.'
-  );
-  const btnModalsTour = t('capacitacion.modal_help_tour_modals_btn', 'Tutorial: ventanas emergentes');
-  const modalsTourAria = t(
-    'capacitacion.modal_help_tour_modals_aria',
-    'Iniciar tutorial sobre cómo funcionan las ventanas emergentes'
-  ).replace(/"/g, '&quot;');
-  const btnDismiss = t('capacitacion.fab_dismiss_bar', 'No mostrar más esta barra');
-  const dismissAria = btnDismiss.replace(/"/g, '&quot;');
+  const onOverlayChange = () => syncHelpBarUnderOverlays();
+  document.addEventListener('shown.bs.modal', onOverlayChange);
+  document.addEventListener('hidden.bs.modal', onOverlayChange);
+  document.addEventListener('shown.bs.offcanvas', onOverlayChange);
+  document.addEventListener('hidden.bs.offcanvas', onOverlayChange);
 
-  const bar = document.createElement('div');
-  bar.id = MODAL_HELP_ID;
-  bar.setAttribute('role', 'region');
-  bar.setAttribute('aria-label', t('capacitacion.modal_help_region', 'Ayuda contextual en ventana emergente'));
-  bar.className = 'border-top shadow-lg bg-white bg-opacity-95';
+  const mo = new MutationObserver(onOverlayChange);
+  mo.observe(document.body, { childList: true, subtree: false });
 
-  bar.innerHTML = `
-    <div class="container-fluid d-flex flex-wrap align-items-center justify-content-between gap-2">
-      <div class="d-flex align-items-start gap-2 min-w-0" style="flex:1 1 180px;">
-        <span class="text-success fs-5 lh-1 flex-shrink-0" aria-hidden="true"><i class="bi bi-window-stack"></i></span>
-        <div class="min-w-0">
-          <div class="small fw-bold text-dark mb-0">${modalTitle}</div>
-          <div class="small text-muted mb-0">${modalSub}</div>
-        </div>
-      </div>
-      <div class="d-flex flex-wrap align-items-center gap-2 gecko-modal-help-actions">
-        <a class="btn btn-success btn-sm fw-bold text-nowrap shadow-sm" href="${capacitacionHref(ctx.slug)}" aria-label="${linkAria}">
-          <i class="bi bi-book-half me-1"></i>${t('capacitacion.fab_btn', 'Ver documento de ayuda')}
-        </a>
-        <button type="button" class="btn btn-outline-success btn-sm fw-bold text-nowrap shadow-sm gecko-modal-help-tour-modals" aria-label="${modalsTourAria}">
-          <i class="bi bi-lightning-charge me-1"></i>${btnModalsTour}
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm gecko-modal-help-dismiss text-nowrap" aria-label="${dismissAria}">
-          ${btnDismiss}
-        </button>
-      </div>
-    </div>
-  `;
-
-  bar.querySelector('.gecko-modal-help-tour-modals')?.addEventListener('click', () => {
-    startCapacitacionInteractiveTour('__modals__', { manual: true, hostMenuPath: ctx.menuPath });
-  });
-
-  bar.querySelector('.gecko-modal-help-dismiss')?.addEventListener('click', () => {
-    setCapacitacionFabHidden(true);
-    removeFab();
-    if (typeof Swal !== 'undefined') {
-      Swal.fire({
-        icon: 'success',
-        title: t('capacitacion.fab_dismiss_toast_title', 'Barra oculta'),
-        html: `<p class="small mb-0">${t(
-          'capacitacion.fab_dismiss_toast_body',
-          'Puede volver a activarla en Ayuda → Capacitación o en el menú del botón Ayuda junto a Excel.'
-        )}</p>`,
-        timer: 4500,
-        showConfirmButton: true,
-        confirmButtonText: t('capacitacion.fab_dismiss_ok', 'Entendido'),
-      });
-    }
-  });
-
-  document.body.appendChild(bar);
+  syncHelpBarUnderOverlays();
 }
 
 /**
@@ -262,7 +209,7 @@ export async function initCapacitacionHelpFab() {
   bar.setAttribute('aria-label', t('capacitacion.fab_region', 'Ayuda contextual'));
   bar.className = 'border-top shadow-lg bg-white bg-opacity-95';
   bar.style.cssText =
-    'position:fixed;left:0;right:0;bottom:0;z-index:1040;padding:10px 12px;' +
+    'position:fixed;left:0;right:0;bottom:0;z-index:1025;padding:10px 12px;' +
     'backdrop-filter:saturate(1.2) blur(6px);';
 
   const fabTitle = t('capacitacion.fab_hint_title', t('capacitacion.fab_hint', '¿Necesita ayuda con esta pantalla?'));
@@ -335,9 +282,5 @@ export async function initCapacitacionHelpFab() {
 
   document.body.appendChild(bar);
   document.body.classList.add('gecko-capacitacion-fab-pad');
-
-  if (document.querySelector('.modal.show')) {
-    mountCapacitacionModalHelpStrip();
-  }
-  syncModalsTourEntrypoints();
+  syncHelpBarUnderOverlays();
 }

@@ -12,7 +12,7 @@ import { setupEventListeners } from './menujs/MenuEvents.js';
 import { refreshMenuNotifications } from './menujs/MenuNotifications.js';
 import { applyPageTitle, translatePage } from '../utils/i18n.js';
 import { refreshInstModulesSnapshot, filterMenuIdsByModulos } from '../modulesAccess.js';
-import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20260703';
+import { initCapacitacionHelpFab, initCapacitacionModalHelpDelegation } from './CapacitacionHelpFab.js?v=20261006e';
 import {
   initCapacitacionPageHelpDelegation,
   initGeckoHelpMenuDropdownActions,

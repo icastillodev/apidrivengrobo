@@ -1248,7 +1248,7 @@ window.loadSpeciesForProtocol = async (protId, selectedSubId = null, opts = {}) 
             : (localStorage.getItem('instId') || sessionStorage.getItem('instId') || '');
         const url = allLocal
             ? `/animals/protocol-species?all=1&inst=${encodeURIComponent(instId)}`
-            : `/animals/protocol-species?id=${protId}`;
+            : `/animals/protocol-species?id=${encodeURIComponent(protId)}&inst=${encodeURIComponent(instId)}`;
         const res = await API.request(url);
         if (res.status === 'success' && res.data) {
             const filtered = res.data.filter(s => s.existe != 2);
@@ -1413,7 +1413,13 @@ window.loadCepasForEspecieModal = async (idespA, currentIdCepa = null) => {
 };
 
 window.handleProtocolChange = async (select) => {
-    window.loadSpeciesForProtocol(select.value);
+    const selCepa = document.getElementById('select-cepa-modal');
+    if (selCepa) {
+        selCepa.value = '0';
+        selCepa.disabled = true;
+    }
+    window._animalModalCepasRequired = false;
+    await window.loadSpeciesForProtocol(select.value);
 };
 
 window.updateDeptoOrgAmbito = (selectEl, idOrg, idAmbito) => {

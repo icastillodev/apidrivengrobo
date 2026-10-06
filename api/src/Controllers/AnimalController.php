@@ -238,7 +238,7 @@ class AnimalController {
             exit;
         }
         try {
-            $data = $this->model->getSpeciesByProtocol($protId);
+            $data = $this->model->getSpeciesByProtocol($protId, $targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(500);

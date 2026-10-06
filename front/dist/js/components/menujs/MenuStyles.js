@@ -10,7 +10,8 @@ export function injectMenuStyles() {
         getTriggerStyles(),
         getOmniBoxStyles(),
         getHotkeyStyles(),
-        getDarkModeStyles()
+        getDarkModeStyles(),
+        getHelpBarOverlayStyles()
     ].join('\n');
 
     document.head.appendChild(style);
@@ -894,6 +895,25 @@ function getDarkModeStyles() {
 [data-bs-theme="dark"] .table tbody tr:hover .text-primary,
 [data-bs-theme="dark"] .table tbody tr:hover .text-warning {
     color: #47627c !important; /* Forzamos a que todo sea oscuro si el fondo se vuelve blanco */
+}
+    `;
+}
+
+/** La barra de ayuda nunca tapa modales, SweetAlert ni offcanvas. */
+function getHelpBarOverlayStyles() {
+    return `
+#gecko-capacitacion-fab { z-index: 1025 !important; }
+#gecko-capacitacion-modal-help { display: none !important; pointer-events: none !important; }
+body.modal-open #gecko-capacitacion-fab,
+body.swal2-shown #gecko-capacitacion-fab,
+html.swal2-shown #gecko-capacitacion-fab,
+body:has(.modal.show) #gecko-capacitacion-fab,
+body:has(.swal2-container) #gecko-capacitacion-fab,
+body:has(.offcanvas.show) #gecko-capacitacion-fab,
+body:has(#gecko-cap-tour-overlay) #gecko-capacitacion-fab,
+body.gecko-help-bar-under-overlay #gecko-capacitacion-fab {
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
     `;
 }

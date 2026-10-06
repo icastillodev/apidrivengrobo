@@ -544,15 +544,18 @@ class AnimalModel {
         }
     }
 
-    public function getCepasBySubespecie($instId, $idSubespA) {
-        // IMPORTANTE:
-        // La tabla cepa ahora es subordinada a especiee (idespA), no a subespecie.
-        // A partir de la subespecie (idsubespA) resolvemos su especie y traemos
-        // todas las cepas habilitadas de ESA especie.
+    /**
+     * Cepas que el combo del modal puede listar para la institución de trabajo.
+     * Misma regla que GET /animals/cepas: no usar la institución dueña de una
+     * taxonomía de otro CEUA (p. ej. al cambiar el protocolo).
+     * Si la categoría es de otro CEUA, ofrece cepas locales de la misma especie (por nombre).
+     */
+    private function listCepasSeleccionablesModal(int $idSubesp, int $instTrabajo): array {
+        if ($idSubesp <= 0 || $instTrabajo <= 0) {
+            return [];
+        }
         $sql = "
-            SELECT 
-                c.idcepaA, 
-                c.CepaNombreA
+            SELECT c.idcepaA, c.CepaNombreA
             FROM cepa c
             INNER JOIN especiee e ON c.idespA = e.idespA
             INNER JOIN subespecie s ON s.idespA = e.idespA
@@ -562,12 +565,50 @@ class AnimalModel {
             ORDER BY c.CepaNombreA ASC
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idSubespA, $instId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt->execute([$idSubesp, $instTrabajo]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($rows)) {
+            return $rows;
+        }
+
+        $sqlByName = "
+            SELECT DISTINCT c.idcepaA, c.CepaNombreA
+            FROM cepa c
+            INNER JOIN especiee eLoc ON c.idespA = eLoc.idespA AND eLoc.IdInstitucion = ?
+            INNER JOIN subespecie sExt ON sExt.idsubespA = ?
+            INNER JOIN especiee eExt ON sExt.idespA = eExt.idespA
+            WHERE (c.Habilitado = 1 OR c.Habilitado IS NULL)
+              AND LOWER(TRIM(eLoc.EspeNombreA)) = LOWER(TRIM(eExt.EspeNombreA))
+            ORDER BY c.CepaNombreA ASC
+        ";
+        $stmt2 = $this->db->prepare($sqlByName);
+        $stmt2->execute([$instTrabajo, $idSubesp]);
+        return $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function cepaEsValidaParaModal(int $idCepa, int $idSubesp, int $instTrabajo): bool {
+        if ($idCepa <= 0) {
+            return false;
+        }
+        foreach ($this->listCepasSeleccionablesModal($idSubesp, $instTrabajo) as $row) {
+            if ((int)($row['idcepaA'] ?? 0) === $idCepa) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function getCepasBySubespecie($instId, $idSubespA) {
+        return $this->listCepasSeleccionablesModal((int)$idSubespA, (int)$instId);
     }
 
     /** Cepas habilitadas por especie (idespA) para formularios. */
     public function getCepasByEspecie($instId, $idespA) {
+        $instId = (int)$instId;
+        $idespA = (int)$idespA;
+        if ($instId <= 0 || $idespA <= 0) {
+            return [];
+        }
         $sql = "
             SELECT 
                 c.idcepaA, 
@@ -581,7 +622,23 @@ class AnimalModel {
         ";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$idespA, $instId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($rows)) {
+            return $rows;
+        }
+
+        $sqlByName = "
+            SELECT DISTINCT c.idcepaA, c.CepaNombreA
+            FROM cepa c
+            INNER JOIN especiee eLoc ON c.idespA = eLoc.idespA AND eLoc.IdInstitucion = ?
+            INNER JOIN especiee eExt ON eExt.idespA = ?
+            WHERE (c.Habilitado = 1 OR c.Habilitado IS NULL)
+              AND LOWER(TRIM(eLoc.EspeNombreA)) = LOWER(TRIM(eExt.EspeNombreA))
+            ORDER BY c.CepaNombreA ASC
+        ";
+        $stmt2 = $this->db->prepare($sqlByName);
+        $stmt2->execute([$instId, $idespA]);
+        return $stmt2->fetchAll(PDO::FETCH_ASSOC);
     }
     // api/src/Models/Animal/AnimalModel.php
 
@@ -844,37 +901,13 @@ public function updateStatus($data) {
                     }
                 }
 
-                // Validación de cepa para la subespecie local
-                $stmtCount = $this->db->prepare("
-                    SELECT COUNT(*)
-                    FROM cepa c
-                    INNER JOIN especiee e ON c.idespA = e.idespA
-                    INNER JOIN subespecie s ON s.idespA = e.idespA
-                    WHERE s.idsubespA = ?
-                      AND c.Habilitado = 1
-                      AND e.IdInstitucion = ?
-                ");
-                $stmtCount->execute([$subespDestino, $instIdRequest]);
-                $hasEnabledCepas = ((int)$stmtCount->fetchColumn()) > 0;
+                // Validación de cepa: mismas opciones que el combo (institución destino).
+                $hasEnabledCepas = count($this->listCepasSeleccionablesModal($subespDestino, $instIdRequest)) > 0;
                 if ($hasEnabledCepas && $cepaDestino <= 0) {
                     throw new \Exception("Debe seleccionar una cepa.");
                 }
-                if ($cepaDestino > 0) {
-                    $stmtCepa = $this->db->prepare("
-                        SELECT c.idcepaA
-                        FROM cepa c
-                        INNER JOIN especiee e ON c.idespA = e.idespA
-                        INNER JOIN subespecie s ON s.idespA = e.idespA
-                        WHERE c.idcepaA = ?
-                          AND s.idsubespA = ?
-                          AND c.Habilitado = 1
-                          AND e.IdInstitucion = ?
-                        LIMIT 1
-                    ");
-                    $stmtCepa->execute([$cepaDestino, $subespDestino, $instIdRequest]);
-                    if (!$stmtCepa->fetchColumn()) {
-                        throw new \Exception("La cepa seleccionada no es válida.");
-                    }
+                if ($cepaDestino > 0 && !$this->cepaEsValidaParaModal($cepaDestino, $subespDestino, $instIdRequest)) {
+                    throw new \Exception("La cepa seleccionada no es válida.");
                 }
 
                 $this->db->prepare("UPDATE formulario_derivacion
@@ -943,50 +976,21 @@ public function updateStatus($data) {
                 throw new \Exception("Debe seleccionar Especie y Categoría para el formulario derivado.");
             }
 
-            // Validación cepa: si existen cepas habilitadas para la categoría, debe seleccionar una
-            // (nota: instId no viene en este POST, lo deducimos por el formulario y la institución de la categoría)
-            $stmtInst = $this->db->prepare("
-                SELECT e.IdInstitucion
-                FROM subespecie s
-                INNER JOIN especiee e ON s.idespA = e.idespA
-                WHERE s.idsubespA = ?
-            ");
-            $stmtInst->execute([$idSubesp]);
-            $instId = $stmtInst->fetchColumn();
-
-            if ($instId) {
-                $stmtCount = $this->db->prepare("
-                    SELECT COUNT(*) 
-                    FROM cepa c
-                    INNER JOIN especiee e ON c.idespA = e.idespA
-                    INNER JOIN subespecie s ON s.idespA = e.idespA
-                    WHERE s.idsubespA = ? 
-                      AND c.Habilitado = 1 
-                      AND e.IdInstitucion = ?
-                ");
-                $stmtCount->execute([$idSubesp, $instId]);
-                $hasEnabledCepas = ((int)$stmtCount->fetchColumn()) > 0;
-
+            // Cepa obligatoria solo si el combo de la institución de trabajo tiene opciones
+            // (no usar la institución dueña de la taxonomía de otro CEUA).
+            $instTrabajo = $instIdRequest;
+            if ($instTrabajo <= 0) {
+                $stmtFormInst = $this->db->prepare("SELECT IdInstitucion FROM formularioe WHERE idformA = ?");
+                $stmtFormInst->execute([$id]);
+                $instTrabajo = (int)$stmtFormInst->fetchColumn();
+            }
+            if ($instTrabajo > 0 && !empty($idSubesp) && (string)$idSubesp !== '0') {
+                $hasEnabledCepas = count($this->listCepasSeleccionablesModal((int)$idSubesp, $instTrabajo)) > 0;
                 if ($hasEnabledCepas && empty($idCepa)) {
                     throw new \Exception("Debe seleccionar una cepa.");
                 }
-
-                if (!empty($idCepa)) {
-                    // Validamos que la cepa pertenezca a la ESPECIE de esta subespecie
-                    $stmtCepa = $this->db->prepare("
-                        SELECT c.idcepaA
-                        FROM cepa c
-                        INNER JOIN especiee e ON c.idespA = e.idespA
-                        INNER JOIN subespecie s ON s.idespA = e.idespA
-                        WHERE c.idcepaA = ? 
-                          AND s.idsubespA = ? 
-                          AND c.Habilitado = 1 
-                          AND e.IdInstitucion = ?
-                    ");
-                    $stmtCepa->execute([$idCepa, $idSubesp, $instId]);
-                    if (!$stmtCepa->fetchColumn()) {
-                        throw new \Exception("La cepa seleccionada no es válida.");
-                    }
+                if (!empty($idCepa) && !$this->cepaEsValidaParaModal((int)$idCepa, (int)$idSubesp, $instTrabajo)) {
+                    throw new \Exception("La cepa seleccionada no es válida.");
                 }
             }
 
@@ -1068,10 +1072,15 @@ public function updateStatus($data) {
         } catch (\Exception $e) { $this->db->rollBack(); throw $e; }
     }
     /**
-     * Obtiene las especies y subespecies aprobadas para un protocolo
+     * Especies y subespecies aprobadas para un protocolo.
+     * Si el protocolo es de otro CEUA, prioriza taxonomía local (red) para que
+     * el combo de Cepa/Stock/Raza coincida con la institución de trabajo.
      */
-    public function getSpeciesByProtocol($protId) {
-        $sql = "SELECT 
+    public function getSpeciesByProtocol($protId, $instId = null) {
+        $protId = (int)$protId;
+        $instId = (int)$instId;
+
+        $sqlOwner = "SELECT 
                     se.idsubespA, 
                     se.idespA,
                     se.SubEspeNombreA, 
@@ -1082,8 +1091,72 @@ public function updateStatus($data) {
                 INNER JOIN subespecie se ON pe.idespA = se.idespA
                 INNER JOIN especiee e ON se.idespA = e.idespA
                 WHERE pe.idprotA = ? AND se.Existe != 2";
-                
-        $stmt = $this->db->prepare($sql);
+
+        if ($protId <= 0) {
+            return [];
+        }
+
+        $ownerInst = 0;
+        if ($instId > 0) {
+            $stmtOwn = $this->db->prepare("SELECT IdInstitucion FROM protocoloexpe WHERE idprotA = ?");
+            $stmtOwn->execute([$protId]);
+            $ownerInst = (int)$stmtOwn->fetchColumn();
+        }
+
+        if ($instId > 0 && $ownerInst > 0 && $ownerInst !== $instId) {
+            $sqlEspRed = "SELECT
+                    s.idsubespA,
+                    e.idespA,
+                    s.SubEspeNombreA,
+                    e.EspeNombreA,
+                    s.Psubanimal,
+                    s.Existe as existe
+                FROM protocoloexpered pr
+                JOIN protocoloexpered_especies pre ON pre.IdProtocoloExpRed = pr.IdProtocoloExpRed
+                JOIN especiee e ON pre.idespA = e.idespA AND e.IdInstitucion = ?
+                JOIN subespecie s ON e.idespA = s.idespA
+                WHERE pr.idprotA = ?
+                  AND pr.IdInstitucion = ?
+                  AND s.Existe != 2
+                ORDER BY e.EspeNombreA ASC, s.SubEspeNombreA ASC";
+            $stmtRed = $this->db->prepare($sqlEspRed);
+            $stmtRed->execute([$instId, $protId, $instId]);
+            $rowsRed = $stmtRed->fetchAll(\PDO::FETCH_ASSOC);
+            if (!empty($rowsRed)) {
+                return $rowsRed;
+            }
+
+            $stmtOwner = $this->db->prepare($sqlOwner);
+            $stmtOwner->execute([$protId]);
+            $ownerRows = $stmtOwner->fetchAll(\PDO::FETCH_ASSOC);
+            $mapped = [];
+            foreach ($ownerRows as $or) {
+                $stmtMap = $this->db->prepare("
+                    SELECT s.idsubespA, e.idespA, s.SubEspeNombreA, e.EspeNombreA, s.Psubanimal, s.Existe as existe
+                    FROM especiee e
+                    INNER JOIN subespecie s ON s.idespA = e.idespA
+                    WHERE e.IdInstitucion = ?
+                      AND s.Existe != 2
+                      AND LOWER(TRIM(e.EspeNombreA)) = LOWER(TRIM(?))
+                      AND LOWER(TRIM(s.SubEspeNombreA)) = LOWER(TRIM(?))
+                    LIMIT 1
+                ");
+                $stmtMap->execute([
+                    $instId,
+                    (string)($or['EspeNombreA'] ?? ''),
+                    (string)($or['SubEspeNombreA'] ?? '')
+                ]);
+                $local = $stmtMap->fetch(\PDO::FETCH_ASSOC);
+                if ($local) {
+                    $mapped[] = $local;
+                }
+            }
+            if (!empty($mapped)) {
+                return $mapped;
+            }
+        }
+
+        $stmt = $this->db->prepare($sqlOwner);
         $stmt->execute([$protId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -1399,59 +1472,16 @@ public function saveOrder($data) {
             $idCepa = $data['idcepaA'] ?? null;
             if ($idCepa === '' || $idCepa === 0 || $idCepa === '0') $idCepa = null;
 
-            // REGLA CEPAS POR ESPECIE:
-            //  - Si la especie (de esta subespecie) tiene cepas habilitadas → idcepaA obligatorio
-            //  - Si la especie tiene cepas pero TODAS deshabilitadas → no se puede hacer el formulario
-            //  - Si la especie no tiene cepas → se permite seguir solo con subespecie
-            $stmtInst = $this->db->prepare("
-                SELECT e.IdInstitucion
-                FROM subespecie s
-                INNER JOIN especiee e ON s.idespA = e.idespA
-                WHERE s.idsubespA = ?
-            ");
-            $stmtInst->execute([$data['idsubespA']]);
-            $instId = $stmtInst->fetchColumn();
-
-            if ($instId) {
-                // Contamos todas las cepas de la especie y las habilitadas
-                $stmtAll = $this->db->prepare("
-                    SELECT 
-                        COUNT(*)                                  AS total_cepas,
-                        SUM(CASE WHEN c.Habilitado = 1 THEN 1 ELSE 0 END) AS cepas_hab
-                    FROM cepa c
-                    INNER JOIN especiee e ON c.idespA = e.idespA
-                    INNER JOIN subespecie s ON s.idespA = e.idespA
-                    WHERE s.idsubespA = ? AND e.IdInstitucion = ?
-                ");
-                $stmtAll->execute([$data['idsubespA'], $instId]);
-                $row = $stmtAll->fetch(\PDO::FETCH_ASSOC) ?: ['total_cepas' => 0, 'cepas_hab' => 0];
-                $totalCepas = (int)$row['total_cepas'];
-                $cepasHab   = (int)$row['cepas_hab'];
-
-                if ($totalCepas > 0 && $cepasHab === 0) {
-                    throw new \Exception("No hay cepas habilitadas para esta especie. No se pueden hacer pedidos.");
-                }
-
-                if ($cepasHab > 0 && empty($idCepa)) {
+            // REGLA CEPAS: mismas opciones que el combo de la institución de trabajo.
+            $instTrabajo = (int)($data['instId'] ?? 0);
+            $idSubespIns = (int)($data['idsubespA'] ?? 0);
+            if ($instTrabajo > 0 && $idSubespIns > 0) {
+                $hasEnabledCepas = count($this->listCepasSeleccionablesModal($idSubespIns, $instTrabajo)) > 0;
+                if ($hasEnabledCepas && empty($idCepa)) {
                     throw new \Exception("Debe seleccionar una cepa para esta especie.");
                 }
-
-                // Si mandan una cepa, validamos que pertenezca a la especie de la subespecie e institución
-                if (!empty($idCepa)) {
-                    $stmtCepa = $this->db->prepare("
-                        SELECT c.idcepaA
-                        FROM cepa c
-                        INNER JOIN especiee e ON c.idespA = e.idespA
-                        INNER JOIN subespecie s ON s.idespA = e.idespA
-                        WHERE c.idcepaA = ? 
-                          AND s.idsubespA = ? 
-                          AND c.Habilitado = 1 
-                          AND e.IdInstitucion = ?
-                    ");
-                    $stmtCepa->execute([$idCepa, $data['idsubespA'], $data['instId']]);
-                    if (!$stmtCepa->fetchColumn()) {
-                        throw new \Exception("Error: La cepa seleccionada no es válida.");
-                    }
+                if (!empty($idCepa) && !$this->cepaEsValidaParaModal((int)$idCepa, $idSubespIns, $instTrabajo)) {
+                    throw new \Exception("Error: La cepa seleccionada no es válida.");
                 }
             }
 
