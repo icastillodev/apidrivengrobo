@@ -16,25 +16,21 @@ import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel } from '../../utils/formProtocolLabels.js';
 import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
+import {
+    ensureJsPdfAutoTable,
+    pdfDash,
+    pdfSelText,
+    pdfNamed,
+    pdfElText,
+    pdfPick,
+    pdfFmtDate,
+    startPedidoFichaPdf,
+    pdfKvTable,
+    pdfNoteBlock,
+} from '../../utils/groboPedidoFichaPdf.js?v=20261006';
 
 function ensureAdminAnimalesPdfLibs() {
-    const g = window.txt?.generales || {};
-    const errPdf = g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.';
-    if (!window.jspdf?.jsPDF) {
-        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
-        return false;
-    }
-    try {
-        const probe = new window.jspdf.jsPDF();
-        if (typeof probe.autoTable !== 'function') {
-            window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
-            return false;
-        }
-    } catch (_) {
-        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
-        return false;
-    }
-    return true;
+    return ensureJsPdfAutoTable();
 }
 
 let allAnimals = [];
@@ -1858,191 +1854,155 @@ function renderPagination(t, c, r) {
 window.downloadAnimalPDFFromModal = () => {
     const hid = document.getElementById('current-idformA');
     const id = hid ? parseInt(hid.value, 10) : 0;
-    if (!id) return;
+    if (!id) {
+        const g = window.txt?.generales || {};
+        window.Swal?.fire?.(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
+        return;
+    }
     window.downloadAnimalPDF(id);
 };
 
 /**
- * GENERACIÓN DE FICHA PDF PERSONALIZADA - GROBO
- * Versión final con corrección de campos y lógica de exención.
+ * Ficha PDF del pedido de animales: fila de listado + valores actuales del modal.
  */
 window.downloadAnimalPDF = async (id) => {
-    if (!ensureAdminAnimalesPdfLibs()) return;
+    if (!(await ensureJsPdfAutoTable())) return;
 
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
     const g = window.txt?.generales || {};
+    const ta = window.txt?.admin_animales || {};
+    const tx = window.txt?.misformularios || {};
+    const fa = window.txt?.form_animales || {};
+    const ti = window.txt?.admin_insumos || {};
     const errPdf = g.err_pdf_generar || 'No se pudo generar el PDF.';
+    const row = (allAnimals || []).find((x) => Number(x.idformA) === Number(id)) || {};
+    const form = document.getElementById('form-animal-full') || document.getElementById('modal-content-animal') || document;
+    const modal = document.getElementById('modal-content-animal') || document;
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
 
-    const getValByName = (name) => document.querySelector(`input[name="${name}"], textarea[name="${name}"]`)?.value || '---';
-    const getSel = (selId) => {
-        const sel = document.getElementById(selId);
-        return sel ? sel.options[sel.selectedIndex]?.text : '---';
-    };
-
-    const investigador = document.querySelector('#modal-content-animal h5 + span')?.innerText || '---';
-    const contacto = document.querySelector('#modal-content-animal .row.g-2.mb-3')?.innerText || '---';
-    const tipoPedido = getSel('select-type-modal');
-    const nProtocolo = getSel('select-protocol-modal');
-    const especie = getSel('select-especie-modal');
-    const categoria = getSel('select-categoria-modal');
-    const estado = getSel('modal-status');
-    const edad = getValByName('edadA');
-    const peso = getValByName('pesoA');
-    const raza = getValByName('razaA');
-    const machos = getValByName('machoA') || '0';
-    const hembras = getValByName('hembraA') || '0';
-    const indistintos = getValByName('indistintoA') || '0';
-    const total = document.getElementById('total-animals-modal')?.value || '0';
-    const precioUnit = document.getElementById('price-unit-modal')?.value || '0';
-    const precioTotalRaw = document.getElementById('price-total-modal')?.value || '0';
-    const precioFinalDisplay = parseFloat(precioTotalRaw) === 0
-        ? `$${precioTotalRaw} (Exento de pago)`
-        : `$${precioTotalRaw}`;
-    const fInicio = getValByName('fechainicioA');
-    const fRetiro = getValByName('fecRetiroA');
-    const aclaracion = document.querySelector('#form-animal-full .bg-light.small')?.innerText || 'Sin aclaraciones.';
+    const investigador = pdfPick(row.Investigador);
+    const email = pdfPick(row.EmailInvestigador);
+    const celular = pdfPick(row.CelularInvestigador);
+    const estado = pdfPick(pdfSelText(modal, '#modal-status'), row.estado);
+    const tipoPedido = pdfPick(pdfSelText(form, '#select-type-modal'), pdfNamed(form, 'tipoA'), row.TipoNombre);
+    const protocolo = pdfPick(
+        pdfSelText(form, '#select-protocol-modal'),
+        (row.NProtocolo && row.TituloProtocolo) ? `${row.NProtocolo} - ${row.TituloProtocolo}` : '',
+        row.NProtocolo
+    );
+    const depto = pdfPick(pdfSelText(form, '#modal-depto-animal'), pdfNamed(form, 'depto'), row.DeptoProtocolo, row.Departamento);
+    const org = pdfPick(pdfElText(form, '#modal-org-animal'), row.Organizacion, g.sin_organizacion);
+    const ambito = pdfPick(pdfElText(form, '#modal-ambito-animal'), Number(row.DeptoExternoFlag) === 2 ? labelExt : labelInt);
+    const especie = pdfPick(pdfSelText(form, '#select-especie-modal'), row.EspeNombreA, row.CatEspecie);
+    const categoria = pdfPick(pdfSelText(form, '#select-categoria-modal'), row.SubEspeNombreA);
+    const cepa = pdfPick(pdfSelText(form, '#select-cepa-modal'), row.CepaNombre, row.raza);
+    const edad = pdfPick(pdfNamed(form, 'edadA'), row.Edad);
+    const peso = pdfPick(pdfNamed(form, 'pesoA'), row.Peso);
+    const razaLegacy = pdfPick(pdfNamed(form, 'razaA'), row.raza);
+    const machos = pdfPick(pdfNamed(form, 'machoA'), '0');
+    const hembras = pdfPick(pdfNamed(form, 'hembraA'), '0');
+    const indistintos = pdfPick(pdfNamed(form, 'indistintoA'), '0');
+    const total = pdfPick(document.getElementById('total-animals-modal')?.value, pdfNamed(form, 'totalA'), row.CantAnimal, '0');
+    const precioUnit = pdfPick(document.getElementById('price-unit-modal')?.value, row.PrecioUnit, '0');
+    const precioTotal = pdfPick(document.getElementById('price-total-modal')?.value, '0');
+    const fInicio = pdfFmtDate(pdfPick(pdfNamed(form, 'fechainicioA'), row.Inicio));
+    const fRetiro = pdfFmtDate(pdfPick(pdfNamed(form, 'fecRetiroA'), row.Retiro));
+    const revisado = pdfPick(document.getElementById('modal-quienvisto')?.value, row.quienvisto);
+    const aclUser = pdfPick(row.Aclaracion, row.aclaraA);
+    const aclAdmin = pdfPick(document.getElementById('modal-aclaracionadm')?.value, row.AclaracionAdm, row.aclaracionadm);
+    const lastNotify = pdfPick(pdfElText(modal, '#notify-text'), ta.pdf_ultima_notif_vacia);
+    const anestSel = document.getElementById('modal-anestesicos-select');
+    let anest = '';
+    if (anestSel) {
+        anest = pdfSelText(modal, '#modal-anestesicos-select');
+    } else if (Object.prototype.hasOwnProperty.call(row, 'TieneAnestesicos')) {
+        anest = Number(row.TieneAnestesicos) === 1 ? (ta.modal?.anestesicos_opcion_si || 'Sí') : (ta.modal?.anestesicos_opcion_no || 'No');
+    }
 
     try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const M = 18;
-        const pageW = doc.internal.pageSize.getWidth();
-        const right = pageW - M;
-        let y = M;
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.setTextColor(26, 93, 59);
-        doc.text(`GROBO - ${inst}`, pageW / 2, y, { align: 'center' });
-        y += 8;
-        doc.setFontSize(12);
-        doc.setTextColor(80);
-        doc.text('FICHA DE PEDIDO: ANIMAL', pageW / 2, y, { align: 'center' });
-        y += 6;
-        doc.setFontSize(9);
-        doc.setTextColor(120);
-        doc.text(`ID Pedido: ${id} | Generado: ${new Date().toLocaleString()}`, pageW / 2, y, { align: 'center' });
-        y += 4;
-        doc.setDrawColor(26, 93, 59);
-        doc.line(M, y, right, y);
-        y += 8;
+        const ctx = startPedidoFichaPdf(ta.ficha_pdf_titulo || 'FICHA DE PEDIDO: ANIMAL', id);
+        const { doc, M } = ctx;
 
         const derivPdf = readAnimalDerivacionForPdf();
         if (derivPdf) {
-            const ta = window.txt?.admin_animales || {};
-            const tx = window.txt?.misformularios || {};
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(10);
             doc.setTextColor(13, 110, 253);
-            doc.text(ta.derivacion_resumen_inst || 'Derivación en red', M, y);
-            y += 6;
+            doc.text(ta.derivacion_resumen_inst || 'Derivación en red', M, ctx.y);
+            ctx.y += 6;
             const derivBody = [
                 [ta.derivacion_inst_origen || 'Derivado de la institución', derivPdf.origen],
                 [ta.derivacion_inst_actual || 'En gestión en', derivPdf.actual || '—'],
                 [ta.derivacion_inst_ruta || 'Ruta institucional', derivPdf.ruta || '—'],
             ];
-            if (derivPdf.depto) {
-                derivBody.push([tx.derivacion_depto_protocolo || 'Depto. protocolo', derivPdf.depto]);
-            }
+            if (derivPdf.depto) derivBody.push([tx.derivacion_depto_protocolo || 'Depto. protocolo', derivPdf.depto]);
             if (derivPdf.workflow && derivPdf.workflow !== '—') {
                 derivBody.push([ta.derivacion_estado_workflow || 'Estado de derivación', derivPdf.workflow]);
             }
-            if (derivPdf.enviadoPor) {
-                derivBody.push([tx.derivacion_enviado_por || 'Enviado por', derivPdf.enviadoPor]);
-            }
-            doc.autoTable({
-                startY: y,
-                margin: { left: M, right: M },
-                body: derivBody,
-                theme: 'grid',
-                styles: { fontSize: 9, cellPadding: 3 },
-                columnStyles: { 0: { fontStyle: 'bold', cellWidth: 52 } },
-            });
-            y = doc.lastAutoTable.finalY + 8;
+            if (derivPdf.enviadoPor) derivBody.push([tx.derivacion_enviado_por || 'Enviado por', derivPdf.enviadoPor]);
+            pdfKvTable(ctx, derivBody, 52);
         }
 
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Investigador: ${investigador}`, M, y);
-        y += 5;
+        doc.text(`${ta.col_investigador || 'Investigador'}: ${investigador}`, M, ctx.y);
+        ctx.y += 5;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(80);
-        const contactoLines = doc.splitTextToSize(String(contacto), right - M);
-        doc.text(contactoLines, M, y);
-        y += contactoLines.length * 4.5 + 3;
+        doc.text(`${ta.pdf_email || 'Email'}: ${email}   |   ${ta.pdf_cel || 'Cel'}: ${celular}   |   ID: ${pdfDash(row.IdInvestigador)}`, M, ctx.y);
+        ctx.y += 6;
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Estado del pedido: ${estado}`, M, y);
-        y += 8;
+        doc.text(`${ta.col_estado || 'Estado'}: ${estado}`, M, ctx.y);
+        ctx.y += 8;
+
+        const cepaPesoRow = [ta.col_cepa || 'Cepa/Stock/Raza', cepa, ta.col_edad || 'Edad', edad];
+        const extraRows = [
+            [ta.pdf_tipo_pedido || 'Tipo de pedido', tipoPedido, ta.col_n_protocolo || 'N° Protocolo', protocolo],
+            [ti.col_departamento || 'Departamento', depto, ti.col_organizacion || 'Organización', org],
+            [ta.col_ambito || 'Ámbito', ambito, ta.pdf_revisado || 'Revisado por', revisado],
+            [fa.especie || ta.col_especie || 'Especie', especie, fa.label_categoria || 'Categoría', categoria],
+            cepaPesoRow,
+            [ta.col_peso || 'Peso', peso, '', ''],
+        ];
+        if (razaLegacy && razaLegacy !== '---' && razaLegacy !== cepa) {
+            extraRows[5] = [ta.col_peso || 'Peso', peso, ta.pdf_raza_legacy || 'Raza (legacy)', razaLegacy];
+        }
+        pdfKvTable(ctx, extraRows);
 
         doc.autoTable({
-            startY: y,
+            startY: ctx.y,
             margin: { left: M, right: M },
-            body: [
-                ['Tipo de pedido', tipoPedido, 'N° Protocolo', nProtocolo],
-                ['Especie', especie, 'Categoría', categoria],
-                ['Cepa/Stock/Raza', raza, 'Edad', edad],
-                ['Peso', peso, '', ''],
-            ],
-            theme: 'grid',
-            styles: { fontSize: 9, cellPadding: 3 },
-            columnStyles: {
-                0: { fontStyle: 'bold', cellWidth: 38 },
-                2: { fontStyle: 'bold', cellWidth: 38 },
-            },
-        });
-
-        y = doc.lastAutoTable.finalY + 6;
-        doc.autoTable({
-            startY: y,
-            margin: { left: M, right: M },
-            head: [['Machos', 'Hembras', 'Indistintos', 'TOTAL']],
+            head: [[
+                ta.pdf_machos || 'Machos',
+                ta.pdf_hembras || 'Hembras',
+                ta.pdf_indistintos || 'Indistintos',
+                ta.pdf_total || 'TOTAL',
+            ]],
             body: [[machos, hembras, indistintos, total]],
-            headStyles: { fillColor: [242, 242, 242], textColor: [0, 0, 0], halign: 'center' },
+            headStyles: { fillColor: [26, 93, 59], textColor: [255, 255, 255], halign: 'center' },
             styles: { halign: 'center', fontSize: 10, fontStyle: 'bold' },
             theme: 'grid',
         });
+        ctx.y = doc.lastAutoTable.finalY + 6;
 
-        y = doc.lastAutoTable.finalY + 8;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Precio unitario: $${precioUnit}`, M, y);
-        y += 6;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(26, 93, 59);
-        doc.text(`Precio total: ${precioFinalDisplay}`, M, y);
-        y += 10;
+        const precioRows = [
+            [fa.precio_unitario_referencia || 'Precio unitario', `$${precioUnit}`, fa.precio_final || 'Precio final', `$${precioTotal}`],
+            [ta.col_inicio || 'Fecha inicio', fInicio, ta.col_retiro || 'Fecha retiro', fRetiro],
+        ];
+        if (anest) {
+            precioRows.push([ta.modal?.anestesicos_label || 'Anestésicos', anest, '', '']);
+        }
+        pdfKvTable(ctx, precioRows, 42);
 
-        doc.setTextColor(0);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.autoTable({
-            startY: y,
-            margin: { left: M, right: M },
-            body: [
-                ['Fecha inicio', fInicio],
-                ['Fecha retiro', fRetiro],
-            ],
-            theme: 'grid',
-            styles: { fontSize: 9 },
-            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 45 } },
-        });
+        pdfNoteBlock(ctx, ta.pdf_acl_user || 'Aclaración del usuario', aclUser);
+        pdfNoteBlock(ctx, ta.pdf_acl_admin || 'Aclaración administración', aclAdmin);
+        pdfNoteBlock(ctx, ta.pdf_ultima_notif || 'Última notificación', lastNotify);
 
-        y = doc.lastAutoTable.finalY + 8;
-        doc.setFont('helvetica', 'bold');
-        doc.text('Aclaración del usuario:', M, y);
-        y += 5;
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(9);
-        doc.setTextColor(80);
-        const aclLines = doc.splitTextToSize(String(aclaracion), right - M);
-        doc.text(aclLines, M, y);
-
-        doc.save(`GROBO_${inst}_Pedido_${id}.pdf`);
+        doc.save(`GROBO_Pedido_Animal_${id}.pdf`);
     } catch (error) {
         console.error('Error al generar PDF:', error);
         window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');

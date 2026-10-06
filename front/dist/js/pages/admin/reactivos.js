@@ -3,7 +3,17 @@
  * Sistema: GROBO 2026
  */
 import { API } from '../../api.js';
-import { saveHtmlStringAsPdf } from '../../utils/groboHtml2Pdf.js';
+import {
+    ensureJsPdfAutoTable,
+    pdfSelText,
+    pdfNamed,
+    pdfElText,
+    pdfPick,
+    pdfFmtDate,
+    startPedidoFichaPdf,
+    pdfKvTable,
+    pdfNoteBlock,
+} from '../../utils/groboPedidoFichaPdf.js?v=20261006';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
@@ -492,7 +502,7 @@ function renderNotificationSection(lastNotify, idformA) {
         <div class="d-flex justify-content-between align-items-center">
             <div style="max-width: 80%;">
                 <p class="mb-1 fw-bold small uppercase"><i class="bi bi-envelope-check me-1"></i> ${t.last_notify}:</p>
-                <div class="mb-0 small" style="font-size: 11px;">
+                <div id="notify-text-reactivo" class="mb-0 small" style="font-size: 11px;">
                     ${hasData ? `
                         <span class="text-muted fw-bold">${lastNotify.fecha}:</span> 
                         <span class="text-dark">${lastNotify.NotaNotificacion}</span>
@@ -929,100 +939,93 @@ window.showDerivHistoryReactivo = async (idformA) => {
 };
 
 /**
- * GENERACIÓN DE PDF - REACTIVOS
- * Captura datos por 'name' y recupera la especie del estado global.
+ * Ficha PDF del pedido de reactivo: datos de la fila + lo que está en el modal.
  */
 window.downloadReactivoPDF = async (id) => {
-    const inst = (localStorage.getItem('NombreInst') || 'URBE').toUpperCase();
-    
-    // 1. Buscamos los datos originales del reactivo para obtener la Especie
-    const rData = allReactivos.find(item => item.idformA == id);
-    const especie = rData ? (rData.Especie || '---') : '---';
-
-    // 2. Capturadores inteligentes por nombre de atributo
-    const getVal = (name) => document.querySelector(`[name="${name}"]`)?.value || '---';
-    
-    // Captura el texto del select usando el atributo 'name' ya que no tiene ID
-    const getSelTextByName = (name) => {
-        const s = document.querySelector(`select[name="${name}"]`);
-        if (!s || s.selectedIndex === -1) return '---';
-        return s.options[s.selectedIndex].text;
-    };
-
-    // Datos del modal abierto
-    const invHeader = document.querySelector('#modal-content-reactivo h5 + span')?.innerText || '---';
-    const contactoInfo = document.querySelector('#modal-content-reactivo .row.g-2.mb-3')?.innerText || '---';
-    const estadoActual = document.getElementById('modal-status')?.options[document.getElementById('modal-status').selectedIndex]?.text || '---';
-    
-    // Captura técnica corregida
-    const reactivoNombre = getSelTextByName('idinsumoA'); // Usa el name del renderOrderModificationSection
-    const nProtocolo = getSelTextByName('idprotA');
-
-    const pdfTemplate = `
-        <div style="font-family: Arial, sans-serif; color: #333; padding: 15px; background: #ffffff;">
-            <div style="text-align: center; border-bottom: 2px solid #1a5d3b; padding-bottom: 10px; margin-bottom: 20px;">
-                <h2 style="margin: 0; color: #1a5d3b;">GROBO - ${inst}</h2>
-                <h4 style="margin: 5px 0;">FICHA DE PEDIDO: REACTIVO BIOLÓGICO</h4>
-                <p style="margin: 0; font-size: 11px; color: #666;">ID Solicitud: ${id} | Generado: ${new Date().toLocaleString()}</p>
-            </div>
-
-            <div style="margin-bottom: 20px;">
-                <p style="margin: 5px 0;"><strong>Investigador:</strong> ${invHeader}</p>
-                <p style="margin: 5px 0; font-size: 11px; color: #555;">${contactoInfo}</p>
-                <p style="margin: 15px 0; font-size: 14px;"><strong>ESTADO DEL PEDIDO:</strong> <span style="color: #1a5d3b; font-weight: bold;">${estadoActual}</span></p>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd; width: 50%;"><strong>Protocolo Asociado:</strong><br>${nProtocolo}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Especie:</strong><br>${especie}</td>
-                </tr>
-                <tr>
-                    <td colspan="2" style="padding: 10px; border: 1px solid #ddd;"><strong>Reactivo:</strong><br>${reactivoNombre}</td>
-                </tr>
-            </table>
-
-            <table style="width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
-                <tr style="background-color: #f2f2f2;">
-                    <th style="padding: 10px; border: 1px solid #ddd;">Cantidad Solicitada</th>
-                    <th style="padding: 10px; border: 1px solid #ddd; background-color: #e9f5ee;">Animales Utilizados</th>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;">${getVal('organo')}</td>
-                    <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">${getVal('totalA')}</td>
-                </tr>
-            </table>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px;"><strong>Fecha Inicio:</strong><br>${getVal('fechainicioA')}</div>
-                <div style="flex: 1; border: 1px solid #ddd; padding: 10px;"><strong>Fecha Retiro:</strong><br>${getVal('fecRetiroA')}</div>
-            </div>
-
-            <div style="border-top: 2px solid #eee; padding-top: 15px; background: #fcfcfc; padding: 10px;">
-                <p style="font-size: 12px; font-weight: bold; color: #1a5d3b; margin-bottom: 5px;">ÚLTIMA OBSERVACIÓN REGISTRADA:</p>
-                <p style="font-size: 11px; font-style: italic; color: #444;">
-                    ${document.querySelector('.alert-success div.small')?.innerText || 'Sin observaciones.'}
-                </p>
-            </div>
-            
-
-        </div>
-    `;
+    if (!(await ensureJsPdfAutoTable())) return;
 
     const g = window.txt?.generales || {};
+    const t = window.txt?.reactivos?.modal || {};
+    const ti = window.txt?.admin_insumos || {};
+    const errPdf = g.err_pdf_generar || 'No se pudo generar el PDF.';
+    const row = (allReactivos || []).find((item) => Number(item.idformA) === Number(id)) || {};
+    const root = document.getElementById('form-reactivo-full') || document.getElementById('modal-content-reactivo') || document;
+    const modal = document.getElementById('modal-content-reactivo') || document;
+    const labelInt = window.txt?.config_departamentos?.badge_interno || 'INTERNO';
+    const labelExt = window.txt?.config_departamentos?.badge_externo || 'EXTERNO';
+
+    const investigador = pdfPick(row.Investigador);
+    const email = pdfPick(row.EmailInvestigador);
+    const celular = pdfPick(row.CelularInvestigador);
+    const idInv = pdfPick(row.IdInvestigador);
+    const estado = pdfPick(pdfSelText(modal, '#modal-status'), row.estado);
+    const tipoPedido = pdfPick(pdfNamed(root, 'tipoA'), row.TipoNombre);
+    const protocolo = pdfPick(
+        pdfSelText(root, '#select-protocol-modal'),
+        (row.NProtocolo && row.TituloProtocolo) ? `${row.NProtocolo} - ${row.TituloProtocolo}` : '',
+        row.NProtocolo
+    );
+    const depto = pdfPick(
+        pdfSelText(root, '#modal-depto-reactivo'),
+        pdfNamed(root, 'depto'),
+        row.Departamento
+    );
+    const org = pdfPick(pdfElText(root, '#modal-org-reactivo'), row.Organizacion, g.sin_organizacion);
+    const ambito = pdfPick(pdfElText(root, '#modal-ambito-reactivo'), Number(row.DeptoExternoFlag) === 2 ? labelExt : labelInt);
+    const reactivoNombre = pdfPick(pdfNamed(root, 'reactivo'), pdfNamed(root, 'idinsumoA'), row.Reactivo);
+    const unidad = pdfPick(row.Medida, 'un.');
+    const presentacion = row.Presentacion != null && String(row.Presentacion).trim() !== '' ? String(row.Presentacion) : '';
+    const cantidad = pdfPick(pdfNamed(root, 'organo'), row.CantidadReactivo, '0');
+    const animales = pdfPick(pdfNamed(root, 'totalA'), row.AnimalesUsados, '0');
+    const especie = pdfPick(row.Especie);
+    const fInicio = pdfFmtDate(pdfPick(pdfNamed(root, 'fechainicioA'), row.Inicio));
+    const fRetiro = pdfFmtDate(pdfPick(pdfNamed(root, 'fecRetiroA'), row.Retiro));
+    const revisado = pdfPick(document.getElementById('modal-quienvisto')?.value, row.quienvisto, row.QuienVio);
+    const aclUser = pdfPick(row.Aclaracion, row.aclaraA);
+    const aclAdmin = pdfPick(document.getElementById('modal-aclaracionadm')?.value, row.aclaracionadm, row.AclaracionAdm);
+    const lastNotify = pdfPick(pdfElText(modal, '#notify-text-reactivo'), t.not_notified);
+
     try {
-        await saveHtmlStringAsPdf(pdfTemplate, {
-            filename: `Pedido_Reactivo_${id}.pdf`,
-            html2canvas: { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true },
-        });
+        const ctx = startPedidoFichaPdf(t.ficha_pdf_titulo || 'FICHA DE PEDIDO: REACTIVO BIOLÓGICO', id);
+        const { doc, M } = ctx;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text(`${t.investigador || 'Investigador'}: ${investigador}`, M, ctx.y);
+        ctx.y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(80);
+        doc.text(`${t.email || 'Email'}: ${email}   |   ${t.phone || 'Cel'}: ${celular}   |   ID: ${idInv}`, M, ctx.y);
+        ctx.y += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        doc.text(`${t.order_status || 'Estado'}: ${estado}`, M, ctx.y);
+        ctx.y += 8;
+
+        const qtyLabel = presentacion
+            ? `${t.qty_req || 'Cant. solicitada'} (${unidad} ${presentacion})`
+            : `${t.qty_req || 'Cant. solicitada'} (${unidad})`;
+
+        pdfKvTable(ctx, [
+            [t.tipo_pedido || 'Tipo de pedido', tipoPedido, t.protocol_label || 'Protocolo', protocolo],
+            [ti.col_departamento || 'Departamento', depto, ti.col_organizacion || 'Organización', org],
+            [ti.col_ambito || 'Ámbito', ambito, t.reviewed_by || 'Revisado por', revisado],
+            [t.insumo_exp_label || 'Insumo experimental', reactivoNombre, t.especie || 'Especie', especie],
+            [qtyLabel, cantidad, t.animals_used || 'Animales utilizados', animales],
+            [t.start_date || 'Fecha inicio', fInicio, t.end_date || 'Fecha retiro', fRetiro],
+        ]);
+
+        pdfNoteBlock(ctx, t.user_notes || 'Aclaración del usuario', aclUser);
+        pdfNoteBlock(ctx, t.admin_notes || 'Aclaración administración', aclAdmin);
+        pdfNoteBlock(ctx, t.last_notify || 'Última notificación', lastNotify);
+
+        doc.save(`GROBO_Pedido_Reactivo_${id}.pdf`);
     } catch (error) {
         console.error('Error al generar PDF reactivo:', error);
-        if (!window.Swal) return;
-        if (error?.code === 'html2pdf_not_loaded') {
-            Swal.fire(g.error || 'Error', g.err_pdf_lib || 'No se cargó la librería de PDF. Recargue la página.', 'error');
-        } else {
-            Swal.fire(g.error || 'Error', g.err_pdf_generar || 'No se pudo generar el PDF.', 'error');
-        }
+        window.Swal?.fire?.(g.error || 'Error', errPdf, 'error');
     }
 };
 /**
