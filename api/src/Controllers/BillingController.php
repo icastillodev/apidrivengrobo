@@ -867,7 +867,7 @@ class BillingController {
                 $this->sendError('Comprobante no encontrado.');
             }
             $key = (string) $row['ComprobantePdfB2Key'];
-            if (!ComunicacionArchivoValidacion::clavePerteneceInstitucion($key, (int) $sesion['instId'])) {
+            if (!ComunicacionArchivoValidacion::clavePerteneceInstitucion($key, 'facturacion', (int) $sesion['instId'])) {
                 http_response_code(403);
                 $this->sendError('Acceso denegado.');
             }
