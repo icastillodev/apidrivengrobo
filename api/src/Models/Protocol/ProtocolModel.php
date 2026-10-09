@@ -71,9 +71,27 @@ class ProtocolModel {
         return !$this->hasLocalSolicitudByProtocol($idprotA);
     }
 
+    /** Animales ya descontados del cupo (pedidos no suspendidos). */
+    public function getAnimalesComprometidos($idprotA): int {
+        $stmt = $this->db->prepare(
+            "SELECT COALESCE(SUM(s.totalA), 0)
+             FROM protformr pf
+             JOIN formularioe f ON pf.idformA = f.idformA
+             JOIN sexoe s ON f.idformA = s.idformA
+             WHERE pf.idprotA = ?
+               AND (f.estado IS NULL OR LOWER(TRIM(f.estado)) <> 'suspendido')"
+        );
+        $stmt->execute([(int)$idprotA]);
+        return (int)$stmt->fetchColumn();
+    }
+
     public function getByInstitution($instId) {
         $peCols = $this->sqlSelectProtocoloexpeBasePrefixed('pe');
         $hasDeriv = $this->hasTable('formulario_derivacion');
+        $hasAloj = $this->hasTable('alojamiento');
+        $alojCountExpr = $hasAloj
+            ? "(SELECT COUNT(*) FROM alojamiento aUso WHERE aUso.idprotA = pe.idprotA) as AlojamientosCount,"
+            : "0 as AlojamientosCount,";
 
         // Flag para el front: el protocolo es de otra institución pero tiene un
         // formulario derivado (entrante) hacia esta institución.
@@ -120,12 +138,19 @@ class ProtocolModel {
                      WHERE pf.idprotA = pe.idprotA
                        AND f.estado = 'Entregado') as AnimalesUsados,
 
+                    (SELECT COALESCE(SUM(s.totalA), 0)
+                     FROM protformr pf
+                     JOIN formularioe f ON pf.idformA = f.idformA
+                     JOIN sexoe s ON f.idformA = s.idformA
+                     WHERE pf.idprotA = pe.idprotA
+                       AND (f.estado IS NULL OR LOWER(TRIM(f.estado)) <> 'suspendido')) as AnimalesComprometidos,
+
                     ((SELECT COALESCE(SUM(s.totalA), 0)
                       FROM protformr pf
                       JOIN formularioe f ON pf.idformA = f.idformA
                       JOIN sexoe s ON f.idformA = s.idformA
                       WHERE pf.idprotA = pe.idprotA
-                        AND f.estado = 'Entregado') + pe.CantidadAniA) as AnimalesTotales,
+                        AND (f.estado IS NULL OR LOWER(TRIM(f.estado)) <> 'suspendido')) + pe.CantidadAniA) as AnimalesTotales,
                     
                     CONCAT('(', COALESCE(u.UsrA, ''), ') ', COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, ''), ' (ID:', COALESCE(pr.IdUsrA, pe.IdUsrA), ')') as ResponsableFormat,
                     CONCAT('(', COALESCE(u_src.UsrA, ''), ') ', COALESCE(p_src.NombreA, ''), ' ', COALESCE(p_src.ApellidoA, ''), ' (ID:', pe.IdUsrA, ')') as ResponsableOrigenFormat,
@@ -242,7 +267,11 @@ class ProtocolModel {
                        AND s4.TipoPedido = 1
                        AND s4.Aprobado = 1
                      ORDER BY s4.idSolicitudProtocolo DESC
-                     LIMIT 1) as IdSolicitudLocalAprobada
+                     LIMIT 1) as IdSolicitudLocalAprobada,
+
+                    (SELECT COUNT(*) FROM protformr pfUso WHERE pfUso.idprotA = pe.idprotA) as FormulariosCount,
+                    {$alojCountExpr}
+                    (SELECT COUNT(*) FROM solicitudprotocolo srUso WHERE srUso.idprotA = pe.idprotA AND srUso.TipoPedido = 2) as RedSolicitudesCount
 
                 FROM protocoloexpe pe
                 LEFT JOIN personae p_src ON pe.IdUsrA = p_src.IdUsrA
@@ -785,6 +814,26 @@ class ProtocolModel {
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
+    /** Formularios, alojamientos y envíos de red ligados al protocolo. */
+    private function getProtocolUsageCounts(int $idprotA): array {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM protformr WHERE idprotA = ?");
+        $stmt->execute([$idprotA]);
+        $forms = (int)$stmt->fetchColumn();
+
+        $aloj = 0;
+        if ($this->hasTable('alojamiento')) {
+            $stmtA = $this->db->prepare("SELECT COUNT(*) FROM alojamiento WHERE idprotA = ?");
+            $stmtA->execute([$idprotA]);
+            $aloj = (int)$stmtA->fetchColumn();
+        }
+
+        $stmtR = $this->db->prepare("SELECT COUNT(*) FROM solicitudprotocolo WHERE idprotA = ? AND TipoPedido = 2");
+        $stmtR->execute([$idprotA]);
+        $red = (int)$stmtR->fetchColumn();
+
+        return ['forms' => $forms, 'alojamientos' => $aloj, 'red' => $red];
+    }
+
     public function deleteManualProtocol($idprotA, $instId, $userId, $plainPassword, $role) {
         $role = (int)$role;
         if (!in_array($role, [1, 2, 4], true)) {
@@ -794,18 +843,11 @@ class ProtocolModel {
             throw new Exception('Debes ingresar tu contraseña para confirmar el borrado.');
         }
 
-        $stmtOwn = $this->db->prepare("SELECT idprotA, tituloA FROM protocoloexpe WHERE idprotA = ? AND IdInstitucion = ?");
+        $stmtOwn = $this->db->prepare("SELECT idprotA, tituloA, nprotA FROM protocoloexpe WHERE idprotA = ? AND IdInstitucion = ?");
         $stmtOwn->execute([$idprotA, $instId]);
         $prot = $stmtOwn->fetch(PDO::FETCH_ASSOC);
         if (!$prot) {
             throw new Exception('El protocolo no pertenece a esta institución o no existe.');
-        }
-
-        $stmtReq = $this->db->prepare("SELECT COUNT(*) FROM solicitudprotocolo WHERE idprotA = ? AND TipoPedido = 1");
-        $stmtReq->execute([$idprotA]);
-        $hasLocalRequest = ((int)$stmtReq->fetchColumn()) > 0;
-        if ($hasLocalRequest) {
-            throw new Exception('Este protocolo proviene de una solicitud. Debes usar la opción de rechazo de solicitud.');
         }
 
         $stmtPwd = $this->db->prepare("SELECT password_secure FROM usuarioe WHERE IdUsrA = ? LIMIT 1");
@@ -815,11 +857,9 @@ class ProtocolModel {
             throw new Exception('La contraseña ingresada no es válida.');
         }
 
-        $stmtForms = $this->db->prepare("SELECT COUNT(*) FROM protformr WHERE idprotA = ?");
-        $stmtForms->execute([$idprotA]);
-        $formsCount = (int)$stmtForms->fetchColumn();
-        if ($formsCount > 0) {
-            throw new Exception("No se puede borrar: este protocolo tiene {$formsCount} formulario(s) asociado(s).");
+        $usage = $this->getProtocolUsageCounts((int)$idprotA);
+        if ($usage['forms'] > 0 || $usage['alojamientos'] > 0 || $usage['red'] > 0) {
+            throw new Exception('No se puede eliminar: este protocolo tiene formularios, alojamientos o actividad en red.');
         }
 
         $this->db->beginTransaction();
@@ -866,13 +906,26 @@ class ProtocolModel {
             }
 
             $this->db->prepare("DELETE FROM solicitudprotocolo WHERE idprotA = ?")->execute([$idprotA]);
+            if ($this->hasTable('protocoloexpered')) {
+                if ($this->hasTable('protocoloexpered_especies')) {
+                    $this->db->prepare(
+                        "DELETE pre FROM protocoloexpered_especies pre
+                         INNER JOIN protocoloexpered pr ON pr.IdProtocoloExpRed = pre.IdProtocoloExpRed
+                         WHERE pr.idprotA = ?"
+                    )->execute([$idprotA]);
+                }
+                $this->db->prepare("DELETE FROM protocoloexpered WHERE idprotA = ?")->execute([$idprotA]);
+            }
             $this->db->prepare("DELETE FROM protinstr WHERE idprotA = ?")->execute([$idprotA]);
             $this->db->prepare("DELETE FROM protesper WHERE idprotA = ?")->execute([$idprotA]);
             $this->db->prepare("DELETE FROM protdeptor WHERE idprotA = ?")->execute([$idprotA]);
             $this->db->prepare("DELETE FROM protocoloexpe WHERE idprotA = ? AND IdInstitucion = ?")->execute([$idprotA, $instId]);
 
             $this->db->commit();
-            return ['deleted' => true, 'titulo' => $prot['tituloA'] ?? ('ID ' . $idprotA)];
+            $nprot = trim((string)($prot['nprotA'] ?? ''));
+            $titulo = trim((string)($prot['tituloA'] ?? ''));
+            $label = trim(($nprot !== '' ? $nprot . ' — ' : '') . ($titulo !== '' ? $titulo : ('ID ' . $idprotA)));
+            return ['deleted' => true, 'titulo' => $label, 'nprotA' => $nprot];
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;

@@ -253,6 +253,23 @@ class ProtocolController {
             }
 
             if ($id) {
+                $comprometidos = $this->model->getAnimalesComprometidos((int)$id);
+                if (array_key_exists('AnimalesTotales', $data) && $data['AnimalesTotales'] !== '' && $data['AnimalesTotales'] !== null) {
+                    $tot = (int)$data['AnimalesTotales'];
+                    if ($tot < $comprometidos) {
+                        throw new \Exception('El número de animales aprobados no puede ser menor que los ya comprometidos en pedidos.');
+                    }
+                    $data['CantidadAniA'] = $tot - $comprometidos;
+                }
+            }
+
+            $cantAni = isset($data['CantidadAniA']) ? (int)$data['CantidadAniA'] : 0;
+            if ($cantAni < 0) {
+                throw new \Exception('El saldo de animales no puede ser negativo.');
+            }
+            $data['CantidadAniA'] = $cantAni;
+
+            if ($id) {
                 // UPDATE
                 $endSet = 'protocoloexpe = ?';
                 if ($cirugiaCol) {
@@ -283,7 +300,7 @@ class ProtocolController {
                 $params[] = $id;
                 $stmt->execute($params);
                 $currentId = $id;
-                Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId");
+                Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId cupo restante: {$data['CantidadAniA']}");
             } else {
                 // INSERT
                 $extraCols = ($cirugiaCol ? ", `{$cirugiaCol}`" : '') . ($permiteAnestCol ? ", `{$permiteAnestCol}`" : '');
@@ -392,7 +409,8 @@ class ProtocolController {
             }
 
             $result = $this->model->deleteManualProtocol($idprotA, (int)$sesion['instId'], (int)$sesion['userId'], $password, (int)$sesion['role']);
-            Auditoria::logManual($this->db, (int)$sesion['userId'], 'DELETE', 'protocoloexpe', "Borró protocolo manual ID: {$idprotA}");
+            $labelAudit = (string)($result['titulo'] ?? ('ID ' . $idprotA));
+            Auditoria::logManual($this->db, (int)$sesion['userId'], 'DELETE', 'protocoloexpe', "Borró protocolo {$labelAudit}");
 
             echo json_encode(['status' => 'success', 'message' => 'Protocolo borrado correctamente.', 'data' => $result]);
         } catch (\Exception $e) {

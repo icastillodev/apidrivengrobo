@@ -315,8 +315,8 @@ function renderTableHeader() {
             <th data-key="DeptoExternoFlag" class="py-3 px-2 text-center" style="width: 80px;">Ámbito</th>
             <th data-key="TipoNombre" class="py-3 px-2 text-center">Tipo</th>
             <th data-key="RedConfigCompleta" class="py-3 px-2 text-center">Estado Red</th>
-            <th data-key="AnimalesUsados" class="py-3 px-2 text-center">Gastados</th>
-            <th data-key="SaldoAnimales" class="py-3 px-2 text-center">Saldo</th>
+            <th data-key="AnimalesComprometidos" class="py-3 px-2 text-center">${window.txt?.admin_protocolos?.col_en_pedidos || 'En pedidos'}</th>
+            <th data-key="SaldoAnimales" class="py-3 px-2 text-center">${window.txt?.admin_protocolos?.col_saldo || 'Saldo'}</th>
     `;
 
     // Columna Origen (red) solo si hay red
@@ -430,7 +430,7 @@ function renderTable() {
             <td class="text-center px-2 align-middle">${ambitoHtml}</td>
             <td class="text-center px-2 align-middle">${tipoHtml}</td>
             <td class="text-center px-2 align-middle">${redConfigHtml}</td>
-            <td class="text-center px-2 small fw-bold text-secondary">${p.AnimalesUsados ?? 0}</td>
+            <td class="text-center px-2 small fw-bold text-secondary">${p.AnimalesComprometidos ?? p.AnimalesUsados ?? 0}</td>
             <td class="text-center px-2 small fw-bold ${ (p.SaldoAnimales ?? 0) <= 0 ? 'text-danger' : 'text-success' }">${p.SaldoAnimales ?? 0}</td>
             ${origenTd}
             <td class="${fechaStyle}">${fechaText}</td>
@@ -597,9 +597,14 @@ window.openProtocolModal = async (p = null) => {
 
     const showOtrosCeuas = false; // Funcionalidad Otros CEUAS retirada
 
-    const usados = p?.AnimalesUsados ?? 0;
-    const saldo = p?.SaldoAnimales ?? (p?.CantidadAniA ?? 0);
-    const totalAprob = p ? (p.AnimalesTotales ?? (usados + saldo)) : 0;
+    const usados = Number(p?.AnimalesUsados ?? 0);
+    const saldo = Number(p?.SaldoAnimales ?? p?.CantidadAniA ?? 0);
+    let comprometidos = Number(p?.AnimalesComprometidos);
+    if (!Number.isFinite(comprometidos)) {
+        comprometidos = usados;
+    }
+    const totalAprob = p ? Number(p.AnimalesTotales ?? (comprometidos + saldo)) : 0;
+    const enTramite = Math.max(0, comprometidos - usados);
 
     const extFlag = p ? Number(p.DeptoExternoFlag || 1) : 1;
     const isExtLocal = (extFlag === 2);
@@ -622,8 +627,17 @@ window.openProtocolModal = async (p = null) => {
     }
     const currentInstId = Number(localStorage.getItem('instId') || 0);
     const isLocalProtocol = p ? Number(p.IdInstitucion || 0) === currentInstId : false;
+    const canEditCupo = Boolean(p && isLocalProtocol);
     const hasSolicitudLocal = p ? Number(p.TieneSolicitudLocal || 0) === 1 : false;
-    const canDeleteManual = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && !hasSolicitudLocal);
+    const protocolHasActivity = Boolean(p && (
+        Number(p.FormulariosCount || 0) > 0
+        || Number(p.AlojamientosCount || 0) > 0
+        || Number(p.RedSolicitudesCount || 0) > 0
+        || Number(p.AnimalesUsados || 0) > 0
+        || Number(p.AnimalesComprometidos || 0) > 0
+    ));
+    const canShowDelete = Boolean(p && isPrivilegedAdmin() && isLocalProtocol);
+    const canDeleteManual = Boolean(canShowDelete && !protocolHasActivity);
     const canRejectSolicitud = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && Number(p.IdSolicitudLocalAprobada || 0) > 0);
     const canTransmitToNetwork = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && formDataCache?.has_network);
     const canManageManualAttachments = Boolean(isPrivilegedAdmin() && (!p || (isLocalProtocol && !hasSolicitudLocal)));
@@ -692,7 +706,7 @@ window.openProtocolModal = async (p = null) => {
             <div class="d-flex gap-2">
                 ${canTransmitToNetwork ? `<button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="window.openTransmitModal(${p.idprotA})"><i class="bi bi-share-fill me-1"></i>${txtProt.btn_transmitir_red || ''}</button>` : ''}
                 ${canRejectSolicitud ? `<button type="button" class="btn btn-outline-warning btn-sm fw-bold" onclick="window.rejectProtocolRequest(${p.idprotA})"><i class="bi bi-x-octagon me-1"></i>${txtProt.btn_rechazar_solicitud || 'Rechazar solicitud'}</button>` : ''}
-                ${canDeleteManual ? `<button type="button" class="btn btn-outline-danger btn-sm fw-bold" onclick="window.deleteManualProtocol(${p.idprotA})"><i class="bi bi-trash me-1"></i>${txtProt.btn_borrar_manual || 'Borrar protocolo'}</button>` : ''}
+                ${canShowDelete ? `<button type="button" class="btn btn-outline-danger btn-sm fw-bold" ${canDeleteManual ? `onclick="window.deleteManualProtocol(${p.idprotA})"` : 'disabled'} title="${escapeHtml(canDeleteManual ? (txtProt.btn_borrar_manual || 'Eliminar protocolo') : (txtProt.borrar_deshabilitado_title || 'No se puede eliminar: este protocolo tiene formularios u otra actividad.'))}"><i class="bi bi-trash me-1"></i>${escapeHtml(txtProt.btn_borrar_manual || 'Eliminar protocolo')}</button>` : ''}
                 ${p ? `<button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.downloadProtocolPDF(${p.idprotA})"><i class="bi bi-file-pdf"></i> FICHA PDF</button>` : ''}
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -730,17 +744,38 @@ window.openProtocolModal = async (p = null) => {
             
             ${p ? `
             <div class="row g-2 mb-3 bg-light border rounded p-2">
-                <div class="col-md-4">
-                    <label class="small fw-bold text-muted d-block">ANIMALES APROBADOS</label>
-                    <span class="fw-bold text-primary">${totalAprob}</span>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted d-block">${txtProt.label_animales_aprobados || 'ANIMALES APROBADOS'}</label>
+                    ${canEditCupo
+                        ? `<input type="number" name="AnimalesTotales" id="inp-animales-aprobados" class="form-control form-control-sm fw-bold text-primary" min="${comprometidos}" step="1" value="${totalAprob}">
+                           <input type="hidden" name="_AnimalesComprometidos" id="inp-animales-comprometidos" value="${comprometidos}">
+                           <input type="hidden" name="CantidadAniA" id="inp-cantidad-ani" value="${saldo}">`
+                        : `<span class="fw-bold text-primary">${totalAprob}</span>
+                           ${p && !isLocalProtocol ? `<div class="form-text small">${txtProt.red_cupo_solo_propietaria || ''}</div>` : ''}
+                           <input type="hidden" name="CantidadAniA" value="${saldo}">`
+                    }
                 </div>
-                <div class="col-md-4">
-                    <label class="small fw-bold text-muted d-block">GASTADOS</label>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted d-block">${txtProt.label_animales_entregados || 'ENTREGADOS'}</label>
                     <span class="fw-bold text-secondary">${usados}</span>
                 </div>
-                <div class="col-md-4">
-                    <label class="small fw-bold text-muted d-block">SALDO DISPONIBLE</label>
-                    <span class="fw-bold ${saldo <= 0 ? 'text-danger' : 'text-success'}">${saldo}</span>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted d-block">${txtProt.label_animales_en_tramite || 'EN TRÁMITE'}</label>
+                    <span class="fw-bold text-warning">${enTramite}</span>
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted d-block">${txtProt.label_animales_saldo || 'SALDO DISPONIBLE'}</label>
+                    <span id="saldo-animales-display" class="fw-bold ${saldo <= 0 ? 'text-danger' : 'text-success'}">${saldo}</span>
+                </div>
+                <div class="col-12">
+                    <div id="cupo-equation-display" class="form-text small mb-0">${
+                        (txtProt.hint_cupo_cuenta || '{a} = {e} entregados + {t} en trámite + {s} saldo')
+                            .replace('{a}', String(totalAprob))
+                            .replace('{e}', String(usados))
+                            .replace('{t}', String(enTramite))
+                            .replace('{s}', String(saldo))
+                    }</div>
+                    ${canEditCupo ? `<div class="form-text small">${txtProt.hint_ampliacion_animales || ''}</div>` : ''}
                 </div>
                 <div class="col-md-12 mt-2">
                     <small class="small fw-bold text-muted me-2">ÁMBITO LOCAL:</small>
@@ -854,10 +889,12 @@ window.openProtocolModal = async (p = null) => {
                         ${formDataCache.types.map(t => `<option value="${t.idtipoprotocolo}" ${String(effectiveTipo) == String(t.idtipoprotocolo) ? 'selected' : ''}>${t.NombreTipoprotocolo}</option>`).join('')}
                     </select>
                 </div>
+                ${!p ? `
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">CANT. ANIMALES</label>
-                    <input type="number" name="CantidadAniA" class="form-control" value="${p?.CantidadAniA || 0}">
+                    <label class="form-label small fw-bold text-muted">${txtProt.label_animales_aprobados || 'ANIMALES APROBADOS'}</label>
+                    <input type="number" name="CantidadAniA" class="form-control" min="0" step="1" value="0">
                 </div>
+                ` : ''}
                 <div class="col-md-3">
                     <label class="form-label small fw-bold text-muted">SEVERIDAD</label>
                     <select name="severidad" class="form-select">
@@ -893,6 +930,34 @@ window.openProtocolModal = async (p = null) => {
     `;
 
     document.getElementById('form-protocolo').onsubmit = (e) => saveProtocol(e, p?.idprotA);
+
+    const inpAprob = document.getElementById('inp-animales-aprobados');
+    if (inpAprob) {
+        const syncSaldo = () => {
+            const tot = parseInt(inpAprob.value, 10);
+            const comp = parseInt(document.getElementById('inp-animales-comprometidos')?.value || '0', 10) || 0;
+            const hid = document.getElementById('inp-cantidad-ani');
+            const disp = document.getElementById('saldo-animales-display');
+            const eq = document.getElementById('cupo-equation-display');
+            if (!Number.isFinite(tot)) return;
+            const nextSaldo = tot - comp;
+            if (hid) hid.value = String(nextSaldo);
+            if (disp) {
+                disp.textContent = String(nextSaldo);
+                disp.classList.toggle('text-danger', nextSaldo <= 0);
+                disp.classList.toggle('text-success', nextSaldo > 0);
+            }
+            if (eq) {
+                eq.textContent = (txtProt.hint_cupo_cuenta || '{a} = {e} entregados + {t} en trámite + {s} saldo')
+                    .replace('{a}', String(tot))
+                    .replace('{e}', String(usados))
+                    .replace('{t}', String(enTramite))
+                    .replace('{s}', String(nextSaldo));
+            }
+        };
+        inpAprob.addEventListener('input', syncSaldo);
+        syncSaldo();
+    }
 
     const btnCx = document.getElementById('btn-toggle-cirugia-prot');
     if (btnCx) {
@@ -991,6 +1056,22 @@ async function saveProtocol(e, id) {
     }
 
     const txtProt = window.txt?.admin_protocolos || {};
+
+    const totAprobRaw = fd.get('AnimalesTotales');
+    if (totAprobRaw !== null && String(totAprobRaw).trim() !== '') {
+        const totAprob = parseInt(totAprobRaw, 10);
+        const comp = parseInt(fd.get('_AnimalesComprometidos') || '0', 10) || 0;
+        if (!Number.isFinite(totAprob) || totAprob < 0) {
+            alert(txtProt.error_aprobados_invalido || 'Indique un número válido de animales aprobados.');
+            return;
+        }
+        if (totAprob < comp) {
+            alert((txtProt.error_aprobados_min || 'No puede ser menor que los animales ya comprometidos en pedidos ({n}).').replace('{n}', String(comp)));
+            return;
+        }
+        fd.set('CantidadAniA', String(totAprob - comp));
+    }
+
     for (const name of ['adjunto1', 'adjunto2', 'adjunto3']) {
         const file = fd.get(name);
         if (!file || !(file instanceof File) || !file.name) continue;
@@ -1161,24 +1242,25 @@ window.deleteManualProtocolAttachment = async (attId) => {
 
 window.deleteManualProtocol = async (idprot) => {
     const txt = window.txt?.admin_protocolos || {};
-    const pre = await window.Swal.fire({
-        title: txt.borrar_manual_title || 'Borrar protocolo manual',
-        text: txt.borrar_manual_confirm || 'Esta accion eliminara el protocolo. Se requiere contraseña.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: txt.continuar || 'Continuar',
-        cancelButtonText: txt.cancelar || 'Cancelar'
-    });
-    if (!pre.isConfirmed) return;
+    const row = (allProtocols || []).find((x) => Number(x.idprotA) === Number(idprot));
+    const nprot = String(row?.nprotA || '').trim();
+    const titulo = String(row?.tituloA || '').trim();
+    const protoLabel = [nprot, titulo].filter(Boolean).join(' — ') || (`ID ${idprot}`);
+    const confirmTxt = txt.borrar_manual_confirm || 'Se eliminará el protocolo. Esta acción no se puede deshacer.';
+    const labelTxt = txt.borrar_protocolo_label || 'Protocolo a eliminar:';
 
     const ask = await window.Swal.fire({
-        title: txt.ingresar_password || 'Ingrese su contraseña',
+        title: txt.borrar_manual_title || 'Eliminar protocolo',
+        html: `<p class="mb-2">${escapeHtml(confirmTxt)}</p>
+               <p class="mb-3"><strong>${escapeHtml(labelTxt)}</strong><br>${escapeHtml(protoLabel)} <span class="text-muted">(ID ${Number(idprot)})</span></p>`,
+        icon: 'warning',
         input: 'password',
         inputLabel: txt.password_label || 'Contraseña de administrador',
         inputPlaceholder: '********',
         showCancelButton: true,
         confirmButtonText: txt.confirmar_borrado || 'Confirmar borrado',
         cancelButtonText: txt.cancelar || 'Cancelar',
+        confirmButtonColor: '#dc3545',
         inputValidator: (value) => (!value ? (txt.password_obligatoria || 'Debe ingresar su contraseña') : undefined)
     });
     if (!ask.isConfirmed) return;
