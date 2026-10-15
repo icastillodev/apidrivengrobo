@@ -404,19 +404,24 @@ class BillingModel {
     /**
      * Indica si hay filas de alojamiento con historia y fechavisado en rango (mismo filtro base que getAlojamientosProtocolo).
      */
-    public function protocolTieneAlojamientoVisadoEnRango(int $idProt, string $desde, string $hasta): bool {
+    public function protocolTieneAlojamientoVisadoEnRango(int $idProt, string $desde, string $hasta, ?int $instCobradora = null): bool {
         $sql = "SELECT 1 FROM alojamiento a
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
                 WHERE a.idprotA = ? AND a.historia IS NOT NULL
-                  AND a.fechavisado BETWEEN ? AND ?
-                LIMIT 1";
+                  AND a.fechavisado BETWEEN ? AND ?";
+        $params = [$idProt, $desde, $hasta];
+        if ($instCobradora !== null && (int) $instCobradora > 0) {
+            $sql .= ' AND a.IdInstitucion = ?';
+            $params[] = (int) $instCobradora;
+        }
+        $sql .= ' LIMIT 1';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$idProt, $desde, $hasta]);
+        $stmt->execute($params);
         return (bool) $stmt->fetchColumn();
     }
 
 // 1. ALOJAMIENTOS: periodos facturables (excluye tramos en stand by: CantidadCaja = 0)
-    public function getAlojamientosProtocolo($idProt, $desde = null, $hasta = null) {
+    public function getAlojamientosProtocolo($idProt, $desde = null, $hasta = null, ?int $instCobradora = null) {
         $extraCols = '';
         if (AlojamientoCobro::hasColumn($this->db, 'alojamiento', 'PrecioSujetoMomento')) {
             $extraCols .= ', a.PrecioSujetoMomento';
@@ -440,6 +445,10 @@ class BillingModel {
                 WHERE a.idprotA = ? AND a.historia IS NOT NULL";
 
         $params = [$idProt];
+        if ($instCobradora !== null && (int) $instCobradora > 0) {
+            $sql .= ' AND a.IdInstitucion = ?';
+            $params[] = (int) $instCobradora;
+        }
         if ($desde && $hasta) {
             $sql .= " AND a.fechavisado BETWEEN ? AND ?";
             array_push($params, $desde, $hasta);
@@ -631,7 +640,7 @@ class BillingModel {
      * Insumos (pedidos de tipo insumo) vinculados al protocolo vía protformr.
      * Misma estructura que getInsumosGenerales para mostrar en facturación por protocolo.
      */
-    public function getInsumosByProtocolo($idProt, $desde = null, $hasta = null) {
+    public function getInsumosByProtocolo($idProt, $desde = null, $hasta = null, ?int $instCobradora = null) {
         $gDeriv = $this->billingSqlDerivacionCamposSelectGrouped('f.idformA');
         $sql = "SELECT f.idformA as id, f.IdUsrA, MAX(CONCAT(u.ApellidoA, ', ', u.NombreA)) as solicitante,
                 {$gDeriv},
@@ -650,6 +659,11 @@ class BillingModel {
                 WHERE f.estado = 'Entregado'
                   AND LOWER(COALESCE(tf.categoriaformulario, '')) LIKE '%insumo%'";
         $params = [$idProt];
+        if ($instCobradora !== null && (int) $instCobradora > 0) {
+            [$instSql, $instParams] = $this->billingSqlAndFormularioEnInstitucionCobradora((int) $instCobradora);
+            $sql .= $instSql;
+            array_push($params, ...$instParams);
+        }
         if ($desde && $hasta) { $sql .= " AND f.fechainicioA BETWEEN ? AND ?"; array_push($params, $desde, $hasta); }
         $sql .= " GROUP BY f.idformA";
         $stmt = $this->db->prepare($sql); $stmt->execute($params); $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -820,16 +834,7 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
 
         $dateWhere = '';
         $dateParams = [];
-        if ($from !== null && $to !== null) {
-            $dateWhere = ' AND h.fecha BETWEEN ? AND ? ';
-            $dateParams = [$from, $to];
-        } elseif ($from !== null) {
-            $dateWhere = ' AND h.fecha >= ? ';
-            $dateParams = [$from];
-        } elseif ($to !== null) {
-            $dateWhere = ' AND h.fecha <= ? ';
-            $dateParams = [$to];
-        }
+        [$dateWhere, $dateParams] = $this->historialPagoDateFilterSql($from, $to);
 
         $paramsBase = array_merge([$instId, $idUsr], $dateParams);
 
@@ -2670,6 +2675,43 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
         return $res ? (float)$res['saldo'] : 0.0;
     }
+    /**
+     * Filtro de fechas para historialpago (DATE o DATETIME): el límite superior del día incluye hasta 23:59:59.
+     *
+     * @return array{0: string, 1: array<int, string>}
+     */
+    private function historialPagoDateFilterSql(?string $from, ?string $to): array {
+        $dateWhere = '';
+        $dateParams = [];
+        if ($from !== null && $to !== null) {
+            $dateWhere = ' AND h.fecha >= ? AND h.fecha <= ? ';
+            $dateParams = [$this->historialPagoDateStart($from), $this->historialPagoDateEnd($to)];
+        } elseif ($from !== null) {
+            $dateWhere = ' AND h.fecha >= ? ';
+            $dateParams = [$this->historialPagoDateStart($from)];
+        } elseif ($to !== null) {
+            $dateWhere = ' AND h.fecha <= ? ';
+            $dateParams = [$this->historialPagoDateEnd($to)];
+        }
+        return [$dateWhere, $dateParams];
+    }
+
+    private function historialPagoDateStart(string $d): string {
+        $d = trim($d);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+            return $d . ' 00:00:00';
+        }
+        return $d;
+    }
+
+    private function historialPagoDateEnd(string $d): string {
+        $d = trim($d);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+            return $d . ' 23:59:59';
+        }
+        return $d;
+    }
+
     public function getFinancialAudit($instId) {
         $hasTransfer = $this->hasColumn('historialpago', 'IdentificadorTransferencia');
         $hasComment = $this->hasColumn('historialpago', 'Comentario');

@@ -8,6 +8,7 @@ import {
     getFacturacionDerivacionSeleccionFromDom as getFacturacionDerivacionSeleccionOrg,
     getFiltrosAlcanceDerivacionCached,
 } from './billingDerivacionFiltros.js';
+import { initBillingPageHub } from './billingPersonHub.js';
 
 let orgBillingReportLoadedOk = false;
 /** @type {{ organizaciones: unknown[], opts: { desde: string, hasta: string, chkAni: boolean, chkAlo: boolean, chkIns: boolean, facturacionDerivacion?: string } } | null} */
@@ -25,6 +26,12 @@ export async function initBillingOrg() {
     aplicarVisibilidadColumnaFacturacionDerivacion(getFiltrosAlcanceDerivacionCached());
     const btn = document.getElementById('btn-cargar-org');
     if (btn) btn.addEventListener('click', cargarFacturacionOrg);
+    await initBillingPageHub('org', {
+        getDateRange: () => ({
+            desde: document.getElementById('f-desde-org')?.value || '',
+            hasta: document.getElementById('f-hasta-org')?.value || '',
+        }),
+    });
 }
 
 async function cargarFacturacionOrg() {

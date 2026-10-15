@@ -15,6 +15,7 @@ import {
 import './billingPayments.js';
 import './modals/manager.js';
 import { setBillingResultsLoadingInline } from './billingResultsLoading.js';
+import { initBillingPageHub } from './billingPersonHub.js';
 
 let currentReportDataInst = null;
 /** Solo se pintan N tarjetas por institución a la vez; los saldos se piden solo para esa página. */
@@ -105,6 +106,12 @@ export async function initBillingInstitucion() {
     await cargarListaInstituciones();
     const btn = document.getElementById('btn-cargar-inst');
     if (btn) btn.addEventListener('click', cargarFacturacionInstitucion);
+    await initBillingPageHub('institucion', {
+        getDateRange: () => ({
+            desde: document.getElementById('f-desde-inst')?.value || '',
+            hasta: document.getElementById('f-hasta-inst')?.value || '',
+        }),
+    });
 }
 
 async function cargarListaInstituciones() {

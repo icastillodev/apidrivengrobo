@@ -1,6 +1,8 @@
 import { API } from '../../api.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
 import { debounce } from '../../utils/debounce.js';
+import { fetchBillingPersonSummary } from './facturacion/billingPersonHub.js';
+import { formatBillingMoney } from './facturacion/billingLocale.js';
 
 export const HistorialState = {
     dataFull: [],
@@ -9,7 +11,8 @@ export const HistorialState = {
     itemsPerPage: 15,
     maxVisiblePages: 6, // El máximo de botones de paginación solicitados
     /** Filtro por investigador afectado (`historialpago.IdUsrA`); null = todos */
-    filterIdUsr: null
+    filterIdUsr: null,
+    personSummary: null,
 };
 
 let investigadoresHistorialCache = [];
@@ -95,6 +98,9 @@ export async function initHistorialContable() {
     try {
         showLoader();
         await Promise.all([loadData(), loadInvestigatorsList()]);
+        if (HistorialState.filterIdUsr != null) {
+            await loadPersonSummaryForFilter();
+        }
     } finally {
         hideLoader();
     }
@@ -104,11 +110,17 @@ async function loadData() {
     try {
         const res = await API.request('/billing/audit-history');
         if (res.status === 'success') {
-            HistorialState.dataFull = res.data || [];
+            HistorialState.dataFull = Array.isArray(res.data) ? res.data : [];
             HistorialState.currentPage = 1;
             filterData();
+        } else {
+            HistorialState.dataFull = [];
+            filterData();
+            console.error('Historial contable:', res.message || res);
         }
     } catch (e) {
+        HistorialState.dataFull = [];
+        filterData();
         console.error("Error cargando historial contable:", e);
     }
 }
@@ -186,6 +198,8 @@ function setupListeners() {
 
     document.getElementById('btn-inv-ver-todos')?.addEventListener('click', () => {
         HistorialState.filterIdUsr = null;
+        HistorialState.personSummary = null;
+        renderPersonSummaryBar();
         renderInvestigatorsPanel();
         filterData();
     });
@@ -196,9 +210,53 @@ function setupListeners() {
         if (!btn || !btn.dataset.id) return;
         const n = parseInt(String(btn.dataset.id), 10);
         HistorialState.filterIdUsr = Number.isFinite(n) ? n : null;
+        void loadPersonSummaryForFilter();
         renderInvestigatorsPanel();
         filterData();
     });
+}
+
+async function loadPersonSummaryForFilter() {
+    const uid = HistorialState.filterIdUsr;
+    const bar = document.getElementById('hist-person-summary');
+    if (!uid) {
+        HistorialState.personSummary = null;
+        renderPersonSummaryBar();
+        return;
+    }
+    if (bar) {
+        bar.innerHTML = `<span class="small text-muted"><span class="spinner-border spinner-border-sm me-1"></span></span>`;
+    }
+    try {
+        HistorialState.personSummary = await fetchBillingPersonSummary(uid, null, null);
+    } catch (_) {
+        HistorialState.personSummary = null;
+    }
+    renderPersonSummaryBar();
+}
+
+function renderPersonSummaryBar() {
+    const bar = document.getElementById('hist-person-summary');
+    if (!bar) return;
+    const s = HistorialState.personSummary;
+    const h = window.txt?.facturacion?.hub || {};
+    if (!s || HistorialState.filterIdUsr == null) {
+        bar.innerHTML = '';
+        bar.classList.add('d-none');
+        return;
+    }
+    bar.classList.remove('d-none');
+    const lblDebe = h.resumen_debe || 'Debe total';
+    const lblPag = h.resumen_pagado || 'Pagado total';
+    bar.innerHTML = `
+        <div class="alert alert-light border small py-2 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span class="fw-bold">${escapeHtml(s.nombre || '')} <span class="text-muted">(ID ${HistorialState.filterIdUsr})</span></span>
+            <span>
+                <span class="badge bg-danger me-1">${lblDebe}: $ ${formatBillingMoney(s.debe)}</span>
+                <span class="badge bg-success">${lblPag}: $ ${formatBillingMoney(s.pagado)}</span>
+            </span>
+            <a class="btn btn-outline-primary btn-sm fw-bold" href="facturacion/investigador.html?idUsr=${encodeURIComponent(HistorialState.filterIdUsr)}&all=1">${escapeHtml(h.btn_abrir_facturacion || 'Estado de cuenta')}</a>
+        </div>`;
 }
 
 function filterData() {

@@ -16,6 +16,7 @@ import {
     getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from '../billingDerivacionFiltros.js';
+import { initBillingPageHub } from '../billingPersonHub.js';
 
 /** Textos facturación (incl. `billing_depto`, `billing_investigador`) */
 function txF() {
@@ -119,6 +120,16 @@ export async function initBillingInvestigador() {
                 renderizarOpcionesInvestigador(listaInvestigadoresBaseFiltrada());
             });
         }
+        await initBillingPageHub('investigador', {
+            getDateRange: () => ({
+                desde: document.getElementById('f-desde')?.value || '',
+                hasta: document.getElementById('f-hasta')?.value || '',
+            }),
+            onInvestigatorPick: (idUsr) => {
+                const sel = document.getElementById('sel-investigador');
+                if (sel) sel.value = String(idUsr);
+            },
+        });
         autoLoadFromUrlParams();
     } catch (error) { 
         console.error("Error en init:", error); 

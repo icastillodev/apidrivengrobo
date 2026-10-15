@@ -858,8 +858,8 @@ class ProtocolModel {
         }
 
         $usage = $this->getProtocolUsageCounts((int)$idprotA);
-        if ($usage['forms'] > 0 || $usage['alojamientos'] > 0 || $usage['red'] > 0) {
-            throw new Exception('No se puede eliminar: este protocolo tiene formularios, alojamientos o actividad en red.');
+        if ($usage['forms'] > 0 || $usage['alojamientos'] > 0) {
+            throw new Exception('No se puede eliminar: este protocolo tiene formularios o alojamientos asociados.');
         }
 
         $this->db->beginTransaction();
@@ -950,14 +950,14 @@ class ProtocolModel {
                 WHERE s.idprotA = ?
                   AND p.IdInstitucion = ?
                   AND s.TipoPedido = 1
-                  AND s.Aprobado = 1
+                  AND s.Aprobado IN (1, 3)
                 ORDER BY s.idSolicitudProtocolo DESC
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$idprotA, $instId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
-            throw new Exception('No existe una solicitud aprobada para rechazar en este protocolo.');
+            throw new Exception('No existe una solicitud local pendiente o aprobada para rechazar en este protocolo.');
         }
 
         // Al rechazar: mantener solicitud/protocolo, pero limpiar adjuntos (B2 + BD).

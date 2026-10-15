@@ -56,14 +56,12 @@ async function fetchSaldoHistorialData(opts) {
     const refId = opts?.refId != null ? parseInt(opts.refId, 10) : null;
     let from = null;
     let to = null;
-    if (opts && typeof opts === 'object') {
-        if ('from' in opts) from = opts.from;
-        else from = document.getElementById('f-desde')?.value ?? null;
-        if ('to' in opts) to = opts.to;
-        else to = document.getElementById('f-hasta')?.value ?? null;
-    } else {
+    if (opts?.useBillingPeriod === true) {
         from = document.getElementById('f-desde')?.value ?? null;
         to = document.getElementById('f-hasta')?.value ?? null;
+    } else if (opts && typeof opts === 'object') {
+        if ('from' in opts) from = opts.from;
+        if ('to' in opts) to = opts.to;
     }
     const qs = new URLSearchParams();
     qs.set('idUsr', String(idUsr));

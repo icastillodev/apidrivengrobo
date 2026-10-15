@@ -629,16 +629,15 @@ window.openProtocolModal = async (p = null) => {
     const isLocalProtocol = p ? Number(p.IdInstitucion || 0) === currentInstId : false;
     const canEditCupo = Boolean(p && isLocalProtocol);
     const hasSolicitudLocal = p ? Number(p.TieneSolicitudLocal || 0) === 1 : false;
-    const protocolHasActivity = Boolean(p && (
+    /** Solo formularios/alojamientos bloquean borrado; envío a red sin pedidos no impide eliminar manual. */
+    const protocolHasBlockingActivity = Boolean(p && (
         Number(p.FormulariosCount || 0) > 0
         || Number(p.AlojamientosCount || 0) > 0
-        || Number(p.RedSolicitudesCount || 0) > 0
-        || Number(p.AnimalesUsados || 0) > 0
-        || Number(p.AnimalesComprometidos || 0) > 0
     ));
-    const canShowDelete = Boolean(p && isPrivilegedAdmin() && isLocalProtocol);
-    const canDeleteManual = Boolean(canShowDelete && !protocolHasActivity);
-    const canRejectSolicitud = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && Number(p.IdSolicitudLocalAprobada || 0) > 0);
+    /** Borrar solo protocolos creados por admin (sin solicitud de investigador); si envió una persona → rechazar. */
+    const canShowDelete = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && !hasSolicitudLocal);
+    const canDeleteManual = Boolean(canShowDelete && !protocolHasBlockingActivity);
+    const canRejectSolicitud = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && hasSolicitudLocal);
     const canTransmitToNetwork = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && formDataCache?.has_network);
     const canManageManualAttachments = Boolean(isPrivilegedAdmin() && (!p || (isLocalProtocol && !hasSolicitudLocal)));
     const usersForSelect = [...(formDataCache.users || [])];

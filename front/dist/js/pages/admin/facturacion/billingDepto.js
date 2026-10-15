@@ -43,6 +43,7 @@ import {
     getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from './billingDerivacionFiltros.js';
+import { initBillingPageHub } from './billingPersonHub.js';
 
 /** Textos facturación (incl. `billing_depto` — lote i18n ES/EN/PT) */
 function txF() {
@@ -197,6 +198,12 @@ export async function initBillingDepto() {
         }
         aplicarParamsUrlDepto();
         renderDeptoOptions();
+        await initBillingPageHub('depto', {
+            getDateRange: () => ({
+                desde: document.getElementById('f-desde')?.value || '',
+                hasta: document.getElementById('f-hasta')?.value || '',
+            }),
+        });
     } catch (error) { console.error("Error en init:", error); } finally { hideLoader(); }
 }
 

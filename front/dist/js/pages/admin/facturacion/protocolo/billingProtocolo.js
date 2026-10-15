@@ -44,6 +44,7 @@ import {
     getAmbitoInternoExternoFromDom,
     getFiltrosAlcanceDerivacionCached,
 } from '../billingDerivacionFiltros.js';
+import { initBillingPageHub } from '../billingPersonHub.js';
 
 window.currentReportData = null;
 window.protocolosCache = [];
@@ -143,6 +144,12 @@ export async function initBillingProtocolo() {
                 renderizarOpciones(listaProtocolosBaseFiltrada());
             });
         }
+        await initBillingPageHub('protocolo', {
+            getDateRange: () => ({
+                desde: document.getElementById('f-desde')?.value || '',
+                hasta: document.getElementById('f-hasta')?.value || '',
+            }),
+        });
     } catch (e) { console.error(e); } finally { hideLoader(); }
 }
 

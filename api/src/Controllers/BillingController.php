@@ -108,7 +108,7 @@ class BillingController {
         if (!$incluirInsumos) {
             return ['formularios' => $formularios, 'insumos' => []];
         }
-        $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
+        $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta, $instId > 0 ? $instId : null);
         $this->enrichInsumosFacturacionDerivadaSaldo($insumos, $mapaSaldos, $instId);
         $insumoIds = [];
         foreach ($insumos as $rowIns) {
@@ -237,15 +237,15 @@ class BillingController {
                 $idProt = (int) $p['idprotA'];
                 if ($rangoFechas) {
                     $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta, $deptoId, (int) $instId);
-                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta);
+                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta, (int) $instId);
                     if (!$hayForms && !$hayAloj) {
                         continue;
                     }
                     $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId) : [];
-                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta) : [];
+                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, (int) $instId) : [];
                 } else {
                     $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId);
-                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, (int) $instId);
                 }
                 $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
                 $part = $this->partitionProtocoloPedidosAndInsumos(
@@ -399,7 +399,7 @@ class BillingController {
                         $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, $deptoId, (int) $instId);
                         $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
                         $alojamientos = $chkAlo
-                            ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta)
+                            ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, (int) $instId)
                             : [];
                         $part = $this->partitionProtocoloPedidosAndInsumos(
                             $idProt,
@@ -613,18 +613,18 @@ class BillingController {
                 $idProt = (int) $p['idprotA'];
                 if ($rangoFechas) {
                     $hayForms = $this->model->protocolTienePedidosEntregadosEnRango($idProt, $desde, $hasta, null, (int) $instId);
-                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta);
+                    $hayAloj = $this->model->protocolTieneAlojamientoVisadoEnRango($idProt, $desde, $hasta, (int) $instId);
                     if (!$hayForms && !$hayAloj) {
                         continue;
                     }
                     $formularios = $hayForms ? $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, (int) $instId) : [];
-                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta) : [];
+                    $alojamientos = $hayAloj ? $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, (int) $instId) : [];
                 } else {
                     $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, (int) $instId);
-                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
+                    $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, (int) $instId);
                 }
                 $this->enrichPedidosFacturacionDerivada($formularios, (int) $instId);
-                $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
+                $insumosProt = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta, (int) $instId);
                 $this->enrichInsumosFacturacionDerivadaSaldo($insumosProt, $mapaSaldos, (int) $instId);
 
                 $sumDebeInsProt = 0.0;
@@ -993,8 +993,8 @@ class BillingController {
             if ($instId > 0) {
                 $this->enrichPedidosFacturacionDerivada($formularios, $instId);
             }
-            $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta);
-            $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta);
+            $alojamientos = $this->model->getAlojamientosProtocolo($idProt, $desde, $hasta, $instId > 0 ? $instId : null);
+            $insumos = $this->model->getInsumosByProtocolo($idProt, $desde, $hasta, $instId > 0 ? $instId : null);
             if ($instId > 0) {
                 $mapaSaldosProt = $this->model->getSaldosPorInstitucion($instId);
                 $this->enrichInsumosFacturacionDerivadaSaldo($insumos, $mapaSaldosProt, $instId);
