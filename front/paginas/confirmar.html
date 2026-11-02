@@ -64,7 +64,15 @@
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </div>
                     <h2 class="text-2xl font-black text-red-600 uppercase mb-2" data-i18n="confirmar.error_titulo">Error de Activación</h2>
-                    <p id="error-message" class="text-gray-600 mb-8 text-sm font-medium" data-i18n="confirmar.error_default">El enlace es inválido o el token ha expirado.</p>
+                    <p id="error-message" class="text-gray-600 mb-4 text-sm font-medium" data-i18n="confirmar.error_default">El enlace es inválido o el token ha expirado.</p>
+                    <p class="text-gray-600 text-sm mb-3" id="confirm-help">Si ya activaste tu cuenta, ingresá normalmente. Si sigue pendiente, solicitá un enlace nuevo.</p>
+                    <a href="#" id="confirm-login-link" class="block text-sm font-bold text-amber-700 underline mb-4">Ir al inicio de sesión</a>
+                    <form id="resend-activation-form" class="flex flex-col gap-2 mb-4">
+                        <input type="text" id="resend-username" required maxlength="64" autocomplete="username" class="border rounded-lg px-3 py-2 text-sm" placeholder="Usuario">
+                        <input type="email" id="resend-email" required autocomplete="email" class="border rounded-lg px-3 py-2 text-sm" placeholder="Correo registrado">
+                        <button type="submit" id="resend-btn" class="bg-amber-600 text-white rounded-lg px-3 py-2 text-sm font-bold">Enviar nuevo enlace</button>
+                        <p id="resend-feedback" role="status" class="text-sm text-gray-700"></p>
+                    </form>
                     <a href="https://groboapp.com" class="text-[10px] font-bold text-gray-400 hover:text-black uppercase underline tracking-widest" data-i18n="confirmar.volver_grobo">
                         Volver a GROBOAPP.COM
                     </a>

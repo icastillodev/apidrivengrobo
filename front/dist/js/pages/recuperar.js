@@ -129,9 +129,12 @@ export async function initRecuperar() {
             if (res.status === 'success') {
                 showSuccessPanel('password');
             } else {
+                const tooMany = res.code === 'too_many_requests' || res.message === 'too_many_requests';
                 Swal.fire(
                     t?.swal_aviso || 'Aviso',
-                    res.message || (t?.swal_datos_no_coinciden || 'Los datos no coinciden con nuestros registros'),
+                    tooMany
+                        ? (t?.too_many_requests || 'Demasiados intentos. Esperá unos minutos.')
+                        : (res.message || (t?.swal_datos_no_coinciden || 'Los datos no coinciden con nuestros registros')),
                     'warning'
                 );
                 btn.disabled = false;
@@ -163,7 +166,14 @@ export async function initRecuperar() {
             if (res.status === 'success') {
                 showSuccessPanel('user');
             } else {
-                Swal.fire(t?.swal_aviso || 'Aviso', res.message || (t?.swal_error_red || 'Error'), 'warning');
+                const tooMany = res.code === 'too_many_requests' || res.message === 'too_many_requests';
+                Swal.fire(
+                    t?.swal_aviso || 'Aviso',
+                    tooMany
+                        ? (t?.too_many_requests || 'Demasiados intentos. Esperá unos minutos.')
+                        : (res.message || (t?.swal_error_red || 'Error')),
+                    'warning'
+                );
                 btn.disabled = false;
                 btn.textContent = labelEnviar;
             }

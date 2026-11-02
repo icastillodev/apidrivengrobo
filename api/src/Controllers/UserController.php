@@ -7,6 +7,7 @@ use App\Models\Services\MailService;
 use App\Models\User\UserModel;
 use App\Models\UserForms\UserFormsModel;
 use App\Utils\Auditoria;
+use App\Utils\MailRateLimiter;
 use PDO;
 
 class UserController {
@@ -253,9 +254,26 @@ class UserController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            $sesion = Auditoria::getDatosSesion(); // Valida que el admin esté logueado
-            $id = $_GET['id'] ?? null;
+            $sesion = Auditoria::getDatosSesion();
+            $role = (int)($sesion['role'] ?? 0);
+            $id = (int)($_GET['id'] ?? 0);
             $data = $_POST;
+            if (!in_array($role, [1, 2], true) || $id <= 0) {
+                http_response_code(403);
+                throw new \RuntimeException('No está autorizado para modificar este perfil.');
+            }
+            $checkSql = 'SELECT 1 FROM usuarioe WHERE IdUsrA = ?';
+            $checkParams = [$id];
+            if ($role !== 1) {
+                $checkSql .= ' AND IdInstitucion = ?';
+                $checkParams[] = (int)$sesion['instId'];
+            }
+            $check = $this->db->prepare($checkSql . ' LIMIT 1');
+            $check->execute($checkParams);
+            if (!$check->fetchColumn()) {
+                http_response_code(403);
+                throw new \RuntimeException('Usuario no encontrado en la institución autorizada.');
+            }
 
             $sql = "UPDATE personae SET 
                     ApellidoA = ?, NombreA = ?, EmailA = ?, CelularA = ?, LabA = ? 
@@ -281,22 +299,57 @@ class UserController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $id = $_GET['id'] ?? null;
-            
-            if (!$id) throw new \Exception('ID de usuario no proporcionado');
+            $role = (int)($sesion['role'] ?? 0);
+            $instId = (int)($sesion['instId'] ?? 0);
+            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            if (!in_array($role, [1, 2], true)) {
+                http_response_code(403);
+                throw new \RuntimeException('Sin permisos para solicitar restablecimiento de clave.');
+            }
+            if (!$id || $id <= 0) throw new \InvalidArgumentException('Usuario no válido.');
 
-            $newPasswordHash = password_hash('12345678', PASSWORD_DEFAULT);
-            $sql = "UPDATE usuarioe SET password_secure = ? WHERE IdUsrA = ?";
+            $sql = 'SELECT u.IdUsrA, u.IdInstitucion, u.confirmado, p.EmailA, p.NombreA,
+                           i.NombreInst FROM usuarioe u
+                    JOIN personae p ON p.IdUsrA = u.IdUsrA
+                    JOIN institucion i ON i.IdInstitucion = u.IdInstitucion
+                    WHERE u.IdUsrA = ?';
+            $params = [$id];
+            if ($role !== 1) {
+                $sql .= ' AND u.IdInstitucion = ?';
+                $params[] = $instId;
+            }
+            $sql .= ' LIMIT 1';
             $stmt = $this->db->prepare($sql);
-            $success = $stmt->execute([$newPasswordHash, $id]);
+            $stmt->execute($params);
+            $account = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$account) throw new \RuntimeException('Usuario no encontrado en la institución autorizada.');
+            if ((int)$account['confirmado'] !== 1) {
+                throw new \RuntimeException('Cuenta pendiente: debe activar el correo primero.');
+            }
+            $email = trim((string)($account['EmailA'] ?? ''));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new \RuntimeException('El usuario no tiene un correo válido configurado.');
+            }
 
-            Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE_PASS', 'usuarioe', "Reseteó forzosamente la clave del usuario ID: $id");
-
-            echo json_encode([
-                'status' => $success ? 'success' : 'error',
-                'message' => $success ? 'Contraseña reseteada a 12345678' : 'No se pudo actualizar'
-            ]);
-        } catch (\Exception $e) {
+            $token = bin2hex(random_bytes(32));
+            if (!$this->model->saveResetToken((int)$account['IdUsrA'], $token)) {
+                throw new \RuntimeException('No se pudo preparar el enlace de recuperación.');
+            }
+            $slug = strtolower(trim((string)$account['NombreInst']));
+            $sent = (new MailService())->sendResetPasswordEmail(
+                $email, (string)$account['NombreA'], $token,
+                (string)$account['NombreInst'], $slug
+            );
+            if (!$sent) {
+                $this->db->prepare('UPDATE usuarioe SET token_confirmacion = NULL WHERE IdUsrA = ? AND token_confirmacion = ?')
+                    ->execute([(int)$account['IdUsrA'], $token]);
+                throw new \RuntimeException('No se pudo enviar el correo de recuperación. No se cambió la contraseña.');
+            }
+            Auditoria::logManual($this->db, (int)$sesion['userId'], 'RECOVERY_ADMIN', 'usuarioe',
+                'Solicitó envío de recuperación al correo del usuario ID: ' . (int)$account['IdUsrA']);
+            echo json_encode(['status' => 'success', 'message' => 'Enlace enviado al correo registrado. No se modificó la contraseña.']);
+        } catch (\Throwable $e) {
+            if (http_response_code() === 200) http_response_code(400);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
@@ -537,6 +590,9 @@ class UserController {
     public function register() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        if ($this->rejectIfMailAbuse('register', 5, 15)) {
+            exit;
+        }
         $data = json_decode(file_get_contents("php://input"), true);
         $slug = $_GET['inst'] ?? 'sede-general';
 
@@ -603,6 +659,51 @@ class UserController {
         exit;
     }
 
+    /**
+     * Reenvía un enlace únicamente a su propio correo, sin revelar si existe la cuenta.
+     * No confirma usuarios ni genera una clave de acceso.
+     */
+    public function resendActivation() {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+        if ($this->rejectIfMailAbuse('resend_activation', 3, 8)) {
+            exit;
+        }
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+        $email = strtolower(trim((string)($data['email'] ?? '')));
+        $username = strtolower(trim((string)($data['username'] ?? '')));
+        $slug = trim((string)($data['slug'] ?? ''));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $username === '' || $slug === '') {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Completa usuario, correo e institución.']);
+            exit;
+        }
+        $generic = ['status' => 'success', 'message' => 'Si la cuenta está pendiente y los datos coinciden, recibirás un enlace nuevo en tu correo.'];
+        try {
+            [$instId, $slug, $err] = $this->resolveInstForRecovery(['slug' => $slug]);
+            if ($err === null && $instId > 0) {
+                $row = $this->model->getPendingActivationForRecovery($email, $username, $instId);
+                if ($row) {
+                    $token = bin2hex(random_bytes(32));
+                    if ($this->model->renewPendingActivationToken((int)$row['IdUsrA'], $instId, $token)) {
+                        $instName = (string)($this->model->getInstitutionName($instId)['NombreInst'] ?? $slug);
+                        $sent = (new MailService())->sendRegistrationEmail(
+                            (string)$row['EmailA'], (string)$row['NombreA'], (string)$row['UsrA'],
+                            $token, $instName, $slug, $data['lang'] ?? 'es'
+                        );
+                        if (!$sent) {
+                            error_log('GROBO: no se pudo enviar activación renovada userId=' . (int)$row['IdUsrA']);
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('GROBO: error en reenvío de activación: ' . get_class($e));
+        }
+        echo json_encode($generic);
+        exit;
+    }
+
     public function checkUsername() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -652,6 +753,9 @@ class UserController {
     public function forgotPassword() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        if ($this->rejectIfMailAbuse('forgot_password', 5, 12)) {
+            exit;
+        }
         $data = json_decode(file_get_contents("php://input"), true) ?: [];
         if (isset($data['user']) && is_string($data['user'])) {
             $data['user'] = strtolower(trim($data['user']));
@@ -689,6 +793,9 @@ class UserController {
     public function forgotUsername() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        if ($this->rejectIfMailAbuse('forgot_username', 5, 12)) {
+            exit;
+        }
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $email = isset($data['email']) ? trim((string) $data['email']) : '';
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -777,5 +884,20 @@ class UserController {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
+    }
+
+    private function rejectIfMailAbuse(string $endpoint, int $max10min, int $maxHour): bool
+    {
+        if (MailRateLimiter::allowEndpoint($endpoint, $max10min, $maxHour)) {
+            return false;
+        }
+        http_response_code(429);
+        echo json_encode([
+            'status' => 'error',
+            'code' => 'too_many_requests',
+            'message' => 'too_many_requests',
+        ]);
+
+        return true;
     }
 }

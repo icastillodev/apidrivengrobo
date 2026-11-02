@@ -97,6 +97,7 @@ class AuthController {
         }
 
         // 3. SI EL LOGIN ES EXITOSO (O VA A 2FA), PERDONAMOS A LA IP
+        // El 2FA sigue pudiendo disparar correo: el tope está en MailService (Resend).
         $this->model->resetLoginAttempts($ip);
 
         // Si el usuario requiere autenticación de 2 factores

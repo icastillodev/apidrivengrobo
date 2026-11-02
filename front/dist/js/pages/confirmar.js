@@ -7,6 +7,50 @@ export async function initConfirmacion() {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     const slug = urlParams.get('inst'); // Recuperamos el slug de la institución
+    const tr = window.txt?.confirmar || {};
+    const captions = [
+        ['confirm-help', 'textContent', tr.reenviar_help],
+        ['confirm-login-link', 'textContent', tr.reenviar_login],
+        ['resend-username', 'placeholder', tr.reenviar_username],
+        ['resend-email', 'placeholder', tr.reenviar_email],
+        ['resend-btn', 'textContent', tr.reenviar_btn],
+    ];
+    captions.forEach(([id, prop, value]) => {
+        const el = document.getElementById(id);
+        if (el && value) el[prop] = value;
+    });
+    const loginLink = document.getElementById('confirm-login-link');
+    if (loginLink && slug) loginLink.href = `${basePath}${encodeURIComponent(slug)}/`;
+
+    const resendForm = document.getElementById('resend-activation-form');
+    resendForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const feedback = document.getElementById('resend-feedback');
+        const btn = document.getElementById('resend-btn');
+        if (!slug) {
+            if (feedback) feedback.textContent = 'Falta la institución en el enlace.';
+            return;
+        }
+        btn.disabled = true;
+        if (feedback) feedback.textContent = '';
+        try {
+            const res = await API.request('/resend-activation', 'POST', {
+                slug,
+                username: document.getElementById('resend-username')?.value.trim(),
+                email: document.getElementById('resend-email')?.value.trim(),
+                lang: localStorage.getItem('lang') || 'es',
+            });
+            if (feedback) feedback.textContent = res.status === 'success'
+                ? (window.txt?.confirmar?.reenviar_generico || 'Si la cuenta está pendiente y los datos coinciden, te llegará un correo nuevo.')
+                : (res.code === 'too_many_requests'
+                    ? (window.txt?.confirmar?.reenviar_limite || 'Demasiados intentos. Probá más tarde.')
+                    : (window.txt?.confirmar?.reenviar_error || 'No se pudo procesar la solicitud.'));
+        } catch (_) {
+            if (feedback) feedback.textContent = window.txt?.confirmar?.reenviar_error || 'No se pudo procesar la solicitud.';
+        } finally {
+            btn.disabled = false;
+        }
+    });
 
     if (!token || !slug) {
         const t = window.txt?.confirmar;

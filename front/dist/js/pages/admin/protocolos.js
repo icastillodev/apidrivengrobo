@@ -638,6 +638,7 @@ window.openProtocolModal = async (p = null) => {
     const canShowDelete = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && !hasSolicitudLocal);
     const canDeleteManual = Boolean(canShowDelete && !protocolHasBlockingActivity);
     const canRejectSolicitud = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && hasSolicitudLocal);
+    const canExecuteRejection = Boolean(canRejectSolicitud && !protocolHasBlockingActivity);
     const canTransmitToNetwork = Boolean(p && isPrivilegedAdmin() && isLocalProtocol && formDataCache?.has_network);
     const canManageManualAttachments = Boolean(isPrivilegedAdmin() && (!p || (isLocalProtocol && !hasSolicitudLocal)));
     const usersForSelect = [...(formDataCache.users || [])];
@@ -704,7 +705,7 @@ window.openProtocolModal = async (p = null) => {
             <h5 class="fw-bold mb-0">${p ? 'Editar Protocolo' : 'Nuevo Protocolo'}</h5>
             <div class="d-flex gap-2">
                 ${canTransmitToNetwork ? `<button type="button" class="btn btn-outline-info btn-sm fw-bold" onclick="window.openTransmitModal(${p.idprotA})"><i class="bi bi-share-fill me-1"></i>${txtProt.btn_transmitir_red || ''}</button>` : ''}
-                ${canRejectSolicitud ? `<button type="button" class="btn btn-outline-warning btn-sm fw-bold" onclick="window.rejectProtocolRequest(${p.idprotA})"><i class="bi bi-x-octagon me-1"></i>${txtProt.btn_rechazar_solicitud || 'Rechazar solicitud'}</button>` : ''}
+                ${canRejectSolicitud ? `<button type="button" class="btn btn-outline-warning btn-sm fw-bold" ${canExecuteRejection ? `onclick="window.rejectProtocolRequest(${p.idprotA})"` : 'disabled'} title="${escapeHtml(canExecuteRejection ? (txtProt.btn_rechazar_solicitud || 'Rechazar solicitud') : (txtProt.borrar_deshabilitado_title || 'No se puede rechazar: existen formularios o alojamientos'))}"><i class="bi bi-x-octagon me-1"></i>${txtProt.btn_rechazar_solicitud || 'Rechazar solicitud'}</button>` : ''}
                 ${canShowDelete ? `<button type="button" class="btn btn-outline-danger btn-sm fw-bold" ${canDeleteManual ? `onclick="window.deleteManualProtocol(${p.idprotA})"` : 'disabled'} title="${escapeHtml(canDeleteManual ? (txtProt.btn_borrar_manual || 'Eliminar protocolo') : (txtProt.borrar_deshabilitado_title || 'No se puede eliminar: este protocolo tiene formularios u otra actividad.'))}"><i class="bi bi-trash me-1"></i>${escapeHtml(txtProt.btn_borrar_manual || 'Eliminar protocolo')}</button>` : ''}
                 ${p ? `<button type="button" class="btn btn-outline-secondary btn-sm fw-bold" onclick="window.downloadProtocolPDF(${p.idprotA})"><i class="bi bi-file-pdf"></i> FICHA PDF</button>` : ''}
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

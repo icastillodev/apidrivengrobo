@@ -139,17 +139,24 @@ class BillingModel {
             return ['', []];
         }
         $fx = $formAlias;
-        $parts = ["{$fx}.IdInstitucion = ?"];
-        $params = [$instCobradora];
-        if ($this->tableExists('formulario_derivacion')) {
-            $parts[] = "EXISTS (
-                SELECT 1 FROM formulario_derivacion fdi
-                WHERE fdi.idformA = {$fx}.idformA AND fdi.Activo = 1
-                  AND fdi.IdInstitucionDestino = ?
+        // Un protocolo compartido NO implica que sus pedidos se cobren en todas las
+        // instituciones de la red. El ledger derivado define la sede cobradora.
+        if ($this->tableExists('facturacion_formulario_derivado')) {
+            $local = "{$fx}.IdInstitucion = ? AND NOT EXISTS (
+                SELECT 1 FROM facturacion_formulario_derivado ffd_out
+                WHERE ffd_out.idformA = {$fx}.idformA
+                  AND ffd_out.IdInstitucionCobradora <> ?
             )";
-            $params[] = $instCobradora;
+            $incoming = "EXISTS (
+                SELECT 1 FROM facturacion_formulario_derivado ffd_in
+                WHERE ffd_in.idformA = {$fx}.idformA
+                  AND ffd_in.IdInstitucionCobradora = ?
+            )";
+            return [' AND ((' . $local . ') OR ' . $incoming . ')',
+                [$instCobradora, $instCobradora, $instCobradora]];
         }
-        return [' AND (' . implode(' OR ', $parts) . ')', $params];
+        // Compatibilidad con BD sin facturación derivada: solamente pedidos locales.
+        return [" AND {$fx}.IdInstitucion = ?", [$instCobradora]];
     }
 
     public function getProtocolosByDepto($deptoId, $instId = null) {

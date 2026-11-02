@@ -107,6 +107,15 @@ export async function initHistorialContable() {
 }
 
 async function loadData() {
+    const errorBox = document.getElementById('historial-carga-error');
+    const displayError = () => {
+        if (errorBox) {
+            errorBox.classList.remove('d-none');
+            errorBox.textContent = window.txt?.admin_historialcontable?.error_carga
+                || 'No se pudo cargar el historial contable. Revisá la conexión o contactá al administrador.';
+        }
+    };
+    if (errorBox) errorBox.classList.add('d-none');
     try {
         const res = await API.request('/billing/audit-history');
         if (res.status === 'success') {
@@ -117,11 +126,13 @@ async function loadData() {
             HistorialState.dataFull = [];
             filterData();
             console.error('Historial contable:', res.message || res);
+            displayError();
         }
     } catch (e) {
         HistorialState.dataFull = [];
         filterData();
         console.error("Error cargando historial contable:", e);
+        displayError();
     }
 }
 
@@ -349,7 +360,7 @@ function renderTable() {
             <td class="text-center fw-bold text-primary">${refTexto === '---' ? '---' : escapeHtml(refTexto)}</td>
             <td class="text-muted small">${transferTxt}</td>
             <td class="text-muted small">${commentTxt}</td>
-            <td class="text-end fw-bold ${row.Monto < 0 ? 'text-danger' : ''}">$${parseFloat(row.Monto).toFixed(2)}</td>
+            <td class="text-end fw-bold ${row.Monto < 0 ? 'text-danger' : ''}">$${(Number.parseFloat(row.Monto) || 0).toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
     });

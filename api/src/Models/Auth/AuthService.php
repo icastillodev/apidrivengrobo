@@ -12,11 +12,25 @@ class AuthService {
     }
 
     /**
-     * Emergencia Hostinger / SMTP caído: sin 2FA por correo ni bloqueo por mail.
-     * GROBO_SKIP_EMAIL_AUTH=1|true|yes|on
+     * Emergencia SMTP/Resend: sin 2FA por correo ni bloqueo por mail.
+     * GROBO_SKIP_EMAIL_AUTH=1|true|yes|on  — o MAIL_ENABLED=0 (no hay proveedor).
      */
     public static function skipEmailAuth(): bool {
-        $v = getenv('GROBO_SKIP_EMAIL_AUTH');
+        if (self::envFlagOn('GROBO_SKIP_EMAIL_AUTH')) {
+            return true;
+        }
+        $mailEnabled = getenv('MAIL_ENABLED');
+        if ($mailEnabled !== false && $mailEnabled !== '') {
+            $v = strtolower(trim((string) $mailEnabled));
+            if (in_array($v, ['0', 'false', 'off', 'no'], true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function envFlagOn(string $name): bool {
+        $v = getenv($name);
         if ($v === false || $v === '') {
             return false;
         }
@@ -150,6 +164,15 @@ public function attemptSuperAdminLogin($user, $pass) {
         // Guardar en BD
         $this->model->save2FACode($user['IdUsrA'], $code);
 
+        $destMail = isset($user['EmailA']) ? trim((string) $user['EmailA']) : '';
+        if ($destMail === '' || !filter_var($destMail, FILTER_VALIDATE_EMAIL)) {
+            error_log('AuthService: 2FA sin correo válido userId=' . (int) $user['IdUsrA']);
+            return [
+                'status' => '2fa_required',
+                'userId' => $user['IdUsrA'],
+            ];
+        }
+
         // Enviar Correo
         $mail = new MailService();
         $body = "
@@ -166,7 +189,7 @@ public function attemptSuperAdminLogin($user, $pass) {
         
         // Si no tiene mail, esto fallará silenciosamente o podrías manejar el error
         // Asumimos que los admin tienen mail válido.
-        $mail->executeSend($user['EmailA'], "Código de Acceso GROBO", $body);
+        $mail->executeSend($destMail, "Código de Acceso GROBO", $body);
 
         // Retornamos estado especial
         return [

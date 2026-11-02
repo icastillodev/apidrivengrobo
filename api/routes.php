@@ -10,6 +10,7 @@ $router->post('/login-superadmin', 'AuthController@loginSuperAdmin');
 
 $router->post('/register', 'UserController@register');
 $router->post('/confirm-account', 'UserController@confirmAccount');
+$router->post('/resend-activation', 'UserController@resendActivation');
 $router->get('/check-username', 'UserController@checkUsername');
 $router->get('/maintenance', 'UserController@maintenance');
 

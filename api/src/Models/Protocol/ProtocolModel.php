@@ -862,6 +862,16 @@ class ProtocolModel {
             throw new Exception('No se puede eliminar: este protocolo tiene formularios o alojamientos asociados.');
         }
 
+        // Los protocolos originados en una solicitud de investigador se rechazan;
+        // no se deben borrar por la ruta reservada a altas manuales de administración.
+        $checkRequest = $this->db->prepare(
+            'SELECT 1 FROM solicitudprotocolo WHERE idprotA = ? AND TipoPedido = 1 LIMIT 1'
+        );
+        $checkRequest->execute([(int)$idprotA]);
+        if ($checkRequest->fetchColumn()) {
+            throw new Exception('Este protocolo fue solicitado por un usuario: utiliza Rechazar solicitud.');
+        }
+
         $this->db->beginTransaction();
         try {
             // Si hubiese solicitudes con adjuntos colgantes para este protocolo, se limpian de B2.
@@ -958,6 +968,13 @@ class ProtocolModel {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             throw new Exception('No existe una solicitud local pendiente o aprobada para rechazar en este protocolo.');
+        }
+
+        // No rechazar una solicitud ya utilizada: los pedidos y alojamientos son
+        // registros científicos/contables que deben conservar su protocolo.
+        $usage = $this->getProtocolUsageCounts((int) $idprotA);
+        if ($usage['forms'] > 0 || $usage['alojamientos'] > 0) {
+            throw new Exception('No se puede rechazar: el protocolo tiene formularios o alojamientos vinculados en la red.');
         }
 
         // Al rechazar: mantener solicitud/protocolo, pero limpiar adjuntos (B2 + BD).

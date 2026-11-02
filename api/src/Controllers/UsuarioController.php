@@ -67,7 +67,10 @@ public function list() {
         $data = json_decode(file_get_contents("php://input"), true);
         
         try {
-            Auditoria::getDatosSesion(); // Valida Token
+            $sesion = Auditoria::getDatosSesion();
+            if ((int)($sesion['role'] ?? 0) !== 1) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Solo el superadministrador puede crear usuarios globales.'], 403);
+            }
 
             $instId = (int) ($data['IdInstitucion'] ?? 0);
             $raw = trim((string) ($data['UsrA'] ?? ''));
@@ -99,8 +102,30 @@ public function list() {
             }
             $data['UsrA'] = $userNorm;
 
-            $id = $this->model->createGlobal($data);
-            $this->jsonOut(['status' => 'success', 'id' => $id]);
+            $email = trim((string)($data['EmailA'] ?? ''));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Correo válido obligatorio para invitar a un usuario.'], 400);
+            }
+            $instStmt = $this->db->prepare('SELECT NombreInst FROM institucion WHERE IdInstitucion = ? LIMIT 1');
+            $instStmt->execute([$instId]);
+            $instName = (string)$instStmt->fetchColumn();
+            if ($instName === '') {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Institución no encontrada.'], 400);
+            }
+
+            $created = $this->model->createGlobal($data);
+            $sent = (new MailService())->sendResetPasswordEmail(
+                $email, (string)$data['NombreA'], $created['token'],
+                $instName, strtolower(trim($instName))
+            );
+            $this->jsonOut([
+                'status' => 'success',
+                'id' => $created['id'],
+                'mail' => $sent ? 'enviado' : 'error_envio',
+                'message' => $sent
+                    ? 'Cuenta creada. Se envió un enlace para elegir la contraseña al correo registrado.'
+                    : 'Cuenta creada sin contraseña conocida. No se pudo enviar el enlace: verificá el SMTP y solicitá su recuperación.'
+            ]);
 
         } catch (\Exception $e) {
             $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
@@ -111,7 +136,10 @@ public function list() {
         $data = json_decode(file_get_contents("php://input"), true);
         $id = $_GET['id'] ?? null;
         try {
-            Auditoria::getDatosSesion(); // Valida Token
+            $sesion = Auditoria::getDatosSesion();
+            if ((int)($sesion['role'] ?? 0) !== 1) {
+                return $this->jsonOut(['status' => 'error', 'message' => 'Solo el superadministrador puede editar usuarios globales.'], 403);
+            }
             $raw = trim((string) ($data['UsrA'] ?? ''));
             $instId = (int) ($data['IdInstitucion'] ?? 0);
             $userRules = new UserModel($this->db);
@@ -149,14 +177,12 @@ public function list() {
     }
 
     public function resetPass() {
-        $id = $_GET['id'] ?? null;
-        try {
-            Auditoria::getDatosSesion(); // Valida Token
-            $this->model->resetPassword($id);
-            $this->jsonOut(['status' => 'success']);
-        } catch (\Exception $e) {
-            $this->jsonOut(['status' => 'error', 'message' => $e->getMessage()], 500);
+        // Mismo control de rol, institución y recuperación segura que el panel de sede.
+        $sesion = Auditoria::getDatosSesion();
+        if ((int)($sesion['role'] ?? 0) !== 1) {
+            $this->jsonOut(['status' => 'error', 'message' => 'Acceso restringido al superadministrador.'], 403);
         }
+        (new UserController($this->db))->resetPassword();
     }
 
     public function checkUsername() {

@@ -591,13 +591,13 @@ window.saveUserData = async (id) => {
 
 window.resetPassword = async (id) => {
     const t = window.txt?.admin_usuarios;
-    if (!confirm(t?.reset_confirm || "¿Estás seguro de resetear la clave a '12345678'?")) return;
+    if (!confirm(t?.reset_confirm || "¿Enviar un enlace de recuperación al correo registrado?")) return;
     
     // Petición POST sin cuerpo de datos
     const res = await API.request(`/users/reset-pass?id=${id}`, 'POST');
     
     if (res.status === 'success') {
-        alert(t?.reset_ok || "Contraseña reseteada correctamente.");
+        alert(res.message || t?.reset_ok || "Enlace enviado al correo registrado.");
     } else {
         alert((t?.reset_error || "Error:") + " " + res.message);
     }

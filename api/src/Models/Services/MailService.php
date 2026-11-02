@@ -5,13 +5,14 @@ require_once __DIR__ . '/PHPMailer/Exception.php';
 require_once __DIR__ . '/PHPMailer/PHPMailer.php';
 require_once __DIR__ . '/PHPMailer/SMTP.php';
 
+use App\Utils\MailRateLimiter;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 class MailService {
-    private $host = 'smtp.hostinger.com';
-    private $user = 'no-reply@groboapp.com';
-    private $pass = 'XHMI@3hU';
+    private $host = '';
+    private $user = '';
+    private $pass = '';
     private $port = 587;
     private $secure = 'tls'; // tls | ssl | none
     private $fromEmail = 'no-reply@groboapp.com';
@@ -237,6 +238,22 @@ public function executeSend($to, $subject, $body, $replyTo = null) {
                 error_log('MailService: envío omitido (MAIL_ENABLED=' . $v . ') to=' . (string) $to);
                 return false;
             }
+        }
+
+        $toAddr = is_string($to) ? trim($to) : '';
+        if ($toAddr === '' || !filter_var($toAddr, FILTER_VALIDATE_EMAIL)) {
+            error_log('MailService: destinatario inválido, envío omitido');
+            return false;
+        }
+
+        if (!MailRateLimiter::allowSend('smtp', $toAddr)) {
+            error_log('MailService: envío omitido (rate limit) to-hash=' . substr(hash('sha256', strtolower($toAddr)), 0, 12));
+            return false;
+        }
+
+        if (trim((string) $this->host) === '' || trim((string) $this->pass) === '') {
+            error_log('MailService: SMTP no configurado (MAIL_HOST/MAIL_PASS). Envío omitido.');
+            return false;
         }
 
         $mail = new PHPMailer(true);

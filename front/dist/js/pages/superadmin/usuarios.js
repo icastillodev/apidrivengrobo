@@ -281,7 +281,7 @@ window.guardarUsuario = async () => {
         IdInstitucion: document.getElementById('IdInstitucion').value,
         IdTipoUsrA: document.getElementById('IdTipoUsrA').value,
         confirmado: document.getElementById('confirmado').value,
-        Clave: id ? null : "12345678"
+        Clave: null // El backend genera una clave aleatoria; el titular define la suya por correo.
     };
 
     const endpoint = id ? `/superadmin/usuarios/update?id=${id}` : '/superadmin/usuarios/create';
@@ -289,7 +289,7 @@ window.guardarUsuario = async () => {
     if (res.status === 'success') {
         modalUser.hide();
         await cargarUsuarios({ inline: true });
-        (window.mostrarNotificacion || alert)(id ? "Datos actualizados" : "Usuario creado (Clave: 12345678)");
+        (window.mostrarNotificacion || alert)(id ? "Datos actualizados" : (res.message || "Cuenta creada. Se enviará un enlace para elegir la contraseña."));
     } else {
         let msg = res.message || 'Error';
         if (msg === 'username_duplicate_institution') {
@@ -305,9 +305,10 @@ window.guardarUsuario = async () => {
 
 window.resetPassword = async () => {
     const id = document.getElementById('IdUsrA').value;
-    if (!confirm("¿Resetear clave de este usuario a '12345678'?")) return;
+    if (!confirm("¿Enviar al correo registrado un enlace para elegir una nueva contraseña?")) return;
     const res = await API.request(`/superadmin/usuarios/reset-pass?id=${id}`, 'POST');
-    if (res.status === 'success') alert("Clave restablecida correctamente.");
+    if (res.status === 'success') alert(res.message || "Enlace enviado al correo registrado.");
+    else alert(res.message || "No se pudo enviar el enlace.");
 };
 
 async function exportToExcel() {

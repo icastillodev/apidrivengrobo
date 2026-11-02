@@ -117,10 +117,14 @@ class UsuarioModel {
         try {
             $this->db->beginTransaction();
 
-            $passHash = password_hash($data['Clave'], PASSWORD_DEFAULT);
-            $sqlU = "INSERT INTO usuarioe (UsrA, password_secure, IdInstitucion, confirmado) VALUES (?, ?, ?, 1)";
+            // Crear con clave aleatoria desconocida: el titular define su propia clave
+            // usando el enlace de recuperación enviado exclusivamente a su correo.
+            $passHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+            $activationToken = bin2hex(random_bytes(32));
+            $sqlU = "INSERT INTO usuarioe (UsrA, password_secure, IdInstitucion, confirmado, token_confirmacion)
+                     VALUES (?, ?, ?, 1, ?)";
             $stmtU = $this->db->prepare($sqlU);
-            $stmtU->execute([$data['UsrA'], $passHash, $data['IdInstitucion']]);
+            $stmtU->execute([$data['UsrA'], $passHash, $data['IdInstitucion'], $activationToken]);
             $newId = $this->db->lastInsertId();
 
             $sqlP = "INSERT INTO personae (IdUsrA, NombreA, ApellidoA, EmailA) VALUES (?, ?, ?, ?)";
@@ -135,7 +139,7 @@ class UsuarioModel {
             Auditoria::log($this->db, 'INSERT', 'usuarioe', "Creó cuenta manual para Usuario: " . $data['UsrA']);
 
             $this->db->commit();
-            return $newId;
+            return ['id' => (int)$newId, 'token' => $activationToken];
 
         } catch (\Exception $e) {
             $this->db->rollBack(); 
@@ -144,12 +148,7 @@ class UsuarioModel {
     }
 
     public function resetPassword($id) {
-        $newPass = password_hash('12345678', PASSWORD_DEFAULT);
-        $res = $this->db->prepare("UPDATE usuarioe SET password_secure = ? WHERE IdUsrA = ?")
-                        ->execute([$newPass, $id]);
-        
-        Auditoria::log($this->db, 'UPDATE_PASS', 'usuarioe', "Forzó reseteo de contraseña (12345678) a Usuario ID: $id");
-        return $res;
+        throw new \LogicException('El restablecimiento seguro requiere enviar un enlace al correo del titular.');
     }
 
     /**

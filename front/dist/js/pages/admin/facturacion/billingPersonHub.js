@@ -94,6 +94,9 @@ export async function mountBillingPersonHub(mountEl, opts = {}) {
                     </button>
                 </div>
                 <div class="col-lg-3 col-md-12 text-md-end">
+                    <button type="button" id="billing-hub-export" class="btn btn-outline-success btn-sm fw-bold d-none me-1">
+                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>${esc(h.btn_exportar || 'Estado de cuenta CSV')}
+                    </button>
                     <a href="#" id="billing-hub-link-full" class="btn btn-outline-primary btn-sm fw-bold d-none">
                         <i class="bi bi-box-arrow-in-right me-1"></i>${esc(h.btn_abrir_facturacion || 'Estado de cuenta completo')}
                     </a>
@@ -139,6 +142,9 @@ export async function mountBillingPersonHub(mountEl, opts = {}) {
     const resultsEl = mountEl.querySelector('#billing-hub-results');
     const linkFull = mountEl.querySelector('#billing-hub-link-full');
     const btn = mountEl.querySelector('#billing-hub-btn-search');
+    const exportBtn = mountEl.querySelector('#billing-hub-export');
+    let lastReports = [];
+    let lastIdUsr = 0;
 
     const runSearch = async () => {
         const idUsr = parseInt(String(sel?.value || ''), 10) || 0;
@@ -163,6 +169,9 @@ export async function mountBillingPersonHub(mountEl, opts = {}) {
             linkFull.classList.remove('d-none');
         }
 
+        lastReports = [];
+        lastIdUsr = idUsr;
+        exportBtn?.classList.add('d-none');
         resultsEl.innerHTML = `<div class="text-center py-3 text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>${esc(window.txt?.generales?.msg_cargando || '…')}</div>`;
 
         try {
@@ -171,6 +180,10 @@ export async function mountBillingPersonHub(mountEl, opts = {}) {
                     fetchInvestigadorReport(idUsr, desde, hasta, 'institucionales'),
                     fetchInvestigadorReport(idUsr, desde, hasta, 'derivados'),
                 ]);
+                lastReports = [
+                    { label: h.seccion_local || 'Local', data: loc },
+                    { label: h.seccion_derivada || 'Derivada', data: der },
+                ];
                 resultsEl.innerHTML = `
                     <div class="row g-3">
                         <div class="col-lg-6">${renderReportSplitPanel(loc, h.seccion_local || 'Local')}</div>
@@ -178,14 +191,39 @@ export async function mountBillingPersonHub(mountEl, opts = {}) {
                     </div>`;
             } else {
                 const data = await fetchInvestigadorReport(idUsr, desde, hasta, 'todos');
+                lastReports = [{ label: h.seccion_juntas || 'Todo', data }];
                 resultsEl.innerHTML = renderReportSplitPanel(data, h.seccion_juntas || 'Todo');
             }
+            if (lastReports.length) exportBtn?.classList.remove('d-none');
         } catch (e) {
             resultsEl.innerHTML = `<div class="alert alert-danger small mb-0">${esc(String(e?.message || e))}</div>`;
         }
     };
 
+    exportBtn?.addEventListener('click', () => {
+        if (!lastReports.length || !lastIdUsr) return;
+        const safe = (val) => {
+            let s = String(val ?? '');
+            if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
+            return '"' + s.replace(/"/g, '""') + '"';
+        };
+        const rows = [['Ámbito', 'Tipo', 'Referencia', 'Detalle', 'Total', 'Pagado', 'Debe']];
+        lastReports.forEach((rep) => flattenReportToLines(rep.data).forEach((ln) => {
+            rows.push([rep.label, ln.tipo, ln.ref, ln.desc, ln.total, ln.pagado, ln.debe]);
+        }));
+        const csv = '\ufeff' + rows.map((row) => row.map(safe).join(';')).join('\r\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `estado-cuenta-${lastIdUsr}-${lastReports.length > 1 ? 'separado' : 'junto'}.csv`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    });
+
     btn?.addEventListener('click', () => runSearch());
+    mountEl.querySelector('#billing-hub-modo')?.addEventListener('change', () => {
+        if (sel?.value) void runSearch();
+    });
 
     const params = new URLSearchParams(window.location.search);
     const urlUsr = params.get('idUsr') || params.get('hubIdUsr');

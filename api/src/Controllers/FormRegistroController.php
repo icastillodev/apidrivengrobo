@@ -2,8 +2,9 @@
 namespace App\Controllers; 
 
 use App\Models\FormRegistro\FormRegistroModel;
-use App\Models\Services\MailService; // <-- Importamos tu MailService
-use App\Utils\Auditoria; 
+use App\Models\Services\MailService;
+use App\Utils\Auditoria;
+use App\Utils\MailRateLimiter;
 
 class FormRegistroController {
     private $model;
@@ -86,6 +87,12 @@ public function getBySlug($slug) {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!MailRateLimiter::allowEndpoint('form_registro', 8, 20)) {
+            http_response_code(429);
+            echo json_encode(['status' => 'error', 'code' => 'too_many_requests', 'message' => 'too_many_requests']);
+            exit;
+        }
         
         try {
             // 0. VALIDACIÓN CRÍTICA: ¿Está el formulario activo?

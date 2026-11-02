@@ -5,6 +5,7 @@ use App\Models\Comunicacion\MensajeriaModel;
 use App\Models\Admin\UsuarioModel;
 use App\Models\Services\MailService;
 use App\Utils\Auditoria;
+use App\Utils\MailRateLimiter;
 
 class MensajeriaController {
     private $model;
@@ -641,6 +642,11 @@ class MensajeriaController {
         ?array $mensajeAnterior = null
     ): array {
         $destinatarioIds = array_values(array_unique(array_filter(array_map('intval', $destinatarioIds), static fn ($v) => $v > 0)));
+        $maxDest = MailRateLimiter::envInt('MAIL_MAX_RECIPIENTS_PER_REQUEST', 25);
+        if ($maxDest > 0 && count($destinatarioIds) > $maxDest) {
+            error_log('Mensajeria: omite blast SMTP destinos=' . count($destinatarioIds) . ' tope=' . $maxDest);
+            return ['ok' => true, 'codigo' => 'omitido_masivo', 'enviados' => 0];
+        }
         if ($destinatarioIds === []) {
             return ['ok' => true, 'codigo' => 'sin_destinos', 'enviados' => 0];
         }
@@ -678,9 +684,8 @@ class MensajeriaController {
         $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
 
         if ($t === 'institucional_comunicado') {
-            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [3]);
-
-            return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+            // Queda en la app. SMTP a todos los investigadores (p. ej. URBE ~300) vacía Resend de un clic.
+            return [];
         }
 
         if ($t === 'consulta_institucion' || $t === 'institucional') {
@@ -721,9 +726,8 @@ class MensajeriaController {
         $b = ($bRaw !== null && $bRaw !== '') ? (int) $bRaw : 0;
 
         if ($t === 'institucional_comunicado') {
-            $ids = $this->model->listIdsUsuariosConTiposInstitucion($inst, [3]);
-
-            return array_values(array_filter($ids, static fn ($id) => $id !== $remitenteId));
+            // Queda en la app. SMTP a todos los investigadores (p. ej. URBE ~300) vacía Resend de un clic.
+            return [];
         }
 
         if ($t === 'consulta_institucion' || $t === 'institucional') {

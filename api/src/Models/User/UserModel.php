@@ -328,23 +328,64 @@ class UserModel {
 
     public function activateUserByToken($token) {
         try {
-            $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE token_confirmacion = ? LIMIT 1");
+            if (!is_string($token) || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+                return ['status' => 'error', 'message' => 'El token no es válido o ya fue utilizado.'];
+            }
+            // Consume solo tokens de activación de cuentas pendientes. Un token de
+            // recuperación no puede activar ni consumir una cuenta ya confirmada.
+            $stmt = $this->db->prepare(
+                'SELECT IdUsrA FROM usuarioe WHERE token_confirmacion = ? AND confirmado = 0 LIMIT 1'
+            );
             $stmt->execute([$token]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
             if (!$user) {
                 return ['status' => 'error', 'message' => 'El token no es válido o ya fue utilizado.'];
             }
-
-            $sql = "UPDATE usuarioe SET confirmado = 1, token_confirmacion = NULL WHERE IdUsrA = ?";
-            $this->db->prepare($sql)->execute([$user['IdUsrA']]);
-
-            Auditoria::logManual($this->db, $user['IdUsrA'], 'UPDATE', 'usuarioe', "Cuenta activada vía email");
-
+            $update = $this->db->prepare(
+                'UPDATE usuarioe SET confirmado = 1, token_confirmacion = NULL
+                 WHERE IdUsrA = ? AND token_confirmacion = ? AND confirmado = 0'
+            );
+            $update->execute([(int)$user['IdUsrA'], $token]);
+            if ($update->rowCount() !== 1) {
+                return ['status' => 'error', 'message' => 'El token no es válido o ya fue utilizado.'];
+            }
+            Auditoria::logManual($this->db, $user['IdUsrA'], 'UPDATE', 'usuarioe', 'Cuenta activada vía email');
             return ['status' => 'success', 'message' => 'Cuenta activada correctamente.'];
         } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => $e->getMessage()];
+            error_log('Error al confirmar cuenta: ' . get_class($e));
+            return ['status' => 'error', 'message' => 'No se pudo verificar la activación.'];
         }
+    }
+
+    /**
+     * Reenvío seguro: solo para cuentas pendientes en una sede concreta.
+     * No revela el token anterior y nunca modifica una cuenta ya confirmada.
+     */
+    public function getPendingActivationForRecovery(string $email, string $username, int $instId): ?array {
+        if ($instId <= 0 || !filter_var($email, FILTER_VALIDATE_EMAIL) || trim($username) === '') {
+            return null;
+        }
+        $st = $this->db->prepare(
+            'SELECT u.IdUsrA, u.UsrA, p.EmailA, p.NombreA
+             FROM usuarioe u INNER JOIN personae p ON p.IdUsrA = u.IdUsrA
+             WHERE u.IdInstitucion = ? AND LOWER(TRIM(p.EmailA)) = ?
+               AND LOWER(TRIM(u.UsrA)) = ? AND COALESCE(u.confirmado, 0) = 0 LIMIT 1'
+        );
+        $st->execute([$instId, strtolower(trim($email)), strtolower(trim($username))]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function renewPendingActivationToken(int $userId, int $instId, string $token): bool {
+        if ($userId <= 0 || $instId <= 0 || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+            return false;
+        }
+        $st = $this->db->prepare(
+            'UPDATE usuarioe SET token_confirmacion = ?
+             WHERE IdUsrA = ? AND IdInstitucion = ? AND COALESCE(confirmado, 0) = 0'
+        );
+        $st->execute([$token, $userId, $instId]);
+        return $st->rowCount() === 1;
     }
 
     /**
@@ -381,22 +422,29 @@ class UserModel {
     }
 
     public function saveResetToken($userId, $token) {
-        $sql = "UPDATE usuarioe SET token_confirmacion = ? WHERE IdUsrA = ?";
-        $res = $this->db->prepare($sql)->execute([$token, $userId]);
+        // No invalidar el token de activación de una cuenta todavía pendiente.
+        $sql = "UPDATE usuarioe SET token_confirmacion = ? WHERE IdUsrA = ? AND confirmado = 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$token, $userId]);
+        $res = $stmt->rowCount() === 1;
         
         Auditoria::logManual($this->db, $userId, 'UPDATE', 'usuarioe', "Generó token de recuperación de clave");
         return $res;
     }
 
     public function resetPasswordWithToken($token, $newHash) {
-        $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE token_confirmacion = ? LIMIT 1");
+        $stmt = $this->db->prepare("SELECT IdUsrA FROM usuarioe WHERE token_confirmacion = ? AND confirmado = 1 LIMIT 1");
         $stmt->execute([$token]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) return ['status' => 'error', 'message' => 'Token inválido'];
 
-        $sql = "UPDATE usuarioe SET password_secure = ?, token_confirmacion = NULL WHERE IdUsrA = ?";
-        $this->db->prepare($sql)->execute([$newHash, $user['IdUsrA']]);
+        $sql = "UPDATE usuarioe SET password_secure = ?, token_confirmacion = NULL WHERE IdUsrA = ? AND token_confirmacion = ? AND confirmado = 1";
+        $st = $this->db->prepare($sql);
+        $st->execute([$newHash, $user['IdUsrA'], $token]);
+        if ($st->rowCount() !== 1) {
+            return ['status' => 'error', 'message' => 'Token inválido'];
+        }
         
         Auditoria::logManual($this->db, $user['IdUsrA'], 'UPDATE', 'usuarioe', "Restableció contraseña vía correo");
         return ['status' => 'success'];
@@ -407,7 +455,8 @@ class UserModel {
         $emailNorm = is_string($email) ? strtolower(trim($email)) : $email;
         $sql = "SELECT p.IdUsrA, p.NombreA FROM personae p 
                 JOIN usuarioe u ON p.IdUsrA = u.IdUsrA 
-                WHERE LOWER(TRIM(p.EmailA)) = ? AND LOWER(TRIM(u.UsrA)) = ? AND u.IdInstitucion = ? LIMIT 1";
+                WHERE LOWER(TRIM(p.EmailA)) = ? AND LOWER(TRIM(u.UsrA)) = ? AND u.IdInstitucion = ?
+        AND u.confirmado = 1 LIMIT 1";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$emailNorm, $username, $instId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);

@@ -595,6 +595,10 @@ class BillingController {
 
             $role = (int)($sesion['role'] ?? 0);
             $sessionUserId = (int)($sesion['userId'] ?? 0);
+            if (!in_array($role, [1, 2, 3, 4, 7], true)) {
+                http_response_code(403);
+                $this->jsonResponse('error', 'Sin permisos para consultar facturación.');
+            }
             if ($role === 3 && $idUsr !== $sessionUserId) {
                 $this->jsonResponse('error', 'No tiene permisos para consultar la facturación de otro usuario.');
             }
@@ -1594,7 +1598,11 @@ class BillingController {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
         try {
-            $sesion = Auditoria::getDatosSesion(); // Seguridad: Solo el admin de esta inst ve esto
+            $sesion = Auditoria::getDatosSesion();
+            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 4, 7], true)) {
+                http_response_code(403);
+                $this->jsonResponse('error', 'Sin permisos para el historial contable.');
+            }
             $data = $this->model->getFinancialAudit($sesion['instId']);
             $this->jsonResponse('success', $data);
         } catch (\Exception $e) {
@@ -1612,10 +1620,18 @@ class BillingController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int) $sesion['instId'];
+            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 3, 4, 7], true)) {
+                http_response_code(403);
+                $this->jsonResponse('error', 'Sin permisos para consultar saldos.');
+            }
 
             $idUsr = isset($_GET['idUsr']) ? (int) $_GET['idUsr'] : 0;
             if ($idUsr <= 0) {
                 $this->jsonResponse('error', 'Usuario inválido.');
+            }
+            if ((int)($sesion['role'] ?? 0) === 3 && $idUsr !== (int)($sesion['userId'] ?? 0)) {
+                http_response_code(403);
+                $this->jsonResponse('error', 'Solo puede consultar sus propios movimientos.');
             }
             $from = !empty($_GET['from']) ? (string) $_GET['from'] : null;
             $to = !empty($_GET['to']) ? (string) $_GET['to'] : null;
