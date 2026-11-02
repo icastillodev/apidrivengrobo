@@ -1,4 +1,4 @@
-import { initBillingPageHub } from './billingPersonHub.js';
+import { initBillingPageHub } from './billingPersonHub.js?v=20261102';
 
 export async function initBillingHubIndex() {
     await initBillingPageHub('index', {

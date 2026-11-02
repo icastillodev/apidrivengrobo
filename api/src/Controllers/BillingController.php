@@ -595,7 +595,7 @@ class BillingController {
 
             $role = (int)($sesion['role'] ?? 0);
             $sessionUserId = (int)($sesion['userId'] ?? 0);
-            if (!in_array($role, [1, 2, 3, 4, 7], true)) {
+            if (!in_array($role, [1, 2, 3, 4, 5, 6, 7], true)) {
                 http_response_code(403);
                 $this->jsonResponse('error', 'Sin permisos para consultar facturación.');
             }
@@ -1599,7 +1599,7 @@ class BillingController {
         header('Content-Type: application/json');
         try {
             $sesion = Auditoria::getDatosSesion();
-            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 4, 7], true)) {
+            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 4, 5, 6, 7], true)) {
                 http_response_code(403);
                 $this->jsonResponse('error', 'Sin permisos para el historial contable.');
             }
@@ -1620,7 +1620,7 @@ class BillingController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int) $sesion['instId'];
-            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 3, 4, 7], true)) {
+            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 3, 4, 5, 6, 7], true)) {
                 http_response_code(403);
                 $this->jsonResponse('error', 'Sin permisos para consultar saldos.');
             }
