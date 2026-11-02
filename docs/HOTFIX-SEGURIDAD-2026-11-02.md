@@ -26,14 +26,18 @@ Ubuntu 24.04 LTS necesita, como mínimo, php8.3-fpm paquete `8.3.6-0ubuntu0.24.0
 
 Archivo preparado: `scripts/grobo-upgrade-php-security.sh`. Se ejecuta como root, hace backup de configuración, actualiza paquetes, comprueba PHP-FPM y Nginx, y verifica el paquete corregido.
 
-## SMTP Resend
-El SMTP actual rechaza con `550 API key is invalid`. Crear **nueva API key** desde la cuenta Resend autorizada; no copiarla al chat, al código ni a Git.
-Archivo preparado: `scripts/grobo-rotate-resend-smtp.sh`. Requiere root, solicita la clave por terminal sin mostrarla, envía un correo de prueba antes de reemplazar el secreto en `.env`, hace backup protegido y pide revocar la clave antigua en el proveedor.
+## SMTP Brevo
+
+Brevo SMTP reemplaza a Resend. Se debe usar login SMTP y clave SMTP (no API key). Servidor: smtp-relay.brevo.com:587 con STARTTLS. Verificar el remitente y autenticar el dominio en Brevo.
+
+Script: scripts/grobo-configurar-brevo-smtp.sh. Prueba STARTTLS, AUTH y aceptacion del correo antes de actualizar .env. Hace respaldo privado y escritura atomica. Credenciales en archivo temporal chmod 600, nunca en Git.
+
+Detalles: docs/BREVO-SMTP-GROBO.md.
 
 ## Despliegue
 1. Obtener permiso administrativo para actualizar paquetes y archivos en producción.
 2. Aplicar parche PHP de seguridad primero y verificar servicios.
-3. Rotar Resend y confirmar recepción real de email.
+3. Configurar Brevo SMTP, probar y confirmar recepción real del correo.
 4. Hacer respaldo reciente de base de datos y de la app; ejecutar migraciones autorizadas.
 5. Desplegar revisión integrada sobre staging, comprobar regresiones y después instalar en producción.
 6. Verificar contable, protocolos en red y acceso de usuario, sin tocar registros históricos.
