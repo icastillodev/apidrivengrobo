@@ -15,4 +15,5 @@ sudo -v
 sudo bash "$OPS/grobo-upgrade-php-security.sh"
 sudo bash "$OPS/grobo-rotate-resend-smtp.sh"
 sudo bash "$OPS/grobo-deploy-release-5ec4a55.sh"
-echo 'GROBO_UPDATE_DONE: realizar QA funcional de cuentas, pagos y protocolos.'
+sudo php "$OPS/grobo-reactivar-usuarios-pendientes.php"
+echo 'GROBO_UPDATE_DONE: revisar los correos de activación y realizar QA de cuentas, pagos y protocolos.'
