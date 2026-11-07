@@ -5,6 +5,7 @@ use App\Models\Auth\AuthModel;
 use App\Models\Auth\AuthService;
 use App\Utils\Auditoria; // Importamos nuestro guardián
 use App\Utils\ModulosInstitucion;
+use App\Utils\JwtSigningKey;
 
 class AuthController {
     private $service;
@@ -38,7 +39,7 @@ class AuthController {
             'exp'    => time() + (86400 * 7) // Expira en 7 días
         ];
         
-        $secretKey = $_ENV['JWT_SECRET'] ?? 'TuClaveSuperSecretaGROBO2026';
+        $secretKey = JwtSigningKey::get();
         $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
         $b64Header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
         $b64Payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));

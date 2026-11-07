@@ -19,18 +19,21 @@ class AdminConfigReservasController {
     public function getAllSalas() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $this->jsonResponse($this->model->getAllSalas($sesion['instId']));
     }
 
     public function getSalaDetail() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
-        $this->jsonResponse($this->model->getSalaDetail($_GET['id']));
+        $this->requireAdminReservaRole($sesion);
+        $this->jsonResponse($this->model->getSalaDetail((int)($_GET['id'] ?? 0), (int)$sesion['instId']));
     }
 
     public function saveSala() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $_POST['IdInstitucion'] = $sesion['instId']; // Inyectamos InstId Real
         
         $horarios = json_decode($_POST['horarios'], true);
@@ -41,14 +44,16 @@ class AdminConfigReservasController {
     public function toggleSala() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $input = json_decode(file_get_contents('php://input'), true);
-        $this->model->toggleSala($input['id'], $input['status']);
+        $this->model->toggleSala($input['id'], $input['status'], (int)$sesion['instId']);
         $this->jsonResponse(['status' => 'success']);
     }
 
     public function updateGlobalTimeType() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $input = json_decode(file_get_contents('php://input'), true);
         
         $this->model->updateGlobalTimeType($sesion['instId'], $input['type']);
@@ -58,26 +63,29 @@ class AdminConfigReservasController {
     public function getAllInst() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $this->jsonResponse($this->model->getAllInst($sesion['instId']));
     }
 
     public function getInstSalasPermitidas() {
         $sesion = Auditoria::getDatosSesion();
+        $this->requireAdminReservaRole($sesion);
         $targetInst = (int)($sesion['instId'] ?? 0);
-        if ((int)($sesion['role'] ?? 0) === 1 && isset($_GET['id']) && $_GET['id'] !== '') {
-            $v = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+        if ((int)($sesion['role'] ?? 0) === 1 && isset($_GET['inst']) && $_GET['inst'] !== '') {
+            $v = filter_var($_GET['inst'], FILTER_VALIDATE_INT);
             if ($v !== false && (int) $v > 0) {
                 $targetInst = (int) $v;
             }
         }
         $this->enforceModuloInstOrExit($sesion, 'reservas', $targetInst);
         $id = $_GET['id'] ?? null;
-        $this->jsonResponse($this->model->getInstSalasPermitidas($id));
+        $this->jsonResponse($this->model->getInstSalasPermitidas($id, $targetInst));
     }
 
     public function saveInst() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $_POST['IdInstitucion'] = $sesion['instId'];
         
         $salasPermitidas = [];
@@ -93,14 +101,16 @@ class AdminConfigReservasController {
     public function toggleInst() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $input = json_decode(file_get_contents('php://input'), true);
-        $this->model->toggleInst($input['id'], $input['status']);
+        $this->model->toggleInst($input['id'], $input['status'], (int)$sesion['instId']);
         $this->jsonResponse(['status' => 'success']);
     }
 
     public function generarQrSala() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         // Solo admins/roles altos
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2, 4, 5, 6], true)) {
@@ -115,6 +125,7 @@ class AdminConfigReservasController {
     public function generarQrInstitucion() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2, 4, 5, 6], true)) {
             $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
@@ -126,6 +137,7 @@ class AdminConfigReservasController {
     public function getModoAprobacion() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $out = $this->model->getModoAprobacion($sesion['instId']);
         $this->jsonResponse($out);
     }
@@ -133,6 +145,7 @@ class AdminConfigReservasController {
     public function setModoAprobacion() {
         $sesion = Auditoria::getDatosSesion();
         $this->enforceModuloSesionOrExit($sesion, 'reservas');
+        $this->requireAdminReservaRole($sesion);
         $role = (int)($sesion['role'] ?? 0);
         if (!in_array($role, [1, 2], true)) {
             $this->jsonResponse(['status' => 'error', 'message' => 'No autorizado']);
@@ -141,6 +154,12 @@ class AdminConfigReservasController {
         if (!is_array($input)) $input = [];
         $out = $this->model->setModoAprobacion($sesion['instId'], $input);
         $this->jsonResponse($out);
+    }
+
+    private function requireAdminReservaRole(array $sesion): void {
+        if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 4, 5, 6], true)) {
+            $this->modulosRespond403('Sin permisos de administración de reservas.');
+        }
     }
 
     private function jsonResponse($data) {

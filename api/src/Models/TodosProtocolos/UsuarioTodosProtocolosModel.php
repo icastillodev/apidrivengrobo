@@ -214,7 +214,37 @@ class UsuarioTodosProtocolosModel {
     }
 
     // ESCRITURA
-    public function getProtocolSpecies($id){$s=$this->db->prepare("SELECT e.idespA, e.EspeNombreA FROM protesper pe JOIN especiee e ON pe.idespA=e.idespA WHERE pe.idprotA=?");$s->execute([$id]);return $s->fetchAll(PDO::FETCH_ASSOC);}
+    public function getProtocolSpecies($id, int $userId, int $instId): array {
+        $id = (int)$id;
+        if ($id <= 0 || $userId <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('Datos de protocolo o sesión inválidos.');
+        }
+
+        // Mis protocolos y protocolos locales son visibles. Los protocolos externos
+        // solo pueden consultarse cuando fueron aprobados explícitamente para la red.
+        $sql = "SELECT e.idespA, e.EspeNombreA
+                FROM protesper pe
+                INNER JOIN especiee e ON e.idespA = pe.idespA
+                INNER JOIN protocoloexpe p ON p.idprotA = pe.idprotA
+                WHERE pe.idprotA = ?
+                  AND (
+                    p.IdUsrA = ?
+                    OR p.IdInstitucion = ?
+                    OR EXISTS (
+                        SELECT 1 FROM protinstr pi
+                        JOIN solicitudprotocolo s
+                          ON s.idprotA = pi.idprotA
+                         AND s.TipoPedido = 2
+                         AND s.Aprobado = 1
+                         AND s.IdInstitucion = pi.IdInstitucion
+                        WHERE pi.idprotA = p.idprotA
+                          AND pi.IdInstitucion = ?
+                    )
+                  )";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$id, $userId, $instId, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
     
     private function normalizeProtocolDates(array $d): array {
         $rawIni = isset($d['FechaIniProtA']) ? trim($d['FechaIniProtA']) : '';
@@ -310,10 +340,26 @@ class UsuarioTodosProtocolosModel {
         }
     }   
     
-    public function updateInternal($d, $files = null) {
+    public function updateInternal($d, int $userId, int $instId, $files = null) {
+        $id = isset($d['idprotA']) ? (int) $d['idprotA'] : 0;
+        if ($id <= 0 || $userId <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('Protocolo, usuario o institución inválidos.');
+        }
+
         $this->db->beginTransaction();
         try {
-            $id=$d['idprotA'];
+            // Bloqueo de fila y comprobación de titularidad ANTES de cualquier UPDATE/DELETE.
+            // Nunca usar IdUsrA ni IdInstitucion enviados por el navegador.
+            $owner = $this->db->prepare(
+                'SELECT idprotA FROM protocoloexpe
+                 WHERE idprotA = ? AND IdUsrA = ? AND IdInstitucion = ?
+                 LIMIT 1 FOR UPDATE'
+            );
+            $owner->execute([$id, $userId, $instId]);
+            if (!$owner->fetchColumn()) {
+                throw new \DomainException('No tiene permiso para modificar este protocolo.');
+            }
+
             [$ini, $fin] = $this->normalizeProtocolDates($d);
             $this->db->prepare("UPDATE protocoloexpe SET tituloA=?,nprotA=?,InvestigadorACargA=?,departamento=?,tipoprotocolo=?,CantidadAniA=?,severidad=?,FechaIniProtA=?,FechaFinProtA=? WHERE idprotA=?")->execute([$d['tituloA'],$d['nprotA'],$d['InvestigadorACargA'],$d['departamento'],$d['tipoprotocolo'],$d['CantidadAniA'],$d['severidad'],$ini,$fin,$id]);
             $this->db->prepare("DELETE FROM protesper WHERE idprotA=?")->execute([$id]);

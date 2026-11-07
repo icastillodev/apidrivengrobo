@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Models\Protocol\ProtocolModel;
 use App\Models\FormDerivacion\FormDerivacionModel;
 use App\Utils\Auditoria; // <-- Seguridad
+use App\Utils\InstitutionScope;
 use App\Models\Services\MailService;
 
 class ProtocolController {
@@ -22,12 +23,11 @@ class ProtocolController {
         try {
             $sesion = Auditoria::getDatosSesion(); // Extrae instId seguro
             // ✅ Respetar la institución que manda el Front (como en animales/reactivos)
-            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $targetInst = InstitutionScope::resolve($sesion, $_GET['inst'] ?? null);
             $data = $this->model->getByInstitution($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
@@ -38,12 +38,11 @@ class ProtocolController {
 
         try {
             $sesion = Auditoria::getDatosSesion();
-            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $targetInst = InstitutionScope::resolve($sesion, $_GET['inst'] ?? null);
             $data = $this->model->getFormData($targetInst);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
@@ -54,11 +53,11 @@ class ProtocolController {
         
         try {
             $sesion = Auditoria::getDatosSesion();
-            $targetInst = $_GET['inst'] ?? $sesion['instId'];
+            $targetInst = InstitutionScope::resolve($sesion, $_GET['inst'] ?? null);
             $count = $this->model->getPendingRequestsCount($targetInst);
             echo json_encode(['status' => 'success', 'count' => $count]);
         } catch (\Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
@@ -176,7 +175,12 @@ class ProtocolController {
 
         try {
             $sesion = Auditoria::getDatosSesion(); // Seguridad
-            $instId = $sesion['instId'];
+            if (!in_array((int)($sesion['role'] ?? 0), [1, 2, 4], true)) {
+                throw new \DomainException('No tiene permisos para administrar protocolos.');
+            }
+            // La institución efectiva proviene del JWT; solo superadmin puede
+            // seleccionar otra explícitamente, nunca un admin de sede.
+            $instId = InstitutionScope::resolve($sesion, $data['IdInstitucion'] ?? null);
             $targetId = $id ? (int)$id : 0;
 
             if ($targetId > 0) {
@@ -283,7 +287,7 @@ class ProtocolController {
                             CantidadAniA = ?, FechaIniProtA = ?, FechaFinProtA = ?, 
                             departamento = ?, tipoprotocolo = ?, severidad = ?, 
                             IdUsrA = ?, {$endSet}
-                        WHERE idprotA = ?";
+                        WHERE idprotA = ? AND IdInstitucion = ?";
                 $stmt = $this->db->prepare($sql);
                 $params = [
                     $data['tituloA'], $data['nprotA'], $data['InvestigadorACargA'], $nombreEncargado,
@@ -298,6 +302,7 @@ class ProtocolController {
                     $params[] = $permiteAnestVal;
                 }
                 $params[] = $id;
+                $params[] = $instId;
                 $stmt->execute($params);
                 $currentId = $id;
                 Auditoria::logManual($this->db, $sesion['userId'], 'UPDATE', 'protocoloexpe', "Modificó protocolo ID: $currentId cupo restante: {$data['CantidadAniA']}");
@@ -356,8 +361,7 @@ class ProtocolController {
 
         } catch (\Exception $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Error BD: ' . $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }

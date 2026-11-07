@@ -9,6 +9,35 @@ class AdminConfigReservasModel {
     private $db;
     public function __construct($db) { $this->db = $db; }
 
+    /** Filtro por IdInstitucion obligatorio para toda escritura de configuración. */
+    private function assertSalaOwned(int $idSala, int $instId): void {
+        if ($idSala <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('Sala o institución inválida.');
+        }
+        $stmt = $this->db->prepare(
+            'SELECT IdSalaReserva FROM reserva_sala
+             WHERE IdSalaReserva = ? AND IdInstitucion = ? LIMIT 1 FOR UPDATE'
+        );
+        $stmt->execute([$idSala, $instId]);
+        if (!$stmt->fetchColumn()) {
+            throw new \DomainException('Sala no encontrada en la institución actual.');
+        }
+    }
+
+    private function assertInstrumentoOwned(int $id, int $instId): void {
+        if ($id <= 0 || $instId <= 0) {
+            throw new \InvalidArgumentException('Instrumento o institución inválidos.');
+        }
+        $stmt = $this->db->prepare(
+            'SELECT IdReservaInstrumento FROM reserva_instrumento
+             WHERE IdReservaInstrumento = ? AND IdInstitucion = ? LIMIT 1 FOR UPDATE'
+        );
+        $stmt->execute([$id, $instId]);
+        if (!$stmt->fetchColumn()) {
+            throw new \DomainException('Instrumento no encontrado en la institución actual.');
+        }
+    }
+
     public function getAllSalas($instId) {
         $cols = ReservaTableColumns::reservaSala();
         $stmt = $this->db->prepare("SELECT {$cols} FROM reserva_sala WHERE IdInstitucion = ? ORDER BY Nombre ASC");
@@ -16,11 +45,14 @@ class AdminConfigReservasModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getSalaDetail($id) {
+    public function getSalaDetail($id, int $instId) {
         $colsSala = ReservaTableColumns::reservaSala();
-        $sala = $this->db->prepare("SELECT {$colsSala} FROM reserva_sala WHERE IdSalaReserva = ?");
-        $sala->execute([$id]);
+        $sala = $this->db->prepare("SELECT {$colsSala} FROM reserva_sala WHERE IdSalaReserva = ? AND IdInstitucion = ?");
+        $sala->execute([$id, $instId]);
         $salaData = $sala->fetch(PDO::FETCH_ASSOC);
+        if (!$salaData) {
+            throw new \DomainException('Sala no encontrada en la institución actual.');
+        }
 
         $colsHor = ReservaTableColumns::reservaHorariosPorDiaSala();
         $horarios = $this->db->prepare("SELECT {$colsHor} FROM reserva_horariospordiasala WHERE IdSalaReserva = ?");
@@ -30,6 +62,8 @@ class AdminConfigReservasModel {
     }
 
     public function saveSala($data, $horarios) {
+        $instId = (int)($data['IdInstitucion'] ?? 0);
+        if ($instId <= 0) throw new \InvalidArgumentException('Institución inválida.');
         try {
             $this->db->beginTransaction();
 
@@ -40,10 +74,11 @@ class AdminConfigReservasModel {
                 $idSala = $this->db->lastInsertId();
                 Auditoria::log($this->db, 'INSERT', 'reserva_sala', "Creó Sala: " . $data['Nombre']);
             } else {
-                $idSala = $data['IdSalaReserva'];
+                $idSala = (int)$data['IdSalaReserva'];
+                $this->assertSalaOwned($idSala, $instId);
                 $hab = $data['habilitado'] ?? 1;
-                $sql = "UPDATE reserva_sala SET Nombre=?, Lugar=?, tipohorasalas=?, habilitado=? WHERE IdSalaReserva=?";
-                $this->db->prepare($sql)->execute([$data['Nombre'], $data['Lugar'], $data['tipohorasalas'], $hab, $idSala]);
+                $sql = "UPDATE reserva_sala SET Nombre=?, Lugar=?, tipohorasalas=?, habilitado=? WHERE IdSalaReserva=? AND IdInstitucion=?";
+                $this->db->prepare($sql)->execute([$data['Nombre'], $data['Lugar'], $data['tipohorasalas'], $hab, $idSala, $instId]);
                 Auditoria::log($this->db, 'UPDATE', 'reserva_sala', "Modificó Sala ID: $idSala");
             }
 
@@ -64,8 +99,10 @@ class AdminConfigReservasModel {
         }
     }
 
-    public function toggleSala($id, $status) {
-        $this->db->prepare("UPDATE reserva_sala SET habilitado = ? WHERE IdSalaReserva = ?")->execute([$status, $id]);
+    public function toggleSala($id, $status, int $instId) {
+        $id = (int)$id;
+        $this->assertSalaOwned($id, $instId);
+        $this->db->prepare("UPDATE reserva_sala SET habilitado = ? WHERE IdSalaReserva = ? AND IdInstitucion = ?")->execute([$status, $id, $instId]);
         Auditoria::log($this->db, 'UPDATE', 'reserva_sala', "Cambió estado a $status de Sala ID: $id");
     }
 
@@ -81,13 +118,20 @@ class AdminConfigReservasModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getInstSalasPermitidas($idReservaInstrumento) {
-        $stmt = $this->db->prepare("SELECT IdSalaReserva FROM reserva_instrumento_sala_permitida WHERE IdReservaInstrumento = ?");
-        $stmt->execute([$idReservaInstrumento]);
+    public function getInstSalasPermitidas($idReservaInstrumento, int $instId) {
+        $stmt = $this->db->prepare(
+            "SELECT permitida.IdSalaReserva FROM reserva_instrumento_sala_permitida permitida
+             JOIN reserva_instrumento instr ON instr.IdReservaInstrumento = permitida.IdReservaInstrumento
+             JOIN reserva_sala sala ON sala.IdSalaReserva = permitida.IdSalaReserva
+             WHERE permitida.IdReservaInstrumento = ? AND instr.IdInstitucion = ? AND sala.IdInstitucion = ?"
+        );
+        $stmt->execute([$idReservaInstrumento, $instId, $instId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function saveInst($data, $salasPermitidas = []) {
+        $instId = (int)($data['IdInstitucion'] ?? 0);
+        if ($instId <= 0) throw new \InvalidArgumentException('Institución inválida.');
         try {
             $this->db->beginTransaction();
 
@@ -97,9 +141,10 @@ class AdminConfigReservasModel {
             $idInstrumento = $this->db->lastInsertId();
             Auditoria::log($this->db, 'INSERT', 'reserva_instrumento', "Agregó instrumento: " . $data['NombreInstrumento']);
             } else {
+            $this->assertInstrumentoOwned((int)$data['IdReservaInstrumento'], $instId);
             $hab = $data['habilitado'] ?? 1;
-            $sql = "UPDATE reserva_instrumento SET NombreInstrumento=?, cantidad=?, detalleInstrumento=?, habilitado=? WHERE IdReservaInstrumento=?";
-            $this->db->prepare($sql)->execute([$data['NombreInstrumento'], $data['cantidad'], $data['detalleInstrumento'], $hab, $data['IdReservaInstrumento']]);
+            $sql = "UPDATE reserva_instrumento SET NombreInstrumento=?, cantidad=?, detalleInstrumento=?, habilitado=? WHERE IdReservaInstrumento=? AND IdInstitucion=?";
+            $this->db->prepare($sql)->execute([$data['NombreInstrumento'], $data['cantidad'], $data['detalleInstrumento'], $hab, $data['IdReservaInstrumento'], $instId]);
             Auditoria::log($this->db, 'UPDATE', 'reserva_instrumento', "Modificó instrumento ID: " . $data['IdReservaInstrumento']);
                 $idInstrumento = $data['IdReservaInstrumento'];
             }
@@ -113,6 +158,7 @@ class AdminConfigReservasModel {
                 foreach ($salasPermitidas as $idSala) {
                     $idSalaInt = (int)$idSala;
                     if ($idSalaInt > 0) {
+                        $this->assertSalaOwned($idSalaInt, $instId);
                         $stmtPerm->execute([(int)$idInstrumento, $idSalaInt]);
                     }
                 }
@@ -125,8 +171,10 @@ class AdminConfigReservasModel {
         }
     }
 
-    public function toggleInst($id, $status) {
-        $this->db->prepare("UPDATE reserva_instrumento SET habilitado = ? WHERE IdReservaInstrumento = ?")->execute([$status, $id]);
+    public function toggleInst($id, $status, int $instId) {
+        $id = (int)$id;
+        $this->assertInstrumentoOwned($id, $instId);
+        $this->db->prepare("UPDATE reserva_instrumento SET habilitado = ? WHERE IdReservaInstrumento = ? AND IdInstitucion = ?")->execute([$status, $id, $instId]);
         Auditoria::log($this->db, 'UPDATE', 'reserva_instrumento', "Cambió estado a $status de Instrumento ID: $id");
     }
 

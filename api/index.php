@@ -1,8 +1,10 @@
 <?php
 // api/index.php
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// No emitir warnings ni stack traces en respuestas de la API (ni siquiera con Host manipulado).
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
 // ... el resto de tu código (require autoload, router, etc.)
@@ -66,5 +68,10 @@ require_once 'routes.php';
 // 5. Limpiamos cualquier echo/espacio en blanco accidental antes de ejecutar
 $basura = ob_get_clean(); 
 
-// 6. Lanzar la aplicación
-$router->run();
+// 6. Lanzar la aplicación; excepciones no capturadas devuelven JSON y código HTTP correcto.
+try {
+    $router->run();
+} catch (\Throwable $e) {
+    error_log('GROBO API unhandled exception: ' . get_class($e));
+    \App\Utils\ApiExceptionHandler::respond($e);
+}

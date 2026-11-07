@@ -488,7 +488,12 @@ class ProtocolModel {
 
         $stmtAccess = $this->db->prepare("SELECT p.idprotA
                                           FROM protocoloexpe p
-                                          LEFT JOIN protinstr pi ON pi.idprotA = p.idprotA
+                                          INNER JOIN protinstr pi ON pi.idprotA = p.idprotA
+                                          INNER JOIN solicitudprotocolo sr
+                                              ON sr.idprotA = p.idprotA
+                                             AND sr.TipoPedido = 2
+                                             AND sr.Aprobado = 1
+                                             AND sr.IdInstitucion = pi.IdInstitucion
                                           WHERE p.idprotA = ?
                                             AND p.IdInstitucion <> ?
                                             AND pi.IdInstitucion = ?

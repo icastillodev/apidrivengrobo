@@ -32,28 +32,28 @@ class Auditoria {
         if (empty($token)) {
             // DEBUG: Descomentar esto si quieres ver qué headers están llegando
             // error_log("Headers recibidos: " . print_r($_SERVER, true));
-            throw new Exception("Acceso denegado: No se proporcionó credencial de seguridad en los headers.");
+            throw new AuthenticationException("Acceso denegado: No se proporcionó credencial de seguridad en los headers.");
         }
         
         $token = str_replace('Bearer ', '', $token);
         $parts = explode('.', $token);
         
         if (count($parts) === 3) {
-            $secretKey = $_ENV['JWT_SECRET'] ?? 'TuClaveSuperSecretaGROBO2026';
+            $secretKey = JwtSigningKey::get();
             
             // 1. Verificamos que la firma no haya sido falsificada
             $signature = hash_hmac('sha256', $parts[0] . "." . $parts[1], $secretKey, true);
             $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
             
             if (!hash_equals($base64UrlSignature, $parts[2])) {
-                throw new Exception("Token adulterado o inválido.");
+                throw new AuthenticationException("Token adulterado o inválido.");
             }
 
             $payload = json_decode(base64_decode($parts[1]), true);
             
             // 2. Verificamos expiración
             if (isset($payload['exp']) && time() > $payload['exp']) {
-                throw new Exception("El token ha expirado. Inicie sesión nuevamente.");
+                throw new AuthenticationException("El token ha expirado. Inicie sesión nuevamente.");
             }
 
             // 3. Devolvemos la sesión (El SuperAdmin pasará con instId = 0)
@@ -64,7 +64,7 @@ class Auditoria {
             ];
         }
         
-        throw new Exception("Formato de token incorrecto.");
+        throw new AuthenticationException("Formato de token incorrecto.");
     }
 
     /**
