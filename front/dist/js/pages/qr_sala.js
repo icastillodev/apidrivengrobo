@@ -126,7 +126,7 @@ async function generarEtiquetaPDF() {
 
     const codigo = resToken.codigo;
     const basePath = window.location.origin + ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/');
-    const publicUrl = `${basePath}qr-sala/${codigo}`;
+    const publicUrl = `${basePath}paginas/qr-sala.html?token=${encodeURIComponent(codigo)}`;
 
     // Render QR invisible
     const buf = document.getElementById('qrcode-buffer');
@@ -212,12 +212,29 @@ function renderCalendar() {
     `;
 
     if (inMonth) {
-      div.onclick = () => {
+      // La celda mantiene el mismo diseño, ahora también se opera con teclado/lector.
+      div.setAttribute('role', 'button');
+      div.tabIndex = 0;
+      div.dataset.date = dateStr;
+      const labelDate = new Date(dateStr + 'T12:00:00').toLocaleDateString(
+        document.documentElement.lang || 'es', { year: 'numeric', month: 'long', day: 'numeric' }
+      );
+      div.setAttribute('aria-label', labelDate + (isAvailable ? ' - ' + (window.txt?.qr_sala?.badge_disp || 'Disponible') : ''));
+      div.setAttribute('aria-pressed', String(state.selectedDate === dateStr));
+      const selectDay = () => {
         state.selectedDate = dateStr;
         state.selectedSlots = [];
         renderCalendar();
         renderDayLists();
         updateReserveButton();
+        grid.querySelector('[data-date="' + dateStr + '"]')?.focus({ preventScroll: true });
+      };
+      div.onclick = selectDay;
+      div.onkeydown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectDay();
+        }
       };
     }
 
@@ -246,6 +263,7 @@ function renderDayLists() {
     btn.type = 'button';
     btn.className = 'btn btn-sm slot-btn ' + (state.selectedSlots.some(x => sameSlot(x, s)) ? 'btn-success' : 'btn-outline-success');
     btn.textContent = `${s.start} - ${s.end}`;
+    btn.setAttribute('aria-pressed', String(state.selectedSlots.some(x => sameSlot(x, s))));
     btn.onclick = () => toggleQrSlot(s);
     slotsList.appendChild(btn);
   });
@@ -254,7 +272,7 @@ function renderDayLists() {
     const mine = !!b.mine;
     busyList.insertAdjacentHTML('beforeend', `
       <div class="d-flex justify-content-between align-items-center border rounded p-2 bg-light">
-        <div class="fw-bold">${b.start} - ${b.end}</div>
+        <div class="fw-bold">${escapeHtml(b.start)} - ${escapeHtml(b.end)}</div>
         <span class="badge ${mine ? 'bg-primary' : 'bg-danger'}">${mine ? (window.txt?.qr_sala?.reservado_vos || 'Reservado por vos') : (window.txt?.qr_sala?.reservado || 'RESERVADO')}</span>
       </div>
     `);

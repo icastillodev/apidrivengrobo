@@ -128,7 +128,7 @@ async function generarEtiquetaPDF() {
 
     const codigo = resToken.codigo;
     const basePath = window.location.origin + ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/URBE-API-DRIVEN/front/' : '/');
-    const publicUrl = `${basePath}qr-salas.html?token=${encodeURIComponent(codigo)}`;
+    const publicUrl = `${basePath}paginas/qr-salas.html?token=${encodeURIComponent(codigo)}`;
 
     const buf = document.getElementById('qrcode-buffer');
     buf.innerHTML = '';
@@ -185,12 +185,12 @@ async function loadBundle() {
     const s = item.sala || {};
     const busy = (item.busyByDay && item.busyByDay[state.dateStr]) ? item.busyByDay[state.dateStr] : [];
     const tok = s.QrToken || '';
-    const salaUrl = tok ? `${window.location.origin}${basePath}qr-sala.html?token=${encodeURIComponent(tok)}` : '#';
+    const salaUrl = tok ? `${window.location.origin}${basePath}paginas/qr-sala.html?token=${encodeURIComponent(tok)}` : '#';
 
     const busyHtml = busy.length
       ? busy.map((b) => `
           <div class="d-flex justify-content-between align-items-center border rounded p-2 bg-light mb-1">
-            <div class="fw-bold small">${b.start} - ${b.end}</div>
+            <div class="fw-bold small">${escapeHtml(b.start)} - ${escapeHtml(b.end)}</div>
             <span class="badge ${b.mine ? 'bg-primary' : 'bg-danger'}">${b.mine ? (window.txt?.qr_sala?.reservado_vos || '') : (window.txt?.qr_sala?.reservado || '')}</span>
           </div>`).join('')
       : `<div class="small text-muted">${t.sin_reservas_dia || ''}</div>`;

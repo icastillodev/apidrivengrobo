@@ -232,3 +232,57 @@
     min-width: 0;
   }
 }
+
+/* Pantallas estrechas: filtros de facturacion y acciones de protocolos. */
+@media (max-width: 599.98px) {
+  .gecko-ux-billing-switches {
+    display: flex !important;
+    height: auto !important;
+    min-height: 36px;
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: .55rem .8rem !important;
+    padding-block: .5rem !important;
+  }
+  .gecko-ux-billing-switches > .form-check {
+    flex: 1 1 108px;
+    min-width: 0;
+    margin: 0 !important;
+  }
+}
+@media (max-width: 575.98px) {
+  .gecko-ux-protocol-actions {
+    display: flex !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap !important;
+    align-items: stretch !important;
+    gap: .5rem !important;
+  }
+  .gecko-ux-protocol-actions > .dropdown-toggle {
+    flex: 1 1 155px;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    padding: .6rem !important;
+    line-height: 1.25;
+    min-height: 44px;
+  }
+  .gecko-ux-protocol-actions > #btn-ayuda-protocolos {
+    flex: 0 0 44px;
+    min-width: 44px;
+    padding: .5rem !important;
+  }
+  .gecko-ux-protocol-actions > .dropdown-menu {
+    max-width: calc(100vw - 32px);
+    min-width: 0 !important;
+  }
+  .gecko-ux-protocol-actions .dropdown-item {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

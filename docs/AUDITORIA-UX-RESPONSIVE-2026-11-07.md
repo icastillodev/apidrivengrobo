@@ -64,3 +64,25 @@ En algunos documentos heredados que redirigen automáticamente, el navegador cam
 Los cambios de UX están desarrollados en el repositorio local, con intención de hacer commit/push y dejar paquete en **staging privado del VPS**; no declarar despliegue de producción hasta verificar escritura en `/var/www/html` y pruebas reales. La cuenta `geckosadm` continúa sin `sudo` no interactivo; no sustituir contraseñas ni compartir secretos por el chat.
 
 Brevo no puede activarse todavía porque los valores `SMTP_LOGIN` y `SMTP_KEY` no están cargados en el archivo local del escritorio. No deshabilitar 2FA ni usar API keys en el campo SMTP.
+
+## Continuación de auditoría de JavaScript y flujos (2026-11-07)
+
+- Analizados **178 módulos JavaScript** y **431 relaciones de importación** con Acorn, más scripts inline de las 84 páginas HTML. Resultado previo: **tres imports rotos**, cero errores de sintaxis. Corregidos los imports de `front/dist/js/formularios.js` y `front/dist/js/pages/noticia_publica.js`; el nuevo análisis registra **0 imports rotos, 0 exports ausentes y 0 scripts inline con errores de sintaxis**.
+- **Noticias públicas**: antes el módulo importaba `api.js` y `noticiaPortadaThumb.js` desde rutas inexistentes; ahora carga. Las pruebas verifican vistas válidas e inválidas, error 404, escape de contenido HTML y tres tamaños de dispositivo.
+- **Reserva vía QR**: los enlaces generados apuntaban a rutas que no corresponden a las vistas físicas. Se estandarizaron en `/paginas/qr-sala.html?token=...` y `/paginas/qr-salas.html?token=...`, sin depender de redirects opcionales del servidor. Se probó la navegación entre ambas vistas con datos simulados.
+- **Accesibilidad QR**: la selección de días admite teclado Enter y Espacio, usa nombre accesible y `aria-pressed`, conserva el foco después de actualizar el calendario. Los intervalos seleccionables informan su estado, sin cambios visuales.
+- **Seguridad de lectura QR**: los horarios recibidos de la API se insertan escapados como texto, no como HTML ejecutable.
+- **Pruebas ejecutadas**: `node tools/audit-grobo-functional-mocks.mjs` — **10/10 casos correctos** (noticia válida en celular/tablet/escritorio, noticia inválida, 404, formulario de animales, sala QR y listado institucional QR a 390/768 px). Las respuestas se simulan exclusivamente desde un servidor local en `127.0.0.1`; no se conectan ni modifican sistemas institucionales reales.
+- **320 px**: se inspeccionaron las 84 rutas; se eliminaron los desbordes en facturación por departamento, facturación por organización, reservas y ambas páginas de Mis Protocolos mediante ajustes responsivos de switches y acciones. Resultado final: **0 desbordes en vistas con contenido** y **1 ruta vacía heredada** (`paginas/usuario/formularios/reservas.html`).
+- Se mantiene pendiente QA con sesiones reales de cada rol, datos de producción, compatibilidad iOS Safari y Android Chrome, procesos completos de reserva, y el despliegue autorizado de PHP + Brevo.
+
+### Nuevos comandos de auditoría
+
+```powershell
+cd C:\Users\nacho\Desktop\webs\URBE-API-DRIVEN
+node tools/audit-grobo-js-modules.mjs
+node tools/audit-grobo-functional-mocks.mjs
+node tools/audit-grobo-responsive.mjs --micro
+```
+
+Los paquetes `playwright-core`, `parse5` y `acorn` utilizados para estas auditorías se instalaron en una carpeta temporal separada, no en las dependencias de la aplicación. El script de fixtures NO debe apuntar al VPS ni recibir credenciales reales.

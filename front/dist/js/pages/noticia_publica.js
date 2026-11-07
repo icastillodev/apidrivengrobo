@@ -1,5 +1,5 @@
-import { API } from '../../api.js';
-import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../../utils/noticiaPortadaThumb.js';
+import { API } from '../api.js';
+import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js';
 
 function escapeHtml(s) {
     return String(s ?? '')

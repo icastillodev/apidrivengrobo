@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-STAGE=/home/geckosadm/grobo-ops/staging-20261107-ux
+STAGE=/home/geckosadm/grobo-ops/staging-20261107-v2
 APP=/var/www/html/app
 API=/var/www/html/core-backend-gem
 MINIMUM=8.3.6-0ubuntu0.24.04.13

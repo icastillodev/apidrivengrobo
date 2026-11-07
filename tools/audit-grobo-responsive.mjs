@@ -38,7 +38,7 @@ const sample = new Set([
 ]);
 const onlySample = process.argv.includes('--sample');
 const pages = all.filter(p => !onlySample || sample.has(path.relative(base,p).replaceAll('\\','/')));
-const widths = (process.argv.includes('--narrow') ? [360] : (process.argv.includes('--phone') ? [390] : (process.argv.includes('--tablet') ? [768,1024] : (process.argv.includes('--desktop') ? [390,768,1024,1366] : [360,390,768,1024]))));
+const widths = process.argv.includes('--micro') ? [320] : process.argv.includes('--narrow') ? [360] : process.argv.includes('--phone') ? [390] : process.argv.includes('--tablet') ? [768,1024] : process.argv.includes('--desktop') ? [390,768,1024,1366] : [360,390,768,1024];
 const browser = await chromium.launch({
   executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   headless:true,

@@ -1,4 +1,4 @@
-import { API } from '../api.js'; // No olvides importarla aquí también
+import { API } from './api.js'; // No olvides importarla aquí también
 
     export async function initFormularios() {
         const instId = localStorage.getItem('instId');
