@@ -44,3 +44,11 @@ Verificar primero la llegada del email de prueba y la autenticacion del dominio 
 Los scripts solo estaran *preparados* hasta disponer de permisos administrativos y credenciales validas. No decir que Brevo o PHP estan activos en produccion sin verificar.
 
 Fuentes: https://help.brevo.com/hc/es/articles/7924908994450-Enviar-emails-transaccionales-con-Brevo-SMTP y https://help.brevo.com/hc/es/articles/7959631848850-Crear-y-administrar-claves-SMTP
+
+## Diagnóstico SMTP 525 (7 de noviembre de 2026)
+
+La conexión desde el VPS al relay `smtp-relay.brevo.com:587` negoció STARTTLS, pero Brevo rechazó AUTH con código **525**: IP de salida no autorizada. No confundir con 535 (credenciales inválidas). La IP de salida debe verificarse desde el servidor antes de autorizarla en **Brevo → Configuración → Seguridad → IP autorizadas**. Evitar desactivar el bloqueo de IP global.
+
+El runner `scripts/grobo-completar-actualizacion.sh` ahora ejecuta `scripts/grobo-brevo-smtp-auth-check.py` **antes de usar sudo y actualizar producción**. El test no envía emails, solo verifica conectividad, STARTTLS y AUTH sin registrar los secretos. Si Brevo responde 525 o 535, se detiene con un estado explicativo, sin editar PHP ni `.env`.
+
+Fuente: https://help.brevo.com/hc/es/articles/115000188150-Soluci%C3%B3n-de-problemas-relacionados-con-Brevo-SMTP
