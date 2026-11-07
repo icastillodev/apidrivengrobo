@@ -23,7 +23,8 @@ if ! awk '
   exit 2
 fi
 apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list -o Dir::Etc::sourceparts=- update
-CANDIDATE=$(apt-cache policy php8.3-fpm | awk '/Candidate:/ {print $2; exit}')
+# No usar `exit` en awk con pipefail: corta apt-cache con SIGPIPE (código 141).
+CANDIDATE=$(apt-cache policy php8.3-fpm | awk '/Candidate:/ {print $2}')
 MINIMUM='8.3.6-0ubuntu0.24.04.13'
 if [[ -z "$CANDIDATE" ]] || ! dpkg --compare-versions "$CANDIDATE" ge "$MINIMUM"; then
   echo "ERROR: repositorio no ofrece el parche requerido ($MINIMUM). Candidato=$CANDIDATE"
