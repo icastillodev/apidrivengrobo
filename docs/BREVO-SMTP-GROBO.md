@@ -52,3 +52,9 @@ La conexión desde el VPS al relay `smtp-relay.brevo.com:587` negoció STARTTLS,
 El runner `scripts/grobo-completar-actualizacion.sh` ahora ejecuta `scripts/grobo-brevo-smtp-auth-check.py` **antes de usar sudo y actualizar producción**. El test no envía emails, solo verifica conectividad, STARTTLS y AUTH sin registrar los secretos. Si Brevo responde 525 o 535, se detiene con un estado explicativo, sin editar PHP ni `.env`.
 
 Fuente: https://help.brevo.com/hc/es/articles/115000188150-Soluci%C3%B3n-de-problemas-relacionados-con-Brevo-SMTP
+
+## Incidente de actualización del VPS — 7 de noviembre de 2026
+
+La primera ejecución del despliegue alcanzó `apt-get update` después de la autenticación de `sudo`, pero se interrumpió por un repositorio opcional de Virtuozzo en `/etc/apt/sources.list.d/ct-preset.list`. Se verificó que `/etc/apt/sources.list` contiene exclusivamente repositorios oficiales de Ubuntu 24.04, y una actualización aislada de índices ejecutada con `Dir::Etc::sourceparts=-` finalizó correctamente (exit 0) sin tocar las fuentes instaladas. La simulación de APT muestra actualización de 12 paquetes PHP a `8.3.6-0ubuntu0.24.04.13`.
+
+`scripts/grobo-upgrade-php-security.sh` ahora valida las entradas del `sources.list` y actualiza índices exclusivamente con ese archivo. No modifica ni deshabilita permanentemente el repositorio de Virtuozzo. La instalación real de PHP sigue sujeta a `sudo`, backup, chequeo de configuración PHP y Nginx y validación de versión mínima antes del deploy.

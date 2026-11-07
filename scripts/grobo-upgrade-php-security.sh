@@ -9,7 +9,20 @@ tar -czf "$BACKUP" /etc/php/8.3 /etc/nginx 2>/dev/null
 chmod 600 "$BACKUP"
 echo "Config respaldada en $BACKUP"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
+# El VPS incluye un repositorio opcional de Virtuozzo que puede fallar en apt update.
+# Actualizar indices SOLO desde el sources.list oficial de Ubuntu, SIN desactivar repositorios
+# globalmente ni modificar /etc/apt. No se aceptan fuentes adicionales en este archivo.
+[[ -f /etc/apt/sources.list ]] || { echo 'ERROR: falta /etc/apt/sources.list'; exit 2; }
+if ! awk '
+  /^[[:space:]]*(#|$)/ { next }
+  /^deb[[:space:]]+https?:\/\/(archive\.ubuntu\.com|security\.ubuntu\.com)\/ubuntu[[:space:]]/ { next }
+  { invalid=1 }
+  END { exit invalid }
+' /etc/apt/sources.list; then
+  echo 'ERROR: repositorios no oficiales detectados en sources.list; abortando.'
+  exit 2
+fi
+apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list -o Dir::Etc::sourceparts=- update
 CANDIDATE=$(apt-cache policy php8.3-fpm | awk '/Candidate:/ {print $2; exit}')
 MINIMUM='8.3.6-0ubuntu0.24.04.13'
 if [[ -z "$CANDIDATE" ]] || ! dpkg --compare-versions "$CANDIDATE" ge "$MINIMUM"; then
