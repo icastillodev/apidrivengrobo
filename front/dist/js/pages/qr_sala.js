@@ -1,4 +1,5 @@
 import { API } from '../api.js';
+import { getQrSessionValue, closeQrSession } from '../utils/qrAuthSession.js';
 
 const state = {
   token: null,
@@ -36,9 +37,9 @@ export async function initQRSalaPage() {
 
 function renderAuthZone() {
   const zone = document.getElementById('auth-zone');
-  const token = localStorage.getItem('token');
-  const name = localStorage.getItem('userName');
-  const role = parseInt(localStorage.getItem('userLevel'), 10);
+  const token = getQrSessionValue('token');
+  const name = getQrSessionValue('userName');
+  const role = parseInt(getQrSessionValue('userLevel'), 10);
   const t = window.txt?.qr_sala || {};
 
   if (token && name) {
@@ -50,9 +51,7 @@ function renderAuthZone() {
       </div>
     `;
     window.__qrSalaLogout = () => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userLevel');
-      localStorage.removeItem('userName');
+      closeQrSession();
       window.location.reload();
     };
 
@@ -335,7 +334,7 @@ function toggleQrSlot(slot) {
 
 function updateReserveButton() {
   const btn = document.getElementById('btn-reservar');
-  const logged = !!localStorage.getItem('token');
+  const logged = !!getQrSessionValue('token');
   const merged = getMergedQr();
   btn.disabled = !(logged && state.sala?.IdSalaReserva && state.selectedDate && merged);
 }
@@ -349,7 +348,7 @@ function clearSelection() {
 }
 
 async function reservar() {
-  const logged = !!localStorage.getItem('token');
+  const logged = !!getQrSessionValue('token');
   if (!logged) return;
   const merged = getMergedQr();
   if (!state.sala?.IdSalaReserva || !state.selectedDate || !merged) return;

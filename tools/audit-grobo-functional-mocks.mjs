@@ -197,6 +197,49 @@ for(const width of [390,768]){
   await page.waitForFunction(()=>document.getElementById('salas-list')?.textContent?.includes('Sala de ensayo'),{timeout:6500});
  });
 }
+await runNews('qr-sala-session-only-logout','paginas/qr-sala.html?token=fixture-sala',390,async page=>{
+ await page.waitForFunction(()=>document.getElementById('sala-nombre')?.textContent?.includes('Sala de ensayo'),{timeout:6500});
+ await page.evaluate(()=>{
+   sessionStorage.setItem('token','qa-session-only');
+   sessionStorage.setItem('userName','Usuario QA');
+   sessionStorage.setItem('userLevel','3');
+   localStorage.setItem('lang','es');
+   localStorage.setItem('theme','dark');
+   localStorage.setItem('NombreInst','URBE');
+ });
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#auth-zone .bi-person-circle',{state:'attached',timeout:6500});
+ const day=page.locator('#calendar-grid .day-cell[data-date$="-14"]').first();
+ await day.click();
+ await page.locator('#slots-list button').first().click();
+ assert(await page.locator('#btn-reservar').isEnabled(),'sesion temporal de navegador no permite reservar');
+ await page.locator('#auth-zone button').click();
+ await page.waitForSelector('#auth-zone .bi-person-lock',{state:'attached',timeout:6500});
+ const state=await page.evaluate(()=>({
+   localToken:localStorage.getItem('token'),
+   sessionToken:sessionStorage.getItem('token'),
+   sessionName:sessionStorage.getItem('userName'),
+   lang:localStorage.getItem('lang'),
+   theme:localStorage.getItem('theme'),
+   inst:localStorage.getItem('NombreInst')
+ }));
+ assert(!state.localToken&&!state.sessionToken&&!state.sessionName,'logout no elimino ambas sesiones');
+ assert(state.lang==='es'&&state.theme==='dark'&&state.inst==='URBE','logout borro preferencias o sede');
+});
+await runNews('qr-salas-session-only-logout','paginas/qr-salas.html?token=fixture-institucion',390,async page=>{
+ await page.waitForFunction(()=>document.getElementById('inst-nombre')?.textContent?.includes('URBE'),{timeout:6500});
+ await page.evaluate(()=>{
+   sessionStorage.setItem('token','qa-session-only');
+   sessionStorage.setItem('userName','Usuario QA');
+   sessionStorage.setItem('userLevel','3');
+   localStorage.setItem('NombreInst','URBE');
+ });
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#auth-zone .bi-person-circle',{state:'attached',timeout:6500});
+ await page.locator('#auth-zone button').click();
+ await page.waitForSelector('#auth-zone .bi-person-lock',{state:'attached',timeout:6500});
+ assert(await page.evaluate(()=>!sessionStorage.getItem('token')&&!localStorage.getItem('token')),'logout salas dejo sesion activa');
+});
 await browser.close();await new Promise(resolve=>server.close(resolve));
 const folder=path.join(os.tmpdir(),'grobo-ux-audit','report');
 fs.mkdirSync(folder,{recursive:true});

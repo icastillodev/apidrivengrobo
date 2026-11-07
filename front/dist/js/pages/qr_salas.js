@@ -2,6 +2,7 @@
  * QR público: todas las salas de la institución (token institucional).
  */
 import { API } from '../api.js';
+import { getQrSessionValue, closeQrSession } from '../utils/qrAuthSession.js';
 
 const state = {
   token: null,
@@ -43,9 +44,9 @@ function toYMD(d) {
 
 function renderAuthZone() {
   const zone = document.getElementById('auth-zone');
-  const token = localStorage.getItem('token');
-  const name = localStorage.getItem('userName');
-  const role = parseInt(localStorage.getItem('userLevel'), 10);
+  const token = getQrSessionValue('token');
+  const name = getQrSessionValue('userName');
+  const role = parseInt(getQrSessionValue('userLevel'), 10);
   const t = window.txt?.qr_salas || {};
 
   if (token && name) {
@@ -57,9 +58,7 @@ function renderAuthZone() {
       </div>
     `;
     window.__qrSalasLogout = () => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userLevel');
-      localStorage.removeItem('userName');
+      closeQrSession();
       window.location.reload();
     };
 
