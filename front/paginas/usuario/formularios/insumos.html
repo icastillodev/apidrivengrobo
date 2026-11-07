@@ -68,6 +68,7 @@
         }
     });
 </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
 
@@ -126,7 +127,8 @@
                 <input type="hidden" id="id-tipo-form"> 
 
                 <div class="card shadow-sm border-0 overflow-hidden">
-                    <table class="table table-hover mb-0 align-middle">
+                    <div class="table-responsive gecko-ux-table-scroll" tabindex="0" role="region" aria-label="Tabla con desplazamiento horizontal">
+<table class="table table-hover mb-0 align-middle">
                         <thead class="bg-light">
                             <tr>
                                 <th class="ps-4 py-3 small text-muted text-uppercase" data-i18n="form_insumos.insumo_articulo">Insumo / Artículo</th>
@@ -136,6 +138,7 @@
                         </thead>
                         <tbody id="insumos-table-body"></tbody>
                     </table>
+</div>
                     <div class="p-3 bg-light border-top">
                         <button type="button" id="btn-add-row" class="btn btn-sm btn-primary fw-bold rounded-pill px-3">
                             <i class="bi bi-plus-lg me-1"></i> <span data-i18n="form_insumos.agregar_otro">AGREGAR OTRO INSUMO</span>

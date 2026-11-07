@@ -39,6 +39,7 @@
 
 
 
+    <link rel="stylesheet" href="../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
 
@@ -105,27 +106,27 @@
                         
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_corto">Nombre Corto (Sede)</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_corto" for="NombreInst">Nombre Corto (Sede)</label>
                                 <input type="text" id="NombreInst" class="form-control" required data-i18n="superadmin_instituciones.ph_nombre_corto" placeholder="Ej: URBE">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_correo">Correo Electrónico</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_correo" for="InstCorreo">Correo Electrónico</label>
                                 <input type="email" id="InstCorreo" class="form-control" required>
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_completo">Nombre Completo Institucional</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_nombre_completo" for="NombreCompletoInst">Nombre Completo Institucional</label>
                                 <input type="text" id="NombreCompletoInst" class="form-control" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_pais">País</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_pais" for="Pais">País</label>
                                 <input type="text" id="Pais" class="form-control" value="Uruguay">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_localidad">Localidad</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_localidad" for="Localidad">Localidad</label>
                                 <input type="text" id="Localidad" class="form-control">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_moneda">Moneda</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_moneda" for="Moneda">Moneda</label>
                                 <select id="Moneda" class="form-select">
                                     <option value="UYU" data-i18n="superadmin_instituciones.opcion_uyu">Peso Uruguayo (UYU)</option>
                                     <option value="USD" data-i18n="superadmin_instituciones.opcion_usd">Dólar (USD)</option>
@@ -133,7 +134,7 @@
                                 </select>
                             </div>
                             <div class="col-md-8">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_web">Web Oficial</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_web" for="Web">Web Oficial</label>
                                 <input type="url" id="Web" class="form-control" data-i18n="superadmin_instituciones.ph_web" placeholder="https://...">
                             </div>
                             <div class="col-md-6">
@@ -150,7 +151,7 @@
                                 <p class="small text-muted mb-0" data-i18n="superadmin_instituciones.help_en_red_auto">Indica que la sede comparte grupo por el texto de arriba. Desmárquelo para vaciar el grupo y guardar sin dependencia.</p>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_logo">URL del Logo</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_logo" for="Logo">URL del Logo</label>
                                 <input type="text" id="Logo" class="form-control" placeholder="https://...">
                             </div>
                             <div class="col-12 border-top pt-3 mt-2">
@@ -163,13 +164,13 @@
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_tipo_app">Tipo de App</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_tipo_app" for="TipoApp">Tipo de App</label>
                                 <select id="TipoApp" class="form-select">
                                     <option value="1" data-i18n="superadmin_instituciones.opcion_comun">1 - Común</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_estado_sede">Estado Sede</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_estado_sede" for="Activo">Estado Sede</label>
                                 <select id="Activo" class="form-select">
                                     <option value="1" data-i18n="superadmin_instituciones.opcion_activa">Activa</option>
                                     <option value="0" data-i18n="superadmin_instituciones.opcion_inactiva">Inactiva (Bloqueada)</option>
@@ -177,7 +178,7 @@
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_ciclo_fact">Ciclo Facturación</label>
+                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_ciclo_fact" for="TipoFacturacion">Ciclo Facturación</label>
                                 <select id="TipoFacturacion" class="form-select border-primary">
                                     <option value="1" data-i18n="superadmin_instituciones.opcion_mensual">Mensual (1 mes)</option>
                                     <option value="3" data-i18n="superadmin_instituciones.opcion_trimestral">Trimestral (3 meses)</option>
@@ -186,16 +187,16 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_fecha_contrato">Fecha Contrato</label>
+                                <label class="form-label fw-bold text-primary" data-i18n="superadmin_instituciones.label_fecha_contrato" for="FechaContrato">Fecha Contrato</label>
                                 <input type="date" id="FechaContrato" class="form-control border-primary">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_ultimo_pago">Último Pago</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_ultimo_pago" for="UltimoPago">Último Pago</label>
                                 <input type="date" id="UltimoPago" class="form-control">
                             </div>
                             
                             <div class="col-12">
-                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_detalles">Detalles / Observaciones Internas</label>
+                                <label class="form-label fw-bold" data-i18n="superadmin_instituciones.label_detalles" for="Detalle">Detalles / Observaciones Internas</label>
                                 <textarea id="Detalle" class="form-control" rows="2" data-i18n="superadmin_instituciones.ph_detalles" placeholder="Notas sobre el contrato, contacto técnico, etc."></textarea>
                             </div>
 

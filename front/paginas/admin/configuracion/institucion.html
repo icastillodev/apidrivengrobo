@@ -102,6 +102,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -145,16 +146,16 @@
                         </div>
                         <div class="card-body p-4">
                             <div class="mb-3">
-                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_nombre_completo"></label>
+                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_nombre_completo" for="in-nombre"></label>
                                 <input type="text" name="NombreCompletoInst" id="in-nombre" class="form-control fw-bold" required>
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_web"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_web" for="in-web"></label>
                                     <input type="text" name="Web" id="in-web" class="form-control" data-i18n="config_institucion.ph_web" placeholder="www.ejemplo.com">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_correo"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_correo" for="in-correo"></label>
                                     <input type="email" name="InstCorreo" id="in-correo" class="form-control" required>
                                 </div>
                             </div>
@@ -168,19 +169,19 @@
                         <div class="card-body p-4">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_direccion"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_direccion" for="in-dir"></label>
                                     <input type="text" name="InstDir" id="in-dir" class="form-control">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_telefono"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_telefono" for="in-contacto"></label>
                                     <input type="text" name="InstContacto" id="in-contacto" class="form-control">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_localidad"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_localidad" for="in-localidad"></label>
                                     <input type="text" name="Localidad" id="in-localidad" class="form-control">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_pais"></label>
+                                    <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_pais" for="in-pais"></label>
                                     <input type="text" name="Pais" id="in-pais" class="form-control">
                                 </div>
                             </div>
@@ -224,7 +225,7 @@
                             <hr class="text-muted opacity-10 my-4">
 
                             <div class="mb-4">
-                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_idioma"></label>
+                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_idioma" for="sel-idioma"></label>
                                 <select name="idioma" id="sel-idioma" class="form-select">
                                     <option value="es" data-i18n="config_institucion.opcion_es"></option>
                                     <option value="en" data-i18n="config_institucion.opcion_en"></option>
@@ -233,7 +234,7 @@
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_moneda"></label>
+                                <label class="form-label small fw-bold text-muted uppercase" data-i18n="config_institucion.label_moneda" for="sel-moneda"></label>
                                 <select name="Moneda" id="sel-moneda" class="form-select fw-bold">
                                     <option value="UYU" data-i18n="config_institucion.opcion_uyu"></option>
                                     <option value="USD" data-i18n="config_institucion.opcion_usd"></option>
@@ -274,15 +275,15 @@
                         
                         <div class="row g-2 mb-3 align-items-end">
                             <div class="col-md-6">
-                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_nombre_servicio"></label>
+                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_nombre_servicio" for="srv-nombre"></label>
                                 <input type="text" id="srv-nombre" class="form-control form-control-sm" data-i18n="config_institucion.ph_servicio" placeholder="Ej: Microcirugía, Hospedaje...">
                             </div>
                             <div class="col-md-2">
-                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_medida"></label>
+                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_medida" for="srv-medida"></label>
                                 <input type="text" id="srv-medida" class="form-control form-control-sm" data-i18n="config_institucion.ph_medida" placeholder="Hora/Kg">
                             </div>
                             <div class="col-md-2">
-                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_cant"></label>
+                                <label class="small text-muted fw-bold" data-i18n="config_institucion.label_cant" for="srv-cant"></label>
                                 <input type="number" id="srv-cant" class="form-control form-control-sm" value="1" min="1">
                             </div>
                             <div class="col-md-2">
@@ -326,16 +327,16 @@
                     <form id="form-edit-service">
                         <input type="hidden" id="edit-srv-id">
                         <div class="mb-3">
-                            <label class="small fw-bold text-muted" data-i18n="config_institucion.label_nombre_servicio_edit"></label>
+                            <label class="small fw-bold text-muted" data-i18n="config_institucion.label_nombre_servicio_edit" for="edit-srv-nombre"></label>
                             <input type="text" id="edit-srv-nombre" class="form-control" required>
                         </div>
                         <div class="row g-2">
                             <div class="col-7">
-                                <label class="small fw-bold text-muted" data-i18n="config_institucion.label_medida"></label>
+                                <label class="small fw-bold text-muted" data-i18n="config_institucion.label_medida" for="edit-srv-medida"></label>
                                 <input type="text" id="edit-srv-medida" class="form-control" data-i18n="config_institucion.ph_medida_edit" placeholder="Hora / Kg / Unidad">
                             </div>
                             <div class="col-5">
-                                <label class="small fw-bold text-muted" data-i18n="config_institucion.label_cantidad"></label>
+                                <label class="small fw-bold text-muted" data-i18n="config_institucion.label_cantidad" for="edit-srv-cant"></label>
                                 <input type="number" id="edit-srv-cant" class="form-control" min="1" step="1" value="1">
                             </div>
                         </div>

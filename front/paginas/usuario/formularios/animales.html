@@ -70,6 +70,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body>
 
@@ -166,196 +167,74 @@
                     <div class="row g-3">
                         
                         <div class="col-12 mb-2">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.tipo_solicitud">Tipo de Solicitud</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.tipo_solicitud" for="select-tipo-form">Tipo de Solicitud</label>
                             <select id="select-tipo-form" class="form-select border-success" required>
                                 <option value="" data-i18n="form_animales.cargando_tipos">Cargando tipos...</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.especie">Especie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.especie" for="select-especie">Especie</label>
                             <select id="select-especie" class="form-select fw-bold text-primary" required disabled>
                                 <option value="" data-i18n="form_animales.seleccione">Seleccione...</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Cepa/Stock/Raza / Subespecie</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie" for="select-subespecie">Cepa/Stock/Raza / Subespecie</label>
                             <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
                                 <option value="" data-i18n="form_animales.primero_especie">Primero seleccione especie...</option>
                             </select>
                         </div>
 
                         <div class="col-12" id="cepa-container" style="display:none;">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa/Stock/Raza</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa" for="select-cepa">Cepa/Stock/Raza</label>
                             <select id="select-cepa" class="form-select fw-bold text-primary" disabled>
                                 <option value="0" data-i18n="form_animales.sin_cepa">Sin Cepa/Stock/Raza / no aplica</option>
                             </select>
                             <small id="cepa-help" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.</small>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.peso">Peso (g/kg)</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.peso" for="input-peso">Peso (g/kg)</label>
                             <input type="text" id="input-peso" class="form-control" required>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.edad">Edad</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.edad" for="input-edad">Edad</label>
                             <input type="text" id="input-edad" class="form-control" required>
                         </div>
 
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.machos">MACHOS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.machos" for="qty-macho">MACHOS</label>
                             <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.hembras">HEMBRAS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.hembras" for="qty-hembra">HEMBRAS</label>
                             <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.indistinto">INDISTINTO</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" data-i18n="form_animales.indistinto" for="qty-indistinto">INDISTINTO</label>
                             <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-success text-center w-100" data-i18n="form_animales.total">TOTAL</label>
+                            <label class="form-label fw-bold small text-success text-center w-100" data-i18n="form_animales.total" for="qty-total">TOTAL</label>
                             <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
                         </div>
 
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.fecha_retiro">Fecha de Retiro</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.fecha_retiro" for="input-fecha">Fecha de Retiro</label>
                             <input type="date" id="input-fecha" class="form-control" required>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.aclaraciones">Aclaraciones</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.aclaraciones" for="input-aclaracion">Aclaraciones</label>
                             <textarea id="input-aclaracion" class="form-control" rows="1" data-i18n="form_animales.ph_observaciones" placeholder="Observaciones opcionales..."></textarea>
                         </div>
 
                         <div class="col-12 mt-4 text-end">
                             <button type="button" class="btn btn-outline-secondary me-2 fw-bold" onclick="window.resetSelection()" data-i18n="form_animales.cancelar">CANCELAR</button>
                             <button type="submit" class="btn btn-success px-5 fw-bold shadow" data-i18n="form_animales.revisar_enviar">REVISAR Y ENVIAR</button>
-                        </div>
-                    </div>
-                </div>
-            </form>
-        </div><div id="step-2" class="hidden-section">
-            
-            <div class="mb-3">
-                <button type="button" class="btn btn-link text-decoration-none text-muted p-0 fw-bold small" onclick="window.resetSelection()">
-                    <i class="bi bi-arrow-left"></i> SELECCIONAR OTRO PROTOCOLO
-                </button>
-            </div>
-
-            <div class="card border-0 shadow-sm mb-4" style="background: #f8fff9; border-left: 5px solid #1a5d3b !important;">
-                <div class="card-body p-4">
-                    <div class="row g-3 align-items-center">
-                        <div class="col-md-7">
-                            <h5 id="info-titulo" class="fw-bold mb-1 text-dark">...</h5>
-                            <div class="mb-3">
-                                <span id="info-nprot" class="badge bg-success">...</span>
-                                <span id="info-vencimiento" class="badge bg-light text-muted border ms-2">...</span>
-                            </div>
-                            
-                            <div class="d-flex gap-5">
-                                <div>
-                                    <span class="info-label d-block">Investigador</span>
-                                    <span id="info-investigador" class="info-value">...</span>
-                                </div>
-                                <div>
-                                    <span class="info-label d-block">Departamento</span>
-                                    <span id="info-depto" class="info-value">...</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-5 border-start ps-md-4">
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <span class="info-label d-block mb-1 text-muted">TOTAL AUTORIZADO</span>
-                                    <h4 id="info-total-orig" class="fw-bold text-dark mb-0">0</h4>
-                                </div>
-                                <div class="col-6">
-                                    <span class="info-label d-block mb-1 text-success">CUPO DISPONIBLE</span>
-                                    <h2 id="info-saldo" class="display-6 fw-bold text-success mb-0">0</h2>
-                                </div>
-                            </div>
-                            <div class="text-center mt-2">
-                                <small class="text-muted" style="font-size: 10px;">animales</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <form id="animal-form">
-                <input type="hidden" id="selected-prot-id" name="idprotA">
-                <input type="hidden" id="is-otros-ceuas" name="is_external" value="0">
-
-                <div class="card shadow-sm border-0 p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Especie</label>
-                            <select id="select-especie" class="form-select fw-bold text-primary" required disabled>
-                                <option value="">Seleccione...</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa_subespecie">Categoría de especie</label>
-                            <select id="select-subespecie" class="form-select fw-bold text-primary" required disabled>
-                                <option value="" data-i18n="form_animales.primero_especie">Primero seleccione especie...</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12" id="cepa-container-2" style="display:none;">
-                            <label class="form-label fw-bold small text-muted text-uppercase" data-i18n="form_animales.cepa">Cepa/Stock/Raza</label>
-                            <select id="select-cepa-2" class="form-select fw-bold text-primary" disabled>
-                                <option value="0" data-i18n="form_animales.sin_cepa">Sin Cepa/Stock/Raza / no aplica</option>
-                            </select>
-                            <small id="cepa-help-2" class="text-muted d-block mt-1" style="font-size: 11px;" data-i18n="form_animales.cepa_help">Si existen Cepa/Stock/Raza configuradas para esta categoría, debe seleccionar una.</small>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
-                            <input type="text" id="input-peso" class="form-control" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Edad</label>
-                            <input type="text" id="input-edad" class="form-control" required>
-                        </div>
-
-                        <div class="col-12"><hr class="text-muted my-2"></div>
-
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Machos</label>
-                            <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Hembras</label>
-                            <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-uppercase text-center w-100">Indistinto</label>
-                            <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-success text-uppercase text-center w-100">TOTAL</label>
-                            <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
-                        </div>
-
-                        <div class="col-12"><hr class="text-muted my-2"></div>
-
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Fecha de Retiro</label>
-                            <input type="date" id="input-fecha" class="form-control" required>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Aclaraciones / Observaciones</label>
-                            <textarea id="input-aclaracion" class="form-control" rows="1"></textarea>
-                        </div>
-
-                        <div class="col-12 mt-4 text-end">
-                            <button type="button" class="btn btn-secondary me-2" onclick="window.resetSelection()">CANCELAR</button>
-                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">REVISAR Y ENVIAR</button>
                         </div>
                     </div>
                 </div>

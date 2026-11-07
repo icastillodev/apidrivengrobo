@@ -4,8 +4,8 @@ OPS=/home/geckosadm/grobo-ops
 if [[ ${1:-} == --check ]]; then
     bash -n "$OPS/grobo-upgrade-php-security.sh"
     bash -n "$OPS/grobo-configurar-brevo-smtp.sh"
-    bash -n "$OPS/grobo-deploy-release-5ec4a55.sh"
-    bash "$OPS/grobo-deploy-release-5ec4a55.sh" --check
+    bash -n "$OPS/grobo-deploy-release-20261107.sh"
+    bash "$OPS/grobo-deploy-release-20261107.sh" --check
     echo 'CHECKS_OK'
     exit 0
 fi
@@ -15,6 +15,6 @@ test -s "$OPS/.brevo-smtp-credentials" || { echo 'ERROR: faltan credenciales SMT
 sudo -v
 sudo bash "$OPS/grobo-upgrade-php-security.sh"
 sudo bash "$OPS/grobo-configurar-brevo-smtp.sh"
-sudo bash "$OPS/grobo-deploy-release-5ec4a55.sh"
+sudo bash "$OPS/grobo-deploy-release-20261107.sh"
 sudo php "$OPS/grobo-reactivar-usuarios-pendientes.php"
 echo 'GROBO_UPDATE_DONE: revisar los correos de activación y realizar QA de cuentas, pagos y protocolos.'

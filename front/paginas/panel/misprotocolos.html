@@ -88,6 +88,7 @@
         }
     </style>
 
+    <link rel="stylesheet" href="../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body data-page-title-key="mis_protocolos">
     <div class="container my-5">
@@ -223,22 +224,22 @@
                         <input type="hidden" name="IdInstitucion" id="form-inst-id"> <input type="hidden" name="external_mode" id="external-mode-flag" value="0">
 
                         <div id="external-inst-selector" class="mb-3 d-none">
-                            <label class="form-label small fw-bold text-primary" data-i18n="misprotocolos.inst_destino_red">INSTITUCIÓN DESTINO (RED)</label>
+                            <label class="form-label small fw-bold text-primary" data-i18n="misprotocolos.inst_destino_red" for="select-target-inst">INSTITUCIÓN DESTINO (RED)</label>
                             <select id="select-target-inst" class="form-select fw-bold border-primary" onchange="window.loadExternalConfig(this.value)">
                                 <option value="" data-i18n="misprotocolos.ph_seleccione_inst">-- Seleccione Institución --</option>
                             </select>
                         </div>
 
                         <div class="row g-3">
-                            <div class="col-md-9"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_titulo">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
-                            <div class="col-md-3"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_expediente">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_resp_proyecto">RESPONSABLE DE PROYECTO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_depto">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_tipo">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_cant_animales">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
-                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_severidad">SEVERIDAD</label><select name="severidad" id="new-sev" class="form-select"></select></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_inicio">FECHA INICIO</label><input type="date" name="FechaIniProtA" id="inp-ini" class="form-control"></div>
-                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_venc">FECHA VENCIMIENTO</label><input type="date" name="FechaFinProtA" id="inp-fin" class="form-control"></div>
+                            <div class="col-md-9"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_titulo" for="inp-titulo">TÍTULO DEL PROYECTO</label><input type="text" name="tituloA" id="inp-titulo" class="form-control fw-bold" required></div>
+                            <div class="col-md-3"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_expediente" for="inp-nprot">N° EXPEDIENTE</label><input type="text" name="nprotA" id="inp-nprot" class="form-control fw-bold" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_resp_proyecto" for="inp-inv">RESPONSABLE DE PROYECTO (Texto)</label><input type="text" name="InvestigadorACargA" id="inp-inv" class="form-control" required></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_depto" for="new-depto">DEPARTAMENTO</label><select name="departamento" id="new-depto" class="form-select" required></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_tipo" for="new-tipo">TIPO</label><select name="tipoprotocolo" id="new-tipo" class="form-select"></select></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_cant_animales" for="inp-cant">CANT. ANIMALES</label><input type="number" name="CantidadAniA" id="inp-cant" class="form-control" value="0"></div>
+                            <div class="col-md-4"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_severidad" for="new-sev">SEVERIDAD</label><select name="severidad" id="new-sev" class="form-select"></select></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_inicio" for="inp-ini">FECHA INICIO</label><input type="date" name="FechaIniProtA" id="inp-ini" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.label_fecha_venc" for="inp-fin">FECHA VENCIMIENTO</label><input type="date" name="FechaFinProtA" id="inp-fin" class="form-control"></div>
                             <div class="col-12 mt-3">
                                 <div class="bg-light p-3 rounded border">
                                     <h6 class="fw-bold small text-muted mb-2" data-i18n="misprotocolos.especies_asociadas">ESPECIES ASOCIADAS</h6>
@@ -252,15 +253,15 @@
                                 <h6 class="fw-bold small text-muted mb-2" data-i18n="misprotocolos.label_adjuntos">ADJUNTOS (OPCIONAL)</h6>
                                 <div class="row g-2">
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_protocolo">Protocolo (PDF/Doc)</label>
+                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_protocolo" for="adj-adjunto1">Protocolo (PDF/Doc)</label>
                                         <input type="file" name="adjunto1" id="adj-adjunto1" class="form-control form-control-sm" accept="application/pdf,.pdf">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_aval">Aval / Carta</label>
+                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_aval" for="adj-adjunto2">Aval / Carta</label>
                                         <input type="file" name="adjunto2" id="adj-adjunto2" class="form-control form-control-sm" accept="application/pdf,.pdf">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_otro">Otro documento</label>
+                                        <label class="form-label small fw-bold text-muted" data-i18n="misprotocolos.adjunto_otro" for="adj-adjunto3">Otro documento</label>
                                         <input type="file" name="adjunto3" id="adj-adjunto3" class="form-control form-control-sm" accept="application/pdf,.pdf">
                                     </div>
                                 </div>
@@ -300,7 +301,7 @@
                 <div class="modal-body p-4">
                     <p class="text-muted small mb-4"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> <span data-i18n="misprotocolos.red_solo_propios">Solo puede enviar a la red sus propios protocolos vigentes y aprobados localmente.</span></p>
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_paso1">1. SELECCIONE PROTOCOLO</label>
+                        <label class="form-label fw-bold text-muted small" data-i18n="misprotocolos.red_paso1" for="select-my-prot">1. SELECCIONE PROTOCOLO</label>
                         <input type="text" class="form-control form-control-sm mb-1" data-i18n="misprotocolos.ph_buscar_prot" placeholder="Buscar..." onkeyup="window.filterMyProtocols(this)">
                         <select id="select-my-prot" class="form-select" size="4" onchange="window.showProtDetails()"></select>
                     </div>

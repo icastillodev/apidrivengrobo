@@ -48,6 +48,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 
 <body class="bg-light" style="font-family: Lato, sans-serif;">
@@ -100,15 +101,15 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_dia_pdf"></label>
+                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_dia_pdf" for="pdf-day"></label>
                         <input type="date" class="form-control" id="pdf-day">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_desde"></label>
+                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_desde" for="range-from"></label>
                         <input type="date" class="form-control" id="range-from">
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_hasta"></label>
+                        <label class="form-label small fw-bold" data-i18n="admin_reservas.label_hasta" for="range-to"></label>
                         <input type="date" class="form-control" id="range-to">
                     </div>
                     <div class="col-md-2 d-grid">
@@ -176,15 +177,15 @@
                 </div>
                 <div class="modal-body">
                     <p class="small text-muted mb-2" data-i18n="admin_reservas.modal_qr_desc"></p>
-                    <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_elige"></label>
+                    <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_elige" for="qr-print-tipo"></label>
                     <select class="form-select mb-3" id="qr-print-tipo"></select>
                     <div class="row g-2">
                         <div class="col-12">
-                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_titulo"></label>
+                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_titulo" for="qr-pdf-titulo"></label>
                             <input type="text" class="form-control form-control-sm" id="qr-pdf-titulo">
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_sub"></label>
+                            <label class="form-label small fw-bold" data-i18n="admin_reservas.modal_qr_pdf_sub" for="qr-pdf-sub"></label>
                             <input type="text" class="form-control form-control-sm" id="qr-pdf-sub">
                         </div>
                     </div>
@@ -210,15 +211,15 @@
                     <form id="form-reserva">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_titular"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_titular" for="res-titular"></label>
                                 <select class="form-select" id="res-titular" required></select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fecha"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fecha" for="res-fecha"></label>
                                 <input type="date" class="form-control" id="res-fecha" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_sala"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_sala" for="res-sala"></label>
                                 <select class="form-select" id="res-sala" required></select>
                             </div>
                             <div class="col-12">
@@ -257,11 +258,11 @@
                                 </div>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_inicio"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_inicio" for="res-hora-ini"></label>
                                 <input type="time" class="form-control" id="res-hora-ini" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fin"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fin" for="res-hora-fin"></label>
                                 <input type="time" class="form-control" id="res-hora-fin" required>
                             </div>
                             <div class="col-md-6">
@@ -280,7 +281,7 @@
 
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_modo"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_modo" for="res-modo"></label>
                                 <select class="form-select" id="res-modo">
                                     <option value="single" data-i18n="admin_reservas.modo_single"></option>
                                     <option value="serie" data-i18n="admin_reservas.modo_serie"></option>
@@ -288,7 +289,7 @@
                             </div>
 
                             <div class="col-md-4 d-none" id="serie-tipo-wrap">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_serie_tipo"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_serie_tipo" for="serie-tipo"></label>
                                 <select class="form-select" id="serie-tipo">
                                     <option value="1" data-i18n="admin_reservas.serie_semanal"></option>
                                     <option value="2" data-i18n="admin_reservas.serie_fechas"></option>
@@ -296,7 +297,7 @@
                             </div>
 
                             <div class="col-md-4 d-none" id="serie-cada-wrap">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_cada_n"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_cada_n" for="serie-cada-n"></label>
                                 <input type="number" class="form-control" id="serie-cada-n" value="1" min="1">
                             </div>
 
@@ -322,7 +323,7 @@
                             </div>
 
                             <div class="col-12 d-none" id="serie-fechas-wrap">
-                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fechas_especificas"></label>
+                                <label class="form-label small fw-bold" data-i18n="admin_reservas.label_fechas_especificas" for="serie-fechas"></label>
                                 <textarea class="form-control" id="serie-fechas" rows="2" placeholder="YYYY-MM-DD, YYYY-MM-DD"></textarea>
                                 <div class="small text-muted mt-1" data-i18n="admin_reservas.hint_fechas"></div>
                             </div>

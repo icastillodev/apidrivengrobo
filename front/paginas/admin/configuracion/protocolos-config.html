@@ -65,6 +65,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -115,7 +116,8 @@
                         </button>
                     </div>
                     <div class="card-body p-0">
-                        <table class="table table-hover align-middle mb-0">
+                        <div class="table-responsive gecko-ux-table-scroll" tabindex="0" role="region" aria-label="Tabla con desplazamiento horizontal">
+<table class="table table-hover align-middle mb-0">
                             <thead class="bg-light small text-uppercase text-secondary">
                                 <tr>
                                     <th class="ps-4" data-i18n="config_protocolos.th_nombre_categoria"></th>
@@ -124,6 +126,7 @@
                             </thead>
                             <tbody id="table-types"></tbody>
                         </table>
+</div>
                     </div>
                 </div>
             </div>
@@ -137,7 +140,8 @@
                         </button>
                     </div>
                     <div class="card-body p-0">
-                        <table class="table table-hover align-middle mb-0">
+                        <div class="table-responsive gecko-ux-table-scroll" tabindex="0" role="region" aria-label="Tabla con desplazamiento horizontal">
+<table class="table table-hover align-middle mb-0">
                             <thead class="bg-light small text-uppercase text-secondary">
                                 <tr>
                                     <th class="ps-4" data-i18n="config_protocolos.th_nombre_nivel"></th>
@@ -147,6 +151,7 @@
                             </thead>
                             <tbody id="table-sev"></tbody>
                         </table>
+</div>
                     </div>
                 </div>
             </div>
@@ -165,7 +170,7 @@
                     <form id="form-type">
                         <input type="hidden" name="idtipoprotocolo" id="type-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_nombre"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_nombre" for="type-name"></label>
                             <input type="text" name="Nombre" id="type-name" class="form-control fw-bold" required>
                         </div>
                         <button type="submit" class="btn btn-danger w-100 fw-bold shadow-sm" data-i18n="config_protocolos.btn_guardar"></button>
@@ -186,11 +191,11 @@
                     <form id="form-sev">
                         <input type="hidden" name="IdSeveridadTipo" id="sev-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_nombre_nivel"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_nombre_nivel" for="sev-name"></label>
                             <input type="text" name="Nombre" id="sev-name" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_detalle"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_protocolos.label_detalle" for="sev-detail"></label>
                             <textarea name="Detalle" id="sev-detail" class="form-control" rows="3"></textarea>
                         </div>
                         <button type="submit" class="btn btn-warning w-100 fw-bold shadow-sm" data-i18n="config_protocolos.btn_guardar"></button>

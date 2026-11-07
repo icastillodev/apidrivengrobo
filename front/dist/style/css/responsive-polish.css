@@ -1,0 +1,234 @@
+/*
+ * GROBO - Pulido responsive 2026-11-07.
+ * Solo smartphone/tablet. Conserva tipografia, colores, tarjetas y layout desktop existentes.
+ * Los selectores gecko-ux-* se aplican solo a las pantallas auditadas.
+ */
+@media (max-width: 1024px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { min-width: 0; }
+  .card, .card-body, .tab-content, .tab-pane, .modal-content,
+  .row > [class*="col-"], .d-flex > .flex-grow-1 {
+    min-width: 0;
+  }
+  img, video, svg, canvas { max-width: 100%; }
+  .table-responsive, .gecko-ux-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .table-responsive > table.table, .gecko-ux-table-scroll > table.table {
+    min-width: 100%;
+    width: max-content;
+  }
+  .modal-dialog {
+    max-width: min(95vw, var(--bs-modal-width, 800px));
+    margin-inline: auto;
+  }
+  .modal-content {
+    max-height: calc(100dvh - 20px);
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modal-header, .modal-footer { flex: 0 0 auto; }
+  .modal-footer { gap: .5rem; }
+  .modal-footer .d-flex { flex-wrap: wrap; min-width: 0; }
+
+}
+
+@media (min-width: 600px) and (max-width: 1000px) {
+  /* Menu existente: tres tarjetas por fila en tablet, dos en telefono. */
+  #side-menu-ul, #mobile-menu-ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .gecko-sidebar .nav-item.expanded-grid { grid-column: span 3 !important; }
+  .gecko-sidebar .dropdown-menu-gecko {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  body > .container,
+  body > .container-fluid,
+  body > main.container,
+  body > main.container-fluid {
+    max-width: 100%;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+    margin-top: 1.25rem !important;
+  }
+
+  body > .container > .card.p-4,
+  body > .container-fluid > .card.p-4,
+  body > .container > .card.p-5,
+  body > .container-fluid > .card.p-5 {
+    padding: 1rem !important;
+  }
+
+  .gecko-ux-heading-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: .75rem;
+  }
+  .gecko-ux-heading-actions > h4,
+  .gecko-ux-heading-actions > h5,
+  .gecko-ux-heading-actions > div:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .gecko-ux-action-buttons {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+    gap: .5rem !important;
+  }
+  .gecko-ux-action-buttons > .btn {
+    flex: 1 1 150px;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+    min-height: 42px;
+  }
+
+  /* Barras de filtros multiparte: etiqueta/campo en filas claras. */
+  .gecko-ux-filters {
+    display: grid !important;
+    grid-template-columns: minmax(85px, .8fr) minmax(0, 1.6fr);
+    gap: .5rem;
+    box-shadow: none !important;
+    align-items: stretch;
+    width: 100%;
+    max-width: 100% !important;
+  }
+  .gecko-ux-filters > .input-group-text {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    justify-content: flex-start;
+    white-space: normal;
+    overflow-wrap: break-word;
+    border-radius: .375rem !important;
+  }
+  .gecko-ux-filters > select,
+  .gecko-ux-filters > input,
+  .gecko-ux-filters > button,
+  .gecko-ux-filters > #dynamic-search-container {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: .375rem !important;
+  }
+  .gecko-ux-filters > input,
+  .gecko-ux-filters > button,
+  .gecko-ux-filters > #dynamic-search-container {
+    grid-column: 1 / -1;
+  }
+  .gecko-ux-filters > #dynamic-search-container > input,
+  .gecko-ux-filters > #dynamic-search-container > select {
+    width: 100%;
+    max-width: 100%;
+  }
+  #protocol-stats { flex-wrap: wrap; gap: .5rem; }
+  #protocol-stats .stat-item { margin-right: 0; padding-right: .5rem; }
+
+  /* iOS Safari: evita el zoom automatico al enfocar campos de texto. */
+  body input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  body select, body textarea, body .form-control, body .form-select {
+    font-size: max(16px, var(--gecko-font-size, 13px)) !important;
+    max-width: 100%;
+  }
+  .gecko-ux-action-buttons > .btn,
+  .gecko-ux-filters > .btn,
+  .modal-footer > .btn { min-height: 44px; }
+
+  .modal-dialog { max-width: calc(100vw - 16px); margin: 8px auto; }
+  .modal-header, .modal-footer { padding: .75rem; }
+  .modal-header .modal-title { min-width: 0; overflow-wrap: anywhere; }
+  .modal-footer > .btn { flex: 1 1 auto; white-space: normal; }
+  .swal2-container .swal2-popup {
+    width: min(32em, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px);
+  }
+  .swal2-container .swal2-actions { gap: .5rem; }
+
+  .nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .nav-tabs > .nav-item, .nav-tabs > .nav-link { flex: 0 0 auto; }
+  .table-responsive > table.table, .gecko-ux-table-scroll > table.table {
+    max-width: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  body > .container-fluid, body > main.container-fluid {
+    padding-inline: 24px !important;
+  }
+  .gecko-ux-action-buttons {
+    flex-wrap: wrap !important;
+    gap: .5rem !important;
+  }
+}
+
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* No comprimir los títulos frente a acciones largas en iPad. */
+  .gecko-ux-heading-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: .75rem;
+  }
+  .gecko-ux-heading-actions > h4,
+  .gecko-ux-heading-actions > h5,
+  .gecko-ux-heading-actions > div:first-child {
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .gecko-ux-action-buttons {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: .5rem !important;
+  }
+  .gecko-ux-action-buttons > .btn {
+    flex: 1 1 180px;
+    min-width: 0;
+    white-space: normal;
+    min-height: 44px;
+    line-height: 1.35;
+  }
+  /* Filtros comprensibles en 768-1024 px, en vez de selects recortados. */
+  .gecko-ux-filter-row > [class*="col-"] {
+    flex: 1 1 210px !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+  .gecko-ux-filter-row > .text-end {
+    text-align: left !important;
+    flex-basis: 100% !important;
+  }
+  .gecko-ux-filter-row select, .gecko-ux-filter-row input {
+    width: 100%;
+    min-width: 0;
+  }
+}

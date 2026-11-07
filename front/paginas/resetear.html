@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="../dist/style/css/styles.css?v=20260703">
-    <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <link rel="icon" href="../dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
     <script type="module">
         import { loadLanguage, translatePage } from '../dist/js/utils/i18n.js?v=20260703';
         import { initReset } from '../dist/js/pages/resetear.js';
@@ -25,6 +25,7 @@
             });
         });
     </script>
+    <link rel="stylesheet" href="../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-[#f2f2f2] font-sans gecko-loaded">
     <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
@@ -46,14 +47,14 @@
                     
                     <form id="reset-password-form" class="space-y-5 text-left">
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="resetear.label_nueva">Nueva Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="resetear.label_nueva" for="new-pass">Nueva Contraseña *</label>
                             <input type="password" id="new-pass" required data-i18n="resetear.ph_pass" placeholder="••••••••"
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
                             <p class="text-[9px] text-gray-400 mt-2 font-bold uppercase italic tracking-tighter" data-i18n="resetear.hint_caracteres">Debe tener entre 5 y 20 caracteres</p>
                         </div>
                         
                         <div>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="resetear.label_confirmar">Confirmar Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1 tracking-widest" data-i18n="resetear.label_confirmar" for="confirm-pass">Confirmar Contraseña *</label>
                             <input type="password" id="confirm-pass" required data-i18n="resetear.ph_pass" placeholder="••••••••"
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 transition-all">
                             <p id="match-error" class="text-[9px] text-red-600 mt-2 font-bold uppercase hidden italic tracking-tighter" data-i18n="resetear.match_error">Las contraseñas no coinciden</p>

@@ -7,7 +7,7 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <link rel="icon" href="../dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -68,6 +68,7 @@
             .swal2-html-container { max-height: min(68vh, 480px); font-size: 0.85rem; }
         }
     </style>
+    <link rel="stylesheet" href="../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="gecko-loaded">
     <div class="container qr-container py-3 py-md-4 qr-kiosk-wrap">
@@ -195,9 +196,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.upd_date">FECHA</label><input type="date" id="reg-fecha-qr" class="form-control"></div>
-                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.upd_qty">CANTIDAD</label><input type="number" id="reg-cantidad-qr" class="form-control"></div>
-                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.upd_obs">OBSERVACIONES</label><textarea id="reg-obs-qr" class="form-control" rows="2"></textarea></div>
+                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.upd_date" for="reg-fecha-qr">FECHA</label><input type="date" id="reg-fecha-qr" class="form-control"></div>
+                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.upd_qty" for="reg-cantidad-qr">CANTIDAD</label><input type="number" id="reg-cantidad-qr" class="form-control"></div>
+                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.upd_obs" for="reg-obs-qr">OBSERVACIONES</label><textarea id="reg-obs-qr" class="form-control" rows="2"></textarea></div>
                     </div>
                 </div>
                 <div class="modal-footer"><button class="btn btn-success w-100 fw-bold" onclick="window.guardarNuevoTramo()" data-i18n="alojamientos.btn_save_clone">AGREGAR TRAMO</button></div>
@@ -214,9 +215,9 @@
                 <div class="modal-body">
                     <input type="hidden" id="edit-id-alojamiento">
                     <div class="row g-3">
-                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.mod_start_date">FECHA INICIO</label><input type="date" id="edit-fecha-qr" class="form-control"></div>
-                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.mod_qty">CANTIDAD</label><input type="number" id="edit-cantidad-qr" class="form-control"></div>
-                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.mod_obs">OBSERVACIONES</label><textarea id="edit-obs-qr" class="form-control" rows="2"></textarea></div>
+                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.mod_start_date" for="edit-fecha-qr">FECHA INICIO</label><input type="date" id="edit-fecha-qr" class="form-control"></div>
+                        <div class="col-6"><label class="small fw-bold" data-i18n="alojamientos.mod_qty" for="edit-cantidad-qr">CANTIDAD</label><input type="number" id="edit-cantidad-qr" class="form-control"></div>
+                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.mod_obs" for="edit-obs-qr">OBSERVACIONES</label><textarea id="edit-obs-qr" class="form-control" rows="2"></textarea></div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -235,10 +236,10 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.qr_title_label">TÍTULO</label><input type="text" id="qr-custom-title" class="form-control"></div>
-                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.qr_ind_label">INDICACIÓN</label><textarea id="qr-custom-text" class="form-control" rows="2"></textarea></div>
+                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.qr_title_label" for="qr-custom-title">TÍTULO</label><input type="text" id="qr-custom-title" class="form-control"></div>
+                        <div class="col-12"><label class="small fw-bold" data-i18n="alojamientos.qr_ind_label" for="qr-custom-text">INDICACIÓN</label><textarea id="qr-custom-text" class="form-control" rows="2"></textarea></div>
                         <div class="col-12">
-                            <label class="small fw-bold" data-i18n="alojamientos.qr_size_label">TAMAÑO</label>
+                            <label class="small fw-bold" data-i18n="alojamientos.qr_size_label" for="qr-custom-size">TAMAÑO</label>
                             <select id="qr-custom-size" class="form-select">
                                 <option value="chico" data-i18n="alojamientos.qr_size_sm">Chico (5x5 cm)</option>
                                 <option value="mediano" selected data-i18n="alojamientos.qr_size_md">Mediano (8x8 cm)</option>

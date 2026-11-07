@@ -72,6 +72,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -183,17 +184,17 @@
                     <form id="form-depto">
                         <input type="hidden" name="iddeptoA" id="depto-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_depto"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_depto" for="depto-nombre"></label>
                             <input type="text" name="NombreDepto" id="depto-nombre" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_organismo_opcional"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_organismo_opcional" for="depto-org"></label>
                             <select name="idOrg" id="depto-org" class="form-select" >
                                 
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_detalle_ubicacion"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_detalle_ubicacion" for="depto-detalle"></label>
                             <textarea name="Detalle" id="depto-detalle" class="form-control" rows="2"></textarea>
                         </div>
                         <div class="mb-3">
@@ -230,27 +231,27 @@
                         <input type="hidden" name="IdOrganismo" id="org-id">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_corto"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_corto" for="org-simple"></label>
                                 <input type="text" name="NombreSimple" id="org-simple" class="form-control fw-bold" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_pais"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_pais" for="org-pais"></label>
                                 <input type="text" name="Pais" id="org-pais" class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_completo"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_nombre_completo" for="org-completo"></label>
                                 <input type="text" name="NombreCompleto" id="org-completo" class="form-control" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_contacto"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_contacto" for="org-contacto"></label>
                                 <input type="text" name="Contacto" id="org-contacto" class="form-control">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_correo"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_correo" for="org-correo"></label>
                                 <input type="email" name="Correo" id="org-correo" class="form-control">
                             </div>
                             <div class="col-12">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_direccion"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_departamentos.label_direccion" for="org-dir"></label>
                                 <input type="text" name="Direccion" id="org-dir" class="form-control">
                             </div>
                             <div class="col-12">

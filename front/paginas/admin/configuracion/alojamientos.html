@@ -80,6 +80,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     <div class="container-fluid my-5 px-4">
@@ -262,16 +263,16 @@
                     <form id="form-type">
                         <input type="hidden" name="IdTipoAlojamiento" id="type-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_ej"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_ej" for="type-name"></label>
                             <input type="text" name="NombreTipoAlojamiento" id="type-name" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_tecnico"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_tecnico" for="type-detail"></label>
                             <textarea name="DetalleTipoAlojamiento" id="type-detail" class="form-control" rows="2"></textarea>
                         </div>
                         
                         <div class="mb-3 d-none" id="type-status-container">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado" for="type-habilitado"></label>
                             <select name="Habilitado" id="type-habilitado" class="form-select fw-bold">
                                 <option value="1" data-i18n="config_alojamientos.opcion_habilitado"></option>
                                 <option value="2" data-i18n="config_alojamientos.opcion_deshabilitado"></option>
@@ -300,12 +301,12 @@
                         <input type="hidden" name="alcance_traz" id="cat-alcance" value="datos">
                         <input type="hidden" name="idprotA" id="cat-idprot" value="">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_variable"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_nombre_variable" for="cat-name"></label>
                             <input type="text" name="NombreCatAlojUnidad" id="cat-name" class="form-control fw-bold" required>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_tipo_dato"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_tipo_dato" for="cat-datatype"></label>
                                 <select name="TipoDeDato" id="cat-datatype" class="form-select" required>
                                     <option value="varchar" data-i18n="config_alojamientos.dt_varchar"></option>
                                     <option value="text" data-i18n="config_alojamientos.dt_text"></option>
@@ -319,7 +320,7 @@
                                 </select>
                             </div>
                             <div class="col-6">
-                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_dependencia"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_dependencia" for="cat-parent"></label>
                                 <select name="dependencia_id" id="cat-parent" class="form-select">
                                     <option value="" data-i18n="config_alojamientos.opcion_ninguna"></option>
                                 </select>
@@ -327,12 +328,12 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_instruccion"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_detalle_instruccion" for="cat-detail"></label>
                             <textarea name="DetalleCatAloj" id="cat-detail" class="form-control" rows="2"></textarea>
                         </div>
 
                         <div class="mb-3 d-none" id="cat-status-container">
-                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_alojamientos.label_estado" for="cat-habilitado"></label>
                             <select name="Habilitado" id="cat-habilitado" class="form-select fw-bold">
                                 <option value="1" data-i18n="config_alojamientos.opcion_habilitado"></option>
                                 <option value="2" data-i18n="config_alojamientos.opcion_deshabilitado"></option>

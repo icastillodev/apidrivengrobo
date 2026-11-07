@@ -80,6 +80,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 
 <body class="hold-transition sidebar-mini gecko-loaded">
@@ -128,15 +129,15 @@
 
                     <div class="row g-3 align-items-end mb-4 pb-3 border-bottom">
                         <div class="col-md-3">
-                            <label class="small fw-bold" data-i18n="admin_estadisticas.desde"></label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.desde" for="stats-from"></label>
                             <input type="date" id="stats-from" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
-                            <label class="small fw-bold" data-i18n="admin_estadisticas.hasta"></label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.hasta" for="stats-to"></label>
                             <input type="date" id="stats-to" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-2">
-                            <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion"></label>
+                            <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion" for="chart-type"></label>
                             <select id="chart-type" class="form-select form-select-sm">
                                 <option value="bar" data-i18n="admin_estadisticas.chart_barras"></option>
                                 <option value="pie" data-i18n="admin_estadisticas.chart_circular"></option>
@@ -352,7 +353,7 @@
                         <p id="red-inst-filter-hint" class="small text-muted mb-3 d-none" aria-live="polite"></p>
                         <div class="row g-2 mb-3 align-items-end">
                             <div class="col-auto">
-                                <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion"></label>
+                                <label class="small fw-bold" data-i18n="admin_estadisticas.visualizacion" for="red-chart-type"></label>
                                 <select id="red-chart-type" class="form-select form-select-sm" style="min-width: 160px;">
                                     <option value="bar" data-i18n="admin_estadisticas.chart_barras"></option>
                                     <option value="pie" data-i18n="admin_estadisticas.chart_circular"></option>

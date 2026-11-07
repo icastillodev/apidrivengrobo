@@ -57,6 +57,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body>
     <div class="container-fluid my-5 px-4 px-md-5">
@@ -83,9 +84,9 @@
             <div id="billing-category-tabs" class="mb-2"></div>
             <div id="billing-person-hub-mount" class="mb-3"></div>
 
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 gecko-ux-heading-actions">
                 <h5 class="fw-bold m-0"><i class="bi bi-house-door-fill text-success me-2"></i><span data-i18n="facturacion.titulo_liquidacion">Liquidación de Departamentos</span></h5>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 gecko-ux-action-buttons">
                         <button class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm" onclick="window.downloadGlobalPDF()">
                             <i class="bi bi-file-earmark-pdf me-1"></i> <span data-i18n="facturacion.pdf_global"></span>
                         </button>
@@ -143,15 +144,15 @@
                     <div class="d-flex gap-3 bg-white p-1 rounded border shadow-sm px-3" style="height: 31px; align-items: center;">
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input" type="checkbox" id="chk-animales" checked>
-                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_animales">ANIMALES/REA</label>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_animales" for="chk-animales">ANIMALES/REA</label>
                         </div>
                         <div class="form-check form-switch m-0">
                             <input class="form-check-input" type="checkbox" id="chk-alojamiento" checked>
-                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_alojamiento">ALOJAMIENTO</label>
+                            <label class="form-check-label small fw-bold" style="font-size: 9px;" data-i18n="facturacion.filtro_alojamiento" for="chk-alojamiento">ALOJAMIENTO</label>
                         </div>
                         <div class="form-check form-switch m-0 border-start ps-4">
                             <input class="form-check-input" type="checkbox" id="chk-insumos" checked>
-                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;" data-i18n="facturacion.filtro_insumos">INSUMOS</label>
+                            <label class="form-check-label small fw-bold text-primary" style="font-size: 9px;" data-i18n="facturacion.filtro_insumos" for="chk-insumos">INSUMOS</label>
                         </div>
                     </div>
                 </div>

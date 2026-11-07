@@ -65,6 +65,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -129,17 +130,17 @@
                         <input type="hidden" name="idInsumo" id="ins-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_nombre_material"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_nombre_material" for="ins-nombre"></label>
                             <input type="text" name="NombreInsumo" id="ins-nombre" class="form-control fw-bold" data-i18n="config_insumos_cat.ph_material" placeholder="Ej: Viruta, Caja Chica" required>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-4">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_cantidad_base"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_cantidad_base" for="ins-cant"></label>
                                 <input type="number" name="CantidadInsumo" id="ins-cant" class="form-control" step="0.01" value="1" required>
                             </div>
                             <div class="col-8">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_tipo_medida"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_cat.label_tipo_medida" for="ins-tipo"></label>
                                 <input type="text" name="TipoInsumo" id="ins-tipo" class="form-control" data-i18n="config_insumos_cat.ph_tipo" placeholder="Ej: Kg, Paquete, Bolsa" required>
                             </div>
                         </div>

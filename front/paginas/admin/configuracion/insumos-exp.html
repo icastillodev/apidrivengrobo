@@ -65,6 +65,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -129,23 +130,23 @@
                         <input type="hidden" name="IdInsumoexp" id="exp-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_nombre"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_nombre" for="exp-nombre"></label>
                             <input type="text" name="NombreInsumo" id="exp-nombre" class="form-control fw-bold" required>
                         </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-4">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_cantidad"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_cantidad" for="exp-cant"></label>
                                 <input type="number" name="CantidadInsumo" id="exp-cant" class="form-control" step="0.01" value="1" required>
                             </div>
                             <div class="col-8">
-                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_tipo_unidad"></label>
+                                <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_tipo_unidad" for="exp-tipo"></label>
                                 <input type="text" name="TipoInsumo" id="exp-tipo" class="form-control" data-i18n="config_insumos_exp.ph_tipo" placeholder="Ej: ml, mg, Dosis" required>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_especie_opcional"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_insumos_exp.label_especie_opcional" for="exp-especie"></label>
                             <select name="IdespA" id="exp-especie" class="form-select">
                                 <option value="0" data-i18n="config_insumos_exp.opcion_general"></option>
                             </select>

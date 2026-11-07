@@ -64,6 +64,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
 
@@ -129,14 +130,14 @@
                     <div class="row g-3">
                         
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Reactivo / Insumo</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="select-insumo">Reactivo / Insumo</label>
                             <select id="select-insumo" class="form-select border-success fw-bold text-primary" required>
                                 <option value="">Cargando catálogo...</option>
                             </select>
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Cantidad a Solicitar</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="input-cantidad">Cantidad a Solicitar</label>
                             <input type="number" id="input-cantidad" class="form-control text-center fw-bold bg-light border-success" min="1" required placeholder="0">
                             <small class="text-muted d-block text-end mt-1" style="font-size: 0.75rem;">
                                 <span id="lbl-medida-disp" class="fw-bold text-dark">---</span>
@@ -146,11 +147,11 @@
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Peso (g/kg)</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="input-peso">Peso (g/kg)</label>
                             <input type="text" id="input-peso" class="form-control" placeholder="-">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Edad</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="input-edad">Edad</label>
                             <input type="text" id="input-edad" class="form-control" placeholder="-">
                         </div>
 
@@ -164,30 +165,30 @@
                         </div>
                         
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">MACHOS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" for="qty-macho">MACHOS</label>
                             <input type="number" id="qty-macho" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">HEMBRAS</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" for="qty-hembra">HEMBRAS</label>
                             <input type="number" id="qty-hembra" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-muted text-center w-100">INDISTINTO</label>
+                            <label class="form-label fw-bold small text-muted text-center w-100" for="qty-indistinto">INDISTINTO</label>
                             <input type="number" id="qty-indistinto" class="form-control text-center fw-bold qty-input" min="0" value="0">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small text-success text-center w-100">TOTAL</label>
+                            <label class="form-label fw-bold small text-success text-center w-100" for="qty-total">TOTAL</label>
                             <input type="number" id="qty-total" class="form-control text-center fw-bold bg-success text-white" readonly value="0">
                         </div>
 
                         <div class="col-12"><hr class="text-muted my-2 opacity-25"></div>
 
                         <div class="col-md-4">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Fecha de Retiro</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="input-fecha">Fecha de Retiro</label>
                             <input type="date" id="input-fecha" class="form-control" required>
                         </div>
                         <div class="col-md-8">
-                            <label class="form-label fw-bold small text-muted text-uppercase">Aclaraciones</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase" for="input-aclaracion">Aclaraciones</label>
                             <textarea id="input-aclaracion" class="form-control" rows="1" placeholder="Observaciones..."></textarea>
                         </div>
 

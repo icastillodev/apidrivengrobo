@@ -37,6 +37,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="gecko-loaded">
 
@@ -109,27 +110,27 @@
                             <div id="user-feedback" class="form-text smaller fw-bold mt-1"></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_nombre">Nombre</label>
+                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_nombre" for="NombreA">Nombre</label>
                             <input type="text" id="NombreA" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_apellido">Apellido</label>
+                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_apellido" for="ApellidoA">Apellido</label>
                             <input type="text" id="ApellidoA" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_email">Email corporativo</label>
+                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_email" for="EmailA">Email corporativo</label>
                             <input type="email" id="EmailA" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label text-success small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_sede">Asignar Sede</label>
+                            <label class="form-label text-success small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_sede" for="IdInstitucion">Asignar Sede</label>
                             <select id="IdInstitucion" class="form-select form-select-sm border-success" required></select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_rol">Rol en el sistema</label>
+                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_rol" for="IdTipoUsrA">Rol en el sistema</label>
                             <select id="IdTipoUsrA" class="form-select form-select-sm" required></select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_habilitacion">Habilitación</label>
+                            <label class="form-label text-muted small fw-bold uppercase" data-i18n="superadmin_usuarios_global.label_habilitacion" for="confirmado">Habilitación</label>
                             <select id="confirmado" class="form-select form-select-sm">
                                 <option value="1" data-i18n="superadmin_usuarios_global.opcion_cuenta_activa">Cuenta Activa</option>
                                 <option value="0" data-i18n="superadmin_usuarios_global.opcion_cuenta_inactiva">Cuenta Inactiva</option>
@@ -167,11 +168,11 @@
                 <ul id="delete-preview-list" class="list-group list-group-flush mb-3"></ul>
                 <p id="delete-code-sent" class="small text-success d-none"></p>
                 <div class="mb-2">
-                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_password">Tu contraseña de Superadmin</label>
+                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_password" for="delete-password">Tu contraseña de Superadmin</label>
                     <input type="password" id="delete-password" class="form-control form-control-sm" placeholder="">
                 </div>
                 <div>
-                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_code">Código de verificación (enviado a tu correo)</label>
+                    <label class="form-label small fw-bold" data-i18n="superadmin_usuarios_global.delete_modal_code" for="delete-code">Código de verificación (enviado a tu correo)</label>
                     <input type="text" id="delete-code" class="form-control form-control-sm" placeholder="000000" maxlength="6">
                 </div>
             </div>

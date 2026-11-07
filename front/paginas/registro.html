@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="../dist/style/css/styles.css?v=20260703">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <link rel="icon" href="./dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
+    <link rel="icon" href="../dist/multimedia/imagenes/grobo/favicon.ico" type="icon">
     <script type="module">
         import { loadLanguage, translatePage } from '../dist/js/utils/i18n.js?v=20260703';
         import { initRegistro } from '../dist/js/pages/registro.js';
@@ -25,6 +25,7 @@
             });
         });
     </script>
+    <link rel="stylesheet" href="../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-[#f2f2f2] font-sans gecko-loaded">
     <main class="container mx-auto flex justify-center items-center min-h-screen p-4">
@@ -60,7 +61,7 @@
                         
                         <div class="col-span-1 md:col-span-2">
                             <p class="text-[10px] text-amber-600 font-bold uppercase mb-1.5 ml-1 tracking-tighter" data-i18n="registro.usuario_sin_espacios">No se permiten espacios en el nombre de usuario.</p>
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_usuario">Nombre de Usuario (Login) *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_usuario" for="reg-user">Nombre de Usuario (Login) *</label>
                             <input type="text" id="reg-user" name="usuario" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-all text-sm">
                             <p id="user-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden" data-i18n="registro.user_error">Este usuario ya se encuentra registrado</p>
@@ -85,18 +86,18 @@
                         </div>
 
                         <div class="col-span-1 md:col-span-2">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_pais">País de Residencia *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_pais" for="reg-pais">País de Residencia *</label>
                             <select id="reg-pais" name="PaisA" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm appearance-none cursor-pointer"></select>
                         </div>
 
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_password">Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_password" for="reg-pass">Contraseña *</label>
                             <input type="password" id="reg-pass" name="contrasena" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                             <p class="text-[9px] text-gray-400 mt-1 font-bold uppercase" data-i18n="registro.pass_hint">Debe tener entre 5 y 20 caracteres</p>
                         </div>
                         <div class="col-span-1">
-                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_confirmar">Confirmar Contraseña *</label>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1" data-i18n="registro.label_confirmar" for="reg-pass-confirm">Confirmar Contraseña *</label>
                             <input type="password" id="reg-pass-confirm" required 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 text-sm">
                             <p id="pass-error" class="text-[9px] text-red-600 mt-1 font-bold uppercase hidden" data-i18n="registro.pass_error">Las contraseñas no coinciden</p>

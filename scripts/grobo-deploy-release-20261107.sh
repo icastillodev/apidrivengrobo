@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-STAGE=/home/geckosadm/grobo-ops/staging-5ec4a55
+STAGE=/home/geckosadm/grobo-ops/staging-20261107-ux
 APP=/var/www/html/app
 API=/var/www/html/core-backend-gem
 MINIMUM=8.3.6-0ubuntu0.24.04.13
@@ -50,7 +50,7 @@ for source in "${FILES[@]}"; do
 done
 chmod -R go-rwx "$BACKUP"
 echo 'BACKUP_OK'
-# Se actualizan únicamente los 31 archivos declarados por el paquete.
+# Solo se actualizan los archivos declarados por el release verificado.
 for source in "${FILES[@]}"; do
   rel=${source#"$STAGE/"}
   case "$rel" in

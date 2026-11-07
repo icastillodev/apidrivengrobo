@@ -80,6 +80,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     <div class="container my-5 px-4">
@@ -219,15 +220,15 @@
                         
                         <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_sala"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_sala" for="sala-nombre"></label>
                                 <input type="text" name="Nombre" id="sala-nombre" class="form-control fw-bold" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_ubicacion"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_ubicacion" for="sala-lugar"></label>
                                 <input type="text" name="Lugar" id="sala-lugar" class="form-control" data-i18n="config_reservas.ph_ubicacion" placeholder="Ej: Planta Baja, Block B">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_tipo_bloque"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_tipo_bloque" for="sala-tipo"></label>
                                 <select name="tipohorasalas" id="sala-tipo" class="form-select">
                                     <option value="1" data-i18n="config_reservas.opcion_hora"></option>
                                     <option value="2" data-i18n="config_reservas.opcion_media"></option>
@@ -235,7 +236,7 @@
                                 </select>
                             </div>
                             <div class="col-md-6 d-none" id="sala-status-container">
-                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado"></label>
+                                <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado" for="sala-habilitado"></label>
                                 <select name="habilitado" id="sala-habilitado" class="form-select fw-bold">
                                     <option value="1" data-i18n="config_reservas.opcion_habilitada"></option>
                                     <option value="0" data-i18n="config_reservas.opcion_fuera_servicio"></option>
@@ -281,15 +282,15 @@
                     <form id="form-inst">
                         <input type="hidden" name="IdReservaInstrumento" id="inst-id">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_inst"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_nombre_inst" for="inst-nombre"></label>
                             <input type="text" name="NombreInstrumento" id="inst-nombre" class="form-control fw-bold" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_cantidad_disp"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_cantidad_disp" for="inst-cant"></label>
                             <input type="number" name="cantidad" id="inst-cant" class="form-control" value="1" min="0">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_detalle"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_detalle" for="inst-detalle"></label>
                             <textarea name="detalleInstrumento" id="inst-detalle" class="form-control" rows="2"></textarea>
                         </div>
 
@@ -309,7 +310,7 @@
                         </div>
                         
                         <div class="mb-3 d-none" id="inst-status-container">
-                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado"></label>
+                            <label class="form-label small fw-bold" data-i18n="config_reservas.label_estado" for="inst-habilitado"></label>
                             <select name="habilitado" id="inst-habilitado" class="form-select">
                                 <option value="1" data-i18n="config_reservas.opcion_habilitado"></option>
                                 <option value="0" data-i18n="config_reservas.opcion_deshabilitado"></option>

@@ -65,6 +65,7 @@
             }
         });
     </script>
+    <link rel="stylesheet" href="../../../dist/style/css/responsive-polish.css?v=20261107a">
 </head>
 <body class="bg-light">
     
@@ -117,13 +118,13 @@
         <div class="tab-content" id="tabContent">
             
             <div class="tab-pane fade show active" id="pane-animal">
-                <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0 align-middle" id="table-animal"></table></div></div>
+                <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive gecko-ux-table-scroll" tabindex="0"><table class="table table-hover mb-0 align-middle" id="table-animal"></table></div></div></div>
             </div>
             <div class="tab-pane fade" id="pane-reactivos">
-                <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0 align-middle" id="table-reactivos"></table></div></div>
+                <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive gecko-ux-table-scroll" tabindex="0"><table class="table table-hover mb-0 align-middle" id="table-reactivos"></table></div></div></div>
             </div>
             <div class="tab-pane fade" id="pane-insumos">
-                <div class="card border-0 shadow-sm"><div class="card-body p-0"><table class="table table-hover mb-0 align-middle" id="table-insumos"></table></div></div>
+                <div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive gecko-ux-table-scroll" tabindex="0"><table class="table table-hover mb-0 align-middle" id="table-insumos"></table></div></div></div>
             </div>
 
         </div>
@@ -141,12 +142,12 @@
                         <input type="hidden" name="IdTipoFormulario" id="type-id">
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_nombre_tipo"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_nombre_tipo" for="type-name"></label>
                             <input type="text" name="nombreTipo" id="type-name" class="form-control fw-bold" data-i18n="config_tipos_form.ph_nombre" placeholder="Ej: Solicitud Regular, Pedido Urgente" required>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_categoria"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_categoria" for="type-cat"></label>
                             <select name="categoriaformulario" id="type-cat" class="form-select" required>
                                 <option value="Animal" data-i18n="config_tipos_form.opcion_animal"></option>
                                 <option value="Otros reactivos biologicos" data-i18n="config_tipos_form.opcion_reactivos"></option>
@@ -171,7 +172,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_color"></label>
+                            <label class="form-label small fw-bold text-muted" data-i18n="config_tipos_form.label_color" for="type-color"></label>
                             <select name="color" id="type-color" class="form-select">
                                 <option value="" data-i18n="config_tipos_form.color_sin">Sin color (gris)</option>
                                 <option value="verde" data-i18n="config_tipos_form.color_verde">Verde</option>
