@@ -64,3 +64,14 @@ Las pruebas son fixtures y no sustituyen pruebas HTTP autenticadas con cuentas c
 - Correcciones de seguridad y 96 tests: **preparadas en la rama de seguridad**, sin despliegue en producción.
 - JWT en VPS: **clasificación pendiente** de permiso sudo; la contraseña nunca debe quedar registrada.
 - No se han enviado nuevos emails ni creado/borrado datos durante esta auditoría.
+
+## Paquete de instalación preparado (no ejecutado)
+
+- Código de seguridad: commit `8adf4ad`, 13 archivos PHP.
+- ZIP de seguridad en staging VPS: `/home/geckosadm/grobo-ops/grobo-security-8adf4ad.zip`, SHA-256 `9e524e7d7f3ff51754d75a008376bcd46d9af9d3f7bdfb1358509ddc71cb821f`.
+- Directorio de archivos verificados: `/home/geckosadm/grobo-ops/staging-security-8adf4ad`.
+- Instalador de seguridad: `/home/geckosadm/grobo-ops/grobo-deploy-security-8adf4ad.sh`.
+- Se verificó `bash -n`, integridad ZIP, `php -l` de 13 archivos y `SECURITY_RELEASE_CHECK_OK count=13`.
+- Antes de copiar archivos, el instalador requiere **`JWT_SECRET_PREFLIGHT_OK`**, PHP actualizado, `php-fpm8.3 -t` y `nginx -t`.
+- Antes de instalar guarda respaldos privados; ante errores tras la primera copia, intenta revertir los archivos previos y recargar PHP-FPM. Verificar la reversión antes de reintentar.
+- La comprobación JWT se dejó abierta como consola de solo lectura en Tojito, requiere entrada manual de `sudo`. **No ejecutar el instalador ni rotar la clave hasta ver ese resultado.**
