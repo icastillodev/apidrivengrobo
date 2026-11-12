@@ -13,19 +13,38 @@ class UserFormsController {
 
     public function getMyForms() {
         if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-        
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: private, no-store, max-age=0');
+
         try {
-            // Seguridad: IDs reales del Token
+            // Seguridad: IDs exclusivos del JWT; jamás aceptar el user/inst del navegador.
             $sesion = Auditoria::getDatosSesion();
+            $userId = (int)$sesion['userId'];
+            $instId = (int)($sesion['instId'] ?? 0);
             $started = microtime(true);
-            $data = $this->model->getAllForms($sesion['userId'], $sesion['instId']);
-            header('Cache-Control: private, no-store, max-age=0');
+            if (($_GET['meta'] ?? '') === '1') {
+                $data = $this->model->getMyFormsFilterMeta($userId, $instId);
+            } elseif (($_GET['paged'] ?? '') === '1') {
+                foreach (['limit', 'offset'] as $key) {
+                    if (isset($_GET[$key]) && (!is_scalar($_GET[$key])
+                        || !preg_match('/^\d{1,9}$/', (string)$_GET[$key]))) {
+                        throw new \InvalidArgumentException('Paginación inválida');
+                    }
+                }
+                $limit = min(100, max(1, (int)($_GET['limit'] ?? 12)));
+                $offset = max(0, (int)($_GET['offset'] ?? 0));
+                $data = $this->model->getAllForms($userId, $instId, [
+                    'limit' => $limit, 'offset' => $offset,
+                ]);
+            } else {
+                // Contrato legacy: integraciones antiguas siguen recibiendo el historial completo.
+                $data = $this->model->getAllForms($userId, $instId);
+            }
             header('Server-Timing: user-forms-db;dur=' . round((microtime(true) - $started) * 1000, 1));
-            echo json_encode(['status' => 'success', 'data' => $data]);
-        } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            echo json_encode(['status' => 'success', 'data' => $data],
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch (\Throwable $e) {
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }

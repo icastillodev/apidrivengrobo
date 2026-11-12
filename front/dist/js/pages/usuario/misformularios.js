@@ -1,6 +1,7 @@
 import { API } from '../../api.js';
 import { hideLoader, showLoader } from '../../components/LoaderComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
+import { eachPagedExportBatch, downloadCsvRows } from '../../utils/pagedCsvExport.js?v=20261112g';
 import {
     isInvestigatorRole,
     buildMensajesNuevoFromContext,
@@ -12,6 +13,11 @@ let protocolsUsedCache = [];
 const rowsPerPage = 12;
 let derivationTargets = [];
 let misFormulariosEventsBound = false;
+let pagedMode = true;
+let pagedTotal = 0;
+let fullHistoryPromise = null;
+let listRequestGeneration = 0;
+let searchDebounce = null;
 const formSearchCache = new WeakMap();
 let misFormsPdfScriptPromise = null;
 
@@ -140,10 +146,101 @@ function getFormPaymentStatusExcelLabel(f) {
     return tmf.pago_completo_badge || '';
 }
 
-export async function initMisFormularios() {
-    const userId = localStorage.getItem('userId');
-    const instId = localStorage.getItem('instId') || sessionStorage.getItem('instId') || '';
+/** Los filtros completos usan el contrato original hasta validar equivalencia SQL global. */
+function hasActiveFormFilters() {
+    return Boolean(document.getElementById('search-input')?.value.trim())
+        || (document.getElementById('filter-status')?.value || 'all') !== 'all'
+        || (document.getElementById('filter-inst')?.value || 'all') !== 'all'
+        || (document.getElementById('filter-derivation')?.value || 'all') !== 'all'
+        || (document.getElementById('filter-origin-inst')?.value || 'all') !== 'all';
+}
 
+async function getCompleteFormsOnDemand() {
+    if (!fullHistoryPromise) {
+        fullHistoryPromise = API.request('/user/my-forms').then(res => {
+            if (res?.status !== 'success' || !Array.isArray(res.data?.list)) {
+                throw new Error(res?.message || 'No se pudo cargar el historial completo.');
+            }
+            return res.data.list;
+        }).catch(error => {
+            fullHistoryPromise = null;
+            throw error;
+        });
+    }
+    return fullHistoryPromise;
+}
+
+/** El servidor pagina por ID canónico, sin crear el historial completo en el navegador. */
+async function loadCurrentForms() {
+    const generation = ++listRequestGeneration;
+    const filtered = hasActiveFormFilters();
+    const tbody = document.getElementById('table-body');
+    const msg = escapeMisFormsHtml(window.txt?.misformularios?.cargando_lista || 'Cargando…');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-2" role="status"></span>${msg}</td></tr>`;
+    try {
+        if (filtered) {
+            const fullList = await getCompleteFormsOnDemand();
+            if (generation !== listRequestGeneration) return;
+            pagedMode = false;
+            allForms = fullList;
+            renderTable();
+            return;
+        }
+
+        const offset = (currentPage - 1) * rowsPerPage;
+        const res = await API.request(`/user/my-forms?paged=1&limit=${rowsPerPage}&offset=${offset}`);
+        if (generation !== listRequestGeneration) return;
+        if (res?.status !== 'success' || !Array.isArray(res.data?.list)
+            || !Number.isSafeInteger(Number(res.data.total)) || Number(res.data.total) < 0) {
+            throw new Error(res?.message || 'La API no devolvió el paginado esperado.');
+        }
+        pagedTotal = Number(res.data.total);
+        if (currentPage > 1 && offset >= pagedTotal) {
+            currentPage = Math.max(1, Math.ceil(pagedTotal / rowsPerPage));
+            await loadCurrentForms();
+            return;
+        }
+        pagedMode = true;
+        allForms = res.data.list;
+        renderTable();
+    } catch (e) {
+        if (generation !== listRequestGeneration) return;
+        console.error('Mis Formularios:', e);
+        showMisFormulariosLoadError(e?.message);
+    }
+}
+
+function onMyFormsFilterChanged(debounce = false) {
+    // Una respuesta anterior nunca debe volver a pintar resultados con filtros nuevos.
+    listRequestGeneration++;
+    currentPage = 1;
+    if (searchDebounce) clearTimeout(searchDebounce);
+    if (debounce) {
+        searchDebounce = setTimeout(() => { searchDebounce = null; void loadCurrentForms(); }, 280);
+    } else {
+        searchDebounce = null;
+        void loadCurrentForms();
+    }
+}
+
+async function loadMyFormsFilterMeta() {
+    try {
+        const res = await API.request('/user/my-forms?meta=1');
+        if (res?.status === 'success') {
+            setupInstitutionFilter(res.data?.instituciones);
+            setupOriginInstitutionFilter(res.data?.origenes);
+        } else {
+            setupInstitutionFilter();
+            setupOriginInstitutionFilter();
+        }
+    } catch (e) {
+        console.error('No se pudieron cargar opciones de filtro:', e);
+        setupInstitutionFilter();
+        setupOriginInstitutionFilter();
+    }
+}
+
+export async function initMisFormularios() {
     const tbodyBoot = document.getElementById('table-body');
     const tmfBoot = window.txt?.misformularios || {};
     const bootMsg = escapeMisFormsHtml(tmfBoot.cargando_lista || tmfBoot.cargando || window.txt?.generales?.msg_cargando || '…');
@@ -166,29 +263,16 @@ export async function initMisFormularios() {
         const btnConfirmDerive = document.getElementById('btn-confirm-derive');
         if (btnConfirmDerive) btnConfirmDerive.onclick = confirmDeriveForm;
 
-        document.getElementById('search-input').addEventListener('keyup', () => { currentPage = 1; renderTable(); });
-        document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; renderTable(); });
-        document.getElementById('filter-inst').addEventListener('change', () => { currentPage = 1; renderTable(); });
-        document.getElementById('filter-derivation')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
-        document.getElementById('filter-origin-inst')?.addEventListener('change', () => { currentPage = 1; renderTable(); });
+        document.getElementById('search-input').addEventListener('input', () => onMyFormsFilterChanged(true));
+        document.getElementById('filter-status').addEventListener('change', () => onMyFormsFilterChanged());
+        document.getElementById('filter-inst').addEventListener('change', () => onMyFormsFilterChanged());
+        document.getElementById('filter-derivation')?.addEventListener('change', () => onMyFormsFilterChanged());
+        document.getElementById('filter-origin-inst')?.addEventListener('change', () => onMyFormsFilterChanged());
     }
 
     try {
         showLoader({ upgradeOnly: true, staticPhrase: '' });
-        const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
-        if (res.status === 'success') {
-            allForms = Array.isArray(res.data?.list) ? res.data.list : [];
-            setupInstitutionFilter();
-            setupOriginInstitutionFilter();
-            renderTable();
-        } else {
-            allForms = [];
-            showMisFormulariosLoadError(res?.message);
-        }
-    } catch (e) {
-        console.error('Error:', e);
-        allForms = [];
-        showMisFormulariosLoadError(e?.message);
+        await Promise.all([loadCurrentForms(), loadMyFormsFilterMeta()]);
     } finally {
         hideLoader();
     }
@@ -217,7 +301,7 @@ function renderTable() {
 
     const normEst = (v) => (v == null || String(v).trim() === '' ? 'Sin estado' : String(v).trim());
 
-    const filtered = allForms.filter(f => {
+    const filtered = pagedMode ? allForms : allForms.filter(f => {
         const matchText = formRowSearchText(f).includes(term);
         const matchStatus = statusFilter === 'all'
             || normEst(f.estado) === statusFilter
@@ -239,7 +323,7 @@ function renderTable() {
     updateCounter(filtered);
 
     const start = (currentPage - 1) * rowsPerPage;
-    const pageData = filtered.slice(start, start + rowsPerPage);
+    const pageData = pagedMode ? filtered : filtered.slice(start, start + rowsPerPage);
     const rowsFragment = document.createDocumentFragment();
 
     pageData.forEach(f => {
@@ -287,7 +371,14 @@ function renderTable() {
     });
     tbody.appendChild(rowsFragment);
 
-    renderPagination(filtered.length);
+    renderPagination(pagedMode ? pagedTotal : filtered.length);
+}
+
+function goToFormsPage(page) {
+    if (page < 1 || page === currentPage) return;
+    currentPage = page;
+    if (pagedMode) void loadCurrentForms();
+    else renderTable();
 }
 
 /* --- PAGINACIÓN INTELIGENTE (MAX 5) --- */
@@ -311,7 +402,7 @@ function renderPagination(totalItems) {
     const prevLi = document.createElement('li');
     prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
     prevLi.innerHTML = `<button class="page-link" aria-label="Previous">&laquo;</button>`;
-    prevLi.onclick = () => { if (currentPage > 1) { currentPage--; renderTable(); } };
+    prevLi.onclick = () => { if (currentPage > 1) goToFormsPage(currentPage - 1); };
     container.appendChild(prevLi);
 
     // Botones Numéricos
@@ -319,7 +410,7 @@ function renderPagination(totalItems) {
         const li = document.createElement('li');
         li.className = `page-item ${i === currentPage ? 'active' : ''}`;
         li.innerHTML = `<button class="page-link shadow-none">${i}</button>`;
-        li.onclick = () => { currentPage = i; renderTable(); };
+        li.onclick = () => goToFormsPage(i);
         container.appendChild(li);
     }
 
@@ -327,7 +418,7 @@ function renderPagination(totalItems) {
     const nextLi = document.createElement('li');
     nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
     nextLi.innerHTML = `<button class="page-link" aria-label="Next">&raquo;</button>`;
-    nextLi.onclick = () => { if (currentPage < totalPages) { currentPage++; renderTable(); } };
+    nextLi.onclick = () => { if (currentPage < totalPages) goToFormsPage(currentPage + 1); };
     container.appendChild(nextLi);
 }
 
@@ -759,17 +850,19 @@ window.downloadPDF = async (id) => {
 };
 
 // ... (Funciones de filtro de inst, updateCounter, excel, etc. se mantienen igual) ...
-function setupInstitutionFilter() {
-    const insts = [...new Set(allForms.flatMap(f =>
-        Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
-            ? f.institucionesParticipantes.map(i => i.NombreInst)
-            : [f.NombreInstitucion].filter(Boolean)
-    ))];
+function setupInstitutionFilter(instNames = null) {
+    const insts = Array.isArray(instNames) ? [...new Set(instNames.filter(Boolean))]
+        : [...new Set(allForms.flatMap(f =>
+            Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
+                ? f.institucionesParticipantes.map(i => i.NombreInst)
+                : [f.NombreInstitucion].filter(Boolean)
+        ))];
     const container = document.getElementById('container-filter-inst');
     const select = document.getElementById('filter-inst');
     if (!container || !select) return;
+    const selected = select.value;
     const allLabel = window.txt?.misformularios?.filter_todas_inst || 'Todas las instituciones';
-    select.innerHTML = `<option value="all">${allLabel}</option>`;
+    select.innerHTML = `<option value="all">${escapeMisFormsHtml(allLabel)}</option>`;
     if (insts.length > 1) {
         container.classList.remove('d-none');
         insts.sort().forEach(inst => {
@@ -779,18 +872,21 @@ function setupInstitutionFilter() {
     } else {
         container.classList.add('d-none');
     }
+    select.value = insts.includes(selected) ? selected : 'all';
 }
 
-function setupOriginInstitutionFilter() {
-    const origins = [...new Set(
-        allForms
-            .map(f => (f.NombreInstitucionOrigen || '').trim())
-            .filter(Boolean)
-    )];
+function setupOriginInstitutionFilter(originNames = null) {
+    const origins = Array.isArray(originNames) ? [...new Set(originNames.filter(Boolean))]
+        : [...new Set(
+            allForms
+                .map(f => (f.NombreInstitucionOrigen || '').trim())
+                .filter(Boolean)
+        )];
     const container = document.getElementById('container-filter-origin-inst');
     const select = document.getElementById('filter-origin-inst');
     if (!container || !select) return;
-    select.innerHTML = `<option value="all">${window.txt?.misformularios?.filter_origen_todos || 'Todas las instituciones origen'}</option>`;
+    const selected = select.value;
+    select.innerHTML = `<option value="all">${escapeMisFormsHtml(window.txt?.misformularios?.filter_origen_todos || 'Todas las instituciones origen')}</option>`;
     if (origins.length > 0) {
         container.classList.remove('d-none');
         origins.sort().forEach(inst => {
@@ -802,9 +898,16 @@ function setupOriginInstitutionFilter() {
     } else {
         container.classList.add('d-none');
     }
+    select.value = origins.includes(selected) ? selected : 'all';
 }
 
 function updateCounter(filteredData) {
+    if (pagedMode) {
+        const maxPage = Math.max(1, Math.ceil(pagedTotal / rowsPerPage));
+        document.getElementById('dynamic-counter').textContent =
+            `${pagedTotal} registros · página ${currentPage}/${maxPage}`;
+        return;
+    }
     const uniqueInst = [...new Set(filteredData.flatMap(f =>
         Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
             ? f.institucionesParticipantes.map(i => i.NombreInst)
@@ -816,7 +919,7 @@ function updateCounter(filteredData) {
     if (countInst > 1) text += ` entre ${countInst} Instituciones`;
     else if (countInst === 1) text += ` en ${uniqueInst[0]}`;
     else text += ` (Sin datos)`;
-    document.getElementById('dynamic-counter').innerHTML = text;
+    document.getElementById('dynamic-counter').textContent = text;
 }
 
 function getStatusBadge(estado, porInstitucion) {
@@ -1002,34 +1105,9 @@ function estadoText(v) {
 }
 
 async function reloadMyForms() {
-    const userId = localStorage.getItem('userId');
-    const instId = localStorage.getItem('instId');
-    const tbody = document.getElementById('table-body');
-    const tmf = window.txt?.misformularios || {};
-    const msg = escapeMisFormsHtml(
-        tmf.cargando_lista || tmf.cargando || window.txt?.generales?.msg_cargando || '…'
-    );
-    if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success" role="status"></div><div class="small text-muted mt-2">${msg}</div></td></tr>`;
-    }
-    try {
-        const res = await API.request(`/user/my-forms?user=${userId}&inst=${instId}`);
-        if (res.status === 'success') {
-            allForms = res.data.list || [];
-            setupInstitutionFilter();
-            setupOriginInstitutionFilter();
-            renderTable();
-        } else if (tbody) {
-            const err = escapeMisFormsHtml(window.txt?.generales?.error_carga || 'Error');
-            tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${err}</td></tr>`;
-        }
-    } catch (e) {
-        console.error(e);
-        if (tbody) {
-            const err = escapeMisFormsHtml(window.txt?.generales?.error_carga || 'Error');
-            tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${err}</td></tr>`;
-        }
-    }
+    // Derivación/cancelación: invalidar el historial completo cacheado.
+    fullHistoryPromise = null;
+    await Promise.all([loadCurrentForms(), loadMyFormsFilterMeta()]);
 }
 
 function openExcelModal() { new bootstrap.Modal(document.getElementById('modal-excel')).show(); }
@@ -1271,13 +1349,13 @@ window.openMyPaymentsHistoryModal = async () => {
     }
 };
 
-window.processExcelExport = () => {
+window.processExcelExport = async () => {
     const start = document.getElementById('excel-start').value;
     const end = document.getElementById('excel-end').value;
     const user = (localStorage.getItem('userFull') || 'Usuario').toUpperCase();
-    if (!start || !end) return Swal.fire('Atención', 'Seleccione fechas.', 'warning');
-    const data = allForms.filter(r => { const f = r.Inicio || '0000-00-00'; return f >= start && f <= end; });
-    if (data.length === 0) return Swal.fire('Sin datos', 'No hay registros.', 'info');
+    if (!start || !end || start > end) {
+        return Swal.fire('Atención', 'Seleccione un rango de fechas válido.', 'warning');
+    }
     const ex = window.txt?.misformularios || {};
     const headers = [
         ex.col_id || 'ID',
@@ -1294,18 +1372,45 @@ window.processExcelExport = () => {
         ex.col_estado_pago || 'Estado pago',
         ex.col_estado || 'Estado',
     ];
-    const rows = [headers.map(csvMisFormsCell).join(";")];
-    data.forEach(r => {
-        const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
-            ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
-            : (r.NombreInstitucion || '');
-        const pagadoStr = formatMoneyMisForm(r.monto_pagado ?? 0);
-        const faltaStr = formatMoneyMisForm(r.falta_pagar ?? 0);
-        const estadoPagoStr = getFormPaymentStatusExcelLabel(r);
-        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, r.Inicio || '', r.Retiro || '', r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, estadoPagoStr, r.estado];
-        rows.push(row.map(csvMisFormsCell).join(";"));
-    });
-    const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `MIS_PEDIDOS_${user}_${start}_${end}.csv`;
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const rows = [headers.map(csvMisFormsCell).join(';')];
+    let count = 0;
+    try {
+        Swal.fire({ title: 'Exportando historial completo…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        // El Excel GLOBAL no hereda el filtro ni la página visibles.
+        await eachPagedExportBatch({
+            pageSize: 100,
+            requestPage: ({limit, offset}) =>
+                API.request(`/user/my-forms?paged=1&limit=${limit}&offset=${offset}`).then(res => ({
+                    status: res.status,
+                    message: res.message,
+                    total: res.data?.total,
+                    data: res.data?.list,
+                })),
+            onBatch: batch => {
+                for (const r of batch) {
+                    const fecha = r.Inicio || '0000-00-00';
+                    if (fecha < start || fecha > end) continue;
+                    const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
+                        ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
+                        : (r.NombreInstitucion || '');
+                    const row = [
+                        r.idformA, instStr, r.Categoria, r.TipoPedido, r.Inicio || '', r.Retiro || '',
+                        r.Protocolo, r.Departamento, r.Organizacion || '',
+                        formatMoneyMisForm(r.monto_pagado ?? 0),
+                        formatMoneyMisForm(r.falta_pagar ?? 0),
+                        getFormPaymentStatusExcelLabel(r), r.estado,
+                    ];
+                    rows.push(row.map(csvMisFormsCell).join(';'));
+                    count++;
+                }
+            },
+        });
+        Swal.close();
+        if (!count) return Swal.fire('Sin datos', 'No hay registros en ese período.', 'info');
+        downloadCsvRows(rows, `MIS_PEDIDOS_${user}_${start}_${end}.csv`);
+        bootstrap.Modal.getInstance(document.getElementById('modal-excel'))?.hide();
+    } catch (e) {
+        console.error('Exportación de Mis Formularios:', e);
+        Swal.fire('Error', e?.message || 'No se pudo exportar el historial.', 'error');
+    }
 };

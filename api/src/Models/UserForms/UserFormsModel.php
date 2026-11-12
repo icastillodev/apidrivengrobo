@@ -10,10 +10,49 @@ class UserFormsModel {
         $this->db = $db;
     }
 
-    public function getAllForms($userId, $currentInstId) {
+    /**
+     * Legacy (sin opciones): retorna el historial completo sin cambiar su contrato.
+     * Paginado opt-in: selecciona IDs canónicos antes de cargar relaciones, snapshots y precios.
+     */
+    public function getAllForms($userId, $currentInstId, ?array $pagination = null) {
+        $paged = $pagination !== null;
+        $limit = $paged ? max(1, min(100, (int)($pagination['limit'] ?? 12))) : 0;
+        $offset = $paged ? max(0, (int)($pagination['offset'] ?? 0)) : 0;
+        $baseWhere = $this->buildGetAllFormsWhereClause();
+        $baseParams = $this->hasTable('formulario_derivacion')
+            ? [(int)$userId, (int)$userId, (int)$currentInstId]
+            : [(int)$userId];
+        $pageIds = [];
+        $paginationTotal = null;
+        if ($paged) {
+            $count = $this->db->prepare("SELECT COUNT(*) FROM formularioe f INNER JOIN institucion i ON i.IdInstitucion = f.IdInstitucion WHERE {$baseWhere}");
+            $count->execute($baseParams);
+            $paginationTotal = (int)$count->fetchColumn();
+            if ($paginationTotal > 0 && $offset < $paginationTotal) {
+                // Nunca paginar un JOIN que pueda multiplicar filas por departamento/protocolo.
+                $ids = $this->db->prepare(
+                    "SELECT f.idformA FROM formularioe f
+                     INNER JOIN institucion i ON i.IdInstitucion = f.IdInstitucion
+                     WHERE {$baseWhere}
+                     ORDER BY f.idformA DESC LIMIT {$limit} OFFSET {$offset}"
+                );
+                $ids->execute($baseParams);
+                $pageIds = array_map('intval', $ids->fetchAll(PDO::FETCH_COLUMN));
+            }
+        }
+
         $stmtInst = $this->db->prepare("SELECT NombreInst, InstCorreo, InstContacto FROM institucion WHERE IdInstitucion = ?");
         $stmtInst->execute([$currentInstId]);
         $institucion = $stmtInst->fetch(PDO::FETCH_ASSOC);
+        if ($paged && $pageIds === []) {
+            return [
+                'info_inst' => $institucion,
+                'list' => [],
+                'total' => $paginationTotal,
+                'limit' => $limit,
+                'offset' => $offset,
+            ];
+        }
 
         $hasWorkflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
             && $this->hasColumn('formularioe', 'DerivadoActivo')
@@ -95,13 +134,25 @@ class UserFormsModel {
                 LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
                 LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
-                WHERE " . $this->buildGetAllFormsWhereClause() . "
+                WHERE " . $baseWhere .
+                    ($paged ? " AND f.idformA IN (" . implode(',', array_fill(0, count($pageIds), '?')) . ")" : "") . "
                 ORDER BY f.idformA DESC";
 
         $stmt = $this->db->prepare($sql);
-        $params = $this->hasTable('formulario_derivacion') ? [$userId, $userId, (int)$currentInstId] : [$userId];
-        $stmt->execute($params);
+        $stmt->execute($paged ? array_merge($baseParams, $pageIds) : $baseParams);
         $list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($paged) {
+            // El JOIN a protdeptor puede duplicar filas; el paginado cuenta pedidos canónicos.
+            $seen = [];
+            $unique = [];
+            foreach ($list as $row) {
+                $key = (int)$row['idformA'];
+                if (isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $unique[] = $row;
+            }
+            $list = $unique;
+        }
 
         $derivedIds = [];
         foreach ($list as $row) {
@@ -137,7 +188,59 @@ class UserFormsModel {
             $row['falta_pagar'] = $exento ? 0.0 : max(0.0, $total - $pag);
         }
         unset($row);
-        return ['info_inst' => $institucion, 'list' => $list];
+        $data = ['info_inst' => $institucion, 'list' => $list];
+        if ($paged) {
+            $data['total'] = $paginationTotal;
+            $data['limit'] = $limit;
+            $data['offset'] = $offset;
+        }
+        return $data;
+    }
+
+    /**
+     * Catálogos globales mínimos para la barra de filtros.
+     * Calculados solo sobre formularios visibles para el JWT; no trae pedidos completos.
+     */
+    public function getMyFormsFilterMeta(int $userId, int $currentInstId): array {
+        $where = $this->buildGetAllFormsWhereClause();
+        $hasDeriv = $this->hasTable('formulario_derivacion');
+        $hasOrigin = $hasDeriv && $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+        $hasWorkflow = $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $params = $hasDeriv ? [$userId, $userId, $currentInstId] : [$userId];
+
+        $joins = $hasDeriv
+            ? "LEFT JOIN formulario_derivacion fd ON fd.idformA = f.idformA"
+                . ($hasOrigin ? " OR fd.idformAOrigen = f.idformA" : "")
+            : "";
+        $instIds = ['f.IdInstitucion'];
+        if ($hasWorkflow) $instIds[] = 'f.IdInstitucionOrigen';
+        if ($hasDeriv) {
+            $instIds[] = 'fd.IdInstitucionOrigen';
+            $instIds[] = 'fd.IdInstitucionDestino';
+        }
+        $in = implode(', ', $instIds);
+        $sql = "SELECT DISTINCT i.NombreInst
+                FROM formularioe f
+                {$joins}
+                INNER JOIN institucion i ON i.IdInstitucion IN ({$in})
+                WHERE {$where}
+                ORDER BY i.NombreInst";
+        $st = $this->db->prepare($sql);
+        $st->execute($params);
+        $instituciones = array_values(array_filter($st->fetchAll(PDO::FETCH_COLUMN), 'is_string'));
+
+        $origenes = [];
+        if ($hasWorkflow) {
+            $originSql = "SELECT DISTINCT io.NombreInst
+                          FROM formularioe f
+                          INNER JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen
+                          WHERE {$where}
+                          ORDER BY io.NombreInst";
+            $st = $this->db->prepare($originSql);
+            $st->execute($params);
+            $origenes = array_values(array_filter($st->fetchAll(PDO::FETCH_COLUMN), 'is_string'));
+        }
+        return ['instituciones' => $instituciones, 'origenes' => $origenes];
     }
 
     public function getDetail($id, $userId = null, $currentInstId = 0) {
