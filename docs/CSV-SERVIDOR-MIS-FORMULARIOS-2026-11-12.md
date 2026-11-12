@@ -37,3 +37,16 @@
 - El archivo temporal puede utilizar disco si la exportación excede memoria de PHP. El navegador aún recibe un `Blob` final, pero evita materializar JSON de cada fila.
 - Las ediciones de importes entre lotes no se congelan transaccionalmente: el conjunto de IDs es estable, pero los atributos de un formulario pueden cambiar durante la exportación. Una exportación con snapshot transaccional requiere diseño adicional de consistencia y presupuesto de bloqueos.
 - No hay cuentas institucionales de ensayo autorizadas disponibles para validación funcional auténtica en URBE y CUPAE, ni p50/p95 autenticados del VPS.
+
+## Publicación controlada y verificación (12/11/2026)
+
+- **Commit de aplicación:** `ebab1a5`, rama `fix/grobo-seguridad-facturacion-20261102`.
+- **Release:** `myforms-csv-ebab1a5`, exactamente **6 archivos de aplicación** (2 de interfaz, 4 PHP incluyendo la ruta y el nuevo servicio).
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-csv-ebab1a5 files=6`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`, respaldo en `/root/grobo-managed-backup-20261112T230851Z`.
+- **6/6 SHA-256** de los archivos finales instalados coinciden con el manifiesto y las copias probadas.
+- Nginx y PHP-FPM activos; preflight JWT correcto.
+- Chrome desde la web real, sin sesión: **9/9 controles** (HTML versionado `20261112h`, hash exacto de JavaScript, cuatro rutas privadas HTTP 401 JSON sin datos y redirección al login en anchos 390/768/1366 px).
+- Antes del despliegue: **96/96 fixtures PHP generales**, **8/8 fixtures de paginación**, **6/6 integración MySQL**, **7/7 CSV MySQL**, **8/8 pruebas de navegador**, **6/6 render/PDF**, **7/7 CSV de bandejas administrativas**. Auditoría: 187 JS + 84 HTML sin errores de sintaxis/importación.
+- Los contenedores y la red MySQL de ensayo se eliminaron tras finalizar; sin datos ni operaciones de escritura de producción.
+- **No equivale a QA autenticado institucional:** faltan prueba con cuentas de ensayo autorizadas de URBE/CUPAE, descarga CSV real por JWT y mediciones p50/p95 del VPS bajo esas sesiones.
