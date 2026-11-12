@@ -1,5 +1,5 @@
 import { API } from '../../api.js?v=20260703';
-import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20260703';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from '../../utils/poeQrPrint.js?v=20261112a';
 import { escapePoeHtml, formatPoeFecha, paintPoeDetail, poeCleanText } from '../../utils/poeDetailUi.js?v=20260703';
 import { exposePoeAssetVersion } from '../../assetVersion.js?v=20260703';
 

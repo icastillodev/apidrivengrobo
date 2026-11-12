@@ -18,9 +18,20 @@ function escapeHtmlAttr(s) {
 /** URL absoluta al portal POEs con ancla de documento (?id=). Sin import de api.js (evita desfase de deploy). */
 export function buildPanelPoePublicUrl(idPoe) {
     const base = `${groboFrontBasePath()}paginas/panel/poe.html`;
-    const id = String(idPoe ?? '').trim();
-    const rel = id ? `${base}?id=${encodeURIComponent(id)}` : base;
-    return window.location.origin + rel;
+    const id = Number.parseInt(String(idPoe ?? ''), 10);
+    const params = new URLSearchParams();
+    if (Number.isSafeInteger(id) && id > 0) params.set('id', String(id));
+    // El QR debe identificar su institución incluso en un celular sin sesión:
+    // sin esto se enviaba a /urbe/ por defecto, aunque el POE fuera de CUPAE.
+    const rawSlug = String(
+        window.localStorage?.getItem('NombreInst')
+        || window.sessionStorage?.getItem('NombreInst')
+        || ''
+    ).trim().toLowerCase();
+    if (/^[a-z0-9][a-z0-9-]{0,49}$/.test(rawSlug)) {
+        params.set('inst', rawSlug);
+    }
+    return window.location.origin + base + (params.size ? `?${params.toString()}` : '');
 }
 
 /** URL absoluta al portal noticias con ancla (?id=) — requiere login. */

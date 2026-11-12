@@ -2661,9 +2661,27 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
         });
         return $out;
     }
-    public function getProtocolHeaderInfo($idProt) {
-        $sql = "SELECT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA, CONCAT(u.ApellidoA, ', ', u.NombreA) as Responsable, d.NombreDeptoA as Departamento, COALESCE(din.SaldoDinero, 0) as SaldoPI FROM protocoloexpe p JOIN personae u ON p.IdUsrA = u.IdUsrA JOIN departamentoe d ON p.departamento = d.iddeptoA LEFT JOIN dinero din ON u.IdUsrA = din.IdUsrA AND p.IdInstitucion = din.IdInstitucion WHERE p.idprotA = ? LIMIT 1";
-        $stmt = $this->db->prepare($sql); $stmt->execute([$idProt]); return $stmt->fetch(\PDO::FETCH_ASSOC);
+    /**
+     * La billetera corresponde SIEMPRE a la institución cobradora, no a la
+     * institución de origen de un protocolo derivado o compartido en red.
+     */
+    public function getProtocolHeaderInfo($idProt, int $instCobradora) {
+        if ((int)$idProt <= 0 || $instCobradora <= 0) {
+            throw new \InvalidArgumentException('Protocolo o institución cobradora inválidos.');
+        }
+        $sql = "SELECT p.idprotA, p.nprotA, p.tituloA, p.IdUsrA,
+                       CONCAT(u.ApellidoA, ', ', u.NombreA) as Responsable,
+                       d.NombreDeptoA as Departamento,
+                       COALESCE(din.SaldoDinero, 0) as SaldoPI
+                FROM protocoloexpe p
+                JOIN personae u ON p.IdUsrA = u.IdUsrA
+                JOIN departamentoe d ON p.departamento = d.iddeptoA
+                LEFT JOIN dinero din
+                    ON din.IdUsrA = p.IdUsrA AND din.IdInstitucion = ?
+                WHERE p.idprotA = ? LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$instCobradora, (int)$idProt]);
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     /**
      * Saldo del usuario en una institución (billetera de esa sede).

@@ -2,7 +2,7 @@
  * UI compartida para detalle de POE (portal y dashboard).
  */
 import { API } from '../api.js';
-import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from './poeQrPrint.js';
+import { buildPanelPoePublicUrl, printPoeQrSheet, showPoeQrSwal } from './poeQrPrint.js?v=20261112a';
 
 const DASH_MODAL_ID = 'grobo-modal-poe-dashboard';
 let dashModalWired = false;

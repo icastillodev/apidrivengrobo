@@ -11,9 +11,18 @@ export function getGroboFrontBasePathForPoe() {
 /** Portal POE — ruta explícita a paginas/panel/poe.html (no depende del rewrite nginx /panel/poe). */
 export function buildPanelPoePublicPageRelativeUrl(idPoe) {
     const base = `${getGroboFrontBasePathForPoe()}paginas/panel/poe.html`;
-    const id = String(idPoe ?? '').trim();
-    if (!id) return base;
-    return `${base}?id=${encodeURIComponent(id)}`;
+    const id = Number.parseInt(String(idPoe ?? ''), 10);
+    const params = new URLSearchParams();
+    if (Number.isSafeInteger(id) && id > 0) params.set('id', String(id));
+    const slug = String(
+        window.localStorage?.getItem('NombreInst')
+        || window.sessionStorage?.getItem('NombreInst')
+        || ''
+    ).trim().toLowerCase();
+    if (/^[a-z0-9][a-z0-9-]{0,49}$/.test(slug)) {
+        params.set('inst', slug);
+    }
+    return base + (params.size ? `?${params.toString()}` : '');
 }
 
 export function buildPanelPoePublicPageAbsoluteUrl(idPoe) {

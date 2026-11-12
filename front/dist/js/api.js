@@ -51,7 +51,7 @@ export function tryResolveLegacyPanelCleanUrl(pathname, search = '', hash = '') 
 export {
     buildPanelPoePublicPageRelativeUrl,
     buildPanelPoePublicPageAbsoluteUrl,
-} from './utils/panelPoeUrl.js?v=20260703';
+} from './utils/panelPoeUrl.js?v=20261112a';
 
 export const API = {
     // 1. DETECCIÓN HÍBRIDA DE ENTORNO

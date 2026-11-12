@@ -7,7 +7,7 @@ import {
     buildNoticiaShareUrl,
     printPoeQrSheet,
     showPoeQrSwal,
-} from '../../utils/poeQrPrint.js?v=20260804';
+} from '../../utils/poeQrPrint.js?v=20261112a';
 
 /** Cupos de fijación en el panel (OrdenFijo 1…N); debe coincidir con backend y dashboard. */
 const NOTICIA_ORDEN_FIJO_MAX = 6;

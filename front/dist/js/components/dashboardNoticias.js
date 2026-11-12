@@ -1,6 +1,6 @@
 import { API } from '../api.js';
-import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js?v=20260703';
-import { openPoeDashboardModal } from '../utils/poeDetailUi.js?v=20260703';
+import { buildPanelPoePublicPageRelativeUrl } from '../utils/panelPoeUrl.js?v=20261112a';
+import { openPoeDashboardModal } from '../utils/poeDetailUi.js?v=20261112a';
 import { getCorrectPath } from './menujs/MenuConfig.js';
 import { hydrateNoticiaPortadaThumbs, bindNoticiaAdjuntoOpenButtons } from '../utils/noticiaPortadaThumb.js?v=20260703';
 

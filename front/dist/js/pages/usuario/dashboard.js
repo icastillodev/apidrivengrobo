@@ -9,7 +9,7 @@ export const DashboardUI = {
     async init() {
         this.renderUserDashboard();
         try {
-            const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20260828');
+            const { injectDashboardNoticias } = await import('../../components/dashboardNoticias.js?v=20261112a');
             await injectDashboardNoticias('dashboard-noticias-mount');
         } catch (e) {
             console.warn('Dashboard noticias:', e);

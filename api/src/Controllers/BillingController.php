@@ -992,7 +992,7 @@ class BillingController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int) ($sesion['instId'] ?? 0);
-            $info = $this->model->getProtocolHeaderInfo($idProt);
+            $info = $this->model->getProtocolHeaderInfo($idProt, $instId);
             $formularios = $this->model->getPedidosProtocolo($idProt, $desde, $hasta, null, $instId > 0 ? $instId : null);
             if ($instId > 0) {
                 $this->enrichPedidosFacturacionDerivada($formularios, $instId);
