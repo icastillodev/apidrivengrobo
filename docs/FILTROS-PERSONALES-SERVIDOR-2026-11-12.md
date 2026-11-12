@@ -54,3 +54,15 @@ Con cuentas de ensayo autorizadas de URBE y CUPAE: verificar búsquedas contra r
 - Auditoría estructural: sin nuevas referencias rotas, HTML inválido ni IDs duplicados. Persiste la deuda anterior de etiquetas accesibles en otros formularios.
 - `git diff --check`: sin errores nuevos.
 - Entorno MySQL de prueba desmontado al finalizar.
+
+## Publicación controlada y verificación real
+
+- **Commit:** `47fbf6b` en la rama `fix/grobo-seguridad-facturacion-20261102`.
+- **Release:** `myforms-filter-47fbf6b` (**4 archivos de aplicación**: controlador, servicio nuevo de filtros, módulo JS, HTML). Sin migraciones SQL ni modificaciones en datos científicos.
+- El helper restringido de despliegue respondió `GROBO_MANIFEST_OK version=myforms-filter-47fbf6b files=4` y luego `GROBO_CONTROLLED_DEPLOY_OK`.
+- **Respaldo:** `/root/grobo-managed-backup-20261112T232541Z`.
+- Hashes SHA-256 revalidados sobre los archivos instalados: **4/4 idénticos** a los del paquete.
+- PHP-FPM 8.3 y Nginx activos, y `JWT_SECRET_PREFLIGHT_OK`.
+- Chrome real, sin sesión: **10/10 comprobaciones** de HTML JS versionado (`20261112i`), hash público exacto, 5 rutas privadas HTTP 401/JSON sin datos privados (incluida `filtered=1`) y redirección al login en 390, 768 y 1366 px.
+- La prueba con login institucional real aún **no** se completó; las pruebas con MySQL 8.4 y 205/5.000 registros fueron sobre datos ficticios.
+- El siguiente cuello de botella es el filtrado server-side dentro de PHP sobre el historial autorizado completo. Se evita la transferencia al navegador, pero se debe planificar una consulta SQL selectiva segura y medir p50/p95 en el VPS con credenciales de ensayo legítimas.
