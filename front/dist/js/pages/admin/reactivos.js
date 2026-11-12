@@ -3,6 +3,7 @@
  * Sistema: GROBO 2026
  */
 import { API } from '../../api.js';
+import { eachPagedExportBatch, safeCsvCell, downloadCsvRows } from '../../utils/pagedCsvExport.js?v=20261112a';
 import {
     ensureJsPdfAutoTable,
     pdfSelText,
@@ -1318,13 +1319,24 @@ window.processExcelExportReactivos = async () => {
 
     let data = [];
     try {
-        const res = await API.request(`/reactivos/all?${buildReactivosListQuery({ limit: 10000, offset: 0 }).toString()}`);
-        if (res?.status === 'success' && Array.isArray(res.data)) {
-            data = res.data;
-        }
+        window.Swal.fire({ title: window.txt?.generales?.cargando || 'Exportando…', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
+        const baseParams = buildReactivosListQuery();
+        baseParams.set('sort_key', 'idformA');
+        baseParams.set('sort_dir', 'ASC');
+        await eachPagedExportBatch({
+            requestPage: ({ limit, offset }) => {
+                const p = new URLSearchParams(baseParams);
+                p.set('limit', String(limit));
+                p.set('offset', String(offset));
+                return API.request(`/reactivos/all?${p.toString()}`);
+            },
+            onBatch: batch => data.push(...batch),
+        });
+        window.Swal.close();
     } catch (e) {
+        window.Swal.close();
         console.error(e);
-        window.Swal.fire('Error', window.txt?.generales?.error_carga || 'Error al cargar datos.', 'error');
+        window.Swal.fire('Error', e?.message || window.txt?.generales?.error_carga || 'Error al cargar datos.', 'error');
         return;
     }
 
@@ -1366,28 +1378,18 @@ window.processExcelExportReactivos = async () => {
             r.Reactivo || 'No asignado',
             r.CantidadReactivo || 0,
             r.Medida || '',
-            // TRUCO EXCEL: Forzar formato texto para fechas
-            `="${r.Inicio || '---'}"`, 
-            `="${r.Retiro || '---'}"`,
+            // Fechas ISO como texto, sin formulas de hoja de calculo.
+            r.Inicio || '---',
+            r.Retiro || '---',
             r.estado || 'Sin estado'
         ];
         
         // Limpiar el texto (quitar puntos y coma y saltos de línea)
-        csvRows.push(row.map(v => String(v).replace(/;/g, ' ').replace(/\n/g, ' ')).join(";"));
+        csvRows.push(row.map(safeCsvCell).join(";"));
     });
 
     // 6. Generación y descarga del archivo
-    const csvContent = "\uFEFF" + csvRows.join("\r\n"); // BOM para caracteres especiales
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", `GROBO_${nombreInst}_Reactivos_${start}_al_${end}.csv`);
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsvRows(csvRows, `GROBO_${nombreInst}_Reactivos_${start}_al_${end}.csv`);
     
     // 7. Cerrar el modal de Excel
     const modalEl = document.getElementById('modal-excel-reactivo');

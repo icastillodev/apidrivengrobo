@@ -1,5 +1,6 @@
 // 1. IMPORTACIONES
 import { API } from '../../api.js';
+import { eachPagedExportBatch, safeCsvCell, downloadCsvRows } from '../../utils/pagedCsvExport.js?v=20261112a';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import {
@@ -2036,15 +2037,20 @@ window.processExcelExport = async () => {
         if (window.Swal) {
             window.Swal.fire({ title: window.txt?.admin_animales?.exportando || 'Exportando…', didOpen: () => window.Swal.showLoading(), allowOutsideClick: false });
         }
-        const p = buildAnimalesListQuery({
-            limit: 8000,
-            offset: 0,
-            inicio_desde: start,
-            inicio_hasta: end,
+        // Filtros e institución quedan fijos durante la descarga.
+        const baseParams = buildAnimalesListQuery({ inicio_desde: start, inicio_hasta: end });
+        baseParams.set('sort_key', 'idformA');
+        baseParams.set('sort_dir', 'ASC');
+        await eachPagedExportBatch({
+            requestPage: ({ limit, offset }) => {
+                const p = new URLSearchParams(baseParams);
+                p.set('limit', String(limit));
+                p.set('offset', String(offset));
+                return API.request(`/animals/all?${p.toString()}`);
+            },
+            onBatch: batch => data.push(...batch),
         });
-        const res = await API.request(`/animals/all?${p.toString()}`);
         if (window.Swal) window.Swal.close();
-        data = Array.isArray(res?.data) ? res.data : [];
     } catch (e) {
         if (window.Swal) window.Swal.close();
         console.error(e);
@@ -2078,27 +2084,16 @@ window.processExcelExport = async () => {
             a.Edad || '---',  // NUEVO
             a.Peso || '---',  // NUEVO
             a.CantAnimal,
-            `="${a.Inicio || '---'}"`, 
-            `="${a.Retiro || '---'}"`,
+            a.Inicio || '---',
+            a.Retiro || '---',
             a.estado
         ];
         // Limpiar el texto para que no rompa las columnas
-        csvRows.push(row.map(v => String(v).replace(/;/g, ' ').replace(/\n/g, ' ')).join(";"));
+        csvRows.push(row.map(safeCsvCell).join(";"));
     });
 
     // Generación del archivo con nombre detallado
-    const csvContent = "\uFEFF" + csvRows.join("\r\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    
-    // Nombre de archivo con fechas incluido
-    link.setAttribute("href", url);
-    link.setAttribute("download", `GROBO_${nombreInst}_Animales_${start}_al_${end}.csv`);
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsvRows(csvRows, `GROBO_${nombreInst}_Animales_${start}_al_${end}.csv`);
     
     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modal-excel-animal'));
     if (modalInstance) modalInstance.hide();

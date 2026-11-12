@@ -12,9 +12,12 @@ let protocolsUsedCache = [];
 const rowsPerPage = 12;
 let derivationTargets = [];
 let misFormulariosEventsBound = false;
+const formSearchCache = new WeakMap();
+let misFormsPdfScriptPromise = null;
 
-/** Texto plano para filtro de búsqueda (evita fallos con objetos anidados). */
+/** Texto plano cacheado por fila para evitar recorrer objetos anidados en cada filtro. */
 function formRowSearchText(f) {
+    if (formSearchCache.has(f)) return formSearchCache.get(f);
     const parts = [];
     const push = (v) => {
         if (v == null || v === '') return;
@@ -29,7 +32,9 @@ function formRowSearchText(f) {
         parts.push(String(v));
     };
     push(f);
-    return parts.join(' ').toLowerCase();
+    const searchableText = parts.join(' ').toLowerCase();
+    formSearchCache.set(f, searchableText);
+    return searchableText;
 }
 
 function showMisFormulariosLoadError(message) {
@@ -49,6 +54,35 @@ function escapeMisFormsHtml(s) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+/** Carga el motor de PDF únicamente cuando el usuario solicita una ficha. */
+function ensureMisFormsPdfLibrary() {
+    if (typeof window.html2pdf === 'function') return Promise.resolve();
+    if (!misFormsPdfScriptPromise) {
+        misFormsPdfScriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            script.async = true;
+            script.onload = () => {
+                if (typeof window.html2pdf === 'function') resolve();
+                else reject(new Error('La biblioteca PDF no se inicializó.'));
+            };
+            script.onerror = () => reject(new Error('No se pudo cargar la biblioteca PDF.'));
+            document.head.appendChild(script);
+        }).catch(error => {
+            misFormsPdfScriptPromise = null;
+            throw error;
+        });
+    }
+    return misFormsPdfScriptPromise;
+}
+
+/** CSV compatible con Excel, evita fórmulas inyectadas y conserva separadores. */
+function csvMisFormsCell(value) {
+    let text = String(value ?? '').replace(/\u0000/g, '').replace(/[\r\n]+/g, ' ');
+    if (/^\s*[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
 }
 
 function formatMoneyMisForm(value) {
@@ -206,6 +240,7 @@ function renderTable() {
 
     const start = (currentPage - 1) * rowsPerPage;
     const pageData = filtered.slice(start, start + rowsPerPage);
+    const rowsFragment = document.createDocumentFragment();
 
     pageData.forEach(f => {
         const tr = document.createElement('tr');
@@ -216,7 +251,7 @@ function renderTable() {
         const tipoLabel = (f.TipoPedido || f.Categoria || '').trim() || (window.txt?.misformularios?.general || 'General');
         const categoryHtml = `
             <div class="d-flex flex-column">
-                <span class="${badgeStyle.className}" style="${badgeStyle.style} font-size: 10px; padding: 3px 8px; width: fit-content;">${tipoLabel.replace(/</g, '&lt;')}</span>
+                <span class="${badgeStyle.className}" style="${badgeStyle.style} font-size: 10px; padding: 3px 8px; width: fit-content;">${escapeMisFormsHtml(tipoLabel)}</span>
             </div>
         `;
 
@@ -232,14 +267,14 @@ function renderTable() {
             : formatMoneyMisForm(f.falta_pagar ?? 0);
         const estadoPagoBadge = getFormPaymentStatusBadgeHtml(f);
         tr.innerHTML = `
-            <td class="ps-3 fw-bold text-muted small">#${f.idformA}</td>
-            <td><span class="inst-badge" title="${instParticipantes}">${instParticipantes}</span></td>
+            <td class="ps-3 fw-bold text-muted small">#${escapeMisFormsHtml(f.idformA)}</td>
+            <td><span class="inst-badge" title="${escapeMisFormsHtml(instParticipantes)}">${escapeMisFormsHtml(instParticipantes)}</span></td>
             <td>${categoryHtml}</td>
-            <td class="small">${f.Inicio || '-'}</td>
-            <td class="small">${f.Retiro || '-'}</td>
-            <td class="text-truncate small" style="max-width: 120px;" title="${f.Protocolo}">${f.Protocolo}</td>
-            <td class="text-truncate small" style="max-width: 120px;" title="${f.Departamento}">${f.Departamento}</td>
-            <td class="text-truncate small" style="max-width: 100px;" title="${f.Organizacion || ''}">${f.Organizacion || ''}</td>
+            <td class="small">${escapeMisFormsHtml(f.Inicio || '-')}</td>
+            <td class="small">${escapeMisFormsHtml(f.Retiro || '-')}</td>
+            <td class="text-truncate small" style="max-width: 120px;" title="${escapeMisFormsHtml(f.Protocolo || '')}">${escapeMisFormsHtml(f.Protocolo || '')}</td>
+            <td class="text-truncate small" style="max-width: 120px;" title="${escapeMisFormsHtml(f.Departamento || '')}">${escapeMisFormsHtml(f.Departamento || '')}</td>
+            <td class="text-truncate small" style="max-width: 100px;" title="${escapeMisFormsHtml(f.Organizacion || '')}">${escapeMisFormsHtml(f.Organizacion || '')}</td>
             <td class="text-end small text-nowrap">${pagadoCell}</td>
             <td class="text-end small text-nowrap">${faltaCell}</td>
             <td class="text-center align-middle">${estadoPagoBadge}</td>
@@ -248,8 +283,9 @@ function renderTable() {
                 ${actions}
             </td>
         `;
-        tbody.appendChild(tr);
+        rowsFragment.appendChild(tr);
     });
+    tbody.appendChild(rowsFragment);
 
     renderPagination(filtered.length);
 }
@@ -574,7 +610,10 @@ window.openContactModal = (encodedInfo) => {
 window.downloadPDF = async (id) => {
     try {
         Swal.fire({ title: 'Generando PDF...', didOpen: () => Swal.showLoading() });
-        const res = await API.request(`/user/form-detail/${id}`);
+        const [, res] = await Promise.all([
+            ensureMisFormsPdfLibrary(),
+            API.request(`/user/form-detail/${id}`),
+        ]);
         
         if (res.status === 'success') {
             const h = res.data.header;
@@ -592,11 +631,11 @@ window.downloadPDF = async (id) => {
                     return `
                     <tr>
                         <td style="border:1px solid #ddd; padding:8px;">
-                            <span style="font-weight:bold; color:#000;">${i.NombreInsumo}</span><br>
-                            <span style="color:#666; font-size:10px;">${presentacion}</span>
+                            <span style="font-weight:bold; color:#000;">${escapeMisFormsHtml(i.NombreInsumo)}</span><br>
+                            <span style="color:#666; font-size:10px;">${escapeMisFormsHtml(presentacion)}</span>
                         </td>
                         <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold; font-size:14px;">
-                            ${i.cantidad}
+                            ${escapeMisFormsHtml(i.cantidad)}
                         </td>
                     </tr>`;
                 }).join('');
@@ -616,12 +655,12 @@ window.downloadPDF = async (id) => {
             else if (categoria === 'Animal' && d) {
                 technicalHtml = `
                     <div style="border:1px solid #ddd; padding:10px; margin-top:10px; border-radius:4px;">
-                        <p style="margin:0 0 5px 0; font-size:12px;"><strong>Especie:</strong> ${d.EspeNombreA || ''} - ${d.SubEspeNombreA || ''}</p>
+                        <p style="margin:0 0 5px 0; font-size:12px;"><strong>Especie:</strong> ${escapeMisFormsHtml(d.EspeNombreA || '')} - ${escapeMisFormsHtml(d.SubEspeNombreA || '')}</p>
                         <table style="width:100%; text-align:center; margin-top:5px; font-size:11px; border-collapse:collapse;">
                             <tr>
-                                <td style="border:1px solid #ccc; padding:6px; background:#f9f9f9;">Machos<br><b>${d.machoA || 0}</b></td>
-                                <td style="border:1px solid #ccc; padding:6px; background:#f9f9f9;">Hembras<br><b>${d.hembraA || 0}</b></td>
-                                <td style="border:1px solid #ccc; padding:6px; background:#e8f5e9; font-weight:bold; color:#1a5d3b;">TOTAL<br>${d.totalA || 0}</td>
+                                <td style="border:1px solid #ccc; padding:6px; background:#f9f9f9;">Machos<br><b>${escapeMisFormsHtml(d.machoA || 0)}</b></td>
+                                <td style="border:1px solid #ccc; padding:6px; background:#f9f9f9;">Hembras<br><b>${escapeMisFormsHtml(d.hembraA || 0)}</b></td>
+                                <td style="border:1px solid #ccc; padding:6px; background:#e8f5e9; font-weight:bold; color:#1a5d3b;">TOTAL<br>${escapeMisFormsHtml(d.totalA || 0)}</td>
                             </tr>
                         </table>
                     </div>`;
@@ -644,11 +683,11 @@ window.downloadPDF = async (id) => {
                         <tbody>
                             <tr>
                                 <td style="border:1px solid #ddd; padding:8px;">
-                                    <span style="font-weight:bold; color:#000;">${nombreItem}</span><br>
-                                    <span style="color:#666; font-size:10px;">${presentacion}</span>
+                                    <span style="font-weight:bold; color:#000;">${escapeMisFormsHtml(nombreItem)}</span><br>
+                                    <span style="color:#666; font-size:10px;">${escapeMisFormsHtml(presentacion)}</span>
                                 </td>
                                 <td style="border:1px solid #ddd; padding:8px; text-align:center; font-weight:bold; font-size:14px;">
-                                    ${orderedQty}
+                                    ${escapeMisFormsHtml(orderedQty)}
                                 </td>
                             </tr>
                         </tbody>
@@ -659,7 +698,7 @@ window.downloadPDF = async (id) => {
             const template = `
                 <div style="font-family: Arial, sans-serif; padding: 30px; color: #333; background: #ffffff;">
                     <div style="text-align: center; border-bottom: 3px solid #1a5d3b; padding-bottom: 15px; margin-bottom: 25px;">
-                        <h2 style="color: #1a5d3b; margin: 0; font-size: 24px; text-transform: uppercase;">${instName}</h2>
+                        <h2 style="color: #1a5d3b; margin: 0; font-size: 24px; text-transform: uppercase;">${escapeMisFormsHtml(instName)}</h2>
                         <h4 style="margin: 8px 0; font-weight: bold; color: #555;">FICHA DE PEDIDO #${h.idformA}</h4>
                         <p style="margin: 0; font-size: 10px; color: #777;">Generado el: ${new Date().toLocaleString()}</p>
                     </div>
@@ -667,25 +706,25 @@ window.downloadPDF = async (id) => {
                     <table style="width:100%; font-size:12px; margin-bottom:20px;">
                         <tr>
                             <td style="padding:4px 0;"><strong>Categoría:</strong></td>
-                            <td>${h.Categoria} (${h.nombreTipo})</td>
+                            <td>${escapeMisFormsHtml(h.Categoria)} (${escapeMisFormsHtml(h.nombreTipo)})</td>
                         </tr>
                         <tr>
                             <td style="padding:4px 0;"><strong>Protocolo:</strong></td>
-                            <td>${h.nprotA || 'N/A'}</td>
+                            <td>${escapeMisFormsHtml(h.nprotA || 'N/A')}</td>
                         </tr>
                         <tr>
                             <td style="padding:4px 0;"><strong>Fechas:</strong></td>
-                            <td>Inicio: ${h.fechainicioA} | Retiro: ${h.fecRetiroA || 'A coordinar'}</td>
+                            <td>Inicio: ${escapeMisFormsHtml(h.fechainicioA)} | Retiro: ${escapeMisFormsHtml(h.fecRetiroA || 'A coordinar')}</td>
                         </tr>
                         <tr>
                             <td style="padding:4px 0;"><strong>Estado:</strong></td>
-                            <td><span style="background:#eee; padding:2px 5px; border-radius:3px; font-weight:bold;">${h.estado}</span></td>
+                            <td><span style="background:#eee; padding:2px 5px; border-radius:3px; font-weight:bold;">${escapeMisFormsHtml(h.estado)}</span></td>
                         </tr>
                     </table>
 
                     <div style="background-color: #fff8e1; border-left: 4px solid #ffc107; padding: 12px; margin-bottom: 25px; font-size: 11px;">
                         <strong>Observaciones:</strong><br>
-                        ${h.aclaraA || 'Sin observaciones adicionales.'}
+                        ${escapeMisFormsHtml(h.aclaraA || 'Sin observaciones adicionales.')}
                     </div>
                     
                     <h4 style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; color: #1a5d3b; font-size: 14px; text-transform: uppercase;">Detalle Técnico</h4>
@@ -702,19 +741,20 @@ window.downloadPDF = async (id) => {
                 </div>
             `;
 
-            Swal.close();
-            
             const opt = { 
                 margin: [18, 18, 18, 18], 
                 filename: `Pedido_${h.idformA}_${instName}.pdf`, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false }
             };
-            html2pdf().set(opt).from(template).save();
+            await window.html2pdf().set(opt).from(template).save();
+            Swal.close();
+        } else {
+            throw new Error(res?.message || 'No se pudo obtener el formulario.');
         }
     } catch (e) {
         console.error(e);
-        Swal.fire('Error', 'No se pudo generar el PDF.', 'error');
+        Swal.fire('Error', e?.message || 'No se pudo generar el PDF.', 'error');
     }
 };
 
@@ -1254,7 +1294,7 @@ window.processExcelExport = () => {
         ex.col_estado_pago || 'Estado pago',
         ex.col_estado || 'Estado',
     ];
-    const rows = [headers.join(";")];
+    const rows = [headers.map(csvMisFormsCell).join(";")];
     data.forEach(r => {
         const instStr = Array.isArray(r.institucionesParticipantes) && r.institucionesParticipantes.length
             ? r.institucionesParticipantes.map(i => i.NombreInst).join(' → ')
@@ -1262,8 +1302,8 @@ window.processExcelExport = () => {
         const pagadoStr = formatMoneyMisForm(r.monto_pagado ?? 0);
         const faltaStr = formatMoneyMisForm(r.falta_pagar ?? 0);
         const estadoPagoStr = getFormPaymentStatusExcelLabel(r);
-        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, `="${r.Inicio||''}"`, `="${r.Retiro||''}"`, r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, estadoPagoStr, r.estado];
-        rows.push(row.map(v => String(v).replace(/;/g, ',')).join(";"));
+        const row = [r.idformA, instStr, r.Categoria, r.TipoPedido, r.Inicio || '', r.Retiro || '', r.Protocolo, r.Departamento, r.Organizacion || '', pagadoStr, faltaStr, estadoPagoStr, r.estado];
+        rows.push(row.map(csvMisFormsCell).join(";"));
     });
     const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `MIS_PEDIDOS_${user}_${start}_${end}.csv`;
