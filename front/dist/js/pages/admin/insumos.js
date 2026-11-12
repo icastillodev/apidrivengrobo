@@ -5,7 +5,8 @@ import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDerivacionProtocoloDeptoBadge } from '../../utils/derivacionTarifariosUI.js';
 import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
-import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js?v=20261112e';
+import { getDepartmentsCached } from '../../utils/referenceDataCache.js?v=20261112e';
 import { withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 
@@ -173,10 +174,11 @@ export async function initInsumosPage() {
 
     try {
         showLoader({ upgradeOnly: true, staticPhrase: '' });
-        await Promise.all([
-            setupOriginInstitutionFilterInsumo(),
-            fetchInsumosList({ loading: 'none' }),
-        ]);
+        // Los filtros auxiliares se completan sin bloquear el primer listado.
+        void setupOriginInstitutionFilterInsumo().catch(error => {
+            console.warn('GROBO filtro de origen no disponible', error?.name);
+        });
+        await fetchInsumosList({ loading: 'none' });
         await openInsumoFromUrlIfNeeded();
         await new Promise((resolve) => {
             requestAnimationFrame(() => requestAnimationFrame(resolve));
@@ -371,7 +373,7 @@ window.openInsumoModal = async (f) => {
             API.request(`/insumos/catalog?inst=${instId}`),
             API.request(`/reactivos/last-notification?id=${f.idformA}`),
             API.request(`/billing/list-active-protocols`),
-            API.request(`/deptos/list`),
+            getDepartmentsCached(instId),
             isDerivedDest ? API.request(`/forms/derivation/config?idformA=${f.idformA}&categoria=Insumos`) : Promise.resolve(null)
         ]);
 

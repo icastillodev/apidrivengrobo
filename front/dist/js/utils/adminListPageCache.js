@@ -48,8 +48,27 @@ export function offsetLimitToPageLimitQuery(rowsPerPage, extra = {}) {
  */
 export function createAdminListPageCache(rowsPerPage, buildListQuery, listUrlPath) {
     /** @type {Map<number, object[]>} */
-    const pageCache = new Map();
+    // Evitar acumular cientos de páginas y peticiones de prefetch en sesiones largas.
+    const MAX_PAGE_CACHE = 12;
+    class BoundedPages extends Map {
+        set(pageNum, rows) {
+            if (this.has(pageNum)) this.delete(pageNum);
+            super.set(pageNum, rows);
+            while (this.size > MAX_PAGE_CACHE) this.delete(this.keys().next().value);
+            return this;
+        }
+    }
+    const pageCache = new BoundedPages();
+    const pendingPrefetch = new Set();
     let listGeneration = 0;
+    function rememberPage(pageNum, rows) {
+        // Mantener lo más reciente sin cambiar el contrato Map de las vistas legacy.
+        pageCache.delete(pageNum);
+        pageCache.set(pageNum, rows);
+        while (pageCache.size > MAX_PAGE_CACHE) {
+            pageCache.delete(pageCache.keys().next().value);
+        }
+    }
     /** @type {string|null} */
     let filtersKeyStored = null;
 
@@ -77,7 +96,9 @@ export function createAdminListPageCache(rowsPerPage, buildListQuery, listUrlPat
     }
 
     async function prefetchPage(pageNum, gen) {
-        if (gen !== listGeneration || pageCache.has(pageNum)) return;
+        const pendingKey = gen + ':' + pageNum;
+        if (gen !== listGeneration || pageCache.has(pageNum) || pendingPrefetch.has(pendingKey)) return;
+        pendingPrefetch.add(pendingKey);
         try {
             const res = await fetchPage(pageNum);
             if (gen !== listGeneration) return;
@@ -88,20 +109,22 @@ export function createAdminListPageCache(rowsPerPage, buildListQuery, listUrlPat
                 rows = res.data.items;
             }
             if (rows) {
-                pageCache.set(pageNum, rows);
+                rememberPage(pageNum, rows);
             }
         } catch (e) {
-            console.warn('[adminListPrefetch]', listUrlPath, 'página', pageNum, e);
+            console.warn('[adminListPrefetch]', listUrlPath, 'página', pageNum, e?.name);
+        } finally {
+            pendingPrefetch.delete(pendingKey);
         }
     }
 
     function schedulePrefetchAround(totalRows, centerPage, gen) {
         if (totalRows <= rowsPerPage) return;
         const totalPages = Math.ceil(totalRows / rowsPerPage);
-        const candidates = [centerPage + 1, centerPage + 2, centerPage + 3, centerPage - 1]
+        const candidates = [centerPage + 1, centerPage - 1]
             .filter((p) => p >= 1 && p <= totalPages && !pageCache.has(p));
         const run = () => {
-            candidates.slice(0, 5).forEach((p) => {
+            candidates.slice(0, 2).forEach((p) => {
                 void prefetchPage(p, gen);
             });
         };

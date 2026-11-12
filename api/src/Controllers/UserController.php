@@ -33,9 +33,11 @@ class UserController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $instId = (int) ($sesion['instId'] ?? 0);
+            header('Cache-Control: private, no-store, max-age=0');
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 0;
             if ($limit > 0) {
                 $offset = isset($_GET['offset']) ? max(0, (int) $_GET['offset']) : 0;
+                $started = microtime(true);
                 $result = $this->model->getUsersByInstitutionPaged($instId, [
                     'limit' => $limit,
                     'offset' => $offset,
@@ -44,13 +46,17 @@ class UserController {
                     'sort_key' => isset($_GET['sort_key']) ? (string) $_GET['sort_key'] : 'IdUsrA',
                     'sort_dir' => isset($_GET['sort_dir']) ? (string) $_GET['sort_dir'] : 'DESC',
                 ]);
+                header('Cache-Control: private, no-store, max-age=0');
+                header('Server-Timing: users-db;dur=' . round((microtime(true) - $started) * 1000, 1));
                 echo json_encode([
                     'status' => 'success',
                     'data' => $result['rows'],
                     'total' => $result['total'],
                 ]);
             } else {
+                $started = microtime(true);
                 $users = $this->model->getUsersByInstitution($instId);
+                header('Server-Timing: users-db;dur=' . round((microtime(true) - $started) * 1000, 1));
                 echo json_encode(['status' => 'success', 'data' => $users]);
             }
         } catch (\Exception $e) {

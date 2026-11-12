@@ -45,9 +45,12 @@ class InsumoController {
                 $opts['offset'] = $offset;
             }
 
+            $started = microtime(true);
             $result = $this->model->getAllByInstitution($targetInst, $opts);
 
             header('Content-Type: application/json');
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Server-Timing: supplies-db;dur=' . round((microtime(true) - $started) * 1000, 1));
             if (\is_array($result) && isset($result['rows'], $result['total'])) {
                 echo json_encode(['status' => 'success', 'data' => $result['rows'], 'total' => $result['total']]);
             } else {

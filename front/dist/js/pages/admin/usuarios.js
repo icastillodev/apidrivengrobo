@@ -6,7 +6,8 @@ import { getCorrectPath } from '../../components/menujs/MenuConfig.js';
 import { getPdfLogoHeaderFromStorage } from '../../utils/pdfLogoHeader.js';
 import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { showLoader } from '../../components/LoaderComponent.js';
-import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js?v=20261112e';
+import { getDepartmentsCached } from '../../utils/referenceDataCache.js?v=20261112e';
 
 console.log('[usuarios.js] módulo cargado (parse OK)');
 
@@ -509,7 +510,7 @@ window.openUserModal = async (initial) => {
         API.request('/users/one?id=' + uid),
         API.request('/users/protocols?id=' + uid + '&inst=' + encodeURIComponent(instId)),
         API.request('/users/forms?id=' + uid + '&inst=' + encodeURIComponent(instId)),
-        API.request('/deptos/list?inst=' + encodeURIComponent(instId)),
+        getDepartmentsCached(instId),
         API.request('/users/alojamientos?id=' + uid + '&inst=' + encodeURIComponent(instId)),
         API.request('/users/protocols-used-in-forms?id=' + uid + '&inst=' + encodeURIComponent(instId)),
         API.request('/users/insumos-pedidos?id=' + uid + '&inst=' + encodeURIComponent(instId)),

@@ -12,7 +12,8 @@ import { openMensajeriaCompose } from '../../utils/mensajeriaCompose.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
 import { translatePage } from '../../utils/i18n.js';
 import { showLoader, hideLoader } from '../../components/LoaderComponent.js';
-import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js?v=20261112e';
+import { getDepartmentsCached } from '../../utils/referenceDataCache.js?v=20261112e';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel, withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 import { mapAnimalFormCepaApiError } from '../../utils/animalFormCepaErrors.js';
@@ -182,10 +183,11 @@ export async function initAnimalesPage() {
     animalesListBootLocked = true;
     try {
         showLoader({ upgradeOnly: true, staticPhrase: '' });
-        await Promise.all([
-            setupOriginInstitutionFilterAnimal(),
-            fetchAnimalesList({ loading: 'none' }),
-        ]);
+        // Los filtros auxiliares se completan sin bloquear el primer listado.
+        void setupOriginInstitutionFilterAnimal().catch(error => {
+            console.warn('GROBO filtro de origen no disponible', error?.name);
+        });
+        await fetchAnimalesList({ loading: 'none' });
         setupSortHeaders();
         await openAnimalFromUrlIfNeeded();
         await new Promise((resolve) => {
@@ -467,7 +469,7 @@ window.openAnimalModal = async (a) => {
         formDataCache ? Promise.resolve({status:'success', data:formDataCache}) : API.request(`/animals/form-data?inst=${instId}`),
         API.request(`/animals/get-sex-data?id=${a.idformA}`),
         API.request(`/animals/last-notification?id=${a.idformA}`),
-        API.request(`/deptos/list?inst=${instId}`),
+        getDepartmentsCached(instId),
         isDerivedDest ? API.request(`/forms/derivation/config?idformA=${a.idformA}&categoria=Animal`) : Promise.resolve(null)
     ]);
     formDataCache = resMaster.data;

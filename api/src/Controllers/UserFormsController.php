@@ -18,8 +18,10 @@ class UserFormsController {
         try {
             // Seguridad: IDs reales del Token
             $sesion = Auditoria::getDatosSesion();
+            $started = microtime(true);
             $data = $this->model->getAllForms($sesion['userId'], $sesion['instId']);
-            
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Server-Timing: user-forms-db;dur=' . round((microtime(true) - $started) * 1000, 1));
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             http_response_code(401);

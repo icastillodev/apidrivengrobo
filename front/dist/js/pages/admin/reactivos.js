@@ -20,7 +20,8 @@ import { refreshMenuNotifications } from '../../components/MenuComponent.js';
 import { getTipoFormBadgeStyle } from '../../utils/badgeTipoForm.js';
 import { renderDerivacionTarifariosToolbar, renderDerivacionRouteBadge, renderDerivacionProtocoloDeptoBadge } from '../../utils/derivacionTarifariosUI.js';
 import { puedeEliminarFormularioAdminSede, runAdminFormularioDelete } from '../../utils/adminFormularioDelete.js';
-import { createAdminListPageCache } from '../../utils/adminListPageCache.js';
+import { createAdminListPageCache } from '../../utils/adminListPageCache.js?v=20261112e';
+import { getDepartmentsCached } from '../../utils/referenceDataCache.js?v=20261112e';
 import { setTbodyLoadingSpinner, setTbodyMessageRow } from '../../utils/tableInlineLoading.js';
 import { formatAdminProtocolOptionLabel, withCurrentProtocolOption } from '../../utils/formProtocolLabels.js?v=20261006c';
 
@@ -191,10 +192,11 @@ export async function initReactivosPage() {
     }
     try {
         showLoader({ upgradeOnly: true, staticPhrase: '' });
-        await Promise.all([
-            setupOriginInstitutionFilterReactivo(),
-            fetchReactivosList({ loading: 'none' }),
-        ]);
+        // Los filtros auxiliares se completan sin bloquear el primer listado.
+        void setupOriginInstitutionFilterReactivo().catch(error => {
+            console.warn('GROBO filtro de origen no disponible', error?.name);
+        });
+        await fetchReactivosList({ loading: 'none' });
         setupSortHeaders();
         await openReactivoFromUrlIfNeeded();
 
@@ -295,7 +297,7 @@ window.openReactivoModal = async (r) => {
             API.request(`/reactivos/form-data?inst=${instId}`),
             API.request(`/reactivos/usage?id=${r.idformA}`),
             API.request(`/reactivos/last-notification?id=${r.idformA}`),
-            API.request(`/deptos/list?inst=${instId}`),
+            getDepartmentsCached(instId),
             isDerivedDest ? API.request(`/forms/derivation/config?idformA=${r.idformA}&categoria=Otros reactivos biologicos`) : Promise.resolve(null)
         ]);
 
