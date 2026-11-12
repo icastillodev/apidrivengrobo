@@ -43,3 +43,22 @@ El servidor contiene consultas complejas, en especial agregaciones por departame
 3. Optimizar imágenes y scripts no críticos de otras pantallas con carga diferida, tras auditoría de regresión.
 4. Instrumentar fallos y Web Vitals con consentimiento y sin datos sensibles.
 5. Completar pruebas por rol en celular, tablet y escritorio con cuentas institucionales de ensayo.
+
+## Publicación y comprobación final
+
+- Release publicado: `stats-4c6bc95` (commit de aplicación `4c6bc95`).
+- Se instalaron exclusivamente **9 archivos de aplicación**, con backup privado en `/root/grobo-managed-backup-20261112T162020Z`.
+- Comparación SHA-256 del manifiesto con archivos publicados: **9/9 idénticos; 0 diferencias**.
+- PHP-FPM y Nginx: activos; preflight JWT correcto.
+- Chrome real: **8/8 recursos HTTP 200** (HTML, JS, CSS, PDF vendor) y **3/3 endpoints privados rechazados con HTTP 401 + JSON + Cache-Control no-store**.
+- Sin sesión, Estadísticas redirige correctamente a login en **390/768/1366 px**, con 0 errores de JavaScript y 0 bibliotecas de PDF descargadas innecesariamente.
+- Se entregó en el escritorio de Tojito `GROBO - Estadisticas DEMO (datos ficticios).pdf` para revisión visual y funcional.
+- Una comprobación con `urllib` desde el VPS recibió 403 por el agente/entorno de la solicitud; se repitió desde Chrome y el resultado fue válido. No se interpretó ese 403 como fallo de la aplicación.
+- Continúa pendiente una prueba de Estadísticas con sesión de administrador autorizada y datos institucionales, incluyendo duración real de las consultas de sede y red. Las pruebas de fixtures verifican código, no certifican rendimiento p95 de MySQL.
+
+### Siguiente etapa de velocidad transversal
+
+1. Medir endpoints reales con `Server-Timing` y comparar p50/p95 antes de reescribir SQL.
+2. Revisar paginación y carga incremental de listados masivos (Facturación, Protocolos, Alojamientos).
+3. Optimizar JS, CSS, imágenes y librerías por página, verificando que no se modifiquen permisos ni cálculos.
+4. Probar rendimiento en equipos básicos, redes móviles y varias instituciones, antes de afirmar porcentajes de mejora.
