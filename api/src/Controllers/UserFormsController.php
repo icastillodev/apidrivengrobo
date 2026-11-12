@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\UserForms\UserFormsModel;
 use App\Services\UserForms\UserFormsCsvExporter;
+use App\Services\UserForms\UserFormsFilterService;
 use App\Utils\Auditoria;
 
 class UserFormsController {
@@ -25,7 +26,7 @@ class UserFormsController {
             $started = microtime(true);
             if (($_GET['meta'] ?? '') === '1') {
                 $data = $this->model->getMyFormsFilterMeta($userId, $instId);
-            } elseif (($_GET['paged'] ?? '') === '1') {
+            } elseif (($_GET['paged'] ?? '') === '1' || ($_GET['filtered'] ?? '') === '1') {
                 foreach (['limit', 'offset'] as $key) {
                     if (isset($_GET[$key]) && (!is_scalar($_GET[$key])
                         || !preg_match('/^\d{1,9}$/', (string)$_GET[$key]))) {
@@ -34,9 +35,22 @@ class UserFormsController {
                 }
                 $limit = min(100, max(1, (int)($_GET['limit'] ?? 12)));
                 $offset = max(0, (int)($_GET['offset'] ?? 0));
-                $data = $this->model->getAllForms($userId, $instId, [
-                    'limit' => $limit, 'offset' => $offset,
-                ]);
+                if (($_GET['filtered'] ?? '') === '1') {
+                    $filterService = new UserFormsFilterService($this->model);
+                    // Todas las condiciones operan sobre la lista autorizada por JWT,
+                    // incluyendo snapshots de origen y ruta institucional completa.
+                    $data = $filterService->page($userId, $instId, [
+                        'search' => $_GET['search'] ?? '',
+                        'status' => $_GET['status'] ?? 'all',
+                        'inst' => $_GET['inst_name'] ?? 'all',
+                        'derivation' => $_GET['derivation'] ?? 'all',
+                        'origin' => $_GET['origin_inst'] ?? 'all',
+                    ], $limit, $offset);
+                } else {
+                    $data = $this->model->getAllForms($userId, $instId, [
+                        'limit' => $limit, 'offset' => $offset,
+                    ]);
+                }
             } else {
                 // Contrato legacy: integraciones antiguas siguen recibiendo el historial completo.
                 $data = $this->model->getAllForms($userId, $instId);

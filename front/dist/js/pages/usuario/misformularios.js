@@ -16,6 +16,7 @@ let misFormulariosEventsBound = false;
 let pagedMode = true;
 let pagedTotal = 0;
 let fullHistoryPromise = null;
+let filteredServerAvailable = true;
 let listRequestGeneration = 0;
 let searchDebounce = null;
 const formSearchCache = new WeakMap();
@@ -178,7 +179,37 @@ async function loadCurrentForms() {
     const msg = escapeMisFormsHtml(window.txt?.misformularios?.cargando_lista || 'Cargando…');
     if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-2" role="status"></span>${msg}</td></tr>`;
     try {
+        if (filtered && !filteredServerAvailable) {
+            const fullList = await getCompleteFormsOnDemand();
+            if (generation !== listRequestGeneration) return;
+            pagedMode = false; // Respaldo temporal si un servidor antiguo ignora "filtered".
+            allForms = fullList;
+            renderTable();
+            return;
+        }
+
+        const offset = (currentPage - 1) * rowsPerPage;
+        const params = new URLSearchParams({
+            limit: String(rowsPerPage), offset: String(offset),
+        });
         if (filtered) {
+            params.set('filtered', '1');
+            params.set('search', document.getElementById('search-input')?.value || '');
+            params.set('status', document.getElementById('filter-status')?.value || 'all');
+            params.set('inst_name', document.getElementById('filter-inst')?.value || 'all');
+            params.set('derivation', document.getElementById('filter-derivation')?.value || 'all');
+            params.set('origin_inst', document.getElementById('filter-origin-inst')?.value || 'all');
+        } else {
+            params.set('paged', '1');
+        }
+        const res = await API.request(`/user/my-forms?${params.toString()}`);
+        if (generation !== listRequestGeneration) return;
+
+        // Compatibilidad con backend sin la ruta filtered: éste devuelve el contrato
+        // legacy (list sin total); nunca hacer fallback ante error de permisos/API.
+        if (filtered && res?.status === 'success' && Array.isArray(res.data?.list)
+            && !Number.isSafeInteger(Number(res.data?.total))) {
+            filteredServerAvailable = false;
             const fullList = await getCompleteFormsOnDemand();
             if (generation !== listRequestGeneration) return;
             pagedMode = false;
@@ -186,10 +217,6 @@ async function loadCurrentForms() {
             renderTable();
             return;
         }
-
-        const offset = (currentPage - 1) * rowsPerPage;
-        const res = await API.request(`/user/my-forms?paged=1&limit=${rowsPerPage}&offset=${offset}`);
-        if (generation !== listRequestGeneration) return;
         if (res?.status !== 'success' || !Array.isArray(res.data?.list)
             || !Number.isSafeInteger(Number(res.data.total)) || Number(res.data.total) < 0) {
             throw new Error(res?.message || 'La API no devolvió el paginado esperado.');
@@ -299,14 +326,13 @@ function renderTable() {
     const derivationFilter = document.getElementById('filter-derivation')?.value || 'all';
     const originInstFilter = document.getElementById('filter-origin-inst')?.value || 'all';
 
-    const normEst = (v) => (v == null || String(v).trim() === '' ? 'Sin estado' : String(v).trim());
-
     const filtered = pagedMode ? allForms : allForms.filter(f => {
         const matchText = formRowSearchText(f).includes(term);
+        const statuses = [f.estado, f.estado_origen, f.estado_destino];
         const matchStatus = statusFilter === 'all'
-            || normEst(f.estado) === statusFilter
-            || normEst(f.estado_origen) === statusFilter
-            || normEst(f.estado_destino) === statusFilter;
+            || (statusFilter === 'Sin estado'
+                ? statuses.every(v => v == null || String(v).trim() === '')
+                : statuses.some(v => v != null && String(v).trim() === statusFilter));
         const instNames = Array.isArray(f.institucionesParticipantes) && f.institucionesParticipantes.length
             ? f.institucionesParticipantes.map(i => i.NombreInst)
             : [f.NombreInstitucion].filter(Boolean);
@@ -370,6 +396,11 @@ function renderTable() {
         rowsFragment.appendChild(tr);
     });
     tbody.appendChild(rowsFragment);
+    if (pageData.length === 0) {
+        const message = escapeMisFormsHtml(window.txt?.misformularios?.sin_resultados
+            || 'No hay formularios para estos filtros.');
+        tbody.innerHTML = `<tr><td colspan="13" class="text-center text-muted py-4">${message}</td></tr>`;
+    }
 
     renderPagination(pagedMode ? pagedTotal : filtered.length);
 }

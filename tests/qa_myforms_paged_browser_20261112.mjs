@@ -69,7 +69,8 @@ try {
         const forms=Array.from({length:205},(_,i)=>({
             idformA:1205-i, Inicio:'2026-11-10', Retiro:'2026-11-14',
             estado:i%2?'Entregado':'Proceso', Categoria:'Animal', TipoPedido:'Animal vivo',
-            colorTipo:'#258b61',NombreInstitucion:'URBE',NombreInstitucionOrigen:'',
+            colorTipo:'#258b61',NombreInstitucion:'URBE',NombreInstitucionOrigen:i%5===0?'URBE':'',
+            DerivadoActivo:i%5===0?1:0,
             Protocolo:'PROTO-'+i, Departamento:'Bio', Organizacion:'Organismo',
             monto_total_facturado:100,monto_pagado:20, falta_pagar:80, exento_form:0,
             institucionesParticipantes: i%5===0
@@ -80,11 +81,40 @@ try {
         api.API.request=async endpoint=>{
             calls.push(endpoint);
             if(endpoint.includes('?meta=1'))return {status:'success',data:{instituciones:['URBE','CUPAE'],origenes:['URBE']}};
-            if(endpoint.includes('?paged=1')){
+            if(endpoint.includes('paged=1')){
                 const u=new URL(endpoint,'http://localhost');
                 const offset=Number(u.searchParams.get('offset')||0);
                 const limit=Number(u.searchParams.get('limit')||12);
                 return {status:'success',data:{total:forms.length,limit,offset,list:forms.slice(offset,offset+limit)}};
+            }
+            if(endpoint.includes('filtered=1')){
+                if(window.__denyFilter)return {status:'error',http_status:403,message:'Denegado QA'};
+                if(window.__legacyFiltered)return {status:'success',data:{list:forms}};
+                const u=new URL(endpoint,'http://localhost');
+                const p=u.searchParams;
+                const search=(p.get('search')||'').toLowerCase();
+                const status=p.get('status')||'all';
+                const inst=p.get('inst_name')||'all';
+                const derived=p.get('derivation')||'all';
+                const origin=p.get('origin_inst')||'all';
+                const allMatching=forms.filter(f=>{
+                    const allText=Object.values(f).flatMap(v=>Array.isArray(v)
+                        ?v.flatMap(item=>Object.values(item)):v).join(' ').toLowerCase();
+                    const statuses=[f.estado,f.estado_origen,f.estado_destino];
+                    const statusMatches=status==='all'||(status==='Sin estado'
+                        ?statuses.every(v=>v==null||String(v).trim()==='')
+                        :statuses.some(v=>v!=null&&String(v).trim()===status));
+                    const names=f.institucionesParticipantes.map(item=>item.NombreInst);
+                    const derivMatches=derived==='all'||(derived==='derived'&&f.DerivadoActivo===1)
+                        ||(derived==='local'&&f.DerivadoActivo!==1);
+                    return allText.includes(search)&&statusMatches&&
+                        (inst==='all'||names.includes(inst))&&derivMatches&&
+                        (origin==='all'||f.NombreInstitucionOrigen===origin);
+                });
+                const offset=Number(p.get('offset')||0);
+                const limit=Number(p.get('limit')||12);
+                return {status:'success',data:{total:allMatching.length,limit,offset,
+                    list:allMatching.slice(offset,offset+limit)}};
             }
             if(endpoint==='/user/my-forms')return {status:'success',data:{list:forms}};
             if(endpoint.startsWith('/forms/derivation/targets'))return {status:'success',data:[]};
@@ -99,7 +129,7 @@ try {
     assert.equal(initial.rows,12);
     assert.ok(initial.counter.includes('205'));
     assert.equal(initial.instOptions,3);
-    assert.ok(initial.calls.some(s=>s.includes('paged=1&limit=12&offset=0')));
+    assert.ok(initial.calls.some(s=>s.includes('paged=1') && s.includes('limit=12') && s.includes('offset=0')));
     assert.ok(!initial.calls.includes('/user/my-forms'),'Legacy fetch on initial load');
     console.log('PASS first page loads only 12 forms; metadata global; no legacy GET');
 
@@ -109,21 +139,50 @@ try {
     console.log('PASS page 2 requests next 12 only');
 
     await page.locator('#search-input').fill('1191');
-    await page.waitForFunction(()=>window.__calls.filter(x=>x==='/user/my-forms').length===1
+    await page.waitForFunction(()=>window.__calls.some(x=>x.includes('filtered=1') && x.includes('1191'))
         && document.querySelectorAll('#table-body tr').length===1);
     let calls=await page.evaluate(()=>window.__calls);
-    assert.equal(calls.filter(x=>x==='/user/my-forms').length,1);
+    assert.ok(calls.some(x=>x.includes('filtered=1') && x.includes('1191')));
+    assert.equal(calls.filter(x=>x==='/user/my-forms').length,0);
     assert.equal(await page.locator('#table-body tr').count(),1);
-    console.log('PASS global search loads legacy once and sees records beyond first page');
+    console.log('PASS global search retrieves 1 row server-side, never downloads all forms');
 
     await page.locator('#search-input').fill('');
     await page.locator('#filter-inst').selectOption('CUPAE');
     await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.includes('41'));
     calls=await page.evaluate(()=>window.__calls);
-    assert.equal(calls.filter(x=>x==='/user/my-forms').length,1);
-    console.log('PASS global institution filter uses complete cached list');
+    assert.equal(calls.filter(x=>x==='/user/my-forms').length,0);
+    assert.ok(calls.some(x=>x.includes('filtered=1') && x.includes('inst_name=CUPAE')));
+    console.log('PASS global institution filter paginates 41 matches on server');
 
+    assert.equal(await page.locator('#table-body tr').count(),12);
+    await page.locator('#pagination button').filter({hasText:'2'}).first().click();
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('#1145'));
+    calls=await page.evaluate(()=>window.__calls);
+    assert.ok(calls.some(x=>x.includes('filtered=1') && x.includes('offset=12')));
+    console.log('PASS global institution filter paginates page 2 on server');
+
+    await page.locator('#filter-status').selectOption('Entregado');
+    await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.includes('20 registros'));
+    await page.locator('#filter-derivation').selectOption('derived');
+    await page.locator('#filter-origin-inst').selectOption('URBE');
+    await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.includes('20 registros'));
+    calls=await page.evaluate(()=>window.__calls);
+    assert.ok(calls.some(x=>x.includes('filtered=1') && x.includes('origin_inst=URBE')
+        && x.includes('derivation=derived') && x.includes('status=Entregado')));
+    console.log('PASS combined origin, status and derivation filters remain server-side');
+
+    await page.locator('#search-input').fill('NOT-A-REAL-PROTOCOL');
+    await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.trim().startsWith('0 registros')
+        && document.getElementById('table-body').textContent.includes('No hay formularios'));
+    assert.ok((await page.locator('#table-body').innerText()).includes('No hay formularios'));
+    console.log('PASS no matching rows show an informative empty state');
+
+    await page.locator('#search-input').fill('');
+    await page.locator('#filter-status').selectOption('all');
     await page.locator('#filter-inst').selectOption('all');
+    await page.locator('#filter-derivation').selectOption('all');
+    await page.locator('#filter-origin-inst').selectOption('all');
     await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.includes('205'));
     assert.equal(await page.locator('#table-body tr').count(),12);
     console.log('PASS reset filters returns to paged API');
@@ -178,8 +237,23 @@ try {
     console.log('PASS JSON permission error aborts export without silent fallback');
     await page.unroute('**/api/user/my-forms-csv?**');
 
+    // La API no debe descargar el historial completo ante un error 403 de filtro.
+    await page.evaluate(()=>{ window.__denyFilter=true; });
+    await page.locator('#search-input').fill('1205');
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('Denegado QA'));
+    assert.equal((await page.evaluate(()=>window.__calls)).filter(x=>x==='/user/my-forms').length,0);
+    console.log('PASS filter 403 errors never fall back to full-history access');
+
+    // En un servidor viejo que ignora filtered=1, usar sólo allí el contrato legacy.
+    await page.evaluate(()=>{window.__denyFilter=false;window.__legacyFiltered=true;});
+    await page.locator('#search-input').fill('1200');
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('#1200')
+        && window.__calls.some(x=>x==='/user/my-forms'));
+    assert.equal(await page.locator('#table-body tr').count(),1);
+    console.log('PASS an older API is supported without breaking global search');
+
     assert.deepEqual(errors,[]);
-    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=8');
+    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=13');
 } finally {
     await browser.close();
     await new Promise(done=>server.close(done));
