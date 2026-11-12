@@ -32,3 +32,14 @@ Durante la prueba de integración con una instalación **MySQL 8.4 local aislada
 ## Verificación requerida
 
 Repetir la integración MySQL con preparación nativa y emulada en entorno autorizado y verificar listados con sesión de ensayo, incluidas derivaciones, estado y paginación. Para cualquier despliegue utilizar exclusivamente el helper controlado, respaldo previo, SHA-256 y comprobación de servicios; las pruebas sin sesión no equivalen a una validación funcional autenticada.
+
+## Publicación controlada y controles posteriores
+
+- **Commit:** `db56e67`; **release:** `schema-db56e67`. Sólo se publicó `api/src/Models/UserForms/UserFormsModel.php` (1 archivo PHP).
+- El comprobador del manifiesto aceptó el paquete; el instalador restringido confirmó `GROBO_CONTROLLED_DEPLOY_OK`.
+- **Respaldo:** `/root/grobo-managed-backup-20261112T223313Z`.
+- **SHA-256 publicado:** `328035fd4ef92320e2a2df23995f17767ec971b5333a0d40a5827e15a12ee3ca`, coincidente con el paquete.
+- Nginx y PHP-FPM activos; preflight JWT correcto.
+- **8/8** verificaciones HTTP/navegador en producción: JS versionado, HTTP 401 sin datos en tres rutas privadas y login protegido en tres anchos.
+- No se modificó la estructura de la base ni se ejecutaron operaciones de escritura.
+- **Limitación persistente:** no se completó la segunda ejecución de integración MySQL con PDO nativo tras el parche ni la prueba con sesiones autorizadas de URBE y CUPAE. Mantener ambos controles en el checklist final.

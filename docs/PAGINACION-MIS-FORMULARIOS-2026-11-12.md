@@ -33,3 +33,12 @@
 - Auditoría estática: **187 JS, 84 HTML, 0 errores de sintaxis, imports o exports**.
 - Se corrigió además la tabla HTML, que mostraba **10 encabezados para 13 columnas**. Ahora incluye Pagado, Falta pagar y Estado del pago, total **13 encabezados**.
 - **Estado de publicación de esta tanda:** código preparado y validado localmente; pendiente de publicación verificada en el VPS. No confundir el commit con un despliegue. El bloqueo de la última operación remota impidió completar la comprobación final contra el VPS.
+
+## Publicación confirmada posteriormente
+
+- **Release:** `myforms-8c0791c`, **4 archivos de aplicación**.
+- El helper restringido devolvió `GROBO_CONTROLLED_DEPLOY_OK`; respaldo en `/root/grobo-managed-backup-20261112T221938Z`.
+- **4/4 SHA-256** de los archivos publicados coincidieron con los del paquete.
+- Nginx, PHP-FPM y el preflight de JWT activos/correctos.
+- Chrome de producción, sin sesión: JS versionado exacto, tres rutas privadas HTTP 401 JSON sin datos y tres resoluciones de navegador con redirección al login; **8/8 controles**.
+- Las pruebas de lectura y exportación autenticada con datos institucionales de ensayo y tiempos p50/p95 de MySQL **siguen pendientes**.
