@@ -5,6 +5,9 @@ use PDO;
 
 class UserFormsModel {
     private $db;
+    /** Caché de metadatos limitado a la instancia/request, nunca compartido entre tenants. */
+    private array $schemaTables = [];
+    private array $schemaColumns = [];
 
     public function __construct($db) {
         $this->db = $db;
@@ -892,22 +895,39 @@ class UserFormsModel {
     }
 
     private function hasTable(string $tableName): bool {
-        try {
-            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
-            $stmt->execute([$tableName]);
-            return (bool)$stmt->fetch(PDO::FETCH_NUM);
-        } catch (\Throwable $e) {
-            return false;
+        if (array_key_exists($tableName, $this->schemaTables)) {
+            return $this->schemaTables[$tableName];
         }
+        try {
+            // SHOW TABLES LIKE ? no admite prepare nativo en ciertas versiones de MySQL.
+            $stmt = $this->db->prepare(
+                "SELECT 1 FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1"
+            );
+            $stmt->execute([$tableName]);
+            $exists = (bool)$stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            $exists = false;
+        }
+        return $this->schemaTables[$tableName] = $exists;
     }
 
     private function hasColumn(string $tableName, string $columnName): bool {
-        try {
-            $stmt = $this->db->prepare("SHOW COLUMNS FROM {$tableName} LIKE ?");
-            $stmt->execute([$columnName]);
-            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (\Throwable $e) {
-            return false;
+        $key = $tableName . '.' . $columnName;
+        if (array_key_exists($key, $this->schemaColumns)) {
+            return $this->schemaColumns[$key];
         }
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ? LIMIT 1"
+            );
+            $stmt->execute([$tableName, $columnName]);
+            $exists = (bool)$stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            $exists = false;
+        }
+        return $this->schemaColumns[$key] = $exists;
     }
 }

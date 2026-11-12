@@ -9,6 +9,10 @@ final class MyFormsFixtureDb {
     /** @var list<array{sql:string,params:array}> */
     public array $queries = [];
     public function prepare(string $sql): MyFormsFixtureStmt {
+        // Simula PDO MySQL con preparación nativa: SHOW ... LIKE ? no es soportado.
+        if (str_starts_with(ltrim($sql), 'SHOW ')) {
+            throw new RuntimeException('Prepared SHOW not supported by native MySQL');
+        }
         return new MyFormsFixtureStmt($this, $sql);
     }
 }
@@ -44,6 +48,18 @@ final class MyFormsFixtureStmt {
         return false;
     }
     public function fetchColumn(int $column = 0): int|false {
+        if (str_contains($this->sql, 'information_schema.TABLES')) {
+            return in_array($this->params[0] ?? null, [
+                'formulario_derivacion', 'formulario_owner_actual',
+                'formulario_datos_originales', 'precioformulario', 'precioinsumosformulario',
+            ], true) ? 1 : false;
+        }
+        if (str_contains($this->sql, 'information_schema.COLUMNS')) {
+            return in_array($this->params[1] ?? null, [
+                'EstadoWorkflow', 'DerivadoActivo', 'IdInstitucionOrigen',
+                'idformAOrigen', 'estado_origen',
+            ], true) ? 1 : false;
+        }
         return str_contains($this->sql, 'COUNT(*)') ? 3 : false;
     }
     public function fetchAll(int $mode = PDO::FETCH_ASSOC): array {
