@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Alojamiento\AlojamientoModel;
 use App\Utils\Auditoria;
+use App\Utils\AlojamientoListMetadata;
 use App\Utils\ModulosInstitucion;
 use App\Utils\Traits\ModuloInstitucionGuardTrait;
 
@@ -35,25 +36,23 @@ class AlojamientoController {
             if ($targetInst === null) {
                 $targetInst = isset($sesion['instId']) ? (int) $sesion['instId'] : 0;
             }
+            $started = microtime(true);
             $data = $this->model->getAllGrouped($targetInst);
+            $metadata = AlojamientoListMetadata::load($this->db, $data, (int)$targetInst);
             foreach ($data as &$row) {
                 $idUsrAloj = (int) ($row['IdUsrA'] ?? 0);
                 $row['idusuario'] = $idUsrAloj;
                 $row['IdUsrResponsableAlojamiento'] = $idUsrAloj;
-                $row['CantSujetos'] = \App\Utils\AlojamientoCobro::countSujetosTramo(
-                    $this->db,
-                    (int) ($row['IdAlojamiento'] ?? 0)
-                );
-                $row['alojamiento_cobro_modo'] = \App\Utils\AlojamientoCobro::getModoTipo(
-                    $this->db,
-                    (int) ($row['IdTipoAlojamiento'] ?? 0),
-                    (int) $targetInst
-                );
+                $row['CantSujetos'] = $metadata['counts'][(int)($row['IdAlojamiento'] ?? 0)] ?? 0;
+                $row['alojamiento_cobro_modo'] = $metadata['modos'][(int)($row['IdTipoAlojamiento'] ?? 0)]
+                    ?? \App\Utils\AlojamientoCobro::MODO_CONTENIDO;
             }
             unset($row);
             $cobro = [
                 'trazabilidad_habilitada' => \App\Utils\AlojamientoCobro::instTrazabilidadHabilitada($this->db, (int) $targetInst),
             ];
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Server-Timing: housing-db;dur=' . round((microtime(true) - $started) * 1000, 1));
             echo json_encode(['status' => 'success', 'data' => $data, 'cobro' => $cobro]);
         } catch (\Exception $e) {
             http_response_code(401);
@@ -86,19 +85,14 @@ class AlojamientoController {
             }
             $rows = $this->model->getHistory($id);
             $instId = !empty($rows[0]['IdInstitucion']) ? (int) $rows[0]['IdInstitucion'] : 0;
+            $metadata = AlojamientoListMetadata::load($this->db, $rows, $instId);
             foreach ($rows as &$row) {
                 $idUsrAloj = (int) ($row['IdUsrResponsableAlojamiento'] ?? $row['IdUsrA'] ?? 0);
                 $row['idusuario'] = $idUsrAloj;
                 $row['IdUsrResponsableAlojamiento'] = $idUsrAloj;
-                $row['CantSujetos'] = \App\Utils\AlojamientoCobro::countSujetosTramo(
-                    $this->db,
-                    (int) ($row['IdAlojamiento'] ?? 0)
-                );
-                $row['alojamiento_cobro_modo'] = \App\Utils\AlojamientoCobro::getModoTipo(
-                    $this->db,
-                    (int) ($row['IdTipoAlojamiento'] ?? 0),
-                    $instId
-                );
+                $row['CantSujetos'] = $metadata['counts'][(int)($row['IdAlojamiento'] ?? 0)] ?? 0;
+                $row['alojamiento_cobro_modo'] = $metadata['modos'][(int)($row['IdTipoAlojamiento'] ?? 0)]
+                    ?? \App\Utils\AlojamientoCobro::MODO_CONTENIDO;
             }
             unset($row);
             $cobro = [

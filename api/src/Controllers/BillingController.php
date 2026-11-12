@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\Billing\BillingModel;
+use App\Models\Billing\BillingAuditReader;
 use App\Utils\Auditoria;
 use App\Utils\BackblazeB2;
 use App\Utils\ComunicacionArchivoValidacion;
@@ -1594,6 +1595,68 @@ class BillingController {
         exit;
     }
     private function getRequestData() { return json_decode(file_get_contents('php://input'), true); }
+    /** Filtros de auditoría válidos para paginación y exportación. */
+    private function auditHistoryFilters(): array {
+        return [
+            'type'=>$_GET['type'] ?? 'all',
+            'column'=>$_GET['column'] ?? 'all',
+            'search'=>$_GET['search'] ?? '',
+            'user_id'=>$_GET['user_id'] ?? 0,
+        ];
+    }
+
+    /**
+     * GET /billing/audit-history-csv: exportación explícita, con permisos.
+     * No carga el historial completo en el navegador, no cambia saldos.
+     */
+    public function exportAuditHistoryCsv() {
+        if (ob_get_length()) ob_clean();
+        try {
+            $session = Auditoria::getDatosSesion();
+            if (!in_array((int)($session['role'] ?? 0), [1, 2, 4, 5, 6, 7], true)) {
+                http_response_code(403);
+                $this->jsonResponse('error', 'Sin permisos para exportar el historial.');
+            }
+            $reader = new BillingAuditReader($this->db);
+            $cursor = $reader->cursor((int)($session['instId'] ?? 0), $this->auditHistoryFilters());
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(400);
+            $this->jsonResponse('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            error_log('GROBO audit export: ' . get_class($e));
+            http_response_code(500);
+            $this->jsonResponse('error', 'No se pudo preparar la exportación.');
+        }
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Cache-Control: private, no-store, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: attachment; filename="GROBO_Historial_' . date('Y-m-d') . '.csv"');
+        $out = fopen('php://output', 'wb');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, ['ID','Fecha','Administrador','Investigador','Tipo','Referencia','Transferencia','Comentario','Monto'], ';');
+        while (($row = $cursor->fetch(\PDO::FETCH_ASSOC)) !== false) {
+            // Evitar fórmulas arbitrarias al abrir nombres o comentarios en Excel.
+            $safe = static function ($text) {
+                $v = str_replace(["\r","\n","\t"], ' ', (string)($text ?? ''));
+                return preg_match('/^\s*[=+@-]/u', $v) ? "'" . $v : $v;
+            };
+            fputcsv($out, [
+                (int)($row['IdHistoPago'] ?? 0),
+                $safe($row['fecha'] ?? ''),
+                $safe($row['AdminCompleto'] ?? ''),
+                $safe($row['UsrCompleto'] ?? ''),
+                $safe($row['TipoHistorial'] ?? ''),
+                (int)($row['IdFormA'] ?? 0),
+                $safe($row['IdentificadorTransferencia'] ?? ''),
+                $safe($row['Comentario'] ?? ''),
+                (float)($row['Monto'] ?? 0),
+            ], ';');
+        }
+        fclose($out);
+        exit;
+    }
+
     public function getAuditHistory() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
@@ -1603,10 +1666,40 @@ class BillingController {
                 http_response_code(403);
                 $this->jsonResponse('error', 'Sin permisos para el historial contable.');
             }
+            // Solicitud paginada moderna; se conserva la respuesta legacy de
+            // lista completa para integraciones antiguas hasta migrarlas.
+            if (($_GET['paged'] ?? '') === '1') {
+                $reader = new BillingAuditReader($this->db);
+                $started = microtime(true);
+                $page = $reader->page(
+                    (int)$sesion['instId'],
+                    $this->auditHistoryFilters(),
+                    (int)($_GET['page'] ?? 1),
+                    (int)($_GET['per_page'] ?? 15)
+                );
+                header('Cache-Control: private, no-store, max-age=0');
+                header('Server-Timing: audit-db;dur=' . round((microtime(true) - $started) * 1000, 1));
+                echo json_encode([
+                    'status' => 'success',
+                    'data' => $page['rows'],
+                    'pagination' => [
+                        'page'=>$page['page'],
+                        'per_page'=>$page['per_page'],
+                        'pages'=>$page['pages'],
+                        'total'=>$page['total'],
+                    ],
+                ]);
+                exit;
+            }
             $data = $this->model->getFinancialAudit($sesion['instId']);
             $this->jsonResponse('success', $data);
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(400);
             $this->jsonResponse('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            error_log('GROBO audit history: ' . get_class($e));
+            http_response_code(500);
+            $this->jsonResponse('error', 'No se pudo cargar el historial contable.');
         }
     }
 

@@ -24,7 +24,10 @@ class ProtocolController {
             $sesion = Auditoria::getDatosSesion(); // Extrae instId seguro
             // ✅ Respetar la institución que manda el Front (como en animales/reactivos)
             $targetInst = InstitutionScope::resolve($sesion, $_GET['inst'] ?? null);
+            $started = microtime(true);
             $data = $this->model->getByInstitution($targetInst);
+            header('Server-Timing: protocol-db;dur=' . round((microtime(true) - $started) * 1000, 1));
+            header('Cache-Control: private, no-store, max-age=0');
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
             \App\Utils\ApiExceptionHandler::respond($e);

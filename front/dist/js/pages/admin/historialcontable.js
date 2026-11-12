@@ -13,6 +13,11 @@ export const HistorialState = {
     /** Filtro por investigador afectado (`historialpago.IdUsrA`); null = todos */
     filterIdUsr: null,
     personSummary: null,
+    /** Nuevo modo: página y filtros en servidor para no transferir todo el historial. */
+    serverMode: true,
+    serverTotal: 0,
+    querySerial: 0,
+    requestAbort: null,
 };
 
 let investigadoresHistorialCache = [];
@@ -32,7 +37,48 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;');
 }
 
-function exportHistorialCsv() {
+function auditQueryParams(page=HistorialState.currentPage, includePaging=true) {
+    const p = new URLSearchParams();
+    if (includePaging) {
+        p.set('paged','1');
+        p.set('page',String(page));
+        p.set('per_page',String(HistorialState.itemsPerPage));
+    }
+    const type=document.getElementById('filter-type')?.value||'all';
+    const column=document.getElementById('filter-column')?.value||'all';
+    const search=document.getElementById('search-input')?.value?.trim()||'';
+    if(type!=='all')p.set('type',type);
+    if(column!=='all')p.set('column',column);
+    if(search)p.set('search',search);
+    if(HistorialState.filterIdUsr>0)p.set('user_id',String(HistorialState.filterIdUsr));
+    return p;
+}
+
+async function exportHistorialCsv() {
+    if (HistorialState.serverMode) {
+        // Exportación por streaming desde el backend; CSV de todo el filtro,
+        // no solo de las 15 filas visibles. Nunca calcular pagos en cliente.
+        try {
+            const p=auditQueryParams(1,false);
+            const token=sessionStorage.getItem('token')||localStorage.getItem('token')||'';
+            const response=await fetch(API.urlBase+'/billing/audit-history-csv?'+p.toString(),{
+                headers:{Authorization:'Bearer '+token},cache:'no-store'
+            });
+            if(!response.ok)throw new Error('No se pudo exportar el historial.');
+            const blob=await response.blob();
+            const link=document.createElement('a');
+            const href=URL.createObjectURL(blob);
+            link.href=href;
+            link.download='GROBO_Historial_'+new Date().toISOString().slice(0,10)+'.csv';
+            link.click();
+            setTimeout(()=>URL.revokeObjectURL(href),5000);
+        }catch(error){
+            const msg=error?.message||'No se pudo descargar el historial.';
+            if(typeof Swal!=='undefined')Swal.fire({icon:'error',text:msg});
+            else alert(msg);
+        }
+        return;
+    }
     const t = txHist();
     const rows = HistorialState.dataFiltered;
     if (!rows.length) {
@@ -106,33 +152,47 @@ export async function initHistorialContable() {
     }
 }
 
-async function loadData() {
-    const errorBox = document.getElementById('historial-carga-error');
-    const displayError = () => {
-        if (errorBox) {
-            errorBox.classList.remove('d-none');
-            errorBox.textContent = window.txt?.admin_historialcontable?.error_carga
-                || 'No se pudo cargar el historial contable. Revisá la conexión o contactá al administrador.';
-        }
-    };
-    if (errorBox) errorBox.classList.add('d-none');
+async function loadData({preservePage=false}={}) {
+    if(!preservePage)HistorialState.currentPage=1;
+    const serial=++HistorialState.querySerial;
+    HistorialState.requestAbort?.abort();
+    const abort=new AbortController();
+    HistorialState.requestAbort=abort;
+    const errorBox=document.getElementById('historial-carga-error');
+    if(errorBox)errorBox.classList.add('d-none');
     try {
-        const res = await API.request('/billing/audit-history');
-        if (res.status === 'success') {
-            HistorialState.dataFull = Array.isArray(res.data) ? res.data : [];
-            HistorialState.currentPage = 1;
-            filterData();
+        const query=auditQueryParams(HistorialState.currentPage,true);
+        const res=await API.request('/billing/audit-history?'+query.toString(),
+            'GET',null,{signal:abort.signal,cache:'no-store'});
+        if(serial!==HistorialState.querySerial)return;
+        if(res.status!=='success')throw new Error(res.message||'No se pudo cargar el historial.');
+        if(res.pagination&&Number.isFinite(Number(res.pagination.total))) {
+            HistorialState.serverMode=true;
+            HistorialState.serverTotal=Math.max(0,Number(res.pagination.total));
+            HistorialState.currentPage=Math.max(1,Number(res.pagination.page)||1);
+            HistorialState.dataFull=Array.isArray(res.data)?res.data:[];
+            HistorialState.dataFiltered=HistorialState.dataFull;
+            renderTable();
         } else {
-            HistorialState.dataFull = [];
+            // Compatibilidad temporal con versiones antiguas de la API.
+            HistorialState.serverMode=false;
+            HistorialState.dataFull=Array.isArray(res.data)?res.data:[];
             filterData();
-            console.error('Historial contable:', res.message || res);
-            displayError();
         }
-    } catch (e) {
-        HistorialState.dataFull = [];
-        filterData();
-        console.error("Error cargando historial contable:", e);
-        displayError();
+    }catch(error){
+        if(serial!==HistorialState.querySerial)return;
+        HistorialState.dataFull=[];
+        HistorialState.dataFiltered=[];
+        HistorialState.serverTotal=0;
+        renderTable();
+        if(errorBox){
+            errorBox.classList.remove('d-none');
+            errorBox.textContent=window.txt?.admin_historialcontable?.error_carga
+                || 'No se pudo cargar el historial contable. Revisá la conexión.';
+        }
+        if(error.name!=='AbortError')console.warn('Historial contable sin cargar',error?.name);
+    }finally{
+        if(serial===HistorialState.querySerial)HistorialState.requestAbort=null;
     }
 }
 
@@ -184,15 +244,15 @@ function renderInvestigatorsPanel() {
         item.className = `list-group-item list-group-item-action d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 ${active ? 'bg-light border-start border-success border-4' : ''}`;
         item.innerHTML = `
             <div class="flex-grow-1" style="min-width: 140px;">
-                <div class="fw-bold small">${(u.ApellidoA || '')} ${(u.NombreA || '')}</div>
-                <div class="text-muted" style="font-size: 10px;">ID ${u.IdUsrA}</div>
+                <div class="fw-bold small">${escapeHtml(u.ApellidoA || '')} ${escapeHtml(u.NombreA || '')}</div>
+                <div class="text-muted" style="font-size: 10px;">ID ${Number(u.IdUsrA) || 0}</div>
             </div>
             <div class="text-end">
                 <span class="badge bg-secondary">${fmt(u.SaldoDinero)}</span>
             </div>
             <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-success btn-sm fw-bold btn-inv-filter" data-id="${u.IdUsrA}">${lblHist}</button>
-                <a class="btn btn-outline-primary btn-sm fw-bold" href="facturacion/investigador.html?idUsr=${encodeURIComponent(u.IdUsrA)}">${lblFact}</a>
+                <button type="button" class="btn btn-success btn-sm fw-bold btn-inv-filter" data-id="${Number(u.IdUsrA) || 0}">${escapeHtml(lblHist)}</button>
+                <a class="btn btn-outline-primary btn-sm fw-bold" href="facturacion/investigador.html?idUsr=${encodeURIComponent(Number(u.IdUsrA) || 0)}">${escapeHtml(lblFact)}</a>
             </div>
         `;
         container.appendChild(item);
@@ -205,6 +265,10 @@ function setupListeners() {
         if(e.key === 'Enter') filterData();
     });
     document.getElementById('filter-type').addEventListener('change', filterData);
+    document.getElementById('filter-column')?.addEventListener('change', filterData);
+    document.getElementById('search-input')?.addEventListener(
+        'input', debounce(filterData, 350)
+    );
     document.getElementById('btn-excel')?.addEventListener('click', exportHistorialCsv);
 
     document.getElementById('btn-inv-ver-todos')?.addEventListener('click', () => {
@@ -274,6 +338,11 @@ function filterData() {
     const text = document.getElementById('search-input').value.toLowerCase();
     const column = document.getElementById('filter-column').value;
     const type = document.getElementById('filter-type').value;
+    if (HistorialState.serverMode) {
+        HistorialState.currentPage=1;
+        void loadData({preservePage:true});
+        return;
+    }
 
     HistorialState.dataFiltered = HistorialState.dataFull.filter(row => {
         if (HistorialState.filterIdUsr != null && HistorialState.filterIdUsr !== '') {
@@ -320,13 +389,18 @@ function renderTable() {
 
     const start = (HistorialState.currentPage - 1) * HistorialState.itemsPerPage;
     const end = start + HistorialState.itemsPerPage;
-    const paginatedItems = HistorialState.dataFiltered.slice(start, end);
+    const paginatedItems = HistorialState.serverMode
+        ? HistorialState.dataFiltered
+        : HistorialState.dataFiltered.slice(start, end);
+    const totalResults = HistorialState.serverMode
+        ? HistorialState.serverTotal
+        : HistorialState.dataFiltered.length;
 
     if (paginatedItems.length === 0) {
         const emptyMsg = txHist().sin_registros || 'No se encontraron registros.';
         tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">${emptyMsg}</td></tr>`;
         info.innerText = txHist().info_cero || '0 registros';
-        renderPagination(0);
+        renderPagination(totalResults);
         return;
     }
 
@@ -368,9 +442,9 @@ function renderTable() {
     const tpl = txHist().table_info || 'Mostrando {a} a {b} de {total} registros';
     info.innerText = tpl
         .replace('{a}', String(start + 1))
-        .replace('{b}', String(Math.min(end, HistorialState.dataFiltered.length)))
-        .replace('{total}', String(HistorialState.dataFiltered.length));
-    renderPagination(HistorialState.dataFiltered.length);
+        .replace('{b}', String(Math.min(end, totalResults)))
+        .replace('{total}', String(totalResults));
+    renderPagination(totalResults);
 }
 
 // ==========================================
@@ -425,7 +499,8 @@ function createPageItem(text, targetPage, disabled = false, active = false) {
         a.addEventListener('click', (e) => {
             e.preventDefault();
             HistorialState.currentPage = targetPage;
-            renderTable();
+            if(HistorialState.serverMode)void loadData({preservePage:true});
+            else renderTable();
         });
     }
 

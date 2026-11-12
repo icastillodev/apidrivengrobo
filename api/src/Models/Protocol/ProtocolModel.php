@@ -145,13 +145,7 @@ class ProtocolModel {
                      WHERE pf.idprotA = pe.idprotA
                        AND (f.estado IS NULL OR LOWER(TRIM(f.estado)) <> 'suspendido')) as AnimalesComprometidos,
 
-                    ((SELECT COALESCE(SUM(s.totalA), 0)
-                      FROM protformr pf
-                      JOIN formularioe f ON pf.idformA = f.idformA
-                      JOIN sexoe s ON f.idformA = s.idformA
-                      WHERE pf.idprotA = pe.idprotA
-                        AND (f.estado IS NULL OR LOWER(TRIM(f.estado)) <> 'suspendido')) + pe.CantidadAniA) as AnimalesTotales,
-                    
+
                     CONCAT('(', COALESCE(u.UsrA, ''), ') ', COALESCE(p.NombreA, ''), ' ', COALESCE(p.ApellidoA, ''), ' (ID:', COALESCE(pr.IdUsrA, pe.IdUsrA), ')') as ResponsableFormat,
                     CONCAT('(', COALESCE(u_src.UsrA, ''), ') ', COALESCE(p_src.NombreA, ''), ' ', COALESCE(p_src.ApellidoA, ''), ' (ID:', pe.IdUsrA, ')') as ResponsableOrigenFormat,
                     
@@ -283,7 +277,6 @@ class ProtocolModel {
                 LEFT JOIN tipoprotocolo tp_red ON pr.idtipoprotocolo = tp_red.idtipoprotocolo
                 LEFT JOIN tiposeveridad ts ON pe.severidad = ts.IdSeveridadTipo
                 LEFT JOIN tiposeveridad ts_red ON pr.IdSeveridadTipo = ts_red.IdSeveridadTipo
-                LEFT JOIN protinstr pi ON pe.idprotA = pi.idprotA
                 LEFT JOIN institucion i_orig ON pe.IdInstitucion = i_orig.IdInstitucion
 
                 WHERE (
@@ -309,7 +302,11 @@ class ProtocolModel {
                     OR
                     -- Red: solo asignados a esta institución y con solicitud de red aprobada
                     (
-                        pi.IdInstitucion = ?
+                        EXISTS (
+                            SELECT 1 FROM protinstr pi
+                            WHERE pi.idprotA = pe.idprotA
+                              AND pi.IdInstitucion = ?
+                        )
                         AND pe.IdInstitucion <> ?
                         AND (
                             -- Manual en red (sin solicitudes de red registradas)
@@ -349,7 +346,15 @@ class ProtocolModel {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        // El total es una suma exacta de dos valores ya devueltos. Evita
+        // repetir el subquery SUM() una vez más por cada protocolo.
+        foreach ($rows as &$row) {
+            $row['AnimalesTotales'] = (int)($row['AnimalesComprometidos'] ?? 0)
+                + (int)($row['SaldoAnimales'] ?? 0);
+        }
+        unset($row);
+        return $rows;
     }
 
     public function getFormData($instId) {

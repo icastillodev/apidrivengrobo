@@ -78,8 +78,9 @@ class AlojamientoModel {
                        COALESCE(CONCAT(pers.NombreA, ' ', pers.ApellidoA), 'Sin Asignar') as Investigador
                 FROM alojamiento a
                 INNER JOIN (
-                    SELECT historia, MAX(IdAlojamiento) as max_id 
-                    FROM alojamiento 
+                    SELECT historia, MAX(IdAlojamiento) as max_id
+                    FROM alojamiento
+                    WHERE IdInstitucion = ?
                     GROUP BY historia
                 ) last_a ON a.IdAlojamiento = last_a.max_id
                 INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
@@ -90,7 +91,7 @@ class AlojamientoModel {
                 WHERE a.IdInstitucion = ?
                 ORDER BY a.historia DESC";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$instId]);
+        $stmt->execute([$instId, $instId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 

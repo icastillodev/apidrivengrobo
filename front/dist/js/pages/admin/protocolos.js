@@ -74,8 +74,15 @@ async function loadProtocolosPageData(opts = {}) {
     }
 
     try {
-        const conf = await API.request(`/protocols/form-data?inst=${instId}`);
-        console.log('[PROTO-DEBUG] /protocols/form-data raw:', conf);
+        // Ambas consultas son independientes; ejecutarlas en paralelo evita
+        // sumar innecesariamente sus tiempos de respuesta.
+        const [conf, res] = await Promise.all([
+            API.request(`/protocols/form-data?inst=${instId}`),
+            API.request(`/protocols/institution?inst=${instId}`)
+        ]);
+        if (conf?.status !== 'success' || !conf.data) {
+            throw new Error('No se pudo cargar la configuración de protocolos.');
+        }
         formDataCache = conf.data;
         console.log('[PROTO-DEBUG] formDataCache parsed:', {
             has_network: !!formDataCache?.has_network,
@@ -115,14 +122,10 @@ async function loadProtocolosPageData(opts = {}) {
             }
         }
 
-        const res = await API.request(`/protocols/institution?inst=${instId}`);
-        console.log('[PROTO-DEBUG] /protocols/institution raw:', res);
+        // Respuesta de protocolos recibida en paralelo con su configuración.
         if (res && res.status === 'success') {
             allProtocols = res.data;
-            console.log('[PROTO-DEBUG] protocolos cargados:', Array.isArray(allProtocols) ? allProtocols.length : 'no-array');
-            if (Array.isArray(allProtocols) && allProtocols.length > 0) {
-                console.log('[PROTO-DEBUG] primer protocolo sample:', allProtocols[0]);
-            }
+
             updateOriginRedIndicator();
             updateStatsBar();
             renderTableHeader();
