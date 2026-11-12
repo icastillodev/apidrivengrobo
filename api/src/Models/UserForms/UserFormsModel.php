@@ -144,18 +144,18 @@ class UserFormsModel {
         $stmt = $this->db->prepare($sql);
         $stmt->execute($paged ? array_merge($baseParams, $pageIds) : $baseParams);
         $list = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if ($paged) {
-            // El JOIN a protdeptor puede duplicar filas; el paginado cuenta pedidos canónicos.
-            $seen = [];
-            $unique = [];
-            foreach ($list as $row) {
-                $key = (int)$row['idformA'];
-                if (isset($seen[$key])) continue;
-                $seen[$key] = true;
-                $unique[] = $row;
-            }
-            $list = $unique;
+        // Cada formulario canónico debe aparecer una sola vez también en el contrato
+        // completo (filtros y Excel), no sólo en el paginado. protdeptor puede tener
+        // más de un departamento para el mismo protocolo.
+        $seen = [];
+        $unique = [];
+        foreach ($list as $row) {
+            $key = (int)$row['idformA'];
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $unique[] = $row;
         }
+        $list = $unique;
 
         $derivedIds = [];
         foreach ($list as $row) {

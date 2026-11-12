@@ -14,7 +14,7 @@ $db = new PDO($dsn, getenv('GROBO_QA_MYSQL_USER') ?: 'root',
     getenv('GROBO_QA_MYSQL_PASSWORD') ?: '', [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::ATTR_EMULATE_PREPARES => (getenv('GROBO_QA_EMULATE_PREPARES') === 'yes'),
     ]);
 if ($db->query('SELECT DATABASE()')->fetchColumn() !== 'grobo_myforms_fixture') {
     throw new RuntimeException('QA_WRONG_DATABASE');
@@ -119,5 +119,6 @@ echo "PASS filter metadata is appropriately scoped\n";
 $legacy = $model->getAllForms(202,22);
 $legacyIds = array_values(array_unique(array_map('intval',array_column($legacy['list'],'idformA'))));
 requireFixture($legacyIds === [1005,1004,1002], 'Legacy list changed');
+requireFixture(count($legacy['list']) === count($legacyIds), 'Legacy list duplicated canonical forms through JOIN');
 echo "PASS legacy contract and canonical identities retained\n";
 echo "GROBO_USERFORMS_MYSQL_INTEGRATION_QA_OK checks=6\n";
