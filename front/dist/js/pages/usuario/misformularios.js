@@ -1349,6 +1349,48 @@ window.openMyPaymentsHistoryModal = async () => {
     }
 };
 
+/**
+ * Descargar CSV desde el servidor con autenticación JWT. No conserva 20.000
+ * objetos de formularios en JS. El flujo anterior queda como respaldo sólo
+ * ante una API antigua donde la ruta todavía no existe (404 no-JSON).
+ */
+async function downloadMyFormsCsvServer(start, end, user) {
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
+    const candidate = (localStorage.getItem('lang') || document.documentElement.lang || 'es').slice(0, 2).toLowerCase();
+    const lang = ['es', 'en', 'pt'].includes(candidate) ? candidate : 'es';
+    const params = new URLSearchParams({ start, end, lang });
+    const response = await fetch(API.urlBase + '/user/my-forms-csv?' + params, {
+        headers: { Authorization: 'Bearer ' + token },
+        cache: 'no-store',
+    });
+    const type = response.headers.get('content-type') || '';
+    if (response.status === 404 && !type.includes('application/json')) {
+        return false; // Backend viejo, conservar exportación paginada de respaldo.
+    }
+    if (!response.ok) {
+        let message = 'No se pudo completar la exportación.';
+        try {
+            const error = await response.json();
+            if (typeof error?.message === 'string') message = error.message;
+        } catch {}
+        if (response.status === 401) API.forceLogout();
+        if (response.status === 404) return { empty: true, message };
+        throw new Error(message);
+    }
+    if (!type.includes('text/csv')) throw new Error('La API no devolvió un archivo CSV válido.');
+
+    const blob = await response.blob();
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = `MIS_PEDIDOS_${user}_${start}_${end}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 5000);
+    return true;
+}
+
 window.processExcelExport = async () => {
     const start = document.getElementById('excel-start').value;
     const end = document.getElementById('excel-end').value;
@@ -1376,6 +1418,17 @@ window.processExcelExport = async () => {
     let count = 0;
     try {
         Swal.fire({ title: 'Exportando historial completo…', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+        const serverExport = await downloadMyFormsCsvServer(start, end, user);
+        if (serverExport && typeof serverExport === 'object' && serverExport.empty) {
+            Swal.fire('Sin datos', serverExport.message, 'info');
+            return;
+        }
+        if (serverExport === true) {
+            Swal.close();
+            bootstrap.Modal.getInstance(document.getElementById('modal-excel'))?.hide();
+            return;
+        }
+        // Respaldo exclusivo para una API antigua sin ruta CSV.
         // El Excel GLOBAL no hereda el filtro ni la página visibles.
         await eachPagedExportBatch({
             pageSize: 100,

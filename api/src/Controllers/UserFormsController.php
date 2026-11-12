@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use App\Models\UserForms\UserFormsModel;
+use App\Services\UserForms\UserFormsCsvExporter;
 use App\Utils\Auditoria;
 
 class UserFormsController {
@@ -45,6 +46,64 @@ class UserFormsController {
                 JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (\Throwable $e) {
             \App\Utils\ApiExceptionHandler::respond($e);
+        }
+        exit;
+    }
+
+    /**
+     * GET /user/my-forms-csv?start=YYYY-MM-DD&end=YYYY-MM-DD&lang=es
+     * Exportación autenticada y acotada. Ensambla en archivo temporal antes de
+     * responder: nunca devuelve un CSV parcialmente generado por error intermedio.
+     */
+    public function exportMyFormsCsv(): void {
+        if (ob_get_length()) ob_clean();
+        header('Cache-Control: private, no-store, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        $stream = null;
+        try {
+            $sesion = Auditoria::getDatosSesion();
+            $start = $_GET['start'] ?? '';
+            $end = $_GET['end'] ?? '';
+            $lang = $_GET['lang'] ?? 'es';
+            if (!is_string($start) || !is_string($end) || !is_string($lang)) {
+                throw new \InvalidArgumentException('Parámetros de exportación inválidos');
+            }
+            $exporter = new UserFormsCsvExporter($this->model);
+            $job = $exporter->prepare((int)$sesion['userId'], (int)($sesion['instId'] ?? 0), $start, $end, $lang);
+            $stream = @tmpfile();
+            if (!is_resource($stream)) {
+                throw new \RuntimeException('No se pudo preparar la exportación');
+            }
+            $count = $exporter->writeCsv($stream, $job, (int)$sesion['userId'], (int)($sesion['instId'] ?? 0));
+            if (!$count) {
+                fclose($stream);
+                http_response_code(404);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['status'=>'error','message'=>'No hay registros en el período seleccionado.'],
+                    JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            rewind($stream);
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="MIS_PEDIDOS_' . date('Y-m-d') . '.csv"');
+            fpassthru($stream);
+            fclose($stream);
+        } catch (\LengthException $e) {
+            if (is_resource($stream)) fclose($stream);
+            http_response_code(413);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['status'=>'error','message'=>'El historial supera el máximo de 20.000 formularios por archivo.'],
+                JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            if (is_resource($stream)) fclose($stream);
+            if ($e instanceof \RuntimeException && $e->getMessage() === 'El historial cambió durante la exportación') {
+                http_response_code(409);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['status'=>'error','message'=>'El historial cambió; vuelva a descargarlo.'],
+                    JSON_UNESCAPED_UNICODE);
+            } else {
+                \App\Utils\ApiExceptionHandler::respond($e);
+            }
         }
         exit;
     }

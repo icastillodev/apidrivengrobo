@@ -27,7 +27,22 @@ class UserFormsModel {
             : [(int)$userId];
         $pageIds = [];
         $paginationTotal = null;
-        if ($paged) {
+        // Exportación: IDs canónicos ya autorizados y capturados para una lista estable.
+        // Aun así, el SELECT de detalle repite el WHERE del JWT; no confía sólo en los IDs.
+        $explicitIds = $paged && isset($pagination['ids']) && is_array($pagination['ids']);
+        if ($explicitIds) {
+            $pageIds = array_values($pagination['ids']);
+            if (count($pageIds) > 100) {
+                throw new \InvalidArgumentException('Lote de formularios demasiado grande');
+            }
+            foreach ($pageIds as $formId) {
+                if (!is_int($formId) || $formId <= 0) {
+                    throw new \InvalidArgumentException('Identificador de formulario inválido');
+                }
+            }
+            $limit = count($pageIds);
+            $paginationTotal = $limit;
+        } elseif ($paged) {
             $count = $this->db->prepare("SELECT COUNT(*) FROM formularioe f INNER JOIN institucion i ON i.IdInstitucion = f.IdInstitucion WHERE {$baseWhere}");
             $count->execute($baseParams);
             $paginationTotal = (int)$count->fetchColumn();
@@ -198,6 +213,30 @@ class UserFormsModel {
             $data['offset'] = $offset;
         }
         return $data;
+    }
+
+    /**
+     * Snapshot ligero de IDs visibles para exportaciones CSV autenticadas.
+     * El máximo evita que una descarga prolongada monopolice PHP-FPM.
+     */
+    public function getVisibleCanonicalIds(int $userId, int $currentInstId, int $maximum = 20000): array {
+        $maximum = max(1, min(20000, $maximum));
+        $params = $this->hasTable('formulario_derivacion')
+            ? [$userId, $userId, $currentInstId]
+            : [$userId];
+        $where = $this->buildGetAllFormsWhereClause();
+        $fetchLimit = $maximum + 1;
+        $sql = "SELECT f.idformA FROM formularioe f
+                INNER JOIN institucion i ON i.IdInstitucion = f.IdInstitucion
+                WHERE {$where}
+                ORDER BY f.idformA DESC LIMIT {$fetchLimit}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        if (count($ids) > $maximum) {
+            throw new \LengthException('El historial supera el límite de exportación segura.');
+        }
+        return $ids;
     }
 
     /**

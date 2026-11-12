@@ -140,8 +140,46 @@ try {
     assert.ok(download.suggestedFilename().endsWith('.csv'));
     console.log('PASS global export traverses 205 forms in three bounded requests');
 
+    // API moderna: respuesta CSV del servidor en lugar de descargar 205 JSON
+    // y concatenarlas en el navegador. La descarga debe llevar JWT.
+    await page.evaluate(()=>{
+        sessionStorage.setItem('token','qa-jwt-test-token');
+        window.__swalMessages=[];
+        window.Swal.fire=(...args)=>{window.__swalMessages.push(args);return {isConfirmed:true};};
+    });
+    let serverAuth = '';
+    await page.route('**/api/user/my-forms-csv?**', async route => {
+        serverAuth = route.request().headers()['authorization'] || '';
+        await route.fulfill({
+            status:200,
+            contentType:'text/csv; charset=utf-8',
+            body:'ID;Estado\r\n1205;Completo\r\n',
+        });
+    });
+    const before = (await page.evaluate(()=>window.__calls)).length;
+    const fromServerPromise = page.waitForEvent('download',{timeout:15000});
+    await page.evaluate(()=>window.processExcelExport());
+    const serverCsv = await fromServerPromise;
+    assert.ok(fs.readFileSync(await serverCsv.path(),'utf8').includes('1205;Completo'));
+    assert.equal(serverAuth,'Bearer qa-jwt-test-token');
+    assert.equal((await page.evaluate(()=>window.__calls)).length,before,
+        'Server CSV should not fetch paginated JSON again');
+    console.log('PASS streamed CSV request uses JWT and skips legacy JSON export');
+    await page.unroute('**/api/user/my-forms-csv?**');
+
+    // Permisos de la API: una respuesta JSON 403 no debe transformarse en CSV.
+    await page.route('**/api/user/my-forms-csv?**', async route =>
+        route.fulfill({status:403,contentType:'application/json',
+            body:JSON.stringify({status:'error',message:'Acceso denegado QA'})}));
+    await page.evaluate(()=>window.processExcelExport());
+    const errorText=await page.evaluate(()=>JSON.stringify(window.__swalMessages));
+    assert.ok(errorText.includes('Acceso denegado QA'));
+    assert.equal((await page.evaluate(()=>window.__calls)).length,before);
+    console.log('PASS JSON permission error aborts export without silent fallback');
+    await page.unroute('**/api/user/my-forms-csv?**');
+
     assert.deepEqual(errors,[]);
-    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=6');
+    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=8');
 } finally {
     await browser.close();
     await new Promise(done=>server.close(done));
