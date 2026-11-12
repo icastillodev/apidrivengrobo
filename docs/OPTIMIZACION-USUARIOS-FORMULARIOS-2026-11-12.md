@@ -32,3 +32,11 @@
 - Próxima etapa: evaluar en staging formularios derivados, trazabilidad, consolidación de consultas y rendimiento P50/P95 de MySQL; no publicar índices sin comparar `EXPLAIN`.
 
 **Despliegue:** solo publicar archivos del cambio con manifiesto SHA-256 y respaldo previo. Probar luego URL y módulos en los tres tamaños y autenticación de cada institución con cuentas controladas.
+
+## Corrección adicional de respuestas HTTP
+
+Después de publicar la optimización de listados, la prueba de acceso anónimo evidenció que algunas rutas antiguas rechazaban solicitudes sin sesión, pero respondían HTTP 200 o 500. Se actualizó el manejo de errores de las lecturas administrativas de Usuarios, Animales, Reactivos, Insumos e Historial Contable para devolver **HTTP 401 con JSON uniforme** ante token ausente o inválido.
+
+- Cinco pruebas PHP sin sesión validan HTTP 401, `status:error` y ausencia de contenido privado.
+- No se modificaron las operaciones de escritura ni las reglas de acceso autenticado.
+- El cambio también evita presentar diagnósticos internos en las respuestas de estos listados.

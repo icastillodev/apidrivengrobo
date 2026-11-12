@@ -60,7 +60,7 @@ class UserController {
                 echo json_encode(['status' => 'success', 'data' => $users]);
             }
         } catch (\Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }

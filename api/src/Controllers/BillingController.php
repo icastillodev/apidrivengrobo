@@ -1693,6 +1693,8 @@ class BillingController {
             }
             $data = $this->model->getFinancialAudit($sesion['instId']);
             $this->jsonResponse('success', $data);
+        } catch (\App\Utils\AuthenticationException $e) {
+            \App\Utils\ApiExceptionHandler::respond($e);
         } catch (\InvalidArgumentException $e) {
             http_response_code(400);
             $this->jsonResponse('error', $e->getMessage());
