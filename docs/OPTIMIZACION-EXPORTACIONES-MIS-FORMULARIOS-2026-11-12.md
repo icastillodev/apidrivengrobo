@@ -37,3 +37,16 @@
 - Si el listado cambia mientras se exporta y el total no cambia, puede requerirse un snapshot o paginación por cursor para garantía transaccional fuerte; el control de ID repetido mitiga, pero no elimina por completo esta carrera.
 - La prueba de navegador autenticado, móvil/tablet/escritorio, PDF con datos representativos y exportaciones largas reales sigue pendiente antes de dar por cerrado el QA operativo.
 - Un commit local no implica despliegue: confirmar la instalación remota mediante manifiesto SHA-256, respaldos y verificaciones públicas/privadas.
+
+## Publicación controlada y verificación (12/11/2026)
+
+- Commit de aplicación y pruebas: `f9aaafd`, rama `fix/grobo-seguridad-facturacion-20261102`.
+- Paquete `forms-export-f9aaafd`: **9 archivos de aplicación**, sin cambios PHP/SQL/configuración del servidor.
+- `grobo-deploy-check`: manifiesto SHA-256 aceptado con 9 archivos.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`; respaldo privado en `/root/grobo-managed-backup-20261112T183601Z`.
+- Relectura de los archivos instalados desde el VPS y comparación con el manifiesto: **9/9 hashes coincidentes**.
+- PHP-FPM y Nginx activos; verificación JWT aprobada.
+- Comprobación HTTP desde Chrome: **5 JS accesibles (HTTP 200 y SHA coincidente con URL versionada)** y **4 HTML accesibles (HTTP 200, referencia a la versión `20261112f` presente)**.
+- Chrome sin sesión: **12/12** pruebas de acceso a Animales, Reactivos, Insumos y Mis Formularios a anchos **390/768/1366 px**: redirección al login de URBE, sin errores JavaScript ni desbordes horizontales observados.
+- Durante el smoke inicial, la URL sin versión de `misformularios.js` llegó desde una **copia antigua en caché CDN** (`CF-Cache-Status: HIT`, `Cache-Control: max-age=14400`). La versión referenciada desde el HTML (`?v=20261112f`) entregó el código nuevo y hash correcto. La igualdad de bytes no se exige a los HTML, pues el servidor/CDN los sirve con modificaciones dinámicas; se validó la versión importada y la carga real.
+- Sin cuentas institucionales autorizadas no se ejecutaron pedidos ni cobros ni se comprobó Excel/PDF con información de producción. La publicación y el smoke **no sustituyen** ese QA funcional.
