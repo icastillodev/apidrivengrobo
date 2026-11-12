@@ -47,3 +47,16 @@ Comparando la primera página con el historial completo: **99,7 % menos bytes** 
 - Tampoco se midieron p50/p95 de endpoints privados del VPS con una sesión legítima. Su medición depende de esas cuentas y permisos; no usar JWT o credenciales de cuentas reales en los fixtures.
 - La segunda ejecución de integración con PDO emulado no se completó; quedó aprobada la variante nativa, que reprodujo el problema de `SHOW ... LIKE ?` original.
 - Las búsquedas globales todavía usan temporalmente el contrato completo bajo demanda; trasladar a SQL exige garantizar equivalencia de snapshots originales y relaciones.
+
+## Publicación y comprobación posdespliegue
+
+- **Commit de corrección:** `4912b05` en la rama `fix/grobo-seguridad-facturacion-20261102`.
+- **Release controlado:** `myforms-dedup-4912b05`, exactamente un archivo: `api/src/Models/UserForms/UserFormsModel.php`.
+- Validación del manifiesto: `GROBO_MANIFEST_OK version=myforms-dedup-4912b05 files=1`.
+- Resultado del instalador restringido: `GROBO_CONTROLLED_DEPLOY_OK`.
+- Respaldo anterior: `/root/grobo-managed-backup-20261112T224516Z`.
+- SHA-256 calculado sobre el archivo instalado: `42f28f986ca3f2730b7f8ef5897fa0e26c95790e9bb02e9230a091ec49eb12b6`, igual al del paquete.
+- Control remoto posterior: `php8.3-fpm=active`, `nginx=active`, `JWT_SECRET_PREFLIGHT_OK`.
+- Chrome sin sesión: **8/8 comprobaciones** de versión JS, 3 respuestas privadas `HTTP 401` sin contenido privado y redirección en 390, 768 y 1366 px.
+- **No** se realizaron transacciones, creación de usuarios, consumos de inventario ni actualización de formularios en producción.
+- **No** se afirma QA autenticado real: aún requieren cuentas de ensayo legitimadas por las instituciones.
