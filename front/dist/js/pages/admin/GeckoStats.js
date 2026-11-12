@@ -7,6 +7,9 @@
 // ¡AQUÍ ESTABA EL ERROR! Faltaba importar la API para que pudiera hacer la petición.
 import { API } from '../../api.js';
 import { getPdfLogoImageUrl } from '../../utils/pdfLogoHeader.js';
+import {ensureStatsExportAssets} from '../../utils/statsAssets.js';
+import {buildCompleteStatisticsPdf} from '../../utils/statsCompletePdf.js';
+import {initStatsToolbar,getStatsRangePreset} from '../../utils/statsUx.js';
 
 let charts = {};
 let rawData = null;
@@ -22,6 +25,34 @@ let redInstitutionFilter = '';
 /** Alineado con StatisticsController::STATS_MAX_RANGE_DAYS (evita peticiones que suelen provocar 504). */
 const STATS_MAX_RANGE_DAYS = 400;
 const STATS_API_TIMEOUT_MS = 120000;
+const STATS_MEMORY_TTL_MS = 90_000;
+const statsMemoryCache = new Map();
+let statsToolbar = null;
+let sedePeriodKey = '';
+let redPeriodKey = '';
+let statsRequestSerial = {sede:0,red:0};
+let statsAbortControllers = {sede:null,red:null};
+
+function statsRangeKey(){
+  return [document.getElementById('stats-from')?.value||'',document.getElementById('stats-to')?.value||''].join('|');
+}
+function statsCacheKey(scope,from,to){
+  return [scope,sessionStorage.getItem('userId')||localStorage.getItem('userId')||'',
+    sessionStorage.getItem('instId')||localStorage.getItem('instId')||'',from,to].join('|');
+}
+async function requestStatsCached(scope,url,from,to,signal,force){
+  const key=statsCacheKey(scope,from,to);
+  const previous=statsMemoryCache.get(key);
+  if(!force&&previous&&Date.now()-previous.time<STATS_MEMORY_TTL_MS){
+    return {status:'success',data:previous.data,fromMemory:true};
+  }
+  const response=await API.request(url,'GET',null,{signal,cache:'no-store'});
+  if(response.status==='success'){
+    if(statsMemoryCache.size>=6)statsMemoryCache.delete(statsMemoryCache.keys().next().value);
+    statsMemoryCache.set(key,{time:Date.now(),data:response.data});
+  }
+  return response;
+}
 
 /** Colores fijos por métrica (alineados con filtros / tarjetas). */
 const STATS_METRIC_COLORS = {
@@ -187,10 +218,18 @@ function buildFilteredRedView(raw, instFilter) {
     };
 }
 
+let redFilteredMemo = null;
 function getRedStatsPayload() {
     if (!redRawData) return null;
     if (!redInstitutionFilter) return redRawData;
-    return buildFilteredRedView(redRawData, redInstitutionFilter);
+    if (redFilteredMemo?.source === redRawData &&
+        redFilteredMemo.institution === redInstitutionFilter) {
+        return redFilteredMemo.view;
+    }
+    // Una sola agregación por filtro, aunque la vista renderice 10 gráficos/tablas.
+    const view = buildFilteredRedView(redRawData, redInstitutionFilter);
+    redFilteredMemo = {source:redRawData,institution:redInstitutionFilter,view};
+    return view;
 }
 
 function statsDataForScope(scope) {
@@ -273,30 +312,50 @@ export async function initStatsPage() {
 
     // 1. Configurar Fechas por defecto (Mes actual)
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const today = now.toISOString().split('T')[0];
+    const defaultDates = getStatsRangePreset('month',now);
+    const firstDay = defaultDates.from;
+    const today = defaultDates.to;
 
     if (document.getElementById('stats-from')) document.getElementById('stats-from').value = firstDay;
     if (document.getElementById('stats-to')) document.getElementById('stats-to').value = today;
 
+    statsToolbar = initStatsToolbar({
+      hasRedData:()=>redDataLoaded&&redPeriodKey===statsRangeKey(),
+      onPeriod:async preset=>{
+        const range=getStatsRangePreset(preset);
+        document.getElementById('stats-from').value=range.from;
+        document.getElementById('stats-to').value=range.to;
+        if(currentStatsScope==='red') await loadStatsRedFull(false);
+        else await loadStats(false);
+      },
+      onPdfExport:exportCurrentStatsPdf,
+    });
+    document.querySelectorAll('#stats-from,#stats-to').forEach(input=>{
+      input.addEventListener('change',()=>{
+        statsToolbar?.setStatus('ready','Período modificado. Pulsá Actualizar antes de exportar.');
+      });
+    });
     // 2. Ocultar contenido hasta que cargue
     const content = document.getElementById('stats-content');
     if (content) content.style.display = 'none';
 
     // 3. Eventos de Botones Principales (según pestaña activa)
     document.getElementById('btn-update-stats').onclick = async () => {
-        if (currentStatsScope === 'red') await loadStatsRedFull();
-        else await loadStats();
+        if (currentStatsScope === 'red') await loadStatsRedFull(true);
+        else await loadStats(true);
     };
 
-    document.getElementById('btn-excel-stats').onclick = () => {
-        if (currentStatsScope === 'red') exportToExcelRed();
-        else exportToExcel();
+    document.getElementById('btn-excel-stats').onclick = async () => {
+       if(currentStatsScope==='red'?redPeriodKey!==statsRangeKey():sedePeriodKey!==statsRangeKey()){
+         statsToolbar?.setStatus('failed','Actualizá el período antes de exportar.');return;
+       }
+       try{
+         await ensureStatsExportAssets('excel');
+         if(currentStatsScope==='red')exportToExcelRed();
+         else exportToExcel();
+       }catch(e){statsToolbar?.setStatus('failed',e.message);}
     };
-    document.getElementById('btn-pdf-stats').onclick = () => {
-        if (currentStatsScope === 'red') askExportPDFOptionsRed();
-        else askExportPDFOptions();
-    };
+    document.getElementById('btn-pdf-stats').onclick = () => statsToolbar?.exportCurrent();
 
     // 4. Configuración de Gráficos (Cambio de tipo)
     const chartTypeSel = document.getElementById('chart-type');
@@ -328,11 +387,40 @@ export async function initStatsPage() {
     window.viewChartFullScreen = openChartModal;
     window.exportChartToPDF = exportChartToPDF;
 
-    loadInstitutionFlags();
+    const flagsLoading=loadInstitutionFlags();
     wireStatsScopeTabs();
 
     // Carga inicial de la pestaña Sede (antes había que pulsar Actualizar a ciegas).
-    await loadStats();
+    // Dejar visible la interfaz: la carga grande se hace en segundo plano.
+    void loadStats();
+    void flagsLoading;
+}
+
+async function exportCurrentStatsPdf(options={}) {
+    const {section='all',includeCharts=true,includeBoth=false}=options;
+    const periodKey=statsRangeKey();
+    if(currentStatsScope==='red' ? (!redRawData||redPeriodKey!==periodKey) : (!rawData||sedePeriodKey!==periodKey)){
+        throw new Error('Actualizá las estadísticas del período antes de generar el PDF.');
+    }
+    await ensureStatsExportAssets('pdf');
+    const datasets=[];
+    if(includeBoth && redDataLoaded && redPeriodKey===periodKey && sedePeriodKey===periodKey) {
+        datasets.push({id:'sede',label:'Sede',data:rawData,chartIds:['chart-canvas','chart-species']});
+        datasets.push({id:'red',label:'Red institucional',data:getRedStatsPayload(),chartIds:['red-chart-canvas','red-chart-species']});
+    } else if(currentStatsScope==='red') {
+        datasets.push({id:'red',label:redInstitutionFilter||'Red institucional',data:getRedStatsPayload(),
+            chartIds:['red-chart-canvas','red-chart-species']});
+    } else {
+        datasets.push({id:'sede',label:'Sede',data:rawData,chartIds:['chart-canvas','chart-species']});
+    }
+    return buildCompleteStatisticsPdf({
+        datasets,
+        period:{from:document.getElementById('stats-from')?.value,to:document.getElementById('stats-to')?.value},
+        institution:localStorage.getItem('NombreInst')||'',
+        sections:section==='all'?undefined:[section],
+        includeCharts,
+        locale:localStorage.getItem('lang')||document.documentElement.lang||'es'
+    });
 }
 
 function wireStatsScopeTabs() {
@@ -341,7 +429,7 @@ function wireStatsScopeTabs() {
     if (tabRed) {
         tabRed.addEventListener('shown.bs.tab', async () => {
             currentStatsScope = 'red';
-            if (!redDataLoaded) await loadStatsRedFull();
+            if (!redDataLoaded || redPeriodKey!==statsRangeKey()) await loadStatsRedFull(false);
             else resizeAllCharts();
         });
     }
@@ -365,10 +453,10 @@ function resizeAllCharts() {
 /**
  * Carga de datos desde la API
  */
-async function loadStats() {
+async function loadStats(force=false) {
     const from = document.getElementById('stats-from')?.value;
     const to = document.getElementById('stats-to')?.value;
-    const instId = localStorage.getItem('instId') || '1';
+    const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId') || '';
     
     const btn = document.getElementById('btn-update-stats');
     const t = txStats();
@@ -387,16 +475,18 @@ async function loadStats() {
         return;
     }
 
+    const requestKey=[from,to].join("|");
+    const serial=++statsRequestSerial.sede;
+    statsAbortControllers.sede?.abort();
     const ac = new AbortController();
+    statsAbortControllers.sede=ac;
+    const startTime=performance.now();
+    statsToolbar?.setStatus('loading');
     const toid = setTimeout(() => ac.abort(), STATS_API_TIMEOUT_MS);
 
     try {
-        const res = await API.request(
-            `/stats/dashboard?inst=${instId}&from=${from}&to=${to}&v=${Date.now()}`,
-            'GET',
-            null,
-            { signal: ac.signal }
-        );
+        const res = await requestStatsCached("sede",'/stats/dashboard?inst='+encodeURIComponent(instId)+'&from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to),from,to,ac.signal,force);
+        if(serial!==statsRequestSerial.sede || statsRangeKey()!==requestKey)return;
 
         if (res.errorKind === 'timeout' || res.message === 'STATS_REQUEST_TIMEOUT') {
             alert(t.err_timeout_cliente || 'La consulta tardó demasiado. Acorte el rango de fechas o intente de nuevo.');
@@ -404,6 +494,8 @@ async function loadStats() {
         }
         if (res.status === 'success') {
             rawData = res.data;
+            sedePeriodKey=requestKey;
+            statsToolbar?.setStatus(res.fromMemory?'cached':'loaded',(res.fromMemory?'Datos recientes':'Datos actualizados')+' · '+Math.round(performance.now()-startTime)+' ms');
             document.getElementById('stats-content').style.display = 'block';
             
             generateDeptColors(rawData.por_departamento, 'sede');
@@ -418,17 +510,19 @@ async function loadStats() {
             renderTableOrganizacion('sede');
             renderMainChart('sede');
             renderSpeciesChart('sede');
-            renderDetailsSection('sede');
+            setTimeout(()=>{if(serial===statsRequestSerial.sede)renderDetailsSection('sede');},0);
             
         } else {
-            alert(res.message || t?.err_respuesta || 'Error en la respuesta.');
+            statsToolbar?.setStatus('failed',res.message || t?.err_respuesta || 'Error en la respuesta.');
         }
     } catch (e) {
+        if(serial!==statsRequestSerial.sede)return;
+        statsToolbar?.setStatus('failed');
         console.error("Error de red/servidor:", e);
-        alert(t?.err_conexion || 'Error de conexión con el servidor.');
+        statsToolbar?.setStatus('failed',t?.err_conexion || 'Error de conexión con el servidor.');
     } finally {
         clearTimeout(toid);
-        if (btn) {
+        if (serial===statsRequestSerial.sede && btn) {
             btn.disabled = false;
             btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
         }
@@ -437,7 +531,8 @@ async function loadStats() {
 
 async function loadInstitutionFlags() {
     try {
-        const res = await API.request('/stats/institution-flags');
+        const instId = sessionStorage.getItem('instId') || localStorage.getItem('instId') || '';
+        const res = await API.request('/stats/institution-flags?inst='+encodeURIComponent(instId));
         const wrap = document.getElementById('stats-scope-wrap');
         const d = res.data || {};
         const mg = Number(d.madre_grupo ?? d.MadreGrupo ?? 0);
@@ -454,7 +549,7 @@ async function loadInstitutionFlags() {
     }
 }
 
-async function loadStatsRedFull() {
+async function loadStatsRedFull(force=false) {
     const from = document.getElementById('stats-from')?.value;
     const to = document.getElementById('stats-to')?.value;
     const btn = document.getElementById('btn-update-stats');
@@ -474,16 +569,18 @@ async function loadStatsRedFull() {
         return;
     }
 
+    const requestKey=[from,to].join("|");
+    const serial=++statsRequestSerial.red;
+    statsAbortControllers.red?.abort();
     const ac = new AbortController();
+    statsAbortControllers.red=ac;
+    const startTime=performance.now();
+    statsToolbar?.setStatus('loading');
     const toid = setTimeout(() => ac.abort(), STATS_API_TIMEOUT_MS);
 
     try {
-        const res = await API.request(
-            `/stats/dashboard-red?from=${from}&to=${to}&v=${Date.now()}`,
-            'GET',
-            null,
-            { signal: ac.signal }
-        );
+        const res = await requestStatsCached("red",'/stats/dashboard-red?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)+'&inst='+encodeURIComponent(sessionStorage.getItem('instId')||localStorage.getItem('instId')||''),from,to,ac.signal,force);
+        if(serial!==statsRequestSerial.red || statsRangeKey()!==requestKey)return;
         if (res.errorKind === 'timeout' || res.message === 'STATS_REQUEST_TIMEOUT') {
             alert(t.err_timeout_cliente || 'La consulta tardó demasiado. Acorte el rango de fechas o intente de nuevo.');
             return;
@@ -492,6 +589,9 @@ async function loadStatsRedFull() {
             redRawData = res.data;
             redInstitutionFilter = '';
             redDataLoaded = true;
+            redPeriodKey=requestKey;
+            statsToolbar?.sync();
+            statsToolbar?.setStatus(res.fromMemory?'cached':'loaded',(res.fromMemory?'Datos recientes':'Datos actualizados')+' · '+Math.round(performance.now()-startTime)+' ms');
             const pane = document.getElementById('stats-content-red');
             if (pane) pane.style.display = 'block';
             generateDeptColors(redRawData.por_departamento || [], 'red');
@@ -505,17 +605,19 @@ async function loadStatsRedFull() {
             renderTableOrganizacion('red');
             renderMainChart('red');
             renderSpeciesChart('red');
-            renderDetailsSection('red');
+            setTimeout(()=>{if(serial===statsRequestSerial.red)renderDetailsSection('red');},0);
             renderRedInstitutionTabs();
         } else {
-            alert(res.message || t?.red_sin_permiso || 'Error al cargar estadísticas de la red.');
+            statsToolbar?.setStatus('failed',res.message || t?.red_sin_permiso || 'Error al cargar estadísticas de la red.');
         }
     } catch (e) {
+        if(serial!==statsRequestSerial.red)return;
+        statsToolbar?.setStatus('failed');
         console.error(e);
-        alert(t?.err_conexion || 'Error de conexión.');
+        statsToolbar?.setStatus('failed',t?.err_conexion || 'Error de conexión.');
     } finally {
         clearTimeout(toid);
-        if (btn) {
+        if (serial===statsRequestSerial.red && btn) {
             btn.disabled = false;
             btn.innerHTML = t?.btn_actualizar || 'ACTUALIZAR';
         }
@@ -1234,12 +1336,28 @@ function renderDetailsSection(scope = 'sede') {
     const t = window.txt?.admin_estadisticas || {};
     const gen = window.txt?.generales || {};
     container.innerHTML = '';
+    // Indexar una vez los resultados evita recorrer todas las listas para cada departamento.
+    const indexByDept = rows => {
+        const map = new Map();
+        (rows || []).forEach(row => {
+            const key = String(row.departamento || '');
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(row);
+        });
+        return map;
+    };
+    const deptSpecies = indexByDept(data.detalle_especies);
+    const deptProtocols = indexByDept(data.detalle_protocolos);
+    const deptStrains = indexByDept(data.detalle_cepas);
+    const esc = value => String(value ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const deptos = data.por_departamento.map(d => d.departamento);
 
     deptos.forEach(depto => {
-        const especies = (data.detalle_especies || []).filter(x => x.departamento === depto);
-        const protocolos = (data.detalle_protocolos || []).filter(x => x.departamento === depto);
-        const cepas = (data.detalle_cepas || []).filter(x => x.departamento === depto);
+        const especies = deptSpecies.get(String(depto)) || [];
+        const protocolos = deptProtocols.get(String(depto)) || [];
+        const cepas = deptStrains.get(String(depto)) || [];
 
         if (especies.length === 0 && protocolos.length === 0 && cepas.length === 0) return;
 
@@ -1249,8 +1367,8 @@ function renderDetailsSection(scope = 'sede') {
         // Render Especies
         let htmlEsp = especies.map(e => `
             <li class="list-group-item d-flex justify-content-between px-0 py-1 border-bottom">
-                <span>${e.especie} <small class="text-muted">(${e.subespecie||'-'})</small></span>
-                <span class="fw-bold text-success">${e.cantidad_animales}</span>
+                <span>${esc(e.especie)} <small class="text-muted">(${esc(e.subespecie||'-')})</small></span>
+                <span class="fw-bold text-success">${Number(e.cantidad_animales)||0}</span>
             </li>`).join('');
 
         // Render Protocolos con Estado
@@ -1259,29 +1377,29 @@ function renderDetailsSection(scope = 'sede') {
             const hoy = new Date();
             const isVencido = vencimiento < hoy;
             const badge = isVencido
-                ? `<span class="badge bg-danger" style="font-size:9px">${t.det_prot_vencido || 'Vencido'} (${p.FechaFinProtA})</span>`
-                : `<span class="badge bg-success" style="font-size:9px">${t.det_prot_vigente || 'Vigente'}</span>`;
+                ? `<span class="badge bg-danger" style="font-size:9px">${esc(t.det_prot_vencido || 'Vencido')} (${esc(p.FechaFinProtA)})</span>`
+                : `<span class="badge bg-success" style="font-size:9px">${esc(t.det_prot_vigente || 'Vigente')}</span>`;
             
             return `
             <li class="list-group-item px-0 py-2 border-bottom">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="badge bg-light text-dark border">${p.nprotA}</span>
+                    <span class="badge bg-light text-dark border">${esc(p.nprotA)}</span>
                     ${badge}
                 </div>
-                <div class="small text-muted text-truncate" title="${p.tituloA}">${p.tituloA}</div>
+                <div class="small text-muted text-truncate" title="${esc(p.tituloA)}">${esc(p.tituloA)}</div>
             </li>`;
         }).join('');
 
         // Render Cepas
         let htmlCep = cepas.map(c => `
             <li class="list-group-item d-flex justify-content-between px-0 py-1 border-bottom">
-                <span>${c.cepa}</span>
-                <span class="fw-bold text-primary">${c.cantidad_animales}</span>
+                <span>${esc(c.cepa)}</span>
+                <span class="fw-bold text-primary">${Number(c.cantidad_animales)||0}</span>
             </li>`).join('');
 
         col.innerHTML = `
             <div class="card h-100 shadow-sm border-0 border-top border-3 border-success">
-                <div class="card-header bg-white fw-bold text-success text-uppercase small">${depto}</div>
+                <div class="card-header bg-white fw-bold text-success text-uppercase small">${esc(depto)}</div>
                 <div class="card-body p-3 pt-0">
                     <div class="mb-3">
                         <h6 class="small fw-bold text-muted border-bottom py-2"><i class="bi bi-heptagon-half"></i> ${(t.det_especies || 'Especies').toUpperCase()}</h6>
@@ -1925,14 +2043,15 @@ async function exportFastPDF(includeCharts) {
 }
 
 // Exportar un solo gráfico (botón en header de tarjeta)
-function exportChartToPDF(canvasId, name) {
+async function exportChartToPDF(canvasId, name) {
+    await ensureStatsExportAssets("pdf");
     const canvas = document.getElementById(canvasId);
-    if (!window.jspdf) return;
+    if (!canvas) return;
     const pdf = new window.jspdf.jsPDF('landscape');
     const imgData = canvas.toDataURL("image/jpeg", 1.0);
     const props = pdf.getImageProperties(imgData);
     const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = (props.height * pdfW) / props.width;
+    const pdfH = Math.min(pdf.internal.pageSize.getHeight()-20,(props.height * pdfW) / props.width);
     pdf.addImage(imgData, 'JPEG', 0, 10, pdfW, pdfH);
     pdf.save(`${name}.pdf`);
 }

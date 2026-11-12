@@ -1,0 +1,65 @@
+/* GROBO Estadísticas — pulido progresivo. Respeta tema/estructura Bootstrap. */
+#stats-toolbar {
+  background: linear-gradient(115deg,#f8fcf9,#fff);
+  border: 1px solid #dce9df;
+  border-radius: 14px;
+  padding: 15px 18px;
+  margin-bottom: 22px;
+  color: #253a2e;
+}
+#stats-toolbar .stats-toolbar-top,
+#stats-toolbar .stats-toolbar-export {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+#stats-toolbar .stats-toolbar-export {
+  border-top: 1px solid #e4eee6;
+  padding-top: 13px;
+  margin-top: 13px;
+  justify-content: flex-start;
+}
+#stats-toolbar .stats-period-group {display:flex;align-items:center;flex-wrap:wrap;gap:7px;}
+#stats-toolbar .stats-tool-label {font-size:11px;font-weight:800;display:block;letter-spacing:.02em;margin-bottom:4px;color:#365e46;}
+#stats-toolbar .stats-period-group .stats-tool-label {margin:0 8px 0 0;}
+#stats-toolbar .stats-period-group .btn {border-radius:9px;min-height:37px;font-weight:700;}
+#stats-toolbar .stats-period-group .btn.active {background-color:#1a5d3b;color:#fff;}
+#stats-toolbar .stats-section-select {flex:1 1 240px;max-width:430px;min-width:0;}
+#stats-toolbar .stats-section-select select {min-height:39px;border-radius:9px;}
+#stats-toolbar .stats-report-checkbox {display:flex;align-items:center;gap:8px;margin:14px 5px 0 0;min-height:35px;}
+#stats-toolbar .stats-report-checkbox .form-check-input {float:none;margin:0;min-width:18px;min-height:18px;}
+#stats-toolbar .stats-report-checkbox .form-check-label {font-size:12px;font-weight:600;cursor:pointer;}
+#stats-toolbar #stats-pdf-complete {min-height:41px;padding-inline:18px;margin-left:auto;border-radius:9px;background:#1a5d3b;border-color:#1a5d3b;}
+#stats-toolbar .stats-update-status {display:flex;align-items:center;gap:8px;font-size:12px;color:#506557;min-width:190px;}
+#stats-toolbar .stats-status-dot {width:9px;height:9px;border-radius:50%;background:#889a8d;flex-shrink:0;}
+#stats-toolbar [data-status="loaded"] .stats-status-dot,
+#stats-toolbar [data-status="cached"] .stats-status-dot,
+#stats-toolbar [data-status="exported"] .stats-status-dot {background:#198754;}
+#stats-toolbar [data-status="loading"] .stats-status-dot,
+#stats-toolbar [data-status="export"] .stats-status-dot {background:#d5a421;animation:stats-pulse 1.2s infinite;}
+#stats-toolbar [data-status="failed"] .stats-status-dot {background:#dc3545;}
+@keyframes stats-pulse {50% {opacity:.35;}}
+#pane-sede .card,#pane-red .card {min-width:0;}
+#pane-sede .table-responsive,#pane-red .table-responsive {overscroll-behavior-x:contain;}
+#pane-sede canvas,#pane-red canvas {max-width:100%;}
+#stats-content .row.g-3 > .col,#stats-content-red .row.g-3 > .col {flex:1 1 150px;min-width:140px;}
+#stats-toolbar :focus-visible {outline:3px solid rgba(26,93,59,.4);outline-offset:2px;}
+@media(max-width:767.98px) {
+  #stats-toolbar {padding:12px;}
+  #stats-toolbar .stats-update-status {width:100%;}
+  #stats-toolbar .stats-section-select {max-width:none;flex-basis:100%;}
+  #stats-toolbar #stats-pdf-complete {width:100%;margin:2px 0 0;}
+  #stats-toolbar .stats-report-checkbox {margin-top:0;flex:1 1 145px;}
+  #stats-toolbar .stats-toolbar-export {gap:7px;}
+  #pane-sede .card,#pane-red .card {height:auto!important;}
+  #pane-sede .card-header,#pane-red .card-header {flex-wrap:wrap;gap:8px;}
+  #stats-scope-tabs .nav-link {min-height:44px;padding:10px 13px!important;}
+  #stats-content .row.g-3 > .col,#stats-content-red .row.g-3 > .col {flex:1 1 calc(50% - 8px);min-width:135px;}
+  #stats-content h2,#stats-content-red h2 {font-size:clamp(1.35rem,6vw,2rem);}
+  #pane-sede .table-responsive,#pane-red .table-responsive {overflow-x:auto;-webkit-overflow-scrolling:touch;}
+}
+@media (prefers-reduced-motion:reduce) {
+  #stats-toolbar .stats-status-dot {animation:none!important;}
+}

@@ -10,6 +10,28 @@ class StatisticsController {
 
     private $model;
 
+    /** Estadísticas institucionales: nunca basta con ocultar el botón en el frontend. */
+    private function resolveStatsInstitution(array $session): int {
+        $role = (int)($session['role'] ?? 0);
+        if (!in_array($role, [1, 2, 4, 5, 6], true)) {
+            throw new \DomainException('No tiene permisos para consultar estadísticas institucionales.');
+        }
+        $instId = (int)($session['instId'] ?? 0);
+        if ($role === 1) {
+            // Solo el superadmin puede elegir una institución, que debe ser explícita.
+            $target = filter_var($_GET['inst'] ?? $instId, FILTER_VALIDATE_INT);
+            if ($target === false || (int)$target <= 0) {
+                throw new \InvalidArgumentException('Seleccione una institución válida.');
+            }
+            return (int)$target;
+        }
+        if ($instId <= 0) {
+            throw new \InvalidArgumentException('Seleccione una institución válida.');
+        }
+        // El parámetro del navegador NO cambia el ámbito del resto de los roles.
+        return $instId;
+    }
+
     public function __construct($db) {
         $this->model = new StatisticsModel($db);
     }
@@ -63,6 +85,7 @@ class StatisticsController {
     public function getStats() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        header('Cache-Control: private, no-store, max-age=0');
         
         try {
             $prep = $this->prepareStatsDatesFromQuery();
@@ -75,15 +98,16 @@ class StatisticsController {
             $this->extendStatsRuntime();
 
             $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
+            $instId = $this->resolveStatsInstitution($sesion);
             $from = $prep['from'];
             $to = $prep['to'];
 
+            $started = microtime(true);
             $data = $this->model->getGeneralStats($instId, $from, $to);
+            header('Server-Timing: stats-db;dur=' . round((microtime(true) - $started) * 1000, 1));
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
@@ -94,14 +118,14 @@ class StatisticsController {
     public function getInstitutionFlags() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        header('Cache-Control: private, no-store, max-age=0');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
+            $instId = $this->resolveStatsInstitution($sesion);
             $data = $this->model->getInstitutionFlags($instId);
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(401);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
@@ -112,9 +136,10 @@ class StatisticsController {
     public function getStatsRed() {
         if (ob_get_length()) ob_clean();
         header('Content-Type: application/json');
+        header('Cache-Control: private, no-store, max-age=0');
         try {
             $sesion = Auditoria::getDatosSesion();
-            $instId = $sesion['instId'];
+            $instId = $this->resolveStatsInstitution($sesion);
             $flags = $this->model->getInstitutionFlags($instId);
             if ((int)($flags['madre_grupo'] ?? 0) !== 1) {
                 http_response_code(403);
@@ -133,11 +158,12 @@ class StatisticsController {
             $this->extendStatsRuntime();
             $from = $prep['from'];
             $to = $prep['to'];
+            $started = microtime(true);
             $data = $this->model->getGeneralStatsRed($instId, $from, $to);
+            header('Server-Timing: stats-db;dur=' . round((microtime(true) - $started) * 1000, 1));
             echo json_encode(['status' => 'success', 'data' => $data]);
         } catch (\Exception $e) {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            \App\Utils\ApiExceptionHandler::respond($e);
         }
         exit;
     }
