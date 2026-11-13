@@ -50,3 +50,15 @@ El SELECT principal une formularios con protocolos y departamentos. Si un protoc
 Los grandes historiales siguen cargando fichas completas para búsquedas de texto sin un índice aprobado. Esta optimización evita mantener filas duplicadas dentro de PHP y previene listas SQL excesivas, **no** elimina el coste de lecturas de miles de fichas. El índice con 39 triggers y 64 contadores permanece desactivado en producción por el coste de escrituras concurrentes observado en QA y porque aún falta preflight autorizado de esquema real y QA autenticado URBE/CUPAE.
 
 No se ha instalado ningún trigger, tabla ni cambio de estructura; no se han modificado datos institucionales.
+
+## Publicación controlada y verificación final
+
+- **Commit funcional:** `a961867`, sincronizado en GitHub en la rama `fix/grobo-seguridad-facturacion-20261102`.
+- **Release:** `myforms-join-dedupe-a961867`, con **un único archivo PHP** instalado: `api/src/Models/UserForms/UserFormsModel.php`. Los cambios de pruebas y documentación no se instalaron en el servidor web.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-join-dedupe-a961867 files=1`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`, respaldo automático en `/root/grobo-managed-backup-20261113T230754Z`.
+- SHA-256 verificado directamente sobre el archivo del VPS: `64e0f28fedf78ba400f2037aa0a5b22471ce36a01bf9f6a37102dc7c504106fc`, idéntico al paquete.
+- `grobo-status`: Nginx/PHP-FPM 8.3 activos, JWT preflight correcto, seguridad multiinstitucional vigente.
+- Navegador público sin credenciales: **10/10** comprobaciones después del despliegue, incluyendo HTML/JS versionados, 5 rutas privadas con HTTP 401 JSON y redirecciones al login de 390/768/1366 px.
+- El historial ficticio de **13.030 fichas**, las 425 derivaciones, los permisos y los importes se validaron **antes de publicar**, en MySQL 8.4 aislado. La prueba de carga de memoria es representativa del algoritmo PHP, **no** una medición del VPS ni una prueba con datos institucionales reales.
+- No se instaló ni activó el índice documental experimental, no se ejecutó ninguna migración y no se modificó la base productiva. QA autenticado de URBE/CUPAE y tiempos privados reales siguen pendientes.
