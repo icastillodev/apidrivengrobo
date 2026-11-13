@@ -130,6 +130,42 @@ foreach([1002,40000,40399,40424] as $fid) {
 }
 requireFixture($mapped[40424]['TipoPedido']==='Pedido original 40424',
     'High-volume original snapshot overwritten');
+
+// Keyset: validar orden, límites y alcance de usuario/institución.
+$windowOne=$model->getVisibleCanonicalIdWindow(101,12,PHP_INT_MAX,100);
+$windowTwo=$model->getVisibleCanonicalIdWindow(101,12,end($windowOne),100);
+requireFixture($windowOne===array_slice($hugeIds,0,100)
+    && $windowTwo===array_slice($hugeIds,100,100),
+    'Keyset canonical ID windows differ from legacy ordering');
+requireFixture($model->countVisibleCanonicalForms(101,12)===13030,
+    'Scoped count disagrees with canonical history');
+requireFixture($model->getVisibleCanonicalIdWindow(999,33)===[],
+    'Keyset included records of unrelated institution');
+requireFixture($model->countVisibleCanonicalForms(999,33)===0,
+    'Keyset count leaked another institution');
+
+// La ruta de escaneo >12.000 debe devolver las mismas ventanas que
+// el histórico original (incluidos snapshots, Unicode y página final).
+foreach ([
+    [['search'=>'PROTO-LOTE-40424'],0],
+    [['search'=>'Proceso'],12000],
+    [['search'=>'URBE'],12000],
+    [['search'=>'ABSENT-NEVER-MATCHES'],0],
+] as [$criteria,$pageOffset]) {
+    $filters=UserFormsFilterService::validateFilters($criteria);
+    $expectedIds=[];
+    foreach($huge['list'] as $row) {
+        if (UserFormsFilterService::matches($row,$filters)) {
+            $expectedIds[]=(int)$row['idformA'];
+        }
+    }
+    $scanned=$service->page(101,12,$criteria,12,$pageOffset);
+    requireFixture($scanned['total']===count($expectedIds)
+        && array_map('intval',array_column($scanned['list'],'idformA'))
+            ===array_slice($expectedIds,$pageOffset,12),
+        'Large-history text scan diverged: '.json_encode([$criteria,$pageOffset]));
+}
+echo "PASS 4 full-text keyset scans match original on 13,030 forms\n";
 unset($huge,$mapped);
 
 echo 'GROBO_MYFORMS_LARGE_HISTORY_MYSQL_OK '

@@ -485,6 +485,51 @@ class UserFormsModel {
     }
 
     /**
+     * Tamaño del historial visible bajo el mismo WHERE de getAllForms,
+     * sin hidratar precios, snapshots ni participantes.
+     */
+    public function countVisibleCanonicalForms(int $userId, int $currentInstId): int
+    {
+        $where = $this->buildGetAllFormsWhereClause();
+        $params = $this->hasTable('formulario_derivacion')
+            ? [$userId, $userId, $currentInstId] : [$userId];
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM formularioe f
+             INNER JOIN institucion i ON i.IdInstitucion=f.IdInstitucion
+             WHERE {$where}"
+        );
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Keyset read-only: retorna como máximo 100 IDs canónicos, decrecientes.
+     * El límite superior exclusivo evita OFFSET sobre miles de registros
+     * y nunca cambia la regla de visibilidad ni incorpora copias antiguas.
+     *
+     * @return list<int>
+     */
+    public function getVisibleCanonicalIdWindow(int $userId, int $currentInstId,
+        int $beforeId = PHP_INT_MAX, int $limit = 100): array
+    {
+        if ($limit < 1 || $limit > 100 || $beforeId < 1) {
+            throw new \InvalidArgumentException('Ventana de IDs inválida');
+        }
+        $where = $this->buildGetAllFormsWhereClause();
+        $params = $this->hasTable('formulario_derivacion')
+            ? [$userId, $userId, $currentInstId] : [$userId];
+        $params[] = $beforeId;
+        $stmt = $this->db->prepare(
+            "SELECT f.idformA FROM formularioe f
+             INNER JOIN institucion i ON i.IdInstitucion=f.IdInstitucion
+             WHERE {$where} AND f.idformA < ?
+             ORDER BY f.idformA DESC LIMIT {$limit}"
+        );
+        $stmt->execute($params);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
      * Snapshot ligero de IDs visibles para exportaciones CSV autenticadas.
      * El máximo evita que una descarga prolongada monopolice PHP-FPM.
      */

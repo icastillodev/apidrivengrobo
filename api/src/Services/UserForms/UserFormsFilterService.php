@@ -112,6 +112,15 @@ final class UserFormsFilterService
     private function scanFullHistoryWindow(int $userId, int $instId,
         array $filters, int $limit, int $offset): array
     {
+        // Con historiales masivos, hidratar todo el histórico mantiene miles
+        // de fichas y snapshots simultáneamente en memoria. Contar IDs
+        // canónicos es barato y no toca el esquema ni los datos de negocio.
+        if ($this->model->countVisibleCanonicalForms($userId, $instId) > 12000) {
+            return $this->scanLargeHistoryWindow(
+                $userId, $instId, $filters, $limit, $offset
+            );
+        }
+
         $full = $this->model->getAllForms($userId, $instId);
         $visible = [];
         $total = 0;
@@ -124,6 +133,57 @@ final class UserFormsFilterService
         }
         return [
             'info_inst' => $full['info_inst'] ?? null,
+            'list' => $visible,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+    }
+
+    /**
+     * Búsqueda completa sobre todos los campos canónicos sin materializar
+     * simultáneamente más de 100 formularios. La selección de IDs y la
+     * hidratación vuelven a exigir el WHERE de usuario/institución.
+     *
+     * La paginación por idformA mantiene el orden descendente y evita el
+     * OFFSET SQL sobre históricos grandes. Una modificación concurrente
+     * puede alterar el total igual que en la API tradicional (sin snapshot).
+     */
+    private function scanLargeHistoryWindow(int $userId, int $instId,
+        array $filters, int $limit, int $offset): array
+    {
+        $visible = [];
+        $total = 0;
+        $beforeId = PHP_INT_MAX;
+        $info = null;
+        do {
+            $ids = $this->model->getVisibleCanonicalIdWindow(
+                $userId, $instId, $beforeId, 100
+            );
+            if ($ids === []) break;
+            $beforeId = $ids[count($ids) - 1];
+            $batch = $this->model->getAllForms(
+                $userId, $instId, ['ids' => $ids]
+            );
+            $info = $info ?? ($batch['info_inst'] ?? null);
+            foreach ($batch['list'] ?? [] as $form) {
+                if (!self::matches($form, $filters)) continue;
+                if ($total >= $offset && count($visible) < $limit) {
+                    $visible[] = $form;
+                }
+                $total++;
+            }
+        } while (count($ids) === 100);
+
+        if ($info === null) {
+            $empty = $this->model->getAllForms(
+                $userId, $instId, ['ids' => []]
+            );
+            $info = $empty['info_inst'] ?? null;
+        }
+
+        return [
+            'info_inst' => $info,
             'list' => $visible,
             'total' => $total,
             'limit' => $limit,
