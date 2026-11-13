@@ -30,3 +30,14 @@ La página ya desechaba respuestas anteriores con `listRequestGeneration`, pero 
 - No instala tablas/triggers, no habilita `GROBO_MYFORMS_SEARCH_INDEX`, no modifica lógica de permisos entre instituciones.
 - No reemplaza un QA autenticado en producción con usuarios de ensayo autorizados de URBE/CUPAE.
 - El rendimiento de texto libre sin filtros todavía depende de la hidratación del historial completo en el backend, aunque el navegador solo recibe la página solicitada.
+
+## Despliegue controlado y postdeploy
+
+- **Commit funcional:** `ca5018e`, rama `fix/grobo-seguridad-facturacion-20261102`, sincronizado con GitHub.
+- **Release:** `myforms-abort-ca5018e`, exactamente **2 archivos frontend**: JavaScript de Mis Formularios y HTML que carga su versión `20261113a`.
+- Validación: `GROBO_MANIFEST_OK version=myforms-abort-ca5018e files=2`.
+- Instalador controlado: `GROBO_CONTROLLED_DEPLOY_OK version=myforms-abort-ca5018e files=2`. **Respaldo:** `/root/grobo-managed-backup-20261113T214508Z`.
+- **2/2 SHA-256** contrastados desde los archivos instalados en VPS: JS `052e90f4143cb2e96e22ad2ce7b36dffef28d62d0bd3ba6983f5b3b402ecf92d`; HTML `ce7891947a97287f8926e369fcbf61b8dbd6629272b98f67983ce794d82470dc`.
+- Estado posterior: Nginx y PHP-FPM activos, JWT preflight correcto, `TENANT_SECURITY_LIVE=yes`.
+- **10/10 pruebas públicas postdeploy**, incluyendo versión exacta de HTML/JS, 5 rutas privadas devolviendo 401 JSON sin datos, y redirecciones al login a 390/768/1366 px.
+- No se tocó la base de datos, no se migró esquema, no se habilitó índice textual con triggers. **Sin sesión institucional autorizada no se realizó QA autenticado de URBE/CUPAE**, ni se atribuye una mejora cuantitativa de latencia del backend a esta optimización del navegador.
