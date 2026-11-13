@@ -25,18 +25,49 @@ final class UserFormsFilterService
             throw new \InvalidArgumentException('Paginación inválida');
         }
         $filters = self::validateFilters($filters);
-        $full = $this->model->getAllForms($userId, $instId);
-        $matching = [];
-        foreach ($full['list'] ?? [] as $form) {
-            if (self::matches($form, $filters)) {
-                $matching[] = $form;
+        $candidates = $this->model->getFilteredCandidateIds($userId, $instId, $filters);
+        if ($candidates === null) {
+            // Sin preselección segura o con demasiados candidatos: contrato
+            // anterior intacto, para búsquedas en campos anidados/snapshots.
+            $full = $this->model->getAllForms($userId, $instId);
+            $matching = [];
+            foreach ($full['list'] ?? [] as $form) {
+                if (self::matches($form, $filters)) {
+                    $matching[] = $form;
+                }
+            }
+            return [
+                'info_inst' => $full['info_inst'] ?? null,
+                'list' => array_slice($matching, $offset, $limit),
+                'total' => count($matching),
+                'limit' => $limit,
+                'offset' => $offset,
+            ];
+        }
+
+        // A lo sumo 500 IDs. Sólo hidratar lotes de 100, manteniendo el
+        // orden canónico y aplicando otra vez WHERE de tenant por lote.
+        // No acumular objetos de fichas descartadas ni de otras páginas.
+        $visible = [];
+        $count = 0;
+        $info = null;
+        $chunks = array_chunk($candidates, 100);
+        if ($chunks === []) $chunks = [[]];
+        foreach ($chunks as $chunk) {
+            $batch = $this->model->getAllForms($userId, $instId, ['ids' => $chunk]);
+            $info = $info ?? ($batch['info_inst'] ?? null);
+            foreach ($batch['list'] ?? [] as $form) {
+                if (!self::matches($form, $filters)) continue;
+                if ($count >= $offset && count($visible) < $limit) {
+                    $visible[] = $form;
+                }
+                $count++;
             }
         }
-        $total = count($matching);
         return [
-            'info_inst' => $full['info_inst'] ?? null,
-            'list' => array_slice($matching, $offset, $limit),
-            'total' => $total,
+            'info_inst' => $info,
+            'list' => $visible,
+            'total' => $count,
             'limit' => $limit,
             'offset' => $offset,
         ];

@@ -80,4 +80,52 @@ requireFixture(filterIds($service,101,12,['status'=>'Sin estado']) === [1009],
     'Empty status normalization changed');
 echo "PASS null status normalization preserves Sin estado\n";
 
-echo "GROBO_USERFORMS_FILTER_MYSQL_QA_OK checks=7\n";
+// Comprobar equivalencia de IDs y total con el contrato completo anterior.
+$cases = [
+    [], ['derivation'=>'derived'], ['derivation'=>'local'],
+    ['origin'=>'URBE'], ['inst'=>'CUPAE'], ['inst'=>'URBE'],
+    ['status'=>'Proceso'], ['status'=>'Entregado'], ['status'=>'Sin estado'],
+    ['search'=>'PROTO-ORIGINAL'], ['search'=>'1002 2026-11-02'],
+    ['status'=>'Proceso','derivation'=>'derived','inst'=>'URBE'],
+    ['origin'=>'URBE','inst'=>'CUPAE','status'=>'Proceso'],
+    ['inst'=>'PRIVATE'], ['derivation'=>'local','search'=>'1004'],
+];
+foreach ([[101,12],[202,22],[404,22],[303,33],[999,33]] as [$uid,$iid]) {
+    $legacy = $model->getAllForms($uid,$iid)['list'];
+    foreach ($cases as $filter) {
+        $normalized = UserFormsFilterService::validateFilters($filter);
+        $expected = array_values(array_map('intval',array_column(
+            array_values(array_filter($legacy, fn($form) =>
+                UserFormsFilterService::matches($form,$normalized))), 'idformA')));
+        $selected = [];
+        foreach ([0,2,4,6] as $offset) {
+            $page = $service->page($uid,$iid,$filter,2,$offset);
+            requireFixture($page['total'] === count($expected),
+                'Total changed in SQL preselection: '.json_encode([$uid,$filter,$offset]));
+            array_push($selected,...array_map('intval',array_column($page['list'],'idformA')));
+        }
+        requireFixture($selected === $expected,
+            'Wrong ID order or missing results in SQL preselection: '.json_encode([$uid,$filter]));
+    }
+}
+echo "PASS 75 legacy-vs-SQL filter combinations with multiple page offsets\n";
+
+requireFixture($model->getFilteredCandidateIds(202,22,['derivation'=>'derived']) === [1005,1002],
+    'SQL preselection for derived forms did not return exact possible IDs');
+requireFixture($model->getFilteredCandidateIds(202,22,['origin'=>'URBE']) === [1005,1002],
+    'SQL preselection for origin is missing a derived form');
+requireFixture($model->getFilteredCandidateIds(202,22,['status'=>'Proceso','inst'=>'URBE'])
+    === [1005,1002], 'Combined SQL candidate selection differs from original scope');
+requireFixture($model->getFilteredCandidateIds(202,22,['search'=>'1002']) === null,
+    'Search-only must retain full semantic safety (no lossy SQL prefilter)');
+requireFixture($model->getFilteredCandidateIds(202,22,['status'=>'Proceso']) === null,
+    'Common unselective status should avoid additional SQL query');
+requireFixture($model->getFilteredCandidateIds(303,33,['inst'=>"URBE' OR 1=1 --"]) === [],
+    'Malformed institution label should never become executable SQL');
+requireFixture($model->getFilteredCandidateIds(202,22,['derivation'=>'derived'],1) === null,
+    'Threshold fallback should avoid a partial list of candidates');
+requireFixture($model->getFilteredCandidateIds(303,33,['inst'=>'URBE']) === [],
+    'SQL preselection crossed institution boundary');
+echo "PASS bounded, parametric SQL candidate selection and safe fallback\n";
+
+echo "GROBO_USERFORMS_FILTER_MYSQL_QA_OK checks=9\n";

@@ -216,6 +216,119 @@ class UserFormsModel {
     }
 
     /**
+     * SQL preseleccionador CONSERVADOR de formularios visibles:
+     * devuelve un superset de los que podrían pasar los filtros finales.
+     * El servicio aplica el predicado completo sobre las fichas/snapshots.
+     *
+     * null: filtros no indexables o demasiados candidatos (usar contrato anterior).
+     * []: ningún ID puede cumplir, sin hidratar historial.
+     *
+     * @return ?array<int,int>
+     */
+    public function getFilteredCandidateIds(int $userId, int $currentInstId, array $filters, int $threshold = 500): ?array
+    {
+        $threshold = max(1, min(1000, $threshold));
+        $where = $this->buildGetAllFormsWhereClause();
+        $params = $this->hasTable('formulario_derivacion')
+            ? [$userId, $userId, $currentInstId] : [$userId];
+
+        $clauses = [];
+        $workflowCols = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasDerivTable = $this->hasTable('formulario_derivacion');
+        $hasCopiedOrigin = $hasDerivTable
+            && $this->hasColumn('formulario_derivacion', 'idformAOrigen');
+
+        // La proyección de getAllForms usa DerivadoActivo=0 cuando falta
+        // una columna de workflow; la preselección debe usar esa misma regla.
+        $derivation = $filters['derivation'] ?? 'all';
+        if ($derivation === 'derived') {
+            if (!$workflowCols) return [];
+            $clauses[] = 'f.DerivadoActivo = 1';
+        } elseif ($derivation === 'local' && $workflowCols) {
+            $clauses[] = '(f.DerivadoActivo IS NULL OR f.DerivadoActivo <> 1)';
+        }
+
+        $origin = $filters['origin'] ?? 'all';
+        if ($origin !== 'all' && trim($origin) !== '') {
+            if (!$workflowCols) return [];
+            $clauses[] = 'EXISTS (
+                SELECT 1 FROM institucion iorig
+                WHERE iorig.IdInstitucion = f.IdInstitucionOrigen
+                  AND iorig.NombreInst = ?
+            )';
+            $params[] = $origin;
+        }
+
+        // Los nombres de participantes salen de la tabla de derivaciones
+        // (origen/destino, incluso copias heredadas); si no hay ruta, del
+        // f.IdInstitucion. Un OR extra a la sede del formulario es intencional:
+        // falsas coincidencias se descartan luego en PHP, nunca falsos negativos.
+        $inst = $filters['inst'] ?? 'all';
+        if ($inst !== 'all' && trim($inst) !== '') {
+            $derivJoin = '';
+            if ($hasDerivTable) {
+                $formJoin = $hasCopiedOrigin
+                    ? '(fd.idformA = f.idformA OR fd.idformAOrigen = f.idformA)'
+                    : '(fd.idformA = f.idformA)';
+                $derivJoin = " OR EXISTS (
+                    SELECT 1 FROM formulario_derivacion fd
+                    WHERE {$formJoin}
+                      AND (fd.IdInstitucionOrigen = im.IdInstitucion
+                           OR fd.IdInstitucionDestino = im.IdInstitucion)
+                )";
+            }
+            $clauses[] = "EXISTS (
+                SELECT 1 FROM institucion im
+                WHERE im.NombreInst = ?
+                  AND (im.IdInstitucion = f.IdInstitucion{$derivJoin})
+            )";
+            $params[] = $inst;
+        }
+
+        // LIKE es deliberadamente amplio. TRIM exacto y los estados de la
+        // derivación más reciente se validan EN PHP con la misma semántica
+        // que tenía la interfaz. 'Sin estado' se deja al camino completo:
+        // whitespace Unicode y columnas derivadas opcionales no son
+        // equivalentes a un NULL SQL genérico.
+        $status = $filters['status'] ?? 'all';
+        // Estados mayoritarios: si son el ÚNICO criterio estructural,
+        // evitar un SELECT extra que probablemente supera el umbral y obliga
+        // a repetir la consulta completa. El resultado permanece idéntico.
+        if ($clauses === [] && in_array($status, ['Proceso', 'Entregado'], true)) {
+            return null;
+        }
+        if ($status !== 'all' && $status !== 'Sin estado' && $status !== '') {
+            $patterns = ['f.estado LIKE ?'];
+            $needle = '%' . $status . '%';
+            $params[] = $needle;
+            if ($hasDerivTable && $this->hasColumn('formulario_derivacion', 'estado_origen')) {
+                foreach (['estado_origen', 'estado_destino'] as $field) {
+                    $patterns[] = "(SELECT dstate.{$field}
+                        FROM formulario_derivacion dstate
+                        WHERE dstate.idformA = f.idformA
+                        ORDER BY dstate.IdFormularioDerivacion DESC LIMIT 1) LIKE ?";
+                    $params[] = $needle;
+                }
+            }
+            $clauses[] = '(' . implode(' OR ', $patterns) . ')';
+        }
+
+        if ($clauses === []) return null;
+
+        $fetchLimit = $threshold + 1;
+        $sql = "SELECT f.idformA FROM formularioe f
+                INNER JOIN institucion i ON i.IdInstitucion = f.IdInstitucion
+                WHERE {$where} AND " . implode(' AND ', $clauses) . "
+                ORDER BY f.idformA DESC LIMIT {$fetchLimit}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return count($ids) > $threshold ? null : $ids;
+    }
+
+    /**
      * Snapshot ligero de IDs visibles para exportaciones CSV autenticadas.
      * El máximo evita que una descarga prolongada monopolice PHP-FPM.
      */
