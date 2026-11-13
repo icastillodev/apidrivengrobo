@@ -59,16 +59,9 @@ final class UserFormsFilterService
                     return $page;
                 }
                 // Epoch cambió durante el request: volver a contrato seguro.
-                $full = $this->model->getAllForms($userId, $instId);
-                $matching = array_values(array_filter($full['list'] ?? [],
-                    static fn($form) => self::matches($form, $filters)));
-                return [
-                    'info_inst'=>$full['info_inst'] ?? null,
-                    'list'=>array_slice($matching,$offset,$limit),
-                    'total'=>count($matching),
-                    'limit'=>$limit,
-                    'offset'=>$offset,
-                ];
+                return $this->scanFullHistoryWindow(
+                    $userId, $instId, $filters, $limit, $offset
+                );
             }
         }
 
@@ -100,27 +93,42 @@ final class UserFormsFilterService
                 ];
             }
 
-            // Texto libre arbitrario: snapshots y participantes anidados
-            // pueden contener la coincidencia. Sin un índice documental
-            // transaccional, NO aplicar una preselección que pierda resultados.
-            $full = $this->model->getAllForms($userId, $instId);
-            $matching = [];
-            foreach ($full['list'] ?? [] as $form) {
-                if (self::matches($form, $filters)) {
-                    $matching[] = $form;
-                }
-            }
-            return [
-                'info_inst' => $full['info_inst'] ?? null,
-                'list' => array_slice($matching, $offset, $limit),
-                'total' => count($matching),
-                'limit' => $limit,
-                'offset' => $offset,
-            ];
+            // Texto libre arbitrario: mantener coincidencias originales
+            // dentro de snapshots, participantes y campos calculados.
+            return $this->scanFullHistoryWindow(
+                $userId, $instId, $filters, $limit, $offset
+            );
         }
 
         return $this->pageFromCandidateIds($userId, $instId,
             $filters, $limit, $offset, $candidates);
+    }
+
+    /**
+     * Contrato completo de búsqueda libre, sin almacenar en memoria todas
+     * las coincidencias. El historial autorizado se mantiene como antes,
+     * pero los resultados retenidos nunca exceden el tamaño de la página.
+     */
+    private function scanFullHistoryWindow(int $userId, int $instId,
+        array $filters, int $limit, int $offset): array
+    {
+        $full = $this->model->getAllForms($userId, $instId);
+        $visible = [];
+        $total = 0;
+        foreach ($full['list'] ?? [] as $form) {
+            if (!self::matches($form, $filters)) continue;
+            if ($total >= $offset && count($visible) < $limit) {
+                $visible[] = $form;
+            }
+            $total++;
+        }
+        return [
+            'info_inst' => $full['info_inst'] ?? null,
+            'list' => $visible,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
     }
 
     /** @param array<int,int> $candidates */
@@ -178,11 +186,20 @@ final class UserFormsFilterService
 
     public static function matches(array $form, array $filters): bool
     {
-        $term = self::lower($filters['search'] ?? '');
-        if ($term !== '' && !str_contains(self::searchText($form), $term)) {
-            return false;
+        // Texto libre sin filtros adicionales: atajo de una sola comparación,
+        // sin comprobar innecesariamente estados, participantes o derivación.
+        $search = $filters['search'] ?? '';
+        if (($filters['status'] ?? 'all') === 'all'
+            && ($filters['inst'] ?? 'all') === 'all'
+            && ($filters['derivation'] ?? 'all') === 'all'
+            && ($filters['origin'] ?? 'all') === 'all') {
+            return $search === '' ||
+                str_contains(self::searchText($form), self::lower($search));
         }
 
+        // Evaluar los predicados escalares ANTES de aplanar todos los campos,
+        // snapshots y participantes. En filtros combinados evita miles de
+        // conversiones UTF-8 de fichas que ya fueron descartadas.
         $status = $filters['status'] ?? 'all';
         if ($status !== 'all') {
             $values = [$form['estado'] ?? null, $form['estado_origen'] ?? null,
@@ -225,6 +242,11 @@ final class UserFormsFilterService
 
         $origin = $filters['origin'] ?? 'all';
         if ($origin !== 'all' && ($form['NombreInstitucionOrigen'] ?? '') !== $origin) {
+            return false;
+        }
+
+        $term = self::lower($filters['search'] ?? '');
+        if ($term !== '' && !str_contains(self::searchText($form), $term)) {
             return false;
         }
         return true;

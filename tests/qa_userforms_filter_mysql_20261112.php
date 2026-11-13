@@ -89,14 +89,29 @@ $cases = [
     ['status'=>'Proceso','derivation'=>'derived','inst'=>'URBE'],
     ['origin'=>'URBE','inst'=>'CUPAE','status'=>'Proceso'],
     ['inst'=>'PRIVATE'], ['derivation'=>'local','search'=>'1004'],
+    ['search'=>'URBE','status'=>'Entregado'],
+    ['search'=>'PROTO-ORIGINAL','derivation'=>'derived','inst'=>'CUPAE'],
+    ['search'=>'CUPAE','status'=>'Proceso','origin'=>'URBE'],
+    ['search'=>'Biologia','status'=>'Proceso','derivation'=>'derived'],
+    ['search'=>'NO-MATCH-2345','inst'=>'URBE','derivation'=>'derived'],
 ];
 foreach ([[101,12],[202,22],[404,22],[303,33],[999,33]] as [$uid,$iid]) {
     $legacy = $model->getAllForms($uid,$iid)['list'];
     foreach ($cases as $filter) {
         $normalized = UserFormsFilterService::validateFilters($filter);
-        $expected = array_values(array_map('intval',array_column(
-            array_values(array_filter($legacy, fn($form) =>
-                UserFormsFilterService::matches($form,$normalized))), 'idformA')));
+        // Verificar contra el orden ORIGINAL de comparación:
+        // búsqueda textual primero, y después filtros estructurados.
+        $expected = array_values(array_map('intval', array_column(
+            array_values(array_filter($legacy, static function($form) use ($normalized) {
+                $term=mb_strtolower($normalized['search'],'UTF-8');
+                if ($term !== ''
+                    && !str_contains(UserFormsFilterService::searchText($form),$term)) {
+                    return false;
+                }
+                $otherFilters=$normalized;
+                $otherFilters['search']='';
+                return UserFormsFilterService::matches($form,$otherFilters);
+            })), 'idformA')));
         $selected = [];
         foreach ([0,2,4,6] as $offset) {
             $page = $service->page($uid,$iid,$filter,2,$offset);
@@ -108,7 +123,7 @@ foreach ([[101,12],[202,22],[404,22],[303,33],[999,33]] as [$uid,$iid]) {
             'Wrong ID order or missing results in SQL preselection: '.json_encode([$uid,$filter]));
     }
 }
-echo "PASS 75 legacy-vs-SQL filter combinations with multiple page offsets\n";
+echo "PASS 100 search-first legacy-vs-filtered combinations with four page offsets\n";
 
 requireFixture($model->getFilteredCandidateIds(202,22,['derivation'=>'derived']) === [1005,1002],
     'SQL preselection for derived forms did not return exact possible IDs');

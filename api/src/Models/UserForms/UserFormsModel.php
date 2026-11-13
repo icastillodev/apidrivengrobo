@@ -350,6 +350,16 @@ class UserFormsModel {
      */
     public function getFilteredCandidateIds(int $userId, int $currentInstId, array $filters, int $threshold = 500): ?array
     {
+        // Texto libre sin filtros estructurados: no existe todavía un SQL
+        // equivalente a la búsqueda anidada; saltar la preselección y sus
+        // consultas de metadatos evita trabajo inútil por cada tecla.
+        if (($filters['search'] ?? '') !== ''
+            && ($filters['status'] ?? 'all') === 'all'
+            && ($filters['inst'] ?? 'all') === 'all'
+            && ($filters['derivation'] ?? 'all') === 'all'
+            && ($filters['origin'] ?? 'all') === 'all') {
+            return null;
+        }
         $threshold = max(1, min(1000, $threshold));
         $where = $this->buildGetAllFormsWhereClause();
         $params = $this->hasTable('formulario_derivacion')

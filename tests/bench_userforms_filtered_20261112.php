@@ -4,6 +4,7 @@
  * Ejecuta primero el banco previo de 5.000 formularios (base efímera).
  */
 declare(strict_types=1);
+require_once __DIR__ . '/qa_userforms_mysql_integration_20261112.php';
 require_once __DIR__ . '/bench_userforms_mysql_20261112.php';
 
 use App\Services\UserForms\UserFormsFilterService;
@@ -33,6 +34,12 @@ function sampleFiltered(callable $fn, int $runs = 11): array
 }
 $bench = [
     'search_id' => sampleFiltered(fn()=>$service->page(101,12,['search'=>'20001'],12,0)),
+    'search_many_later_page' => sampleFiltered(fn()=>$service->page(
+        101,12,['search'=>'URBE'],12,240
+    )),
+    'search_combined' => sampleFiltered(fn()=>$service->page(
+        101,12,['search'=>'URBE','inst'=>'CUPAE','status'=>'Proceso'],12,0
+    )),
     'search_exact_id' => sampleFiltered(fn()=>$service->page(101,12,['search'=>'#20001'],12,0)),
     'status_proceso' => sampleFiltered(fn()=>$service->page(101,12,['status'=>'Proceso'],12,0)),
     'institution_urbe' => sampleFiltered(fn()=>$service->page(101,12,['inst'=>'URBE'],12,0)),
@@ -59,6 +66,9 @@ foreach ([
     [202,22,['origin'=>'URBE','derivation'=>'derived','status'=>'Proceso']],
     [101,12,['status'=>'Proceso']],
     [101,12,['search'=>'20001']],
+    [101,12,['search'=>'URBE']],
+    [101,12,['search'=>'URBE','inst'=>'CUPAE','status'=>'Proceso']],
+    [101,12,['search'=>'NONEXISTENT-REF']],
 ] as [$uid,$iid,$criteria]) {
     $expected = array_values(array_filter(
         $model->getAllForms($uid,$iid)['list'],
@@ -72,7 +82,7 @@ foreach ([
         throw new RuntimeException('5k fixture result parity violated: '.json_encode($criteria));
     }
 }
-echo "GROBO_MYFORMS_SQL_PREFILTER_5K_PARITY_OK cases=6\n";
+echo "GROBO_MYFORMS_SQL_PREFILTER_5K_PARITY_OK cases=9\n";
 echo 'GROBO_MYFORMS_FILTER_SYNTHETIC_MYSQL_BENCH '
     . json_encode(['fixture_rows'=>5000,'results'=>$bench],
         JSON_INVALID_UTF8_SUBSTITUTE|JSON_UNESCAPED_UNICODE) . PHP_EOL;
