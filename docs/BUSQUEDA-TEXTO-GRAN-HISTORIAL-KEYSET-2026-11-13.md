@@ -58,3 +58,15 @@ La memoria medida es la reportada por `memory_get_peak_usage(true)` en PHP dentr
 - `php -l` validó clases y pruebas modificadas. En el banco de 5.000 registros, nueve comparaciones de filtros se mantuvieron idénticas; la ruta de 12.000 fichas no se activó.
 
 **Importante:** la medición de 5.000 fichas usa condiciones locales distintas a las de historiales de 13.030. No se atribuyen ganancias de velocidad a la aplicación completa. El camino de lectura por lotes prioriza memoria y solo opera sobre el historial del JWT.
+
+## Despliegue de código y verificación posterior
+
+- **Commit funcional:** `b7e6adb` en la rama `fix/grobo-seguridad-facturacion-20261102`, subida a GitHub.
+- **Release:** `myforms-keyset-b7e6adb`, exclusivamente dos archivos PHP: `api/src/Models/UserForms/UserFormsModel.php` y `api/src/Services/UserForms/UserFormsFilterService.php`.
+- `GROBO_MANIFEST_OK version=myforms-keyset-b7e6adb files=2`; `GROBO_CONTROLLED_DEPLOY_OK version=myforms-keyset-b7e6adb files=2`.
+- **Respaldo automático:** `/root/grobo-managed-backup-20261113T232243Z`.
+- **SHA-256 comprobados en VPS:** modelo `ae8dc69133be343729351def8279e579a044f44055cbc9e53017dfddb5b3f17c`; servicio `e23ee7d1e2b5faff941ec6aef367420e6a8fee2e8ae9432b8c4c025d0c80f8eb`. Ambos idénticos a los hashes del paquete.
+- Estado en VPS: Nginx/PHP-FPM activos, JWT preflight correcto y seguridad multiinstitucional vigente.
+- **10/10 controles públicos postdeploy**: HTML/JS de versión vigente, cinco rutas privadas devolviendo 401 JSON sin exposición, redirecciones a login en 390/768/1366 px.
+- **Sin DDL en producción**, no se instalaron tablas/triggers ni se alteró la base de datos o `GROBO_MYFORMS_SEARCH_INDEX`. La nueva ruta grande está incorporada al servicio PHP con umbral de 12.000 formularios visibles.
+- **Pendiente:** medir `Server-Timing` con cuentas de ensayo institucionales autorizadas, comprobar memoria real de PHP-FPM en VPS y completar pruebas autenticadas URBE/CUPAE. Las verificaciones de navegador sin sesión no sustituyen esos controles.
