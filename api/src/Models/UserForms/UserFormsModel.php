@@ -216,6 +216,65 @@ class UserFormsModel {
     }
 
     /**
+     * Búsqueda textual opcional en documento materializado, con aislamiento JWT.
+     * null = índice no disponible/fuera de fecha o más de 500 candidatos;
+     * nunca confiar en un índice desactualizado para declarar "sin resultados".
+     *
+     * @return ?array{ids:array<int,int>,stamp:array{epoch:int,generation:string}}
+     */
+    public function getIndexedTextCandidates(int $userId, int $currentInstId,
+        string $term, int $threshold = 500): ?array
+    {
+        if (getenv('GROBO_MYFORMS_SEARCH_INDEX') !== '1' || $term === ''
+            || !$this->hasTable('grobo_form_search_state')
+            || !$this->hasTable('grobo_form_search_document')) {
+            return null;
+        }
+        $store = new UserFormsSearchIndexStore($this->db);
+        try {
+            $stamp = $store->readable();
+            if ($stamp === null) return null;
+            $limit = max(1,min(1000,$threshold)) + 1;
+            $where = $this->buildGetAllFormsWhereClause();
+            $params = $this->hasTable('formulario_derivacion')
+                ? [$userId,$userId,$currentInstId]
+                : [$userId];
+            $params[] = $stamp['generation'];
+            $params[] = mb_strtolower($term, 'UTF-8');
+            $sql = "SELECT f.idformA
+                    FROM formularioe f
+                    INNER JOIN institucion i ON i.IdInstitucion=f.IdInstitucion
+                    INNER JOIN grobo_form_search_document doc ON doc.idformA=f.idformA
+                    WHERE {$where}
+                      AND doc.generation=?
+                      AND LOCATE(
+                          CAST(? AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_bin,
+                          doc.text_flat
+                      ) > 0
+                    ORDER BY f.idformA DESC LIMIT {$limit}";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $ids = array_map('intval',$stmt->fetchAll(PDO::FETCH_COLUMN));
+            if (count($ids) > $threshold || !$store->stillReadable($stamp)) return null;
+            return ['ids'=>$ids,'stamp'=>$stamp];
+        } catch (\Throwable $e) {
+            // No ofrecer datos parciales: un índice opcional no puede bloquear el
+            // contrato funcional previo ni facilitar información privada.
+            error_log('GROBO search index fallback: ' . get_class($e));
+            return null;
+        }
+    }
+
+    public function indexedTextStillFresh(array $stamp): bool
+    {
+        try {
+            return (new UserFormsSearchIndexStore($this->db))->stillReadable($stamp);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Filtro masivo sin búsqueda libre: solo proyecta las columnas que deciden
      * estado/derivación/institución. No incorpora JOIN de precios, protocolo,
      * departamentos ni snapshots: ninguno altera estos filtros.

@@ -44,6 +44,34 @@ final class UserFormsFilterService
             ];
         }
 
+        // Índice documental OPCIONAL: sólo se consulta cuando está completo,
+        // los 39 triggers de invalidación existen y epoch sigue vigente.
+        // Un índice inválido jamás transforma una búsqueda real en "sin datos".
+        if ($filters['search'] !== '') {
+            $indexed = $this->model->getIndexedTextCandidates(
+                $userId, $instId, $filters['search']
+            );
+            if ($indexed !== null) {
+                $page = $this->pageFromCandidateIds(
+                    $userId, $instId, $filters, $limit, $offset, $indexed['ids']
+                );
+                if ($this->model->indexedTextStillFresh($indexed['stamp'])) {
+                    return $page;
+                }
+                // Epoch cambió durante el request: volver a contrato seguro.
+                $full = $this->model->getAllForms($userId, $instId);
+                $matching = array_values(array_filter($full['list'] ?? [],
+                    static fn($form) => self::matches($form, $filters)));
+                return [
+                    'info_inst'=>$full['info_inst'] ?? null,
+                    'list'=>array_slice($matching,$offset,$limit),
+                    'total'=>count($matching),
+                    'limit'=>$limit,
+                    'offset'=>$offset,
+                ];
+            }
+        }
+
         $candidates = $this->model->getFilteredCandidateIds($userId, $instId, $filters);
         if ($candidates === null) {
             if ($filters['search'] === '') {
@@ -91,9 +119,16 @@ final class UserFormsFilterService
             ];
         }
 
-        // A lo sumo 500 IDs. Sólo hidratar lotes de 100, manteniendo el
-        // orden canónico y aplicando otra vez WHERE de tenant por lote.
-        // No acumular objetos de fichas descartadas ni de otras páginas.
+        return $this->pageFromCandidateIds($userId, $instId,
+            $filters, $limit, $offset, $candidates);
+    }
+
+    /** @param array<int,int> $candidates */
+    private function pageFromCandidateIds(int $userId, int $instId,
+        array $filters, int $limit, int $offset, array $candidates): array
+    {
+        // Bounded: <=500 IDs, batches <=100; el WHERE se vuelve a exigir en
+        // cada consulta para no dejar que un índice cambie autorización.
         $visible = [];
         $count = 0;
         $info = null;
