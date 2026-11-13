@@ -26,7 +26,7 @@ No usa `FULLTEXT` por tokens porque no equivale a `str_contains` para cadenas de
 
 ## QA aislado con MySQL 8.4
 
-- `tests/qa_userforms_search_index_mysql_20261113.php`: **10/10 bloques**, incluyendo 80 búsquedas equivalentes a legacy en cinco pares de usuario/institución ficticios; coincidencias con snapshots, minúsculas, fragmentos, flecha, símbolos y Unicode.
+- `tests/qa_userforms_search_index_mysql_20261113.php`: **11/11 bloques**, incluyendo 80 búsquedas equivalentes a legacy en cinco pares de usuario/institución ficticios; coincidencias con snapshots, minúsculas, fragmentos, flecha, símbolos y Unicode.
 - Verificó propietario, receptor, colega institucional y tercero ajeno: **ninguna consulta del índice puede reemplazar el WHERE del usuario**.
 - Se validó el recuento exacto de documentos y una publicación atómica; una mutación de precio o snapshot invalida la generación antes de volver a responder.
 - Se provocó una escritura concurrente: la publicación de una generación desfasada fue rechazada. Se eliminó a propósito un trigger y el lector volvió al método anterior; una reinstalación recuperó el esquema.
@@ -68,3 +68,16 @@ El CLI no usa credenciales en el repositorio; recibe por variables privadas `GRO
 - Los borrados en cascada vía claves foráneas pueden no invocar triggers de la tabla hija en MySQL. Ante una purga institucional o restauración, **desactivar y reconstruir** el índice, limpiar generaciones antiguas y comprobar la cobertura; no considerar los triggers suficientes para cualquier modalidad de borrado administrativo.
 - El lector verifica el manifiesto completo desde `information_schema.TRIGGERS`. Un usuario MySQL de aplicación sin permiso de visibilidad sobre triggers puede ver el índice como no disponible; en ese caso vuelve al modo anterior. **No ampliar privilegios del usuario web sin una revisión de seguridad**. Alternativamente se puede evaluar un preflight firmado y verificable por un componente de mantenimiento.
 - Esta preparación no modifica respaldos existentes ni políticas de conservación de información sensible. Las tablas de búsqueda deben entrar en el inventario de datos personales si se instalan.
+
+## Estado comprobado del despliegue de código
+
+- **Commit de implementación:** `3893f31` en la rama `fix/grobo-seguridad-facturacion-20261102`, confirmado en GitHub.
+- **Release de código PHP únicamente:** `myforms-docindex-code-3893f31`. El despliegue restringido autorizó exactamente **cinco archivos**: modelo personal, servicio de filtrado, esquema auxiliar, almacén del índice y constructor del índice.
+- Verificación del manifiesto: `GROBO_MANIFEST_OK version=myforms-docindex-code-3893f31 files=5`.
+- Publicación: `GROBO_CONTROLLED_DEPLOY_OK version=myforms-docindex-code-3893f31 files=5`. **Respaldo:** `/root/grobo-managed-backup-20261113T034701Z`.
+- **5/5 hashes SHA-256 coincidentes**, comparados contra los archivos instalados en el VPS. Nginx y PHP-FPM activos, preflight JWT correcto.
+- Chrome en la web pública, sin sesión: **10/10 comprobaciones aprobadas**, incluyendo las cinco rutas privadas protegidas con HTTP 401, integridad del JavaScript y redirecciones al login para 390/768/1366 px.
+- **No se migró MySQL de producción.** No se crearon `grobo_form_search_state`, `grobo_form_search_document` ni sus 39 triggers en producción. No se activó la variable `GROBO_MYFORMS_SEARCH_INDEX`; el lector de documentos sigue **desactivado por defecto**.
+- Suite aislada: **11/11 bloques del índice**, con 80 consultas de equivalencia, 39 invalidaciones DML y purga de documentos de formularios borrados; **96/96 fixtures PHP generales**, **16/16 Chrome sintético** y **6/6 pruebas de render/PDF**. Se retiraron el contenedor MySQL efímero y su red interna al terminar.
+- El comando CLI de mantenimiento quedó creado y pasó revisión sintáctica, pero **no se ejecutó separadamente en el VPS**. La migración y el constructor sí se ejercitaron por sus clases directamente con datos ficticios en MySQL 8.4.
+- Pendiente de activación: aprobar migración con backups/definers y prueba de carga de escrituras sobre un staging representativo, validar sesiones institucionales autorizadas, definir retención/cron de reconstrucción y medir `Server-Timing` real. Hasta entonces, no afirmar que la mejora de búsqueda libre del benchmark esté activa para usuarios de producción.
