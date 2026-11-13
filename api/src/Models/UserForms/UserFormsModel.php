@@ -158,19 +158,20 @@ class UserFormsModel {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($paged ? array_merge($baseParams, $pageIds) : $baseParams);
-        $list = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        // Cada formulario canónico debe aparecer una sola vez también en el contrato
-        // completo (filtros y Excel), no sólo en el paginado. protdeptor puede tener
-        // más de un departamento para el mismo protocolo.
+        // Deduplicar mientras se lee el cursor de PDO: evita materializar
+        // dos listas de filas y retener copias del JOIN protdeptor.
+        // Conserva exactamente la primera fila de cada ID y su orden
+        // DESC, tanto en la API legacy como en la paginada.
         $seen = [];
-        $unique = [];
-        foreach ($list as $row) {
+        $list = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $key = (int)$row['idformA'];
             if (isset($seen[$key])) continue;
             $seen[$key] = true;
-            $unique[] = $row;
+            $list[] = $row;
         }
-        $list = $unique;
+        // Cursor completamente consumido; compatible también con
+        // dobles de PDO de la suite de regresión.
 
         $derivedIds = [];
         foreach ($list as $row) {
@@ -178,11 +179,33 @@ class UserFormsModel {
                 $derivedIds[] = (int)$row['idformA'];
             }
         }
-        $originalMap = $this->getOriginalRowDataMap($derivedIds);
+        // Las consultas de snapshots usan IN: dividir los IDs de historiales
+        // grandes evita exceder el máximo de marcadores de MySQL/PDO.
+        $originalMap = [];
+        foreach (array_chunk($derivedIds, 400) as $batch) {
+            foreach ($this->getOriginalRowDataMap($batch) as $id => $snapshot) {
+                $originalMap[$id] = $snapshot;
+            }
+        }
 
-        $participantesByForm = $this->getInstitucionesParticipantesBatch(array_map(static function ($row) {
+        $allIds = array_map(static function ($row) {
             return (int)$row['idformA'];
-        }, $list));
+        }, $list);
+        // Para historiales comunes mantener una consulta agregada rápida.
+        // Sólo si hay más de 12.000 fichas, acotar los marcadores PDO de
+        // participantes/derivaciones: cada lote de 2.000 puede usar hasta
+        // 4.000 parámetros, lejos del límite de MySQL. Lotes de 400 hacían
+        // demasiados viajes a la base cuando el historial era muy grande.
+        if (count($allIds) <= 12000) {
+            $participantesByForm = $this->getInstitucionesParticipantesBatch($allIds);
+        } else {
+            $participantesByForm = [];
+            foreach (array_chunk($allIds, 2000) as $batch) {
+                foreach ($this->getInstitucionesParticipantesBatch($batch) as $id => $participants) {
+                    $participantesByForm[$id] = $participants;
+                }
+            }
+        }
 
         foreach ($list as &$row) {
             $fid = (int)$row['idformA'];

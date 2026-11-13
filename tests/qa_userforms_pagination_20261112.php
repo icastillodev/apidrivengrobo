@@ -45,6 +45,13 @@ final class MyFormsFixtureStmt {
                 ? ['IdInstitucion' => 12, 'NombreInst' => 'URBE', 'InstCorreo' => '', 'InstContacto' => '']
                 : false;
         }
+        // La lectura del modelo ahora consume el cursor con fetch() en vez
+        // de fetchAll(): el doble PDO debe entregar las mismas filas, incluidas
+        // las duplicadas del JOIN ficticio, y llegar a false al final.
+        if (str_contains($this->sql, 'INNER JOIN institucion i ON f.IdInstitucion')) {
+            $rows = $this->fetchAll($mode);
+            return $rows[$this->cursor++] ?? false;
+        }
         return false;
     }
     public function fetchColumn(int $column = 0): int|false {
