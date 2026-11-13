@@ -19,45 +19,66 @@ final class UserFormsSearchIndexBuilder
         private UserFormsSearchIndexStore $store
     ) {}
 
-    /** @return array{generation:string,epoch:int,documents:int,elapsed_ms:float} */
+    /** @return array{generation:string,epoch:int,documents:int,old_documents_purged:int,elapsed_ms:float} */
     public function rebuild(): array
     {
         $started = hrtime(true);
-        // El script de mantenimiento verifica el manifiesto entero.
-        $firstEpoch = $this->store->epoch();
-        $generation = bin2hex(random_bytes(16));
-        $seenIds = [];
-        foreach ($this->store->owners() as $userId) {
-            $offset = 0;
-            do {
-                $page = $this->model->getAllForms($userId, 0, [
-                    'limit'=>100,'offset'=>$offset,
-                ]);
-                $list = $page['list'] ?? [];
-                foreach ($list as $form) {
-                    $id = (int)($form['idformA'] ?? 0);
-                    if ($id < 1) throw new RuntimeException('Formulario canónico inválido');
-                    if (isset($seenIds[$id])) continue;
-                    $seenIds[$id] = true;
-                    $this->store->writeDocument($generation, $id,
-                        UserFormsFilterService::searchText($form));
+        // GET_LOCK por base impide que un cron y una reconstrucción manual
+        // generen simultáneamente copias de datos personales.
+        $this->store->acquireRebuildLock();
+        $generation = null;
+        $published = false;
+        try {
+            $firstEpoch = $this->store->epoch();
+            $generation = bin2hex(random_bytes(16));
+            $seenIds = [];
+            $pending = [];
+            foreach ($this->store->owners() as $userId) {
+                $offset = 0;
+                do {
+                    $page = $this->model->getAllForms($userId, 0, [
+                        'limit'=>100,'offset'=>$offset,
+                    ]);
+                    foreach ($page['list'] ?? [] as $form) {
+                        $id = (int)($form['idformA'] ?? 0);
+                        if ($id < 1) throw new RuntimeException('Formulario canónico inválido');
+                        if (isset($seenIds[$id])) continue;
+                        $seenIds[$id] = true;
+                        $pending[$id] = UserFormsFilterService::searchText($form);
+                        if (count($pending) >= 100) {
+                            $this->store->writeDocumentsBatch($generation, $pending);
+                            $pending = [];
+                        }
+                    }
+                    $offset += 100;
+                    $total = (int)($page['total'] ?? 0);
+                } while ($offset < $total);
+            }
+            if ($pending !== []) {
+                $this->store->writeDocumentsBatch($generation, $pending);
+            }
+            // Una escritura concurrente obliga a cancelar la publicación.
+            $total = $this->store->publish($generation, $firstEpoch);
+            $published = true;
+            $oldPurged = $this->store->purgeOldGenerations();
+            return [
+                'generation'=>$generation, 'epoch'=>$firstEpoch,
+                'documents'=>$total,
+                'old_documents_purged'=>$oldPurged,
+                'elapsed_ms'=>round((hrtime(true)-$started)/1000000, 2),
+            ];
+        } catch (\Throwable $e) {
+            if ($generation !== null && !$published) {
+                try {
+                    $this->store->discardUnpublishedGeneration($generation);
+                } catch (\Throwable $cleanupError) {
+                    error_log('GROBO search index cleanup failed: '
+                        . get_class($cleanupError));
                 }
-                $offset += 100;
-                $total = (int)($page['total'] ?? 0);
-            } while ($offset < $total);
+            }
+            throw $e;
+        } finally {
+            $this->store->releaseRebuildLock();
         }
-        // Una escritura concurrente en cualquier tabla fuente obliga a
-        // cancelar la publicación y repetir el backfill cuando sea oportuno.
-        $total = $this->store->publish($generation, $firstEpoch);
-        // Una generación vieja puede contener nombres, contactos y precios
-        // ya corregidos. Limpiarla después de activar la nueva, manteniendo
-        // la verificación de generación en cada lectura concurrente.
-        $oldPurged = $this->store->purgeOldGenerations();
-        return [
-            'generation'=>$generation, 'epoch'=>$firstEpoch,
-            'documents'=>$total,
-            'old_documents_purged'=>$oldPurged,
-            'elapsed_ms'=>round((hrtime(true)-$started)/1000000, 2),
-        ];
     }
 }

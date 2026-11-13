@@ -12,10 +12,20 @@ use App\Services\UserForms\UserFormsSearchIndexBuilder;
 use App\Services\UserForms\UserFormsFilterService;
 
 $schema = UserFormsSearchIndexSchema::class;
+$preflight = $schema::preflight($db);
+requireFixture($preflight['schema_compatible'] && $preflight['missing_tables'] === []
+    && $preflight['missing_columns'] === []
+    && $preflight['expected_triggers'] === 39,
+    'Read-only preflight rejected the valid synthetic source schema');
 $schema::install($db);
 requireFixture($schema::triggersReady($db), 'Missing one of 39 source triggers');
 requireFixture(count($schema::triggerManifest()) === 39,'Expected 39 invalidation triggers');
-echo "PASS complete migration and 39 validated source-change triggers\n";
+$installed = $schema::preflight($db);
+requireFixture($installed['triggers_present']===39
+    && $installed['trigger_conflicts'] === []
+    && $installed['index_document_table_exists'],
+    'Read-only preflight cannot detect installed search index');
+echo "PASS complete migration, 39 triggers and read-only schema preflight\n";
 
 $store = new UserFormsSearchIndexStore($db);
 $builder = new UserFormsSearchIndexBuilder($model,$store);
@@ -119,6 +129,10 @@ echo "PASS concurrent source writes abort stale index publication\n";
 $builder->rebuild();
 $db->exec("DROP TRIGGER grobo_fs_pf_au");
 requireFixture(!$schema::triggersReady($db),'Partial trigger installation accepted');
+$missingTriggerReport = $schema::preflight($db);
+requireFixture($missingTriggerReport['triggers_present']===38
+    && $missingTriggerReport['schema_compatible'],
+    'Read-only preflight did not detect one missing invalidation trigger');
 requireFixture($model->getIndexedTextCandidates(101,12,'PROTO-URBE-1')===null,
     'Reader used index after removing a required trigger');
 $schema::install($db);
@@ -210,4 +224,86 @@ requireFixture($docsAfter===0, 'Deleted form still present in one or more index 
 requireFixture($store->readable()===null, 'Deleted form did not invalidate indexed search');
 echo "PASS deleted canonical form purges all document generations in the same transaction\n";
 
-echo "GROBO_MYFORMS_SEARCH_INDEX_MYSQL_QA_OK checks=11\n";
+
+// Dos conexiones independientes no pueden reconstruir el mismo índice a la vez.
+// El cierre siempre debe liberar el GET_LOCK incluso ante una excepción.
+$otherPdo = new PDO($dsn,getenv('GROBO_QA_MYSQL_USER') ?: 'root',
+    getenv('GROBO_QA_MYSQL_PASSWORD') ?: '',[
+        PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES=>false,
+    ]);
+$otherStore = new UserFormsSearchIndexStore($otherPdo);
+$store->acquireRebuildLock();
+try {
+    try {
+        $otherStore->acquireRebuildLock();
+        throw new RuntimeException('Concurrent rebuild lock was ignored');
+    } catch (RuntimeException $e) {
+        requireFixture(str_contains($e->getMessage(),'en curso'),
+            'Unexpected concurrent rebuild error');
+    }
+} finally {
+    $store->releaseRebuildLock();
+}
+$otherStore->acquireRebuildLock();
+$otherStore->releaseRebuildLock();
+echo "PASS separate MySQL sessions serialize rebuilds and release locks\n";
+
+// La escritura masiva admite hasta 100 fichas; al fallar una reconstrucción,
+// descartar su generación NO debe borrar una generación publicada.
+$orphan=bin2hex(random_bytes(16));
+$store->writeDocumentsBatch($orphan,[1002=>'QA one',1003=>'QA two']);
+requireFixture((int)$db->query(
+    "SELECT COUNT(*) FROM grobo_form_search_document WHERE generation='{$orphan}'"
+)->fetchColumn()===2,'Batch upsert did not persist both synthetic records');
+requireFixture($store->discardUnpublishedGeneration($orphan)===2,
+    'Failed generation left copied personal data on disk');
+requireFixture($store->discardUnpublishedGeneration($orphan)===0,
+    'Repeated cleanup should be idempotent');
+try {
+    $store->writeDocumentsBatch($orphan,array_fill_keys(range(10001,10101),'QA'));
+    throw new RuntimeException('101-document batch was accepted');
+} catch (RuntimeException $e) {
+    requireFixture(str_contains($e->getMessage(),'inválido'),
+        'Unexpected error on oversized batch');
+}
+echo "PASS bounded 100-document SQL batches and failed-generation cleanup\n";
+
+// Purgar más de un lote de 500 sin borrar la generación actual.
+$stale=bin2hex(random_bytes(16));
+foreach (array_chunk(range(20000,21119),100) as $chunk) {
+    $store->writeDocumentsBatch($stale,array_fill_keys($chunk,'historical QA'));
+}
+$activeGeneration=$db->query(
+    'SELECT published_generation FROM grobo_form_search_state WHERE id=1'
+)->fetchColumn();
+$activeCount=$db->prepare(
+    'SELECT COUNT(*) FROM grobo_form_search_document WHERE generation=?'
+);
+$activeCount->execute([$activeGeneration]);
+$preserved=(int)$activeCount->fetchColumn();
+requireFixture($preserved>0,'No published generation to protect during cleanup');
+$purged=$store->purgeOldGenerations();
+requireFixture($purged===1120,
+    'Cleanup did not traverse all of the 500-row delete batches');
+$activeCount->execute([$activeGeneration]);
+requireFixture((int)$activeCount->fetchColumn()===$preserved,
+    'Bounded cleanup modified documents of the published generation');
+echo "PASS 1120 old documents purged in bounded batches; live generation preserved\n";
+
+// Ensayo destructivo final SÓLO en grobo_myforms_fixture: una columna o
+// tabla faltante deben reportarse antes de cualquier migración.
+$db->exec('ALTER TABLE formularioe DROP COLUMN estado');
+$missingColumnReport = $schema::preflight($db);
+requireFixture(!$missingColumnReport['schema_compatible']
+    && in_array('formularioe.estado',$missingColumnReport['missing_columns'],true),
+    'Preflight did not warn about a missing critical source column');
+$db->exec('DROP TABLE formulario_owner_actual');
+$missingTableReport = $schema::preflight($db);
+requireFixture(!$missingTableReport['schema_compatible']
+    && in_array('formulario_owner_actual',$missingTableReport['missing_tables'],true),
+    'Preflight did not warn about a missing source table');
+echo "PASS read-only preflight detects incompatible source tables and columns\n";
+
+echo "GROBO_MYFORMS_SEARCH_INDEX_MYSQL_QA_OK checks=15\n";

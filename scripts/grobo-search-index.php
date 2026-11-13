@@ -19,8 +19,8 @@ use App\Models\UserForms\UserFormsSearchIndexStore;
 use App\Services\UserForms\UserFormsSearchIndexBuilder;
 
 $mode = $argv[1] ?? '--status';
-if (!in_array($mode,['--status','--migrate','--rebuild','--disable','--purge'],true)) {
-    fwrite(STDERR,"Modo no reconocido: --status, --migrate, --rebuild, --disable, --purge\n");
+if (!in_array($mode,['--status','--preflight','--migrate','--rebuild','--disable','--purge'],true)) {
+    fwrite(STDERR,"Modo no reconocido: --status, --preflight, --migrate, --rebuild, --disable, --purge\n");
     exit(2);
 }
 $dsn = (string)getenv('GROBO_SEARCH_INDEX_DSN');
@@ -28,7 +28,8 @@ if ($dsn === '' || !str_contains($dsn,'dbname=') || !str_contains($dsn,'charset=
     fwrite(STDERR, "Debe definirse DSN con dbname y charset=utf8mb4 explícitos\n");
     exit(2);
 }
-if ($mode !== '--status' && getenv('GROBO_SEARCH_INDEX_APPROVED') !== 'yes') {
+if ($mode !== '--status' && $mode !== '--preflight'
+    && getenv('GROBO_SEARCH_INDEX_APPROVED') !== 'yes') {
     fwrite(STDERR,"Una migración/reconstrucción requiere aprobación explícita\n");
     exit(2);
 }
@@ -41,8 +42,23 @@ $db = new PDO($dsn, getenv('GROBO_SEARCH_INDEX_USER') ?: '',
 $dbName = $db->query('SELECT DATABASE()')->fetchColumn();
 if (!$dbName) throw new RuntimeException('No hay base seleccionada');
 
+if ($mode === '--preflight') {
+    // SELECT sobre information_schema únicamente. No lee registros científicos.
+    $report=UserFormsSearchIndexSchema::preflight($db);
+    echo 'GROBO_SEARCH_PREFLIGHT '
+        . json_encode($report,JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE)
+        . PHP_EOL;
+    exit($report['schema_compatible'] && $report['trigger_conflicts'] === [] ? 0 : 3);
+}
+
 if ($mode === '--migrate') {
-    UserFormsSearchIndexSchema::install($db);
+    $store = new UserFormsSearchIndexStore($db);
+    $store->acquireRebuildLock();
+    try {
+        UserFormsSearchIndexSchema::install($db);
+    } finally {
+        $store->releaseRebuildLock();
+    }
     echo "GROBO_SEARCH_SCHEMA_READY triggers="
         . count(UserFormsSearchIndexSchema::triggerManifest()) . "\n";
 } elseif ($mode === '--rebuild') {
@@ -55,12 +71,24 @@ if ($mode === '--migrate') {
     $result=$builder->rebuild();
     echo 'GROBO_SEARCH_REBUILT '.json_encode($result).PHP_EOL;
 } elseif ($mode === '--disable') {
-    $db->exec('UPDATE grobo_form_search_state
-              SET published_generation=NULL,published_epoch=NULL,published_count=0
-              WHERE id=1');
+    $store = new UserFormsSearchIndexStore($db);
+    $store->acquireRebuildLock();
+    try {
+        $db->exec('UPDATE grobo_form_search_state
+                  SET published_generation=NULL,published_epoch=NULL,published_count=0
+                  WHERE id=1');
+    } finally {
+        $store->releaseRebuildLock();
+    }
     echo "GROBO_SEARCH_DISABLED\n";
 } elseif ($mode === '--purge') {
-    $purged=(new UserFormsSearchIndexStore($db))->purgeOldGenerations();
+    $store = new UserFormsSearchIndexStore($db);
+    $store->acquireRebuildLock();
+    try {
+        $purged = $store->purgeOldGenerations();
+    } finally {
+        $store->releaseRebuildLock();
+    }
     echo "GROBO_SEARCH_PURGED_OLD count={$purged}\n";
 } else {
     $store=new UserFormsSearchIndexStore($db);

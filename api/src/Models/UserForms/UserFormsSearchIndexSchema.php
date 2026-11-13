@@ -74,6 +74,102 @@ final class UserFormsSearchIndexSchema
         return true;
     }
 
+    /** Columnas imprescindibles, compartidas por preflight e instalación. */
+    public static function requiredColumns(): array
+    {
+        return [
+            'formularioe' => ['idformA','IdUsrA','IdInstitucion','tipoA','estado'],
+            'formulario_derivacion' => [
+                'IdFormularioDerivacion','idformA','idformAOrigen',
+                'IdUsrDestinoResponsable','IdInstitucionDestino','Activo',
+            ],
+            'formulario_datos_originales' => ['idformA','IdFormularioDerivacion','datos_json'],
+            'institucion' => ['IdInstitucion','NombreInst'],
+            'tipoformularios' => ['IdTipoFormulario','IdInstitucion','nombreTipo','categoriaformulario'],
+            'precioformulario' => ['idformA','precioformulario','totalpago'],
+            'precioinsumosformulario' => ['idformA','preciototal','totalpago'],
+            'protocoloexpe' => ['idprotA','nprotA'],
+            'protformr' => ['idformA','idprotA'],
+            'protdeptor' => ['idprotA','iddeptoA'],
+            'departamentoe' => ['iddeptoA','NombreDeptoA'],
+            'organismoe' => ['IdOrganismo','NombreOrganismoSimple'],
+            'formulario_owner_actual' => ['idformA','IdInstitucionActual'],
+        ];
+    }
+
+    /**
+     * Inspección de estructura exclusivamente SELECT/metadata, antes de DDL.
+     * No inspecciona filas de usuarios ni altera permisos o esquema.
+     */
+    public static function preflight(PDO $db): array
+    {
+        $database = (string)$db->query('SELECT DATABASE()')->fetchColumn();
+        if ($database === '') throw new RuntimeException('Seleccione una base de datos explícita');
+
+        $knownTables = array_fill_keys($db->query(
+            "SELECT TABLE_NAME FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()"
+        )->fetchAll(PDO::FETCH_COLUMN), true);
+        $knownColumns = [];
+        $stmt = $db->query("SELECT TABLE_NAME,COLUMN_NAME
+                            FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE()");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $col) {
+            $knownColumns[$col['TABLE_NAME']][$col['COLUMN_NAME']] = true;
+        }
+
+        $missingTables = [];
+        $missingColumns = [];
+        foreach (self::requiredColumns() as $table=>$columns) {
+            if (!isset($knownTables[$table])) {
+                $missingTables[] = $table;
+                continue;
+            }
+            foreach ($columns as $column) {
+                if (!isset($knownColumns[$table][$column])) {
+                    $missingColumns[] = $table . '.' . $column;
+                }
+            }
+        }
+
+        $expectedTriggers = self::triggerManifest();
+        $foundTriggers = [];
+        $trig = $db->query("SELECT TRIGGER_NAME,EVENT_OBJECT_TABLE,
+                                   EVENT_MANIPULATION,ACTION_STATEMENT
+                            FROM information_schema.TRIGGERS
+                            WHERE TRIGGER_SCHEMA=DATABASE()");
+        foreach ($trig->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $foundTriggers[$row['TRIGGER_NAME']] = $row;
+        }
+        $present = 0;
+        $conflicts = [];
+        foreach ($expectedTriggers as $name=>$rule) {
+            if (!isset($foundTriggers[$name])) continue;
+            $present++;
+            $row = $foundTriggers[$name];
+            if ($row['EVENT_OBJECT_TABLE'] !== $rule['table']
+                || $row['EVENT_MANIPULATION'] !== $rule['event']
+                || !str_contains(strtolower((string)$row['ACTION_STATEMENT']),
+                    'grobo_form_search_state')
+                || ($name === 'grobo_fs_fo_ad'
+                    && !str_contains(strtolower((string)$row['ACTION_STATEMENT']),
+                        'grobo_form_search_document'))) {
+                $conflicts[] = $name;
+            }
+        }
+        return [
+            'schema_compatible' => $missingTables === [] && $missingColumns === [],
+            'missing_tables' => $missingTables,
+            'missing_columns' => $missingColumns,
+            'expected_triggers' => count($expectedTriggers),
+            'triggers_present' => $present,
+            'trigger_conflicts' => $conflicts,
+            'index_state_table_exists' => isset($knownTables['grobo_form_search_state']),
+            'index_document_table_exists' => isset($knownTables['grobo_form_search_document']),
+            'note' => 'Read-only schema check, does not establish privileges or installation safety.',
+        ];
+    }
+
     /**
      * Sólo invocable por script de mantenimiento aprobado con DSN definido.
      * Si faltan tablas origen, aborta: no crear un índice incompleto.
@@ -95,24 +191,7 @@ final class UserFormsSearchIndexSchema
         // Evitar activar un esquema que no soporta las reglas canónicas de
         // visibilidad, copias y precio. La base desplegada debe pasar primero
         // la compatibilidad de columnas en forma explícita.
-        $columns = [
-            'formularioe' => ['idformA','IdUsrA','IdInstitucion','tipoA','estado'],
-            'formulario_derivacion' => [
-                'IdFormularioDerivacion','idformA','idformAOrigen',
-                'IdUsrDestinoResponsable','IdInstitucionDestino','Activo',
-            ],
-            'formulario_datos_originales' => ['idformA','IdFormularioDerivacion','datos_json'],
-            'institucion' => ['IdInstitucion','NombreInst'],
-            'tipoformularios' => ['IdTipoFormulario','IdInstitucion','nombreTipo','categoriaformulario'],
-            'precioformulario' => ['idformA','precioformulario','totalpago'],
-            'precioinsumosformulario' => ['idformA','preciototal','totalpago'],
-            'protocoloexpe' => ['idprotA','nprotA'],
-            'protformr' => ['idformA','idprotA'],
-            'protdeptor' => ['idprotA','iddeptoA'],
-            'departamentoe' => ['iddeptoA','NombreDeptoA'],
-            'organismoe' => ['IdOrganismo','NombreOrganismoSimple'],
-            'formulario_owner_actual' => ['idformA','IdInstitucionActual'],
-        ];
+        $columns = self::requiredColumns();
         $colStmt = $db->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS
                                  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?
                                    AND COLUMN_NAME=?");
