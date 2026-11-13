@@ -216,6 +216,70 @@ class UserFormsModel {
     }
 
     /**
+     * Filtro masivo sin búsqueda libre: solo proyecta las columnas que deciden
+     * estado/derivación/institución. No incorpora JOIN de precios, protocolo,
+     * departamentos ni snapshots: ninguno altera estos filtros.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getFilterSummaryRows(int $userId, int $currentInstId, bool $includeParticipants = false): array
+    {
+        $where = $this->buildGetAllFormsWhereClause();
+        $params = $this->hasTable('formulario_derivacion')
+            ? [$userId, $userId, $currentInstId] : [$userId];
+
+        // Debe ser idéntico al esquema condicional de getAllForms.
+        $hasWorkflow = $this->hasColumn('formularioe', 'EstadoWorkflow')
+            && $this->hasColumn('formularioe', 'DerivadoActivo')
+            && $this->hasColumn('formularioe', 'IdInstitucionOrigen');
+        $hasDerivStates = $this->hasTable('formulario_derivacion')
+            && $this->hasColumn('formulario_derivacion', 'estado_origen');
+
+        $derivedExpr = $hasWorkflow ? 'f.DerivadoActivo' : '0';
+        $originExpr = $hasWorkflow ? 'io.NombreInst' : 'NULL';
+        $originJoin = $hasWorkflow
+            ? 'LEFT JOIN institucion io ON io.IdInstitucion = f.IdInstitucionOrigen' : '';
+        $stateOriginExpr = $hasDerivStates
+            ? '(SELECT fd.estado_origen FROM formulario_derivacion fd
+                WHERE fd.idformA = f.idformA ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)'
+            : 'NULL';
+        $stateDestExpr = $hasDerivStates
+            ? '(SELECT fd.estado_destino FROM formulario_derivacion fd
+                WHERE fd.idformA = f.idformA ORDER BY fd.IdFormularioDerivacion DESC LIMIT 1)'
+            : 'NULL';
+
+        $sql = "SELECT f.idformA, f.estado,
+                       {$derivedExpr} AS DerivadoActivo,
+                       {$originExpr} AS NombreInstitucionOrigen,
+                       i.NombreInst AS NombreInstitucion,
+                       {$stateOriginExpr} AS estado_origen,
+                       {$stateDestExpr} AS estado_destino
+                FROM formularioe f
+                INNER JOIN institucion i ON f.IdInstitucion = i.IdInstitucion
+                {$originJoin}
+                WHERE {$where}
+                ORDER BY f.idformA DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($includeParticipants && $rows !== []) {
+            $indicesById = [];
+            foreach ($rows as $index => $row) {
+                $indicesById[(int)$row['idformA']] = $index;
+            }
+            // Lotes para evitar superar el límite de marcadores PDO con historiales grandes.
+            foreach (array_chunk(array_keys($indicesById), 400) as $batch) {
+                $map = $this->getInstitucionesParticipantesBatch($batch);
+                foreach ($map as $fid => $participants) {
+                    $rows[$indicesById[(int)$fid]]['institucionesParticipantes'] = $participants;
+                }
+            }
+        }
+        return $rows;
+    }
+
+    /**
      * SQL preseleccionador CONSERVADOR de formularios visibles:
      * devuelve un superset de los que podrían pasar los filtros finales.
      * El servicio aplica el predicado completo sobre las fichas/snapshots.

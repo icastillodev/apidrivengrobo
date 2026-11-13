@@ -25,10 +25,56 @@ final class UserFormsFilterService
             throw new \InvalidArgumentException('Paginación inválida');
         }
         $filters = self::validateFilters($filters);
+
+        // Búsqueda intencional por identificador exacto: #12345.
+        // Es opt-in y jamás amplía el acceso del JWT. El resto del buscador
+        // sigue buscando libremente en todos los campos y snapshots.
+        if (preg_match('/^#([1-9][0-9]{0,9})$/', trim($filters['search']), $m)) {
+            $data = $this->model->getAllForms($userId, $instId, ['ids' => [(int)$m[1]]]);
+            $withoutSearch = $filters;
+            $withoutSearch['search'] = '';
+            $matched = array_values(array_filter($data['list'], static fn($form) =>
+                self::matches($form, $withoutSearch)));
+            return [
+                'info_inst' => $data['info_inst'] ?? null,
+                'list' => array_slice($matched, $offset, $limit),
+                'total' => count($matched),
+                'limit' => $limit,
+                'offset' => $offset,
+            ];
+        }
+
         $candidates = $this->model->getFilteredCandidateIds($userId, $instId, $filters);
         if ($candidates === null) {
-            // Sin preselección segura o con demasiados candidatos: contrato
-            // anterior intacto, para búsquedas en campos anidados/snapshots.
+            if ($filters['search'] === '') {
+                // Para filtros masivos, sólo consultar columnas necesarias para
+                // el predicado. Ni precios, ni protocolos, ni snapshots, ni
+                // N filas completas: hidratar exclusivamente la página visible.
+                $light = $this->model->getFilterSummaryRows(
+                    $userId, $instId, $filters['inst'] !== 'all'
+                );
+                $idsOnPage = [];
+                $total = 0;
+                foreach ($light as $form) {
+                    if (!self::matches($form, $filters)) continue;
+                    if ($total >= $offset && count($idsOnPage) < $limit) {
+                        $idsOnPage[] = (int)$form['idformA'];
+                    }
+                    $total++;
+                }
+                $detail = $this->model->getAllForms($userId, $instId, ['ids' => $idsOnPage]);
+                return [
+                    'info_inst' => $detail['info_inst'] ?? null,
+                    'list' => $detail['list'],
+                    'total' => $total,
+                    'limit' => $limit,
+                    'offset' => $offset,
+                ];
+            }
+
+            // Texto libre arbitrario: snapshots y participantes anidados
+            // pueden contener la coincidencia. Sin un índice documental
+            // transaccional, NO aplicar una preselección que pierda resultados.
             $full = $this->model->getAllForms($userId, $instId);
             $matching = [];
             foreach ($full['list'] ?? [] as $form) {

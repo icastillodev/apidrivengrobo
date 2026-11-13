@@ -267,7 +267,36 @@ async function loadMyFormsFilterMeta() {
     }
 }
 
+/** Ayuda breve y localizada para búsqueda exacta sin alterar el buscador libre. */
+function setupExactIdSearchHint() {
+    const input = document.getElementById('search-input');
+    if (!input) return;
+    const lang = String(localStorage.getItem('lang') || localStorage.getItem('idioma')
+        || document.documentElement.lang || 'es').slice(0, 2).toLowerCase();
+    const hints = {
+        es: 'ID exacto: escribí #12345.',
+        en: 'Exact ID: type #12345.',
+        pt: 'ID exato: digite #12345.',
+    };
+    const message = hints[lang] || hints.es;
+    input.title = message;
+    let hint = document.getElementById('misforms-id-hint');
+    if (!hint) {
+        hint = document.createElement('small');
+        hint.id = 'misforms-id-hint';
+        hint.className = 'd-block text-muted mt-1';
+        hint.style.fontSize = '10px';
+        input.after(hint);
+    }
+    hint.textContent = message;
+    const described = input.getAttribute('aria-describedby') || '';
+    if (!described.split(/\s+/).includes(hint.id)) {
+        input.setAttribute('aria-describedby', (described + ' ' + hint.id).trim());
+    }
+}
+
 export async function initMisFormularios() {
+    setupExactIdSearchHint();
     const tbodyBoot = document.getElementById('table-body');
     const tmfBoot = window.txt?.misformularios || {};
     const bootMsg = escapeMisFormsHtml(tmfBoot.cargando_lista || tmfBoot.cargando || window.txt?.generales?.msg_cargando || '…');

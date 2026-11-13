@@ -93,6 +93,7 @@ try {
                 const u=new URL(endpoint,'http://localhost');
                 const p=u.searchParams;
                 const search=(p.get('search')||'').toLowerCase();
+                const exactId=/^#([1-9][0-9]{0,9})$/.exec(search.trim());
                 const status=p.get('status')||'all';
                 const inst=p.get('inst_name')||'all';
                 const derived=p.get('derivation')||'all';
@@ -107,7 +108,8 @@ try {
                     const names=f.institucionesParticipantes.map(item=>item.NombreInst);
                     const derivMatches=derived==='all'||(derived==='derived'&&f.DerivadoActivo===1)
                         ||(derived==='local'&&f.DerivadoActivo!==1);
-                    return allText.includes(search)&&statusMatches&&
+                    return (exactId ? String(f.idformA)===exactId[1] : allText.includes(search))
+                        &&statusMatches&&
                         (inst==='all'||names.includes(inst))&&derivMatches&&
                         (origin==='all'||f.NombreInstitucionOrigen===origin);
                 });
@@ -129,6 +131,10 @@ try {
     assert.equal(initial.rows,12);
     assert.ok(initial.counter.includes('205'));
     assert.equal(initial.instOptions,3);
+    assert.equal(await page.locator('#misforms-id-hint').count(),1);
+    assert.ok((await page.locator('#misforms-id-hint').innerText()).includes('#12345'));
+    assert.ok((await page.locator('#search-input').getAttribute('aria-describedby')).includes('misforms-id-hint'));
+    console.log('PASS accessible, localized exact-ID search hint renders once');
     assert.ok(initial.calls.some(s=>s.includes('paged=1') && s.includes('limit=12') && s.includes('offset=0')));
     assert.ok(!initial.calls.includes('/user/my-forms'),'Legacy fetch on initial load');
     console.log('PASS first page loads only 12 forms; metadata global; no legacy GET');
@@ -146,6 +152,13 @@ try {
     assert.equal(calls.filter(x=>x==='/user/my-forms').length,0);
     assert.equal(await page.locator('#table-body tr').count(),1);
     console.log('PASS global search retrieves 1 row server-side, never downloads all forms');
+
+    await page.locator('#search-input').fill('#1191');
+    await page.waitForFunction(()=>window.__calls.some(x=>x.includes('search=%231191'))
+        && document.getElementById('table-body').textContent.includes('#1191'));
+    assert.equal(await page.locator('#table-body tr').count(),1);
+    assert.ok((await page.evaluate(()=>window.__calls)).some(x=>x.includes('filtered=1') && x.includes('search=%231191')));
+    console.log('PASS exact #ID search requests server-side indexed form lookup');
 
     await page.locator('#search-input').fill('');
     await page.locator('#filter-inst').selectOption('CUPAE');
@@ -252,8 +265,20 @@ try {
     assert.equal(await page.locator('#table-body tr').count(),1);
     console.log('PASS an older API is supported without breaking global search');
 
+    for (const [lang,label] of [['en','Exact ID'],['pt','ID exato']]) {
+        const result = await page.evaluate(async ({base,lang})=>{
+            localStorage.setItem('lang',lang);
+            await (await import(base+'dist/js/pages/usuario/misformularios.js')).initMisFormularios();
+            return {text:document.getElementById('misforms-id-hint').textContent,
+                count:document.querySelectorAll('#misforms-id-hint').length};
+        },{base,lang});
+        assert.ok(result.text.includes(label), 'Localized exact-ID help missing for '+lang);
+        assert.equal(result.count,1,'Search hint duplicated on reinit');
+    }
+    console.log('PASS localized EN/PT exact-ID hints remain unique on reinit');
+
     assert.deepEqual(errors,[]);
-    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=13');
+    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=16');
 } finally {
     await browser.close();
     await new Promise(done=>server.close(done));

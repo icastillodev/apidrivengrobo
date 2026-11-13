@@ -33,6 +33,7 @@ function sampleFiltered(callable $fn, int $runs = 11): array
 }
 $bench = [
     'search_id' => sampleFiltered(fn()=>$service->page(101,12,['search'=>'20001'],12,0)),
+    'search_exact_id' => sampleFiltered(fn()=>$service->page(101,12,['search'=>'#20001'],12,0)),
     'status_proceso' => sampleFiltered(fn()=>$service->page(101,12,['status'=>'Proceso'],12,0)),
     'institution_urbe' => sampleFiltered(fn()=>$service->page(101,12,['inst'=>'URBE'],12,0)),
     'empty' => sampleFiltered(fn()=>$service->page(101,12,['search'=>'NONEXISTENT-REF'],12,0)),

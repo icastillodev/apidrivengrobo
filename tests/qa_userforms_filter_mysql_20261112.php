@@ -128,4 +128,29 @@ requireFixture($model->getFilteredCandidateIds(303,33,['inst'=>'URBE']) === [],
     'SQL preselection crossed institution boundary');
 echo "PASS bounded, parametric SQL candidate selection and safe fallback\n";
 
-echo "GROBO_USERFORMS_FILTER_MYSQL_QA_OK checks=9\n";
+// Ruta rápida de búsqueda exacta opcional. El ID siempre pasa por
+// getAllForms, que vuelve a exigir el WHERE de usuario e institución.
+requireFixture(filterIds($service,202,22,['search'=>'#1002']) === [1002],
+    'Exact ID should find derived original form');
+requireFixture(filterIds($service,101,12,['search'=>'#1003']) === [],
+    'Exact ID must not leak unrelated institution');
+requireFixture(filterIds($service,101,12,['search'=>'#1007']) === [],
+    'Legacy copy should not become directly visible by ID');
+requireFixture(filterIds($service,404,22,['search'=>'#1005','origin'=>'URBE']) === [1005],
+    'Exact ID with origin filter must preserve recipient institution sharing');
+requireFixture(filterIds($service,202,22,['search'=>'#1002','derivation'=>'local']) === [],
+    'Exact ID must still obey other active filters');
+echo "PASS exact #ID search with JWT scope, legacy copies and combined filters\n";
+
+$light = $model->getFilterSummaryRows(202,22,true);
+requireFixture(array_map('intval',array_column($light,'idformA')) === [1005,1004,1002],
+    'Summary scope/order differs from full forms');
+requireFixture(array_column($light,'estado') === ['Proceso','Proceso','Proceso'],
+    'Summary statuses changed');
+requireFixture(count($light[2]['institucionesParticipantes']) === 2,
+    'Summary participants missing historical destination');
+requireFixture(!array_key_exists('monto_pagado',$light[0]),
+    'Lightweight projection must not fetch prices');
+echo "PASS lightweight SQL projection preserves filter fields without hydration\n";
+
+echo "GROBO_USERFORMS_FILTER_MYSQL_QA_OK checks=11\n";
