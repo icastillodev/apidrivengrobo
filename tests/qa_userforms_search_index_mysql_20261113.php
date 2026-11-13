@@ -23,7 +23,8 @@ requireFixture(count($schema::triggerManifest()) === 39,'Expected 39 invalidatio
 $installed = $schema::preflight($db);
 requireFixture($installed['triggers_present']===39
     && $installed['trigger_conflicts'] === []
-    && $installed['index_document_table_exists'],
+    && $installed['index_document_table_exists']
+    && $installed['invalidation_shards_present']===64,
     'Read-only preflight cannot detect installed search index');
 echo "PASS complete migration, 39 triggers and read-only schema preflight\n";
 
@@ -207,7 +208,13 @@ foreach ($mutationCases as [$table,$insert,$update,$delete]) {
     requireFixture($store->epoch()===$before+3,
         'One or more insert/update/delete triggers failed on '.$table);
 }
-echo "PASS 39 source INSERT/UPDATE/DELETE events each increment epoch\n";
+$activeShards=(int)$db->query(
+    'SELECT COUNT(*) FROM grobo_form_search_invalidation WHERE epoch>0'
+)->fetchColumn();
+requireFixture($activeShards>=6,
+    'Global epoch contention was not distributed across multiple counter rows');
+echo "PASS 39 source events increment a monotonic sum across "
+    . $activeShards . " active shards\n";
 
 // El índice contiene texto con nombres y contactos; un borrado físico debe
 // eliminar toda copia de ese formulario en el mismo commit de la tabla origen.
@@ -292,6 +299,24 @@ requireFixture((int)$activeCount->fetchColumn()===$preserved,
     'Bounded cleanup modified documents of the published generation');
 echo "PASS 1120 old documents purged in bounded batches; live generation preserved\n";
 
+// La pérdida accidental de un contador invalida el índice inmediatamente.
+$db->exec('DELETE FROM grobo_form_search_invalidation WHERE shard=63');
+requireFixture(!$schema::triggersReady($db)
+    && $store->readable()===null,
+    'Missing invalidation shard should reject indexed search');
+$reportAfterLoss=$schema::preflight($db);
+requireFixture($reportAfterLoss['invalidation_shards_present']===63,
+    'Read-only schema preflight did not report a missing counter shard');
+$schema::install($db);
+requireFixture($schema::triggersReady($db),
+    'Idempotent sharded counter repair did not restore all 64 rows');
+$publishedAfterRepair=$db->query(
+    'SELECT published_generation FROM grobo_form_search_state WHERE id=1'
+)->fetchColumn();
+requireFixture($publishedAfterRepair===null && $store->readable()===null,
+    'Repair of a missing shard must invalidate any previously published index');
+echo "PASS missing shard fails closed; repair cannot resurrect stale search\n";
+
 // Ensayo destructivo final SÓLO en grobo_myforms_fixture: una columna o
 // tabla faltante deben reportarse antes de cualquier migración.
 $db->exec('ALTER TABLE formularioe DROP COLUMN estado');
@@ -306,4 +331,4 @@ requireFixture(!$missingTableReport['schema_compatible']
     'Preflight did not warn about a missing source table');
 echo "PASS read-only preflight detects incompatible source tables and columns\n";
 
-echo "GROBO_MYFORMS_SEARCH_INDEX_MYSQL_QA_OK checks=15\n";
+echo "GROBO_MYFORMS_SEARCH_INDEX_MYSQL_QA_OK checks=16\n";

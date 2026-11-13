@@ -29,6 +29,26 @@ final class UserFormsSearchIndexSchema
         'institucion' => 'in',
     ];
 
+    public const INVALIDATION_SHARDS = 64;
+
+    // Claves de reparto del contador, restringidas al esquema verificado.
+    // Si cambia la identidad de una fila, igualmente cambia la suma global.
+    private const SOURCE_KEYS = [
+        'formularioe'=>'idformA',
+        'formulario_derivacion'=>'IdFormularioDerivacion',
+        'formulario_owner_actual'=>'idformA',
+        'formulario_datos_originales'=>'IdFormularioDerivacion',
+        'tipoformularios'=>'IdTipoFormulario',
+        'precioformulario'=>'idformA',
+        'precioinsumosformulario'=>'idformA',
+        'protformr'=>'idformA',
+        'protocoloexpe'=>'idprotA',
+        'protdeptor'=>'idprotA',
+        'departamentoe'=>'iddeptoA',
+        'organismoe'=>'IdOrganismo',
+        'institucion'=>'IdInstitucion',
+    ];
+
     /** @return array<string,array{table:string,event:string}> */
     public static function triggerManifest(): array
     {
@@ -60,7 +80,8 @@ final class UserFormsSearchIndexSchema
             $found = $seen[$name] ?? null;
             if (!$found || $found['EVENT_OBJECT_TABLE'] !== $rule['table']
                 || $found['EVENT_MANIPULATION'] !== $rule['event']
-                || !str_contains(strtolower((string)$found['ACTION_STATEMENT']), 'grobo_form_search_state')) {
+                || !str_contains(strtolower((string)$found['ACTION_STATEMENT']), 'grobo_form_search_invalidation')
+                || !str_contains(strtolower((string)$found['ACTION_STATEMENT']), 'crc32')) {
                 return false;
             }
             // Borrado físico de una ficha: purgar todas sus copias indexadas
@@ -71,7 +92,17 @@ final class UserFormsSearchIndexSchema
                 return false;
             }
         }
-        return true;
+        try {
+            $shards=$db->query(
+                'SELECT COUNT(*) AS n, MIN(shard) AS lo, MAX(shard) AS hi
+                 FROM grobo_form_search_invalidation'
+            )->fetch(PDO::FETCH_ASSOC);
+            return (int)($shards['n'] ?? 0) === self::INVALIDATION_SHARDS
+                && (int)($shards['lo'] ?? -1) === 0
+                && (int)($shards['hi'] ?? -1) === self::INVALIDATION_SHARDS-1;
+        } catch (\PDOException $e) {
+            return false;
+        }
     }
 
     /** Columnas imprescindibles, compartidas por preflight e instalación. */
@@ -150,13 +181,19 @@ final class UserFormsSearchIndexSchema
             if ($row['EVENT_OBJECT_TABLE'] !== $rule['table']
                 || $row['EVENT_MANIPULATION'] !== $rule['event']
                 || !str_contains(strtolower((string)$row['ACTION_STATEMENT']),
-                    'grobo_form_search_state')
+                    'grobo_form_search_invalidation')
+                || !str_contains(strtolower((string)$row['ACTION_STATEMENT']), 'crc32')
                 || ($name === 'grobo_fs_fo_ad'
                     && !str_contains(strtolower((string)$row['ACTION_STATEMENT']),
                         'grobo_form_search_document'))) {
                 $conflicts[] = $name;
             }
         }
+        $shardCount = isset($knownTables['grobo_form_search_invalidation'])
+            ? (int)$db->query(
+                'SELECT COUNT(*) FROM grobo_form_search_invalidation'
+            )->fetchColumn()
+            : 0;
         return [
             'schema_compatible' => $missingTables === [] && $missingColumns === [],
             'missing_tables' => $missingTables,
@@ -166,6 +203,10 @@ final class UserFormsSearchIndexSchema
             'trigger_conflicts' => $conflicts,
             'index_state_table_exists' => isset($knownTables['grobo_form_search_state']),
             'index_document_table_exists' => isset($knownTables['grobo_form_search_document']),
+            'invalidation_shard_table_exists' =>
+                isset($knownTables['grobo_form_search_invalidation']),
+            'invalidation_shards_present' => $shardCount,
+            'invalidation_shards_expected' => self::INVALIDATION_SHARDS,
             'note' => 'Read-only schema check, does not establish privileges or installation safety.',
         ];
     }
@@ -223,6 +264,26 @@ final class UserFormsSearchIndexSchema
                 PRIMARY KEY (generation,idformA),
                 KEY idx_gfsi_form (idformA)
             ) ENGINE=InnoDB");
+        $db->exec("CREATE TABLE IF NOT EXISTS grobo_form_search_invalidation (
+                shard TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+                epoch BIGINT UNSIGNED NOT NULL DEFAULT 0
+            ) ENGINE=InnoDB");
+        // Un contador perdido pudo haber omitido escrituras. Nunca permitir
+        // que una reparación resucite una generación anterior con epoch igual.
+        $existingShards=(int)$db->query(
+            'SELECT COUNT(*) FROM grobo_form_search_invalidation'
+        )->fetchColumn();
+        if ($existingShards!==self::INVALIDATION_SHARDS) {
+            $db->exec("UPDATE grobo_form_search_state
+                       SET published_epoch=NULL,published_generation=NULL,
+                           published_count=0,published_at=NULL WHERE id=1");
+        }
+        $values=[];
+        for($shard=0; $shard<self::INVALIDATION_SHARDS; $shard++) {
+            $values[]="({$shard},0)";
+        }
+        $db->exec("INSERT IGNORE INTO grobo_form_search_invalidation
+                   (shard,epoch) VALUES ".implode(',', $values));
 
         $check = $db->prepare("SELECT TRIGGER_NAME, ACTION_STATEMENT
                                FROM information_schema.TRIGGERS
@@ -232,23 +293,30 @@ final class UserFormsSearchIndexSchema
             $exists = $check->fetch(PDO::FETCH_ASSOC);
             if ($exists) {
                 $statement = strtolower((string)$exists['ACTION_STATEMENT']);
-                if (!str_contains($statement, 'grobo_form_search_state')
+                if (!str_contains($statement, 'grobo_form_search_invalidation')
+                    || !str_contains($statement, 'crc32')
                     || ($name === 'grobo_fs_fo_ad'
                         && !str_contains($statement, 'grobo_form_search_document'))) {
                     throw new RuntimeException('Trigger preexistente no coincide: ' . $name);
                 }
                 continue;
             }
+            $key=self::SOURCE_KEYS[$rule['table']];
+            $entity=$rule['event']==='DELETE' ? 'OLD' : 'NEW';
+            $count=self::INVALIDATION_SHARDS;
+            $bucket="MOD(CRC32(CONCAT('{$rule['table']}:',
+                     COALESCE(CAST({$entity}.{$key} AS CHAR),''))),{$count})";
+            $invalidate="UPDATE grobo_form_search_invalidation
+                         SET epoch=epoch+1 WHERE shard={$bucket}";
             if ($name === 'grobo_fs_fo_ad') {
                 $sql = "CREATE TRIGGER {$name} AFTER DELETE ON formularioe
                         FOR EACH ROW BEGIN
-                            UPDATE grobo_form_search_state SET epoch=epoch+1 WHERE id=1;
+                            {$invalidate};
                             DELETE FROM grobo_form_search_document WHERE idformA=OLD.idformA;
                         END";
             } else {
                 $sql = "CREATE TRIGGER {$name} AFTER {$rule['event']}
-                        ON {$rule['table']} FOR EACH ROW
-                        UPDATE grobo_form_search_state SET epoch=epoch+1 WHERE id=1";
+                        ON {$rule['table']} FOR EACH ROW {$invalidate}";
             }
             $db->exec($sql);
         }

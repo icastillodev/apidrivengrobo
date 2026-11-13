@@ -1,6 +1,8 @@
 <?php
 /** Benchmark del índice materializado, exclusivamente MySQL ficticio/aislado. */
 declare(strict_types=1);
+// Siempre recrear fixture sintético; nunca depende de residuos de otra prueba.
+require_once __DIR__ . '/qa_userforms_mysql_integration_20261112.php';
 require __DIR__ . '/bench_userforms_mysql_20261112.php';
 
 use App\Models\UserForms\UserFormsSearchIndexSchema;

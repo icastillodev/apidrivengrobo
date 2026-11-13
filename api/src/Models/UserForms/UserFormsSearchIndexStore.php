@@ -95,9 +95,17 @@ final class UserFormsSearchIndexStore
 
     public function epoch(): int
     {
-        $value = $this->db->query('SELECT epoch FROM grobo_form_search_state WHERE id=1')->fetchColumn();
-        if ($value === false) throw new RuntimeException('Índice de búsqueda no instalado');
-        return (int)$value;
+        $row = $this->db->query(
+            'SELECT COUNT(*) AS n, COALESCE(SUM(epoch),0) AS total
+             FROM grobo_form_search_invalidation'
+        )->fetch(PDO::FETCH_ASSOC);
+        if (!$row || (int)$row['n'] !== UserFormsSearchIndexSchema::INVALIDATION_SHARDS) {
+            throw new RuntimeException('Índice de búsqueda sin sus 64 contadores');
+        }
+        // Los 64 contadores son crecientes; la suma cambia con cada commit.
+        // A diferencia del epoch global, diferentes escritores bloquean
+        // filas distintas según el ID de su objeto.
+        return (int)$row['total'];
     }
 
     public function writeDocument(string $generation, int $idformA, string $text): void
@@ -119,8 +127,11 @@ final class UserFormsSearchIndexStore
     {
         $this->db->beginTransaction();
         try {
-            $locked = $this->db->query("SELECT epoch FROM grobo_form_search_state WHERE id=1 FOR UPDATE")->fetchColumn();
-            if ($locked === false || (int)$locked !== $startingEpoch) {
+            $locked = $this->db->query(
+                "SELECT id FROM grobo_form_search_state WHERE id=1 FOR UPDATE"
+            )->fetchColumn();
+            if ($locked === false || !UserFormsSearchIndexSchema::triggersReady($this->db)
+                || $this->epoch() !== $startingEpoch) {
                 throw new RuntimeException('Fuentes cambiaron durante la indexación; no publicar');
             }
             $countStmt = $this->db->prepare(
@@ -157,10 +168,11 @@ final class UserFormsSearchIndexStore
             }
             $up = $this->db->prepare(
                 "UPDATE grobo_form_search_state
-                 SET published_epoch=?, published_generation=?, published_count=?, published_at=NOW()
+                 SET epoch=?, published_epoch=?, published_generation=?,
+                     published_count=?, published_at=NOW()
                  WHERE id=1"
             );
-            $up->execute([$startingEpoch,$generation,$expected]);
+            $up->execute([$startingEpoch,$startingEpoch,$generation,$expected]);
             $this->db->commit();
             return $expected;
         } catch (\Throwable $e) {
@@ -173,24 +185,41 @@ final class UserFormsSearchIndexStore
      * @return ?array{epoch:int,generation:string}
      * Sólo una generación completa, protegida por los 39 triggers, es válida.
      */
+    private function currentSnapshot(): array|false
+    {
+        return $this->db->query(
+            "SELECT s.published_epoch, s.published_generation,
+                    v.current_epoch, v.n
+             FROM grobo_form_search_state s
+             CROSS JOIN (
+                SELECT COALESCE(SUM(epoch),0) AS current_epoch, COUNT(*) AS n
+                FROM grobo_form_search_invalidation
+             ) v WHERE s.id=1"
+        )->fetch(PDO::FETCH_ASSOC);
+    }
+
     public function readable(): ?array
     {
-        $row = $this->db->query("SELECT epoch, published_epoch, published_generation
-                                 FROM grobo_form_search_state WHERE id=1")->fetch(PDO::FETCH_ASSOC);
+        $row = $this->currentSnapshot();
         if (!$row || !$row['published_generation']
             || $row['published_epoch'] === null
-            || (int)$row['epoch'] !== (int)$row['published_epoch']) {
+            || (int)$row['n'] !== UserFormsSearchIndexSchema::INVALIDATION_SHARDS
+            || (int)$row['current_epoch'] !== (int)$row['published_epoch']) {
             return null;
         }
         if (!UserFormsSearchIndexSchema::triggersReady($this->db)) return null;
-        return ['epoch'=>(int)$row['epoch'],'generation'=>(string)$row['published_generation']];
+        return [
+            'epoch'=>(int)$row['current_epoch'],
+            'generation'=>(string)$row['published_generation']
+        ];
     }
 
     public function stillReadable(array $snapshot): bool
     {
-        $row = $this->db->query("SELECT epoch,published_epoch,published_generation
-                                 FROM grobo_form_search_state WHERE id=1")->fetch(PDO::FETCH_ASSOC);
-        return $row && (int)$row['epoch'] === $snapshot['epoch']
+        $row = $this->currentSnapshot();
+        return $row
+            && (int)$row['n'] === UserFormsSearchIndexSchema::INVALIDATION_SHARDS
+            && (int)$row['current_epoch'] === $snapshot['epoch']
             && (int)$row['published_epoch'] === $snapshot['epoch']
             && $row['published_generation'] === $snapshot['generation'];
     }
