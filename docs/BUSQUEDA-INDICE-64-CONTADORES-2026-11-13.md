@@ -70,3 +70,16 @@ Las búsquedas muy amplias vuelven al contrato anterior. El índice es eficaz pa
 2. Confirmar que la API responde consultas con el buscador original y permisos JWT.
 3. En mantenimiento aprobado, invalidar publicación y retirar triggers auxiliares. Respaldar antes de cualquier DROP y limpiar datos duplicados del índice según la política institucional.
 4. Verificar restauración, uso de disco, integridad de formularios y funciones de facturación/derivación.
+
+## Publicación controlada de código (sin migración DB)
+
+- **Commit funcional:** `a8ebe57`, rama `fix/grobo-seguridad-facturacion-20261102`, subido a GitHub.
+- **Release:** `myforms-index-shards-a8ebe57`; únicamente dos clases PHP: `api/src/Models/UserForms/UserFormsSearchIndexSchema.php` y `api/src/Models/UserForms/UserFormsSearchIndexStore.php`.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-index-shards-a8ebe57 files=2`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`. Respaldo automático: `/root/grobo-managed-backup-20261113T044035Z`.
+- Hashes SHA-256 releídos en VPS: **2/2 idénticos** a los del paquete. `grobo-status`: Nginx y PHP-FPM activos, JWT preflight correcto, comprobación de seguridad multi-tenant vigente.
+- Chrome público sin sesión: **10/10 verificaciones** de HTML/JS versionado, cinco rutas privadas HTTP 401 con JSON sin datos y redirección al login en 390, 768 y 1366 píxeles.
+- **No se instalaron las tres tablas auxiliares de búsqueda ni los 39 triggers en la base productiva**. Tampoco se ejecutó backfill, cron, cambios en PHP-FPM ni activación del índice. La mejora de velocidad de texto libre sigue siendo **experimental** y no está disponible para usuarios reales.
+- `tests/qa_userforms_search_index_mysql_20261113.php`: **16/16 bloques**; la suite general PHP **96/96**; Chrome ficticio **16/16**; auditoría de 187 JS y 84 HTML sin errores de módulos. Los contenedores de MySQL ficticio y su red se eliminaron al finalizar.
+- El preflight **real** del VPS no pudo ejecutarse: cuenta SSH sin variables de conexión específicas y `.env` protegido. Se eliminó el script temporal que intentó realizar el control read-only. No se leyó la base de producción, ni se extrajeron secretos.
+- **Decisión registrada: NO-GO** para activar índices/triggers en producción: el costo de escritura y el acceso administrativo no están validados. El código dormido podrá utilizarse únicamente luego de las verificaciones y autorización de la ventana de mantenimiento.
