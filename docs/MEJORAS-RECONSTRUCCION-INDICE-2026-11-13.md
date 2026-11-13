@@ -60,3 +60,16 @@ El preflight **no** confirma privilegios `TRIGGER`, el estado de los backups ni 
 - `php -l` sin errores en las clases de esquema, store, builder, script CLI y test. `git diff --check` sin errores tras normalizar el final del archivo de QA.
 - El despliegue de este parche, si se hace, debe incluir **únicamente** las tres clases PHP de esquema, store y builder. El script CLI nuevo queda disponible en GitHub, pero no se habilitará una migración desde la aplicación web.
 - El valor productivo `GROBO_MYFORMS_SEARCH_INDEX` continúa sin habilitarse. Ninguna de estas mejoras justifica por sí sola aplicar los 39 triggers sobre la base real sin comprobar privilegios, definers, impacto en transacciones y plan de reversión.
+
+## Publicación de código y verificación (13/11/2026)
+
+- **Commit funcional:** `d7173ca`, rama `fix/grobo-seguridad-facturacion-20261102`, sincronizado en GitHub.
+- **Release de 3 clases PHP:** `myforms-index-rebuild-d7173ca`. Únicos archivos: `UserFormsSearchIndexSchema.php`, `UserFormsSearchIndexStore.php`, `UserFormsSearchIndexBuilder.php`.
+- Despliegue autorizado: `GROBO_MANIFEST_OK version=myforms-index-rebuild-d7173ca files=3` y `GROBO_CONTROLLED_DEPLOY_OK`.
+- **Respaldo:** `/root/grobo-managed-backup-20261113T040347Z`.
+- Revisión en el VPS: **3/3 hashes SHA-256 correctos**; Nginx y PHP-FPM 8.3 activos; preflight de JWT y multitenencia correctos.
+- Chrome público sin sesión: **10/10 controles**, HTML/JS vigente sin modificación, cinco rutas privadas responden HTTP 401 sin exponer datos y redirecciones de login en móvil, tablet y escritorio.
+- **No se ejecutó ninguna migración, actualización de triggers ni backfill en la base productiva.** `GROBO_MYFORMS_SEARCH_INDEX` continúa apagado por defecto.
+- El CLI `scripts/grobo-search-index.php` actualizado (incluido `--preflight`) se encuentra en GitHub, **no** en el paquete PHP de producción. Para usarlo en una ventana de mantenimiento habrá que desplegarlo por un procedimiento administrativo separado.
+- QA aislado: **15/15 pruebas MySQL** del índice; suite general **96/96 PHP**, pruebas de navegador **16/16**, auditoría JS/HTML sin errores y **8/8** paginación personal. Contenedor y red de MySQL sintético eliminados al finalizar.
+- Continúa pendiente: preflight de la estructura real mediante acceso de mantenimiento autorizado, backups comprobados, medida de contención de `epoch`, QA autenticado de instituciones de ensayo y aprobación separada para instalar 39 triggers. No atribuir a los usuarios de producción una aceleración de búsqueda libre que todavía no está activa.
