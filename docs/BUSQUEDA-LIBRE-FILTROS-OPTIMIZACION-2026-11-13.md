@@ -37,3 +37,15 @@ Son muestras sintéticas de **CPU de filtrado**. La hidración SQL y la red aña
 - La indexación documental con 64 contadores sigue siendo **experimental y desactivada**, porque el costo de escrituras bajo concurrencia y el acceso de mantenimiento al esquema productivo no superaron el criterio de activación.
 - La búsqueda libre sin otro filtro aún hidrata el historial completo en PHP; esta tanda mejora el predicado y su ventana de resultados, **no** implementa un índice persistente ni elimina el trabajo SQL de esa búsqueda.
 - Faltan QA autenticado institucional con usuarios de ensayo autorizados de URBE/CUPAE y mediciones privadas `Server-Timing` en VPS. No considerar respuestas HTTP 401 sin sesión como sustituto de esos controles.
+
+## Despliegue controlado y verificaciones finales (13/11/2026)
+
+- **Commit funcional:** `c691fe8`, rama `fix/grobo-seguridad-facturacion-20261102`, subido a GitHub.
+- **Release:** `myforms-search-window-c691fe8`, exactamente **2 archivos PHP**: `api/src/Models/UserForms/UserFormsModel.php` y `api/src/Services/UserForms/UserFormsFilterService.php`. Sin cambios JS/HTML, SQL, triggers ni tablas.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-search-window-c691fe8 files=2`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`; **respaldo** `/root/grobo-managed-backup-20261113T204823Z` (UTC).
+- **2/2 SHA-256 exactos** re-leídos en el VPS: modelo `d16ef1749e821da61be95f067131f8157e50721c48751a82f9fc596403e1d58b`; servicio `5c1d7cb4b70dfced37398ce6e31306c5c95c896d13fb2393bcb23bef5cab95f3`.
+- `grobo-status`: `SERVICE_nginx=active`, `SERVICE_php8.3-fpm=active`, `JWT_SECRET_PREFLIGHT_OK`, `TENANT_SECURITY_LIVE=yes`.
+- Chrome web pública sin sesión: **10/10** (HTML/JS original, cinco rutas privadas HTTP 401 JSON sin filtraciones, login en 390/768/1366 px).
+- QA previo y aislado: **100 combinaciones** comparadas con la semántica original con 4 offsets cada una; 9 casos sobre 5.000 fichas; general **96/96 PHP**, navegador sintético **16/16**, PDF/render **6/6**, CSV **7/7** y paginación **8/8**. MySQL ficticio y su red interna eliminados.
+- **Pendiente:** falta E2E institucional autenticado con cuentas de ensayo autorizadas de URBE/CUPAE y mediciones reales privadas del VPS. No se instaló ni habilitó el índice experimental con 39 triggers/64 contadores.
