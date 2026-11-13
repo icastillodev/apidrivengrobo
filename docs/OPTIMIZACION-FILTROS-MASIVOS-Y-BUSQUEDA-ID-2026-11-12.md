@@ -51,3 +51,15 @@ Las cifras son de una ejecución sintética y no deben interpretarse como p50/p9
 - El camino masivo filtra una proyección pequeña de todos los formularios visibles. Su memoria y tiempo de DB dependen todavía del tamaño del historial y de la cantidad de derivaciones.
 - Los cambios concurrentes entre selección de IDs y lectura de fichas pueden afectar resultados; no hay snapshot transaccional de toda la búsqueda.
 - Falta validación autenticada real con cuentas autorizadas de ensayo de URBE/CUPAE y tiempos `Server-Timing` de endpoints privados del VPS. No sustituirla por respuestas HTTP 401 sin sesión.
+
+## Publicación controlada y comprobación posterior
+
+- **Commit de aplicación:** `2faa597`, rama `fix/grobo-seguridad-facturacion-20261102`; enviado a GitHub.
+- **Release:** `myforms-broad-2faa597`. Se publicaron exactamente **4 archivos**: modelo de formularios, servicio de filtros, JavaScript de Mis Formularios y HTML que actualiza su versión.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-broad-2faa597 files=4`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`. **Respaldo:** `/root/grobo-managed-backup-20261113T011846Z` (fecha UTC del VPS).
+- **4/4 hashes SHA-256** leídos de los archivos ya instalados en el VPS coinciden con el paquete local de la misma versión.
+- Estado posterior: servicio `nginx=active`, `php8.3-fpm=active`, `JWT_SECRET_PREFLIGHT_OK`, protección multitenant y responsive activos.
+- Chrome real sin sesión: **10/10** comprobaciones: HTML versionado `20261112j`, hash de JS exacto, cinco rutas privadas devuelven **HTTP 401** con JSON sin datos y login protegido en 390, 768 y 1366 píxeles.
+- Pruebas sintéticas previas al despliegue: **96/96 PHP generales**, **11/11 integración MySQL para filtros**, **8/8 paginación**, **16/16 Chrome de navegación y búsqueda exacta ES/EN/PT**, **6/6 PDF/render** y **7/7 exportaciones administrativas**.
+- **Limitación:** estas pruebas públicas no comprueban la funcionalidad con un JWT real de URBE/CUPAE; siguen pendientes esas sesiones autorizadas, la lectura de tiempos `Server-Timing` reales y la futura indexación transaccional de texto libre arbitrario.
