@@ -46,3 +46,14 @@ En la ejecución anterior al pequeño ajuste que evita consultar previamente los
 - El SQL hace una preselección segura, **no constituye búsqueda Full-Text global**. Búsquedas libres y filtros con más de 500 candidatos todavía hidratan el historial autorizado completo en PHP.
 - Una modificación concurrente entre la preselección y la hidratación puede alterar las filas incluidas; para coherencia transaccional fuerte se requiere snapshot/versión, sin retener transacciones grandes en PHP-FPM.
 - Continúa pendiente QA autenticado con cuentas de ensayo autorizadas de URBE/CUPAE y mediciones privadas en VPS por `Server-Timing`. No marcar ese punto aprobado con los fixtures.
+
+## Publicación controlada — verificación del VPS
+
+- **Commit funcional:** `d0a33e4`, rama `fix/grobo-seguridad-facturacion-20261102`, publicado en GitHub.
+- **Release:** `myforms-sql-d0a33e4`, exactamente **2 PHP**: `api/src/Models/UserForms/UserFormsModel.php` y `api/src/Services/UserForms/UserFormsFilterService.php`. Sin cambios JS, HTML, rutas, SQL DDL, stock, pagos ni configuraciones privadas.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-sql-d0a33e4 files=2`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK`. Respaldo en `/root/grobo-managed-backup-20261113T005233Z` (servidor UTC).
+- Relectura SHA-256 en VPS: **2/2 hashes idénticos a los del paquete**. Modelo `8262b809fbb95bccd14495ad1f861560e1ff5c57a1a6cecff2fca3ed9c0063fb`; servicio `a619abb574c5253252cd2384a66fb98910aec3f0ca2d8883297fa46996190012`.
+- `grobo-status`: Nginx y PHP-FPM activos, JWT preflight correcto, seguridad tenant y responsive vigentes.
+- Chrome público, sin sesión: **10/10 controles** para HTML/JS versionado anterior, hashes, cinco rutas privadas HTTP 401 JSON sin datos y redirecciones al login a 390, 768 y 1366 px.
+- **QA operativo autenticado sigue pendiente:** no se usaron cuentas de ensayo reales de URBE/CUPAE; los tiempos del benchmark corresponden exclusivamente a MySQL y PHP locales con datos ficticios.
