@@ -18,6 +18,7 @@ let pagedTotal = 0;
 let fullHistoryPromise = null;
 let filteredServerAvailable = true;
 let listRequestGeneration = 0;
+let activeListRequest = null;
 let searchDebounce = null;
 const formSearchCache = new WeakMap();
 let misFormsPdfScriptPromise = null;
@@ -174,6 +175,11 @@ async function getCompleteFormsOnDemand() {
 /** El servidor pagina por ID canónico, sin crear el historial completo en el navegador. */
 async function loadCurrentForms() {
     const generation = ++listRequestGeneration;
+    // No esperar a una respuesta ya obsoleta: liberar inmediatamente el
+    // fetch anterior, incluso si se cambiaron página o criterios de filtro.
+    if (activeListRequest) activeListRequest.abort();
+    activeListRequest = null;
+    let requestController = null;
     const filtered = hasActiveFormFilters();
     const tbody = document.getElementById('table-body');
     const msg = escapeMisFormsHtml(window.txt?.misformularios?.cargando_lista || 'Cargando…');
@@ -202,8 +208,11 @@ async function loadCurrentForms() {
         } else {
             params.set('paged', '1');
         }
-        const res = await API.request(`/user/my-forms?${params.toString()}`);
-        if (generation !== listRequestGeneration) return;
+        requestController = new AbortController();
+        activeListRequest = requestController;
+        const res = await API.request(`/user/my-forms?${params.toString()}`,
+            'GET', null, { signal: requestController.signal });
+        if (generation !== listRequestGeneration || requestController.signal.aborted) return;
 
         // Compatibilidad con backend sin la ruta filtered: éste devuelve el contrato
         // legacy (list sin total); nunca hacer fallback ante error de permisos/API.
@@ -234,12 +243,18 @@ async function loadCurrentForms() {
         if (generation !== listRequestGeneration) return;
         console.error('Mis Formularios:', e);
         showMisFormulariosLoadError(e?.message);
+    } finally {
+        // Una respuesta antigua no puede borrar el controlador vigente.
+        if (activeListRequest === requestController) activeListRequest = null;
     }
 }
 
 function onMyFormsFilterChanged(debounce = false) {
-    // Una respuesta anterior nunca debe volver a pintar resultados con filtros nuevos.
+    // La solicitud vieja se cancela ya al escribir, antes de los 280 ms
+    // de debounce. El control generacional protege además respuestas tardías.
     listRequestGeneration++;
+    if (activeListRequest) activeListRequest.abort();
+    activeListRequest = null;
     currentPage = 1;
     if (searchDebounce) clearTimeout(searchDebounce);
     if (debounce) {

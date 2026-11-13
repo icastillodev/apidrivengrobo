@@ -78,8 +78,35 @@ try {
         }));
         const api=await import(base+'dist/js/api.js');
         const calls=[];
-        api.API.request=async endpoint=>{
+        api.API.request=async (endpoint, method='GET', data=null, fetchOptions=null)=>{
             calls.push(endpoint);
+            const signal=fetchOptions?.signal;
+            const params=new URL(endpoint,'http://localhost').searchParams;
+            const search=params.get('search');
+            const pageOffset=Number(params.get('offset')||0);
+            const slowSearch=window.__slowFilteredQA && endpoint.includes('filtered=1')
+                && search==='1201';
+            const stubbornSearch=window.__stubbornFilteredQA && endpoint.includes('filtered=1')
+                && search==='1202';
+            const slowPage=window.__slowPageQA && endpoint.includes('paged=1') && pageOffset===12;
+            if(slowSearch || stubbornSearch || slowPage){
+                const kind=slowSearch?'search':stubbornSearch?'stubborn':'page';
+                window.__slowCounts??={};
+                window.__slowCounts[kind]=(window.__slowCounts[kind]||0)+1;
+                return new Promise(resolve=>{
+                    let done=false;
+                    const finish=result=>{if(done)return;done=true;resolve(result);};
+                    window.__resolveSlowQA=()=>finish({status:'success',
+                        data:{total:1,limit:12,offset:pageOffset,list:[forms[0]]}});
+                    const onAbort=()=>{
+                        window.__abortCounts??={};
+                        window.__abortCounts[kind]=(window.__abortCounts[kind]||0)+1;
+                        if(!stubbornSearch) finish({status:'error',errorKind:'timeout'});
+                    };
+                    if(signal?.aborted)onAbort();
+                    else signal?.addEventListener('abort',onAbort,{once:true});
+                });
+            }
             if(endpoint.includes('?meta=1'))return {status:'success',data:{instituciones:['URBE','CUPAE'],origenes:['URBE']}};
             if(endpoint.includes('paged=1')){
                 const u=new URL(endpoint,'http://localhost');
@@ -200,6 +227,42 @@ try {
     assert.equal(await page.locator('#table-body tr').count(),12);
     console.log('PASS reset filters returns to paged API');
 
+    // Cancelar búsquedas viejas en el momento de escribir, sin esperar el
+    // debounce de 280 ms. El servidor viejo sólo simula una red lenta.
+    await page.evaluate(()=>{window.__slowFilteredQA=true;window.__slowCounts={};window.__abortCounts={};});
+    await page.locator('#search-input').fill('1201');
+    await page.waitForFunction(()=>window.__slowCounts?.search===1);
+    await page.locator('#search-input').fill('1200');
+    await page.waitForFunction(()=>window.__abortCounts?.search===1);
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('#1200'));
+    assert.equal(await page.locator('#table-body tr').count(),1);
+    console.log('PASS obsolete text request is aborted before debounce and never repaints');
+
+    // Algunos transportes pueden ignorar AbortController: el número de
+    // generación también debe descartar la respuesta tardía.
+    await page.evaluate(()=>{window.__slowFilteredQA=false;window.__stubbornFilteredQA=true;});
+    await page.locator('#search-input').fill('1202');
+    await page.waitForFunction(()=>window.__slowCounts?.stubborn===1);
+    await page.locator('#search-input').fill('1200');
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('#1200'));
+    await page.evaluate(()=>window.__resolveSlowQA());
+    assert.ok((await page.locator('#table-body').innerText()).includes('#1200'));
+    assert.equal(await page.locator('#table-body tr').count(),1);
+    console.log('PASS late response ignoring abort cannot overwrite the current filter');
+
+    await page.evaluate(()=>{window.__stubbornFilteredQA=false;});
+    await page.locator('#search-input').fill('');
+    await page.waitForFunction(()=>document.getElementById('dynamic-counter').textContent.includes('205'));
+    await page.evaluate(()=>{window.__slowPageQA=true;});
+    await page.locator('#pagination button').filter({hasText:'2'}).first().click();
+    await page.waitForFunction(()=>window.__slowCounts?.page===1);
+    await page.locator('#pagination button').filter({hasText:'3'}).first().click();
+    await page.waitForFunction(()=>window.__abortCounts?.page===1);
+    await page.waitForFunction(()=>document.getElementById('table-body').textContent.includes('#1181'));
+    assert.equal(await page.locator('#table-body tr').count(),12);
+    await page.evaluate(()=>{window.__slowPageQA=false;});
+    console.log('PASS fast pagination aborts older fetch while preserving page 3');
+
     await page.locator('#excel-start').fill('2026-11-01');
     await page.locator('#excel-end').fill('2026-11-30');
     const downloadPromise=page.waitForEvent('download',{timeout:15000});
@@ -278,7 +341,7 @@ try {
     console.log('PASS localized EN/PT exact-ID hints remain unique on reinit');
 
     assert.deepEqual(errors,[]);
-    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=16');
+    console.log('GROBO_MYFORMS_PAGED_BROWSER_QA_OK checks=19');
 } finally {
     await browser.close();
     await new Promise(done=>server.close(done));
