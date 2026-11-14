@@ -121,6 +121,9 @@ class UserFormsModel {
                 LEFT JOIN precioinsumosformulario pri ON f.idformA = pri.idformA"
             : "";
 
+        // Primero departamento propio; consultar los departamentos del
+        // protocolo solo si el propio no tiene nombre, evitando JOIN 1:N
+        // redundantes antes de la deduplicación por formulario canónico.
         $sql = "SELECT
                     f.idformA,
                     f.fechainicioA as Inicio,
@@ -148,9 +151,10 @@ class UserFormsModel {
                 {$payJoin}
                 LEFT JOIN protformr pf ON f.idformA = pf.idformA
                 LEFT JOIN protocoloexpe px ON pf.idprotA = px.idprotA
-                LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
-                LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
                 LEFT JOIN departamentoe d ON f.depto = d.iddeptoA
+                LEFT JOIN protdeptor pd ON px.idprotA = pd.idprotA
+                                       AND d.NombreDeptoA IS NULL
+                LEFT JOIN departamentoe dp ON pd.iddeptoA = dp.iddeptoA
                 LEFT JOIN organismoe o ON d.organismopertenece = o.IdOrganismo
                 WHERE " . $baseWhere .
                     ($paged ? " AND f.idformA IN (" . implode(',', array_fill(0, count($pageIds), '?')) . ")" : "") . "
