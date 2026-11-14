@@ -55,3 +55,15 @@ Se estudió reemplazar las dos subconsultas de estado más reciente de derivaci�
 ## Pendientes
 
 Validación con cuentas de ensayo autenticadas de URBE/CUPAE y medición de `Server-Timing` real. El índice documental materializado con 39 triggers y 64 contadores se mantiene desactivado por requisitos de seguridad y pruebas de carga de escrituras. Esta optimización **no requiere activar ese índice ni modificar la base productiva**.
+
+## Publicación controlada y verificaciones finales
+
+- **Commit funcional:** `6decbd6`, rama `fix/grobo-seguridad-facturacion-20261102`, sincronizado en GitHub.
+- **Release:** `myforms-protocol-join-6decbd6`, con **un único archivo PHP** instalado: `api/src/Models/UserForms/UserFormsModel.php`. Las pruebas y la documentación no se desplegaron en el servidor web.
+- `grobo-deploy-check`: `GROBO_MANIFEST_OK version=myforms-protocol-join-6decbd6 files=1`.
+- `grobo-deploy-apply`: `GROBO_CONTROLLED_DEPLOY_OK version=myforms-protocol-join-6decbd6 files=1`. **Respaldo:** `/root/grobo-managed-backup-20261114T000209Z`.
+- Hash SHA-256 validado directamente en el VPS: `040b1745021c4a273b92e660aa60842158fb3d3b39d351386feecded8f70ac66`, exactamente igual al paquete.
+- `grobo-status`: Nginx y PHP-FPM 8.3 activos, comprobación JWT correcta y seguridad multiinstitucional vigente.
+- Chrome público sin sesión: **10/10** controles postdeploy, incluyendo versión exacta del HTML/JS, cinco rutas privadas devolviendo HTTP 401 JSON sin datos y redirecciones al login en 390, 768 y 1366 px.
+- Prueba de **13.030 formularios** previa a publicación: snapshots, rutas institucionales, keyset, recuentos y cuatro búsquedas equivalentes aprobadas.
+- **La base productiva no fue modificada**. No se creó ningún índice/trigger, no hubo backfill y `GROBO_MYFORMS_SEARCH_INDEX` sigue desactivado. Faltan pruebas de sesión institucional autorizada y latencias privadas para confirmar el beneficio en datos reales.
