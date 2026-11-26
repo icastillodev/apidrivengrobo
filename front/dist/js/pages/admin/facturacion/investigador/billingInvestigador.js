@@ -6,9 +6,9 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge, htmlAlojAbonoBtn, billingPdfFormularioTaxonomia, billingPdfFormularioCantidad, billingEspCepaDisplayHtml } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge, htmlAlojAbonoBtn, billingPdfFormularioTaxonomia, billingPdfFormularioCantidad, billingEspCepaDisplayHtml } from '../billingLocale.js?v=20261126-abonos';
 import '../billingPayments.js'; 
-import '../modals/manager.js';
+import '../modals/manager.js?v=20261126-abonos';
 import {
     fetchFiltrosAlcanceDerivacion,
     aplicarVisibilidadColumnaFacturacionDerivacion,

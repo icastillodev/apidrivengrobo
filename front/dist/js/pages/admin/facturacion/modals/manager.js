@@ -5,7 +5,7 @@
 import { API } from '../../../../api.js';
 import { hideLoader, showLoader } from '../../../../components/LoaderComponent.js'; 
 import { openAnimalModal } from './animalModal.js';
-import { openAlojModal } from './alojamientos/alojModal.js';
+import { openAlojModal } from './alojamientos/alojModal.js?v=20261126-abonos';
 import { openReactiveModal } from './reactiveModal.js';
 import { openInsumoModal } from './insumoModal.js';
 import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingInsumoMontoTotalCobrable, billingPdfFormularioTaxonomia } from '../billingLocale.js';

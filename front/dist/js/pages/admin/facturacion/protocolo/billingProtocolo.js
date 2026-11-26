@@ -35,9 +35,9 @@ import {
     billingPdfFormularioTaxonomia,
     billingPdfFormularioCantidad,
     billingEspCepaDisplayHtml
-} from '../billingLocale.js';
+} from '../billingLocale.js?v=20261126-abonos';
 import '../billingPayments.js'; 
-import '../modals/manager.js';
+import '../modals/manager.js?v=20261126-abonos';
 import {
     fetchFiltrosAlcanceDerivacion,
     aplicarVisibilidadColumnaFacturacionDerivacion,

@@ -54,7 +54,7 @@ export async function loadLanguage(lang = null) {
     try {
         // 2. Importación dinámica (Ojo a la ruta relativa)
         // Esto busca en: dist/js/utils/i18n/es.js
-        const module = await import(`./i18n/${selectedLang}.js`);
+        const module = await import(`./i18n/${selectedLang}.js?v=20261126-abonos`);
         
         // 3. Verificamos que el módulo tenga lo que esperamos
         if (!module[selectedLang]) {

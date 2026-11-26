@@ -193,7 +193,7 @@ export function getAlojCobroModoLabel(modo) {
 export function htmlAlojAbonoBtn(historia, debe) {
     const id = Number(historia);
     const rol = Number(sessionStorage.getItem('userLevel') || localStorage.getItem('userLevel'));
-    if (!Number.isSafeInteger(id) || id <= 0 || !(Number(debe) > 0) || rol === 7) return '';
+    if (!Number.isSafeInteger(id) || id <= 0 || !(Number(debe) > 0) || ![1, 2, 4, 5, 6].includes(rol)) return '';
     const label = window.txt?.facturacion?.billing_modal?.aloj_btn_abonar || 'Abonar';
     return `<div class="mt-1"><button type="button" class="btn btn-sm btn-outline-success py-0" onclick="event.stopPropagation(); window.abrirEdicionFina('ALOJ', ${id})">${label}</button></div>`;
 }
