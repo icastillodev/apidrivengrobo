@@ -508,68 +508,15 @@ class BillingModel {
         $out = [];
         foreach ($byHist as $historia => $rows) {
             $lastId = 0;
-            $sumCuenta = 0.0;
-            $sumPagado = 0.0;
-            $sumCalc = 0.0;
             $especie = '';
             $caja = '';
-
-            $payRanges = [];
-            $n = count($rows);
-            for ($i = 0; $i < $n; $i++) {
-                $r = $rows[$i];
-                $lastId = max($lastId, (int) ($r['IdAlojamiento'] ?? 0));
-                $sumCuenta += (float) ($r['cuentaapagar'] ?? 0);
-                $sumPagado = max($sumPagado, (float) ($r['totalpago'] ?? 0));
-
-                if (!empty($r['especie'])) {
-                    $especie = (string) $r['especie'];
-                }
-                if (!empty($r['caja'])) {
-                    $caja = (string) $r['caja'];
-                }
-
-                $precio = AlojamientoCobro::precioUnitarioTramo($r);
-                $qty = AlojamientoCobro::cantidadCobroTramo($this->db, $instIdFact, $r);
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $next = $rows[$i + 1] ?? null;
-                if ($next !== null) {
-                    $end = (string) ($next['fechavisado'] ?? '');
-                } elseif ((int) ($r['finalizado'] ?? 0) === 1 && !empty($r['hastafecha'])) {
-                    $end = (string) $r['hastafecha'];
-                } else {
-                    $end = $hoy;
-                }
-                $start = (string) ($r['fechavisado'] ?? '');
-                if ($start === '' || $end === '') {
-                    continue;
-                }
-                $tsS = strtotime($start);
-                $tsE = strtotime($end);
-                if ($tsS === false || $tsE === false) {
-                    continue;
-                }
-                $dias = max(0, (int) floor(($tsE - $tsS) / 86400));
-                $sumCalc += $dias * $precio * $qty;
-                $payRanges[] = [
-                    'desde' => $start,
-                    'hasta' => $end,
-                    'dias' => $dias,
-                ];
+            foreach ($rows as $row) {
+                $lastId = max($lastId, (int) ($row['IdAlojamiento'] ?? 0));
+                $especie = !empty($row['especie']) ? (string) $row['especie'] : $especie;
+                $caja = !empty($row['caja']) ? (string) $row['caja'] : $caja;
             }
-
-            $totalGuardado = $sumCuenta;
-            $total = $totalGuardado > 0 ? $totalGuardado : $sumCalc;
-            $pagado = $sumPagado;
-            $debe = max(0, $total - $pagado);
-
-            $diasPay = 0;
-            foreach ($payRanges as $pr) {
-                $diasPay += (int) ($pr['dias'] ?? 0);
-            }
+            $resumen = AlojamientoCobro::resumenFacturable($this->db, $instIdFact, $rows, $hoy);
+            $payRanges = $resumen['periodos_facturables'];
 
             $parts = [];
             foreach ($payRanges as $pr) {
@@ -592,10 +539,10 @@ class BillingModel {
                 'historia' => $historia,
                 'especie' => $especie !== '' ? $especie : '-',
                 'caja' => $caja !== '' ? $caja : 'Estructura',
-                'total' => $total,
-                'pagado' => $pagado,
-                'debe' => $debe,
-                'dias' => $diasPay,
+                'total' => $resumen['total'],
+                'pagado' => $resumen['pagado'],
+                'debe' => $resumen['debe'],
+                'dias' => $resumen['dias'],
                 'fecha_inicio' => $fechaInicioRes,
                 'fecha_fin' => $fechaFinRes,
                 'periodo' => $periodoTxt,
@@ -863,34 +810,34 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         $whereExtra = '';
         $paramsPagos = array_merge([$instId, $idUsr], $dateParams);
 
+        $esPagoAloj = "h.TipoHistorial IN ('PAGO_ALOJ', 'LIQUIDACION_ALOJ', 'DEVOLUCION_ALOJ')";
         if ($scope === 'protocolo' && $refId && $refId > 0) {
-            // h.IdFormA puede ser idformA (formularios/insumos) o historia (alojamientos)
-            $join = "
-                LEFT JOIN protformr pfr ON pfr.idformA = h.IdFormA AND pfr.idprotA = ?
-                LEFT JOIN alojamiento alo ON alo.historia = h.IdFormA AND alo.idprotA = ? AND alo.IdInstitucion = h.IdInstitucion
-            ";
-            $whereExtra = " AND (pfr.idprotA IS NOT NULL OR alo.idprotA IS NOT NULL) ";
+            // La historia puede tener varios tramos y su ID no es un ID de formulario.
+            $whereExtra = " AND (
+                (NOT ($esPagoAloj) AND EXISTS (
+                    SELECT 1 FROM protformr pfr WHERE pfr.idformA = h.IdFormA AND pfr.idprotA = ?
+                )) OR ($esPagoAloj AND EXISTS (
+                    SELECT 1 FROM alojamiento alo
+                    WHERE alo.historia = h.IdFormA AND alo.idprotA = ? AND alo.IdInstitucion = h.IdInstitucion
+                ))
+            ) ";
             $paramsPagos[] = $refId;
             $paramsPagos[] = $refId;
         } elseif ($scope === 'depto' && $refId && $refId > 0) {
-            // Filtrar por id depto en formularioe.depto y por protdeptor (protocolo ↔ departamento).
-            // protocoloexpe.departamento es texto legado; no debe compararse con iddeptoA numérico.
-            // idformA es PK global en formularioe: no acoplar por IdInstitucion (derivados / cobro en otra sede).
-            $join = '
-                LEFT JOIN formularioe f ON f.idformA = h.IdFormA
-            ';
+            $join = "LEFT JOIN formularioe f ON f.idformA = h.IdFormA AND NOT ($esPagoAloj)";
             $whereExtra = " AND (
-                (f.depto IS NOT NULL AND f.depto = ?)
-                OR EXISTS (
-                    SELECT 1 FROM protformr pfx
-                    INNER JOIN protdeptor pdx ON pdx.idprotA = pfx.idprotA AND pdx.iddeptoA = ?
-                    WHERE pfx.idformA = h.IdFormA
-                )
-                OR EXISTS (
+                (NOT ($esPagoAloj) AND (
+                    (f.depto IS NOT NULL AND f.depto = ?)
+                    OR EXISTS (
+                        SELECT 1 FROM protformr pfx
+                        INNER JOIN protdeptor pdx ON pdx.idprotA = pfx.idprotA AND pdx.iddeptoA = ?
+                        WHERE pfx.idformA = h.IdFormA
+                    )
+                )) OR ($esPagoAloj AND EXISTS (
                     SELECT 1 FROM alojamiento ax
                     INNER JOIN protdeptor pdx ON pdx.idprotA = ax.idprotA AND pdx.iddeptoA = ?
                     WHERE ax.historia = h.IdFormA AND ax.IdInstitucion = h.IdInstitucion
-                )
+                ))
             ) ";
             $paramsPagos[] = $refId;
             $paramsPagos[] = $refId;
@@ -935,6 +882,14 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
         $sumItems = round($sumItems, 2);
         if (abs($sumItems - $monto) > 0.02) {
             throw new \RuntimeException('El total enviado no coincide con la suma de los ítems.');
+        }
+        if (in_array('ALOJ', array_column($items, 'tipo'), true)) {
+            if ($sumItems !== $monto) {
+                throw new \RuntimeException('El total enviado no coincide con la suma de los ítems.');
+            }
+            if ($monto !== round($monto, $this->getSaldoPrecision())) {
+                throw new \RuntimeException('La billetera no admite esa cantidad de decimales.');
+            }
         }
         try {
             $this->db->beginTransaction();
@@ -1019,27 +974,18 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
                     );
 
                 } else if ($item['tipo'] === 'ALOJ') {
-                    // totalpago canónico por historia (varios tramos): MAX + SET, no sumar por cada fila.
                     $histId = (int) $id;
-                    $stmtMax = $this->db->prepare(
-                        'SELECT COALESCE(MAX(COALESCE(totalpago, 0)), 0) FROM alojamiento WHERE historia = ?'
-                    );
-                    $stmtMax->execute([$histId]);
-                    $pagadoActual = round((float) $stmtMax->fetchColumn(), 2);
-                    $stmtCuenta = $this->db->prepare(
-                        'SELECT COALESCE(SUM(COALESCE(cuentaapagar, 0)), 0) FROM alojamiento WHERE historia = ?'
-                    );
-                    $stmtCuenta->execute([$histId]);
-                    $cuentaTotal = round((float) $stmtCuenta->fetchColumn(), 2);
-                    $debeAloj = max(0.0, round($cuentaTotal - $pagadoActual, 2));
-                    if ($monto_item - $debeAloj > 0.009) {
+                    $rows = $this->getAlojamientoPaymentRows($histId, $inst, true);
+                    if ($rows === [] || array_filter($rows, static fn (array $row): bool => (int) $row['IdTitular'] !== $idUsr)) {
+                        throw new \RuntimeException('El alojamiento no corresponde al titular en esta institución.');
+                    }
+                    $resumen = AlojamientoCobro::resumenFacturable($this->db, $inst, $rows, date('Y-m-d'));
+                    if ($monto_item <= 0 || $monto_item > $resumen['debe']) {
                         throw new \RuntimeException(
-                            'El monto supera la deuda pendiente del alojamiento (historia #' . $histId . ').'
+                            'El monto no es válido para la deuda pendiente del alojamiento (historia #' . $histId . ').'
                         );
                     }
-                    $nuevoPagado = round($pagadoActual + $monto_item, 2);
-                    $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ?')
-                        ->execute([$nuevoPagado, $histId]);
+                    $this->updateAlojamientoPagado($histId, $inst, round($resumen['pagado'] + $monto_item, 2));
 
                     $this->insertHistorialPagoStandard(
                         $adminId,
@@ -2096,88 +2042,78 @@ public function updateBalance($idUsr, $inst, $monto, $adminId, ?string $transfer
     }
 
 
-public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
-        try {
-            $this->db->beginTransaction();
+    /** Lectura de una historia en la sede que presta el alojamiento, incluso con protocolo compartido. */
+    public function getAlojamientoPaymentRows(int $historia, int $instId, bool $lock = false): array {
+        $sql = "SELECT a.IdAlojamiento, a.IdTipoAlojamiento, a.fechavisado, a.hastafecha,
+                       a.finalizado, a.CantidadCaja, a.PrecioCajaMomento, a.cuentaapagar,
+                       a.totalpago, a.totaldiasdefinidos, p.IdUsrA AS IdTitular
+                FROM alojamiento a
+                INNER JOIN protocoloexpe p ON p.idprotA = a.idprotA
+                WHERE a.historia = ? AND a.IdInstitucion = ?
+                ORDER BY a.fechavisado ASC, a.IdAlojamiento ASC";
+        $stmt = $this->db->prepare($sql . ($lock ? ' FOR UPDATE' : ''));
+        $stmt->execute([$historia, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-            $monto = (float) $monto;
-            $historiaId = (int) $historiaId;
-            if ($monto <= 0) {
-                throw new \InvalidArgumentException('Monto inválido.');
-            }
+    public function getAlojamientoBillingInfo(int $idAlojamiento, int $instId): array {
+        $sql = "SELECT p.nprotA, ta.NombreTipoAlojamiento, a.PrecioCajaMomento,
+                       CONCAT(tit.NombreA, ' ', tit.ApellidoA) AS TitularNombre,
+                       COALESCE(CONCAT(resp.NombreA, ' ', resp.ApellidoA),
+                                CONCAT(tit.NombreA, ' ', tit.ApellidoA)) AS Investigador
+                FROM alojamiento a
+                INNER JOIN protocoloexpe p ON p.idprotA = a.idprotA
+                LEFT JOIN tipoalojamiento ta ON ta.IdTipoAlojamiento = a.IdTipoAlojamiento
+                LEFT JOIN personae tit ON tit.IdUsrA = p.IdUsrA
+                LEFT JOIN personae resp ON resp.IdUsrA = a.IdUsrA
+                WHERE a.IdAlojamiento = ? AND a.IdInstitucion = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$idAlojamiento, $instId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    }
 
-            // Titular del protocolo (billetera), no el técnico del alojamiento.
-            $sqlInfo = "SELECT a.IdInstitucion, p.IdUsrA AS IdTitular
-                        FROM alojamiento a
-                        INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-                        WHERE a.historia = ?
-                        LIMIT 1";
-            $stmtInfo = $this->db->prepare($sqlInfo);
-            $stmtInfo->execute([$historiaId]);
-            $data = $stmtInfo->fetch(\PDO::FETCH_ASSOC);
+    public function getSaldoPrecision(): int {
+        $stmt = $this->db->prepare("SHOW COLUMNS FROM dinero LIKE 'SaldoDinero'");
+        $stmt->execute();
+        $type = (string) ($stmt->fetch(PDO::FETCH_ASSOC)['Type'] ?? '');
+        return preg_match('/^decimal\(\d+,(\d+)\)/i', $type, $m) ? min(2, (int) $m[1]) : 0;
+    }
 
-            if (!$data) {
-                throw new \RuntimeException('Historia no encontrada');
-            }
+    public function lockWalletBalances(int $idUsr, int $instId): array {
+        $stmt = $this->db->prepare('SELECT SaldoDinero FROM dinero WHERE IdUsrA = ? AND IdInstitucion = ? FOR UPDATE');
+        $stmt->execute([$idUsr, $instId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
 
-            $idPagador = (int) $data['IdTitular'];
-            $instId = (int) $data['IdInstitucion'];
-
-            // Un valor canónico por historia (varios tramos): igual que la grilla (MAX), no SUM.
-            $stmtSum = $this->db->prepare(
-                'SELECT COALESCE(MAX(COALESCE(totalpago, 0)), 0) FROM alojamiento WHERE historia = ?'
-            );
-            $stmtSum->execute([$historiaId]);
-            $totalPagado = (float) $stmtSum->fetchColumn();
-
-            if ($accion === 'PAGAR') {
-                $nuevoPagado = $totalPagado + $monto;
-                $stmtS = $this->db->prepare(
-                    'UPDATE dinero SET SaldoDinero = SaldoDinero - ? WHERE IdUsrA = ? AND IdInstitucion = ? AND SaldoDinero >= ?'
-                );
-                $stmtS->execute([$monto, $idPagador, $instId, $monto]);
-                if ($stmtS->rowCount() !== 1) {
-                    throw new \RuntimeException('Saldo insuficiente en la billetera.');
-                }
-                $tipoHist = 'PAGO_ALOJ';
-            } elseif ($accion === 'QUITAR') {
-                if ($monto > $totalPagado + 0.0001) {
-                    throw new \RuntimeException('No se puede quitar más de lo ya pagado en este alojamiento.');
-                }
-                $nuevoPagado = max(0.0, $totalPagado - $monto);
-                $stmtS = $this->db->prepare(
-                    'UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?'
-                );
-                $stmtS->execute([$monto, $idPagador, $instId]);
-                if ($stmtS->rowCount() === 0) {
-                    $this->db->prepare('INSERT INTO dinero (IdUsrA, IdInstitucion, SaldoDinero) VALUES (?, ?, ?)')
-                        ->execute([$idPagador, $instId, $monto]);
-                }
-                $tipoHist = 'DEVOLUCION_ALOJ';
-            } else {
-                throw new \InvalidArgumentException('Acción no válida.');
-            }
-
-            // Todas las filas de la historia quedan con el mismo totalpago (evita SUM inflado en el modal).
-            $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ?')
-                ->execute([$nuevoPagado, $historiaId]);
-
-            Auditoria::log($this->db, $tipoHist, 'alojamiento', "Ajuste $accion de $$monto en Historia #$historiaId (totalpago=$nuevoPagado)");
-
-            // Convención del sistema: en alojamiento IdFormA guarda el nº de historia (no idformA).
-            $this->db->prepare(
-                'INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
-                 VALUES (?, ?, ?, ?, NOW(), ?, ?)'
-            )->execute([$adminId, $monto, $idPagador, $historiaId, $tipoHist, $instId]);
-
-            $this->db->commit();
-            return true;
-        } catch (\Exception $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            throw $e;
+    public function moveWalletForAlojamiento(int $idUsr, int $instId, float $delta): int {
+        $sql = 'UPDATE dinero SET SaldoDinero = SaldoDinero + ? WHERE IdUsrA = ? AND IdInstitucion = ?';
+        $params = [$delta, $idUsr, $instId];
+        if ($delta < 0) {
+            $sql .= ' AND SaldoDinero >= ?';
+            $params[] = -$delta;
         }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount();
+    }
+
+    public function createWalletForAlojamiento(int $idUsr, int $instId, float $saldo): void {
+        $this->db->prepare('INSERT INTO dinero (IdUsrA, IdInstitucion, SaldoDinero) VALUES (?, ?, ?)')
+            ->execute([$idUsr, $instId, $saldo]);
+    }
+
+    /** El acumulado se guarda igual en cada tramo de la historia. */
+    public function updateAlojamientoPagado(int $historia, int $instId, float $pagado): void {
+        $this->db->prepare('UPDATE alojamiento SET totalpago = ? WHERE historia = ? AND IdInstitucion = ?')
+            ->execute([$pagado, $historia, $instId]);
+    }
+
+    public function insertAlojamientoPaymentHistory(int $adminId, float $monto, int $idUsr, int $historia, int $instId, string $tipo): void {
+        // Por convención, IdFormA es la historia cuando el tipo de movimiento es de alojamiento.
+        $this->db->prepare(
+            'INSERT INTO historialpago (IdUsrAAdmin, Monto, IdUsrA, IdFormA, fecha, TipoHistorial, IdInstitucion)
+             VALUES (?, ?, ?, ?, NOW(), ?, ?)'
+        )->execute([$adminId, $monto, $idUsr, $historia, $tipo, $instId]);
     }
 
     // ... [TODO EL RESTO DEL BLOQUE DE GETTERS SIGUE IGUAL] ...
@@ -3805,35 +3741,6 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
     }
 
     /**
-     * Suma por historia para el modal legacy de alojamiento (coherente con la grilla agrupada por historia).
-     */
-    public function getLegacyAlojamientoModalData($historia, $instId) {
-        $check = $this->db->prepare(
-            "SELECT COUNT(*) FROM alojamiento a
-             INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-             WHERE a.historia = ? AND p.IdInstitucion = ?"
-        );
-        $check->execute([(int)$historia, (int)$instId]);
-        if ((int)$check->fetchColumn() === 0) {
-            return null;
-        }
-        $sql = "SELECT COALESCE(SUM(a.totaldiasdefinidos), 0) AS totaldiasdefinidos,
-                       COALESCE(SUM(a.cuentaapagar), 0) AS cuentaapagar,
-                       COALESCE(MAX(COALESCE(a.totalpago, 0)), 0) AS totalpago
-                FROM alojamiento a
-                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-                WHERE a.historia = ? AND p.IdInstitucion = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([(int)$historia, (int)$instId]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        return [
-            'totaldiasdefinidos' => (int)$row['totaldiasdefinidos'],
-            'cuentaapagar' => (float)$row['cuentaapagar'],
-            'totalpago' => (float)$row['totalpago'],
-        ];
-    }
-
-    /**
      * Modal legacy: replica los valores en todos los tramos de la historia (mismo criterio que lectura por SUM).
      */
     public function updateLegacyAlojamientoModal($historia, $instId, $dias, $cuenta, $pago) {
@@ -3862,55 +3769,53 @@ public function procesarAjustePagoAloj($historiaId, $monto, $accion, $adminId) {
             throw new \InvalidArgumentException('billing_fijar_invalido');
         }
 
-        $sql = "SELECT a.IdAlojamiento, COALESCE(a.cuentaapagar, 0) AS cuentaapagar, COALESCE(a.totalpago, 0) AS totalpago
-                FROM alojamiento a
-                INNER JOIN protocoloexpe p ON a.idprotA = p.idprotA
-                WHERE a.historia = ? AND p.IdInstitucion = ?
-                ORDER BY a.IdAlojamiento ASC";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$historia, $instId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if ($rows === []) {
-            throw new \RuntimeException('billing_fijar_aloj_no_encontrado');
-        }
-
-        $maxPago = 0.0;
-        foreach ($rows as $r) {
-            $maxPago = max($maxPago, (float) ($r['totalpago'] ?? 0));
-        }
-        if ($nuevoTotal + 1e-6 < round($maxPago, 2)) {
-            throw new \RuntimeException('billing_fijar_menor_pagado');
-        }
-
-        $weights = [];
-        foreach ($rows as $r) {
-            $w = (float) ($r['cuentaapagar'] ?? 0);
-            $weights[] = $w > 0 ? $w : 0.0;
-        }
-        $sumW = array_sum($weights);
-        $n = count($rows);
-        $alloc = array_fill(0, $n, 0.0);
-        if ($sumW <= 0) {
-            $each = round($nuevoTotal / $n, 2);
-            for ($i = 0; $i < $n - 1; $i++) {
-                $alloc[$i] = $each;
-            }
-            $alloc[$n - 1] = round($nuevoTotal - $each * ($n - 1), 2);
-        } else {
-            $acc = 0.0;
-            for ($i = 0; $i < $n - 1; $i++) {
-                $part = round($nuevoTotal * ($weights[$i] / $sumW), 2);
-                $alloc[$i] = $part;
-                $acc += $part;
-            }
-            $alloc[$n - 1] = round($nuevoTotal - $acc, 2);
-        }
-
         $this->db->beginTransaction();
         try {
-            $upd = $this->db->prepare('UPDATE alojamiento SET cuentaapagar = ? WHERE IdAlojamiento = ?');
+            $sql = "SELECT a.IdAlojamiento, COALESCE(a.cuentaapagar, 0) AS cuentaapagar, COALESCE(a.totalpago, 0) AS totalpago
+                    FROM alojamiento a
+                    WHERE a.historia = ? AND a.IdInstitucion = ?
+                    ORDER BY a.IdAlojamiento ASC FOR UPDATE";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$historia, $instId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if ($rows === []) {
+                throw new \RuntimeException('billing_fijar_aloj_no_encontrado');
+            }
+
+            $maxPago = 0.0;
+            foreach ($rows as $r) {
+                $maxPago = max($maxPago, (float) ($r['totalpago'] ?? 0));
+            }
+            if ($nuevoTotal + 1e-6 < round($maxPago, 2)) {
+                throw new \RuntimeException('billing_fijar_menor_pagado');
+            }
+
+            $weights = [];
+            foreach ($rows as $r) {
+                $w = (float) ($r['cuentaapagar'] ?? 0);
+                $weights[] = $w > 0 ? $w : 0.0;
+            }
+            $sumW = array_sum($weights);
+            $n = count($rows);
+            $alloc = array_fill(0, $n, 0.0);
+            if ($sumW <= 0) {
+                $each = round($nuevoTotal / $n, 2);
+                for ($i = 0; $i < $n - 1; $i++) {
+                    $alloc[$i] = $each;
+                }
+                $alloc[$n - 1] = round($nuevoTotal - $each * ($n - 1), 2);
+            } else {
+                $acc = 0.0;
+                for ($i = 0; $i < $n - 1; $i++) {
+                    $part = round($nuevoTotal * ($weights[$i] / $sumW), 2);
+                    $alloc[$i] = $part;
+                    $acc += $part;
+                }
+                $alloc[$n - 1] = round($nuevoTotal - $acc, 2);
+            }
+            $upd = $this->db->prepare('UPDATE alojamiento SET cuentaapagar = ? WHERE IdAlojamiento = ? AND IdInstitucion = ?');
             foreach ($rows as $i => $r) {
-                $upd->execute([max(0.0, (float) $alloc[$i]), (int) $r['IdAlojamiento']]);
+                $upd->execute([max(0.0, (float) $alloc[$i]), (int) $r['IdAlojamiento'], $instId]);
             }
             Auditoria::log($this->db, 'UPDATE', 'alojamiento', "Fijar total cuenta historia={$historia} inst={$instId} → {$nuevoTotal} (admin {$adminId})");
             $this->db->commit();

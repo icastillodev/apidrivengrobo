@@ -17,6 +17,7 @@ import {
     billingSumFormulariosCobrable,
     billingSumAlojamientos,
     htmlAlojCobroBadge,
+    htmlAlojAbonoBtn,
     billingSumInsumosCobrable,
     billingInsumoMontoTotalCobrable,
     billingDerivacionPlainText,
@@ -426,7 +427,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                         <td>${a.especie}</td>${a.alojamiento_cobro_modo ? `<td>${htmlAlojCobroBadge(a.alojamiento_cobro_modo)}</td>` : ''}<td class="fw-bold">${a.dias ?? ''}</td>
                         <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                         <td class="text-end text-success">$ ${formatBillingMoney(a.pagado)}</td>
-                        <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}</td>
+                        <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}${htmlAlojAbonoBtn(a.historia, a.debe)}</td>
                     </tr>`).join('')}
             </tbody>
         </table>`;

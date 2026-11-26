@@ -118,6 +118,9 @@ async function billingPersistTotalFromField(kind, id, inputId, skipIfUnchanged) 
             return;
         }
         inp.dataset.billingTotalOrig = nuevo.toFixed(2);
+        if (kind === 'ALOJ' && inp.isConnected && document.getElementById('modalAlojamiento')?.classList.contains('show')) {
+            await openAlojModal(id);
+        }
         if (typeof window.recargarGrillaActiva === 'function') {
             await window.recargarGrillaActiva();
         }
@@ -318,84 +321,84 @@ window.toggleEditTotal = async (id) => {
 // ==========================================
 // LÓGICA DE PAGOS: ALOJAMIENTO
 // ==========================================
+let billingAlojPaymentBusy = false;
+
 window.ajustarPagoAloj = async (accion, id) => {
-    const inputMonto = document.getElementById('mdl-aloj-monto-accion');
-    let montoIngresado = parseFloat(inputMonto.value || 0);
-    
-    const totalCosto = parseFloat(document.getElementById('mdl-aloj-total').value);
-    const yaPagado = parseFloat(document.getElementById('mdl-aloj-pagado-val').value);
-    const saldoInvestigador = parseFloat(document.getElementById('mdl-aloj-saldo-val').value);
-    
-    const deudaPendiente = Math.max(0, totalCosto - yaPagado);
-
-    if (montoIngresado <= 0) {
-        return Swal.fire(
-            window.txt?.generales?.swal_atencion || 'Atención',
-            window.txt?.facturacion?.billing_modal?.ph_monto || 'Ingrese un monto mayor a 0.',
-            'warning'
-        );
-    }
-
-    let montoAProcesar = montoIngresado;
-    let notaAjuste = '';
+    const modal = document.getElementById('modalAlojamiento');
+    const inputMonto = modal?.querySelector('#mdl-aloj-monto-accion');
+    if (!inputMonto || inputMonto.disabled || billingAlojPaymentBusy || billingPersistTotalBusy) return;
 
     const tx = txBM();
-    const accionLabel = accion === 'PAGAR' ? (tx.btn_pagar || accion) : (tx.btn_quitar || accion);
-    const mStr = () => `$ ${formatBillingMoney(montoAProcesar)}`;
+    const g = window.txt?.generales || {};
+    const tf = window.txt?.facturacion || {};
+    const pagar = accion === 'PAGAR';
+    const decimales = Number(inputMonto.dataset.decimales);
+    const monto = inputMonto.valueAsNumber;
+    const aCentavos = value => Math.round(Number(value) * 100);
+    const montoSolicitado = aCentavos(monto);
 
-    if (accion === 'PAGAR') {
-        if (montoAProcesar > deudaPendiente) {
-            montoAProcesar = deudaPendiente;
-            notaAjuste = bmTpl(bmTxt(tx, 'aloj_nota_deuda_max_tpl', 'Adjusted to maximum debt: {m}.'), { m: mStr() });
-        }
-        if (montoAProcesar > saldoInvestigador) {
-            montoAProcesar = saldoInvestigador;
-            notaAjuste = bmTpl(bmTxt(tx, 'aloj_nota_saldo_tpl', 'Adjusted to available balance: {m}.'), { m: mStr() });
-        }
-    } else {
-        if (montoAProcesar > yaPagado) {
-            montoAProcesar = yaPagado;
-            notaAjuste = bmTpl(bmTxt(tx, 'aloj_nota_ya_pagado_tpl', 'Adjusted to amount paid: {m}.'), { m: mStr() });
-        }
+    if (!Number.isFinite(monto) || monto <= 0 || !Number.isSafeInteger(montoSolicitado)
+        || monto !== Number(monto.toFixed(decimales))) {
+        return Swal.fire(g.swal_atencion || 'Atención',
+            decimales === 0 ? (tx.aloj_err_importe_entero || 'Ingresá un importe entero mayor a cero.')
+                : (tx.aloj_err_importe || 'Ingresá un importe mayor a cero con los decimales permitidos.'),
+            'warning');
     }
 
-    if (montoAProcesar <= 0) {
-        return Swal.fire(window.txt?.facturacion?.operacion_no_requerida || 'Operación no requerida', window.txt?.facturacion?.operacion_no_requerida_msg || 'El monto resultante es 0 o no hay saldo/deuda para procesar.', 'info');
+    const total = aCentavos(modal.querySelector('#mdl-aloj-total').dataset.billingTotalOrig);
+    const pagado = aCentavos(modal.querySelector('#mdl-aloj-pagado-val').value);
+    const debe = aCentavos(modal.querySelector('#mdl-aloj-debe-val').value);
+    const saldo = aCentavos(modal.querySelector('#mdl-aloj-saldo-val').value);
+    const paso = 10 ** (2 - decimales);
+    const tope = Math.floor(Math.max(0, pagar ? Math.min(debe, saldo) : pagado) / paso) * paso;
+    const centavos = Math.min(montoSolicitado, tope);
+    if (centavos <= 0) {
+        return Swal.fire(tf.operacion_no_requerida || 'Operación no requerida',
+            tf.operacion_no_requerida_msg || 'No hay saldo o deuda para procesar el pago.', 'info');
     }
 
-    const confirm = await Swal.fire({
-        title: bmTpl(bmTxt(tx, 'confirm_title_tpl', 'Confirm {accion}?'), { accion: accionLabel }),
-        text: notaAjuste || bmTpl(bmTxt(tx, 'confirm_procesar_tpl', 'Amount to process: {m}'), { m: mStr() }),
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: tx.btn_procesar || window.txt?.facturacion?.billing_modal?.btn_procesar || window.txt?.generales?.procesar || 'Process',
-        cancelButtonText: window.txt?.facturacion?.btn_cancelar_swal || window.txt?.generales?.cerrar || 'Cancelar'
-    });
+    const importe = `$ ${formatBillingMoney(centavos / 100)}`;
+    const restante = Math.max(0, total - pagado + (pagar ? -centavos : centavos));
+    const etiqueta = pagar ? (tx.aloj_btn_abonar || 'Abonar') : (tx.btn_quitar || 'Quitar');
+    let detalle = bmTpl(bmTxt(tx, 'confirm_procesar_tpl', 'Amount to process: {m}'), { m: importe });
+    if (centavos < montoSolicitado) {
+        const clave = !pagar ? 'aloj_nota_ya_pagado_tpl' : (debe <= saldo ? 'aloj_nota_deuda_max_tpl' : 'aloj_nota_saldo_tpl');
+        detalle = bmTpl(bmTxt(tx, clave, 'Adjusted to {m}.'), { m: importe });
+    }
+    const restanteTexto = bmTpl(tx.aloj_pendiente_despues_tpl || 'Queda pendiente {m}.', { m: `$ ${formatBillingMoney(restante / 100)}` });
 
-    if (confirm.isConfirmed) {
+    billingAlojPaymentBusy = true;
+    try {
+        const confirm = await Swal.fire({
+            title: bmTpl(bmTxt(tx, 'confirm_title_tpl', 'Confirm {accion}?'), { accion: etiqueta }),
+            text: `${detalle} ${restanteTexto}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: tx.btn_procesar || g.procesar || 'Procesar',
+            cancelButtonText: tf.btn_cancelar_swal || g.cerrar || 'Cancelar'
+        });
+        if (!confirm.isConfirmed || !modal.isConnected) return;
+
         showLoader();
+        let res;
         try {
-            const res = await API.request('/billing/ajustar-pago-aloj', 'POST', { 
-                id, 
-                monto: montoAProcesar, 
-                accion 
-            });
-
-            if (res.status === 'success') {
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalAlojamiento'));
-                if (modalInstance) modalInstance.hide();
-                await sleepBillingModal(300);
-                await openAlojModal(id);
-                await window.recargarGrillaActiva();
-            } else {
-                Swal.fire(window.txt?.generales?.error || 'Error', res.message || txPayFail(), 'error');
-            }
-        } catch (e) { 
-            console.error(e); 
-            Swal.fire(window.txt?.generales?.error || 'Error', txPayFail(), 'error');
+            res = await API.request('/billing/ajustar-pago-aloj', 'POST', { id, monto: centavos / 100, accion });
+        } catch (e) {
+            console.error(e);
         } finally {
             hideLoader();
         }
+        if (res?.status !== 'success') {
+            await Swal.fire(g.error || 'Error', res?.message || txPayFail(), 'error');
+            return;
+        }
+
+        bootstrap.Modal.getInstance(modal)?.hide();
+        await sleepBillingModal(300);
+        await openAlojModal(id);
+        await window.recargarGrillaActiva();
+    } finally {
+        billingAlojPaymentBusy = false;
     }
 };
 

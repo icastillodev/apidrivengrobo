@@ -6,7 +6,7 @@ import { hideLoader, showLoader } from '../../../../components/LoaderComponent.j
 import { refreshMenuNotifications } from '../../../../components/MenuComponent.js';
 import { setBillingResultsLoadingInline } from '../billingResultsLoading.js';
 import { renderDashboard } from '../billingDashboard.js';
-import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge, billingPdfFormularioTaxonomia, billingPdfFormularioCantidad, billingEspCepaDisplayHtml } from '../billingLocale.js';
+import { formatBillingMoney, pdfColsPrecioDebePagoTotal, billingTipoExento, billingTdTotalPagadoDebe, billingSumFormulariosCobrable, billingSumInsumosCobrable, billingInsumoMontoTotalCobrable, billingSumAlojamientos, getBillingNombreInstitucion, billingDerivacionPlainText, billingDerivacionSelectorLabel, billingDerivadaLiquidacionBadge, billingDerivacionSalienteHint, billingPdfFormularioIdDisplay, billingPdfMarcaExentoLarga, billingAlojPeriodoParaInforme, billingPedidoSinMontoNoExento, billingHtmlRowInsumoPedidoFacturacion, billingHtmlInsumoProtSectionHeader, billingPartitionInsumosPedidoReactivoOtros, billingFormatPedidoFechasPlain, htmlAlojCobroBadge, htmlAlojAbonoBtn, billingPdfFormularioTaxonomia, billingPdfFormularioCantidad, billingEspCepaDisplayHtml } from '../billingLocale.js';
 import '../billingPayments.js'; 
 import '../modals/manager.js';
 import {
@@ -496,7 +496,7 @@ function getAlojTableHTML(alojamientos, idProt) {
                             <td class="fw-bold">${a.dias}</td>
                             <td class="text-end">$ ${formatBillingMoney(a.total)}</td>
                             <td class="text-end text-success fw-bold">$ ${formatBillingMoney(a.pagado || 0)}</td>
-                            <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}</td>
+                            <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(a.debe)}${htmlAlojAbonoBtn(a.historia, a.debe)}</td>
                         </tr>`).join('')}
                 </tbody>
             </table>

@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Models\Billing\BillingModel;
 use App\Models\Billing\BillingAuditReader;
+use App\Services\Billing\AlojamientoPaymentService;
 use App\Utils\Auditoria;
 use App\Utils\BackblazeB2;
 use App\Utils\ComunicacionArchivoValidacion;
@@ -14,6 +15,7 @@ class BillingController {
 
     /** Rol Contador: solo lectura en facturación. */
     private const ROLE_CONTADOR = 7;
+    private const ROLES_STAFF_FACTURACION = [1, 2, 4, 5, 6, self::ROLE_CONTADOR];
 
     public function __construct($db) {
         $this->db = $db;
@@ -25,6 +27,13 @@ class BillingController {
         if ($role === self::ROLE_CONTADOR) {
             http_response_code(403);
             $this->sendError('Su rol (Contador) es solo lectura: no puede modificar saldos ni pagos.');
+        }
+    }
+
+    private function assertAlojamientoBillingStaff(array $sesion): void {
+        if (!in_array((int) ($sesion['role'] ?? 0), self::ROLES_STAFF_FACTURACION, true)) {
+            http_response_code(403);
+            $this->sendError('Sin permisos para facturación de alojamientos.');
         }
     }
 
@@ -890,6 +899,9 @@ class BillingController {
         try {
             $sesion = Auditoria::getDatosSesion();
             $this->assertBillingWritable($sesion);
+            if (is_array($f['items'] ?? null) && in_array('ALOJ', array_column($f['items'], 'tipo'), true)) {
+                $this->assertAlojamientoBillingStaff($sesion);
+            }
             $rawComment = $f['comentario'] ?? ($f['comment'] ?? '');
             $comment = is_string($rawComment) ? trim($rawComment) : '';
             if ($comment === '') {
@@ -961,16 +973,17 @@ class BillingController {
     }
 
     public function ajustarPagoAloj() {
-        $input = $this->getRequestData();
-        if (!isset($input['id'], $input['monto'], $input['accion'])) $this->jsonResponse('error', 'Datos insuficientes');
-
+        if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertAlojamientoBillingStaff($sesion);
             $this->assertBillingWritable($sesion);
-            $res = $this->model->procesarAjustePagoAloj($input['id'], $input['monto'], $input['accion'], $sesion['userId']);
-            if ($res) $this->jsonResponse('success', 'Transacción de alojamiento completada');
-            else $this->jsonResponse('error', 'No se pudo procesar');
-        } catch (\Exception $e) { $this->jsonResponse('error', $e->getMessage()); }
+            $service = new AlojamientoPaymentService($this->db, $this->model);
+            $result = $service->ajustar((array) $this->getRequestData(), (int) $sesion['instId'], (int) $sesion['userId']);
+            return $this->jsonResponse('success', $result);
+        } catch (\Exception $e) {
+            return $this->jsonResponse('error', $e->getMessage());
+        }
     }
 
     public function listActiveProtocols() {
@@ -1097,16 +1110,14 @@ class BillingController {
     }
 
     public function getAlojamientoDetail($id) {
+        if (ob_get_length()) ob_clean();
         try {
             $sesion = Auditoria::getDatosSesion();
-            $historia = (int)$id;
-            if ($historia <= 0) {
-                return $this->jsonResponse('error', 'ID de historia inválido');
-            }
-            $data = $this->model->getLegacyAlojamientoModalData($historia, (int)$sesion['instId']);
-            if ($data === null) {
-                return $this->jsonResponse('error', 'No se encontró alojamiento para esa historia en esta institución.');
-            }
+            $this->assertAlojamientoBillingStaff($sesion);
+            $service = new AlojamientoPaymentService($this->db, $this->model);
+            $data = $service->getDetalle((int) $id, (int) $sesion['instId']);
+            $data['solo_lectura'] = (int) $sesion['role'] === self::ROLE_CONTADOR;
+            header('Cache-Control: private, no-store');
             return $this->jsonResponse('success', $data);
         } catch (\Exception $e) {
             return $this->jsonResponse('error', $e->getMessage());
@@ -1147,6 +1158,8 @@ class BillingController {
         }
         try {
             $sesion = Auditoria::getDatosSesion();
+            $this->assertAlojamientoBillingStaff($sesion);
+            $this->assertBillingWritable($sesion);
             $this->model->updateAlojamientoCuentaTotalPorHistoria(
                 (int) $f['historia'],
                 (float) $f['total'],

@@ -929,6 +929,8 @@ Las columnas `totalpago` en las tablas de precio funcionan como acumuladores.
 - *Pago 2:* El usuario paga $500. Se crea otro `historialpago`. Se actualiza `totalpago` a $1000.
 - *Cierre:* Como `totalpago` == `precioformulario`, la deuda está saldada.
 
+En **Facturación → Alojamientos → Abonar** se puede ingresar parte de lo pendiente y completar la deuda con abonos sucesivos. El detalle usa el mismo total que Facturación. Cada abono debita la billetera del titular del protocolo en la institución del alojamiento y deja un movimiento en `historialpago`. Los tramos comparten el acumulado `totalpago` de la historia, por lo que se lee el máximo, no la suma. **Pagar selección** sigue liquidando el pendiente completo de los ítems marcados.
+
 ### 4. Auditoría de Doble Punta (`historialpago`)
 
 Esta entidad resuelve el problema de "¿Quién aceptó este pago?".

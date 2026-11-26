@@ -115,6 +115,58 @@ class AlojamientoCobro {
         return max(0, (int) ($row['CantidadCaja'] ?? 0));
     }
 
+    /** El total guardado prevalece, como en Facturación. totalpago es un acumulado por historia, no por tramo. */
+    public static function resumenFacturable(PDO $db, int $instId, array $rows, string $hoy, bool $conTramos = false): array {
+        $guardado = (float) array_sum(array_column($rows, 'cuentaapagar'));
+        $calculado = 0.0;
+        $pagado = 0.0;
+        $diasTotales = 0;
+        $periodos = [];
+        $tramos = [];
+        foreach ($rows as $i => $row) {
+            $pagado = max($pagado, (float) ($row['totalpago'] ?? 0));
+            $cantidad = self::cantidadCobroTramo($db, $instId, $row);
+            $desde = (string) ($row['fechavisado'] ?? '');
+            $next = $rows[$i + 1] ?? null;
+            $vigente = $next === null && ((int) ($row['finalizado'] ?? 0) !== 1 || empty($row['hastafecha']));
+            $hasta = $next !== null ? (string) ($next['fechavisado'] ?? '')
+                : ($vigente ? $hoy : (string) $row['hastafecha']);
+            $inicio = $desde !== '' ? strtotime($desde) : false;
+            $fin = $hasta !== '' ? strtotime($hasta) : false;
+            $dias = 0;
+            if ($cantidad > 0 && $inicio !== false && $fin !== false) {
+                $dias = max(0, (int) floor(($fin - $inicio) / 86400));
+                $periodos[] = ['desde' => $desde, 'hasta' => $hasta, 'dias' => $dias];
+            }
+            $costo = $dias * self::precioUnitarioTramo($row) * $cantidad;
+            $calculado += $costo;
+            $diasTotales += $dias;
+            if ($conTramos) {
+                $tramos[] = [
+                    'id' => (int) $row['IdAlojamiento'],
+                    'desde' => $desde,
+                    'hasta' => $hasta,
+                    'vigente' => $vigente,
+                    'cantidad' => $cantidad,
+                    'dias' => $dias,
+                    'subtotal' => $guardado > 0 ? (float) ($row['cuentaapagar'] ?? 0) : $costo,
+                ];
+            }
+        }
+
+        $total = round($guardado > 0 ? $guardado : $calculado, 2);
+        $pagado = round($pagado, 2);
+        return [
+            'total' => $total,
+            'cuentaapagar' => $guardado,
+            'pagado' => $pagado,
+            'debe' => max(0.0, round($total - $pagado, 2)),
+            'dias' => $diasTotales,
+            'periodos_facturables' => $periodos,
+            'tramos' => $tramos,
+        ];
+    }
+
     public static function precioDesdeTipo(PDO $db, int $idTipoAlojamiento): float {
         if ($idTipoAlojamiento <= 0) {
             return 0.0;

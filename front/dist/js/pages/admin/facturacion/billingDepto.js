@@ -24,6 +24,7 @@ import {
     billingPdfMarcaExentoLarga,
     billingAlojPeriodoParaInforme,
     htmlAlojCobroBadge,
+    htmlAlojAbonoBtn,
     billingPedidoSinMontoNoExento,
     billingHtmlRowInsumoPedidoFacturacion,
     billingHtmlInsumoProtSectionHeader,
@@ -685,7 +686,7 @@ function getAlojTableHTML(alojamientos, idProt) {
             <td class="fw-bold">${a.dias}</td>
             <td class="text-end">$ ${formatBillingMoney(total)}</td>
             <td class="text-end text-success">$ ${formatBillingMoney(pagado)}</td>
-            <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(debe)}</td>
+            <td class="text-end text-danger fw-bold">$ ${formatBillingMoney(debe)}${htmlAlojAbonoBtn(a.historia, debe)}</td>
         </tr>`;
     }).join('');
 

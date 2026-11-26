@@ -5,7 +5,6 @@
 import { API } from '../../../../../api.js';
 import { hideLoader, showLoader } from '../../../../../components/LoaderComponent.js';
 import { formatBillingMoney, getBillingDateLocale, htmlAlojCobroBadge } from '../../billingLocale.js';
-import { isStandByTramo } from '../../../alojamientos/tramoHelpers.js';
 
 function bmTpl(str, map) {
     if (!str) return '';
@@ -22,64 +21,34 @@ export const openAlojModal = async (historiaId) => {
             hideLoader();
             return Swal.fire(g.error || 'Error', t.err_aloj_no_estadia || 'No se encontró la estadía.', 'error');
         }
-        const dateLoc = getBillingDateLocale();
-
-        const resAloj = await API.request(`/alojamiento/history?historia=${hid}`);
-        const historyRows = Array.isArray(resAloj.data) ? resAloj.data : [];
-
-        if (resAloj.status !== 'success' || historyRows.length === 0) {
+        const res = await API.request(`/billing/detail-alojamiento/${hid}`, 'GET', null, { cache: 'no-store' });
+        if (res.status !== 'success' || !res.data) {
             hideLoader();
-            const apiMsg = typeof resAloj.message === 'string' && resAloj.message.trim() !== ''
-                ? resAloj.message.trim()
-                : '';
-            const body = apiMsg || (t.err_aloj_no_estadia || 'No se encontró la estadía.');
-            return Swal.fire(g.error || 'Error', body, 'error');
+            return Swal.fire(g.error || 'Error', res.message || t.err_aloj_no_estadia || 'No se encontró la estadía.', 'error');
         }
-
-        const history = historyRows;
-        const cobro = resAloj.cobro || {};
-        const trazHabilitada = !!cobro.trazabilidad_habilitada;
-        const first = history[0];
-        const modoEstadia = (cobro.alojamiento_cobro_modo || first.alojamiento_cobro_modo) === 'SUJETO'
-            ? 'SUJETO'
-            : 'CONTENIDO';
-
-        // Titular del protocolo (quien paga). No usar idprotA como fallback: es ID de protocolo, no de usuario.
-        const idPagador = parseInt(String(first.IdTitularProtocolo ?? first.IdUsrTitular ?? '0'), 10) || 0;
-        const titularNombre = first.TitularNombre || bmTpl(t.aloj_titular_fallback_tpl || 'Titular (ID: {id})', { id: idPagador });
-        const respEstadia = first.Investigador || t.aloj_sin_asignar || 'Sin asignar';
-
-        const resSaldo = idPagador > 0
-            ? await API.request(`/billing/get-investigator-balance/${idPagador}`)
-            : { status: 'success', data: { SaldoDinero: 0 } };
         hideLoader();
 
-        const saldoReal = (resSaldo.status === 'success' && resSaldo.data)
-            ? parseFloat(resSaldo.data.SaldoDinero || 0)
-            : 0;
-
+        const detalle = res.data;
+        const first = detalle.estadia || {};
+        const trazHabilitada = !!detalle.trazabilidad_habilitada;
+        const modoEstadia = detalle.alojamiento_cobro_modo;
+        const titularNombre = first.TitularNombre || bmTpl(t.aloj_titular_fallback_tpl || 'Titular (ID: {id})', { id: detalle.id_pagador });
+        const respEstadia = first.Investigador || t.aloj_sin_asignar || 'Sin asignar';
         const tipoAlojamiento = first.NombreTipoAlojamiento || t.aloj_estructura_default || 'Estructura Estándar';
-        const precioActual = parseFloat(first.PrecioCajaMomento || 0);
-
-        const { tramos, diasTotales, costoHistoricoTotal } = procesarTramosFinancieros(
-            history,
-            dateLoc,
-            t.aloj_estado_vigente || 'VIGENTE',
-            trazHabilitada
-        );
-
-        let totalPagadoHistorico = 0;
-        history.forEach(h => {
-            // Misma semántica que la grilla de facturación: un totalpago por historia (MAX), no suma de tramos.
-            totalPagadoHistorico = Math.max(totalPagadoHistorico, parseFloat(h.totalpago || 0) || 0);
-        });
+        const precioActual = Number(first.PrecioCajaMomento) || 0;
+        const dateLoc = getBillingDateLocale();
+        const tramos = detalle.tramos.map(tr => ({
+            ...tr,
+            desde: formatFechaTramo(tr.desde, dateLoc),
+            hasta: tr.vigente ? (t.aloj_estado_vigente || 'VIGENTE') : formatFechaTramo(tr.hasta, dateLoc),
+        }));
 
         const html = `
         <div class="modal fade" id="modalAlojamiento" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                     
-                    ${renderHeader(hid, saldoReal, titularNombre, t, g)}
+                    ${renderHeader(hid, detalle.saldo, titularNombre, t, g)}
 
                     <div class="modal-body p-4 bg-light">
                         <div class="row">
@@ -88,17 +57,17 @@ export const openAlojModal = async (historiaId) => {
                                 <div class="row mb-4 bg-white p-2 rounded shadow-sm border">
                                     <div class="col-6 border-end">
                                         <label class="small text-muted d-block uppercase fw-bold" style="font-size: 10px;">${t.aloj_lbl_titular_paga_c || 'Titular (Paga):'}</label>
-                                        <strong class="text-primary fs-6">${titularNombre}</strong>
+                                        <strong class="text-primary fs-6">${escapeAloj(titularNombre)}</strong>
                                     </div>
                                     <div class="col-6">
                                         <label class="small text-muted d-block uppercase fw-bold" style="font-size: 10px;">${t.aloj_lbl_resp_estadia_c || 'Resp. Estadía:'}</label>
-                                        <span class="fs-6 fw-semibold text-secondary">${respEstadia}</span>
+                                        <span class="fs-6 fw-semibold text-secondary">${escapeAloj(respEstadia)}</span>
                                     </div>
                                 </div>
                                 ${renderResumenTecnico(first, tipoAlojamiento, precioActual, tramos, t, { trazabilidad_habilitada: trazHabilitada, alojamiento_cobro_modo: modoEstadia })}
                             </div>
                             <div class="col-lg-5 ps-lg-4">
-                                ${renderGestionCobros(hid, diasTotales, costoHistoricoTotal, totalPagadoHistorico, t)}
+                                ${renderGestionCobros(hid, detalle, t)}
                             </div>
                         </div>
                     </div>
@@ -136,7 +105,7 @@ function renderHeader(id, saldo, titularNombre, t, g) {
         <div class="d-flex align-items-center w-100 justify-content-between pe-4">
             <h5 class="modal-title fw-bold"><i class="bi bi-house-door me-2 text-info"></i>${titulo}</h5>
             <div class="text-end">
-                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">${dineroLbl}</small>
+                <small class="text-white-50 d-block fw-bold uppercase" style="font-size: 10px;">${escapeAloj(dineroLbl)}</small>
                 <span class="badge bg-success fs-5" id="mdl-aloj-saldo-txt">$ ${formatBillingMoney(saldo)}</span>
                 <input type="hidden" id="mdl-aloj-saldo-val" value="${saldo}">
             </div>
@@ -158,11 +127,11 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t, cobro =
         ${cobroBadge}
         <div class="col-md-6">
             <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">${t.aloj_lbl_inv_resp_estadia || 'Investigador Resp. Estadía'}</label>
-            <div id="pdf-aloj-inv" class="form-control-plaintext border-bottom fw-bold text-dark">${first.Investigador || (t.na || 'N/A')}</div>
+            <div id="pdf-aloj-inv" class="form-control-plaintext border-bottom fw-bold text-dark">${escapeAloj(first.Investigador || t.na || 'N/A')}</div>
         </div>
         <div class="col-md-3 text-center">
             <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">${t.aloj_lbl_tipo_alojamiento || 'Tipo Alojamiento'}</label>
-            <div id="pdf-aloj-tipo" class="form-control-plaintext border-bottom fw-bold text-secondary text-truncate">${tipoAlojamiento}</div>
+            <div id="pdf-aloj-tipo" class="form-control-plaintext border-bottom fw-bold text-secondary text-truncate">${escapeAloj(tipoAlojamiento)}</div>
         </div>
         <div class="col-md-3 text-center">
             <label class="small fw-bold text-muted text-primary uppercase" style="font-size: 10px;">${t.aloj_lbl_precio_momento || 'Precio Momento'}</label>
@@ -170,7 +139,7 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t, cobro =
         </div>
         <div class="col-12 mt-1">
             <label class="small fw-bold text-muted uppercase" style="font-size: 10px;">${t.aloj_lbl_protocolo || 'Protocolo'}</label>
-            <div id="pdf-aloj-prot" class="form-control-plaintext border-bottom small">${first.nprotA != null ? String(first.nprotA) : '—'}</div>
+            <div id="pdf-aloj-prot" class="form-control-plaintext border-bottom small">${escapeAloj(first.nprotA ?? '—')}</div>
         </div>
     </div>
     <div class="table-responsive bg-white rounded border shadow-sm">
@@ -183,8 +152,8 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t, cobro =
                     <tr>
                         <td class="ps-2 text-start text-muted">#${tr.id}</td>
                         <td>${tr.desde}</td>
-                        <td class="${tr.esVigente ? 'text-success fw-bold' : ''}">${tr.hasta}</td>
-                        <td class="fw-bold">${tr.cajas}</td>
+                        <td class="${tr.vigente ? 'text-success fw-bold' : ''}">${tr.hasta}</td>
+                        <td class="fw-bold">${tr.cantidad}</td>
                         <td class="fw-bold text-info">${tr.dias}</td>
                         <td class="text-end pe-2 fw-bold text-dark">$ ${formatBillingMoney(tr.subtotal)}</td>
                     </tr>
@@ -194,10 +163,17 @@ function renderResumenTecnico(first, tipoAlojamiento, precio, tramos, t, cobro =
     </div>`;
 }
 
-function renderGestionCobros(historiaId, dias, total, pagado, t) {
-    const hintAuto = String(t.hint_total_auto_save || '').replace(/"/g, '&quot;');
-    const hintBtn = String(t.hint_guardar_total_btn || '').replace(/"/g, '&quot;');
-    const totalInputAttrs = `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('ALOJ',${historiaId},'mdl-aloj-total')" title="${hintAuto}"`;
+function renderGestionCobros(historiaId, detalle, t) {
+    const { dias, total, totalpago: pagado, debe, id_pagador: idPagador, solo_lectura: soloLectura } = detalle;
+    const decimales = Number(detalle.decimales) || 0;
+    const paso = 10 ** -decimales;
+    const hintAuto = escapeAloj(t.hint_total_auto_save || '');
+    const hintBtn = escapeAloj(t.hint_guardar_total_btn || '');
+    const totalInputAttrs = soloLectura ? 'readonly' : `data-billing-total-orig="${total.toFixed(2)}" step="0.01" min="0" inputmode="decimal" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" onblur="window.billingPersistTotalBlur('ALOJ',${historiaId},'mdl-aloj-total')" title="${hintAuto}"`;
+    const puedePagar = debe >= paso && idPagador > 0;
+    const puedeDevolver = pagado >= paso && idPagador > 0;
+    const tf = window.txt?.facturacion || {};
+    const nombreImporte = t.aloj_lbl_importe_abono || 'Importe a abonar';
     return `
     <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 uppercase" style="font-size: 11px;">${t.aloj_sec_control_cobros || 'Control de Cobros'}</h6>
     <div class="p-3 bg-white border rounded mb-3 text-center shadow-sm">
@@ -205,87 +181,43 @@ function renderGestionCobros(historiaId, dias, total, pagado, t) {
         <span id="pdf-aloj-dias" class="display-6 fw-bold text-info">${dias}</span>
     </div>
     <div class="p-3 bg-white border rounded mb-3 shadow-sm">
-        <label class="form-label fw-bold text-primary small uppercase">${t.aloj_lbl_costo_total_pagar || 'Costo Total a Pagar'}</label>
+        <label for="mdl-aloj-total" class="form-label fw-bold text-primary small uppercase">${t.aloj_lbl_costo_total_pagar || 'Costo Total a Pagar'}</label>
         <div class="input-group input-group-lg">
             <span class="input-group-text">$</span>
             <input type="number" id="mdl-aloj-total" class="form-control fw-bold text-primary fs-4" value="${total.toFixed(2)}" ${totalInputAttrs}>
-            <button class="btn btn-primary" type="button" onclick="window.toggleEditTotalAloj(${historiaId})" title="${hintBtn}"><i class="bi bi-pencil-fill"></i></button>
+            ${soloLectura ? '' : `<button class="btn btn-primary" type="button" onclick="window.toggleEditTotalAloj(${historiaId})" title="${hintBtn}" aria-label="${hintBtn}"><i class="bi bi-pencil-fill"></i></button>`}
         </div>
     </div>
     <div class="p-3 border rounded bg-white shadow-sm">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center">
             <span class="fw-bold text-muted small uppercase">${t.aloj_lbl_total_pagado_uc || 'TOTAL PAGADO:'}</span>
-            <span class="fs-3 fw-bold text-success" id="mdl-aloj-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
+            <span class="fs-5 fw-bold text-success" id="mdl-aloj-pagado-txt">$ ${formatBillingMoney(pagado)}</span>
             <input type="hidden" id="mdl-aloj-pagado-val" value="${pagado}">
             <input type="hidden" id="mdl-aloj-exento" value="0">
         </div>
-        <div class="input-group">
-            <input type="number" id="mdl-aloj-monto-accion" class="form-control form-control-lg" placeholder="${t.ph_monto || 'Monto...'}">
-            <button class="btn btn-success fw-bold px-4" onclick="window.ajustarPagoAloj('PAGAR', ${historiaId})">${t.btn_pagar || 'PAGAR'}</button>
-            <button class="btn btn-danger fw-bold px-4" onclick="window.ajustarPagoAloj('QUITAR', ${historiaId})">${t.btn_quitar || 'QUITAR'}</button>
+        <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-2 mb-3">
+            <span class="fw-bold small">${t.aloj_lbl_pendiente || 'Pendiente de pago'}</span>
+            ${debe > 0 && pagado > 0 ? `<span class="badge bg-warning text-dark">${t.badge_pago_parcial || 'PAGO PARCIAL'}</span>` : ''}
+            <span class="fs-5 fw-bold ${debe > 0 ? 'text-danger' : 'text-success'}">$ ${formatBillingMoney(debe)}</span>
+            <input type="hidden" id="mdl-aloj-debe-val" value="${debe}">
         </div>
+        ${soloLectura ? `<div class="small text-muted">${tf.billing_readonly_contador || 'El rol Contador es solo lectura.'}</div>` : `
+        <label for="mdl-aloj-monto-accion" class="form-label fw-semibold small">${nombreImporte}</label>
+        <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" id="mdl-aloj-monto-accion" class="form-control" step="${paso}" min="${paso}" inputmode="${decimales ? 'decimal' : 'numeric'}" data-decimales="${decimales}" ${puedePagar || puedeDevolver ? '' : 'disabled'}>
+            <button type="button" class="btn btn-success fw-bold" ${puedePagar ? '' : 'disabled'} onclick="window.ajustarPagoAloj('PAGAR', ${historiaId})">${t.aloj_btn_abonar || 'Abonar'}</button>
+            <button type="button" class="btn btn-outline-danger fw-bold" ${puedeDevolver ? '' : 'disabled'} onclick="window.ajustarPagoAloj('QUITAR', ${historiaId})">${t.btn_quitar || 'QUITAR'}</button>
+        </div>
+        ${puedePagar ? `<p class="small text-muted mt-2 mb-0">${t.aloj_ayuda_abonos || 'Podés abonar una parte y pagar el resto más adelante.'}</p>` : ''}`}
     </div>`;
 }
 
-/** Parsea `YYYY-MM-DD` o ISO; devuelve null si no es válida. */
-function parseFechaAlojTramo(s) {
-    if (s == null || String(s).trim() === '') return null;
-    const str = String(s).trim();
-    const d = new Date(str.includes('T') ? str : `${str}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return null;
-    d.setHours(12, 0, 0, 0);
-    return d;
+function formatFechaTramo(value, locale) {
+    const date = new Date(`${value}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString(locale);
 }
 
-function procesarTramosFinancieros(history, locale, vigenteLabel, trazHabilitada = false) {
-    const hoy = new Date();
-    hoy.setHours(12, 0, 0, 0);
-    let diasTotales = 0;
-    let costoHistoricoTotal = 0;
-
-    const tramos = (history || []).map(h => {
-        const fIni = parseFechaAlojTramo(h.fechavisado);
-        if (!fIni) {
-            return {
-                id: h.IdAlojamiento ?? '—',
-                desde: '—',
-                hasta: '—',
-                cajas: (trazHabilitada && h.alojamiento_cobro_modo === 'SUJETO')
-                    ? (parseInt(String(h.CantSujetos || 0), 10) || 0)
-                    : (parseInt(String(h.CantidadCaja || 0), 10) || 0),
-                dias: 0,
-                subtotal: Math.max(0, parseFloat(String(h.cuentaapagar || 0)) || 0),
-                esVigente: !h.hastafecha
-            };
-        }
-        const fFinRaw = parseFechaAlojTramo(h.hastafecha);
-        const fFin = !h.hastafecha || !fFinRaw ? hoy : fFinRaw;
-
-        const dias = Math.max(0, Math.floor((fFin - fIni) / (1000 * 60 * 60 * 24)));
-
-        const cant = (trazHabilitada && h.alojamiento_cobro_modo === 'SUJETO')
-            ? (parseInt(String(h.CantSujetos || 0), 10) || 0)
-            : (parseInt(String(h.CantidadCaja || 0), 10) || 0);
-        const precio = parseFloat(String(h.PrecioCajaMomento || 0)) || 0;
-
-        const subtotal = parseFloat(String(h.cuentaapagar || 0)) > 0
-            ? parseFloat(String(h.cuentaapagar))
-            : (dias * precio * cant);
-
-        if (!isStandByTramo(h)) {
-            diasTotales += dias;
-            costoHistoricoTotal += subtotal;
-        }
-
-        return {
-            id: h.IdAlojamiento,
-            desde: fIni.toLocaleDateString(locale),
-            hasta: !h.hastafecha ? vigenteLabel : fFin.toLocaleDateString(locale),
-            cajas: cant,
-            dias: dias,
-            subtotal: subtotal,
-            esVigente: !h.hastafecha
-        };
-    });
-    return { tramos, diasTotales, costoHistoricoTotal };
+function escapeAloj(value) {
+    return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
